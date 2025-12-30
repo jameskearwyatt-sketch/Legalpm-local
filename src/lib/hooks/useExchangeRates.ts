@@ -33,6 +33,7 @@ export function useExchangeRates() {
             'CAD': 1.36,
             'SGD': 1.34,
             'Ringgit': 4.47,
+            'SEK': 10.95,
           }
         };
       }

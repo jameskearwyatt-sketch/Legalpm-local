@@ -42,6 +42,12 @@ export default function Settings() {
                   <SelectItem value="GBP">GBP (£)</SelectItem>
                   <SelectItem value="USD">USD ($)</SelectItem>
                   <SelectItem value="EUR">EUR (€)</SelectItem>
+                  <SelectItem value="CHF">CHF</SelectItem>
+                  <SelectItem value="AUD">AUD (A$)</SelectItem>
+                  <SelectItem value="CAD">CAD (C$)</SelectItem>
+                  <SelectItem value="SGD">SGD (S$)</SelectItem>
+                  <SelectItem value="SEK">SEK (kr)</SelectItem>
+                  <SelectItem value="Ringgit">Ringgit (RM)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-sm text-muted-foreground">

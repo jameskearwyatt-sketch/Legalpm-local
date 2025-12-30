@@ -26,6 +26,7 @@ export function EditableFinancialCell({ value, currency, onSave, className }: Ed
       AUD: 'A$',
       CAD: 'C$',
       SGD: 'S$',
+      SEK: 'kr ',
     };
     const symbol = symbols[currency] || currency + ' ';
     return symbol + new Intl.NumberFormat('en-GB', {

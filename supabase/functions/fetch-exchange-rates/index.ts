@@ -10,7 +10,7 @@ const corsHeaders = {
 const EXCHANGE_RATE_API = 'https://api.exchangerate-api.com/v4/latest/USD';
 
 // Currencies used in the app
-const APP_CURRENCIES = ['GBP', 'USD', 'EUR', 'MYR', 'CHF', 'AUD', 'CAD', 'SGD'];
+const APP_CURRENCIES = ['GBP', 'USD', 'EUR', 'MYR', 'CHF', 'AUD', 'CAD', 'SGD', 'SEK'];
 
 interface ExchangeRateResponse {
   base: string;
@@ -79,6 +79,7 @@ const handler = async (req: Request): Promise<Response> => {
           'CAD': 1.36,
           'SGD': 1.34,
           'Ringgit': 4.47,
+          'SEK': 10.95,
         }
       }),
       {

@@ -8,7 +8,8 @@ export const CURRENCY_SYMBOLS: Record<string, string> = {
   'CHF': 'CHF ',
   'AUD': 'A$',
   'CAD': 'C$',
-  'SGD': 'S$'
+  'SGD': 'S$',
+  'SEK': 'kr '
 };
 
 export function getCurrencySymbol(currency: string): string {

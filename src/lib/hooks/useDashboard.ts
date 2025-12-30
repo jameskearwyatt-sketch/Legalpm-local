@@ -78,24 +78,27 @@ export function useDashboard() {
         }
       });
 
-      let totalBudget = 0;
-      let totalWip = 0;
-      let totalBilled = 0;
-      let totalPaid = 0;
+      let totalBmFeesUsd = 0;
+      let totalWipUsd = 0;
+      let totalBilledUsd = 0;
+      let totalPaidUsd = 0;
       const alerts: Alert[] = [];
 
       matters?.forEach(matter => {
         const snapshot = snapshotMap.get(matter.id);
-        // Use fee_amount_upper_end as the budget (this is the agreed budget)
+        // Use bm_fee_component as the BM fee and convert to USD using exchange_rate
+        const bmFee = Number(matter.bm_fee_component) || 0;
+        const exchangeRate = Number(matter.exchange_rate) || 1;
         const budget = Number(matter.fee_amount_upper_end) || 0;
         const wipAmount = Number(snapshot?.wip_amount) || 0;
         const billedAmount = Number(snapshot?.billed_amount) || 0;
         const paidAmount = Number(snapshot?.paid_amount) || 0;
 
-        totalBudget += budget;
-        totalWip += wipAmount;
-        totalBilled += billedAmount;
-        totalPaid += paidAmount;
+        // Convert to USD using exchange rate
+        totalBmFeesUsd += bmFee * exchangeRate;
+        totalWipUsd += wipAmount * exchangeRate;
+        totalBilledUsd += billedAmount * exchangeRate;
+        totalPaidUsd += paidAmount * exchangeRate;
 
         const totalUsed = billedAmount + wipAmount;
         const budgetUsedPercent = budget > 0 ? (totalUsed / budget) * 100 : 0;
@@ -178,13 +181,13 @@ export function useDashboard() {
         }
       });
 
-      const avgCollectionRate = totalBilled > 0 ? (totalPaid / totalBilled) * 100 : 100;
+      const avgCollectionRate = totalBilledUsd > 0 ? (totalPaidUsd / totalBilledUsd) * 100 : 100;
 
       return {
-        totalBudget,
-        totalWip,
-        totalBilled,
-        totalPaid,
+        totalBudget: totalBmFeesUsd,
+        totalWip: totalWipUsd,
+        totalBilled: totalBilledUsd,
+        totalPaid: totalPaidUsd,
         avgCollectionRate,
         openMattersCount: matters?.length || 0,
         alerts: alerts.sort((a, b) => {

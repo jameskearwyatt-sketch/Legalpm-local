@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useDashboard } from '@/lib/hooks/useDashboard';
 import { 
-  PoundSterling, 
+  DollarSign, 
   FileText, 
   TrendingUp, 
   AlertTriangle,
@@ -22,9 +22,9 @@ export default function Dashboard() {
   const { data: stats, isLoading } = useDashboard();
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-GB', {
+    return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'GBP',
+      currency: 'USD',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
@@ -42,9 +42,9 @@ export default function Dashboard() {
 
   const kpiCards = [
     {
-      title: 'Total Agreed Budget',
+      title: 'Total Budgeted BM Fees',
       value: formatCurrency(stats?.totalBudget || 0),
-      icon: <PoundSterling className="h-5 w-5" />,
+      icon: <DollarSign className="h-5 w-5" />,
       variant: 'default' as const,
     },
     {
@@ -135,7 +135,7 @@ export default function Dashboard() {
                       <XAxis dataKey="month" className="text-xs" />
                       <YAxis 
                         className="text-xs" 
-                        tickFormatter={(value) => `£${(value / 1000)}k`}
+                        tickFormatter={(value) => `$${(value / 1000)}k`}
                       />
                       <Tooltip 
                         formatter={(value: number) => formatCurrency(value)}

@@ -16,8 +16,10 @@ import {
 } from '@/components/ui/select';
 import { useMatters, useMatter, CreateMatterInput, MatterCategory, MatterStage, FeeType, MatterSource, PipelineOutcome } from '@/lib/hooks/useMatters';
 import { useClients } from '@/lib/hooks/useClients';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { useExchangeRates, getExchangeRate } from '@/lib/hooks/useExchangeRates';
+import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 import { z } from 'zod';
+import { cn } from '@/lib/utils';
 
 const matterSchema = z.object({
   client_id: z.string().min(1, 'Client is required'),
@@ -96,6 +98,7 @@ export default function MatterForm() {
   const { data: existingMatter, isLoading: matterLoading } = useMatter(id || '');
   const { createMatter, updateMatter } = useMatters();
   const { clients, isLoading: clientsLoading } = useClients();
+  const { data: exchangeRatesData, isLoading: ratesLoading, refetch: refetchRates } = useExchangeRates();
 
   const [formData, setFormData] = useState<Partial<CreateMatterInput>>({
     client_id: '',
@@ -192,6 +195,16 @@ export default function MatterForm() {
       bm_fee_component: feeUpper - localCounsel
     }));
   }, [formData.fee_amount_upper_end, formData.local_counsel_fee]);
+
+  // Auto-populate exchange rate when fee currency changes
+  useEffect(() => {
+    if (exchangeRatesData?.rates && formData.fee_currency) {
+      const rate = getExchangeRate(exchangeRatesData.rates, formData.fee_currency);
+      if (rate !== formData.exchange_rate) {
+        setFormData(prev => ({ ...prev, exchange_rate: rate }));
+      }
+    }
+  }, [formData.fee_currency, exchangeRatesData?.rates]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -610,7 +623,20 @@ export default function MatterForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="exchange_rate">Exchange Rate (to USD)</Label>
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="exchange_rate">Exchange Rate (to USD)</Label>
+                    <Button 
+                      type="button" 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => refetchRates()}
+                      disabled={ratesLoading}
+                      className="h-6 px-2 text-xs"
+                    >
+                      <RefreshCw className={cn("h-3 w-3 mr-1", ratesLoading && "animate-spin")} />
+                      Refresh
+                    </Button>
+                  </div>
                   <Input
                     id="exchange_rate"
                     type="number"
@@ -619,6 +645,11 @@ export default function MatterForm() {
                     value={formData.exchange_rate}
                     onChange={(e) => updateField('exchange_rate', parseFloat(e.target.value) || 1)}
                   />
+                  {exchangeRatesData?.date && (
+                    <p className="text-xs text-muted-foreground">
+                      Rates as of {exchangeRatesData.date}
+                    </p>
+                  )}
                 </div>
               </div>
 

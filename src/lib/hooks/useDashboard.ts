@@ -14,10 +14,11 @@ export interface DashboardStats {
 
 export interface Alert {
   id: string;
-  type: 'Over Budget' | 'Near Budget' | 'High WIP' | 'Poor Collection' | 'Overdue Invoice';
+  type: 'Over Budget' | 'Near Budget' | 'High WIP' | 'Poor Collection';
   matterId: string;
   matterName: string;
   matterNumber: string;
+  cmNumber: string;
   clientName: string;
   message: string;
   value?: number;
@@ -61,15 +62,6 @@ export function useDashboard() {
         .in('matter_id', matterIds)
         .order('as_of_date', { ascending: false });
 
-      // Get overdue invoices
-      const today = new Date().toISOString().split('T')[0];
-      const { data: overdueInvoices } = await supabase
-        .from('invoices')
-        .select('*, matters(id, matter_name, matter_number, clients(name))')
-        .in('matter_id', matterIds)
-        .neq('status', 'Paid')
-        .lt('due_date', today);
-
       // Create a map of matter_id to latest snapshot
       const snapshotMap = new Map<string, any>();
       snapshots?.forEach(snap => {
@@ -105,6 +97,8 @@ export function useDashboard() {
         const collectionRate = billedAmount > 0 ? (paidAmount / billedAmount) * 100 : 100;
         const clientName = matter.clients?.name || 'Unknown Client';
 
+        const cmNumber = matter.cm_number || matter.matter_number;
+
         // Over budget check
         if (budget > 0 && totalUsed > budget) {
           alerts.push({
@@ -113,6 +107,7 @@ export function useDashboard() {
             matterId: matter.id,
             matterName: matter.matter_name,
             matterNumber: matter.matter_number,
+            cmNumber,
             clientName,
             message: `Budget exceeded by £${(totalUsed - budget).toLocaleString()}`,
             value: budgetUsedPercent,
@@ -126,6 +121,7 @@ export function useDashboard() {
             matterId: matter.id,
             matterName: matter.matter_name,
             matterNumber: matter.matter_number,
+            cmNumber,
             clientName,
             message: `${budgetUsedPercent.toFixed(0)}% of budget used`,
             value: budgetUsedPercent,
@@ -140,6 +136,7 @@ export function useDashboard() {
             matterId: matter.id,
             matterName: matter.matter_name,
             matterNumber: matter.matter_number,
+            cmNumber,
             clientName,
             message: `WIP of £${wipAmount.toLocaleString()} with low billing`,
             value: wipAmount,
@@ -154,29 +151,10 @@ export function useDashboard() {
             matterId: matter.id,
             matterName: matter.matter_name,
             matterNumber: matter.matter_number,
+            cmNumber,
             clientName,
             message: `Collection rate at ${collectionRate.toFixed(0)}%`,
             value: collectionRate,
-          });
-        }
-      });
-
-      // Add overdue invoice alerts
-      overdueInvoices?.forEach(invoice => {
-        const matter = invoice.matters as any;
-        if (matter) {
-          const dueDate = new Date(invoice.due_date!);
-          const daysOverdue = Math.floor((new Date().getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-          
-          alerts.push({
-            id: `overdue-${invoice.id}`,
-            type: 'Overdue Invoice',
-            matterId: matter.id,
-            matterName: matter.matter_name,
-            matterNumber: matter.matter_number,
-            clientName: matter.clients?.name || 'Unknown Client',
-            message: `Invoice ${invoice.invoice_number} is ${daysOverdue} days overdue`,
-            value: daysOverdue,
           });
         }
       });
@@ -191,7 +169,7 @@ export function useDashboard() {
         avgCollectionRate,
         openMattersCount: matters?.length || 0,
         alerts: alerts.sort((a, b) => {
-          const priority = { 'Over Budget': 1, 'Overdue Invoice': 2, 'Near Budget': 3, 'Poor Collection': 4, 'High WIP': 5 };
+          const priority = { 'Over Budget': 1, 'Near Budget': 2, 'Poor Collection': 3, 'High WIP': 4 };
           return priority[a.type] - priority[b.type];
         }),
       } as DashboardStats;

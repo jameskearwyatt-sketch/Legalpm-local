@@ -10,8 +10,7 @@ import {
   Loader2,
   DollarSign,
   TrendingDown,
-  Clock,
-  FileWarning
+  Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -20,7 +19,6 @@ const alertTypeConfig: Record<Alert['type'], { icon: React.ReactNode; color: str
   'Near Budget': { icon: <TrendingDown className="h-4 w-4" />, color: 'text-warning' },
   'High WIP': { icon: <Clock className="h-4 w-4" />, color: 'text-warning' },
   'Poor Collection': { icon: <TrendingDown className="h-4 w-4" />, color: 'text-warning' },
-  'Overdue Invoice': { icon: <FileWarning className="h-4 w-4" />, color: 'text-destructive' },
 };
 
 export default function RedFlags() {
@@ -35,7 +33,7 @@ export default function RedFlags() {
     return acc;
   }, {} as Record<Alert['type'], Alert[]>) || {};
 
-  const alertTypeOrder: Alert['type'][] = ['Over Budget', 'Overdue Invoice', 'Near Budget', 'Poor Collection', 'High WIP'];
+  const alertTypeOrder: Alert['type'][] = ['Over Budget', 'Near Budget', 'Poor Collection', 'High WIP'];
 
   if (isLoading) {
     return (
@@ -80,7 +78,7 @@ export default function RedFlags() {
         ) : (
           <div className="space-y-6">
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {alertTypeOrder.map((type) => {
                 const count = alertsByType[type]?.length || 0;
                 const config = alertTypeConfig[type];
@@ -132,7 +130,7 @@ export default function RedFlags() {
                               {alert.matterName}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              {alert.clientName} • {alert.matterNumber}
+                              {alert.clientName} • {alert.cmNumber}
                             </p>
                           </div>
                           <div className="text-right flex-shrink-0">

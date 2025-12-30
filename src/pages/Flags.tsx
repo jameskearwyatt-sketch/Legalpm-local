@@ -119,7 +119,7 @@ export default function Flags() {
       return {
         id: matter.id,
         matter_name: matter.matter_name,
-        matter_number: matter.matter_number,
+        matter_number: matter.cm_number || matter.matter_number,
         client_name: matter.clients?.name || '',
         category: matter.category,
         flags,

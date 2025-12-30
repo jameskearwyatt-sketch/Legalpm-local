@@ -728,11 +728,11 @@ export default function MatterDetail() {
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Lead Partner</Label>
+                <Label>Billing Partner</Label>
                 <Input value={formData.lead_partner || ''} onChange={(e) => updateField('lead_partner', e.target.value)} placeholder="e.g., James Wyatt" />
               </div>
               <div className="space-y-2">
-                <Label>Originator</Label>
+                <Label>MMA</Label>
                 <Input value={formData.originator || ''} onChange={(e) => updateField('originator', e.target.value)} />
               </div>
             </div>

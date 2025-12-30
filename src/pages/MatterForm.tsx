@@ -576,7 +576,7 @@ export default function MatterForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="lead_partner">Matter Partner</Label>
+                  <Label htmlFor="lead_partner">Billing Partner</Label>
                   <Input
                     id="lead_partner"
                     value={formData.lead_partner}
@@ -586,7 +586,7 @@ export default function MatterForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="originator">Billing Partner</Label>
+                  <Label htmlFor="originator">MMA</Label>
                   <Input
                     id="originator"
                     value={formData.originator}

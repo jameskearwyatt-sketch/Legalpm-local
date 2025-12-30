@@ -82,7 +82,7 @@ export default function Reports() {
             <div>
               <h4 className="font-semibold mb-2">Matters CSV Columns</h4>
               <code className="text-sm bg-muted px-3 py-2 rounded block overflow-x-auto">
-                client_name, matter_name, matter_number, practice_area, status, lead_partner, start_date, target_close_date, fee_type, fee_amount_upper_end, fee_currency
+                client_name, matter_name, matter_number, practice_area, status, billing_partner, start_date, target_close_date, fee_type, fee_amount_upper_end, fee_currency
               </code>
             </div>
 

@@ -1,0 +1,230 @@
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
+import { useBudgetAmendments } from '@/lib/hooks/useBudgetAmendments';
+import { useMatters } from '@/lib/hooks/useMatters';
+import { Loader2, History } from 'lucide-react';
+import { format } from 'date-fns';
+
+interface BudgetUpdateModalProps {
+  matterId: string;
+  currentBudget: number;
+  currentBmFee: number;
+  currentLocalCounsel: number;
+  currency: string;
+}
+
+export function BudgetUpdateModal({
+  matterId,
+  currentBudget,
+  currentBmFee,
+  currentLocalCounsel,
+  currency,
+}: BudgetUpdateModalProps) {
+  const [open, setOpen] = useState(false);
+  const [newBudget, setNewBudget] = useState(currentBudget.toString());
+  const [newBmFee, setNewBmFee] = useState(currentBmFee.toString());
+  const [newLocalCounsel, setNewLocalCounsel] = useState(currentLocalCounsel.toString());
+  const [notes, setNotes] = useState('');
+  
+  const { amendments, isLoading, createAmendment } = useBudgetAmendments(matterId);
+  const { updateMatter } = useMatters();
+
+  const formatCurrency = (value: number) => {
+    const symbols: Record<string, string> = {
+      GBP: '£',
+      USD: '$',
+      EUR: '€',
+    };
+    const symbol = symbols[currency] || currency + ' ';
+    return symbol + new Intl.NumberFormat('en-GB', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(value);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const newBudgetNum = parseFloat(newBudget.replace(/,/g, '')) || 0;
+    const newBmFeeNum = parseFloat(newBmFee.replace(/,/g, '')) || 0;
+    const newLocalCounselNum = parseFloat(newLocalCounsel.replace(/,/g, '')) || 0;
+
+    // Create amendment record
+    await createAmendment.mutateAsync({
+      matter_id: matterId,
+      previous_budget: currentBudget,
+      new_budget: newBudgetNum,
+      previous_bm_fee: currentBmFee,
+      new_bm_fee: newBmFeeNum,
+      previous_local_counsel: currentLocalCounsel,
+      new_local_counsel: newLocalCounselNum,
+      notes: notes || undefined,
+    });
+
+    // Update matter with new values
+    await updateMatter.mutateAsync({
+      id: matterId,
+      fee_amount_upper_end: newBudgetNum,
+      bm_fee_component: newBmFeeNum,
+      local_counsel_fee: newLocalCounselNum,
+    });
+
+    setOpen(false);
+    setNotes('');
+  };
+
+  const handleOpenChange = (isOpen: boolean) => {
+    setOpen(isOpen);
+    if (isOpen) {
+      setNewBudget(currentBudget.toString());
+      setNewBmFee(currentBmFee.toString());
+      setNewLocalCounsel(currentLocalCounsel.toString());
+      setNotes('');
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="h-5 px-2 text-[10px] font-medium"
+        >
+          Update
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Update Budget Agreement</DialogTitle>
+        </DialogHeader>
+        
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="newBudget">Total Budget</Label>
+              <Input
+                id="newBudget"
+                type="text"
+                value={newBudget}
+                onChange={(e) => setNewBudget(e.target.value)}
+                placeholder="Enter new budget"
+              />
+              <p className="text-xs text-muted-foreground">
+                Current: {formatCurrency(currentBudget)}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="newBmFee">Baker McKenzie Fee</Label>
+              <Input
+                id="newBmFee"
+                type="text"
+                value={newBmFee}
+                onChange={(e) => setNewBmFee(e.target.value)}
+                placeholder="Enter BM fee component"
+              />
+              <p className="text-xs text-muted-foreground">
+                Current: {formatCurrency(currentBmFee)}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="newLocalCounsel">Local Counsel Fee</Label>
+              <Input
+                id="newLocalCounsel"
+                type="text"
+                value={newLocalCounsel}
+                onChange={(e) => setNewLocalCounsel(e.target.value)}
+                placeholder="Enter local counsel fee"
+              />
+              <p className="text-xs text-muted-foreground">
+                Current: {formatCurrency(currentLocalCounsel)}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes</Label>
+              <Textarea
+                id="notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Describe the background to this budget update..."
+                rows={3}
+              />
+            </div>
+          </div>
+
+          <Button 
+            type="submit" 
+            className="w-full"
+            disabled={createAmendment.isPending || updateMatter.isPending}
+          >
+            {(createAmendment.isPending || updateMatter.isPending) && (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            )}
+            Save Budget Update
+          </Button>
+        </form>
+
+        {/* Amendment History */}
+        {amendments.length > 0 && (
+          <Accordion type="single" collapsible className="mt-4">
+            <AccordionItem value="history" className="border-none">
+              <AccordionTrigger className="text-sm py-2">
+                <div className="flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  Budget History ({amendments.length})
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-3 max-h-48 overflow-y-auto">
+                  {isLoading ? (
+                    <div className="flex justify-center py-4">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    </div>
+                  ) : (
+                    amendments.map((amendment) => (
+                      <div 
+                        key={amendment.id} 
+                        className="text-xs p-2 bg-muted/50 rounded space-y-1"
+                      >
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            {format(new Date(amendment.amendment_date), 'dd MMM yyyy')}
+                          </span>
+                          <span className="font-medium">
+                            {formatCurrency(amendment.previous_budget)} → {formatCurrency(amendment.new_budget)}
+                          </span>
+                        </div>
+                        {amendment.notes && (
+                          <p className="text-muted-foreground">{amendment.notes}</p>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

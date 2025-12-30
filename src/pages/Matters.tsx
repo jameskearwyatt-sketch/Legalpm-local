@@ -31,11 +31,12 @@ import { useClients } from '@/lib/hooks/useClients';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useAuth } from '@/lib/auth';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
+import { BudgetUpdateModal } from '@/components/matters/BudgetUpdateModal';
 import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-type SortField = 'matter_name' | 'fee_amount' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'stage';
+type SortField = 'matter_name' | 'fee_amount' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'local_counsel' | 'stage';
 type SortDirection = 'asc' | 'desc';
 
 const categoryIcons: Record<MatterCategory, React.ReactNode> = {
@@ -186,6 +187,14 @@ export default function Matters() {
         case 'paid':
           aVal = a.latest_snapshot?.paid_amount || 0;
           bVal = b.latest_snapshot?.paid_amount || 0;
+          break;
+        case 'budget_burn':
+          aVal = (a.latest_snapshot?.wip_amount || 0) + (a.latest_snapshot?.billed_amount || 0) + (a.latest_snapshot?.paid_amount || 0);
+          bVal = (b.latest_snapshot?.wip_amount || 0) + (b.latest_snapshot?.billed_amount || 0) + (b.latest_snapshot?.paid_amount || 0);
+          break;
+        case 'local_counsel':
+          aVal = a.local_counsel_fee || 0;
+          bVal = b.local_counsel_fee || 0;
           break;
         case 'stage':
           aVal = a.current_stage || '';
@@ -343,12 +352,14 @@ export default function Matters() {
                       <TableHead className="min-w-[180px]">
                         <SortableHeader field="matter_name">Client / Matter</SortableHeader>
                       </TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader field="fee_amount">Fee (Upper)</SortableHeader>
+                      <TableHead className="text-right min-w-[120px]">
+                        <SortableHeader field="fee_amount">Budget</SortableHeader>
                       </TableHead>
-                      <TableHead className="text-right">BM Fee</TableHead>
                       {isLive && (
                         <>
+                          <TableHead className="text-right">
+                            <SortableHeader field="local_counsel">Local Counsel</SortableHeader>
+                          </TableHead>
                           <TableHead className="text-right">
                             <SortableHeader field="wip">WIP</SortableHeader>
                           </TableHead>
@@ -357,6 +368,9 @@ export default function Matters() {
                           </TableHead>
                           <TableHead className="text-right">
                             <SortableHeader field="paid">Paid</SortableHeader>
+                          </TableHead>
+                          <TableHead className="text-right">
+                            <SortableHeader field="budget_burn">Budget Burn</SortableHeader>
                           </TableHead>
                           <TableHead className="text-right">
                             <SortableHeader field="headroom">Headroom</SortableHeader>
@@ -377,14 +391,24 @@ export default function Matters() {
                         <SortableHeader field="stage">Stage</SortableHeader>
                       </TableHead>
                       <TableHead>Practice</TableHead>
-                      <TableHead>Originator</TableHead>
                       <TableHead className="w-16">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredMatters.map((matter) => {
                       const headroomStatus = getHeadroomStatus(matter);
-                      const bmFeeUsd = (matter.bm_fee_component || 0) * (matter.exchange_rate || 1);
+                      const budgetBurn = (matter.latest_snapshot?.wip_amount || 0) + 
+                                        (matter.latest_snapshot?.billed_amount || 0) + 
+                                        (matter.latest_snapshot?.paid_amount || 0);
+                      
+                      // Get fee type label for display
+                      const getFeeTypeLabel = (feeType: string | null) => {
+                        if (!feeType) return null;
+                        if (feeType.includes('Cap')) return 'Cap';
+                        if (feeType.includes('Estimate')) return 'Estimate';
+                        return feeType;
+                      };
+                      
                       return (
                         <TableRow key={matter.id} className="group">
                           <TableCell>
@@ -398,14 +422,30 @@ export default function Matters() {
                               </p>
                             </Link>
                           </TableCell>
-                          <TableCell className="text-right font-medium">
-                            {formatCurrency(matter.fee_amount_upper_end, matter.fee_currency)}
-                          </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(bmFeeUsd)}
+                          <TableCell className="text-right">
+                            <div className="flex flex-col items-end gap-0.5">
+                              {matter.fee_type && (
+                                <span className="text-[10px] text-muted-foreground">
+                                  {getFeeTypeLabel(matter.fee_type)}
+                                </span>
+                              )}
+                              <span className="font-medium">
+                                {formatCurrency(matter.fee_amount_upper_end, matter.fee_currency)}
+                              </span>
+                              <BudgetUpdateModal
+                                matterId={matter.id}
+                                currentBudget={matter.fee_amount_upper_end}
+                                currentBmFee={matter.bm_fee_component}
+                                currentLocalCounsel={matter.local_counsel_fee}
+                                currency={matter.fee_currency}
+                              />
+                            </div>
                           </TableCell>
                           {isLive && (
                             <>
+                              <TableCell className="text-right text-muted-foreground">
+                                {formatCurrency(matter.local_counsel_fee, matter.fee_currency)}
+                              </TableCell>
                               <TableCell className="p-1">
                                 <EditableFinancialCell
                                   value={matter.latest_snapshot?.wip_amount || 0}
@@ -445,6 +485,9 @@ export default function Matters() {
                                   }}
                                   className="text-success"
                                 />
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {formatCurrency(budgetBurn, matter.fee_currency)}
                               </TableCell>
                               <TableCell className={cn(
                                 "text-right font-medium",
@@ -497,9 +540,6 @@ export default function Matters() {
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm">
                             {matter.practice_area || '-'}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground text-sm">
-                            {matter.originator || '-'}
                           </TableCell>
                           <TableCell>
                             <DropdownMenu>

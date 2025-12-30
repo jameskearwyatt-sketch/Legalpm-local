@@ -14,6 +14,59 @@ export type Database = {
   }
   public: {
     Tables: {
+      budget_amendments: {
+        Row: {
+          amendment_date: string
+          created_at: string
+          id: string
+          matter_id: string
+          new_bm_fee: number
+          new_budget: number
+          new_local_counsel: number
+          notes: string | null
+          previous_bm_fee: number
+          previous_budget: number
+          previous_local_counsel: number
+          user_id: string
+        }
+        Insert: {
+          amendment_date?: string
+          created_at?: string
+          id?: string
+          matter_id: string
+          new_bm_fee?: number
+          new_budget?: number
+          new_local_counsel?: number
+          notes?: string | null
+          previous_bm_fee?: number
+          previous_budget?: number
+          previous_local_counsel?: number
+          user_id: string
+        }
+        Update: {
+          amendment_date?: string
+          created_at?: string
+          id?: string
+          matter_id?: string
+          new_bm_fee?: number
+          new_budget?: number
+          new_local_counsel?: number
+          notes?: string | null
+          previous_bm_fee?: number
+          previous_budget?: number
+          previous_local_counsel?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_amendments_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           billing_contact: string | null

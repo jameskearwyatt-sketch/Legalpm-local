@@ -4,4 +4,4 @@ project_id = "sdnunnmldefddezdsyqk"
 verify_jwt = false
 
 [functions.polish-narrative]
-verify_jwt = true
+verify_jwt = false

@@ -13,6 +13,7 @@ import Clients from "./pages/Clients";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import Help from "./pages/Help";
+import Flags from "./pages/Flags";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -47,6 +48,7 @@ function AppRoutes() {
       <Route path="/matters/:id/edit" element={<ProtectedRoute><MatterForm /></ProtectedRoute>} />
       <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
       <Route path="/clients/new" element={<ProtectedRoute><Clients defaultDialogOpen /></ProtectedRoute>} />
+      <Route path="/flags" element={<ProtectedRoute><Flags /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />

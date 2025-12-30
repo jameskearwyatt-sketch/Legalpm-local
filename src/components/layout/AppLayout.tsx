@@ -22,6 +22,7 @@ import {
   Menu,
   X,
   FileText,
+  Flag,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +34,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Matters', href: '/matters', icon: Briefcase },
   { name: 'Clients', href: '/clients', icon: Users },
+  { name: 'Flags', href: '/flags', icon: Flag },
   { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Help', href: '/help', icon: HelpCircle },

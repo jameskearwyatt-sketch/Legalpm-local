@@ -42,7 +42,7 @@ type SortField = 'matter_name' | 'fee_amount' | 'bm_fee' | 'headroom' | 'headroo
 type SortDirection = 'asc' | 'desc';
 
 // Stage options based on category
-const liveStages: MatterStage[] = ['Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Closing Process', 'Closed', 'Paused'];
+const liveStages: MatterStage[] = ['Pre-Start', 'Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Closing Process', 'Closed', 'Paused'];
 const pipelineStages: MatterStage[] = ['Pending', 'Won', 'Lost'];
 
 const categoryIcons: Record<MatterCategory, React.ReactNode> = {

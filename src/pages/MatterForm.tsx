@@ -883,41 +883,10 @@ export default function MatterForm() {
           {/* Budget (Legacy) */}
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle className="text-lg font-heading">Budget & Notes</CardTitle>
-              <CardDescription>Internal budget tracking and notes</CardDescription>
+              <CardTitle className="text-lg font-heading">Notes</CardTitle>
+              <CardDescription>Internal notes and documentation</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="agreed_budget_amount">Agreed Budget</Label>
-                  <Input
-                    id="agreed_budget_amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.agreed_budget_amount}
-                    onChange={(e) => updateField('agreed_budget_amount', parseFloat(e.target.value) || 0)}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="currency">Budget Currency</Label>
-                  <Select
-                    value={formData.currency}
-                    onValueChange={(v) => updateField('currency', v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {currencies.map((c) => (
-                        <SelectItem key={c} value={c}>{c}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="budget_notes">Budget Notes</Label>
                 <Textarea

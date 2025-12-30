@@ -119,7 +119,9 @@ export default function Flags() {
       return {
         id: matter.id,
         matter_name: matter.matter_name,
-        matter_number: matter.cm_number || matter.matter_number,
+        matter_number: matter.cm_number && matter.cm_number.trim() !== '' 
+          ? matter.cm_number 
+          : '[CM number required]',
         client_name: matter.clients?.name || '',
         category: matter.category,
         flags,

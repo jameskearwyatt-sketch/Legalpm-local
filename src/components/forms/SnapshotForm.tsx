@@ -7,6 +7,7 @@ import { useSnapshots, FinancialSnapshot, CreateSnapshotInput } from '@/lib/hook
 import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import { format } from 'date-fns';
+import { getCurrencySymbol } from '@/lib/currencyUtils';
 
 const snapshotSchema = z.object({
   as_of_date: z.string().min(1, 'Date is required'),
@@ -20,9 +21,11 @@ interface SnapshotFormProps {
   matterId: string;
   snapshot?: FinancialSnapshot | null;
   onSuccess: () => void;
+  currency?: string;
 }
 
-export function SnapshotForm({ matterId, snapshot, onSuccess }: SnapshotFormProps) {
+export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }: SnapshotFormProps) {
+  const currencySymbol = getCurrencySymbol(currency);
   const { createSnapshot, updateSnapshot } = useSnapshots(matterId);
   const isEditing = !!snapshot;
 
@@ -91,7 +94,7 @@ export function SnapshotForm({ matterId, snapshot, onSuccess }: SnapshotFormProp
 
       <div className="grid grid-cols-3 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="wip_amount">WIP (£)</Label>
+          <Label htmlFor="wip_amount">WIP ({currencySymbol.trim()})</Label>
           <Input
             id="wip_amount"
             type="number"
@@ -105,7 +108,7 @@ export function SnapshotForm({ matterId, snapshot, onSuccess }: SnapshotFormProp
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="billed_amount">Billed (£)</Label>
+          <Label htmlFor="billed_amount">Billed ({currencySymbol.trim()})</Label>
           <Input
             id="billed_amount"
             type="number"
@@ -119,7 +122,7 @@ export function SnapshotForm({ matterId, snapshot, onSuccess }: SnapshotFormProp
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="paid_amount">Paid (£)</Label>
+          <Label htmlFor="paid_amount">Paid ({currencySymbol.trim()})</Label>
           <Input
             id="paid_amount"
             type="number"

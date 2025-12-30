@@ -21,6 +21,7 @@ export interface Alert {
   cmNumber: string;
   clientName: string;
   message: string;
+  currency: string;
   value?: number;
 }
 
@@ -97,7 +98,17 @@ export function useDashboard() {
         const collectionRate = billedAmount > 0 ? (paidAmount / billedAmount) * 100 : 100;
         const clientName = matter.clients?.name || 'Unknown Client';
 
-        const cmNumber = matter.cm_number || matter.matter_number;
+        // Use cm_number if available, otherwise show placeholder
+        const cmNumber = matter.cm_number && matter.cm_number.trim() !== '' 
+          ? matter.cm_number 
+          : '[CM number required]';
+        
+        // Get the correct currency symbol for display
+        const feeCurrency = matter.fee_currency || 'GBP';
+        const currencySymbols: Record<string, string> = {
+          'GBP': '£', 'USD': '$', 'EUR': '€', 'MYR': 'RM ', 'CHF': 'CHF ', 'AUD': 'A$', 'CAD': 'C$', 'SGD': 'S$'
+        };
+        const currencySymbol = currencySymbols[feeCurrency] || feeCurrency + ' ';
 
         // Over budget check
         if (budget > 0 && totalUsed > budget) {
@@ -109,7 +120,8 @@ export function useDashboard() {
             matterNumber: matter.matter_number,
             cmNumber,
             clientName,
-            message: `Budget exceeded by £${(totalUsed - budget).toLocaleString()}`,
+            currency: feeCurrency,
+            message: `Budget exceeded by ${currencySymbol}${(totalUsed - budget).toLocaleString()}`,
             value: budgetUsedPercent,
           });
         }
@@ -123,6 +135,7 @@ export function useDashboard() {
             matterNumber: matter.matter_number,
             cmNumber,
             clientName,
+            currency: feeCurrency,
             message: `${budgetUsedPercent.toFixed(0)}% of budget used`,
             value: budgetUsedPercent,
           });
@@ -138,7 +151,8 @@ export function useDashboard() {
             matterNumber: matter.matter_number,
             cmNumber,
             clientName,
-            message: `WIP of £${wipAmount.toLocaleString()} with low billing`,
+            currency: feeCurrency,
+            message: `WIP of ${currencySymbol}${wipAmount.toLocaleString()} with low billing`,
             value: wipAmount,
           });
         }
@@ -153,6 +167,7 @@ export function useDashboard() {
             matterNumber: matter.matter_number,
             cmNumber,
             clientName,
+            currency: feeCurrency,
             message: `Collection rate at ${collectionRate.toFixed(0)}%`,
             value: collectionRate,
           });

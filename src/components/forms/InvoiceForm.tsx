@@ -14,6 +14,7 @@ import { useInvoices, Invoice, CreateInvoiceInput } from '@/lib/hooks/useInvoice
 import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import { format } from 'date-fns';
+import { getCurrencySymbol } from '@/lib/currencyUtils';
 
 const invoiceSchema = z.object({
   invoice_number: z.string().min(1, 'Invoice number is required').max(50),
@@ -30,9 +31,11 @@ interface InvoiceFormProps {
   matterId: string;
   invoice?: Invoice | null;
   onSuccess: () => void;
+  currency?: string;
 }
 
-export function InvoiceForm({ matterId, invoice, onSuccess }: InvoiceFormProps) {
+export function InvoiceForm({ matterId, invoice, onSuccess, currency = 'GBP' }: InvoiceFormProps) {
+  const currencySymbol = getCurrencySymbol(currency);
   const { createInvoice, updateInvoice } = useInvoices(matterId);
   const isEditing = !!invoice;
 
@@ -149,7 +152,7 @@ export function InvoiceForm({ matterId, invoice, onSuccess }: InvoiceFormProps) 
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="billed_amount">Billed Amount (£) *</Label>
+          <Label htmlFor="billed_amount">Billed Amount ({currencySymbol.trim()}) *</Label>
           <Input
             id="billed_amount"
             type="number"
@@ -163,7 +166,7 @@ export function InvoiceForm({ matterId, invoice, onSuccess }: InvoiceFormProps) 
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="paid_amount">Paid Amount (£)</Label>
+          <Label htmlFor="paid_amount">Paid Amount ({currencySymbol.trim()})</Label>
           <Input
             id="paid_amount"
             type="number"

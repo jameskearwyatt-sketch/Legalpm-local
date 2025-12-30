@@ -166,9 +166,8 @@ export function useMatters() {
         const budgetUsedPercent = budget > 0 ? (totalUsed / budget) * 100 : 0;
         const collectionRate = billedAmount > 0 ? (paidAmount / billedAmount) * 100 : 0;
         
-        // Headroom calculation: Fee Amount - (Paid + AR + WIP)
-        const totalPaidArWip = paidAmount + billedAmount + wipAmount;
-        const headroom = feeUpperEnd - totalPaidArWip;
+        // Headroom calculation: Fee Amount - (AR + WIP) - paid is subset of billed
+        const headroom = feeUpperEnd - totalUsed;
         const headroomPercent = feeUpperEnd > 0 ? (headroom / feeUpperEnd) * 100 : 0;
 
         return {
@@ -184,7 +183,7 @@ export function useMatters() {
           collection_rate: collectionRate,
           headroom,
           headroom_percent: headroomPercent,
-          total_paid_ar_wip: totalPaidArWip,
+          total_paid_ar_wip: totalUsed, // Budget burn = WIP + Billed
         } as MatterWithFinancials;
       }) || [];
     },

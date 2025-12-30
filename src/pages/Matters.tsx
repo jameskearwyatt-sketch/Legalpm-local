@@ -189,8 +189,9 @@ export default function Matters() {
           bVal = b.latest_snapshot?.paid_amount || 0;
           break;
         case 'budget_burn':
-          aVal = (a.latest_snapshot?.wip_amount || 0) + (a.latest_snapshot?.billed_amount || 0) + (a.latest_snapshot?.paid_amount || 0);
-          bVal = (b.latest_snapshot?.wip_amount || 0) + (b.latest_snapshot?.billed_amount || 0) + (b.latest_snapshot?.paid_amount || 0);
+          // Budget burn = WIP + Billed only (paid is a subset of billed, not additional spend)
+          aVal = (a.latest_snapshot?.wip_amount || 0) + (a.latest_snapshot?.billed_amount || 0);
+          bVal = (b.latest_snapshot?.wip_amount || 0) + (b.latest_snapshot?.billed_amount || 0);
           break;
         case 'local_counsel':
           aVal = a.local_counsel_fee || 0;
@@ -404,9 +405,9 @@ export default function Matters() {
                   <TableBody>
                     {filteredMatters.map((matter) => {
                       const headroomStatus = getHeadroomStatus(matter);
+                      // Budget burn = WIP + Billed only (paid is a subset of billed)
                       const budgetBurn = (matter.latest_snapshot?.wip_amount || 0) + 
-                                        (matter.latest_snapshot?.billed_amount || 0) + 
-                                        (matter.latest_snapshot?.paid_amount || 0);
+                                        (matter.latest_snapshot?.billed_amount || 0);
                       
                       // Get fee type label for display
                       const getFeeTypeLabel = (feeType: string | null) => {

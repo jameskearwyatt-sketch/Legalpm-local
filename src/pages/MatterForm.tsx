@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils';
 const matterSchema = z.object({
   client_id: z.string().min(1, 'Client is required'),
   matter_name: z.string().min(1, 'Matter name is required').max(200),
-  matter_number: z.string().min(1, 'Matter number is required').max(50),
+  matter_number: z.string().max(50).default('AUTO'), // Auto-generated, no longer user input
   practice_area: z.string().optional(),
   aml_kyc_complete: z.boolean().default(false),
   assignment_letter_signed: z.boolean().default(false),
@@ -278,6 +278,11 @@ export default function MatterForm() {
         dataToValidate.cm_number = masterClient?.cm_number || '';
       }
       
+      // Auto-generate matter_number if not set (using cm_number or timestamp)
+      if (!dataToValidate.matter_number || dataToValidate.matter_number === '') {
+        dataToValidate.matter_number = dataToValidate.cm_number || `MAT-${Date.now()}`;
+      }
+      
       const validated = matterSchema.parse(dataToValidate);
       const dataToSubmit = { 
         ...validated, 
@@ -405,15 +410,18 @@ export default function MatterForm() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="cm_number">C/M Number</Label>
-                  <Input
-                    id="cm_number"
-                    value={formData.cm_number}
-                    onChange={(e) => updateField('cm_number', e.target.value)}
-                    placeholder="e.g., 51339685"
-                  />
-                </div>
+                {/* Only show C/M Number here for single-client matters */}
+                {!isMultiClient && (
+                  <div className="space-y-2">
+                    <Label htmlFor="cm_number">C/M Number</Label>
+                    <Input
+                      id="cm_number"
+                      value={formData.cm_number}
+                      onChange={(e) => updateField('cm_number', e.target.value)}
+                      placeholder="e.g., 51339685"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Current Stage - only show when editing */}
@@ -522,23 +530,6 @@ export default function MatterForm() {
                     <p className="text-sm text-destructive">{errors.matter_name}</p>
                   )}
                 </div>
-
-                {/* Only show matter number for non-multi-client matters */}
-                {!isMultiClient && (
-                  <div className="space-y-2">
-                    <Label htmlFor="matter_number">Internal Reference *</Label>
-                    <Input
-                      id="matter_number"
-                      value={formData.matter_number}
-                      onChange={(e) => updateField('matter_number', e.target.value)}
-                      placeholder="e.g., MAT-001"
-                      className={errors.matter_number ? 'border-destructive' : ''}
-                    />
-                    {errors.matter_number && (
-                      <p className="text-sm text-destructive">{errors.matter_number}</p>
-                    )}
-                  </div>
-                )}
               </div>
 
               <div className="space-y-2">

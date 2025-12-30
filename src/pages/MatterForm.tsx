@@ -620,29 +620,7 @@ export default function MatterForm() {
                 </div>
               )}
 
-              {isPipeline && (
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="submission_deadline">RFP Response Date</Label>
-                    <Input
-                      id="submission_deadline"
-                      type="date"
-                      value={formData.submission_deadline}
-                      onChange={(e) => updateField('submission_deadline', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="decision_date">Decision Date</Label>
-                    <Input
-                      id="decision_date"
-                      type="date"
-                      value={formData.decision_date}
-                      onChange={(e) => updateField('decision_date', e.target.value)}
-                    />
-                  </div>
-                </div>
-              )}
+              {/* Dates moved to Pipeline Tracking section for pipeline matters */}
             </CardContent>
           </Card>
 
@@ -841,7 +819,7 @@ export default function MatterForm() {
                   </div>
                 </div>
 
-                <div className="grid sm:grid-cols-2 gap-4">
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="opportunity_receipt_date">Opportunity Receipt</Label>
                     <Input
@@ -853,12 +831,32 @@ export default function MatterForm() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="clarifications_date">Q&A Date</Label>
+                    <Label htmlFor="clarifications_date">Clarifications Date</Label>
                     <Input
                       id="clarifications_date"
                       type="date"
                       value={formData.clarifications_date}
                       onChange={(e) => updateField('clarifications_date', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="submission_deadline">Submission Deadline</Label>
+                    <Input
+                      id="submission_deadline"
+                      type="date"
+                      value={formData.submission_deadline}
+                      onChange={(e) => updateField('submission_deadline', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="decision_date">Decision Date</Label>
+                    <Input
+                      id="decision_date"
+                      type="date"
+                      value={formData.decision_date}
+                      onChange={(e) => updateField('decision_date', e.target.value)}
                     />
                   </div>
                 </div>

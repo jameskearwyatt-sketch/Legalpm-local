@@ -4,7 +4,7 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 
 export type MatterCategory = 'Live' | 'Pipeline' | 'Closed' | 'Lost';
-export type MatterStage = 'Term Sheet' | 'Documentation - Start' | 'Documentation - Close' | 'Closing Process' | 'Paused' | 'Closed' | 'Won' | 'Pending' | 'Lost';
+export type MatterStage = 'Pre-Start' | 'Term Sheet' | 'Documentation - Start' | 'Documentation - Close' | 'Closing Process' | 'Paused' | 'Closed' | 'Won' | 'Pending' | 'Lost';
 export type FeeType = 'Discounted Rates with Cap' | 'Discounted Rates with Estimate' | 'Discounted Rates with Partial Cap' | 'Rack Rates with Cap' | 'Rack Rates with Estimate';
 export type MatterSource = 'RfP' | 'Direct from Client' | 'Internal Referral';
 export type PipelineOutcome = 'Won' | 'Lost' | 'Pending';

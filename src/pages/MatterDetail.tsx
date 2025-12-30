@@ -62,7 +62,7 @@ const practiceAreas = [
 ];
 
 const allCategories: MatterCategory[] = ['Live', 'Pipeline', 'Closed', 'Lost'];
-const liveStages: MatterStage[] = ['Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Closing Process', 'Closed', 'Paused'];
+const liveStages: MatterStage[] = ['Pre-Start', 'Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Closing Process', 'Closed', 'Paused'];
 const pipelineStages: MatterStage[] = ['Pending', 'Won', 'Lost'];
 const allStages: MatterStage[] = [...liveStages, ...pipelineStages];
 const feeTypes: FeeType[] = ['Discounted Rates with Cap', 'Discounted Rates with Estimate', 'Discounted Rates with Partial Cap', 'Rack Rates with Cap', 'Rack Rates with Estimate'];

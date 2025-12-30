@@ -555,6 +555,7 @@ export type Database = {
       matter_category: "Live" | "Pipeline" | "Closed" | "Lost"
       matter_source: "RfP" | "Direct from Client" | "Internal Referral"
       matter_stage:
+        | "Pre-Start"
         | "Term Sheet"
         | "Documentation - Start"
         | "Documentation - Close"
@@ -706,6 +707,7 @@ export const Constants = {
       matter_category: ["Live", "Pipeline", "Closed", "Lost"],
       matter_source: ["RfP", "Direct from Client", "Internal Referral"],
       matter_stage: [
+        "Pre-Start",
         "Term Sheet",
         "Documentation - Start",
         "Documentation - Close",

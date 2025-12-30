@@ -21,6 +21,7 @@ import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useBudgetAmendments } from '@/lib/hooks/useBudgetAmendments';
 import { useClients } from '@/lib/hooks/useClients';
 import { useExchangeRates, getExchangeRate } from '@/lib/hooks/useExchangeRates';
+import { useMatterClients } from '@/lib/hooks/useMatterClients';
 import {
   Collapsible,
   CollapsibleContent,
@@ -75,6 +76,7 @@ export default function MatterDetail() {
   const { amendments, isLoading: amendmentsLoading } = useBudgetAmendments(id);
   const { clients, isLoading: clientsLoading } = useClients();
   const { data: exchangeRatesData, refetch: refetchRates } = useExchangeRates();
+  const { matterClients } = useMatterClients(id);
   
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -267,9 +269,16 @@ export default function MatterDetail() {
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-1 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl lg:text-3xl font-heading font-bold text-foreground">
-                    {matter.clients?.name}
-                  </span>
+                  {/* Show all clients for multi-client matters */}
+                  {matterClients && matterClients.length > 1 ? (
+                    <span className="text-2xl lg:text-3xl font-heading font-bold text-foreground">
+                      {matterClients.map(mc => mc.clients?.name).join(' / ')}
+                    </span>
+                  ) : (
+                    <span className="text-2xl lg:text-3xl font-heading font-bold text-foreground">
+                      {matter.clients?.name}
+                    </span>
+                  )}
                   <span className="text-2xl lg:text-3xl font-heading text-muted-foreground">–</span>
                   <Input
                     value={formData.matter_name || ''}
@@ -279,12 +288,24 @@ export default function MatterDetail() {
                 </div>
                 <StatusBadge status={formData.status || matter.status} />
               </div>
-              <Input
-                value={formData.cm_number || ''}
-                onChange={(e) => updateField('cm_number', e.target.value)}
-                className="text-muted-foreground border-0 p-0 h-auto focus-visible:ring-0 bg-transparent w-48"
-                placeholder="C/M Number"
-              />
+              {/* Show C/M number - for multi-client show master's */}
+              {matterClients && matterClients.length > 1 ? (
+                <div className="text-sm text-muted-foreground">
+                  {matterClients.map(mc => (
+                    <span key={mc.id} className="mr-4">
+                      {mc.clients?.name}: {mc.cm_number || '—'} ({mc.fee_percentage}%)
+                      {mc.is_master && <span className="ml-1 text-primary text-xs">★ Master</span>}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <Input
+                  value={formData.cm_number || ''}
+                  onChange={(e) => updateField('cm_number', e.target.value)}
+                  className="text-muted-foreground border-0 p-0 h-auto focus-visible:ring-0 bg-transparent w-48"
+                  placeholder="C/M Number"
+                />
+              )}
             </div>
           </div>
           <div className="flex gap-2 ml-10 sm:ml-0">

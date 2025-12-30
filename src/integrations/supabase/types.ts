@@ -200,6 +200,57 @@ export type Database = {
           },
         ]
       }
+      matter_clients: {
+        Row: {
+          client_id: string
+          cm_number: string | null
+          created_at: string
+          fee_percentage: number
+          id: string
+          is_master: boolean
+          matter_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          cm_number?: string | null
+          created_at?: string
+          fee_percentage?: number
+          id?: string
+          is_master?: boolean
+          matter_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          cm_number?: string | null
+          created_at?: string
+          fee_percentage?: number
+          id?: string
+          is_master?: boolean
+          matter_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matter_clients_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "matter_clients_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matters: {
         Row: {
           agreed_budget_amount: number
@@ -226,6 +277,7 @@ export type Database = {
           fee_earner_mix_notes: string | null
           fee_type: Database["public"]["Enums"]["fee_type"] | null
           id: string
+          is_multi_client: boolean
           lead_partner: string | null
           local_counsel_fee: number
           matter_name: string
@@ -271,6 +323,7 @@ export type Database = {
           fee_earner_mix_notes?: string | null
           fee_type?: Database["public"]["Enums"]["fee_type"] | null
           id?: string
+          is_multi_client?: boolean
           lead_partner?: string | null
           local_counsel_fee?: number
           matter_name: string
@@ -316,6 +369,7 @@ export type Database = {
           fee_earner_mix_notes?: string | null
           fee_type?: Database["public"]["Enums"]["fee_type"] | null
           id?: string
+          is_multi_client?: boolean
           lead_partner?: string | null
           local_counsel_fee?: number
           matter_name?: string

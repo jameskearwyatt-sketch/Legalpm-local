@@ -316,7 +316,7 @@ export default function Matters() {
                 </Select>
               </div>
               <div className="text-right">
-                <p className="text-sm text-muted-foreground">Total BM Fees (USD)</p>
+                <p className="text-sm text-muted-foreground">Total Budgeted BM Fees (USD)</p>
                 <p className="text-2xl font-bold text-foreground">
                   ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(categoryTotals)}
                 </p>

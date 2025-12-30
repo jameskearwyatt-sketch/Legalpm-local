@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useMatters, useMatter, CreateMatterInput } from '@/lib/hooks/useMatters';
+import { useMatters, useMatter, CreateMatterInput, MatterCategory, MatterStage, FeeType, MatterSource, PipelineOutcome } from '@/lib/hooks/useMatters';
 import { useClients } from '@/lib/hooks/useClients';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { z } from 'zod';
@@ -36,9 +36,35 @@ const matterSchema = z.object({
   budget_notes: z.string().optional(),
   fee_earner_mix_notes: z.string().optional(),
   billing_terms: z.string().optional(),
+  // New fields
+  category: z.enum(['Live', 'Pipeline', 'Closed', 'Lost']).default('Live'),
+  current_stage: z.enum(['Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Paused', 'Closed', 'Won', 'Pending']).nullable().optional(),
+  fee_amount_upper_end: z.number().min(0).default(0),
+  local_counsel_fee: z.number().min(0).default(0),
+  bm_fee_component: z.number().min(0).default(0),
+  exchange_rate: z.number().min(0).default(1.0),
+  fee_currency: z.string().default('GBP'),
+  fee_type: z.enum(['Discounted Rates with Cap', 'Discounted Rates with Estimate', 'Discounted Rates with Partial Cap', 'Rack Rates with Cap', 'Rack Rates with Estimate']).nullable().optional(),
+  source: z.enum(['RfP', 'Direct from Client', 'Internal Referral']).nullable().optional(),
+  originator: z.string().optional(),
+  deal_currency: z.string().optional(),
+  deal_value: z.number().nullable().optional(),
+  cm_number: z.string().optional(),
+  conflicts_check: z.boolean().default(false),
+  opportunity_receipt_date: z.string().optional(),
+  clarifications_date: z.string().optional(),
+  submission_deadline: z.string().optional(),
+  submitted: z.boolean().default(false),
+  decision_date: z.string().optional(),
+  pipeline_outcome: z.enum(['Won', 'Lost', 'Pending']).nullable().optional(),
 });
 
 const practiceAreas = [
+  'Voluntary Carbon',
+  'PPAs',
+  'Nuclear',
+  'SAF',
+  'Renewables',
   'Corporate & Commercial',
   'Litigation & Dispute Resolution',
   'Real Estate',
@@ -51,6 +77,13 @@ const practiceAreas = [
   'Regulatory',
   'Other',
 ];
+
+const categories: MatterCategory[] = ['Live', 'Pipeline', 'Closed', 'Lost'];
+const stages: MatterStage[] = ['Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Paused', 'Closed', 'Won', 'Pending'];
+const feeTypes: FeeType[] = ['Discounted Rates with Cap', 'Discounted Rates with Estimate', 'Discounted Rates with Partial Cap', 'Rack Rates with Cap', 'Rack Rates with Estimate'];
+const sources: MatterSource[] = ['RfP', 'Direct from Client', 'Internal Referral'];
+const outcomes: PipelineOutcome[] = ['Won', 'Lost', 'Pending'];
+const currencies = ['GBP', 'USD', 'EUR', 'Ringgit', 'CHF', 'AUD', 'CAD', 'SGD'];
 
 export default function MatterForm() {
   const { id } = useParams<{ id: string }>();
@@ -78,6 +111,27 @@ export default function MatterForm() {
     budget_notes: '',
     fee_earner_mix_notes: '',
     billing_terms: '',
+    // New fields
+    category: 'Live',
+    current_stage: null,
+    fee_amount_upper_end: 0,
+    local_counsel_fee: 0,
+    bm_fee_component: 0,
+    exchange_rate: 1.0,
+    fee_currency: 'GBP',
+    fee_type: null,
+    source: null,
+    originator: '',
+    deal_currency: '',
+    deal_value: undefined,
+    cm_number: '',
+    conflicts_check: false,
+    opportunity_receipt_date: '',
+    clarifications_date: '',
+    submission_deadline: '',
+    submitted: false,
+    decision_date: '',
+    pipeline_outcome: null,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -101,9 +155,40 @@ export default function MatterForm() {
         budget_notes: existingMatter.budget_notes || '',
         fee_earner_mix_notes: existingMatter.fee_earner_mix_notes || '',
         billing_terms: existingMatter.billing_terms || '',
+        // New fields
+        category: existingMatter.category || 'Live',
+        current_stage: existingMatter.current_stage || null,
+        fee_amount_upper_end: existingMatter.fee_amount_upper_end || 0,
+        local_counsel_fee: existingMatter.local_counsel_fee || 0,
+        bm_fee_component: existingMatter.bm_fee_component || 0,
+        exchange_rate: existingMatter.exchange_rate || 1.0,
+        fee_currency: existingMatter.fee_currency || 'GBP',
+        fee_type: existingMatter.fee_type || null,
+        source: existingMatter.source || null,
+        originator: existingMatter.originator || '',
+        deal_currency: existingMatter.deal_currency || '',
+        deal_value: existingMatter.deal_value || undefined,
+        cm_number: existingMatter.cm_number || '',
+        conflicts_check: existingMatter.conflicts_check || false,
+        opportunity_receipt_date: existingMatter.opportunity_receipt_date || '',
+        clarifications_date: existingMatter.clarifications_date || '',
+        submission_deadline: existingMatter.submission_deadline || '',
+        submitted: existingMatter.submitted || false,
+        decision_date: existingMatter.decision_date || '',
+        pipeline_outcome: existingMatter.pipeline_outcome || null,
       });
     }
   }, [existingMatter]);
+
+  // Auto-calculate BM fee component
+  useEffect(() => {
+    const feeUpper = formData.fee_amount_upper_end || 0;
+    const localCounsel = formData.local_counsel_fee || 0;
+    setFormData(prev => ({
+      ...prev,
+      bm_fee_component: feeUpper - localCounsel
+    }));
+  }, [formData.fee_amount_upper_end, formData.local_counsel_fee]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +233,8 @@ export default function MatterForm() {
     }
   };
 
+  const isPipeline = formData.category === 'Pipeline';
+
   if (isEditing && matterLoading) {
     return (
       <AppLayout>
@@ -160,7 +247,7 @@ export default function MatterForm() {
 
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8 max-w-4xl mx-auto">
+      <div className="p-6 lg:p-8 max-w-5xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <Button variant="ghost" size="icon" asChild className="-ml-2">
             <Link to={isEditing ? `/matters/${id}` : '/matters'}>
@@ -172,12 +259,106 @@ export default function MatterForm() {
               {isEditing ? 'Edit Matter' : 'New Matter'}
             </h1>
             <p className="text-muted-foreground">
-              {isEditing ? 'Update matter details' : 'Create a new legal matter'}
+              {isEditing ? 'Update matter details' : 'Create a new legal matter or pipeline opportunity'}
             </p>
           </div>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Category & Status */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-lg font-heading">Category & Status</CardTitle>
+              <CardDescription>What type of matter is this?</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category *</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(v) => updateField('category', v as MatterCategory)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="current_stage">Current Stage</Label>
+                  <Select
+                    value={formData.current_stage || ''}
+                    onValueChange={(v) => updateField('current_stage', v || null)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select stage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {stages.map((stage) => (
+                        <SelectItem key={stage} value={stage}>{stage}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cm_number">C/M Number</Label>
+                  <Input
+                    id="cm_number"
+                    value={formData.cm_number}
+                    onChange={(e) => updateField('cm_number', e.target.value)}
+                    placeholder="e.g., 51339685"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Label>Onboarding Status</Label>
+                <div className="flex flex-wrap gap-6">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="aml_kyc_complete"
+                      checked={formData.aml_kyc_complete}
+                      onCheckedChange={(checked) => updateField('aml_kyc_complete', checked === true)}
+                    />
+                    <Label htmlFor="aml_kyc_complete" className="font-normal cursor-pointer">
+                      AML/KYC Complete
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="assignment_letter_signed"
+                      checked={formData.assignment_letter_signed}
+                      onCheckedChange={(checked) => updateField('assignment_letter_signed', checked === true)}
+                    />
+                    <Label htmlFor="assignment_letter_signed" className="font-normal cursor-pointer">
+                      Assignment Letter Signed
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="matter_open"
+                      checked={formData.matter_open}
+                      onCheckedChange={(checked) => updateField('matter_open', checked === true)}
+                    />
+                    <Label htmlFor="matter_open" className="font-normal cursor-pointer">
+                      Matter Open
+                    </Label>
+                  </div>
+                  {formData.aml_kyc_complete && formData.assignment_letter_signed && formData.matter_open && (
+                    <span className="text-sm text-green-600 font-medium">✓ Fully Open</span>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Basic Info */}
           <Card className="shadow-card">
             <CardHeader>
@@ -217,61 +398,22 @@ export default function MatterForm() {
                   )}
                 </div>
 
-                <div className="space-y-3">
-                  <Label>Matter Status</Label>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="aml_kyc_complete"
-                        checked={formData.aml_kyc_complete}
-                        onCheckedChange={(checked) => updateField('aml_kyc_complete', checked === true)}
-                      />
-                      <Label htmlFor="aml_kyc_complete" className="font-normal cursor-pointer">
-                        AML/KYC Complete
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="assignment_letter_signed"
-                        checked={formData.assignment_letter_signed}
-                        onCheckedChange={(checked) => updateField('assignment_letter_signed', checked === true)}
-                      />
-                      <Label htmlFor="assignment_letter_signed" className="font-normal cursor-pointer">
-                        Assignment Letter Signed
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="matter_open"
-                        checked={formData.matter_open}
-                        onCheckedChange={(checked) => updateField('matter_open', checked === true)}
-                      />
-                      <Label htmlFor="matter_open" className="font-normal cursor-pointer">
-                        Matter Open
-                      </Label>
-                    </div>
-                  </div>
-                  {formData.aml_kyc_complete && formData.assignment_letter_signed && formData.matter_open && (
-                    <p className="text-sm text-green-600 font-medium">✓ Fully Open</p>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="matter_name">Matter Name *</Label>
                   <Input
                     id="matter_name"
                     value={formData.matter_name}
                     onChange={(e) => updateField('matter_name', e.target.value)}
-                    placeholder="e.g., Acquisition of ABC Ltd"
+                    placeholder="e.g., Project Kheti"
                     className={errors.matter_name ? 'border-destructive' : ''}
                   />
                   {errors.matter_name && (
                     <p className="text-sm text-destructive">{errors.matter_name}</p>
                   )}
                 </div>
+              </div>
 
+              <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="matter_number">Matter Number *</Label>
                   <Input
@@ -285,9 +427,7 @@ export default function MatterForm() {
                     <p className="text-sm text-destructive">{errors.matter_number}</p>
                   )}
                 </div>
-              </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="practice_area">Practice Area</Label>
                   <Select
@@ -299,12 +439,39 @@ export default function MatterForm() {
                     </SelectTrigger>
                     <SelectContent>
                       {practiceAreas.map((area) => (
-                        <SelectItem key={area} value={area}>
-                          {area}
-                        </SelectItem>
+                        <SelectItem key={area} value={area}>{area}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="source">Source</Label>
+                  <Select
+                    value={formData.source || ''}
+                    onValueChange={(v) => updateField('source', v || null)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sources.map((src) => (
+                        <SelectItem key={src} value={src}>{src}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="originator">Originator</Label>
+                  <Input
+                    id="originator"
+                    value={formData.originator}
+                    onChange={(e) => updateField('originator', e.target.value)}
+                    placeholder="e.g., Andrew Hedges"
+                  />
                 </div>
 
                 <div className="space-y-2">
@@ -342,11 +509,250 @@ export default function MatterForm() {
             </CardContent>
           </Card>
 
-          {/* Budget Info */}
+          {/* Deal Information */}
           <Card className="shadow-card">
             <CardHeader>
-              <CardTitle className="text-lg font-heading">Budget & Billing</CardTitle>
-              <CardDescription>Financial terms for this matter</CardDescription>
+              <CardTitle className="text-lg font-heading">Deal Information</CardTitle>
+              <CardDescription>Details about the underlying transaction</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="deal_currency">Deal Currency</Label>
+                  <Select
+                    value={formData.deal_currency || ''}
+                    onValueChange={(v) => updateField('deal_currency', v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currencies.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="deal_value">Deal Value</Label>
+                  <Input
+                    id="deal_value"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.deal_value || ''}
+                    onChange={(e) => updateField('deal_value', e.target.value ? parseFloat(e.target.value) : null)}
+                    placeholder="e.g., 150,000,000"
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Fee Structure */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-lg font-heading">Fee Structure</CardTitle>
+              <CardDescription>Fee arrangement and breakdown</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fee_type">Fee Type</Label>
+                  <Select
+                    value={formData.fee_type || ''}
+                    onValueChange={(v) => updateField('fee_type', v || null)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {feeTypes.map((ft) => (
+                        <SelectItem key={ft} value={ft}>{ft}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="fee_currency">Fee Currency</Label>
+                  <Select
+                    value={formData.fee_currency}
+                    onValueChange={(v) => updateField('fee_currency', v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currencies.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="exchange_rate">Exchange Rate (to USD)</Label>
+                  <Input
+                    id="exchange_rate"
+                    type="number"
+                    min="0"
+                    step="0.0001"
+                    value={formData.exchange_rate}
+                    onChange={(e) => updateField('exchange_rate', parseFloat(e.target.value) || 1)}
+                  />
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="fee_amount_upper_end">Fee Amount (Upper End)</Label>
+                  <Input
+                    id="fee_amount_upper_end"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.fee_amount_upper_end}
+                    onChange={(e) => updateField('fee_amount_upper_end', parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="local_counsel_fee">Local Counsel Fee</Label>
+                  <Input
+                    id="local_counsel_fee"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.local_counsel_fee}
+                    onChange={(e) => updateField('local_counsel_fee', parseFloat(e.target.value) || 0)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bm_fee_component">BM Fee Component (auto)</Label>
+                  <Input
+                    id="bm_fee_component"
+                    type="number"
+                    value={formData.bm_fee_component}
+                    disabled
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="billing_terms">Billing Arrangements</Label>
+                <Input
+                  id="billing_terms"
+                  value={formData.billing_terms}
+                  onChange={(e) => updateField('billing_terms', e.target.value)}
+                  placeholder="e.g., Monthly, Quarterly, Milestone-based"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Pipeline Tracking - only show for Pipeline category */}
+          {isPipeline && (
+            <Card className="shadow-card border-amber-200 bg-amber-50/50">
+              <CardHeader>
+                <CardTitle className="text-lg font-heading">Pipeline Tracking</CardTitle>
+                <CardDescription>RFP and opportunity tracking details</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="conflicts_check"
+                      checked={formData.conflicts_check}
+                      onCheckedChange={(checked) => updateField('conflicts_check', checked === true)}
+                    />
+                    <Label htmlFor="conflicts_check" className="font-normal cursor-pointer">
+                      Conflicts Check Complete
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="submitted"
+                      checked={formData.submitted}
+                      onCheckedChange={(checked) => updateField('submitted', checked === true)}
+                    />
+                    <Label htmlFor="submitted" className="font-normal cursor-pointer">
+                      Submitted
+                    </Label>
+                  </div>
+                </div>
+
+                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="opportunity_receipt_date">Opportunity Receipt</Label>
+                    <Input
+                      id="opportunity_receipt_date"
+                      type="date"
+                      value={formData.opportunity_receipt_date}
+                      onChange={(e) => updateField('opportunity_receipt_date', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="clarifications_date">Q&A Date</Label>
+                    <Input
+                      id="clarifications_date"
+                      type="date"
+                      value={formData.clarifications_date}
+                      onChange={(e) => updateField('clarifications_date', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="submission_deadline">Submission Deadline</Label>
+                    <Input
+                      id="submission_deadline"
+                      type="date"
+                      value={formData.submission_deadline}
+                      onChange={(e) => updateField('submission_deadline', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="decision_date">Decision Date</Label>
+                    <Input
+                      id="decision_date"
+                      type="date"
+                      value={formData.decision_date}
+                      onChange={(e) => updateField('decision_date', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pipeline_outcome">Outcome</Label>
+                  <Select
+                    value={formData.pipeline_outcome || ''}
+                    onValueChange={(v) => updateField('pipeline_outcome', v || null)}
+                  >
+                    <SelectTrigger className="max-w-xs">
+                      <SelectValue placeholder="Pending decision" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {outcomes.map((o) => (
+                        <SelectItem key={o} value={o}>{o}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Budget (Legacy) */}
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-lg font-heading">Budget & Notes</CardTitle>
+              <CardDescription>Internal budget tracking and notes</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid sm:grid-cols-3 gap-4">
@@ -370,7 +776,7 @@ export default function MatterForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="agreed_budget_amount">Agreed Budget (£)</Label>
+                  <Label htmlFor="agreed_budget_amount">Agreed Budget</Label>
                   <Input
                     id="agreed_budget_amount"
                     type="number"
@@ -378,15 +784,11 @@ export default function MatterForm() {
                     step="0.01"
                     value={formData.agreed_budget_amount}
                     onChange={(e) => updateField('agreed_budget_amount', parseFloat(e.target.value) || 0)}
-                    className={errors.agreed_budget_amount ? 'border-destructive' : ''}
                   />
-                  {errors.agreed_budget_amount && (
-                    <p className="text-sm text-destructive">{errors.agreed_budget_amount}</p>
-                  )}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="currency">Currency</Label>
+                  <Label htmlFor="currency">Budget Currency</Label>
                   <Select
                     value={formData.currency}
                     onValueChange={(v) => updateField('currency', v)}
@@ -395,22 +797,12 @@ export default function MatterForm() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="GBP">GBP (£)</SelectItem>
-                      <SelectItem value="USD">USD ($)</SelectItem>
-                      <SelectItem value="EUR">EUR (€)</SelectItem>
+                      {currencies.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="billing_terms">Billing Terms</Label>
-                <Input
-                  id="billing_terms"
-                  value={formData.billing_terms}
-                  onChange={(e) => updateField('billing_terms', e.target.value)}
-                  placeholder="e.g., Monthly, On completion, Milestone-based"
-                />
               </div>
 
               <div className="space-y-2">

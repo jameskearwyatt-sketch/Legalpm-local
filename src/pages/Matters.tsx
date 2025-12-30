@@ -28,11 +28,14 @@ import {
 } from '@/components/ui/table';
 import { useMatters, MatterWithFinancials, MatterCategory } from '@/lib/hooks/useMatters';
 import { useClients } from '@/lib/hooks/useClients';
+import { useSnapshots } from '@/lib/hooks/useSnapshots';
+import { useAuth } from '@/lib/auth';
+import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-type SortField = 'matter_name' | 'fee_amount' | 'headroom' | 'headroom_pct' | 'total_paid_ar_wip' | 'stage';
+type SortField = 'matter_name' | 'fee_amount' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'stage';
 type SortDirection = 'asc' | 'desc';
 
 const categoryIcons: Record<MatterCategory, React.ReactNode> = {
@@ -43,8 +46,10 @@ const categoryIcons: Record<MatterCategory, React.ReactNode> = {
 };
 
 export default function Matters() {
+  const { user } = useAuth();
   const { matters, isLoading, updateMatter } = useMatters();
   const { clients } = useClients();
+  const { upsertTodaySnapshot } = useSnapshots();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<MatterCategory>('Live');
   const [clientFilter, setClientFilter] = useState<string>('all');
@@ -170,9 +175,17 @@ export default function Matters() {
           aVal = a.headroom_percent || 0;
           bVal = b.headroom_percent || 0;
           break;
-        case 'total_paid_ar_wip':
-          aVal = a.total_paid_ar_wip || 0;
-          bVal = b.total_paid_ar_wip || 0;
+        case 'wip':
+          aVal = a.latest_snapshot?.wip_amount || 0;
+          bVal = b.latest_snapshot?.wip_amount || 0;
+          break;
+        case 'ar':
+          aVal = a.latest_snapshot?.billed_amount || 0;
+          bVal = b.latest_snapshot?.billed_amount || 0;
+          break;
+        case 'paid':
+          aVal = a.latest_snapshot?.paid_amount || 0;
+          bVal = b.latest_snapshot?.paid_amount || 0;
           break;
         case 'stage':
           aVal = a.current_stage || '';
@@ -337,7 +350,13 @@ export default function Matters() {
                       {isLive && (
                         <>
                           <TableHead className="text-right">
-                            <SortableHeader field="total_paid_ar_wip">Paid+AR+WIP</SortableHeader>
+                            <SortableHeader field="wip">WIP</SortableHeader>
+                          </TableHead>
+                          <TableHead className="text-right">
+                            <SortableHeader field="ar">AR (Billed)</SortableHeader>
+                          </TableHead>
+                          <TableHead className="text-right">
+                            <SortableHeader field="paid">Paid</SortableHeader>
                           </TableHead>
                           <TableHead className="text-right">
                             <SortableHeader field="headroom">Headroom</SortableHeader>
@@ -387,8 +406,45 @@ export default function Matters() {
                           </TableCell>
                           {isLive && (
                             <>
-                              <TableCell className="text-right text-muted-foreground">
-                                {formatCurrency(matter.total_paid_ar_wip, matter.fee_currency)}
+                              <TableCell className="p-1">
+                                <EditableFinancialCell
+                                  value={matter.latest_snapshot?.wip_amount || 0}
+                                  currency={matter.fee_currency}
+                                  onSave={async (value) => {
+                                    await upsertTodaySnapshot.mutateAsync({
+                                      matterId: matter.id,
+                                      field: 'wip_amount',
+                                      value,
+                                    });
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell className="p-1">
+                                <EditableFinancialCell
+                                  value={matter.latest_snapshot?.billed_amount || 0}
+                                  currency={matter.fee_currency}
+                                  onSave={async (value) => {
+                                    await upsertTodaySnapshot.mutateAsync({
+                                      matterId: matter.id,
+                                      field: 'billed_amount',
+                                      value,
+                                    });
+                                  }}
+                                />
+                              </TableCell>
+                              <TableCell className="p-1">
+                                <EditableFinancialCell
+                                  value={matter.latest_snapshot?.paid_amount || 0}
+                                  currency={matter.fee_currency}
+                                  onSave={async (value) => {
+                                    await upsertTodaySnapshot.mutateAsync({
+                                      matterId: matter.id,
+                                      field: 'paid_amount',
+                                      value,
+                                    });
+                                  }}
+                                  className="text-success"
+                                />
                               </TableCell>
                               <TableCell className={cn(
                                 "text-right font-medium",

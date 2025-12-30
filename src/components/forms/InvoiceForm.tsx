@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ClearableDateInput } from '@/components/ui/clearable-date-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -129,11 +130,10 @@ export function InvoiceForm({ matterId, invoice, onSuccess, currency = 'GBP' }: 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="invoice_date">Invoice Date *</Label>
-          <Input
+          <ClearableDateInput
             id="invoice_date"
-            type="date"
             value={formData.invoice_date}
-            onChange={(e) => updateField('invoice_date', e.target.value)}
+            onChange={(value) => updateField('invoice_date', value)}
             className={errors.invoice_date ? 'border-destructive' : ''}
           />
           {errors.invoice_date && <p className="text-sm text-destructive">{errors.invoice_date}</p>}
@@ -141,11 +141,10 @@ export function InvoiceForm({ matterId, invoice, onSuccess, currency = 'GBP' }: 
 
         <div className="space-y-2">
           <Label htmlFor="due_date">Due Date</Label>
-          <Input
+          <ClearableDateInput
             id="due_date"
-            type="date"
             value={formData.due_date}
-            onChange={(e) => updateField('due_date', e.target.value)}
+            onChange={(value) => updateField('due_date', value)}
           />
         </div>
       </div>
@@ -181,11 +180,10 @@ export function InvoiceForm({ matterId, invoice, onSuccess, currency = 'GBP' }: 
       {(formData.status === 'Part Paid' || formData.status === 'Paid') && (
         <div className="space-y-2">
           <Label htmlFor="paid_date">Paid Date</Label>
-          <Input
+          <ClearableDateInput
             id="paid_date"
-            type="date"
             value={formData.paid_date}
-            onChange={(e) => updateField('paid_date', e.target.value)}
+            onChange={(value) => updateField('paid_date', value)}
           />
         </div>
       )}

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ClearableDateInput } from '@/components/ui/clearable-date-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useSnapshots, FinancialSnapshot, CreateSnapshotInput } from '@/lib/hooks/useSnapshots';
@@ -82,11 +83,10 @@ export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="as_of_date">As of Date *</Label>
-        <Input
+        <ClearableDateInput
           id="as_of_date"
-          type="date"
           value={formData.as_of_date}
-          onChange={(e) => updateField('as_of_date', e.target.value)}
+          onChange={(value) => updateField('as_of_date', value)}
           className={errors.as_of_date ? 'border-destructive' : ''}
         />
         {errors.as_of_date && <p className="text-sm text-destructive">{errors.as_of_date}</p>}

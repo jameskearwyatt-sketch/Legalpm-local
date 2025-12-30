@@ -70,6 +70,66 @@ export function useSnapshots(matterId?: string) {
     },
   });
 
+  // Upsert snapshot for today - used for inline editing
+  const upsertTodaySnapshot = useMutation({
+    mutationFn: async ({ matterId, field, value }: { matterId: string; field: 'wip_amount' | 'billed_amount' | 'paid_amount'; value: number }) => {
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Check if a snapshot exists for today
+      const { data: existing } = await supabase
+        .from('financial_snapshots')
+        .select('*')
+        .eq('matter_id', matterId)
+        .eq('as_of_date', today)
+        .maybeSingle();
+
+      if (existing) {
+        // Update existing snapshot
+        const { data, error } = await supabase
+          .from('financial_snapshots')
+          .update({ [field]: value })
+          .eq('id', existing.id)
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      } else {
+        // Get the latest snapshot to copy other values
+        const { data: latestSnapshot } = await supabase
+          .from('financial_snapshots')
+          .select('*')
+          .eq('matter_id', matterId)
+          .order('as_of_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        // Create new snapshot with today's date
+        const { data, error } = await supabase
+          .from('financial_snapshots')
+          .insert({
+            matter_id: matterId,
+            user_id: user!.id,
+            as_of_date: today,
+            wip_amount: field === 'wip_amount' ? value : (latestSnapshot?.wip_amount || 0),
+            billed_amount: field === 'billed_amount' ? value : (latestSnapshot?.billed_amount || 0),
+            paid_amount: field === 'paid_amount' ? value : (latestSnapshot?.paid_amount || 0),
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['snapshots'] });
+      queryClient.invalidateQueries({ queryKey: ['matters'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to update', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const updateSnapshot = useMutation({
     mutationFn: async ({ id, ...input }: Partial<CreateSnapshotInput> & { id: string }) => {
       const { data, error } = await supabase
@@ -120,5 +180,6 @@ export function useSnapshots(matterId?: string) {
     createSnapshot,
     updateSnapshot,
     deleteSnapshot,
+    upsertTodaySnapshot,
   };
 }

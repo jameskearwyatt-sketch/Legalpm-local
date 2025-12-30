@@ -35,10 +35,14 @@ import { useClients, Client } from '@/lib/hooks/useClients';
 import { Search, Plus, Edit, Trash2, Loader2, Users } from 'lucide-react';
 import { format } from 'date-fns';
 
-export default function Clients() {
+interface ClientsProps {
+  defaultDialogOpen?: boolean;
+}
+
+export default function Clients({ defaultDialogOpen = false }: ClientsProps) {
   const { clients, isLoading, deleteClient } = useClients();
   const [search, setSearch] = useState('');
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(defaultDialogOpen);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
 
   const filteredClients = clients.filter(

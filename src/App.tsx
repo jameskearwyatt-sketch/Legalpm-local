@@ -46,6 +46,7 @@ function AppRoutes() {
       <Route path="/matters/:id" element={<ProtectedRoute><MatterDetail /></ProtectedRoute>} />
       <Route path="/matters/:id/edit" element={<ProtectedRoute><MatterForm /></ProtectedRoute>} />
       <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
+      <Route path="/clients/new" element={<ProtectedRoute><Clients defaultDialogOpen /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />

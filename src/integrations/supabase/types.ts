@@ -153,20 +153,42 @@ export type Database = {
           aml_kyc_complete: boolean
           assignment_letter_signed: boolean
           billing_terms: string | null
+          bm_fee_component: number
           budget_notes: string | null
           budget_type: Database["public"]["Enums"]["budget_type"]
+          category: Database["public"]["Enums"]["matter_category"]
+          clarifications_date: string | null
           client_id: string
+          cm_number: string | null
+          conflicts_check: boolean
           created_at: string
           currency: string
+          current_stage: Database["public"]["Enums"]["matter_stage"] | null
+          deal_currency: string | null
+          deal_value: number | null
+          decision_date: string | null
+          exchange_rate: number
+          fee_amount_upper_end: number
+          fee_currency: string
           fee_earner_mix_notes: string | null
+          fee_type: Database["public"]["Enums"]["fee_type"] | null
           id: string
           lead_partner: string | null
+          local_counsel_fee: number
           matter_name: string
           matter_number: string
           matter_open: boolean
+          opportunity_receipt_date: string | null
+          originator: string | null
+          pipeline_outcome:
+            | Database["public"]["Enums"]["pipeline_outcome"]
+            | null
           practice_area: string | null
+          source: Database["public"]["Enums"]["matter_source"] | null
           start_date: string | null
           status: Database["public"]["Enums"]["matter_status"]
+          submission_deadline: string | null
+          submitted: boolean
           target_close_date: string | null
           updated_at: string
           user_id: string
@@ -176,20 +198,42 @@ export type Database = {
           aml_kyc_complete?: boolean
           assignment_letter_signed?: boolean
           billing_terms?: string | null
+          bm_fee_component?: number
           budget_notes?: string | null
           budget_type?: Database["public"]["Enums"]["budget_type"]
+          category?: Database["public"]["Enums"]["matter_category"]
+          clarifications_date?: string | null
           client_id: string
+          cm_number?: string | null
+          conflicts_check?: boolean
           created_at?: string
           currency?: string
+          current_stage?: Database["public"]["Enums"]["matter_stage"] | null
+          deal_currency?: string | null
+          deal_value?: number | null
+          decision_date?: string | null
+          exchange_rate?: number
+          fee_amount_upper_end?: number
+          fee_currency?: string
           fee_earner_mix_notes?: string | null
+          fee_type?: Database["public"]["Enums"]["fee_type"] | null
           id?: string
           lead_partner?: string | null
+          local_counsel_fee?: number
           matter_name: string
           matter_number: string
           matter_open?: boolean
+          opportunity_receipt_date?: string | null
+          originator?: string | null
+          pipeline_outcome?:
+            | Database["public"]["Enums"]["pipeline_outcome"]
+            | null
           practice_area?: string | null
+          source?: Database["public"]["Enums"]["matter_source"] | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["matter_status"]
+          submission_deadline?: string | null
+          submitted?: boolean
           target_close_date?: string | null
           updated_at?: string
           user_id: string
@@ -199,20 +243,42 @@ export type Database = {
           aml_kyc_complete?: boolean
           assignment_letter_signed?: boolean
           billing_terms?: string | null
+          bm_fee_component?: number
           budget_notes?: string | null
           budget_type?: Database["public"]["Enums"]["budget_type"]
+          category?: Database["public"]["Enums"]["matter_category"]
+          clarifications_date?: string | null
           client_id?: string
+          cm_number?: string | null
+          conflicts_check?: boolean
           created_at?: string
           currency?: string
+          current_stage?: Database["public"]["Enums"]["matter_stage"] | null
+          deal_currency?: string | null
+          deal_value?: number | null
+          decision_date?: string | null
+          exchange_rate?: number
+          fee_amount_upper_end?: number
+          fee_currency?: string
           fee_earner_mix_notes?: string | null
+          fee_type?: Database["public"]["Enums"]["fee_type"] | null
           id?: string
           lead_partner?: string | null
+          local_counsel_fee?: number
           matter_name?: string
           matter_number?: string
           matter_open?: boolean
+          opportunity_receipt_date?: string | null
+          originator?: string | null
+          pipeline_outcome?:
+            | Database["public"]["Enums"]["pipeline_outcome"]
+            | null
           practice_area?: string | null
+          source?: Database["public"]["Enums"]["matter_source"] | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["matter_status"]
+          submission_deadline?: string | null
+          submitted?: boolean
           target_close_date?: string | null
           updated_at?: string
           user_id?: string
@@ -372,8 +438,25 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       budget_type: "Fixed" | "Cap" | "Estimate" | "Retainer" | "Hourly"
+      fee_type:
+        | "Discounted Rates with Cap"
+        | "Discounted Rates with Estimate"
+        | "Discounted Rates with Partial Cap"
+        | "Rack Rates with Cap"
+        | "Rack Rates with Estimate"
       invoice_status: "Draft" | "Sent" | "Part Paid" | "Paid" | "Overdue"
+      matter_category: "Live" | "Pipeline" | "Closed" | "Lost"
+      matter_source: "RfP" | "Direct from Client" | "Internal Referral"
+      matter_stage:
+        | "Term Sheet"
+        | "Documentation - Start"
+        | "Documentation - Close"
+        | "Paused"
+        | "Closed"
+        | "Won"
+        | "Pending"
       matter_status: "Open" | "On Hold" | "Closed"
+      pipeline_outcome: "Won" | "Lost" | "Pending"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -503,8 +586,27 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user"],
       budget_type: ["Fixed", "Cap", "Estimate", "Retainer", "Hourly"],
+      fee_type: [
+        "Discounted Rates with Cap",
+        "Discounted Rates with Estimate",
+        "Discounted Rates with Partial Cap",
+        "Rack Rates with Cap",
+        "Rack Rates with Estimate",
+      ],
       invoice_status: ["Draft", "Sent", "Part Paid", "Paid", "Overdue"],
+      matter_category: ["Live", "Pipeline", "Closed", "Lost"],
+      matter_source: ["RfP", "Direct from Client", "Internal Referral"],
+      matter_stage: [
+        "Term Sheet",
+        "Documentation - Start",
+        "Documentation - Close",
+        "Paused",
+        "Closed",
+        "Won",
+        "Pending",
+      ],
       matter_status: ["Open", "On Hold", "Closed"],
+      pipeline_outcome: ["Won", "Lost", "Pending"],
     },
   },
 } as const

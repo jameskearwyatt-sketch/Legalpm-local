@@ -4,7 +4,8 @@ import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -20,27 +21,43 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useMatters, MatterWithFinancials } from '@/lib/hooks/useMatters';
+import { useMatters, MatterWithFinancials, MatterCategory } from '@/lib/hooks/useMatters';
 import { useClients } from '@/lib/hooks/useClients';
-import { Search, Plus, ArrowUpDown, Loader2, Briefcase } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-type SortField = 'matter_name' | 'agreed_budget_amount' | 'wip' | 'billed' | 'remaining' | 'budget_used' | 'collection';
+type SortField = 'matter_name' | 'fee_amount' | 'headroom' | 'headroom_pct' | 'total_paid_ar_wip' | 'stage';
 type SortDirection = 'asc' | 'desc';
+
+const categoryIcons: Record<MatterCategory, React.ReactNode> = {
+  Live: <Briefcase className="h-4 w-4" />,
+  Pipeline: <TrendingUp className="h-4 w-4" />,
+  Closed: <CheckCircle2 className="h-4 w-4" />,
+  Lost: <XCircle className="h-4 w-4" />,
+};
 
 export default function Matters() {
   const { matters, isLoading } = useMatters();
   const { clients } = useClients();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [categoryFilter, setCategoryFilter] = useState<MatterCategory>('Live');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('matter_name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-GB', {
-      style: 'currency',
-      currency: 'GBP',
+  const formatCurrency = (value: number, currency: string = 'GBP') => {
+    const symbols: Record<string, string> = {
+      GBP: '£',
+      USD: '$',
+      EUR: '€',
+      Ringgit: 'RM ',
+      CHF: 'CHF ',
+      AUD: 'A$',
+      CAD: 'C$',
+      SGD: 'S$',
+    };
+    const symbol = symbols[currency] || currency + ' ';
+    return symbol + new Intl.NumberFormat('en-GB', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
@@ -58,6 +75,9 @@ export default function Matters() {
   const filteredMatters = useMemo(() => {
     let result = [...matters];
 
+    // Category filter
+    result = result.filter((m) => m.category === categoryFilter);
+
     // Search filter
     if (search) {
       const searchLower = search.toLowerCase();
@@ -66,13 +86,10 @@ export default function Matters() {
           m.matter_name.toLowerCase().includes(searchLower) ||
           m.matter_number.toLowerCase().includes(searchLower) ||
           m.clients?.name.toLowerCase().includes(searchLower) ||
-          m.lead_partner?.toLowerCase().includes(searchLower)
+          m.lead_partner?.toLowerCase().includes(searchLower) ||
+          m.originator?.toLowerCase().includes(searchLower) ||
+          m.practice_area?.toLowerCase().includes(searchLower)
       );
-    }
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      result = result.filter((m) => m.status === statusFilter);
     }
 
     // Client filter
@@ -88,29 +105,25 @@ export default function Matters() {
           aVal = a.matter_name.toLowerCase();
           bVal = b.matter_name.toLowerCase();
           break;
-        case 'agreed_budget_amount':
-          aVal = a.agreed_budget_amount;
-          bVal = b.agreed_budget_amount;
+        case 'fee_amount':
+          aVal = a.fee_amount_upper_end || 0;
+          bVal = b.fee_amount_upper_end || 0;
           break;
-        case 'wip':
-          aVal = a.latest_snapshot?.wip_amount || 0;
-          bVal = b.latest_snapshot?.wip_amount || 0;
+        case 'headroom':
+          aVal = a.headroom || 0;
+          bVal = b.headroom || 0;
           break;
-        case 'billed':
-          aVal = a.latest_snapshot?.billed_amount || 0;
-          bVal = b.latest_snapshot?.billed_amount || 0;
+        case 'headroom_pct':
+          aVal = a.headroom_percent || 0;
+          bVal = b.headroom_percent || 0;
           break;
-        case 'remaining':
-          aVal = a.remaining_budget;
-          bVal = b.remaining_budget;
+        case 'total_paid_ar_wip':
+          aVal = a.total_paid_ar_wip || 0;
+          bVal = b.total_paid_ar_wip || 0;
           break;
-        case 'budget_used':
-          aVal = a.budget_used_percent;
-          bVal = b.budget_used_percent;
-          break;
-        case 'collection':
-          aVal = a.collection_rate;
-          bVal = b.collection_rate;
+        case 'stage':
+          aVal = a.current_stage || '';
+          bVal = b.current_stage || '';
           break;
         default:
           return 0;
@@ -122,7 +135,21 @@ export default function Matters() {
     });
 
     return result;
-  }, [matters, search, statusFilter, clientFilter, sortField, sortDirection]);
+  }, [matters, search, categoryFilter, clientFilter, sortField, sortDirection]);
+
+  const categoryCounts = useMemo(() => {
+    const counts: Record<MatterCategory, number> = { Live: 0, Pipeline: 0, Closed: 0, Lost: 0 };
+    matters.forEach(m => {
+      if (counts[m.category] !== undefined) {
+        counts[m.category]++;
+      }
+    });
+    return counts;
+  }, [matters]);
+
+  const categoryTotals = useMemo(() => {
+    return filteredMatters.reduce((sum, m) => sum + (m.bm_fee_component || 0) * (m.exchange_rate || 1), 0);
+  }, [filteredMatters]);
 
   const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <button
@@ -137,11 +164,15 @@ export default function Matters() {
     </button>
   );
 
-  const getBudgetStatus = (matter: MatterWithFinancials) => {
-    if (matter.budget_used_percent > 100) return 'danger';
-    if (matter.budget_used_percent >= 80) return 'warning';
+  const getHeadroomStatus = (matter: MatterWithFinancials) => {
+    const pct = matter.headroom_percent || 0;
+    if (pct < 0) return 'danger';
+    if (pct < 20) return 'warning';
     return 'success';
   };
+
+  const isPipeline = categoryFilter === 'Pipeline';
+  const isLive = categoryFilter === 'Live';
 
   return (
     <AppLayout>
@@ -150,7 +181,7 @@ export default function Matters() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl lg:text-3xl font-heading font-bold text-foreground">Matters</h1>
-            <p className="text-muted-foreground mt-1">Manage your legal matters and track budgets</p>
+            <p className="text-muted-foreground mt-1">Track live transactions, pipeline, and closed matters</p>
           </div>
           <Button asChild>
             <Link to="/matters/new">
@@ -160,43 +191,55 @@ export default function Matters() {
           </Button>
         </div>
 
-        {/* Filters */}
+        {/* Category Tabs */}
+        <Tabs value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as MatterCategory)}>
+          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+            {(['Live', 'Pipeline', 'Closed', 'Lost'] as MatterCategory[]).map((cat) => (
+              <TabsTrigger key={cat} value={cat} className="gap-2">
+                {categoryIcons[cat]}
+                <span>{cat}</span>
+                <span className="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded-full">
+                  {categoryCounts[cat]}
+                </span>
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+
+        {/* Summary & Filters */}
         <Card className="shadow-card">
           <CardContent className="pt-6">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search matters, clients, partners..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                />
+            <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
+              <div className="flex flex-col sm:flex-row gap-4 flex-1">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search matters, clients, partners..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                <Select value={clientFilter} onValueChange={setClientFilter}>
+                  <SelectTrigger className="w-full sm:w-48">
+                    <SelectValue placeholder="Client" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Clients</SelectItem>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-full sm:w-40">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="Open">Open</SelectItem>
-                  <SelectItem value="On Hold">On Hold</SelectItem>
-                  <SelectItem value="Closed">Closed</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={clientFilter} onValueChange={setClientFilter}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="Client" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Clients</SelectItem>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Total BM Fees (USD)</p>
+                <p className="text-2xl font-bold text-foreground">
+                  ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(categoryTotals)}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -211,13 +254,13 @@ export default function Matters() {
             ) : filteredMatters.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <Briefcase className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-medium text-foreground">No matters found</h3>
+                <h3 className="text-lg font-medium text-foreground">No {categoryFilter.toLowerCase()} matters found</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {search || statusFilter !== 'all' || clientFilter !== 'all'
+                  {search || clientFilter !== 'all'
                     ? 'Try adjusting your filters'
-                    : 'Get started by creating your first matter'}
+                    : `Get started by creating a new ${categoryFilter.toLowerCase()} matter`}
                 </p>
-                {!search && statusFilter === 'all' && clientFilter === 'all' && (
+                {!search && clientFilter === 'all' && (
                   <Button asChild className="mt-4">
                     <Link to="/matters/new">
                       <Plus className="mr-2 h-4 w-4" />
@@ -231,34 +274,44 @@ export default function Matters() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="min-w-[200px]">
-                        <SortableHeader field="matter_name">Matter</SortableHeader>
-                      </TableHead>
-                      <TableHead>Client</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader field="agreed_budget_amount">Budget</SortableHeader>
+                      <TableHead className="min-w-[180px]">
+                        <SortableHeader field="matter_name">Client / Matter</SortableHeader>
                       </TableHead>
                       <TableHead className="text-right">
-                        <SortableHeader field="wip">WIP</SortableHeader>
+                        <SortableHeader field="fee_amount">Fee (Upper)</SortableHeader>
                       </TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader field="billed">Billed</SortableHeader>
+                      <TableHead className="text-right">BM Fee</TableHead>
+                      {isLive && (
+                        <>
+                          <TableHead className="text-right">
+                            <SortableHeader field="total_paid_ar_wip">Paid+AR+WIP</SortableHeader>
+                          </TableHead>
+                          <TableHead className="text-right">
+                            <SortableHeader field="headroom">Headroom</SortableHeader>
+                          </TableHead>
+                          <TableHead className="text-right">
+                            <SortableHeader field="headroom_pct">%</SortableHeader>
+                          </TableHead>
+                        </>
+                      )}
+                      {isPipeline && (
+                        <>
+                          <TableHead>Source</TableHead>
+                          <TableHead>Deadline</TableHead>
+                          <TableHead>Outcome</TableHead>
+                        </>
+                      )}
+                      <TableHead>
+                        <SortableHeader field="stage">Stage</SortableHeader>
                       </TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader field="remaining">Remaining</SortableHeader>
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader field="budget_used">% Used</SortableHeader>
-                      </TableHead>
-                      <TableHead className="text-right">
-                        <SortableHeader field="collection">Collection</SortableHeader>
-                      </TableHead>
+                      <TableHead>Practice</TableHead>
+                      <TableHead>Originator</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredMatters.map((matter) => {
-                      const budgetStatus = getBudgetStatus(matter);
+                      const headroomStatus = getHeadroomStatus(matter);
+                      const bmFeeUsd = (matter.bm_fee_component || 0) * (matter.exchange_rate || 1);
                       return (
                         <TableRow key={matter.id} className="group">
                           <TableCell>
@@ -266,52 +319,77 @@ export default function Matters() {
                               to={`/matters/${matter.id}`}
                               className="block hover:text-primary transition-colors"
                             >
+                              <p className="text-sm text-muted-foreground">{matter.clients?.name}</p>
                               <p className="font-medium text-foreground group-hover:text-primary transition-colors">
                                 {matter.matter_name}
                               </p>
-                              <p className="text-sm text-muted-foreground">{matter.matter_number}</p>
                             </Link>
                           </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {matter.clients?.name}
-                          </TableCell>
-                          <TableCell>
-                            <StatusBadge status={matter.status} />
-                          </TableCell>
                           <TableCell className="text-right font-medium">
-                            {formatCurrency(matter.agreed_budget_amount)}
+                            {formatCurrency(matter.fee_amount_upper_end, matter.fee_currency)}
                           </TableCell>
                           <TableCell className="text-right text-muted-foreground">
-                            {formatCurrency(matter.latest_snapshot?.wip_amount || 0)}
+                            ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(bmFeeUsd)}
                           </TableCell>
-                          <TableCell className="text-right text-muted-foreground">
-                            {formatCurrency(matter.latest_snapshot?.billed_amount || 0)}
+                          {isLive && (
+                            <>
+                              <TableCell className="text-right text-muted-foreground">
+                                {formatCurrency(matter.total_paid_ar_wip, matter.fee_currency)}
+                              </TableCell>
+                              <TableCell className={cn(
+                                "text-right font-medium",
+                                matter.headroom < 0 ? "text-danger" : "text-foreground"
+                              )}>
+                                {formatCurrency(matter.headroom, matter.fee_currency)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className={cn(
+                                  "font-medium",
+                                  headroomStatus === 'danger' && 'text-danger',
+                                  headroomStatus === 'warning' && 'text-warning',
+                                  headroomStatus === 'success' && 'text-success'
+                                )}>
+                                  {matter.headroom_percent.toFixed(0)}%
+                                </span>
+                              </TableCell>
+                            </>
+                          )}
+                          {isPipeline && (
+                            <>
+                              <TableCell className="text-muted-foreground">
+                                {matter.source || '-'}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {matter.submission_deadline || '-'}
+                              </TableCell>
+                              <TableCell>
+                                {matter.pipeline_outcome ? (
+                                  <span className={cn(
+                                    "text-sm font-medium px-2 py-1 rounded",
+                                    matter.pipeline_outcome === 'Won' && 'bg-green-100 text-green-700',
+                                    matter.pipeline_outcome === 'Lost' && 'bg-red-100 text-red-700',
+                                    matter.pipeline_outcome === 'Pending' && 'bg-amber-100 text-amber-700'
+                                  )}>
+                                    {matter.pipeline_outcome}
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground">Pending</span>
+                                )}
+                              </TableCell>
+                            </>
+                          )}
+                          <TableCell>
+                            {matter.current_stage ? (
+                              <span className="text-sm px-2 py-1 bg-muted rounded">
+                                {matter.current_stage}
+                              </span>
+                            ) : '-'}
                           </TableCell>
-                          <TableCell className={cn(
-                            "text-right font-medium",
-                            matter.remaining_budget < 0 ? "text-danger" : "text-foreground"
-                          )}>
-                            {formatCurrency(matter.remaining_budget)}
+                          <TableCell className="text-muted-foreground text-sm">
+                            {matter.practice_area || '-'}
                           </TableCell>
-                          <TableCell className="text-right">
-                            <span className={cn(
-                              "font-medium",
-                              budgetStatus === 'danger' && 'text-danger',
-                              budgetStatus === 'warning' && 'text-warning',
-                              budgetStatus === 'success' && 'text-success'
-                            )}>
-                              {matter.budget_used_percent.toFixed(0)}%
-                            </span>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <span className={cn(
-                              "font-medium",
-                              matter.collection_rate < 60 && 'text-danger',
-                              matter.collection_rate >= 60 && matter.collection_rate < 80 && 'text-warning',
-                              matter.collection_rate >= 80 && 'text-success'
-                            )}>
-                              {matter.collection_rate.toFixed(0)}%
-                            </span>
+                          <TableCell className="text-muted-foreground text-sm">
+                            {matter.originator || '-'}
                           </TableCell>
                         </TableRow>
                       );

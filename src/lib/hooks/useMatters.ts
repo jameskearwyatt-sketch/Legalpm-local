@@ -3,6 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 
+export type MatterCategory = 'Live' | 'Pipeline' | 'Closed' | 'Lost';
+export type MatterStage = 'Term Sheet' | 'Documentation - Start' | 'Documentation - Close' | 'Paused' | 'Closed' | 'Won' | 'Pending';
+export type FeeType = 'Discounted Rates with Cap' | 'Discounted Rates with Estimate' | 'Discounted Rates with Partial Cap' | 'Rack Rates with Cap' | 'Rack Rates with Estimate';
+export type MatterSource = 'RfP' | 'Direct from Client' | 'Internal Referral';
+export type PipelineOutcome = 'Won' | 'Lost' | 'Pending';
+
 export interface Matter {
   id: string;
   user_id: string;
@@ -23,6 +29,27 @@ export interface Matter {
   budget_notes: string | null;
   fee_earner_mix_notes: string | null;
   billing_terms: string | null;
+  // New fields
+  category: MatterCategory;
+  current_stage: MatterStage | null;
+  fee_amount_upper_end: number;
+  local_counsel_fee: number;
+  bm_fee_component: number;
+  exchange_rate: number;
+  fee_currency: string;
+  fee_type: FeeType | null;
+  source: MatterSource | null;
+  originator: string | null;
+  deal_currency: string | null;
+  deal_value: number | null;
+  cm_number: string | null;
+  conflicts_check: boolean;
+  opportunity_receipt_date: string | null;
+  clarifications_date: string | null;
+  submission_deadline: string | null;
+  submitted: boolean;
+  decision_date: string | null;
+  pipeline_outcome: PipelineOutcome | null;
   created_at: string;
   updated_at: string;
   clients?: {
@@ -41,6 +68,9 @@ export interface MatterWithFinancials extends Matter {
   remaining_budget: number;
   budget_used_percent: number;
   collection_rate: number;
+  headroom: number;
+  headroom_percent: number;
+  total_paid_ar_wip: number;
 }
 
 export interface CreateMatterInput {
@@ -61,6 +91,27 @@ export interface CreateMatterInput {
   budget_notes?: string;
   fee_earner_mix_notes?: string;
   billing_terms?: string;
+  // New fields
+  category?: MatterCategory;
+  current_stage?: MatterStage | null;
+  fee_amount_upper_end?: number;
+  local_counsel_fee?: number;
+  bm_fee_component?: number;
+  exchange_rate?: number;
+  fee_currency?: string;
+  fee_type?: FeeType | null;
+  source?: MatterSource | null;
+  originator?: string;
+  deal_currency?: string;
+  deal_value?: number;
+  cm_number?: string;
+  conflicts_check?: boolean;
+  opportunity_receipt_date?: string;
+  clarifications_date?: string;
+  submission_deadline?: string;
+  submitted?: boolean;
+  decision_date?: string;
+  pipeline_outcome?: PipelineOutcome | null;
 }
 
 export function useMatters() {
@@ -108,11 +159,17 @@ export function useMatters() {
         const billedAmount = snapshot?.billed_amount || 0;
         const paidAmount = snapshot?.paid_amount || 0;
         const budget = matter.agreed_budget_amount || 0;
+        const feeUpperEnd = matter.fee_amount_upper_end || 0;
         
         const totalUsed = billedAmount + wipAmount;
         const remainingBudget = budget - totalUsed;
         const budgetUsedPercent = budget > 0 ? (totalUsed / budget) * 100 : 0;
         const collectionRate = billedAmount > 0 ? (paidAmount / billedAmount) * 100 : 0;
+        
+        // Headroom calculation: Fee Amount - (Paid + AR + WIP)
+        const totalPaidArWip = paidAmount + billedAmount + wipAmount;
+        const headroom = feeUpperEnd - totalPaidArWip;
+        const headroomPercent = feeUpperEnd > 0 ? (headroom / feeUpperEnd) * 100 : 0;
 
         return {
           ...matter,
@@ -125,6 +182,9 @@ export function useMatters() {
           remaining_budget: remainingBudget,
           budget_used_percent: budgetUsedPercent,
           collection_rate: collectionRate,
+          headroom,
+          headroom_percent: headroomPercent,
+          total_paid_ar_wip: totalPaidArWip,
         } as MatterWithFinancials;
       }) || [];
     },

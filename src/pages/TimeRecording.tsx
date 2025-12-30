@@ -394,7 +394,7 @@ export default function TimeRecording() {
         if (entry.type === 'matter') {
           output += `CLIENT: ${entry.clientName || 'N/A'}\n`;
           output += `MATTER: ${entry.matterName || 'N/A'}\n`;
-          output += `MATTER NUMBER: ${entry.matterNumber || 'N/A'}\n`;
+          output += `MATTER NUMBER: ${entry.cmNumber || 'N/A'}\n`;
         } else {
           const code = entry.nonChargeableCode ? ` (${entry.nonChargeableCode})` : '';
           output += `NON-CHARGEABLE: ${entry.nonChargeableName}${code}\n`;
@@ -658,7 +658,7 @@ export default function TimeRecording() {
                       <div className="space-y-0.5">
                         <div className="font-semibold text-primary">{entry.clientName || 'Unknown Client'}</div>
                         <div className="font-medium">{entry.matterName}</div>
-                        <div className="text-sm text-muted-foreground">{entry.matterNumber}</div>
+                        <div className="text-sm text-muted-foreground">{entry.cmNumber || 'N/A'}</div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -915,7 +915,7 @@ export default function TimeRecording() {
                           <div className="font-semibold text-primary">{entry.clientName || 'Unknown Client'}</div>
                           <div className="font-medium">{entry.matterName || 'Unknown Matter'}</div>
                           <div className="text-sm text-muted-foreground">
-                            {entry.matterNumber || 'N/A'}
+                            {entry.cmNumber || 'N/A'}
                           </div>
                         </div>
                       ) : (

@@ -52,6 +52,8 @@ interface GridRowEntry {
   matterId?: string;
   matterNumber?: string;
   matterName?: string;
+  clientName?: string;
+  cmNumber?: string;
   nonChargeableCode?: string;
   nonChargeableName?: string;
   hours: number;
@@ -63,20 +65,24 @@ interface GridRowEntry {
   otherDescription?: string;
 }
 
+interface DayOutputEntry {
+  id: string;
+  type: 'matter' | 'non-chargeable';
+  matterNumber?: string;
+  matterName?: string;
+  clientName?: string;
+  cmNumber?: string;
+  nonChargeableCode?: string;
+  nonChargeableName?: string;
+  otherDescription?: string;
+  hours: number;
+  narrative: string;
+  polishedNarrative: string;
+}
+
 interface DayOutput {
   date: Date;
-  entries: {
-    id: string;
-    type: 'matter' | 'non-chargeable';
-    matterNumber?: string;
-    matterName?: string;
-    nonChargeableCode?: string;
-    nonChargeableName?: string;
-    otherDescription?: string;
-    hours: number;
-    narrative: string;
-    polishedNarrative: string;
-  }[];
+  entries: DayOutputEntry[];
 }
 
 type Step = 'mode-select' | 'grid-input' | 'output';
@@ -128,6 +134,8 @@ export default function TimeRecording() {
         matterId: matter.id,
         matterNumber: matter.matter_number,
         matterName: matter.matter_name,
+        clientName: matter.clients?.name,
+        cmNumber: matter.cm_number || undefined,
         hours: 0,
         narrative: '',
         selectedDays: [],
@@ -265,6 +273,8 @@ export default function TimeRecording() {
             type: entry.type,
             matterNumber: entry.matterNumber,
             matterName: entry.matterName,
+            clientName: entry.clientName,
+            cmNumber: entry.cmNumber,
             nonChargeableCode: entry.nonChargeableCode,
             nonChargeableName: entry.nonChargeableName,
             otherDescription: entry.otherDescription,
@@ -325,6 +335,8 @@ export default function TimeRecording() {
               type: entry.type,
               matterNumber: entry.matterNumber,
               matterName: entry.matterName,
+              clientName: entry.clientName,
+              cmNumber: entry.cmNumber,
               nonChargeableCode: entry.nonChargeableCode,
               nonChargeableName: entry.nonChargeableName,
               otherDescription: entry.otherDescription,
@@ -380,7 +392,9 @@ export default function TimeRecording() {
 
       for (const entry of day.entries) {
         if (entry.type === 'matter') {
-          output += `MATTER: ${entry.matterNumber || 'N/A'} - ${entry.matterName || 'N/A'}\n`;
+          output += `CLIENT: ${entry.clientName || 'N/A'}\n`;
+          output += `MATTER: ${entry.matterName || 'N/A'}\n`;
+          output += `CM NUMBER: ${entry.cmNumber || 'N/A'}\n`;
         } else {
           const code = entry.nonChargeableCode ? ` (${entry.nonChargeableCode})` : '';
           output += `NON-CHARGEABLE: ${entry.nonChargeableName}${code}\n`;
@@ -395,6 +409,26 @@ export default function TimeRecording() {
     }
 
     return output;
+  };
+
+  // Update a polished narrative in the output
+  const updatePolishedNarrative = (dayIndex: number, entryId: string, newNarrative: string) => {
+    if (!processedOutput) return;
+    
+    setProcessedOutput(prev => {
+      if (!prev) return prev;
+      return prev.map((day, dIdx) => {
+        if (dIdx !== dayIndex) return day;
+        return {
+          ...day,
+          entries: day.entries.map(entry => 
+            entry.id === entryId 
+              ? { ...entry, polishedNarrative: newNarrative }
+              : entry
+          )
+        };
+      });
+    });
   };
 
   const copyToClipboard = async () => {
@@ -868,19 +902,22 @@ export default function TimeRecording() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[250px]">Matter / Activity</TableHead>
+                  <TableHead className="w-[280px]">Client / Matter / CM Number</TableHead>
                   <TableHead className="w-[80px] text-center">Hours</TableHead>
-                  <TableHead>Polished Narrative</TableHead>
+                  <TableHead>Polished Narrative (editable)</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {day.entries.map((entry, entryIndex) => (
-                  <TableRow key={entryIndex}>
+                {day.entries.map((entry) => (
+                  <TableRow key={entry.id}>
                     <TableCell>
                       {entry.type === 'matter' ? (
-                        <div>
-                          <div className="font-medium">{entry.matterNumber}</div>
-                          <div className="text-sm text-muted-foreground">{entry.matterName}</div>
+                        <div className="space-y-0.5">
+                          <div className="font-semibold text-primary">{entry.clientName || 'Unknown Client'}</div>
+                          <div className="font-medium">{entry.matterName || 'Unknown Matter'}</div>
+                          <div className="text-sm text-muted-foreground">
+                            CM: {entry.cmNumber || 'N/A'}
+                          </div>
                         </div>
                       ) : (
                         <div>
@@ -898,7 +935,12 @@ export default function TimeRecording() {
                     </TableCell>
                     <TableCell className="text-center font-medium">{entry.hours}</TableCell>
                     <TableCell>
-                      <p className="text-sm">{entry.polishedNarrative || entry.narrative}</p>
+                      <Textarea
+                        value={entry.polishedNarrative || entry.narrative}
+                        onChange={(e) => updatePolishedNarrative(dayIndex, entry.id, e.target.value)}
+                        className="min-h-[80px] text-sm"
+                        placeholder="Edit the polished narrative..."
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

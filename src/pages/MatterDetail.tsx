@@ -264,19 +264,25 @@ export default function MatterDetail() {
               </Link>
             </Button>
             <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
-                <Input
-                  value={formData.matter_name || ''}
-                  onChange={(e) => updateField('matter_name', e.target.value)}
-                  className="text-2xl lg:text-3xl font-heading font-bold border-0 p-0 h-auto focus-visible:ring-0 bg-transparent"
-                />
+              <div className="flex items-center gap-3 mb-1 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl lg:text-3xl font-heading font-bold text-foreground">
+                    {matter.clients?.name}
+                  </span>
+                  <span className="text-2xl lg:text-3xl font-heading text-muted-foreground">–</span>
+                  <Input
+                    value={formData.matter_name || ''}
+                    onChange={(e) => updateField('matter_name', e.target.value)}
+                    className="text-2xl lg:text-3xl font-heading font-bold border-0 p-0 h-auto focus-visible:ring-0 bg-transparent"
+                  />
+                </div>
                 <StatusBadge status={formData.status || matter.status} />
               </div>
               <Input
-                value={formData.matter_number || ''}
-                onChange={(e) => updateField('matter_number', e.target.value)}
+                value={formData.cm_number || ''}
+                onChange={(e) => updateField('cm_number', e.target.value)}
                 className="text-muted-foreground border-0 p-0 h-auto focus-visible:ring-0 bg-transparent w-48"
-                placeholder="Matter number"
+                placeholder="C/M Number"
               />
             </div>
           </div>

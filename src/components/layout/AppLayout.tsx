@@ -24,6 +24,7 @@ import {
   FileText,
   Flag,
   AlertTriangle,
+  Rocket,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +37,7 @@ const navigation = [
   { name: 'Matters', href: '/matters', icon: Briefcase },
   { name: 'Clients', href: '/clients', icon: Users },
   { name: 'Red Flags', href: '/red-flags', icon: AlertTriangle },
+  { name: 'Pipeline Flags', href: '/pipeline-flags', icon: Rocket },
   { name: 'Admin Flags', href: '/flags', icon: Flag },
   { name: 'Reports', href: '/reports', icon: FileText },
   { name: 'Settings', href: '/settings', icon: Settings },

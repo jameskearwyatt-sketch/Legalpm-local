@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { differenceInDays, parseISO, isAfter } from 'date-fns';
 
 export interface DashboardStats {
   totalBudget: number;
@@ -10,6 +11,7 @@ export interface DashboardStats {
   avgCollectionRate: number;
   openMattersCount: number;
   alerts: Alert[];
+  pipelineAlerts: PipelineAlert[];
 }
 
 export interface Alert {
@@ -25,14 +27,24 @@ export interface Alert {
   value?: number;
 }
 
+export interface PipelineAlert {
+  id: string;
+  type: 'RFP Deadline Soon' | 'Awaiting Decision';
+  matterId: string;
+  matterName: string;
+  cmNumber: string;
+  clientName: string;
+  message: string;
+}
+
 export function useDashboard() {
   const { user } = useAuth();
 
   return useQuery({
     queryKey: ['dashboard', user?.id],
     queryFn: async () => {
-      // Get all Live matters (not Pipeline) with their clients
-      const { data: matters, error: mattersError } = await supabase
+      // Get all Live matters with their clients
+      const { data: liveMatters, error: mattersError } = await supabase
         .from('matters')
         .select(`
           *,
@@ -42,9 +54,20 @@ export function useDashboard() {
 
       if (mattersError) throw mattersError;
 
-      const matterIds = matters?.map(m => m.id) || [];
+      // Get all Pipeline matters for pipeline alerts
+      const { data: pipelineMatters, error: pipelineError } = await supabase
+        .from('matters')
+        .select(`
+          *,
+          clients (id, name)
+        `)
+        .eq('category', 'Pipeline');
+
+      if (pipelineError) throw pipelineError;
+
+      const matterIds = liveMatters?.map(m => m.id) || [];
       
-      if (matterIds.length === 0) {
+      if (matterIds.length === 0 && (!pipelineMatters || pipelineMatters.length === 0)) {
         return {
           totalBudget: 0,
           totalWip: 0,
@@ -53,15 +76,16 @@ export function useDashboard() {
           avgCollectionRate: 0,
           openMattersCount: 0,
           alerts: [],
+          pipelineAlerts: [],
         } as DashboardStats;
       }
 
       // Get latest snapshots for each matter
-      const { data: snapshots } = await supabase
+      const { data: snapshots } = matterIds.length > 0 ? await supabase
         .from('financial_snapshots')
         .select('*')
         .in('matter_id', matterIds)
-        .order('as_of_date', { ascending: false });
+        .order('as_of_date', { ascending: false }) : { data: [] };
 
       // Create a map of matter_id to latest snapshot
       const snapshotMap = new Map<string, any>();
@@ -76,8 +100,9 @@ export function useDashboard() {
       let totalBilledUsd = 0;
       let totalPaidUsd = 0;
       const alerts: Alert[] = [];
+      const pipelineAlerts: PipelineAlert[] = [];
 
-      matters?.forEach(matter => {
+      liveMatters?.forEach(matter => {
         const snapshot = snapshotMap.get(matter.id);
         // Use bm_fee_component as the BM fee and convert to USD using exchange_rate
         const bmFee = Number(matter.bm_fee_component) || 0;
@@ -174,6 +199,55 @@ export function useDashboard() {
         }
       });
 
+      // Generate pipeline alerts
+      const today = new Date();
+      pipelineMatters?.forEach(matter => {
+        const clientName = matter.clients?.name || 'Unknown Client';
+        const cmNumber = matter.cm_number && matter.cm_number.trim() !== '' 
+          ? matter.cm_number 
+          : '[CM number required]';
+
+        if (matter.submission_deadline) {
+          const deadline = parseISO(matter.submission_deadline);
+          const daysUntilDeadline = differenceInDays(deadline, today);
+          
+          if (!matter.submitted) {
+            // Not yet submitted - check if deadline is within 7 days
+            if (daysUntilDeadline <= 7 && daysUntilDeadline >= 0) {
+              const daysText = daysUntilDeadline === 0 
+                ? 'Due today!' 
+                : `Due in ${daysUntilDeadline} day${daysUntilDeadline === 1 ? '' : 's'}`;
+              pipelineAlerts.push({
+                id: `rfp-${matter.id}`,
+                type: 'RFP Deadline Soon',
+                matterId: matter.id,
+                matterName: matter.matter_name,
+                cmNumber,
+                clientName,
+                message: daysText,
+              });
+            }
+          } else if (!matter.pipeline_outcome || matter.pipeline_outcome === 'Pending') {
+            // Submitted but no decision yet - check if we should follow up
+            if (isAfter(today, deadline)) {
+              const daysSinceDeadline = differenceInDays(today, deadline);
+              const weeksSince = Math.floor(daysSinceDeadline / 7);
+              if (weeksSince >= 1) {
+                pipelineAlerts.push({
+                  id: `decision-${matter.id}`,
+                  type: 'Awaiting Decision',
+                  matterId: matter.id,
+                  matterName: matter.matter_name,
+                  cmNumber,
+                  clientName,
+                  message: `${weeksSince} week${weeksSince === 1 ? '' : 's'} since submission`,
+                });
+              }
+            }
+          }
+        }
+      });
+
       const avgCollectionRate = totalBilledUsd > 0 ? (totalPaidUsd / totalBilledUsd) * 100 : 100;
 
       return {
@@ -182,10 +256,16 @@ export function useDashboard() {
         totalBilled: totalBilledUsd,
         totalPaid: totalPaidUsd,
         avgCollectionRate,
-        openMattersCount: matters?.length || 0,
+        openMattersCount: liveMatters?.length || 0,
         alerts: alerts.sort((a, b) => {
           const priority = { 'Over Budget': 1, 'Near Budget': 2, 'Poor Collection': 3, 'High WIP': 4 };
           return priority[a.type] - priority[b.type];
+        }),
+        pipelineAlerts: pipelineAlerts.sort((a, b) => {
+          // RFP deadlines first
+          if (a.type === 'RFP Deadline Soon' && b.type !== 'RFP Deadline Soon') return -1;
+          if (a.type !== 'RFP Deadline Soon' && b.type === 'RFP Deadline Soon') return 1;
+          return 0;
         }),
       } as DashboardStats;
     },

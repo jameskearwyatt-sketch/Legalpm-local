@@ -21,7 +21,9 @@ import {
   Loader2,
   FileText,
   ArrowRight,
-  RotateCcw
+  RotateCcw,
+  AlertTriangle,
+  Target
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -121,6 +123,27 @@ export default function TimeRecording() {
     if (mode !== 'multi' || !dateRange.from || !dateRange.to) return [];
     return eachDayOfInterval({ start: dateRange.from, end: dateRange.to });
   }, [mode, dateRange]);
+
+  // Hours targets: minimum 8 per day, ideal 10 per day
+  const HOURS_MINIMUM_PER_DAY = 8;
+  const HOURS_IDEAL_PER_DAY = 10;
+  
+  // Calculate number of days being recorded
+  const numberOfDays = useMemo(() => {
+    if (mode === 'single') return 1;
+    return datesInRange.length || 1;
+  }, [mode, datesInRange]);
+
+  // Calculate hours targets based on number of days
+  const hoursMinimum = numberOfDays * HOURS_MINIMUM_PER_DAY;
+  const hoursIdeal = numberOfDays * HOURS_IDEAL_PER_DAY;
+
+  // Get hours status for color coding
+  const getHoursStatus = (hours: number): 'critical' | 'warning' | 'good' => {
+    if (hours < hoursMinimum) return 'critical';
+    if (hours < hoursIdeal) return 'warning';
+    return 'good';
+  };
 
   // Initialize grid with all matters and non-chargeable codes
   const initializeGrid = () => {
@@ -249,6 +272,25 @@ export default function TimeRecording() {
   };
 
   const processEntries = async () => {
+    const totalHours = getTotalHours();
+    const hoursStatus = getHoursStatus(totalHours);
+    
+    // Show warning if hours are below target, but allow to proceed
+    if (hoursStatus === 'critical') {
+      const shortfall = hoursMinimum - totalHours;
+      toast({
+        title: "⚠️ Hours Below Minimum Target",
+        description: `You've recorded ${totalHours.toFixed(1)}h but need at least ${hoursMinimum}h (${shortfall.toFixed(1)}h short). Consider adding more time to reach your target.`,
+        variant: "destructive"
+      });
+    } else if (hoursStatus === 'warning') {
+      const toIdeal = hoursIdeal - totalHours;
+      toast({
+        title: "📊 Hours Below Ideal Target",
+        description: `You've recorded ${totalHours.toFixed(1)}h. Add ${toIdeal.toFixed(1)}h more to hit the ideal ${hoursIdeal}h target.`,
+      });
+    }
+    
     setIsProcessing(true);
     
     try {
@@ -594,31 +636,118 @@ export default function TimeRecording() {
         </CardContent>
       </Card>
 
-      {/* Total hours summary */}
-      <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
-        <div className="flex items-center gap-2">
-          <Clock className="h-5 w-5 text-muted-foreground" />
-          <span className="font-medium">Total Hours:</span>
-          <span className="text-2xl font-bold">{getTotalHours().toFixed(2)}</span>
-        </div>
-        <Button 
-          onClick={processEntries} 
-          disabled={isProcessing || getTotalHours() === 0}
-          size="lg"
-        >
-          {isProcessing ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Process & Polish Narratives
-            </>
-          )}
-        </Button>
-      </div>
+      {/* Total hours summary with target tracking */}
+      {(() => {
+        const totalHours = getTotalHours();
+        const hoursStatus = getHoursStatus(totalHours);
+        const statusColors = {
+          critical: 'bg-destructive/10 border-destructive/50',
+          warning: 'bg-yellow-500/10 border-yellow-500/50',
+          good: 'bg-green-500/10 border-green-500/50'
+        };
+        const textColors = {
+          critical: 'text-destructive',
+          warning: 'text-yellow-600 dark:text-yellow-400',
+          good: 'text-green-600 dark:text-green-400'
+        };
+        const progressPercent = Math.min((totalHours / hoursIdeal) * 100, 100);
+        
+        return (
+          <div className={cn("p-4 rounded-lg border-2 space-y-3", statusColors[hoursStatus])}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium">Total Hours:</span>
+                  <span className={cn("text-2xl font-bold", textColors[hoursStatus])}>
+                    {totalHours.toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Target className="h-4 w-4" />
+                  <span>Target: {hoursMinimum}h min / {hoursIdeal}h ideal</span>
+                  {numberOfDays > 1 && (
+                    <Badge variant="outline" className="ml-1">
+                      {numberOfDays} days × {HOURS_MINIMUM_PER_DAY}-{HOURS_IDEAL_PER_DAY}h
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              <Button 
+                onClick={processEntries} 
+                disabled={isProcessing || totalHours === 0}
+                size="lg"
+              >
+                {isProcessing ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Process & Polish Narratives
+                  </>
+                )}
+              </Button>
+            </div>
+            
+            {/* Progress bar */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0h</span>
+                <span className={hoursStatus === 'critical' ? 'font-semibold text-destructive' : ''}>
+                  {hoursMinimum}h minimum
+                </span>
+                <span className={hoursStatus === 'warning' ? 'font-semibold text-yellow-600 dark:text-yellow-400' : ''}>
+                  {hoursIdeal}h ideal
+                </span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden relative">
+                {/* Minimum marker */}
+                <div 
+                  className="absolute h-full w-0.5 bg-foreground/30 z-10"
+                  style={{ left: `${(hoursMinimum / hoursIdeal) * 100}%` }}
+                />
+                {/* Progress fill */}
+                <div 
+                  className={cn(
+                    "h-full transition-all duration-300",
+                    hoursStatus === 'critical' && 'bg-destructive',
+                    hoursStatus === 'warning' && 'bg-yellow-500',
+                    hoursStatus === 'good' && 'bg-green-500'
+                  )}
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+            </div>
+            
+            {/* Status message */}
+            {hoursStatus === 'critical' && (
+              <div className="flex items-center gap-2 text-sm text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <span>
+                  {(hoursMinimum - totalHours).toFixed(1)}h short of minimum target. Add more time before processing.
+                </span>
+              </div>
+            )}
+            {hoursStatus === 'warning' && (
+              <div className="flex items-center gap-2 text-sm text-yellow-600 dark:text-yellow-400">
+                <AlertTriangle className="h-4 w-4" />
+                <span>
+                  {(hoursIdeal - totalHours).toFixed(1)}h short of ideal target. Consider adding more time.
+                </span>
+              </div>
+            )}
+            {hoursStatus === 'good' && (
+              <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
+                <Check className="h-4 w-4" />
+                <span>Great! You've hit your ideal hours target.</span>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Main Grid */}
       <Card>

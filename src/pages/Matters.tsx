@@ -36,7 +36,7 @@ import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-type SortField = 'matter_name' | 'fee_amount' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'local_counsel' | 'stage';
+type SortField = 'matter_name' | 'fee_amount' | 'bm_fee' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'local_counsel' | 'stage';
 type SortDirection = 'asc' | 'desc';
 
 const categoryIcons: Record<MatterCategory, React.ReactNode> = {
@@ -195,6 +195,10 @@ export default function Matters() {
         case 'local_counsel':
           aVal = a.local_counsel_fee || 0;
           bVal = b.local_counsel_fee || 0;
+          break;
+        case 'bm_fee':
+          aVal = a.bm_fee_component || 0;
+          bVal = b.bm_fee_component || 0;
           break;
         case 'stage':
           aVal = a.current_stage || '';
@@ -358,6 +362,9 @@ export default function Matters() {
                       {isLive && (
                         <>
                           <TableHead className="text-right">
+                            <SortableHeader field="bm_fee">BM Fee</SortableHeader>
+                          </TableHead>
+                          <TableHead className="text-right">
                             <SortableHeader field="local_counsel">Local Counsel</SortableHeader>
                           </TableHead>
                           <TableHead className="text-right">
@@ -443,6 +450,9 @@ export default function Matters() {
                           </TableCell>
                           {isLive && (
                             <>
+                              <TableCell className="text-right font-medium">
+                                {formatCurrency(matter.bm_fee_component, matter.fee_currency)}
+                              </TableCell>
                               <TableCell className="text-right text-muted-foreground">
                                 {formatCurrency(matter.local_counsel_fee, matter.fee_currency)}
                               </TableCell>

@@ -211,7 +211,7 @@ export default function Dashboard() {
                           {alert.matterName}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {alert.clientName} • {alert.matterNumber}
+                          {alert.clientName} • {alert.cmNumber}
                         </p>
                         <p className="text-sm text-muted-foreground mt-1">
                           {alert.message}

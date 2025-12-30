@@ -41,6 +41,7 @@ const practiceAreas = [
   'Real Estate',
   'Employment',
   'Banking & Finance',
+  'Energy & Infrastructure',
   'Intellectual Property',
   'Private Client',
   'Tax',

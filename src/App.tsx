@@ -16,6 +16,7 @@ import Help from "./pages/Help";
 import Flags from "./pages/Flags";
 import RedFlags from "./pages/RedFlags";
 import PipelineFlags from "./pages/PipelineFlags";
+import TimeRecording from "./pages/TimeRecording";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -50,6 +51,7 @@ function AppRoutes() {
       <Route path="/matters/:id/edit" element={<ProtectedRoute><MatterForm /></ProtectedRoute>} />
       <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
       <Route path="/clients/new" element={<ProtectedRoute><Clients defaultDialogOpen /></ProtectedRoute>} />
+      <Route path="/time-recording" element={<ProtectedRoute><TimeRecording /></ProtectedRoute>} />
       <Route path="/flags" element={<ProtectedRoute><Flags /></ProtectedRoute>} />
       <Route path="/red-flags" element={<ProtectedRoute><RedFlags /></ProtectedRoute>} />
       <Route path="/pipeline-flags" element={<ProtectedRoute><PipelineFlags /></ProtectedRoute>} />

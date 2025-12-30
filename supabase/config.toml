@@ -2,3 +2,6 @@ project_id = "sdnunnmldefddezdsyqk"
 
 [functions.fetch-exchange-rates]
 verify_jwt = false
+
+[functions.polish-narrative]
+verify_jwt = true

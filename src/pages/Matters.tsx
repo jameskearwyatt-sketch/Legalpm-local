@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -14,6 +13,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,8 +28,9 @@ import {
 } from '@/components/ui/table';
 import { useMatters, MatterWithFinancials, MatterCategory } from '@/lib/hooks/useMatters';
 import { useClients } from '@/lib/hooks/useClients';
-import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 type SortField = 'matter_name' | 'fee_amount' | 'headroom' | 'headroom_pct' | 'total_paid_ar_wip' | 'stage';
 type SortDirection = 'asc' | 'desc';
@@ -37,13 +43,60 @@ const categoryIcons: Record<MatterCategory, React.ReactNode> = {
 };
 
 export default function Matters() {
-  const { matters, isLoading } = useMatters();
+  const { matters, isLoading, updateMatter } = useMatters();
   const { clients } = useClients();
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<MatterCategory>('Live');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('matter_name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  const handleCategoryChange = async (matterId: string, newCategory: MatterCategory, pipelineOutcome?: 'Won' | 'Lost') => {
+    try {
+      const updateData: any = { category: newCategory };
+      
+      // Set appropriate status based on category
+      if (newCategory === 'Live') {
+        updateData.status = 'Open';
+        updateData.pipeline_outcome = 'Won';
+      } else if (newCategory === 'Closed') {
+        updateData.status = 'Closed';
+      } else if (newCategory === 'Lost') {
+        updateData.pipeline_outcome = 'Lost';
+      }
+      
+      if (pipelineOutcome) {
+        updateData.pipeline_outcome = pipelineOutcome;
+      }
+      
+      await updateMatter.mutateAsync({ id: matterId, ...updateData });
+      toast.success(`Matter moved to ${newCategory}`);
+    } catch (error) {
+      toast.error('Failed to move matter');
+    }
+  };
+
+  const getCategoryActions = (matter: MatterWithFinancials) => {
+    const actions: { label: string; category: MatterCategory; outcome?: 'Won' | 'Lost' }[] = [];
+    
+    switch (matter.category) {
+      case 'Pipeline':
+        actions.push({ label: 'Move to Live (Won)', category: 'Live', outcome: 'Won' });
+        actions.push({ label: 'Mark as Lost', category: 'Lost', outcome: 'Lost' });
+        break;
+      case 'Live':
+        actions.push({ label: 'Move to Closed', category: 'Closed' });
+        break;
+      case 'Closed':
+        actions.push({ label: 'Reopen (Move to Live)', category: 'Live' });
+        break;
+      case 'Lost':
+        actions.push({ label: 'Move to Pipeline', category: 'Pipeline' });
+        break;
+    }
+    
+    return actions;
+  };
 
   const formatCurrency = (value: number, currency: string = 'GBP') => {
     const symbols: Record<string, string> = {
@@ -306,6 +359,7 @@ export default function Matters() {
                       </TableHead>
                       <TableHead>Practice</TableHead>
                       <TableHead>Originator</TableHead>
+                      <TableHead className="w-16">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -390,6 +444,27 @@ export default function Matters() {
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm">
                             {matter.originator || '-'}
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {getCategoryActions(matter).map((action) => (
+                                  <DropdownMenuItem
+                                    key={action.label}
+                                    onClick={() => handleCategoryChange(matter.id, action.category, action.outcome)}
+                                    className="cursor-pointer"
+                                  >
+                                    <ArrowRightCircle className="mr-2 h-4 w-4" />
+                                    {action.label}
+                                  </DropdownMenuItem>
+                                ))}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </TableCell>
                         </TableRow>
                       );

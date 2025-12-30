@@ -79,15 +79,11 @@ export default function Dashboard() {
     },
   ];
 
-  // Sample trend data for demonstration
-  const trendData = [
-    { month: 'Jul', wip: 120000, billed: 95000, paid: 80000 },
-    { month: 'Aug', wip: 135000, billed: 110000, paid: 92000 },
-    { month: 'Sep', wip: 150000, billed: 125000, paid: 105000 },
-    { month: 'Oct', wip: 145000, billed: 140000, paid: 118000 },
-    { month: 'Nov', wip: 160000, billed: 155000, paid: 130000 },
-    { month: 'Dec', wip: stats?.totalWip || 0, billed: stats?.totalBilled || 0, paid: stats?.totalPaid || 0 },
-  ];
+  // Only show chart with actual data - no sample data
+  const hasData = (stats?.totalWip || 0) + (stats?.totalBilled || 0) + (stats?.totalPaid || 0) > 0;
+  const trendData = hasData ? [
+    { month: 'Current', wip: stats?.totalWip || 0, billed: stats?.totalBilled || 0, paid: stats?.totalPaid || 0 },
+  ] : [];
 
   return (
     <AppLayout>
@@ -131,51 +127,59 @@ export default function Dashboard() {
               <CardTitle className="font-heading text-lg">Financial Trends</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trendData}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                    <XAxis dataKey="month" className="text-xs" />
-                    <YAxis 
-                      className="text-xs" 
-                      tickFormatter={(value) => `£${(value / 1000)}k`}
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: 'var(--radius)',
-                      }}
-                    />
-                    <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="wip" 
-                      name="WIP"
-                      stroke="hsl(var(--chart-3))" 
-                      strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--chart-3))' }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="billed" 
-                      name="Billed"
-                      stroke="hsl(var(--chart-1))" 
-                      strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--chart-1))' }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="paid" 
-                      name="Paid"
-                      stroke="hsl(var(--chart-2))" 
-                      strokeWidth={2}
-                      dot={{ fill: 'hsl(var(--chart-2))' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+              {hasData ? (
+                <div className="h-72">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={trendData}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                      <XAxis dataKey="month" className="text-xs" />
+                      <YAxis 
+                        className="text-xs" 
+                        tickFormatter={(value) => `£${(value / 1000)}k`}
+                      />
+                      <Tooltip 
+                        formatter={(value: number) => formatCurrency(value)}
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: 'var(--radius)',
+                        }}
+                      />
+                      <Legend />
+                      <Line 
+                        type="monotone" 
+                        dataKey="wip" 
+                        name="WIP"
+                        stroke="hsl(var(--chart-3))" 
+                        strokeWidth={2}
+                        dot={{ fill: 'hsl(var(--chart-3))' }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="billed" 
+                        name="Billed"
+                        stroke="hsl(var(--chart-1))" 
+                        strokeWidth={2}
+                        dot={{ fill: 'hsl(var(--chart-1))' }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="paid" 
+                        name="Paid"
+                        stroke="hsl(var(--chart-2))" 
+                        strokeWidth={2}
+                        dot={{ fill: 'hsl(var(--chart-2))' }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-72 text-center">
+                  <TrendingUp className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                  <p className="text-sm font-medium text-muted-foreground">No financial data yet</p>
+                  <p className="text-xs text-muted-foreground mt-1">Add snapshots to your matters to see trends</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

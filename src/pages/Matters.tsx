@@ -33,7 +33,8 @@ import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useAuth } from '@/lib/auth';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { BudgetUpdateModal } from '@/components/matters/BudgetUpdateModal';
-import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock } from 'lucide-react';
+import { format, differenceInDays, parseISO, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -397,7 +398,10 @@ export default function Matters() {
                       {isPipeline && (
                         <>
                           <TableHead>Source</TableHead>
-                          <TableHead>Deadline</TableHead>
+                          <TableHead>Clarifications</TableHead>
+                          <TableHead>Submission</TableHead>
+                          <TableHead>Decision</TableHead>
+                          <TableHead>Submitted</TableHead>
                           <TableHead>Outcome</TableHead>
                         </>
                       )}
@@ -536,16 +540,69 @@ export default function Matters() {
                           )}
                           {isPipeline && (
                             <>
-                              <TableCell className="text-muted-foreground">
+                              <TableCell className="text-muted-foreground text-sm">
                                 {matter.source || '-'}
                               </TableCell>
-                              <TableCell className="text-muted-foreground">
-                                {matter.submission_deadline || '-'}
+                              <TableCell className="text-sm">
+                                {matter.clarifications_date ? (
+                                  <span className={cn(
+                                    !matter.submitted && matter.clarifications_date && 
+                                    differenceInDays(parseISO(matter.clarifications_date), new Date()) <= 3 &&
+                                    differenceInDays(parseISO(matter.clarifications_date), new Date()) >= 0
+                                      ? "text-warning font-medium"
+                                      : "text-muted-foreground"
+                                  )}>
+                                    {format(parseISO(matter.clarifications_date), 'dd MMM')}
+                                  </span>
+                                ) : '-'}
+                              </TableCell>
+                              <TableCell className="text-sm">
+                                {matter.submission_deadline ? (() => {
+                                  const deadlineDate = parseISO(matter.submission_deadline);
+                                  const daysUntil = differenceInDays(deadlineDate, new Date());
+                                  const isOverdue = isPast(deadlineDate) && !isToday(deadlineDate);
+                                  const isUrgent = !isOverdue && daysUntil <= 3;
+                                  const needsAttention = !matter.submitted && (isOverdue || isUrgent);
+                                  
+                                  return (
+                                    <div className="flex items-center gap-1">
+                                      {needsAttention && (
+                                        <AlertTriangle className={cn(
+                                          "h-3.5 w-3.5",
+                                          isOverdue ? "text-destructive" : "text-warning"
+                                        )} />
+                                      )}
+                                      <span className={cn(
+                                        needsAttention && isOverdue && "text-destructive font-medium",
+                                        needsAttention && isUrgent && !isOverdue && "text-warning font-medium",
+                                        !needsAttention && "text-muted-foreground"
+                                      )}>
+                                        {format(deadlineDate, 'dd MMM')}
+                                      </span>
+                                    </div>
+                                  );
+                                })() : '-'}
+                              </TableCell>
+                              <TableCell className="text-muted-foreground text-sm">
+                                {matter.decision_date ? format(parseISO(matter.decision_date), 'dd MMM') : '-'}
+                              </TableCell>
+                              <TableCell>
+                                {matter.submitted ? (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded">
+                                    <CheckCircle2 className="h-3 w-3" />
+                                    Yes
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                                    <Clock className="h-3 w-3" />
+                                    No
+                                  </span>
+                                )}
                               </TableCell>
                               <TableCell>
                                 {matter.pipeline_outcome ? (
                                   <span className={cn(
-                                    "text-sm font-medium px-2 py-1 rounded",
+                                    "text-xs font-medium px-2 py-1 rounded",
                                     matter.pipeline_outcome === 'Won' && 'bg-green-100 text-green-700',
                                     matter.pipeline_outcome === 'Lost' && 'bg-red-100 text-red-700',
                                     matter.pipeline_outcome === 'Pending' && 'bg-amber-100 text-amber-700'
@@ -553,7 +610,7 @@ export default function Matters() {
                                     {matter.pipeline_outcome}
                                   </span>
                                 ) : (
-                                  <span className="text-muted-foreground">Pending</span>
+                                  <span className="text-xs text-muted-foreground bg-amber-100 text-amber-700 px-2 py-1 rounded">Pending</span>
                                 )}
                               </TableCell>
                             </>

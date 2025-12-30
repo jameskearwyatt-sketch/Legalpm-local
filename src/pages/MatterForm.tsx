@@ -783,26 +783,7 @@ export default function MatterForm() {
               <CardDescription>Internal budget tracking and notes</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid sm:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="budget_type">Budget Type</Label>
-                  <Select
-                    value={formData.budget_type}
-                    onValueChange={(v) => updateField('budget_type', v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Fixed">Fixed</SelectItem>
-                      <SelectItem value="Cap">Cap</SelectItem>
-                      <SelectItem value="Estimate">Estimate</SelectItem>
-                      <SelectItem value="Retainer">Retainer</SelectItem>
-                      <SelectItem value="Hourly">Hourly</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
+              <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="agreed_budget_amount">Agreed Budget</Label>
                   <Input

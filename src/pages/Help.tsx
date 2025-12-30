@@ -45,8 +45,8 @@ export default function Help() {
               <h3 className="font-semibold text-foreground mb-2">Matters</h3>
               <p className="text-muted-foreground">
                 A matter represents a specific piece of legal work for a client. Each matter has an
-                agreed budget, a budget type (Fixed, Cap, Estimate, Retainer, or Hourly), and tracking
-                for work in progress, billing, and payments.
+                agreed budget, a fee type (e.g., Discounted Rates with Cap, Rack Rates with Estimate), 
+                and tracking for work in progress, billing, and payments.
               </p>
             </div>
 

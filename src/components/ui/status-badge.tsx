@@ -19,12 +19,6 @@ const statusConfig: Record<string, { variant: 'success' | 'warning' | 'danger' |
   'Paid': { variant: 'success' },
   'Overdue': { variant: 'danger' },
   
-  // Budget type
-  'Fixed': { variant: 'neutral' },
-  'Cap': { variant: 'neutral' },
-  'Estimate': { variant: 'neutral' },
-  'Retainer': { variant: 'neutral' },
-  'Hourly': { variant: 'neutral' },
   
   // Alert types
   'Over Budget': { variant: 'danger' },

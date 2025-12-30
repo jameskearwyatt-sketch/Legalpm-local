@@ -659,17 +659,6 @@ export default function MatterDetail() {
                 <p className="text-xs text-muted-foreground">Auto-calculated: Budget - Local Counsel</p>
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Budget Type</Label>
-              <Select value={formData.budget_type} onValueChange={(v) => updateField('budget_type', v)}>
-                <SelectTrigger className="max-w-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {['Fixed', 'Cap', 'Estimate', 'Retainer', 'Hourly'].map((bt) => (
-                    <SelectItem key={bt} value={bt}>{bt}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
           </CardContent>
         </Card>
 

@@ -60,11 +60,11 @@ const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; descr
 export default function Flags() {
   const { matters, isLoading } = useMatters();
 
-  // Only check Live and Pipeline matters for admin flags
-  const activeMatters = matters.filter(m => m.category === 'Live' || m.category === 'Pipeline');
+  // Only check Live matters for admin flags
+  const liveMatters = matters.filter(m => m.category === 'Live');
 
   // Build flagged matters list (admin flags only)
-  const flaggedMatters: FlaggedMatter[] = activeMatters
+  const flaggedMatters: FlaggedMatter[] = liveMatters
     .map(matter => {
       const flags: FlagType[] = [];
       
@@ -113,7 +113,7 @@ export default function Flags() {
               Admin Flags
             </h1>
             <p className="text-muted-foreground mt-1">
-              Track compliance items for live and pipeline matters
+              Track compliance items for live matters
             </p>
           </div>
           {totalFlags === 0 && !isLoading && (
@@ -176,7 +176,6 @@ export default function Flags() {
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="min-w-[200px]">Matter</TableHead>
-                      <TableHead>Category</TableHead>
                       <TableHead>Outstanding Items</TableHead>
                       <TableHead className="w-20"></TableHead>
                     </TableRow>
@@ -188,15 +187,6 @@ export default function Flags() {
                           <p className="text-sm text-muted-foreground">{matter.client_name}</p>
                           <p className="font-medium text-foreground">{matter.matter_name}</p>
                           <p className="text-xs text-muted-foreground">{matter.matter_number}</p>
-                        </TableCell>
-                        <TableCell>
-                          <span className={cn(
-                            "text-sm font-medium px-2 py-1 rounded",
-                            matter.category === 'Live' && 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
-                            matter.category === 'Pipeline' && 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
-                          )}>
-                            {matter.category}
-                          </span>
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-2">
@@ -235,7 +225,7 @@ export default function Flags() {
               <li>• Click the edit button on any matter to update its admin status</li>
               <li>• Ensure engagement letters are signed before work begins</li>
               <li>• Complete AML/KYC checks as required by firm policy</li>
-              <li>• Only Live and Pipeline matters are checked - Closed and Lost matters are excluded</li>
+              <li>• Only Live matters are checked - Pipeline, Closed and Lost matters are excluded</li>
             </ul>
           </CardContent>
         </Card>

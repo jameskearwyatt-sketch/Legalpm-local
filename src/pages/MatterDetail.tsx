@@ -304,10 +304,10 @@ export default function MatterDetail() {
     setIsSaving(true);
     
     try {
-      // Compute status based on checkboxes
+      // Compute status based on checkboxes: Open if all complete, ATTN (attention needed) otherwise
       const computedStatus = formData.aml_kyc_complete && formData.assignment_letter_signed && formData.matter_open
         ? 'Open' as const
-        : 'On Hold' as const;
+        : 'On Hold' as const; // Database stores 'On Hold', displayed as 'ATTN'
 
       // Clean up empty date strings to null
       const cleanData = { ...formData };

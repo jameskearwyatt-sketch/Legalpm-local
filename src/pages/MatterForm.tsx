@@ -265,7 +265,7 @@ export default function MatterForm() {
         }
       }
 
-      // Compute status based on checkboxes
+      // Compute status based on checkboxes: Open if all complete, On Hold (displayed as ATTN) otherwise
       const computedStatus = formData.aml_kyc_complete && formData.assignment_letter_signed && formData.matter_open
         ? 'Open' as const
         : 'On Hold' as const;

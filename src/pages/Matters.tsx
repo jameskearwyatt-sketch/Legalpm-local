@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { StatusBadge } from '@/components/ui/status-badge';
 import {
   Select,
   SelectContent,
@@ -354,6 +355,7 @@ export default function Matters() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-20">Status</TableHead>
                       <TableHead className="min-w-[180px]">
                         <SortableHeader field="matter_name">Client / Matter</SortableHeader>
                       </TableHead>
@@ -417,8 +419,16 @@ export default function Matters() {
                         return feeType;
                       };
                       
+                      // Determine display status: Open if all 3 checkboxes true, ATTN otherwise
+                      const displayStatus = matter.aml_kyc_complete && matter.assignment_letter_signed && matter.matter_open
+                        ? 'Open'
+                        : 'ATTN';
+                      
                       return (
                         <TableRow key={matter.id} className="group">
+                          <TableCell>
+                            <StatusBadge status={displayStatus} />
+                          </TableCell>
                           <TableCell>
                             <Link 
                               to={`/matters/${matter.id}`}

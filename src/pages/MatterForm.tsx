@@ -410,8 +410,8 @@ export default function MatterForm() {
                   </Select>
                 </div>
 
-                {/* Only show C/M Number here for single-client matters */}
-                {!isMultiClient && (
+                {/* Only show C/M Number here for single-client matters and non-pipeline */}
+                {!isMultiClient && !isPipeline && (
                   <div className="space-y-2">
                     <Label htmlFor="cm_number">C/M Number</Label>
                     <Input
@@ -444,44 +444,47 @@ export default function MatterForm() {
                 </div>
               )}
 
-              <div className="space-y-3">
-                <Label>Onboarding Status</Label>
-                <div className="flex flex-wrap gap-6">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="aml_kyc_complete"
-                      checked={formData.aml_kyc_complete}
-                      onCheckedChange={(checked) => updateField('aml_kyc_complete', checked === true)}
-                    />
-                    <Label htmlFor="aml_kyc_complete" className="font-normal cursor-pointer">
-                      AML/KYC Complete
-                    </Label>
+              {/* Only show onboarding status for non-pipeline matters */}
+              {!isPipeline && (
+                <div className="space-y-3">
+                  <Label>Onboarding Status</Label>
+                  <div className="flex flex-wrap gap-6">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="aml_kyc_complete"
+                        checked={formData.aml_kyc_complete}
+                        onCheckedChange={(checked) => updateField('aml_kyc_complete', checked === true)}
+                      />
+                      <Label htmlFor="aml_kyc_complete" className="font-normal cursor-pointer">
+                        AML/KYC Complete
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="assignment_letter_signed"
+                        checked={formData.assignment_letter_signed}
+                        onCheckedChange={(checked) => updateField('assignment_letter_signed', checked === true)}
+                      />
+                      <Label htmlFor="assignment_letter_signed" className="font-normal cursor-pointer">
+                        Assignment Letter Signed
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="matter_open"
+                        checked={formData.matter_open}
+                        onCheckedChange={(checked) => updateField('matter_open', checked === true)}
+                      />
+                      <Label htmlFor="matter_open" className="font-normal cursor-pointer">
+                        Matter Open
+                      </Label>
+                    </div>
+                    {formData.aml_kyc_complete && formData.assignment_letter_signed && formData.matter_open && (
+                      <span className="text-sm text-green-600 font-medium">✓ Fully Open</span>
+                    )}
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="assignment_letter_signed"
-                      checked={formData.assignment_letter_signed}
-                      onCheckedChange={(checked) => updateField('assignment_letter_signed', checked === true)}
-                    />
-                    <Label htmlFor="assignment_letter_signed" className="font-normal cursor-pointer">
-                      Assignment Letter Signed
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="matter_open"
-                      checked={formData.matter_open}
-                      onCheckedChange={(checked) => updateField('matter_open', checked === true)}
-                    />
-                    <Label htmlFor="matter_open" className="font-normal cursor-pointer">
-                      Matter Open
-                    </Label>
-                  </div>
-                  {formData.aml_kyc_complete && formData.assignment_letter_signed && formData.matter_open && (
-                    <span className="text-sm text-green-600 font-medium">✓ Fully Open</span>
-                  )}
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 

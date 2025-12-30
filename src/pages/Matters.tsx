@@ -359,7 +359,7 @@ export default function Matters() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="w-20">Status</TableHead>
+                      {!isPipeline && <TableHead className="w-20">Status</TableHead>}
                       <TableHead className="min-w-[180px]">
                         <SortableHeader field="matter_name">Client / Matter</SortableHeader>
                       </TableHead>
@@ -430,9 +430,11 @@ export default function Matters() {
                       
                       return (
                         <TableRow key={matter.id} className="group">
-                          <TableCell>
-                            <StatusBadge status={displayStatus} />
-                          </TableCell>
+                          {!isPipeline && (
+                            <TableCell>
+                              <StatusBadge status={displayStatus} />
+                            </TableCell>
+                          )}
                           <TableCell>
                             <Link 
                               to={`/matters/${matter.id}`}

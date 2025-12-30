@@ -464,170 +464,172 @@ export default function MatterDetail() {
           </div>
         </div>
 
-        {/* Budget Overview & Financial Summary */}
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Budget overview */}
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="text-lg font-heading">Budget Overview</CardTitle>
-              {formData.fee_type && (
-                <CardDescription className="text-xs text-muted-foreground">
-                  {formData.fee_type}
-                </CardDescription>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Budget Used</span>
-                  <span className={cn(
-                    "font-medium",
-                    budgetUsedPercent > 100 && "text-danger",
-                    budgetUsedPercent >= 80 && budgetUsedPercent <= 100 && "text-warning",
-                    budgetUsedPercent < 80 && "text-success"
+        {/* Budget Overview & Financial Summary - only for non-pipeline matters */}
+        {!isPipeline && (
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Budget overview */}
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle className="text-lg font-heading">Budget Overview</CardTitle>
+                {formData.fee_type && (
+                  <CardDescription className="text-xs text-muted-foreground">
+                    {formData.fee_type}
+                  </CardDescription>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Budget Used</span>
+                    <span className={cn(
+                      "font-medium",
+                      budgetUsedPercent > 100 && "text-danger",
+                      budgetUsedPercent >= 80 && budgetUsedPercent <= 100 && "text-warning",
+                      budgetUsedPercent < 80 && "text-success"
+                    )}>
+                      {budgetUsedPercent.toFixed(1)}%
+                    </span>
+                  </div>
+                  <Progress 
+                    value={Math.min(budgetUsedPercent, 100)} 
+                    className={cn(
+                      "h-3",
+                      budgetUsedPercent > 100 && "[&>div]:bg-danger",
+                      budgetUsedPercent >= 80 && budgetUsedPercent <= 100 && "[&>div]:bg-warning",
+                      budgetUsedPercent < 80 && "[&>div]:bg-success"
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 rounded-lg bg-muted/50">
+                    <p className="text-sm text-muted-foreground">Total Budget</p>
+                    <p className="text-xl font-heading font-bold">{formatCurrency(budget, currency)}</p>
+                  </div>
+                  <div className={cn(
+                    "p-4 rounded-lg",
+                    remainingBudget < 0 ? "bg-danger/10" : "bg-success/10"
                   )}>
-                    {budgetUsedPercent.toFixed(1)}%
+                    <p className="text-sm text-muted-foreground">Remaining</p>
+                    <p className={cn(
+                      "text-xl font-heading font-bold",
+                      remainingBudget < 0 ? "text-danger" : "text-success"
+                    )}>
+                      {formatCurrency(remainingBudget, currency)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* BM Fee and Local Counsel breakdown */}
+                <div className="space-y-2 pt-2 border-t">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">BM Fee Component</span>
+                    <span className="font-medium">{formatCurrency(bmFee, currency)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Local Counsel</span>
+                    <span className="font-medium">{formatCurrency(localCounsel, currency)}</span>
+                  </div>
+                </div>
+
+                {/* Budget History Collapsible */}
+                <Collapsible open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="outline" size="sm" className="w-full">
+                      <History className="mr-2 h-4 w-4" />
+                      Budget History
+                      <ChevronDown className={cn(
+                        "ml-auto h-4 w-4 transition-transform",
+                        isHistoryOpen && "rotate-180"
+                      )} />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="pt-4">
+                    {amendmentsLoading ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : amendments && amendments.length > 0 ? (
+                      <div className="space-y-3 max-h-64 overflow-y-auto">
+                        {amendments.map((amendment) => (
+                          <div key={amendment.id} className="p-3 rounded-lg bg-muted/30 text-sm space-y-1">
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium">{formatDate(amendment.amendment_date)}</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-2 text-xs">
+                              <div>
+                                <span className="text-muted-foreground">Budget:</span>
+                                <span className="ml-1">
+                                  {formatCurrency(amendment.previous_budget, currency)} → {formatCurrency(amendment.new_budget, currency)}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">BM:</span>
+                                <span className="ml-1">
+                                  {formatCurrency(amendment.previous_bm_fee, currency)} → {formatCurrency(amendment.new_bm_fee, currency)}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-muted-foreground">LC:</span>
+                                <span className="ml-1">
+                                  {formatCurrency(amendment.previous_local_counsel, currency)} → {formatCurrency(amendment.new_local_counsel, currency)}
+                                </span>
+                              </div>
+                            </div>
+                            {amendment.notes && (
+                              <p className="text-xs text-muted-foreground italic mt-1">{amendment.notes}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        No budget amendments recorded yet.
+                      </p>
+                    )}
+                  </CollapsibleContent>
+                </Collapsible>
+              </CardContent>
+            </Card>
+
+            {/* Financial Summary */}
+            <Card className="shadow-card">
+              <CardHeader>
+                <CardTitle className="text-lg font-heading">Financial Summary</CardTitle>
+                {latestSnapshot && (
+                  <CardDescription>
+                    As of {formatDate(latestSnapshot.as_of_date)}
+                  </CardDescription>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center py-3 border-b">
+                  <span className="text-muted-foreground">Work in Progress</span>
+                  <span className="text-lg font-semibold">{formatCurrency(wipAmount, currency)}</span>
+                </div>
+                <div className="flex justify-between items-center py-3 border-b">
+                  <span className="text-muted-foreground">AR (Billed)</span>
+                  <span className="text-lg font-semibold">{formatCurrency(billedAmount, currency)}</span>
+                </div>
+                <div className="flex justify-between items-center py-3 border-b">
+                  <span className="text-muted-foreground">Paid</span>
+                  <span className="text-lg font-semibold text-success">{formatCurrency(paidAmount, currency)}</span>
+                </div>
+                <div className="flex justify-between items-center py-3">
+                  <span className="text-muted-foreground">Collection Rate</span>
+                  <span className={cn(
+                    "text-lg font-semibold",
+                    collectionRate >= 80 && "text-success",
+                    collectionRate >= 60 && collectionRate < 80 && "text-warning",
+                    collectionRate < 60 && "text-danger"
+                  )}>
+                    {collectionRate.toFixed(1)}%
                   </span>
                 </div>
-                <Progress 
-                  value={Math.min(budgetUsedPercent, 100)} 
-                  className={cn(
-                    "h-3",
-                    budgetUsedPercent > 100 && "[&>div]:bg-danger",
-                    budgetUsedPercent >= 80 && budgetUsedPercent <= 100 && "[&>div]:bg-warning",
-                    budgetUsedPercent < 80 && "[&>div]:bg-success"
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 rounded-lg bg-muted/50">
-                  <p className="text-sm text-muted-foreground">Total Budget</p>
-                  <p className="text-xl font-heading font-bold">{formatCurrency(budget, currency)}</p>
-                </div>
-                <div className={cn(
-                  "p-4 rounded-lg",
-                  remainingBudget < 0 ? "bg-danger/10" : "bg-success/10"
-                )}>
-                  <p className="text-sm text-muted-foreground">Remaining</p>
-                  <p className={cn(
-                    "text-xl font-heading font-bold",
-                    remainingBudget < 0 ? "text-danger" : "text-success"
-                  )}>
-                    {formatCurrency(remainingBudget, currency)}
-                  </p>
-                </div>
-              </div>
-
-              {/* BM Fee and Local Counsel breakdown */}
-              <div className="space-y-2 pt-2 border-t">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">BM Fee Component</span>
-                  <span className="font-medium">{formatCurrency(bmFee, currency)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Local Counsel</span>
-                  <span className="font-medium">{formatCurrency(localCounsel, currency)}</span>
-                </div>
-              </div>
-
-              {/* Budget History Collapsible */}
-              <Collapsible open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-full">
-                    <History className="mr-2 h-4 w-4" />
-                    Budget History
-                    <ChevronDown className={cn(
-                      "ml-auto h-4 w-4 transition-transform",
-                      isHistoryOpen && "rotate-180"
-                    )} />
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="pt-4">
-                  {amendmentsLoading ? (
-                    <div className="flex justify-center py-4">
-                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : amendments && amendments.length > 0 ? (
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
-                      {amendments.map((amendment) => (
-                        <div key={amendment.id} className="p-3 rounded-lg bg-muted/30 text-sm space-y-1">
-                          <div className="flex justify-between items-center">
-                            <span className="font-medium">{formatDate(amendment.amendment_date)}</span>
-                          </div>
-                          <div className="grid grid-cols-3 gap-2 text-xs">
-                            <div>
-                              <span className="text-muted-foreground">Budget:</span>
-                              <span className="ml-1">
-                                {formatCurrency(amendment.previous_budget, currency)} → {formatCurrency(amendment.new_budget, currency)}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">BM:</span>
-                              <span className="ml-1">
-                                {formatCurrency(amendment.previous_bm_fee, currency)} → {formatCurrency(amendment.new_bm_fee, currency)}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">LC:</span>
-                              <span className="ml-1">
-                                {formatCurrency(amendment.previous_local_counsel, currency)} → {formatCurrency(amendment.new_local_counsel, currency)}
-                              </span>
-                            </div>
-                          </div>
-                          {amendment.notes && (
-                            <p className="text-xs text-muted-foreground italic mt-1">{amendment.notes}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No budget amendments recorded yet.
-                    </p>
-                  )}
-                </CollapsibleContent>
-              </Collapsible>
-            </CardContent>
-          </Card>
-
-          {/* Financial Summary */}
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="text-lg font-heading">Financial Summary</CardTitle>
-              {latestSnapshot && (
-                <CardDescription>
-                  As of {formatDate(latestSnapshot.as_of_date)}
-                </CardDescription>
-              )}
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex justify-between items-center py-3 border-b">
-                <span className="text-muted-foreground">Work in Progress</span>
-                <span className="text-lg font-semibold">{formatCurrency(wipAmount, currency)}</span>
-              </div>
-              <div className="flex justify-between items-center py-3 border-b">
-                <span className="text-muted-foreground">AR (Billed)</span>
-                <span className="text-lg font-semibold">{formatCurrency(billedAmount, currency)}</span>
-              </div>
-              <div className="flex justify-between items-center py-3 border-b">
-                <span className="text-muted-foreground">Paid</span>
-                <span className="text-lg font-semibold text-success">{formatCurrency(paidAmount, currency)}</span>
-              </div>
-              <div className="flex justify-between items-center py-3">
-                <span className="text-muted-foreground">Collection Rate</span>
-                <span className={cn(
-                  "text-lg font-semibold",
-                  collectionRate >= 80 && "text-success",
-                  collectionRate >= 60 && collectionRate < 80 && "text-warning",
-                  collectionRate < 60 && "text-danger"
-                )}>
-                  {collectionRate.toFixed(1)}%
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Category & Status */}
         <Card className="shadow-card">
@@ -658,32 +660,38 @@ export default function MatterDetail() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>C/M Number</Label>
-                <Input value={formData.cm_number || ''} onChange={(e) => updateField('cm_number', e.target.value)} placeholder="e.g., 51339685" />
-              </div>
+              {/* Hide C/M Number for pipeline matters */}
+              {!isPipeline && (
+                <div className="space-y-2">
+                  <Label>C/M Number</Label>
+                  <Input value={formData.cm_number || ''} onChange={(e) => updateField('cm_number', e.target.value)} placeholder="e.g., 51339685" />
+                </div>
+              )}
             </div>
 
-            <div className="space-y-3">
-              <Label>Onboarding Status</Label>
-              <div className="flex flex-wrap gap-6">
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="aml_kyc_complete" checked={formData.aml_kyc_complete} onCheckedChange={(checked) => updateField('aml_kyc_complete', checked === true)} />
-                  <Label htmlFor="aml_kyc_complete" className="font-normal cursor-pointer">AML/KYC Complete</Label>
+            {/* Hide onboarding status for pipeline matters */}
+            {!isPipeline && (
+              <div className="space-y-3">
+                <Label>Onboarding Status</Label>
+                <div className="flex flex-wrap gap-6">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox id="aml_kyc_complete" checked={formData.aml_kyc_complete} onCheckedChange={(checked) => updateField('aml_kyc_complete', checked === true)} />
+                    <Label htmlFor="aml_kyc_complete" className="font-normal cursor-pointer">AML/KYC Complete</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox id="assignment_letter_signed" checked={formData.assignment_letter_signed} onCheckedChange={(checked) => updateField('assignment_letter_signed', checked === true)} />
+                    <Label htmlFor="assignment_letter_signed" className="font-normal cursor-pointer">Assignment Letter Signed</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox id="matter_open" checked={formData.matter_open} onCheckedChange={(checked) => updateField('matter_open', checked === true)} />
+                    <Label htmlFor="matter_open" className="font-normal cursor-pointer">Matter Open</Label>
+                  </div>
+                  {formData.aml_kyc_complete && formData.assignment_letter_signed && formData.matter_open && (
+                    <span className="text-sm text-green-600 font-medium">✓ Fully Open</span>
+                  )}
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="assignment_letter_signed" checked={formData.assignment_letter_signed} onCheckedChange={(checked) => updateField('assignment_letter_signed', checked === true)} />
-                  <Label htmlFor="assignment_letter_signed" className="font-normal cursor-pointer">Assignment Letter Signed</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox id="matter_open" checked={formData.matter_open} onCheckedChange={(checked) => updateField('matter_open', checked === true)} />
-                  <Label htmlFor="matter_open" className="font-normal cursor-pointer">Matter Open</Label>
-                </div>
-                {formData.aml_kyc_complete && formData.assignment_letter_signed && formData.matter_open && (
-                  <span className="text-sm text-green-600 font-medium">✓ Fully Open</span>
-                )}
               </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 
@@ -727,16 +735,19 @@ export default function MatterDetail() {
                 <Input value={formData.originator || ''} onChange={(e) => updateField('originator', e.target.value)} />
               </div>
             </div>
-            <div className="grid sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Start Date</Label>
-                <Input type="date" value={formData.start_date || ''} onChange={(e) => updateField('start_date', e.target.value)} />
+            {/* Hide start date and target close date for pipeline matters */}
+            {!isPipeline && (
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start Date</Label>
+                  <Input type="date" value={formData.start_date || ''} onChange={(e) => updateField('start_date', e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Target Close Date</Label>
+                  <Input type="date" value={formData.target_close_date || ''} onChange={(e) => updateField('target_close_date', e.target.value)} />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Target Close Date</Label>
-                <Input type="date" value={formData.target_close_date || ''} onChange={(e) => updateField('target_close_date', e.target.value)} />
-              </div>
-            </div>
+            )}
           </CardContent>
         </Card>
 

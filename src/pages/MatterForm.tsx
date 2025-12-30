@@ -37,8 +37,8 @@ const matterSchema = z.object({
   fee_earner_mix_notes: z.string().optional(),
   billing_terms: z.string().optional(),
   // New fields
-  category: z.enum(['Live', 'Pipeline', 'Closed', 'Lost']).default('Live'),
-  current_stage: z.enum(['Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Paused', 'Closed', 'Won', 'Pending']).nullable().optional(),
+  category: z.enum(['Live', 'Pipeline']).default('Live'),
+  current_stage: z.enum(['Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Closing Process', 'Closed', 'Paused', 'Pending', 'Won', 'Lost']).nullable().optional(),
   fee_amount_upper_end: z.number().min(0).default(0),
   local_counsel_fee: z.number().min(0).default(0),
   bm_fee_component: z.number().min(0).default(0),
@@ -78,12 +78,15 @@ const practiceAreas = [
   'Other',
 ];
 
-const categories: MatterCategory[] = ['Live', 'Pipeline', 'Closed', 'Lost'];
-const stages: MatterStage[] = ['Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Paused', 'Closed', 'Won', 'Pending'];
+const newMatterCategories: MatterCategory[] = ['Live', 'Pipeline'];
+const liveStages: MatterStage[] = ['Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Closing Process', 'Closed', 'Paused'];
+const pipelineStages: MatterStage[] = ['Pending', 'Won', 'Lost'];
 const feeTypes: FeeType[] = ['Discounted Rates with Cap', 'Discounted Rates with Estimate', 'Discounted Rates with Partial Cap', 'Rack Rates with Cap', 'Rack Rates with Estimate'];
 const sources: MatterSource[] = ['RfP', 'Direct from Client', 'Internal Referral'];
 const outcomes: PipelineOutcome[] = ['Won', 'Lost', 'Pending'];
 const currencies = ['GBP', 'USD', 'EUR', 'Ringgit', 'CHF', 'AUD', 'CAD', 'SGD'];
+const allCategories: MatterCategory[] = ['Live', 'Pipeline', 'Closed', 'Lost'];
+const allStages: MatterStage[] = ['Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Closing Process', 'Closed', 'Paused', 'Pending', 'Won', 'Lost'];
 
 export default function MatterForm() {
   const { id } = useParams<{ id: string }>();
@@ -272,7 +275,7 @@ export default function MatterForm() {
               <CardDescription>What type of matter is this?</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid sm:grid-cols-3 gap-4">
+              <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="category">Category *</Label>
                   <Select
@@ -283,25 +286,8 @@ export default function MatterForm() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {categories.map((cat) => (
+                      {(isEditing ? allCategories : newMatterCategories).map((cat) => (
                         <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="current_stage">Current Stage</Label>
-                  <Select
-                    value={formData.current_stage || ''}
-                    onValueChange={(v) => updateField('current_stage', v || null)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select stage" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {stages.map((stage) => (
-                        <SelectItem key={stage} value={stage}>{stage}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -317,6 +303,26 @@ export default function MatterForm() {
                   />
                 </div>
               </div>
+
+              {/* Current Stage - only show when editing */}
+              {isEditing && (
+                <div className="space-y-2">
+                  <Label htmlFor="current_stage">Current Stage</Label>
+                  <Select
+                    value={formData.current_stage || ''}
+                    onValueChange={(v) => updateField('current_stage', v || null)}
+                  >
+                    <SelectTrigger className="max-w-xs">
+                      <SelectValue placeholder="Select stage" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(formData.category === 'Pipeline' ? pipelineStages : formData.category === 'Live' ? liveStages : allStages).map((stage) => (
+                        <SelectItem key={stage} value={stage}>{stage}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="space-y-3">
                 <Label>Onboarding Status</Label>
@@ -413,37 +419,21 @@ export default function MatterForm() {
                 </div>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="matter_number">Matter Number *</Label>
-                  <Input
-                    id="matter_number"
-                    value={formData.matter_number}
-                    onChange={(e) => updateField('matter_number', e.target.value)}
-                    placeholder="e.g., MAT-2024-001"
-                    className={errors.matter_number ? 'border-destructive' : ''}
-                  />
-                  {errors.matter_number && (
-                    <p className="text-sm text-destructive">{errors.matter_number}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="practice_area">Practice Area</Label>
-                  <Select
-                    value={formData.practice_area || ''}
-                    onValueChange={(v) => updateField('practice_area', v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select area" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {practiceAreas.map((area) => (
-                        <SelectItem key={area} value={area}>{area}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="practice_area">Practice Area</Label>
+                <Select
+                  value={formData.practice_area || ''}
+                  onValueChange={(v) => updateField('practice_area', v)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select area" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {practiceAreas.map((area) => (
+                      <SelectItem key={area} value={area}>{area}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="grid sm:grid-cols-3 gap-4">
@@ -465,17 +455,7 @@ export default function MatterForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="originator">Originator</Label>
-                  <Input
-                    id="originator"
-                    value={formData.originator}
-                    onChange={(e) => updateField('originator', e.target.value)}
-                    placeholder="e.g., Andrew Hedges"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="lead_partner">Lead Partner</Label>
+                  <Label htmlFor="lead_partner">Matter Partner</Label>
                   <Input
                     id="lead_partner"
                     value={formData.lead_partner}
@@ -483,29 +463,66 @@ export default function MatterForm() {
                     placeholder="Partner name"
                   />
                 </div>
-              </div>
-
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="start_date">Start Date</Label>
-                  <Input
-                    id="start_date"
-                    type="date"
-                    value={formData.start_date}
-                    onChange={(e) => updateField('start_date', e.target.value)}
-                  />
-                </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="target_close_date">Target Close Date</Label>
+                  <Label htmlFor="originator">Billing Partner</Label>
                   <Input
-                    id="target_close_date"
-                    type="date"
-                    value={formData.target_close_date}
-                    onChange={(e) => updateField('target_close_date', e.target.value)}
+                    id="originator"
+                    value={formData.originator}
+                    onChange={(e) => updateField('originator', e.target.value)}
+                    placeholder="Partner name"
                   />
                 </div>
               </div>
+
+              {/* Dates - conditional based on category */}
+              {!isPipeline && (
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="start_date">Start Date</Label>
+                    <Input
+                      id="start_date"
+                      type="date"
+                      value={formData.start_date}
+                      onChange={(e) => updateField('start_date', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="target_close_date">Target Close Date</Label>
+                    <Input
+                      id="target_close_date"
+                      type="date"
+                      value={formData.target_close_date}
+                      onChange={(e) => updateField('target_close_date', e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {isPipeline && (
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="submission_deadline">RFP Response Date</Label>
+                    <Input
+                      id="submission_deadline"
+                      type="date"
+                      value={formData.submission_deadline}
+                      onChange={(e) => updateField('submission_deadline', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="decision_date">Decision Date</Label>
+                    <Input
+                      id="decision_date"
+                      type="date"
+                      value={formData.decision_date}
+                      onChange={(e) => updateField('decision_date', e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -656,7 +673,7 @@ export default function MatterForm() {
 
           {/* Pipeline Tracking - only show for Pipeline category */}
           {isPipeline && (
-            <Card className="shadow-card border-amber-200 bg-amber-50/50">
+            <Card className="shadow-card border-amber-200 bg-amber-50/50 dark:border-amber-800 dark:bg-amber-950/30">
               <CardHeader>
                 <CardTitle className="text-lg font-heading">Pipeline Tracking</CardTitle>
                 <CardDescription>RFP and opportunity tracking details</CardDescription>
@@ -686,7 +703,7 @@ export default function MatterForm() {
                   </div>
                 </div>
 
-                <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="opportunity_receipt_date">Opportunity Receipt</Label>
                     <Input
@@ -704,26 +721,6 @@ export default function MatterForm() {
                       type="date"
                       value={formData.clarifications_date}
                       onChange={(e) => updateField('clarifications_date', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="submission_deadline">Submission Deadline</Label>
-                    <Input
-                      id="submission_deadline"
-                      type="date"
-                      value={formData.submission_deadline}
-                      onChange={(e) => updateField('submission_deadline', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="decision_date">Decision Date</Label>
-                    <Input
-                      id="decision_date"
-                      type="date"
-                      value={formData.decision_date}
-                      onChange={(e) => updateField('decision_date', e.target.value)}
                     />
                   </div>
                 </div>

@@ -454,6 +454,76 @@ export default function TimeRecording() {
     return output;
   };
 
+  // Format output as HTML for rich pasting into Outlook
+  const formatOutputAsHtml = (): string => {
+    if (!processedOutput) return '';
+
+    let html = `
+      <html>
+        <head>
+          <style>
+            body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
+            .day-header { background-color: #1e3a5f; color: white; padding: 8px 12px; margin-top: 16px; font-weight: bold; }
+            .entry { border: 1px solid #ddd; margin-bottom: 12px; }
+            .entry-header { background-color: #f5f5f5; padding: 8px 12px; border-bottom: 1px solid #ddd; }
+            .entry-body { padding: 8px 12px; }
+            .label { font-weight: bold; color: #555; }
+            .client-name { font-weight: bold; color: #1e3a5f; font-size: 12pt; }
+            .matter-name { font-weight: 600; }
+            .hours { font-weight: bold; color: #2563eb; }
+            .narrative { margin-top: 8px; line-height: 1.4; }
+            .non-chargeable { color: #ea580c; font-weight: bold; }
+            table { border-collapse: collapse; width: 100%; margin-bottom: 8px; }
+            td { padding: 4px 8px; vertical-align: top; }
+            .label-col { width: 120px; }
+          </style>
+        </head>
+        <body>
+    `;
+
+    for (const day of processedOutput) {
+      html += `<div class="day-header">${format(day.date, 'EEEE, d MMMM yyyy')}</div>`;
+
+      if (day.entries.length === 0) {
+        html += `<p><em>No time recorded</em></p>`;
+        continue;
+      }
+
+      for (const entry of day.entries) {
+        html += `<div class="entry">`;
+        html += `<div class="entry-header">`;
+        
+        if (entry.type === 'matter') {
+          html += `<table>`;
+          html += `<tr><td class="label-col"><span class="label">Client:</span></td><td><span class="client-name">${entry.clientName || 'N/A'}</span></td></tr>`;
+          html += `<tr><td class="label-col"><span class="label">Matter:</span></td><td><span class="matter-name">${entry.matterName || 'N/A'}</span></td></tr>`;
+          html += `<tr><td class="label-col"><span class="label">Matter No:</span></td><td>${entry.cmNumber || 'N/A'}</td></tr>`;
+          html += `<tr><td class="label-col"><span class="label">Time:</span></td><td><span class="hours">${entry.hours} hours</span></td></tr>`;
+          html += `</table>`;
+        } else {
+          const code = entry.nonChargeableCode ? ` (${entry.nonChargeableCode})` : '';
+          html += `<table>`;
+          html += `<tr><td class="label-col"><span class="label">Code:</span></td><td><span class="non-chargeable">${entry.nonChargeableName}${code}</span></td></tr>`;
+          if (entry.otherDescription) {
+            html += `<tr><td class="label-col"><span class="label">Description:</span></td><td>${entry.otherDescription}</td></tr>`;
+          }
+          html += `<tr><td class="label-col"><span class="label">Time:</span></td><td><span class="hours">${entry.hours} hours</span></td></tr>`;
+          html += `</table>`;
+        }
+        
+        html += `</div>`;
+        html += `<div class="entry-body">`;
+        html += `<span class="label">Narrative:</span>`;
+        html += `<div class="narrative">${(entry.polishedNarrative || entry.narrative).replace(/\n/g, '<br>')}</div>`;
+        html += `</div>`;
+        html += `</div>`;
+      }
+    }
+
+    html += `</body></html>`;
+    return html;
+  };
+
   // Update a polished narrative in the output
   const updatePolishedNarrative = (dayIndex: number, entryId: string, newNarrative: string) => {
     if (!processedOutput) return;
@@ -475,13 +545,33 @@ export default function TimeRecording() {
   };
 
   const copyToClipboard = async () => {
-    const text = formatOutputForClipboard();
-    await navigator.clipboard.writeText(text);
-    setCopied(true);
-    toast({
-      title: "Copied!",
-      description: "Time recording output copied to clipboard.",
-    });
+    const plainText = formatOutputForClipboard();
+    const htmlContent = formatOutputAsHtml();
+    
+    try {
+      // Try to copy both HTML and plain text for rich pasting
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': new Blob([htmlContent], { type: 'text/html' }),
+          'text/plain': new Blob([plainText], { type: 'text/plain' }),
+        }),
+      ]);
+      setCopied(true);
+      toast({
+        title: "Copied with formatting!",
+        description: "Paste into Outlook for nicely formatted output.",
+      });
+    } catch (err) {
+      // Fallback to plain text if HTML copy fails
+      console.warn('Rich copy failed, falling back to plain text:', err);
+      await navigator.clipboard.writeText(plainText);
+      setCopied(true);
+      toast({
+        title: "Copied!",
+        description: "Time recording output copied to clipboard.",
+      });
+    }
+    
     setTimeout(() => setCopied(false), 2000);
   };
 

@@ -259,6 +259,8 @@ export default function Matters() {
 
   const isPipeline = categoryFilter === 'Pipeline';
   const isLive = categoryFilter === 'Live';
+  const isLost = categoryFilter === 'Lost';
+  const isPipelineOrLost = isPipeline || isLost;
 
   return (
     <AppLayout>
@@ -360,19 +362,19 @@ export default function Matters() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      {!isPipeline && (
+                      {!isPipelineOrLost && (
                         <TableHead className="w-20 sticky left-0 z-20 bg-background">Status</TableHead>
                       )}
                       <TableHead className={cn(
                         "min-w-[180px] sticky z-20 bg-background",
-                        isPipeline ? "left-0" : "left-20"
+                        isPipelineOrLost ? "left-0" : "left-20"
                       )}>
                         <SortableHeader field="matter_name">Client / Matter</SortableHeader>
                       </TableHead>
                       <TableHead className="text-right min-w-[120px]">
                         <SortableHeader field="fee_amount">Budget</SortableHeader>
                       </TableHead>
-                      {isPipeline && (
+                      {isPipelineOrLost && (
                         <TableHead className="text-right min-w-[100px]">USD</TableHead>
                       )}
                       {isLive && (
@@ -403,9 +405,11 @@ export default function Matters() {
                           </TableHead>
                         </>
                       )}
+                      {isPipelineOrLost && (
+                        <TableHead>Source</TableHead>
+                      )}
                       {isPipeline && (
                         <>
-                          <TableHead>Source</TableHead>
                           <TableHead>Clarifications</TableHead>
                           <TableHead>Submission</TableHead>
                           <TableHead>Decision</TableHead>
@@ -413,9 +417,11 @@ export default function Matters() {
                           <TableHead>Outcome</TableHead>
                         </>
                       )}
-                      <TableHead>
-                        <SortableHeader field="stage">Stage</SortableHeader>
-                      </TableHead>
+                      {!isLost && (
+                        <TableHead>
+                          <SortableHeader field="stage">Stage</SortableHeader>
+                        </TableHead>
+                      )}
                       <TableHead>Practice</TableHead>
                       <TableHead className="w-16">Actions</TableHead>
                     </TableRow>
@@ -442,14 +448,14 @@ export default function Matters() {
                       
                       return (
                         <TableRow key={matter.id} className="group">
-                          {!isPipeline && (
+                          {!isPipelineOrLost && (
                             <TableCell className="sticky left-0 z-10 bg-background">
                               <StatusBadge status={displayStatus} />
                             </TableCell>
                           )}
                           <TableCell className={cn(
                             "sticky z-10 bg-background",
-                            isPipeline ? "left-0" : "left-20"
+                            isPipelineOrLost ? "left-0" : "left-20"
                           )}>
                             <Link 
                               to={`/matters/${matter.id}`}
@@ -480,7 +486,7 @@ export default function Matters() {
                               />
                             </div>
                           </TableCell>
-                          {isPipeline && (
+                          {isPipelineOrLost && (
                             <TableCell className="text-right text-muted-foreground">
                               ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(matter.fee_amount_upper_end * (matter.exchange_rate || 1))}
                             </TableCell>
@@ -554,11 +560,13 @@ export default function Matters() {
                               </TableCell>
                             </>
                           )}
+                          {isPipelineOrLost && (
+                            <TableCell className="text-muted-foreground text-sm">
+                              {matter.source || '-'}
+                            </TableCell>
+                          )}
                           {isPipeline && (
                             <>
-                              <TableCell className="text-muted-foreground text-sm">
-                                {matter.source || '-'}
-                              </TableCell>
                               <TableCell className="text-sm">
                                 {matter.clarifications_date ? (
                                   <span className={cn(
@@ -631,33 +639,35 @@ export default function Matters() {
                               </TableCell>
                             </>
                           )}
-                          <TableCell>
-                            <Select
-                              value={matter.current_stage || ''}
-                              onValueChange={async (value) => {
-                                try {
-                                  await updateMatter.mutateAsync({
-                                    id: matter.id,
-                                    current_stage: value as MatterStage,
-                                  });
-                                  toast.success('Stage updated');
-                                } catch (error) {
-                                  toast.error('Failed to update stage');
-                                }
-                              }}
-                            >
-                              <SelectTrigger className="h-8 w-[160px] text-sm">
-                                <SelectValue placeholder="Select stage" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {(matter.category === 'Pipeline' ? pipelineStages : liveStages).map((stage) => (
-                                  <SelectItem key={stage} value={stage}>
-                                    {stage}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
+                          {!isLost && (
+                            <TableCell>
+                              <Select
+                                value={matter.current_stage || ''}
+                                onValueChange={async (value) => {
+                                  try {
+                                    await updateMatter.mutateAsync({
+                                      id: matter.id,
+                                      current_stage: value as MatterStage,
+                                    });
+                                    toast.success('Stage updated');
+                                  } catch (error) {
+                                    toast.error('Failed to update stage');
+                                  }
+                                }}
+                              >
+                                <SelectTrigger className="h-8 w-[160px] text-sm">
+                                  <SelectValue placeholder="Select stage" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {(matter.category === 'Pipeline' ? pipelineStages : liveStages).map((stage) => (
+                                    <SelectItem key={stage} value={stage}>
+                                      {stage}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                          )}
                           <TableCell className="text-muted-foreground text-sm">
                             {matter.practice_area || '-'}
                           </TableCell>

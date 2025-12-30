@@ -29,14 +29,14 @@ export function useDashboard() {
   return useQuery({
     queryKey: ['dashboard', user?.id],
     queryFn: async () => {
-      // Get all open matters with their clients
+      // Get all Live matters (not Pipeline) with their clients
       const { data: matters, error: mattersError } = await supabase
         .from('matters')
         .select(`
           *,
           clients (id, name)
         `)
-        .eq('status', 'Open');
+        .eq('category', 'Live');
 
       if (mattersError) throw mattersError;
 
@@ -86,7 +86,8 @@ export function useDashboard() {
 
       matters?.forEach(matter => {
         const snapshot = snapshotMap.get(matter.id);
-        const budget = Number(matter.agreed_budget_amount) || 0;
+        // Use fee_amount_upper_end as the budget (this is the agreed budget)
+        const budget = Number(matter.fee_amount_upper_end) || 0;
         const wipAmount = Number(snapshot?.wip_amount) || 0;
         const billedAmount = Number(snapshot?.billed_amount) || 0;
         const paidAmount = Number(snapshot?.paid_amount) || 0;

@@ -54,7 +54,7 @@ export default function Dashboard() {
       variant: 'default' as const,
     },
     {
-      title: 'Total Billed',
+      title: 'AR (Total Billed)',
       value: formatCurrency(stats?.totalBilled || 0),
       icon: <FileText className="h-5 w-5" />,
       variant: 'default' as const,
@@ -72,7 +72,7 @@ export default function Dashboard() {
       variant: (stats?.avgCollectionRate || 0) >= 80 ? 'success' as const : (stats?.avgCollectionRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
     },
     {
-      title: 'Open Matters',
+      title: 'Live Matters',
       value: stats?.openMattersCount || 0,
       icon: <Briefcase className="h-5 w-5" />,
       variant: 'default' as const,

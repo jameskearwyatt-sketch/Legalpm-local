@@ -360,8 +360,13 @@ export default function Matters() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      {!isPipeline && <TableHead className="w-20">Status</TableHead>}
-                      <TableHead className="min-w-[180px]">
+                      {!isPipeline && (
+                        <TableHead className="w-20 sticky left-0 z-20 bg-background">Status</TableHead>
+                      )}
+                      <TableHead className={cn(
+                        "min-w-[180px] sticky z-20 bg-background",
+                        isPipeline ? "left-0" : "left-20"
+                      )}>
                         <SortableHeader field="matter_name">Client / Matter</SortableHeader>
                       </TableHead>
                       <TableHead className="text-right min-w-[120px]">
@@ -438,11 +443,14 @@ export default function Matters() {
                       return (
                         <TableRow key={matter.id} className="group">
                           {!isPipeline && (
-                            <TableCell>
+                            <TableCell className="sticky left-0 z-10 bg-background">
                               <StatusBadge status={displayStatus} />
                             </TableCell>
                           )}
-                          <TableCell>
+                          <TableCell className={cn(
+                            "sticky z-10 bg-background",
+                            isPipeline ? "left-0" : "left-20"
+                          )}>
                             <Link 
                               to={`/matters/${matter.id}`}
                               className="block hover:text-primary transition-colors"

@@ -27,7 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useMatters, MatterWithFinancials, MatterCategory } from '@/lib/hooks/useMatters';
+import { useMatters, MatterWithFinancials, MatterCategory, MatterStage } from '@/lib/hooks/useMatters';
 import { useClients } from '@/lib/hooks/useClients';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useAuth } from '@/lib/auth';
@@ -39,6 +39,10 @@ import { toast } from 'sonner';
 
 type SortField = 'matter_name' | 'fee_amount' | 'bm_fee' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'local_counsel' | 'stage';
 type SortDirection = 'asc' | 'desc';
+
+// Stage options based on category
+const liveStages: MatterStage[] = ['Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Closing Process', 'Closed', 'Paused'];
+const pipelineStages: MatterStage[] = ['Pending', 'Won', 'Lost'];
 
 const categoryIcons: Record<MatterCategory, React.ReactNode> = {
   Live: <Briefcase className="h-4 w-4" />,
@@ -553,11 +557,31 @@ export default function Matters() {
                             </>
                           )}
                           <TableCell>
-                            {matter.current_stage ? (
-                              <span className="text-sm px-2 py-1 bg-muted rounded">
-                                {matter.current_stage}
-                              </span>
-                            ) : '-'}
+                            <Select
+                              value={matter.current_stage || ''}
+                              onValueChange={async (value) => {
+                                try {
+                                  await updateMatter.mutateAsync({
+                                    id: matter.id,
+                                    current_stage: value as MatterStage,
+                                  });
+                                  toast.success('Stage updated');
+                                } catch (error) {
+                                  toast.error('Failed to update stage');
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-8 w-[160px] text-sm">
+                                <SelectValue placeholder="Select stage" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {(matter.category === 'Pipeline' ? pipelineStages : liveStages).map((stage) => (
+                                  <SelectItem key={stage} value={stage}>
+                                    {stage}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </TableCell>
                           <TableCell className="text-muted-foreground text-sm">
                             {matter.practice_area || '-'}

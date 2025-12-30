@@ -21,6 +21,7 @@ import {
   Loader2,
   FileText,
   ArrowRight,
+  ArrowLeft,
   RotateCcw,
   AlertTriangle,
   Target
@@ -490,6 +491,12 @@ export default function TimeRecording() {
     setGridEntries([]);
     setProcessedOutput(null);
     setDateRange({ from: undefined, to: undefined });
+  };
+
+  // Go back to grid input from output (keeps all data intact)
+  const goBackToInput = () => {
+    setStep('grid-input');
+    setProcessedOutput(null);
   };
 
   const getTotalHours = () => gridEntries.reduce((sum, e) => sum + (e.hours || 0), 0);
@@ -995,6 +1002,10 @@ export default function TimeRecording() {
           <p className="text-muted-foreground">Ready for your PA</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={goBackToInput}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Go Back & Edit
+          </Button>
           <Button variant="outline" onClick={startOver}>
             <RotateCcw className="h-4 w-4 mr-2" />
             Start Over

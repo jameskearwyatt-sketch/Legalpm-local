@@ -11,6 +11,9 @@ export interface Matter {
   matter_number: string;
   practice_area: string | null;
   status: 'Open' | 'On Hold' | 'Closed';
+  aml_kyc_complete: boolean;
+  assignment_letter_signed: boolean;
+  matter_open: boolean;
   lead_partner: string | null;
   start_date: string | null;
   target_close_date: string | null;
@@ -46,6 +49,9 @@ export interface CreateMatterInput {
   matter_number: string;
   practice_area?: string;
   status?: 'Open' | 'On Hold' | 'Closed';
+  aml_kyc_complete?: boolean;
+  assignment_letter_signed?: boolean;
+  matter_open?: boolean;
   lead_partner?: string;
   start_date?: string;
   target_close_date?: string;

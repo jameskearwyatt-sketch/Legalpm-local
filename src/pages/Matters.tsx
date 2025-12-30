@@ -358,7 +358,7 @@ export default function Matters() {
                     ? 'Try adjusting your filters'
                     : `Get started by creating a new ${categoryFilter.toLowerCase()} matter`}
                 </p>
-                {!search && clientFilter === 'all' && (
+                {!search && clientFilter === 'all' && !isClosed && (
                   <Button asChild className="mt-4">
                     <Link to="/matters/new">
                       <Plus className="mr-2 h-4 w-4" />

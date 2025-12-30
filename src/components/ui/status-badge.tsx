@@ -9,7 +9,8 @@ interface StatusBadgeProps {
 const statusConfig: Record<string, { variant: 'success' | 'warning' | 'danger' | 'neutral'; label?: string }> = {
   // Matter status
   'Open': { variant: 'success' },
-  'On Hold': { variant: 'warning' },
+  'ATTN': { variant: 'warning', label: 'ATTN' },
+  'On Hold': { variant: 'warning' }, // Legacy support
   'Closed': { variant: 'neutral' },
   
   // Invoice status
@@ -18,7 +19,6 @@ const statusConfig: Record<string, { variant: 'success' | 'warning' | 'danger' |
   'Part Paid': { variant: 'warning' },
   'Paid': { variant: 'success' },
   'Overdue': { variant: 'danger' },
-  
   
   // Alert types
   'Over Budget': { variant: 'danger' },

@@ -150,6 +150,8 @@ export type Database = {
       matters: {
         Row: {
           agreed_budget_amount: number
+          aml_kyc_complete: boolean
+          assignment_letter_signed: boolean
           billing_terms: string | null
           budget_notes: string | null
           budget_type: Database["public"]["Enums"]["budget_type"]
@@ -161,6 +163,7 @@ export type Database = {
           lead_partner: string | null
           matter_name: string
           matter_number: string
+          matter_open: boolean
           practice_area: string | null
           start_date: string | null
           status: Database["public"]["Enums"]["matter_status"]
@@ -170,6 +173,8 @@ export type Database = {
         }
         Insert: {
           agreed_budget_amount?: number
+          aml_kyc_complete?: boolean
+          assignment_letter_signed?: boolean
           billing_terms?: string | null
           budget_notes?: string | null
           budget_type?: Database["public"]["Enums"]["budget_type"]
@@ -181,6 +186,7 @@ export type Database = {
           lead_partner?: string | null
           matter_name: string
           matter_number: string
+          matter_open?: boolean
           practice_area?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["matter_status"]
@@ -190,6 +196,8 @@ export type Database = {
         }
         Update: {
           agreed_budget_amount?: number
+          aml_kyc_complete?: boolean
+          assignment_letter_signed?: boolean
           billing_terms?: string | null
           budget_notes?: string | null
           budget_type?: Database["public"]["Enums"]["budget_type"]
@@ -201,6 +209,7 @@ export type Database = {
           lead_partner?: string | null
           matter_name?: string
           matter_number?: string
+          matter_open?: boolean
           practice_area?: string | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["matter_status"]

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import {
   Select,
@@ -23,7 +24,9 @@ const matterSchema = z.object({
   matter_name: z.string().min(1, 'Matter name is required').max(200),
   matter_number: z.string().min(1, 'Matter number is required').max(50),
   practice_area: z.string().optional(),
-  status: z.enum(['Open', 'On Hold', 'Closed']).default('Open'),
+  aml_kyc_complete: z.boolean().default(false),
+  assignment_letter_signed: z.boolean().default(false),
+  matter_open: z.boolean().default(false),
   lead_partner: z.string().optional(),
   start_date: z.string().optional(),
   target_close_date: z.string().optional(),
@@ -63,7 +66,9 @@ export default function MatterForm() {
     matter_name: '',
     matter_number: '',
     practice_area: '',
-    status: 'Open',
+    aml_kyc_complete: false,
+    assignment_letter_signed: false,
+    matter_open: false,
     lead_partner: '',
     start_date: '',
     target_close_date: '',
@@ -84,7 +89,9 @@ export default function MatterForm() {
         matter_name: existingMatter.matter_name,
         matter_number: existingMatter.matter_number,
         practice_area: existingMatter.practice_area || '',
-        status: existingMatter.status,
+        aml_kyc_complete: existingMatter.aml_kyc_complete || false,
+        assignment_letter_signed: existingMatter.assignment_letter_signed || false,
+        matter_open: existingMatter.matter_open || false,
         lead_partner: existingMatter.lead_partner || '',
         start_date: existingMatter.start_date || '',
         target_close_date: existingMatter.target_close_date || '',
@@ -103,14 +110,20 @@ export default function MatterForm() {
     setErrors({});
 
     try {
+      // Compute status based on checkboxes
+      const computedStatus = formData.aml_kyc_complete && formData.assignment_letter_signed && formData.matter_open
+        ? 'Open' as const
+        : 'On Hold' as const;
+      
       const validated = matterSchema.parse(formData);
+      const dataToSubmit = { ...validated, status: computedStatus };
       setIsSubmitting(true);
 
       if (isEditing) {
-        await updateMatter.mutateAsync({ id, ...validated });
+        await updateMatter.mutateAsync({ id, ...dataToSubmit });
         navigate(`/matters/${id}`);
       } else {
-        const result = await createMatter.mutateAsync(validated as CreateMatterInput);
+        const result = await createMatter.mutateAsync(dataToSubmit as CreateMatterInput);
         navigate(`/matters/${result.id}`);
       }
     } catch (error) {
@@ -204,21 +217,43 @@ export default function MatterForm() {
                   )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={formData.status}
-                    onValueChange={(v) => updateField('status', v)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Open">Open</SelectItem>
-                      <SelectItem value="On Hold">On Hold</SelectItem>
-                      <SelectItem value="Closed">Closed</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <div className="space-y-3">
+                  <Label>Matter Status</Label>
+                  <div className="space-y-3">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="aml_kyc_complete"
+                        checked={formData.aml_kyc_complete}
+                        onCheckedChange={(checked) => updateField('aml_kyc_complete', checked === true)}
+                      />
+                      <Label htmlFor="aml_kyc_complete" className="font-normal cursor-pointer">
+                        AML/KYC Complete
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="assignment_letter_signed"
+                        checked={formData.assignment_letter_signed}
+                        onCheckedChange={(checked) => updateField('assignment_letter_signed', checked === true)}
+                      />
+                      <Label htmlFor="assignment_letter_signed" className="font-normal cursor-pointer">
+                        Assignment Letter Signed
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="matter_open"
+                        checked={formData.matter_open}
+                        onCheckedChange={(checked) => updateField('matter_open', checked === true)}
+                      />
+                      <Label htmlFor="matter_open" className="font-normal cursor-pointer">
+                        Matter Open
+                      </Label>
+                    </div>
+                  </div>
+                  {formData.aml_kyc_complete && formData.assignment_letter_signed && formData.matter_open && (
+                    <p className="text-sm text-green-600 font-medium">✓ Fully Open</p>
+                  )}
                 </div>
               </div>
 

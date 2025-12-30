@@ -455,6 +455,8 @@ export type Database = {
         | "Closed"
         | "Won"
         | "Pending"
+        | "Closing Process"
+        | "Lost"
       matter_status: "Open" | "On Hold" | "Closed"
       pipeline_outcome: "Won" | "Lost" | "Pending"
     }
@@ -604,6 +606,8 @@ export const Constants = {
         "Closed",
         "Won",
         "Pending",
+        "Closing Process",
+        "Lost",
       ],
       matter_status: ["Open", "On Hold", "Closed"],
       pipeline_outcome: ["Won", "Lost", "Pending"],

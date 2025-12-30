@@ -46,8 +46,17 @@ export function useExchangeRates() {
   });
 }
 
-// Helper to get rate for a specific currency (returns rate vs USD)
+// Helper to get exchange rate for converting a currency TO USD
+// The API returns rates as "1 USD = X units of currency"
+// To convert currency to USD, we need to DIVIDE by the rate (or multiply by 1/rate)
+// This function returns the multiplier to convert FROM the currency TO USD
 export function getExchangeRate(rates: Record<string, number> | undefined, currency: string): number {
   if (!rates) return 1;
-  return rates[currency] || 1;
+  if (currency === 'USD') return 1;
+  
+  const rate = rates[currency];
+  if (!rate || rate === 0) return 1;
+  
+  // Invert the rate: if 1 USD = 9.18 SEK, then 1 SEK = 1/9.18 USD = 0.109 USD
+  return 1 / rate;
 }

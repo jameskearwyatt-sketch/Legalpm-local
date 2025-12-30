@@ -9,7 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import Matters from "./pages/Matters";
 import MatterDetail from "./pages/MatterDetail";
 import MatterForm from "./pages/MatterForm";
-import Clients from "./pages/Clients";
+
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import Help from "./pages/Help";
@@ -49,8 +49,6 @@ function AppRoutes() {
       <Route path="/matters/new" element={<ProtectedRoute><MatterForm /></ProtectedRoute>} />
       <Route path="/matters/:id" element={<ProtectedRoute><MatterDetail /></ProtectedRoute>} />
       <Route path="/matters/:id/edit" element={<ProtectedRoute><MatterForm /></ProtectedRoute>} />
-      <Route path="/clients" element={<ProtectedRoute><Clients /></ProtectedRoute>} />
-      <Route path="/clients/new" element={<ProtectedRoute><Clients defaultDialogOpen /></ProtectedRoute>} />
       <Route path="/time-recording" element={<ProtectedRoute><TimeRecording /></ProtectedRoute>} />
       <Route path="/flags" element={<ProtectedRoute><Flags /></ProtectedRoute>} />
       <Route path="/red-flags" element={<ProtectedRoute><RedFlags /></ProtectedRoute>} />

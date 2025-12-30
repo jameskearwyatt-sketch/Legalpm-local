@@ -11,9 +11,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Trash2, Star, Users } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Plus, Trash2, Star, Users, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Client } from '@/lib/hooks/useClients';
+import { ClientForm } from '@/components/forms/ClientForm';
 
 export interface ClientAllocation {
   client_id: string;
@@ -33,6 +40,7 @@ interface MultiClientSectionProps {
   singleClientId: string;
   onSingleClientChange: (clientId: string) => void;
   singleClientError?: string;
+  onClientCreated?: () => void;
 }
 
 export function MultiClientSection({
@@ -45,8 +53,10 @@ export function MultiClientSection({
   singleClientId,
   onSingleClientChange,
   singleClientError,
+  onClientCreated,
 }: MultiClientSectionProps) {
   const [totalPercentage, setTotalPercentage] = useState(0);
+  const [showNewClientDialog, setShowNewClientDialog] = useState(false);
 
   // Calculate total percentage whenever allocations change
   useEffect(() => {
@@ -125,13 +135,25 @@ export function MultiClientSection({
             <Label htmlFor="client_id">Client *</Label>
             <Select
               value={singleClientId}
-              onValueChange={onSingleClientChange}
+              onValueChange={(value) => {
+                if (value === '__add_new__') {
+                  setShowNewClientDialog(true);
+                } else {
+                  onSingleClientChange(value);
+                }
+              }}
               disabled={clientsLoading}
             >
               <SelectTrigger className={singleClientError ? 'border-destructive' : ''}>
                 <SelectValue placeholder="Select client" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="__add_new__" className="text-primary font-medium">
+                  <span className="flex items-center gap-2">
+                    <UserPlus className="h-4 w-4" />
+                    Add New Client
+                  </span>
+                </SelectItem>
                 {clients.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
                     {client.name}
@@ -143,6 +165,21 @@ export function MultiClientSection({
               <p className="text-sm text-destructive">{singleClientError}</p>
             )}
           </div>
+          
+          {/* New Client Dialog */}
+          <Dialog open={showNewClientDialog} onOpenChange={setShowNewClientDialog}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Client</DialogTitle>
+              </DialogHeader>
+              <ClientForm 
+                onSuccess={() => {
+                  setShowNewClientDialog(false);
+                  onClientCreated?.();
+                }} 
+              />
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
     );
@@ -208,13 +245,25 @@ export function MultiClientSection({
                   <Label className="text-xs">Client *</Label>
                   <Select
                     value={allocation.client_id}
-                    onValueChange={(v) => updateAllocation(index, 'client_id', v)}
+                    onValueChange={(v) => {
+                      if (v === '__add_new__') {
+                        setShowNewClientDialog(true);
+                      } else {
+                        updateAllocation(index, 'client_id', v);
+                      }
+                    }}
                     disabled={clientsLoading}
                   >
                     <SelectTrigger className="h-9">
                       <SelectValue placeholder="Select client" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="__add_new__" className="text-primary font-medium">
+                        <span className="flex items-center gap-2">
+                          <UserPlus className="h-4 w-4" />
+                          Add New Client
+                        </span>
+                      </SelectItem>
                       {getAvailableClients(allocation.client_id).map((client) => (
                         <SelectItem key={client.id} value={client.id}>
                           {client.name}
@@ -292,6 +341,21 @@ export function MultiClientSection({
         {hasDuplicateClients && (
           <p className="text-sm text-destructive">Each client can only be added once.</p>
         )}
+        
+        {/* New Client Dialog */}
+        <Dialog open={showNewClientDialog} onOpenChange={setShowNewClientDialog}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Client</DialogTitle>
+            </DialogHeader>
+            <ClientForm 
+              onSuccess={() => {
+                setShowNewClientDialog(false);
+                onClientCreated?.();
+              }} 
+            />
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

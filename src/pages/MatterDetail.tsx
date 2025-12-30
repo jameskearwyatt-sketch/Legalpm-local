@@ -21,7 +21,7 @@ import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useBudgetAmendments } from '@/lib/hooks/useBudgetAmendments';
 import { useClients } from '@/lib/hooks/useClients';
 import { useExchangeRates, getExchangeRate } from '@/lib/hooks/useExchangeRates';
-import { useMatterClients } from '@/lib/hooks/useMatterClients';
+import { useMatterClients, UpdateMatterClientInput } from '@/lib/hooks/useMatterClients';
 import {
   Collapsible,
   CollapsibleContent,
@@ -45,7 +45,10 @@ import {
   ChevronDown,
   History,
   Save,
-  RefreshCw
+  RefreshCw,
+  Pencil,
+  Check,
+  X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -67,6 +70,130 @@ const sources: MatterSource[] = ['RfP', 'Direct from Client', 'Internal Referral
 const outcomes: PipelineOutcome[] = ['Won', 'Lost', 'Pending'];
 const currencies = ['GBP', 'USD', 'EUR', 'Ringgit', 'CHF', 'AUD', 'CAD', 'SGD'];
 
+// Inline editable component for multi-client matter details
+interface EditableMatterClientsProps {
+  matterClients: Array<{
+    id: string;
+    clients?: { name: string };
+    cm_number: string | null;
+    fee_percentage: number;
+    is_master: boolean;
+  }>;
+  updateMatterClient: {
+    mutateAsync: (input: UpdateMatterClientInput) => Promise<unknown>;
+    isPending?: boolean;
+  };
+}
+
+function EditableMatterClients({ matterClients, updateMatterClient }: EditableMatterClientsProps) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editCmNumber, setEditCmNumber] = useState('');
+  const [editFeePercentage, setEditFeePercentage] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const startEditing = (mc: EditableMatterClientsProps['matterClients'][0]) => {
+    setEditingId(mc.id);
+    setEditCmNumber(mc.cm_number || '');
+    setEditFeePercentage(mc.fee_percentage.toString());
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditCmNumber('');
+    setEditFeePercentage('');
+  };
+
+  const saveChanges = async (mcId: string, originalCm: string | null, originalFee: number) => {
+    const newCm = editCmNumber.trim() || null;
+    const newFee = parseFloat(editFeePercentage) || 0;
+    
+    // Check if anything changed
+    if (newCm === originalCm && newFee === originalFee) {
+      cancelEditing();
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await updateMatterClient.mutateAsync({
+        id: mcId,
+        cm_number: newCm,
+        fee_percentage: newFee,
+      });
+      toast.success('Client details updated');
+      cancelEditing();
+    } catch (error) {
+      toast.error('Failed to update client details');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap gap-x-6 gap-y-2">
+      {matterClients.map(mc => (
+        <div key={mc.id} className="flex items-center gap-1 group">
+          <span className="font-medium">{mc.clients?.name}:</span>
+          
+          {editingId === mc.id ? (
+            <>
+              <Input
+                value={editCmNumber}
+                onChange={(e) => setEditCmNumber(e.target.value)}
+                className="h-6 w-24 text-xs px-1"
+                placeholder="C/M #"
+              />
+              <span className="mx-1">(</span>
+              <Input
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={editFeePercentage}
+                onChange={(e) => setEditFeePercentage(e.target.value)}
+                className="h-6 w-14 text-xs px-1"
+              />
+              <span>%)</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 ml-1"
+                onClick={() => saveChanges(mc.id, mc.cm_number, mc.fee_percentage)}
+                disabled={isSaving}
+              >
+                {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-success" />}
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5"
+                onClick={cancelEditing}
+                disabled={isSaving}
+              >
+                <X className="h-3 w-3 text-destructive" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <span>{mc.cm_number || '—'}</span>
+              <span className="mx-1">({mc.fee_percentage}%)</span>
+              {mc.is_master && <span className="text-primary text-xs">★ Master</span>}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={() => startEditing(mc)}
+              >
+                <Pencil className="h-3 w-3 text-muted-foreground" />
+              </Button>
+            </>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function MatterDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -76,7 +203,7 @@ export default function MatterDetail() {
   const { amendments, isLoading: amendmentsLoading } = useBudgetAmendments(id);
   const { clients, isLoading: clientsLoading } = useClients();
   const { data: exchangeRatesData, refetch: refetchRates } = useExchangeRates();
-  const { matterClients } = useMatterClients(id);
+  const { matterClients, updateMatterClient } = useMatterClients(id);
   
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -288,15 +415,13 @@ export default function MatterDetail() {
                 </div>
                 <StatusBadge status={formData.status || matter.status} />
               </div>
-              {/* Show C/M number - for multi-client show master's */}
+              {/* Show C/M number - for multi-client show editable fields */}
               {matterClients && matterClients.length > 1 ? (
                 <div className="text-sm text-muted-foreground">
-                  {matterClients.map(mc => (
-                    <span key={mc.id} className="mr-4">
-                      {mc.clients?.name}: {mc.cm_number || '—'} ({mc.fee_percentage}%)
-                      {mc.is_master && <span className="ml-1 text-primary text-xs">★ Master</span>}
-                    </span>
-                  ))}
+                  <EditableMatterClients 
+                    matterClients={matterClients} 
+                    updateMatterClient={updateMatterClient}
+                  />
                 </div>
               ) : (
                 <Input

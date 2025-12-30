@@ -394,7 +394,7 @@ export default function TimeRecording() {
         if (entry.type === 'matter') {
           output += `CLIENT: ${entry.clientName || 'N/A'}\n`;
           output += `MATTER: ${entry.matterName || 'N/A'}\n`;
-          output += `CM NUMBER: ${entry.cmNumber || 'N/A'}\n`;
+          output += `MATTER NUMBER: ${entry.matterNumber || 'N/A'}\n`;
         } else {
           const code = entry.nonChargeableCode ? ` (${entry.nonChargeableCode})` : '';
           output += `NON-CHARGEABLE: ${entry.nonChargeableName}${code}\n`;
@@ -633,7 +633,7 @@ export default function TimeRecording() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[300px]">Matter / Activity</TableHead>
+                  <TableHead className="w-[320px]">Client / Matter / Number</TableHead>
                   <TableHead className="w-[100px] text-center">Hours</TableHead>
                   {mode === 'single' ? (
                     <TableHead>Narrative</TableHead>
@@ -655,11 +655,10 @@ export default function TimeRecording() {
                 {gridEntries.filter(e => e.type === 'matter').map(entry => (
                   <TableRow key={entry.id} className={entry.hours > 0 ? 'bg-primary/5' : ''}>
                     <TableCell>
-                      <div>
-                        <div className="font-medium">{entry.matterNumber}</div>
-                        <div className="text-sm text-muted-foreground truncate max-w-[280px]">
-                          {entry.matterName}
-                        </div>
+                      <div className="space-y-0.5">
+                        <div className="font-semibold text-primary">{entry.clientName || 'Unknown Client'}</div>
+                        <div className="font-medium">{entry.matterName}</div>
+                        <div className="text-sm text-muted-foreground">{entry.matterNumber}</div>
                       </div>
                     </TableCell>
                     <TableCell>
@@ -902,7 +901,7 @@ export default function TimeRecording() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-[280px]">Client / Matter / CM Number</TableHead>
+                  <TableHead className="w-[280px]">Client / Matter / Number</TableHead>
                   <TableHead className="w-[80px] text-center">Hours</TableHead>
                   <TableHead>Polished Narrative (editable)</TableHead>
                 </TableRow>
@@ -916,7 +915,7 @@ export default function TimeRecording() {
                           <div className="font-semibold text-primary">{entry.clientName || 'Unknown Client'}</div>
                           <div className="font-medium">{entry.matterName || 'Unknown Matter'}</div>
                           <div className="text-sm text-muted-foreground">
-                            CM: {entry.cmNumber || 'N/A'}
+                            {entry.matterNumber || 'N/A'}
                           </div>
                         </div>
                       ) : (

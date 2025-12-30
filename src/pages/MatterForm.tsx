@@ -507,6 +507,10 @@ export default function MatterForm() {
             singleClientId={formData.client_id || ''}
             onSingleClientChange={(v) => updateField('client_id', v)}
             singleClientError={errors.client_id}
+            onClientCreated={() => {
+              // Clients list will auto-refresh via React Query
+              // Toast is shown by ClientForm
+            }}
           />
 
           {/* Basic Info */}

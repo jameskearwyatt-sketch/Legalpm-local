@@ -17,6 +17,8 @@ import {
 import { useMatters, useMatter, CreateMatterInput, MatterCategory, MatterStage, FeeType, MatterSource, PipelineOutcome } from '@/lib/hooks/useMatters';
 import { useClients } from '@/lib/hooks/useClients';
 import { useExchangeRates, getExchangeRate } from '@/lib/hooks/useExchangeRates';
+import { useMatterClients } from '@/lib/hooks/useMatterClients';
+import { MultiClientSection, ClientAllocation } from '@/components/matters/MultiClientSection';
 import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 import { z } from 'zod';
 import { cn } from '@/lib/utils';
@@ -99,6 +101,11 @@ export default function MatterForm() {
   const { createMatter, updateMatter } = useMatters();
   const { clients, isLoading: clientsLoading } = useClients();
   const { data: exchangeRatesData, isLoading: ratesLoading, refetch: refetchRates } = useExchangeRates();
+  const { matterClients, saveMatterClients } = useMatterClients(id);
+
+  // Multi-client state
+  const [isMultiClient, setIsMultiClient] = useState(false);
+  const [clientAllocations, setClientAllocations] = useState<ClientAllocation[]>([]);
 
   const [formData, setFormData] = useState<Partial<CreateMatterInput>>({
     client_id: '',
@@ -142,6 +149,7 @@ export default function MatterForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Load existing matter data
   useEffect(() => {
     if (existingMatter) {
       setFormData({
@@ -161,7 +169,6 @@ export default function MatterForm() {
         budget_notes: existingMatter.budget_notes || '',
         fee_earner_mix_notes: existingMatter.fee_earner_mix_notes || '',
         billing_terms: existingMatter.billing_terms || '',
-        // New fields
         category: existingMatter.category || 'Live',
         current_stage: existingMatter.current_stage || null,
         fee_amount_upper_end: existingMatter.fee_amount_upper_end || 0,
@@ -183,8 +190,25 @@ export default function MatterForm() {
         decision_date: existingMatter.decision_date || '',
         pipeline_outcome: existingMatter.pipeline_outcome || null,
       });
+      // Set multi-client flag from matter
+      setIsMultiClient((existingMatter as any).is_multi_client || false);
     }
   }, [existingMatter]);
+
+  // Load existing matter client allocations
+  useEffect(() => {
+    if (matterClients && matterClients.length > 0) {
+      setClientAllocations(
+        matterClients.map(mc => ({
+          client_id: mc.client_id,
+          cm_number: mc.cm_number || '',
+          is_master: mc.is_master,
+          fee_percentage: mc.fee_percentage,
+        }))
+      );
+      setIsMultiClient(true);
+    }
+  }, [matterClients]);
 
   // Auto-calculate BM fee component
   useEffect(() => {
@@ -211,20 +235,95 @@ export default function MatterForm() {
     setErrors({});
 
     try {
+      // Validate multi-client if enabled
+      if (isMultiClient) {
+        if (clientAllocations.length === 0) {
+          setErrors({ client_id: 'At least one client is required for multi-client matters' });
+          return;
+        }
+        
+        const totalPercentage = clientAllocations.reduce((sum, a) => sum + (a.fee_percentage || 0), 0);
+        if (Math.abs(totalPercentage - 100) > 0.01) {
+          setErrors({ client_id: 'Fee percentages must total 100%' });
+          return;
+        }
+        
+        if (!clientAllocations.some(a => a.is_master)) {
+          setErrors({ client_id: 'One client must be designated as the master matter' });
+          return;
+        }
+        
+        const masterClient = clientAllocations.find(a => a.is_master);
+        if (masterClient && !masterClient.cm_number) {
+          setErrors({ client_id: 'Master matter must have a C/M number' });
+          return;
+        }
+        
+        if (clientAllocations.some(a => !a.client_id)) {
+          setErrors({ client_id: 'All client allocations must have a client selected' });
+          return;
+        }
+      }
+
       // Compute status based on checkboxes
       const computedStatus = formData.aml_kyc_complete && formData.assignment_letter_signed && formData.matter_open
         ? 'Open' as const
         : 'On Hold' as const;
       
-      const validated = matterSchema.parse(formData);
-      const dataToSubmit = { ...validated, status: computedStatus };
+      // For multi-client, set client_id to the master client
+      let dataToValidate = { ...formData };
+      if (isMultiClient) {
+        const masterClient = clientAllocations.find(a => a.is_master);
+        dataToValidate.client_id = masterClient?.client_id || '';
+        dataToValidate.cm_number = masterClient?.cm_number || '';
+      }
+      
+      const validated = matterSchema.parse(dataToValidate);
+      const dataToSubmit = { 
+        ...validated, 
+        status: computedStatus,
+        is_multi_client: isMultiClient,
+      };
       setIsSubmitting(true);
 
       if (isEditing) {
         await updateMatter.mutateAsync({ id, ...dataToSubmit });
+        
+        // Save multi-client allocations
+        if (isMultiClient) {
+          await saveMatterClients.mutateAsync({
+            matterId: id!,
+            clients: clientAllocations.map(a => ({
+              matter_id: id!,
+              client_id: a.client_id,
+              cm_number: a.cm_number || null,
+              is_master: a.is_master,
+              fee_percentage: a.fee_percentage,
+            })),
+          });
+        } else {
+          // Clear any existing multi-client allocations
+          await saveMatterClients.mutateAsync({ matterId: id!, clients: [] });
+        }
+        
         navigate(`/matters/${id}`);
       } else {
         const result = await createMatter.mutateAsync(dataToSubmit as CreateMatterInput);
+        
+        // Save multi-client allocations for new matter
+        if (isMultiClient && result.id) {
+          await saveMatterClients.mutateAsync({
+            matterId: result.id,
+            clients: clientAllocations.map(a => ({
+              matter_id: result.id,
+              client_id: a.client_id,
+              cm_number: a.cm_number || null,
+              is_master: a.is_master,
+              fee_percentage: a.fee_percentage,
+            })),
+          });
+        }
+        
         navigate(`/matters/${result.id}`);
       }
     } catch (error) {
@@ -378,6 +477,30 @@ export default function MatterForm() {
             </CardContent>
           </Card>
 
+          {/* Multi-Client Section - at top of form */}
+          <MultiClientSection
+            isMultiClient={isMultiClient}
+            onMultiClientChange={(value) => {
+              setIsMultiClient(value);
+              if (value && clientAllocations.length === 0) {
+                // Add first client allocation when enabling multi-client
+                setClientAllocations([{
+                  client_id: formData.client_id || '',
+                  cm_number: formData.cm_number || '',
+                  is_master: true,
+                  fee_percentage: 100,
+                }]);
+              }
+            }}
+            clientAllocations={clientAllocations}
+            onAllocationsChange={setClientAllocations}
+            clients={clients}
+            clientsLoading={clientsLoading}
+            singleClientId={formData.client_id || ''}
+            onSingleClientChange={(v) => updateField('client_id', v)}
+            singleClientError={errors.client_id}
+          />
+
           {/* Basic Info */}
           <Card className="shadow-card">
             <CardHeader>
@@ -386,37 +509,6 @@ export default function MatterForm() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="client_id">Client *</Label>
-                  <Select
-                    value={formData.client_id}
-                    onValueChange={(v) => updateField('client_id', v)}
-                    disabled={clientsLoading}
-                  >
-                    <SelectTrigger className={errors.client_id ? 'border-destructive' : ''}>
-                      <SelectValue placeholder="Select client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>
-                          {client.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.client_id && (
-                    <p className="text-sm text-destructive">{errors.client_id}</p>
-                  )}
-                  {clients.length === 0 && !clientsLoading && (
-                    <p className="text-sm text-muted-foreground">
-                      No clients yet.{' '}
-                      <Link to="/clients/new" className="text-primary hover:underline">
-                        Create one first
-                      </Link>
-                    </p>
-                  )}
-                </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="matter_name">Matter Name *</Label>
                   <Input
@@ -430,6 +522,23 @@ export default function MatterForm() {
                     <p className="text-sm text-destructive">{errors.matter_name}</p>
                   )}
                 </div>
+
+                {/* Only show matter number for non-multi-client matters */}
+                {!isMultiClient && (
+                  <div className="space-y-2">
+                    <Label htmlFor="matter_number">Internal Reference *</Label>
+                    <Input
+                      id="matter_number"
+                      value={formData.matter_number}
+                      onChange={(e) => updateField('matter_number', e.target.value)}
+                      placeholder="e.g., MAT-001"
+                      className={errors.matter_number ? 'border-destructive' : ''}
+                    />
+                    {errors.matter_number && (
+                      <p className="text-sm text-destructive">{errors.matter_number}</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">

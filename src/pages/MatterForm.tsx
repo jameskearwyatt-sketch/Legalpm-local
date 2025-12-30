@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ClearableDateInput } from '@/components/ui/clearable-date-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -600,21 +601,19 @@ export default function MatterForm() {
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="start_date">Start Date</Label>
-                    <Input
+                    <ClearableDateInput
                       id="start_date"
-                      type="date"
                       value={formData.start_date}
-                      onChange={(e) => updateField('start_date', e.target.value)}
+                      onChange={(value) => updateField('start_date', value)}
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="target_close_date">Target Close Date</Label>
-                    <Input
+                    <ClearableDateInput
                       id="target_close_date"
-                      type="date"
                       value={formData.target_close_date}
-                      onChange={(e) => updateField('target_close_date', e.target.value)}
+                      onChange={(value) => updateField('target_close_date', value)}
                     />
                   </div>
                 </div>
@@ -822,41 +821,37 @@ export default function MatterForm() {
                 <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="opportunity_receipt_date">Opportunity Receipt</Label>
-                    <Input
+                    <ClearableDateInput
                       id="opportunity_receipt_date"
-                      type="date"
                       value={formData.opportunity_receipt_date}
-                      onChange={(e) => updateField('opportunity_receipt_date', e.target.value)}
+                      onChange={(value) => updateField('opportunity_receipt_date', value)}
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="clarifications_date">Clarifications Date</Label>
-                    <Input
+                    <ClearableDateInput
                       id="clarifications_date"
-                      type="date"
                       value={formData.clarifications_date}
-                      onChange={(e) => updateField('clarifications_date', e.target.value)}
+                      onChange={(value) => updateField('clarifications_date', value)}
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="submission_deadline">Submission Deadline</Label>
-                    <Input
+                    <ClearableDateInput
                       id="submission_deadline"
-                      type="date"
                       value={formData.submission_deadline}
-                      onChange={(e) => updateField('submission_deadline', e.target.value)}
+                      onChange={(value) => updateField('submission_deadline', value)}
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label htmlFor="decision_date">Decision Date</Label>
-                    <Input
+                    <ClearableDateInput
                       id="decision_date"
-                      type="date"
                       value={formData.decision_date}
-                      onChange={(e) => updateField('decision_date', e.target.value)}
+                      onChange={(value) => updateField('decision_date', value)}
                     />
                   </div>
                 </div>

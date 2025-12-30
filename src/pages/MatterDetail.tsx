@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
+import { ClearableDateInput } from '@/components/ui/clearable-date-input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -740,11 +741,11 @@ export default function MatterDetail() {
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Start Date</Label>
-                  <Input type="date" value={formData.start_date || ''} onChange={(e) => updateField('start_date', e.target.value)} />
+                  <ClearableDateInput value={formData.start_date || ''} onChange={(value) => updateField('start_date', value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Target Close Date</Label>
-                  <Input type="date" value={formData.target_close_date || ''} onChange={(e) => updateField('target_close_date', e.target.value)} />
+                  <ClearableDateInput value={formData.target_close_date || ''} onChange={(value) => updateField('target_close_date', value)} />
                 </div>
               </div>
             )}
@@ -877,19 +878,19 @@ export default function MatterDetail() {
               <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <Label>Opportunity Receipt</Label>
-                  <Input type="date" value={formData.opportunity_receipt_date || ''} onChange={(e) => updateField('opportunity_receipt_date', e.target.value)} />
+                  <ClearableDateInput value={formData.opportunity_receipt_date || ''} onChange={(value) => updateField('opportunity_receipt_date', value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Clarifications Date</Label>
-                  <Input type="date" value={formData.clarifications_date || ''} onChange={(e) => updateField('clarifications_date', e.target.value)} />
+                  <ClearableDateInput value={formData.clarifications_date || ''} onChange={(value) => updateField('clarifications_date', value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Submission Deadline</Label>
-                  <Input type="date" value={formData.submission_deadline || ''} onChange={(e) => updateField('submission_deadline', e.target.value)} />
+                  <ClearableDateInput value={formData.submission_deadline || ''} onChange={(value) => updateField('submission_deadline', value)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Decision Date</Label>
-                  <Input type="date" value={formData.decision_date || ''} onChange={(e) => updateField('decision_date', e.target.value)} />
+                  <ClearableDateInput value={formData.decision_date || ''} onChange={(value) => updateField('decision_date', value)} />
                 </div>
               </div>
               <div className="flex items-center space-x-2">

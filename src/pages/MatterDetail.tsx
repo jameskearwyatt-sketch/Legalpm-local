@@ -243,7 +243,8 @@ export default function MatterDetail() {
   const budget = formData.fee_amount_upper_end || matter.fee_amount_upper_end || 0;
   const bmFee = formData.bm_fee_component || matter.bm_fee_component || 0;
   const localCounsel = formData.local_counsel_fee || matter.local_counsel_fee || 0;
-  const totalUsed = billedAmount + wipAmount;
+  // Total budget burn = WIP + AR (Billed) + Paid
+  const totalUsed = wipAmount + billedAmount + paidAmount;
   const remainingBudget = budget - totalUsed;
   const budgetUsedPercent = budget > 0 ? (totalUsed / budget) * 100 : 0;
   const collectionRate = billedAmount > 0 ? (paidAmount / billedAmount) * 100 : 100;
@@ -460,7 +461,7 @@ export default function MatterDetail() {
                 <span className="text-lg font-semibold">{formatCurrency(wipAmount, currency)}</span>
               </div>
               <div className="flex justify-between items-center py-3 border-b">
-                <span className="text-muted-foreground">Billed</span>
+                <span className="text-muted-foreground">AR (Billed)</span>
                 <span className="text-lg font-semibold">{formatCurrency(billedAmount, currency)}</span>
               </div>
               <div className="flex justify-between items-center py-3 border-b">

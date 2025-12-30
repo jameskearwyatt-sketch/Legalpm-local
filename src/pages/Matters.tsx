@@ -498,14 +498,30 @@ export default function Matters() {
                             </div>
                           </TableCell>
                           {isPipelineOrLost && (
-                            <TableCell className="text-right text-muted-foreground">
-                              ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(matter.fee_amount_upper_end * (matter.exchange_rate || 1))}
+                            <TableCell className="text-right">
+                              <div className="flex flex-col items-end">
+                                <span className="text-muted-foreground">
+                                  {formatCurrency(matter.bm_fee_component, matter.fee_currency)}
+                                </span>
+                                {matter.fee_currency !== 'USD' && (
+                                  <span className="text-[10px] text-muted-foreground/70">
+                                    ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(matter.bm_fee_component * (matter.exchange_rate || 1))}
+                                  </span>
+                                )}
+                              </div>
                             </TableCell>
                           )}
                           {isLive && (
                             <>
                               <TableCell className="text-right font-medium">
-                                {formatCurrency(matter.bm_fee_component, matter.fee_currency)}
+                                <div className="flex flex-col items-end">
+                                  <span>{formatCurrency(matter.bm_fee_component, matter.fee_currency)}</span>
+                                  {matter.fee_currency !== 'USD' && (
+                                    <span className="text-[10px] text-muted-foreground/70 font-normal">
+                                      ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(matter.bm_fee_component * (matter.exchange_rate || 1))}
+                                    </span>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell className="text-right text-muted-foreground">
                                 {formatCurrency(matter.local_counsel_fee, matter.fee_currency)}

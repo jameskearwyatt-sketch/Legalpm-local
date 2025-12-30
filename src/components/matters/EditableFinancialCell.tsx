@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { Check, X, Loader2 } from 'lucide-react';
+import { Check, X, Loader2, Pencil } from 'lucide-react';
 
 interface EditableFinancialCellProps {
   value: number;
@@ -86,7 +86,6 @@ export function EditableFinancialCell({ value, currency, onSave, className }: Ed
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={() => {
-            // Small delay to allow button clicks
             setTimeout(() => {
               if (!isSaving) handleCancel();
             }, 150);
@@ -122,12 +121,17 @@ export function EditableFinancialCell({ value, currency, onSave, className }: Ed
     <button
       onClick={() => setIsEditing(true)}
       className={cn(
-        "text-right w-full hover:bg-muted/50 px-2 py-1 rounded transition-colors cursor-pointer",
+        "text-right w-full px-2 py-1 rounded transition-all cursor-pointer group",
+        "border border-dashed border-primary/30 hover:border-primary hover:bg-primary/5",
         className
       )}
       title="Click to edit"
     >
-      {formatCurrency(value)}
+      <span className="flex items-center justify-end gap-1">
+        {formatCurrency(value)}
+        <Pencil className="h-3 w-3 text-primary/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+      </span>
     </button>
   );
 }
+

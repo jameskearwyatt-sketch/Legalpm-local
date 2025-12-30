@@ -246,26 +246,27 @@ export default function TimeRecording() {
     }
   };
 
-  // Intelligent time spreading - uses iterative distribution
+  // Even time spreading - divides hours equally across selected days
+  // Rounds to nearest 0.25 (15 mins) and ensures total matches input
   const spreadTimeAcrossDays = (totalHours: number, dayCount: number): number[] => {
     if (dayCount === 0) return [];
     if (dayCount === 1) return [totalHours];
     
-    // Use a slight wave pattern for natural distribution
+    // Simply divide equally, round to 0.25 increments
     const baseHours = totalHours / dayCount;
+    const roundedBase = Math.round(baseHours * 4) / 4; // Round to nearest 0.25
+    
     const result: number[] = [];
-    let remaining = totalHours;
+    let allocated = 0;
     
     for (let i = 0; i < dayCount; i++) {
       if (i === dayCount - 1) {
-        // Last day gets remaining to avoid rounding issues
-        result.push(Math.round(remaining * 4) / 4); // Round to 0.25
+        // Last day gets whatever remains to ensure exact total
+        const remaining = Math.round((totalHours - allocated) * 4) / 4;
+        result.push(remaining);
       } else {
-        // Slight variation: alternate between slightly more/less
-        const variation = (i % 2 === 0) ? 1.05 : 0.95;
-        const hours = Math.round(baseHours * variation * 4) / 4;
-        result.push(hours);
-        remaining -= hours;
+        result.push(roundedBase);
+        allocated += roundedBase;
       }
     }
     

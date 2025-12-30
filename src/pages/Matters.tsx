@@ -367,6 +367,9 @@ export default function Matters() {
                       <TableHead className="text-right min-w-[120px]">
                         <SortableHeader field="fee_amount">Budget</SortableHeader>
                       </TableHead>
+                      {isPipeline && (
+                        <TableHead className="text-right min-w-[100px]">USD</TableHead>
+                      )}
                       {isLive && (
                         <>
                           <TableHead className="text-right">
@@ -469,6 +472,11 @@ export default function Matters() {
                               />
                             </div>
                           </TableCell>
+                          {isPipeline && (
+                            <TableCell className="text-right text-muted-foreground">
+                              ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(matter.fee_amount_upper_end * (matter.exchange_rate || 1))}
+                            </TableCell>
+                          )}
                           {isLive && (
                             <>
                               <TableCell className="text-right font-medium">

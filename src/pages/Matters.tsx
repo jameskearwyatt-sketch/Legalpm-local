@@ -237,6 +237,11 @@ export default function Matters() {
     return filteredMatters.reduce((sum, m) => sum + (m.bm_fee_component || 0) * (m.exchange_rate || 1), 0);
   }, [filteredMatters]);
 
+  const closedFeesPaid = useMemo(() => {
+    if (categoryFilter !== 'Closed') return 0;
+    return filteredMatters.reduce((sum, m) => sum + (m.latest_snapshot?.paid_amount || 0) * (m.exchange_rate || 1), 0);
+  }, [filteredMatters, categoryFilter]);
+
   const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <button
       onClick={() => toggleSort(field)}
@@ -260,6 +265,7 @@ export default function Matters() {
   const isPipeline = categoryFilter === 'Pipeline';
   const isLive = categoryFilter === 'Live';
   const isLost = categoryFilter === 'Lost';
+  const isClosed = categoryFilter === 'Closed';
   const isPipelineOrLost = isPipeline || isLost;
 
   return (
@@ -271,12 +277,14 @@ export default function Matters() {
             <h1 className="text-2xl lg:text-3xl font-heading font-bold text-foreground">Matters</h1>
             <p className="text-muted-foreground mt-1">Track live transactions, pipeline, and closed matters</p>
           </div>
-          <Button asChild>
-            <Link to="/matters/new">
-              <Plus className="mr-2 h-4 w-4" />
-              New Matter
-            </Link>
-          </Button>
+          {!isClosed && (
+            <Button asChild>
+              <Link to="/matters/new">
+                <Plus className="mr-2 h-4 w-4" />
+                New Matter
+              </Link>
+            </Button>
+          )}
         </div>
 
         {/* Category Tabs */}
@@ -323,9 +331,11 @@ export default function Matters() {
                 </Select>
               </div>
               <div className="text-right">
-                <p className="text-sm text-muted-foreground">Total Budgeted BM Fees (USD)</p>
+                <p className="text-sm text-muted-foreground">
+                  {isClosed ? 'Total BM Fees Paid (USD)' : 'Total Budgeted BM Fees (USD)'}
+                </p>
                 <p className="text-2xl font-bold text-foreground">
-                  ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(categoryTotals)}
+                  ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(isClosed ? closedFeesPaid : categoryTotals)}
                 </p>
               </div>
             </div>

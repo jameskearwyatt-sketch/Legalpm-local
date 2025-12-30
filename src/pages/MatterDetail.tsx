@@ -69,7 +69,7 @@ const allStages: MatterStage[] = [...liveStages, ...pipelineStages];
 const feeTypes: FeeType[] = ['Discounted Rates with Cap', 'Discounted Rates with Estimate', 'Discounted Rates with Partial Cap', 'Rack Rates with Cap', 'Rack Rates with Estimate'];
 const sources: MatterSource[] = ['RfP', 'Direct from Client', 'Internal Referral'];
 const outcomes: PipelineOutcome[] = ['Won', 'Lost', 'Pending'];
-const currencies = ['GBP', 'USD', 'EUR', 'Ringgit', 'CHF', 'AUD', 'CAD', 'SGD'];
+const currencies = ['GBP', 'USD', 'EUR', 'Ringgit', 'CHF', 'AUD', 'CAD', 'SGD', 'SEK'];
 
 // Inline editable component for multi-client matter details
 interface EditableMatterClientsProps {

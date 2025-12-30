@@ -89,7 +89,7 @@ const pipelineStages: MatterStage[] = ['Pending', 'Won', 'Lost'];
 const feeTypes: FeeType[] = ['Discounted Rates with Cap', 'Discounted Rates with Estimate', 'Discounted Rates with Partial Cap', 'Rack Rates with Cap', 'Rack Rates with Estimate'];
 const sources: MatterSource[] = ['RfP', 'Direct from Client', 'Internal Referral'];
 const outcomes: PipelineOutcome[] = ['Won', 'Lost', 'Pending'];
-const currencies = ['GBP', 'USD', 'EUR', 'Ringgit', 'CHF', 'AUD', 'CAD', 'SGD'];
+const currencies = ['GBP', 'USD', 'EUR', 'Ringgit', 'CHF', 'AUD', 'CAD', 'SGD', 'SEK'];
 const allCategories: MatterCategory[] = ['Live', 'Pipeline', 'Closed', 'Lost'];
 const allStages: MatterStage[] = ['Pre-Start', 'Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Closing Process', 'Closed', 'Paused', 'Pending', 'Won', 'Lost'];
 

@@ -10,7 +10,7 @@ const statusConfig: Record<string, { variant: 'success' | 'warning' | 'danger' |
   // Matter status
   'Open': { variant: 'success' },
   'ATTN': { variant: 'warning', label: 'ATTN' },
-  'On Hold': { variant: 'warning' }, // Legacy support
+  'On Hold': { variant: 'warning', label: 'ATTN' }, // Database stores 'On Hold', display as 'ATTN'
   'Closed': { variant: 'neutral' },
   
   // Invoice status

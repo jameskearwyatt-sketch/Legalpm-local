@@ -225,8 +225,10 @@ export default function MatterForm() {
   useEffect(() => {
     if (exchangeRatesData?.rates && formData.fee_currency) {
       const rate = getExchangeRate(exchangeRatesData.rates, formData.fee_currency);
-      if (rate !== formData.exchange_rate) {
-        setFormData(prev => ({ ...prev, exchange_rate: rate }));
+      // Round to 4 decimal places to avoid database precision issues
+      const roundedRate = Math.round(rate * 10000) / 10000;
+      if (roundedRate !== formData.exchange_rate) {
+        setFormData(prev => ({ ...prev, exchange_rate: roundedRate }));
       }
     }
   }, [formData.fee_currency, exchangeRatesData?.rates]);
@@ -285,11 +287,25 @@ export default function MatterForm() {
       }
       
       const validated = matterSchema.parse(dataToValidate);
-      const dataToSubmit = { 
+      
+      // Convert empty string dates to null to avoid database syntax errors
+      const cleanDates = (data: any) => ({
+        ...data,
+        start_date: data.start_date || null,
+        target_close_date: data.target_close_date || null,
+        opportunity_receipt_date: data.opportunity_receipt_date || null,
+        clarifications_date: data.clarifications_date || null,
+        submission_deadline: data.submission_deadline || null,
+        decision_date: data.decision_date || null,
+        // Also ensure exchange_rate is rounded
+        exchange_rate: Math.round((data.exchange_rate || 1) * 10000) / 10000,
+      });
+      
+      const dataToSubmit = cleanDates({ 
         ...validated, 
         status: computedStatus,
         is_multi_client: isMultiClient,
-      };
+      });
       setIsSubmitting(true);
 
       if (isEditing) {

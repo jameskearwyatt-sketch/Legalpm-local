@@ -6,15 +6,40 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileSpreadsheet, Calculator, Database } from "lucide-react";
-import { analyzeExcelFile, getFormulaCells, getSummary, WorkbookAnalysis } from "@/utils/excelParser";
+import { Upload, FileSpreadsheet, Calculator, Database, Send } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+
+interface CellInfo {
+  address: string;
+  value: any;
+  formula?: string;
+  type: string;
+}
+
+interface SheetAnalysis {
+  name: string;
+  rowCount: number;
+  colCount: number;
+  cells: CellInfo[];
+  usedRange: string;
+  headers: string[];
+  dataRows: any[][];
+}
+
+interface WorkbookAnalysis {
+  sheetNames: string[];
+  sheets: SheetAnalysis[];
+}
 
 export default function ExcelAnalyzer() {
   const [analysis, setAnalysis] = useState<WorkbookAnalysis | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [fileName, setFileName] = useState<string>("");
+  const [rawJson, setRawJson] = useState<string>("");
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -24,17 +49,36 @@ export default function ExcelAnalyzer() {
     setFileName(file.name);
     
     try {
-      const result = await analyzeExcelFile(file);
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-excel`,
+        {
+          method: 'POST',
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to parse Excel file');
+      }
+
+      const result = await response.json();
       setAnalysis(result);
+      setRawJson(JSON.stringify(result, null, 2));
+      toast({ title: "File parsed successfully", description: `Found ${result.sheetNames.length} sheets` });
     } catch (error) {
       console.error("Error parsing Excel file:", error);
+      toast({ title: "Error", description: "Failed to parse Excel file", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const formulas = analysis ? getFormulaCells(analysis) : [];
-  const summary = analysis ? getSummary(analysis) : "";
+  const formulas = analysis ? analysis.sheets.flatMap(sheet => 
+    sheet.cells.filter(c => c.formula).map(c => ({ sheet: sheet.name, ...c }))
+  ) : [];
 
   return (
     <AppLayout>
@@ -61,7 +105,7 @@ export default function ExcelAnalyzer() {
                 onChange={handleFileUpload}
                 className="max-w-md"
               />
-              {isLoading && <span className="text-muted-foreground">Analyzing...</span>}
+              {isLoading && <span className="text-muted-foreground">Analyzing via server...</span>}
               {fileName && !isLoading && (
                 <Badge variant="secondary">
                   <FileSpreadsheet className="h-3 w-3 mr-1" />
@@ -86,6 +130,10 @@ export default function ExcelAnalyzer() {
               <TabsTrigger value="sheets">
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 Sheet Details
+              </TabsTrigger>
+              <TabsTrigger value="raw">
+                <Send className="h-4 w-4 mr-2" />
+                Raw JSON
               </TabsTrigger>
             </TabsList>
 
@@ -245,6 +293,21 @@ export default function ExcelAnalyzer() {
                       </AccordionItem>
                     ))}
                   </Accordion>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="raw">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Raw JSON Output</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea 
+                    value={rawJson} 
+                    readOnly 
+                    className="font-mono text-xs h-[600px]"
+                  />
                 </CardContent>
               </Card>
             </TabsContent>

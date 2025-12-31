@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.polish-narrative]
 verify_jwt = false
+
+[functions.parse-excel]
+verify_jwt = false

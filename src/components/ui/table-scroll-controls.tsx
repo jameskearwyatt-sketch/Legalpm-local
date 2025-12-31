@@ -10,18 +10,58 @@ interface TableScrollControlsProps {
 
 export function TableScrollControls({ children, className }: TableScrollControlsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [position, setPosition] = useState({ left: 0, width: 0, visible: false });
+  const [scrollableEl, setScrollableEl] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
+  // Find the actual scrollable element (the Table component's internal div)
+  useEffect(() => {
+    if (!containerRef.current) return;
+    
+    // The Table component wraps the table in a div with overflow-auto
+    // Find it by looking for the scrollable child
+    const findScrollable = () => {
+      const container = containerRef.current;
+      if (!container) return null;
+      
+      // Look for element with overflow-auto that has horizontal scroll
+      const candidates = container.querySelectorAll('div');
+      for (const el of candidates) {
+        const style = window.getComputedStyle(el);
+        if (style.overflowX === 'auto' || style.overflow === 'auto') {
+          if (el.scrollWidth > el.clientWidth) {
+            return el as HTMLElement;
+          }
+        }
+      }
+      return null;
+    };
+
+    // Try to find it after a delay to allow content to render
+    const t1 = setTimeout(() => {
+      const el = findScrollable();
+      if (el) setScrollableEl(el);
+    }, 100);
+    
+    const t2 = setTimeout(() => {
+      const el = findScrollable();
+      if (el) setScrollableEl(el);
+    }, 500);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, [mounted]);
+
   const updateScrollState = useCallback(() => {
-    const el = scrollRef.current;
+    const el = scrollableEl;
     const container = containerRef.current;
     if (!el || !container) return;
     
@@ -36,51 +76,39 @@ export function TableScrollControls({ children, className }: TableScrollControls
     // Get position for fixed controls
     const rect = container.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
-    const isVisible = rect.top < viewportHeight && rect.bottom > 100;
+    const isVisible = rect.top < viewportHeight && rect.bottom > 60;
     
     setPosition({
       left: rect.left,
       width: rect.width,
       visible: isVisible && overflow,
     });
-  }, []);
+  }, [scrollableEl]);
 
   useEffect(() => {
-    const el = scrollRef.current;
-    if (!el || !mounted) return;
+    if (!scrollableEl || !mounted) return;
 
-    // Check immediately and after delays for dynamic content
     updateScrollState();
-    const t1 = setTimeout(updateScrollState, 100);
-    const t2 = setTimeout(updateScrollState, 500);
-    const t3 = setTimeout(updateScrollState, 1000);
     
-    el.addEventListener('scroll', updateScrollState);
+    scrollableEl.addEventListener('scroll', updateScrollState);
     window.addEventListener('scroll', updateScrollState, true);
     window.addEventListener('resize', updateScrollState);
     
     const resizeObserver = new ResizeObserver(updateScrollState);
-    resizeObserver.observe(el);
-    if (el.firstElementChild) {
-      resizeObserver.observe(el.firstElementChild);
-    }
+    resizeObserver.observe(scrollableEl);
 
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-      clearTimeout(t3);
-      el.removeEventListener('scroll', updateScrollState);
+      scrollableEl.removeEventListener('scroll', updateScrollState);
       window.removeEventListener('scroll', updateScrollState, true);
       window.removeEventListener('resize', updateScrollState);
       resizeObserver.disconnect();
     };
-  }, [updateScrollState, mounted]);
+  }, [updateScrollState, scrollableEl, mounted]);
 
   const scroll = (direction: 'left' | 'right') => {
-    const el = scrollRef.current;
-    if (!el) return;
+    if (!scrollableEl) return;
     
-    el.scrollBy({
+    scrollableEl.scrollBy({
       left: direction === 'left' ? -250 : 250,
       behavior: 'smooth'
     });
@@ -90,12 +118,7 @@ export function TableScrollControls({ children, className }: TableScrollControls
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
-      <div 
-        ref={scrollRef} 
-        className="overflow-x-auto"
-      >
-        {children}
-      </div>
+      {children}
       
       {/* Fixed floating controls via portal */}
       {showControls && createPortal(
@@ -106,7 +129,6 @@ export function TableScrollControls({ children, className }: TableScrollControls
             left: `${position.left + position.width / 2}px`,
             transform: 'translateX(-50%)',
             zIndex: 99999,
-            pointerEvents: 'auto',
           }}
         >
           <div 

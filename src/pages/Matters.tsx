@@ -390,10 +390,10 @@ export default function Matters() {
                       {isLive && (
                         <>
                           <TableHead className="text-right min-w-[100px]">
-                            <SortableHeader field="bm_fee">BM Fee</SortableHeader>
+                            <SortableHeader field="bm_fee">BM Budget</SortableHeader>
                           </TableHead>
                           <TableHead className="text-right min-w-[110px]">
-                            <SortableHeader field="local_counsel">Local Counsel</SortableHeader>
+                            <SortableHeader field="local_counsel">Local Budget</SortableHeader>
                           </TableHead>
                           <TableHead className="text-right min-w-[90px]">
                             <SortableHeader field="wip">WIP</SortableHeader>

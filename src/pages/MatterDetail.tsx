@@ -19,15 +19,10 @@ import {
 } from '@/components/ui/select';
 import { useMatter, useMatters, MatterCategory, MatterStage, FeeType, MatterSource, PipelineOutcome } from '@/lib/hooks/useMatters';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
-import { useBudgetAmendments } from '@/lib/hooks/useBudgetAmendments';
+import { BudgetSection } from '@/components/matters/BudgetSection';
 import { useClients } from '@/lib/hooks/useClients';
 import { useExchangeRates, getExchangeRate } from '@/lib/hooks/useExchangeRates';
 import { useMatterClients, UpdateMatterClientInput } from '@/lib/hooks/useMatterClients';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,8 +38,6 @@ import {
   ArrowLeft, 
   Trash2, 
   Loader2,
-  ChevronDown,
-  History,
   Save,
   RefreshCw,
   Pencil,
@@ -201,12 +194,10 @@ export default function MatterDetail() {
   const { data: matter, isLoading: matterLoading } = useMatter(id!);
   const { deleteMatter, updateMatter } = useMatters();
   const { snapshots } = useSnapshots(id);
-  const { amendments, isLoading: amendmentsLoading } = useBudgetAmendments(id);
   const { clients, isLoading: clientsLoading } = useClients();
   const { data: exchangeRatesData, refetch: refetchRates } = useExchangeRates();
   const { matterClients, updateMatterClient } = useMatterClients(id);
   
-  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   
@@ -521,75 +512,6 @@ export default function MatterDetail() {
                   </div>
                 </div>
 
-                {/* BM Fee and Local Counsel breakdown */}
-                <div className="space-y-2 pt-2 border-t">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">BM Fee Component</span>
-                    <span className="font-medium">{formatCurrency(bmFee, currency)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Local Counsel</span>
-                    <span className="font-medium">{formatCurrency(localCounsel, currency)}</span>
-                  </div>
-                </div>
-
-                {/* Budget History Collapsible */}
-                <Collapsible open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="outline" size="sm" className="w-full">
-                      <History className="mr-2 h-4 w-4" />
-                      Budget History
-                      <ChevronDown className={cn(
-                        "ml-auto h-4 w-4 transition-transform",
-                        isHistoryOpen && "rotate-180"
-                      )} />
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="pt-4">
-                    {amendmentsLoading ? (
-                      <div className="flex justify-center py-4">
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : amendments && amendments.length > 0 ? (
-                      <div className="space-y-3 max-h-64 overflow-y-auto">
-                        {amendments.map((amendment) => (
-                          <div key={amendment.id} className="p-3 rounded-lg bg-muted/30 text-sm space-y-1">
-                            <div className="flex justify-between items-center">
-                              <span className="font-medium">{formatDate(amendment.amendment_date)}</span>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 text-xs">
-                              <div>
-                                <span className="text-muted-foreground">Budget:</span>
-                                <span className="ml-1">
-                                  {formatCurrency(amendment.previous_budget, currency)} → {formatCurrency(amendment.new_budget, currency)}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">BM:</span>
-                                <span className="ml-1">
-                                  {formatCurrency(amendment.previous_bm_fee, currency)} → {formatCurrency(amendment.new_bm_fee, currency)}
-                                </span>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">LC:</span>
-                                <span className="ml-1">
-                                  {formatCurrency(amendment.previous_local_counsel, currency)} → {formatCurrency(amendment.new_local_counsel, currency)}
-                                </span>
-                              </div>
-                            </div>
-                            {amendment.notes && (
-                              <p className="text-xs text-muted-foreground italic mt-1">{amendment.notes}</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">
-                        No budget amendments recorded yet.
-                      </p>
-                    )}
-                  </CollapsibleContent>
-                </Collapsible>
               </CardContent>
             </Card>
 
@@ -796,36 +718,13 @@ export default function MatterDetail() {
                 </div>
               </div>
             </div>
-            <div className="grid sm:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Budget (Total Fee)</Label>
-                <Input 
-                  type="number" 
-                  value={formData.fee_amount_upper_end || ''} 
-                  onChange={(e) => updateField('fee_amount_upper_end', parseFloat(e.target.value) || 0)} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Local Counsel Fee</Label>
-                <Input 
-                  type="number" 
-                  value={formData.local_counsel_fee || ''} 
-                  onChange={(e) => updateField('local_counsel_fee', parseFloat(e.target.value) || 0)} 
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>BM Fee Component</Label>
-                <Input 
-                  type="number" 
-                  value={formData.bm_fee_component || ''} 
-                  readOnly
-                  className="bg-muted"
-                />
-                <p className="text-xs text-muted-foreground">Auto-calculated: Budget - Local Counsel</p>
-              </div>
-            </div>
           </CardContent>
         </Card>
+
+        {/* Budget Section - only for non-pipeline matters */}
+        {!isPipeline && (
+          <BudgetSection matterId={id!} currency={currency} />
+        )}
 
         {/* Pipeline Information (conditionally shown) */}
         {isPipeline && (

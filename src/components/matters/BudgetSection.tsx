@@ -16,6 +16,17 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Plus, Trash2, Loader2, ChevronDown, History, Check } from 'lucide-react';
 import { useBudgetVersions, DraftLineItem, BudgetLineItem } from '@/lib/hooks/useBudgetVersions';
 import { format } from 'date-fns';
@@ -36,6 +47,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     isLoading,
     isLoadingLineItems,
     finalizeBudget,
+    deleteBudgetVersion,
     fetchLineItems,
   } = useBudgetVersions(matterId);
 
@@ -117,6 +129,14 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     setIsEditing(false);
   };
 
+  const handleDeleteVersion = async (versionId: string) => {
+    await deleteBudgetVersion.mutateAsync(versionId);
+    // Reset draft items if we deleted the last version
+    if (versions.length === 1) {
+      setDraftItems([{ work_item: '', provider: 'Baker McKenzie', fee_amount: 0 }]);
+    }
+  };
+
   const startEditing = () => {
     setIsEditing(true);
     if (draftItems.length === 0) {
@@ -171,11 +191,53 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     <Card className="shadow-card">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg font-heading">Budget</CardTitle>
-        {hasExistingBudget && latestVersion && (
-          <span className="text-sm text-muted-foreground">
-            Version {latestVersion.version_number} • Finalized {formatDate(latestVersion.finalized_at)}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {hasExistingBudget && latestVersion && (
+            <span className="text-sm text-muted-foreground">
+              Version {latestVersion.version_number} • Finalized {formatDate(latestVersion.finalized_at)}
+            </span>
+          )}
+          {hasExistingBudget && latestVersion && !isEditing && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Budget Version {latestVersion.version_number}?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you wish to delete this budget? This will remove all line items and cannot be undone.
+                    {versions.length > 1 && (
+                      <span className="block mt-2">
+                        The previous version (Version {versions[1]?.version_number}) will become the current budget.
+                      </span>
+                    )}
+                    {versions.length === 1 && (
+                      <span className="block mt-2">
+                        This is the only budget version. The budget will be reset to zero.
+                      </span>
+                    )}
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleDeleteVersion(latestVersion.id)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {deleteBudgetVersion.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      'Delete'
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Budget Line Items */}
@@ -274,16 +336,25 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           </div>
         </div>
 
-        {/* Notes for Update */}
-        {isEditing && hasExistingBudget && (
+        {/* Notes - shown for both initial and updates */}
+        {(isEditing || !hasExistingBudget) && (
           <div className="space-y-2">
-            <Label>Update Notes</Label>
+            <Label>{hasExistingBudget ? 'Update Notes' : 'Budget Notes'}</Label>
             <Textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Why is this budget being updated? (e.g., Client agreed to additional scope)"
+              placeholder={hasExistingBudget 
+                ? "Why is this budget being updated? (e.g., Client agreed to additional scope)" 
+                : "Any notes about this budget (optional)"}
               rows={2}
             />
+          </div>
+        )}
+
+        {/* Show current budget notes if viewing (not editing) */}
+        {hasExistingBudget && !isEditing && latestVersion?.notes && (
+          <div className="bg-muted/30 rounded-lg p-3">
+            <p className="text-sm text-muted-foreground italic">{latestVersion.notes}</p>
           </div>
         )}
 
@@ -345,20 +416,56 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                   <div
                     key={version.id}
                     className={cn(
-                      "p-3 rounded-lg text-sm space-y-2 cursor-pointer transition-colors",
+                      "p-3 rounded-lg text-sm space-y-2 transition-colors",
                       version.id === latestVersion?.id ? "bg-primary/10 border border-primary/20" : "bg-muted/30 hover:bg-muted/50",
                       selectedVersionId === version.id && "ring-2 ring-primary"
                     )}
-                    onClick={() => loadVersionItems(version.id)}
                   >
                     <div className="flex justify-between items-center">
-                      <span className="font-medium">
+                      <button
+                        className="font-medium text-left flex-1 cursor-pointer"
+                        onClick={() => loadVersionItems(version.id)}
+                      >
                         Version {version.version_number}
                         {version.id === latestVersion?.id && <span className="ml-2 text-xs text-primary">(Current)</span>}
-                      </span>
-                      <span className="text-xs text-muted-foreground">{formatDate(version.finalized_at)}</span>
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">{formatDate(version.finalized_at)}</span>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 text-destructive hover:text-destructive"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Budget Version {version.version_number}?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you wish to delete this budget version? This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteVersion(version.id)}
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                              >
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div 
+                      className="grid grid-cols-3 gap-2 text-xs cursor-pointer"
+                      onClick={() => loadVersionItems(version.id)}
+                    >
                       <div>
                         <span className="text-muted-foreground">BM:</span>
                         <span className="ml-1">{formatCurrency(version.bm_total)}</span>

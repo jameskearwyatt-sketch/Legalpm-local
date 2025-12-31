@@ -811,10 +811,6 @@ export default function MatterDetail() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Budget Notes</Label>
-              <Textarea value={formData.budget_notes || ''} onChange={(e) => updateField('budget_notes', e.target.value)} rows={3} />
-            </div>
-            <div className="space-y-2">
               <Label>Fee Earner Mix Notes</Label>
               <Textarea value={formData.fee_earner_mix_notes || ''} onChange={(e) => updateField('fee_earner_mix_notes', e.target.value)} rows={3} />
             </div>

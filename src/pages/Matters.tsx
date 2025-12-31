@@ -520,8 +520,19 @@ export default function Matters() {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-right text-muted-foreground">
-                                {formatCurrency(matter.local_counsel_fee, matter.fee_currency)}
+                              <TableCell className="p-1">
+                                <EditableFinancialCell
+                                  value={matter.local_counsel_fee || 0}
+                                  currency={matter.fee_currency}
+                                  onSave={async (value) => {
+                                    const newBmFee = (matter.fee_amount_upper_end || 0) - value;
+                                    await updateMatter.mutateAsync({
+                                      id: matter.id,
+                                      local_counsel_fee: value,
+                                      bm_fee_component: newBmFee,
+                                    });
+                                  }}
+                                />
                               </TableCell>
                               <TableCell className="p-1">
                                 <EditableFinancialCell

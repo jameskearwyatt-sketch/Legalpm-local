@@ -373,15 +373,12 @@ export default function Matters() {
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      {!isPipelineOrLost && (
-                        <TableHead className="w-20 sticky left-0 z-20 bg-background">Status</TableHead>
-                      )}
-                      <TableHead className={cn(
-                        "min-w-[180px] sticky z-20 bg-background",
-                        isPipelineOrLost ? "left-0" : "left-20"
-                      )}>
+                      <TableHead className="min-w-[180px] sticky left-0 z-20 bg-background">
                         <SortableHeader field="matter_name">Client / Matter</SortableHeader>
                       </TableHead>
+                      {!isPipelineOrLost && (
+                        <TableHead className="w-20">Status</TableHead>
+                      )}
                       <TableHead className="text-right min-w-[120px]">
                         <SortableHeader field="fee_amount">Budget</SortableHeader>
                       </TableHead>
@@ -459,15 +456,7 @@ export default function Matters() {
                       
                       return (
                         <TableRow key={matter.id} className="group">
-                          {!isPipelineOrLost && (
-                            <TableCell className="sticky left-0 z-10 bg-background">
-                              <StatusBadge status={displayStatus} />
-                            </TableCell>
-                          )}
-                          <TableCell className={cn(
-                            "sticky z-10 bg-background",
-                            isPipelineOrLost ? "left-0" : "left-20"
-                          )}>
+                          <TableCell className="sticky left-0 z-10 bg-background">
                             <Link 
                               to={`/matters/${matter.id}`}
                               className="block hover:text-primary transition-colors"
@@ -478,6 +467,11 @@ export default function Matters() {
                               </p>
                             </Link>
                           </TableCell>
+                          {!isPipelineOrLost && (
+                            <TableCell>
+                              <StatusBadge status={displayStatus} />
+                            </TableCell>
+                          )}
                           <TableCell className="text-right">
                             <div className="flex flex-col items-end gap-0.5">
                               {matter.fee_type && (

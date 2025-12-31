@@ -1,6 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, MoveHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface TableScrollControlsProps {
@@ -10,17 +9,19 @@ interface TableScrollControlsProps {
 
 export function TableScrollControls({ children, className }: TableScrollControlsProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  const trackRef = useRef<HTMLDivElement>(null);
   const [mounted, setMounted] = useState(false);
   const [position, setPosition] = useState({ left: 0, width: 0, visible: false });
   const [scrollableEl, setScrollableEl] = useState<HTMLElement | null>(null);
+  const [scrollInfo, setScrollInfo] = useState({ thumbWidth: 0, thumbLeft: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, scrollLeft: 0 });
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  // Find the actual scrollable element (the Table component's internal div)
+  // Find the actual scrollable element
   useEffect(() => {
     if (!containerRef.current) return;
     
@@ -66,13 +67,20 @@ export function TableScrollControls({ children, className }: TableScrollControls
     const scrollLeft = el.scrollLeft;
     
     const overflow = scrollWidth > clientWidth + 2;
-    setCanScrollLeft(scrollLeft > 2);
-    setCanScrollRight(overflow && scrollLeft < scrollWidth - clientWidth - 2);
     
     const rect = container.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     const isVisible = rect.top < viewportHeight && rect.bottom > 60;
     
+    // Calculate thumb size and position relative to track
+    const trackWidth = Math.min(rect.width * 0.6, 300); // Track width
+    const ratio = clientWidth / scrollWidth;
+    const thumbWidth = Math.max(trackWidth * ratio, 40); // Min thumb size
+    const maxThumbLeft = trackWidth - thumbWidth;
+    const scrollRatio = scrollLeft / (scrollWidth - clientWidth);
+    const thumbLeft = maxThumbLeft * scrollRatio;
+    
+    setScrollInfo({ thumbWidth, thumbLeft });
     setPosition({
       left: rect.left,
       width: rect.width,
@@ -100,22 +108,68 @@ export function TableScrollControls({ children, className }: TableScrollControls
     };
   }, [updateScrollState, scrollableEl, mounted]);
 
-  const scroll = (direction: 'left' | 'right') => {
+  // Handle drag
+  const handleMouseDown = (e: React.MouseEvent) => {
     if (!scrollableEl) return;
+    e.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX, scrollLeft: scrollableEl.scrollLeft };
+  };
+
+  useEffect(() => {
+    if (!isDragging || !scrollableEl) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const trackWidth = Math.min(position.width * 0.6, 300);
+      const scrollWidth = scrollableEl.scrollWidth;
+      const clientWidth = scrollableEl.clientWidth;
+      const maxScroll = scrollWidth - clientWidth;
+      
+      const deltaX = e.clientX - dragStartRef.current.x;
+      const scrollPerPixel = maxScroll / (trackWidth - scrollInfo.thumbWidth);
+      const newScrollLeft = dragStartRef.current.scrollLeft + deltaX * scrollPerPixel;
+      
+      scrollableEl.scrollLeft = Math.max(0, Math.min(maxScroll, newScrollLeft));
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
     
-    scrollableEl.scrollBy({
-      left: direction === 'left' ? -250 : 250,
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, scrollableEl, position.width, scrollInfo.thumbWidth]);
+
+  // Handle track click
+  const handleTrackClick = (e: React.MouseEvent) => {
+    if (!scrollableEl || !trackRef.current) return;
+    
+    const trackRect = trackRef.current.getBoundingClientRect();
+    const clickX = e.clientX - trackRect.left;
+    const trackWidth = trackRect.width;
+    const scrollWidth = scrollableEl.scrollWidth;
+    const clientWidth = scrollableEl.clientWidth;
+    const maxScroll = scrollWidth - clientWidth;
+    
+    const scrollRatio = clickX / trackWidth;
+    scrollableEl.scrollTo({
+      left: maxScroll * scrollRatio,
       behavior: 'smooth'
     });
   };
 
   const showControls = mounted && position.visible;
+  const trackWidth = Math.min(position.width * 0.6, 300);
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
       {children}
       
-      {/* Fixed floating controls via portal - styled to match app theme */}
       {showControls && createPortal(
         <div 
           style={{
@@ -127,39 +181,29 @@ export function TableScrollControls({ children, className }: TableScrollControls
           }}
           className="animate-in fade-in slide-in-from-bottom-2 duration-200"
         >
-          <div className="flex items-center gap-1 bg-card border border-border rounded-lg shadow-lg px-2 py-1.5 backdrop-blur-sm">
-            <button
-              onClick={() => scroll('left')}
-              disabled={!canScrollLeft}
-              className={cn(
-                "p-1.5 rounded-md transition-all",
-                canScrollLeft 
-                  ? "text-foreground hover:bg-secondary active:bg-secondary/80" 
-                  : "text-muted-foreground/30 cursor-not-allowed"
-              )}
-              aria-label="Scroll left"
+          <div className="bg-card border border-border rounded-lg shadow-lg p-2 backdrop-blur-sm">
+            {/* Scrollbar track */}
+            <div
+              ref={trackRef}
+              onClick={handleTrackClick}
+              className="relative h-3 bg-secondary rounded-full cursor-pointer"
+              style={{ width: trackWidth }}
             >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            
-            <div className="flex items-center gap-1.5 px-2 border-x border-border">
-              <MoveHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-xs font-medium text-muted-foreground">Scroll</span>
+              {/* Scrollbar thumb */}
+              <div
+                onMouseDown={handleMouseDown}
+                className={cn(
+                  "absolute top-0.5 h-2 rounded-full transition-colors cursor-grab",
+                  isDragging 
+                    ? "bg-primary cursor-grabbing" 
+                    : "bg-muted-foreground/40 hover:bg-muted-foreground/60"
+                )}
+                style={{
+                  width: scrollInfo.thumbWidth,
+                  left: scrollInfo.thumbLeft,
+                }}
+              />
             </div>
-            
-            <button
-              onClick={() => scroll('right')}
-              disabled={!canScrollRight}
-              className={cn(
-                "p-1.5 rounded-md transition-all",
-                canScrollRight 
-                  ? "text-foreground hover:bg-secondary active:bg-secondary/80" 
-                  : "text-muted-foreground/30 cursor-not-allowed"
-              )}
-              aria-label="Scroll right"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
           </div>
         </div>,
         document.body

@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TableScrollControls } from '@/components/ui/table-scroll-controls';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -228,7 +229,7 @@ export default function Flags() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <TableScrollControls>
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
@@ -289,7 +290,7 @@ export default function Flags() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+              </TableScrollControls>
             )}
           </CardContent>
         </Card>

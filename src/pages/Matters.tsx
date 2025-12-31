@@ -34,7 +34,6 @@ import { useClients } from '@/lib/hooks/useClients';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useAuth } from '@/lib/auth';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
-import { BudgetUpdateModal } from '@/components/matters/BudgetUpdateModal';
 import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock } from 'lucide-react';
 import { format, differenceInDays, parseISO, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -485,13 +484,6 @@ export default function Matters() {
                               <span className="font-medium">
                                 {formatCurrency(matter.fee_amount_upper_end, matter.fee_currency)}
                               </span>
-                              <BudgetUpdateModal
-                                matterId={matter.id}
-                                currentBudget={matter.fee_amount_upper_end}
-                                currentBmFee={matter.bm_fee_component}
-                                currentLocalCounsel={matter.local_counsel_fee}
-                                currency={matter.fee_currency}
-                              />
                             </div>
                           </TableCell>
                           {isPipelineOrLost && (
@@ -520,19 +512,8 @@ export default function Matters() {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className="p-1">
-                                <EditableFinancialCell
-                                  value={matter.local_counsel_fee || 0}
-                                  currency={matter.fee_currency}
-                                  onSave={async (value) => {
-                                    const newBmFee = (matter.fee_amount_upper_end || 0) - value;
-                                    await updateMatter.mutateAsync({
-                                      id: matter.id,
-                                      local_counsel_fee: value,
-                                      bm_fee_component: newBmFee,
-                                    });
-                                  }}
-                                />
+                              <TableCell className="text-right text-muted-foreground">
+                                {formatCurrency(matter.local_counsel_fee, matter.fee_currency)}
                               </TableCell>
                               <TableCell className="p-1">
                                 <EditableFinancialCell

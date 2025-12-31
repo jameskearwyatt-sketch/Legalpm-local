@@ -67,6 +67,92 @@ export type Database = {
           },
         ]
       }
+      budget_line_items: {
+        Row: {
+          budget_version_id: string
+          created_at: string
+          fee_amount: number
+          id: string
+          matter_id: string
+          provider: string
+          sort_order: number
+          updated_at: string
+          user_id: string
+          work_item: string
+        }
+        Insert: {
+          budget_version_id: string
+          created_at?: string
+          fee_amount?: number
+          id?: string
+          matter_id: string
+          provider: string
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+          work_item: string
+        }
+        Update: {
+          budget_version_id?: string
+          created_at?: string
+          fee_amount?: number
+          id?: string
+          matter_id?: string
+          provider?: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+          work_item?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_line_items_budget_version_id_fkey"
+            columns: ["budget_version_id"]
+            isOneToOne: false
+            referencedRelation: "budget_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_versions: {
+        Row: {
+          bm_total: number
+          created_at: string
+          finalized_at: string
+          id: string
+          local_counsel_total: number
+          matter_id: string
+          notes: string | null
+          total_amount: number
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          bm_total?: number
+          created_at?: string
+          finalized_at?: string
+          id?: string
+          local_counsel_total?: number
+          matter_id: string
+          notes?: string | null
+          total_amount?: number
+          user_id: string
+          version_number?: number
+        }
+        Update: {
+          bm_total?: number
+          created_at?: string
+          finalized_at?: string
+          id?: string
+          local_counsel_total?: number
+          matter_id?: string
+          notes?: string | null
+          total_amount?: number
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: []
+      }
       clients: {
         Row: {
           billing_contact: string | null

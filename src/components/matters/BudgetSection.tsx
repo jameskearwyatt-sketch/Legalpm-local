@@ -1,0 +1,409 @@
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import { Plus, Trash2, Loader2, ChevronDown, History, Check } from 'lucide-react';
+import { useBudgetVersions, DraftLineItem, BudgetLineItem } from '@/lib/hooks/useBudgetVersions';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+
+interface BudgetSectionProps {
+  matterId: string;
+  currency: string;
+}
+
+const providerOptions = ['Baker McKenzie', 'Local Counsel'] as const;
+
+export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
+  const {
+    versions,
+    latestVersion,
+    latestLineItems,
+    isLoading,
+    isLoadingLineItems,
+    finalizeBudget,
+    fetchLineItems,
+  } = useBudgetVersions(matterId);
+
+  const [draftItems, setDraftItems] = useState<DraftLineItem[]>([]);
+  const [notes, setNotes] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const [selectedVersionItems, setSelectedVersionItems] = useState<BudgetLineItem[]>([]);
+  const [loadingVersionItems, setLoadingVersionItems] = useState(false);
+
+  const hasExistingBudget = versions.length > 0;
+
+  // Initialize draft items from latest version when available
+  useEffect(() => {
+    if (latestLineItems.length > 0 && !isEditing) {
+      setDraftItems(latestLineItems.map(item => ({
+        id: item.id,
+        work_item: item.work_item,
+        provider: item.provider,
+        fee_amount: item.fee_amount,
+      })));
+    } else if (!hasExistingBudget && draftItems.length === 0) {
+      // Add one empty line for new budgets
+      setDraftItems([{ work_item: '', provider: 'Baker McKenzie', fee_amount: 0 }]);
+    }
+  }, [latestLineItems, hasExistingBudget]);
+
+  const formatCurrency = (value: number) => {
+    const symbols: Record<string, string> = {
+      GBP: '£', USD: '$', EUR: '€', Ringgit: 'RM ', CHF: 'CHF ', AUD: 'A$', CAD: 'C$', SGD: 'S$', SEK: 'kr ',
+    };
+    const symbol = symbols[currency] || currency + ' ';
+    return symbol + new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+  };
+
+  const formatDate = (date: string) => format(new Date(date), 'dd MMM yyyy HH:mm');
+
+  const addLineItem = () => {
+    setDraftItems([...draftItems, { work_item: '', provider: 'Baker McKenzie', fee_amount: 0 }]);
+  };
+
+  const removeLineItem = (index: number) => {
+    setDraftItems(draftItems.filter((_, i) => i !== index));
+  };
+
+  const updateLineItem = (index: number, field: keyof DraftLineItem, value: string | number) => {
+    const updated = [...draftItems];
+    if (field === 'fee_amount') {
+      updated[index][field] = typeof value === 'string' ? parseFloat(value) || 0 : value;
+    } else if (field === 'provider') {
+      updated[index][field] = value as 'Baker McKenzie' | 'Local Counsel';
+    } else {
+      updated[index][field] = value as string;
+    }
+    setDraftItems(updated);
+  };
+
+  // Calculate totals
+  const bmTotal = draftItems
+    .filter(item => item.provider === 'Baker McKenzie')
+    .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+  const localCounselTotal = draftItems
+    .filter(item => item.provider === 'Local Counsel')
+    .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+  const overallTotal = bmTotal + localCounselTotal;
+
+  const handleFinalize = async () => {
+    // Filter out empty items
+    const validItems = draftItems.filter(item => item.work_item.trim() !== '');
+    
+    await finalizeBudget.mutateAsync({
+      matter_id: matterId,
+      line_items: validItems,
+      notes: notes.trim() || undefined,
+    });
+
+    setNotes('');
+    setIsEditing(false);
+  };
+
+  const startEditing = () => {
+    setIsEditing(true);
+    if (draftItems.length === 0) {
+      setDraftItems([{ work_item: '', provider: 'Baker McKenzie', fee_amount: 0 }]);
+    }
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    // Reset to latest version
+    if (latestLineItems.length > 0) {
+      setDraftItems(latestLineItems.map(item => ({
+        id: item.id,
+        work_item: item.work_item,
+        provider: item.provider,
+        fee_amount: item.fee_amount,
+      })));
+    }
+    setNotes('');
+  };
+
+  const loadVersionItems = async (versionId: string) => {
+    if (selectedVersionId === versionId) {
+      setSelectedVersionId(null);
+      setSelectedVersionItems([]);
+      return;
+    }
+    
+    setLoadingVersionItems(true);
+    setSelectedVersionId(versionId);
+    try {
+      const items = await fetchLineItems(versionId);
+      setSelectedVersionItems(items);
+    } catch (error) {
+      console.error('Failed to load version items:', error);
+    } finally {
+      setLoadingVersionItems(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="shadow-card">
+        <CardContent className="flex items-center justify-center py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="shadow-card">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-lg font-heading">Budget</CardTitle>
+        {hasExistingBudget && latestVersion && (
+          <span className="text-sm text-muted-foreground">
+            Version {latestVersion.version_number} • Finalized {formatDate(latestVersion.finalized_at)}
+          </span>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Budget Line Items */}
+        <div className="space-y-3">
+          <div className="grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground px-1">
+            <div className="col-span-5">Work Item</div>
+            <div className="col-span-3">Provider</div>
+            <div className="col-span-3 text-right">Fee ({currency})</div>
+            <div className="col-span-1"></div>
+          </div>
+
+          {isLoadingLineItems && !isEditing ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            draftItems.map((item, index) => (
+              <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                <div className="col-span-5">
+                  <Input
+                    value={item.work_item}
+                    onChange={(e) => updateLineItem(index, 'work_item', e.target.value)}
+                    placeholder="e.g., Due diligence review"
+                    disabled={!isEditing && hasExistingBudget}
+                  />
+                </div>
+                <div className="col-span-3">
+                  <Select
+                    value={item.provider}
+                    onValueChange={(v) => updateLineItem(index, 'provider', v)}
+                    disabled={!isEditing && hasExistingBudget}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {providerOptions.map((p) => (
+                        <SelectItem key={p} value={p}>{p}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="col-span-3">
+                  <Input
+                    type="number"
+                    value={item.fee_amount || ''}
+                    onChange={(e) => updateLineItem(index, 'fee_amount', e.target.value)}
+                    placeholder="0"
+                    className="text-right"
+                    disabled={!isEditing && hasExistingBudget}
+                  />
+                </div>
+                <div className="col-span-1 flex justify-center">
+                  {(isEditing || !hasExistingBudget) && draftItems.length > 1 && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => removeLineItem(index)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
+
+          {/* Add Line Item Button */}
+          {(isEditing || !hasExistingBudget) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={addLineItem}
+              className="w-full border-dashed"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Work Item
+            </Button>
+          )}
+        </div>
+
+        {/* Totals */}
+        <div className="border-t pt-4 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Baker McKenzie Total:</span>
+            <span className="font-medium">{formatCurrency(bmTotal)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Local Counsel Total:</span>
+            <span className="font-medium">{formatCurrency(localCounselTotal)}</span>
+          </div>
+          <div className="flex justify-between text-base font-semibold border-t pt-2">
+            <span>Overall Budget:</span>
+            <span className="text-primary">{formatCurrency(overallTotal)}</span>
+          </div>
+        </div>
+
+        {/* Notes for Update */}
+        {isEditing && hasExistingBudget && (
+          <div className="space-y-2">
+            <Label>Update Notes</Label>
+            <Textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Why is this budget being updated? (e.g., Client agreed to additional scope)"
+              rows={2}
+            />
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 pt-2">
+          {!hasExistingBudget ? (
+            <Button
+              onClick={handleFinalize}
+              disabled={finalizeBudget.isPending || draftItems.every(i => !i.work_item.trim())}
+              className="flex-1"
+            >
+              {finalizeBudget.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Check className="h-4 w-4 mr-2" />
+              )}
+              Finalize Initial Budget
+            </Button>
+          ) : isEditing ? (
+            <>
+              <Button variant="outline" onClick={cancelEditing} className="flex-1">
+                Cancel
+              </Button>
+              <Button
+                onClick={handleFinalize}
+                disabled={finalizeBudget.isPending}
+                className="flex-1"
+              >
+                {finalizeBudget.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Check className="h-4 w-4 mr-2" />
+                )}
+                Update Budget
+              </Button>
+            </>
+          ) : (
+            <Button variant="outline" onClick={startEditing} className="flex-1">
+              Update Budget
+            </Button>
+          )}
+        </div>
+
+        {/* Budget History */}
+        {versions.length > 1 && (
+          <Collapsible open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="w-full justify-between text-muted-foreground hover:text-foreground">
+                <span className="flex items-center gap-2">
+                  <History className="h-4 w-4" />
+                  Budget History ({versions.length} versions)
+                </span>
+                <ChevronDown className={cn("h-4 w-4 transition-transform", isHistoryOpen && "rotate-180")} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <div className="space-y-3 max-h-64 overflow-y-auto">
+                {versions.map((version) => (
+                  <div
+                    key={version.id}
+                    className={cn(
+                      "p-3 rounded-lg text-sm space-y-2 cursor-pointer transition-colors",
+                      version.id === latestVersion?.id ? "bg-primary/10 border border-primary/20" : "bg-muted/30 hover:bg-muted/50",
+                      selectedVersionId === version.id && "ring-2 ring-primary"
+                    )}
+                    onClick={() => loadVersionItems(version.id)}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="font-medium">
+                        Version {version.version_number}
+                        {version.id === latestVersion?.id && <span className="ml-2 text-xs text-primary">(Current)</span>}
+                      </span>
+                      <span className="text-xs text-muted-foreground">{formatDate(version.finalized_at)}</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <span className="text-muted-foreground">BM:</span>
+                        <span className="ml-1">{formatCurrency(version.bm_total)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">LC:</span>
+                        <span className="ml-1">{formatCurrency(version.local_counsel_total)}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Total:</span>
+                        <span className="ml-1 font-medium">{formatCurrency(version.total_amount)}</span>
+                      </div>
+                    </div>
+                    {version.notes && (
+                      <p className="text-xs text-muted-foreground italic">{version.notes}</p>
+                    )}
+
+                    {/* Show line items when selected */}
+                    {selectedVersionId === version.id && (
+                      <div className="mt-2 pt-2 border-t border-border/50">
+                        {loadingVersionItems ? (
+                          <div className="flex justify-center py-2">
+                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            {selectedVersionItems.map((item) => (
+                              <div key={item.id} className="flex justify-between text-xs">
+                                <span>{item.work_item}</span>
+                                <span className="text-muted-foreground">
+                                  {item.provider === 'Baker McKenzie' ? 'BM' : 'LC'}: {formatCurrency(item.fee_amount)}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

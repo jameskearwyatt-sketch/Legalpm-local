@@ -13,114 +13,93 @@ export function TableScrollControls({ children, className }: TableScrollControls
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [showControls, setShowControls] = useState(false);
-  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
-  const [position, setPosition] = useState({ left: 0, width: 0 });
+  const [hasOverflow, setHasOverflow] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [position, setPosition] = useState({ left: 0, width: 0, visible: false });
 
-  const checkScroll = useCallback(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    
-    const hasHorizontalScroll = el.scrollWidth > el.clientWidth + 5;
-    setCanScrollLeft(el.scrollLeft > 1);
-    setCanScrollRight(hasHorizontalScroll && el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
-    
-    return hasHorizontalScroll;
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
-  const updatePosition = useCallback(() => {
+  const updateScrollState = useCallback(() => {
+    const el = scrollRef.current;
     const container = containerRef.current;
-    const scrollEl = scrollRef.current;
-    if (!container || !scrollEl) return;
-
-    const hasHorizontalScroll = scrollEl.scrollWidth > scrollEl.clientWidth + 5;
+    if (!el || !container) return;
     
-    if (!hasHorizontalScroll) {
-      setShowControls(false);
-      return;
-    }
-
+    const scrollWidth = el.scrollWidth;
+    const clientWidth = el.clientWidth;
+    const scrollLeft = el.scrollLeft;
+    
+    const overflow = scrollWidth > clientWidth + 2;
+    setHasOverflow(overflow);
+    setCanScrollLeft(scrollLeft > 2);
+    setCanScrollRight(overflow && scrollLeft < scrollWidth - clientWidth - 2);
+    
+    // Get position for fixed controls
     const rect = container.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
+    const isVisible = rect.top < viewportHeight && rect.bottom > 100;
     
-    // Check if any part of the container is visible in viewport
-    const isPartiallyVisible = rect.top < viewportHeight - 60 && rect.bottom > 60;
-    
-    if (!isPartiallyVisible) {
-      setShowControls(false);
-      return;
-    }
-
-    setShowControls(true);
     setPosition({
       left: rect.left,
       width: rect.width,
+      visible: isVisible && overflow,
     });
-  }, []);
-
-  useEffect(() => {
-    // Create portal container
-    setPortalContainer(document.body);
+    
+    // Debug log
+    console.log('TableScrollControls:', { 
+      scrollWidth, 
+      clientWidth, 
+      overflow, 
+      scrollLeft,
+      visible: isVisible && overflow,
+      rectTop: rect.top,
+      rectBottom: rect.bottom
+    });
   }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
-    if (!el) return;
+    if (!el || !mounted) return;
 
-    // Initial checks with delay for content to render
-    const timeoutId = setTimeout(() => {
-      checkScroll();
-      updatePosition();
-    }, 200);
+    // Check immediately and after delays for dynamic content
+    updateScrollState();
+    const t1 = setTimeout(updateScrollState, 100);
+    const t2 = setTimeout(updateScrollState, 500);
+    const t3 = setTimeout(updateScrollState, 1000);
     
-    el.addEventListener('scroll', checkScroll);
+    el.addEventListener('scroll', updateScrollState);
+    window.addEventListener('scroll', updateScrollState, true);
+    window.addEventListener('resize', updateScrollState);
     
-    // ResizeObserver for container and content
-    const resizeObserver = new ResizeObserver(() => {
-      checkScroll();
-      updatePosition();
-    });
+    const resizeObserver = new ResizeObserver(updateScrollState);
     resizeObserver.observe(el);
-    
     if (el.firstElementChild) {
       resizeObserver.observe(el.firstElementChild);
     }
 
-    // Update on scroll and resize
-    const handleUpdate = () => {
-      checkScroll();
-      updatePosition();
-    };
-    
-    window.addEventListener('scroll', handleUpdate, true);
-    window.addEventListener('resize', handleUpdate);
-
-    // Also trigger on any layout changes
-    const mutationObserver = new MutationObserver(handleUpdate);
-    mutationObserver.observe(el, { childList: true, subtree: true });
-
     return () => {
-      clearTimeout(timeoutId);
-      el.removeEventListener('scroll', checkScroll);
-      window.removeEventListener('scroll', handleUpdate, true);
-      window.removeEventListener('resize', handleUpdate);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      el.removeEventListener('scroll', updateScrollState);
+      window.removeEventListener('scroll', updateScrollState, true);
+      window.removeEventListener('resize', updateScrollState);
       resizeObserver.disconnect();
-      mutationObserver.disconnect();
     };
-  }, [checkScroll, updatePosition]);
+  }, [updateScrollState, mounted]);
 
   const scroll = (direction: 'left' | 'right') => {
     const el = scrollRef.current;
     if (!el) return;
     
-    const scrollAmount = Math.min(el.clientWidth * 0.5, 300);
     el.scrollBy({
-      left: direction === 'left' ? -scrollAmount : scrollAmount,
+      left: direction === 'left' ? -250 : 250,
       behavior: 'smooth'
     });
   };
 
-  const controlsVisible = showControls && (canScrollLeft || canScrollRight);
+  const showControls = mounted && position.visible;
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
@@ -131,42 +110,40 @@ export function TableScrollControls({ children, className }: TableScrollControls
         {children}
       </div>
       
-      {/* Portal-based floating controls fixed to viewport bottom */}
-      {controlsVisible && portalContainer && createPortal(
+      {/* Fixed floating controls via portal */}
+      {showControls && createPortal(
         <div 
           style={{
             position: 'fixed',
-            bottom: '20px',
+            bottom: '24px',
             left: `${position.left + position.width / 2}px`,
             transform: 'translateX(-50%)',
-            zIndex: 9999,
+            zIndex: 99999,
+            pointerEvents: 'auto',
           }}
         >
-          <div className="flex items-center gap-1 bg-background border-2 border-primary/20 rounded-full shadow-2xl px-3 py-2 backdrop-blur-sm">
+          <div 
+            className="flex items-center gap-2 bg-primary text-primary-foreground rounded-full shadow-2xl px-4 py-2"
+            style={{ boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}
+          >
             <button
               onClick={() => scroll('left')}
               disabled={!canScrollLeft}
               className={cn(
-                "p-2 rounded-full transition-all",
-                canScrollLeft 
-                  ? "hover:bg-primary/10 text-primary" 
-                  : "text-muted-foreground/30 cursor-not-allowed"
+                "p-1 rounded-full transition-opacity",
+                canScrollLeft ? "opacity-100 hover:bg-white/20" : "opacity-30 cursor-not-allowed"
               )}
               aria-label="Scroll left"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
-            <div className="flex items-center gap-2 px-2">
-              <span className="text-sm font-medium text-foreground">Scroll Table</span>
-            </div>
+            <span className="text-sm font-medium px-1">← Scroll →</span>
             <button
               onClick={() => scroll('right')}
               disabled={!canScrollRight}
               className={cn(
-                "p-2 rounded-full transition-all",
-                canScrollRight 
-                  ? "hover:bg-primary/10 text-primary" 
-                  : "text-muted-foreground/30 cursor-not-allowed"
+                "p-1 rounded-full transition-opacity",
+                canScrollRight ? "opacity-100 hover:bg-white/20" : "opacity-30 cursor-not-allowed"
               )}
               aria-label="Scroll right"
             >
@@ -174,7 +151,7 @@ export function TableScrollControls({ children, className }: TableScrollControls
             </button>
           </div>
         </div>,
-        portalContainer
+        document.body
       )}
     </div>
   );

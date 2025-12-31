@@ -28,6 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { TableScrollControls } from '@/components/ui/table-scroll-controls';
+import { StickyTableHeader } from '@/components/ui/sticky-table-header';
 import { useMatters, MatterWithFinancials, MatterCategory, MatterStage } from '@/lib/hooks/useMatters';
 import { useClients } from '@/lib/hooks/useClients';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
@@ -370,8 +371,9 @@ export default function Matters() {
                 )}
               </div>
             ) : (
-              <TableScrollControls>
-                <Table>
+              <StickyTableHeader>
+                <TableScrollControls>
+                  <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="min-w-[180px] sticky left-0 z-20 bg-background">
@@ -720,6 +722,7 @@ export default function Matters() {
                   </TableBody>
                 </Table>
               </TableScrollControls>
+            </StickyTableHeader>
             )}
           </CardContent>
         </Card>

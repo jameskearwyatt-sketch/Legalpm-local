@@ -17,6 +17,7 @@ import Flags from "./pages/Flags";
 import RedFlags from "./pages/RedFlags";
 import PipelineFlags from "./pages/PipelineFlags";
 import TimeRecording from "./pages/TimeRecording";
+import ExcelAnalyzer from "./pages/ExcelAnalyzer";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -55,6 +56,7 @@ function AppRoutes() {
       <Route path="/pipeline-flags" element={<ProtectedRoute><PipelineFlags /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+      <Route path="/excel-analyzer" element={<ProtectedRoute><ExcelAnalyzer /></ProtectedRoute>} />
       <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>

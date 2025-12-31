@@ -12,6 +12,8 @@ export function TableScrollControls({ children, className }: TableScrollControls
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const [controlsStyle, setControlsStyle] = useState<React.CSSProperties>({});
 
   const checkScroll = useCallback(() => {
     const el = scrollRef.current;
@@ -22,36 +24,92 @@ export function TableScrollControls({ children, className }: TableScrollControls
     setCanScrollRight(hasHorizontalScroll && el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
   }, []);
 
+  const updateControlsPosition = useCallback(() => {
+    const container = containerRef.current;
+    const scrollEl = scrollRef.current;
+    if (!container || !scrollEl) return;
+
+    const hasHorizontalScroll = scrollEl.scrollWidth > scrollEl.clientWidth;
+    if (!hasHorizontalScroll) {
+      setIsVisible(false);
+      return;
+    }
+
+    const rect = container.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    
+    // Check if container is in viewport
+    const isInView = rect.top < viewportHeight && rect.bottom > 0;
+    
+    if (!isInView) {
+      setIsVisible(false);
+      return;
+    }
+
+    setIsVisible(true);
+    
+    // Position the controls at the bottom of the visible area of the table
+    // or at the bottom of the table if the table bottom is visible
+    const tableBottomInView = rect.bottom <= viewportHeight;
+    
+    if (tableBottomInView) {
+      // Table bottom is visible, position controls just above it
+      setControlsStyle({
+        position: 'absolute',
+        bottom: '8px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+      });
+    } else {
+      // Table extends below viewport, use fixed positioning
+      setControlsStyle({
+        position: 'fixed',
+        bottom: '16px',
+        left: `${rect.left + rect.width / 2}px`,
+        transform: 'translateX(-50%)',
+      });
+    }
+  }, []);
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
-    // Initial check after a brief delay to allow content to render
-    const timeoutId = setTimeout(checkScroll, 100);
+    // Initial checks
+    const timeoutId = setTimeout(() => {
+      checkScroll();
+      updateControlsPosition();
+    }, 100);
     
     el.addEventListener('scroll', checkScroll);
     
-    // Check on resize
+    // Check on resize and scroll
     const resizeObserver = new ResizeObserver(() => {
       checkScroll();
+      updateControlsPosition();
     });
     resizeObserver.observe(el);
     
-    // Also observe children for size changes
     if (el.firstElementChild) {
       resizeObserver.observe(el.firstElementChild);
     }
 
-    // Check when window resizes
-    window.addEventListener('resize', checkScroll);
+    // Update position on window scroll and resize
+    const handleScrollOrResize = () => {
+      updateControlsPosition();
+    };
+    
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
 
     return () => {
       clearTimeout(timeoutId);
       el.removeEventListener('scroll', checkScroll);
-      window.removeEventListener('resize', checkScroll);
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
       resizeObserver.disconnect();
     };
-  }, [checkScroll]);
+  }, [checkScroll, updateControlsPosition]);
 
   const scroll = (direction: 'left' | 'right') => {
     const el = scrollRef.current;
@@ -64,7 +122,7 @@ export function TableScrollControls({ children, className }: TableScrollControls
     });
   };
 
-  const showControls = canScrollLeft || canScrollRight;
+  const showControls = isVisible && (canScrollLeft || canScrollRight);
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
@@ -75,10 +133,13 @@ export function TableScrollControls({ children, className }: TableScrollControls
         {children}
       </div>
       
-      {/* Floating scroll controls - positioned at the bottom of the container */}
+      {/* Floating scroll controls */}
       {showControls && (
-        <div className="sticky bottom-2 left-0 right-0 flex justify-center pointer-events-none z-20 -mt-12 pb-2">
-          <div className="flex items-center gap-1 pointer-events-auto bg-background border rounded-full shadow-lg px-1.5 py-1">
+        <div 
+          style={controlsStyle}
+          className="z-50 pointer-events-auto"
+        >
+          <div className="flex items-center gap-1 bg-background border-2 border-border rounded-full shadow-xl px-2 py-1.5">
             <button
               onClick={() => scroll('left')}
               disabled={!canScrollLeft}
@@ -90,9 +151,9 @@ export function TableScrollControls({ children, className }: TableScrollControls
               )}
               aria-label="Scroll left"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-5 w-5" />
             </button>
-            <span className="text-xs text-muted-foreground px-1 select-none">←→</span>
+            <span className="text-xs text-muted-foreground px-2 select-none font-medium">Scroll</span>
             <button
               onClick={() => scroll('right')}
               disabled={!canScrollRight}
@@ -104,7 +165,7 @@ export function TableScrollControls({ children, className }: TableScrollControls
               )}
               aria-label="Scroll right"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-5 w-5" />
             </button>
           </div>
         </div>

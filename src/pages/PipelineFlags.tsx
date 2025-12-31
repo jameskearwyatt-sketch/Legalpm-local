@@ -10,6 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TableScrollControls } from '@/components/ui/table-scroll-controls';
 import { useMatters } from '@/lib/hooks/useMatters';
 import { 
   Clock, 
@@ -209,7 +210,7 @@ export default function PipelineFlags() {
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <TableScrollControls>
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
@@ -254,7 +255,7 @@ export default function PipelineFlags() {
                     ))}
                   </TableBody>
                 </Table>
-              </div>
+              </TableScrollControls>
             )}
           </CardContent>
         </Card>

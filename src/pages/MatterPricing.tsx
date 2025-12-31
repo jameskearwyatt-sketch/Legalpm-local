@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { TableScrollControls } from "@/components/ui/table-scroll-controls";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Calculator, Users, FileText, TrendingUp, Clock, Percent, DollarSign, Building } from "lucide-react";
@@ -263,6 +264,7 @@ export default function MatterPricing() {
                 <CardTitle>Fee Breakdown by Grade</CardTitle>
               </CardHeader>
               <CardContent>
+                <TableScrollControls>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -317,6 +319,7 @@ export default function MatterPricing() {
                     </TableRow>
                   </TableBody>
                 </Table>
+                </TableScrollControls>
               </CardContent>
             </Card>
           </TabsContent>
@@ -455,6 +458,7 @@ export default function MatterPricing() {
                 <CardDescription>Edit the base hours for each work phase. Negotiation adjustments are applied based on assumptions.</CardDescription>
               </CardHeader>
               <CardContent>
+                <TableScrollControls>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -528,6 +532,7 @@ export default function MatterPricing() {
                     </TableRow>
                   </TableBody>
                 </Table>
+                </TableScrollControls>
               </CardContent>
             </Card>
           </TabsContent>
@@ -540,6 +545,7 @@ export default function MatterPricing() {
                 <CardDescription>Configure hourly rates and costs by grade. AFA discount is applied automatically.</CardDescription>
               </CardHeader>
               <CardContent>
+                <TableScrollControls>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -637,6 +643,7 @@ export default function MatterPricing() {
                     </TableRow>
                   </TableBody>
                 </Table>
+                </TableScrollControls>
               </CardContent>
             </Card>
           </TabsContent>

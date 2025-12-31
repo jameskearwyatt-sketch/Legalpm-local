@@ -27,6 +27,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { TableScrollControls } from '@/components/ui/table-scroll-controls';
 import { useMatters, MatterWithFinancials, MatterCategory, MatterStage } from '@/lib/hooks/useMatters';
 import { useClients } from '@/lib/hooks/useClients';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
@@ -369,7 +370,7 @@ export default function Matters() {
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <TableScrollControls>
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
@@ -718,7 +719,7 @@ export default function Matters() {
                     })}
                   </TableBody>
                 </Table>
-              </div>
+              </TableScrollControls>
             )}
           </CardContent>
         </Card>

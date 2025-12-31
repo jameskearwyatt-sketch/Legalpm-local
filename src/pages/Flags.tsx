@@ -10,6 +10,22 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useMatters } from '@/lib/hooks/useMatters';
 import { 
   Flag, 
@@ -19,9 +35,12 @@ import {
   AlertTriangle,
   CheckCircle2,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts';
 
@@ -34,31 +53,69 @@ interface FlaggedMatter {
   flags: FlagType[];
 }
 
-const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; description: string }> = {
+const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; description: string; field: string }> = {
   engagement_letter: {
     label: 'No Engagement Letter',
     icon: <FileSignature className="h-4 w-4" />,
-    description: 'Assignment letter not signed'
+    description: 'Assignment letter not signed',
+    field: 'assignment_letter_signed'
   },
   aml_kyc: {
     label: 'Incomplete AML/KYC',
     icon: <Shield className="h-4 w-4" />,
-    description: 'AML/KYC checks not complete'
+    description: 'AML/KYC checks not complete',
+    field: 'aml_kyc_complete'
   },
   matter_open: {
     label: 'Matter Not Open',
     icon: <FolderOpen className="h-4 w-4" />,
-    description: 'Matter not fully opened in system'
+    description: 'Matter not fully opened in system',
+    field: 'matter_open'
   },
   conflicts: {
     label: 'Conflicts Pending',
     icon: <AlertTriangle className="h-4 w-4" />,
-    description: 'Conflicts check not completed'
+    description: 'Conflicts check not completed',
+    field: 'conflicts_check'
   },
 };
 
 export default function Flags() {
-  const { matters, isLoading } = useMatters();
+  const { matters, isLoading, updateMatter } = useMatters();
+  const { toast } = useToast();
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    matterId: string;
+    matterName: string;
+    flagType: FlagType;
+  } | null>(null);
+
+  const handleClearFlag = async () => {
+    if (!confirmDialog) return;
+    
+    const { matterId, flagType, matterName } = confirmDialog;
+    const fieldToUpdate = flagConfig[flagType].field;
+    
+    try {
+      await updateMatter.mutateAsync({
+        id: matterId,
+        [fieldToUpdate]: true
+      });
+      
+      toast({
+        title: "Flag cleared",
+        description: `${flagConfig[flagType].label} cleared for ${matterName}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to clear flag. Please try again.",
+        variant: "destructive",
+      });
+    }
+    
+    setConfirmDialog(null);
+  };
 
   // Only check Live matters for admin flags
   const liveMatters = matters.filter(m => m.category === 'Live');
@@ -193,10 +250,30 @@ export default function Flags() {
                             {matter.flags.map((flag) => (
                               <span
                                 key={flag}
-                                className="inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded-full border bg-warning/10 text-warning border-warning/30"
+                                className="inline-flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-full border bg-warning/10 text-warning border-warning/30 group/flag relative"
                               >
                                 {flagConfig[flag].icon}
                                 {flagConfig[flag].label}
+                                <TooltipProvider delayDuration={100}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        onClick={() => setConfirmDialog({
+                                          open: true,
+                                          matterId: matter.id,
+                                          matterName: matter.matter_name,
+                                          flagType: flag
+                                        })}
+                                        className="ml-1 p-0.5 rounded-full hover:bg-warning/30 transition-colors"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      <p>Clear</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               </span>
                             ))}
                           </div>
@@ -230,6 +307,27 @@ export default function Flags() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Confirmation Dialog */}
+      <AlertDialog open={confirmDialog?.open} onOpenChange={(open) => !open && setConfirmDialog(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear this flag?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to clear "{confirmDialog && flagConfig[confirmDialog.flagType].label}" for{' '}
+              <span className="font-medium text-foreground">{confirmDialog?.matterName}</span>?
+              <br /><br />
+              This will update the matter record to mark this item as complete.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClearFlag}>
+              Clear Flag
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

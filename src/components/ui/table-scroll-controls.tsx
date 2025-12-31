@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -12,81 +13,72 @@ export function TableScrollControls({ children, className }: TableScrollControls
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
-  const [controlsStyle, setControlsStyle] = useState<React.CSSProperties>({});
+  const [showControls, setShowControls] = useState(false);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
+  const [position, setPosition] = useState({ left: 0, width: 0 });
 
   const checkScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
     
-    const hasHorizontalScroll = el.scrollWidth > el.clientWidth;
+    const hasHorizontalScroll = el.scrollWidth > el.clientWidth + 5;
     setCanScrollLeft(el.scrollLeft > 1);
     setCanScrollRight(hasHorizontalScroll && el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
+    
+    return hasHorizontalScroll;
   }, []);
 
-  const updateControlsPosition = useCallback(() => {
+  const updatePosition = useCallback(() => {
     const container = containerRef.current;
     const scrollEl = scrollRef.current;
     if (!container || !scrollEl) return;
 
-    const hasHorizontalScroll = scrollEl.scrollWidth > scrollEl.clientWidth;
+    const hasHorizontalScroll = scrollEl.scrollWidth > scrollEl.clientWidth + 5;
+    
     if (!hasHorizontalScroll) {
-      setIsVisible(false);
+      setShowControls(false);
       return;
     }
 
     const rect = container.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
     
-    // Check if container is in viewport
-    const isInView = rect.top < viewportHeight && rect.bottom > 0;
+    // Check if any part of the container is visible in viewport
+    const isPartiallyVisible = rect.top < viewportHeight - 60 && rect.bottom > 60;
     
-    if (!isInView) {
-      setIsVisible(false);
+    if (!isPartiallyVisible) {
+      setShowControls(false);
       return;
     }
 
-    setIsVisible(true);
-    
-    // Position the controls at the bottom of the visible area of the table
-    // or at the bottom of the table if the table bottom is visible
-    const tableBottomInView = rect.bottom <= viewportHeight;
-    
-    if (tableBottomInView) {
-      // Table bottom is visible, position controls just above it
-      setControlsStyle({
-        position: 'absolute',
-        bottom: '8px',
-        left: '50%',
-        transform: 'translateX(-50%)',
-      });
-    } else {
-      // Table extends below viewport, use fixed positioning
-      setControlsStyle({
-        position: 'fixed',
-        bottom: '16px',
-        left: `${rect.left + rect.width / 2}px`,
-        transform: 'translateX(-50%)',
-      });
-    }
+    setShowControls(true);
+    setPosition({
+      left: rect.left,
+      width: rect.width,
+    });
+  }, []);
+
+  useEffect(() => {
+    // Create portal container
+    setPortalContainer(document.body);
   }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
-    // Initial checks
+    // Initial checks with delay for content to render
     const timeoutId = setTimeout(() => {
       checkScroll();
-      updateControlsPosition();
-    }, 100);
+      updatePosition();
+    }, 200);
     
     el.addEventListener('scroll', checkScroll);
     
-    // Check on resize and scroll
+    // ResizeObserver for container and content
     const resizeObserver = new ResizeObserver(() => {
       checkScroll();
-      updateControlsPosition();
+      updatePosition();
     });
     resizeObserver.observe(el);
     
@@ -94,35 +86,41 @@ export function TableScrollControls({ children, className }: TableScrollControls
       resizeObserver.observe(el.firstElementChild);
     }
 
-    // Update position on window scroll and resize
-    const handleScrollOrResize = () => {
-      updateControlsPosition();
+    // Update on scroll and resize
+    const handleUpdate = () => {
+      checkScroll();
+      updatePosition();
     };
     
-    window.addEventListener('scroll', handleScrollOrResize, true);
-    window.addEventListener('resize', handleScrollOrResize);
+    window.addEventListener('scroll', handleUpdate, true);
+    window.addEventListener('resize', handleUpdate);
+
+    // Also trigger on any layout changes
+    const mutationObserver = new MutationObserver(handleUpdate);
+    mutationObserver.observe(el, { childList: true, subtree: true });
 
     return () => {
       clearTimeout(timeoutId);
       el.removeEventListener('scroll', checkScroll);
-      window.removeEventListener('scroll', handleScrollOrResize, true);
-      window.removeEventListener('resize', handleScrollOrResize);
+      window.removeEventListener('scroll', handleUpdate, true);
+      window.removeEventListener('resize', handleUpdate);
       resizeObserver.disconnect();
+      mutationObserver.disconnect();
     };
-  }, [checkScroll, updateControlsPosition]);
+  }, [checkScroll, updatePosition]);
 
   const scroll = (direction: 'left' | 'right') => {
     const el = scrollRef.current;
     if (!el) return;
     
-    const scrollAmount = Math.min(el.clientWidth * 0.6, 400);
+    const scrollAmount = Math.min(el.clientWidth * 0.5, 300);
     el.scrollBy({
       left: direction === 'left' ? -scrollAmount : scrollAmount,
       behavior: 'smooth'
     });
   };
 
-  const showControls = isVisible && (canScrollLeft || canScrollRight);
+  const controlsVisible = showControls && (canScrollLeft || canScrollRight);
 
   return (
     <div ref={containerRef} className={cn("relative", className)}>
@@ -133,42 +131,50 @@ export function TableScrollControls({ children, className }: TableScrollControls
         {children}
       </div>
       
-      {/* Floating scroll controls */}
-      {showControls && (
+      {/* Portal-based floating controls fixed to viewport bottom */}
+      {controlsVisible && portalContainer && createPortal(
         <div 
-          style={controlsStyle}
-          className="z-50 pointer-events-auto"
+          style={{
+            position: 'fixed',
+            bottom: '20px',
+            left: `${position.left + position.width / 2}px`,
+            transform: 'translateX(-50%)',
+            zIndex: 9999,
+          }}
         >
-          <div className="flex items-center gap-1 bg-background border-2 border-border rounded-full shadow-xl px-2 py-1.5">
+          <div className="flex items-center gap-1 bg-background border-2 border-primary/20 rounded-full shadow-2xl px-3 py-2 backdrop-blur-sm">
             <button
               onClick={() => scroll('left')}
               disabled={!canScrollLeft}
               className={cn(
-                "p-1.5 rounded-full transition-all",
+                "p-2 rounded-full transition-all",
                 canScrollLeft 
-                  ? "hover:bg-muted text-foreground" 
-                  : "text-muted-foreground/40 cursor-not-allowed"
+                  ? "hover:bg-primary/10 text-primary" 
+                  : "text-muted-foreground/30 cursor-not-allowed"
               )}
               aria-label="Scroll left"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
-            <span className="text-xs text-muted-foreground px-2 select-none font-medium">Scroll</span>
+            <div className="flex items-center gap-2 px-2">
+              <span className="text-sm font-medium text-foreground">Scroll Table</span>
+            </div>
             <button
               onClick={() => scroll('right')}
               disabled={!canScrollRight}
               className={cn(
-                "p-1.5 rounded-full transition-all",
+                "p-2 rounded-full transition-all",
                 canScrollRight 
-                  ? "hover:bg-muted text-foreground" 
-                  : "text-muted-foreground/40 cursor-not-allowed"
+                  ? "hover:bg-primary/10 text-primary" 
+                  : "text-muted-foreground/30 cursor-not-allowed"
               )}
               aria-label="Scroll right"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
-        </div>
+        </div>,
+        portalContainer
       )}
     </div>
   );

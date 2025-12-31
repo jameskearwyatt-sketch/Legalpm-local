@@ -388,28 +388,28 @@ export default function Matters() {
                       )}
                       {isLive && (
                         <>
-                          <TableHead className="text-right">
+                          <TableHead className="text-right min-w-[100px]">
                             <SortableHeader field="bm_fee">BM Fee</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right">
+                          <TableHead className="text-right min-w-[110px]">
                             <SortableHeader field="local_counsel">Local Counsel</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right">
+                          <TableHead className="text-right min-w-[90px]">
                             <SortableHeader field="wip">WIP</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right">
+                          <TableHead className="text-right min-w-[100px]">
                             <SortableHeader field="ar">AR (Billed)</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right">
+                          <TableHead className="text-right min-w-[90px]">
                             <SortableHeader field="paid">Paid</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right">
+                          <TableHead className="text-right min-w-[110px]">
                             <SortableHeader field="budget_burn">Budget Burn</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right">
+                          <TableHead className="text-right min-w-[100px]">
                             <SortableHeader field="headroom">Headroom</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right">
+                          <TableHead className="text-right min-w-[60px]">
                             <SortableHeader field="headroom_pct">%</SortableHeader>
                           </TableHead>
                         </>
@@ -427,12 +427,12 @@ export default function Matters() {
                         </>
                       )}
                       {!isLost && (
-                        <TableHead>
+                        <TableHead className="min-w-[120px]">
                           <SortableHeader field="stage">Stage</SortableHeader>
                         </TableHead>
                       )}
-                      <TableHead>Practice</TableHead>
-                      <TableHead className="w-16">Actions</TableHead>
+                      <TableHead className="min-w-[100px]">Practice</TableHead>
+                      <TableHead className="w-16 min-w-[64px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

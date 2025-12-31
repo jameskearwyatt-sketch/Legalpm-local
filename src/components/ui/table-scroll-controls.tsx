@@ -13,7 +13,6 @@ export function TableScrollControls({ children, className }: TableScrollControls
   const scrollRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
-  const [hasOverflow, setHasOverflow] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [position, setPosition] = useState({ left: 0, width: 0, visible: false });
 
@@ -31,7 +30,6 @@ export function TableScrollControls({ children, className }: TableScrollControls
     const scrollLeft = el.scrollLeft;
     
     const overflow = scrollWidth > clientWidth + 2;
-    setHasOverflow(overflow);
     setCanScrollLeft(scrollLeft > 2);
     setCanScrollRight(overflow && scrollLeft < scrollWidth - clientWidth - 2);
     
@@ -44,17 +42,6 @@ export function TableScrollControls({ children, className }: TableScrollControls
       left: rect.left,
       width: rect.width,
       visible: isVisible && overflow,
-    });
-    
-    // Debug log
-    console.log('TableScrollControls:', { 
-      scrollWidth, 
-      clientWidth, 
-      overflow, 
-      scrollLeft,
-      visible: isVisible && overflow,
-      rectTop: rect.top,
-      rectBottom: rect.bottom
     });
   }, []);
 

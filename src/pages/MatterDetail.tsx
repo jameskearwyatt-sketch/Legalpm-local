@@ -374,6 +374,13 @@ export default function MatterDetail() {
   const isPipeline = formData.category === 'Pipeline';
   const relevantStages = formData.category === 'Pipeline' ? pipelineStages : formData.category === 'Live' ? liveStages : allStages;
 
+  // Compute display status based on checkboxes for Live matters
+  const displayStatus = isPipeline 
+    ? (formData.status || matter.status) 
+    : (formData.aml_kyc_complete && formData.assignment_letter_signed && formData.matter_open)
+      ? 'Open'
+      : 'On Hold'; // Will display as 'ATTN' via StatusBadge
+
   return (
     <AppLayout>
       <div className="p-6 lg:p-8 space-y-6 max-w-6xl mx-auto">
@@ -405,7 +412,7 @@ export default function MatterDetail() {
                     className="text-2xl lg:text-3xl font-heading font-bold border-0 p-0 h-auto focus-visible:ring-0 bg-transparent"
                   />
                 </div>
-                <StatusBadge status={formData.status || matter.status} />
+                <StatusBadge status={displayStatus} />
               </div>
               {/* Show C/M number - for multi-client show editable fields */}
               {matterClients && matterClients.length > 1 ? (

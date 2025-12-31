@@ -166,6 +166,66 @@ export function useBudgetVersions(matterId?: string) {
     },
   });
 
+  // Delete a budget version
+  const deleteBudgetVersion = useMutation({
+    mutationFn: async (versionId: string) => {
+      // Get the version to delete
+      const versionToDelete = versionsQuery.data?.find(v => v.id === versionId);
+      if (!versionToDelete) throw new Error('Version not found');
+
+      // Delete the version (line items will cascade delete)
+      const { error: deleteError } = await supabase
+        .from('budget_versions')
+        .delete()
+        .eq('id', versionId);
+
+      if (deleteError) throw deleteError;
+
+      // Get remaining versions after deletion
+      const remainingVersions = (versionsQuery.data || []).filter(v => v.id !== versionId);
+
+      // Update matters table with the previous version's totals, or zero if no versions left
+      if (remainingVersions.length > 0) {
+        // Sort by version number to get the new latest
+        const newLatest = remainingVersions.sort((a, b) => b.version_number - a.version_number)[0];
+        const { error: matterError } = await supabase
+          .from('matters')
+          .update({
+            fee_amount_upper_end: newLatest.total_amount,
+            bm_fee_component: newLatest.bm_total,
+            local_counsel_fee: newLatest.local_counsel_total,
+          })
+          .eq('id', matterId!);
+
+        if (matterError) throw matterError;
+      } else {
+        // No versions left, reset to zero
+        const { error: matterError } = await supabase
+          .from('matters')
+          .update({
+            fee_amount_upper_end: 0,
+            bm_fee_component: 0,
+            local_counsel_fee: 0,
+          })
+          .eq('id', matterId!);
+
+        if (matterError) throw matterError;
+      }
+
+      return versionId;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budget-versions', matterId] });
+      queryClient.invalidateQueries({ queryKey: ['budget-line-items'] });
+      queryClient.invalidateQueries({ queryKey: ['matters'] });
+      queryClient.invalidateQueries({ queryKey: ['matter', matterId] });
+      toast({ title: 'Budget version deleted' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to delete budget version', description: error.message, variant: 'destructive' });
+    },
+  });
+
   return {
     versions: versionsQuery.data || [],
     latestVersion,
@@ -174,6 +234,7 @@ export function useBudgetVersions(matterId?: string) {
     isLoadingLineItems: latestLineItemsQuery.isLoading,
     error: versionsQuery.error,
     finalizeBudget,
+    deleteBudgetVersion,
     fetchLineItems,
   };
 }

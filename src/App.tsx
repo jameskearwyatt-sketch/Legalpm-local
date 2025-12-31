@@ -18,6 +18,7 @@ import RedFlags from "./pages/RedFlags";
 import PipelineFlags from "./pages/PipelineFlags";
 import TimeRecording from "./pages/TimeRecording";
 import ExcelAnalyzer from "./pages/ExcelAnalyzer";
+import MatterPricing from "./pages/MatterPricing";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -51,6 +52,7 @@ function AppRoutes() {
       <Route path="/matters/:id" element={<ProtectedRoute><MatterDetail /></ProtectedRoute>} />
       <Route path="/matters/:id/edit" element={<ProtectedRoute><MatterForm /></ProtectedRoute>} />
       <Route path="/time-recording" element={<ProtectedRoute><TimeRecording /></ProtectedRoute>} />
+      <Route path="/pricing" element={<ProtectedRoute><MatterPricing /></ProtectedRoute>} />
       <Route path="/flags" element={<ProtectedRoute><Flags /></ProtectedRoute>} />
       <Route path="/red-flags" element={<ProtectedRoute><RedFlags /></ProtectedRoute>} />
       <Route path="/pipeline-flags" element={<ProtectedRoute><PipelineFlags /></ProtectedRoute>} />

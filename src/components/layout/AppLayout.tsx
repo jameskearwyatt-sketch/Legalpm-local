@@ -25,6 +25,7 @@ import {
   AlertTriangle,
   Rocket,
   Clock,
+  Calculator,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -35,6 +36,7 @@ interface AppLayoutProps {
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Matters', href: '/matters', icon: Briefcase },
+  { name: 'Pricing Tool', href: '/pricing', icon: Calculator },
   { name: 'Time Recording', href: '/time-recording', icon: Clock },
   { name: 'Red Flags', href: '/red-flags', icon: AlertTriangle },
   { name: 'Pipeline Flags', href: '/pipeline-flags', icon: Rocket },

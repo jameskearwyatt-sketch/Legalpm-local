@@ -599,7 +599,7 @@ export default function MatterDetail() {
                 <CardTitle className="text-lg font-heading">Financial Summary</CardTitle>
                 {latestSnapshot && (
                   <CardDescription>
-                    As of {formatDate(latestSnapshot.as_of_date)}
+                    Updated {formatDate(latestSnapshot.updated_at)}
                   </CardDescription>
                 )}
               </CardHeader>

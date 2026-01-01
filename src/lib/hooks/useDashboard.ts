@@ -31,7 +31,7 @@ export interface DashboardStats {
 
 export interface Alert {
   id: string;
-  type: 'Over Budget' | 'Near Budget' | 'High WIP' | 'Poor Collection' | 'Stale Financials';
+  type: 'Over Budget' | 'Near Budget' | 'High WIP' | 'Poor Collection' | 'Stale Financials' | 'Stale LC Financials';
   matterId: string;
   matterName: string;
   matterNumber: string;
@@ -63,7 +63,8 @@ export function useDashboard(excludedMatterIds: string[] = []) {
         .from('matters')
         .select(`
           *,
-          clients (id, name)
+          clients (id, name),
+          matter_local_counsels (id, last_updated)
         `)
         .eq('category', 'Live');
 
@@ -273,10 +274,52 @@ export function useDashboard(excludedMatterIds: string[] = []) {
             cmNumber,
             clientName,
             currency: feeCurrency,
-            message: `No financial data recorded`,
-          });
+          message: `No financial data recorded`,
+        });
+      }
+
+        // Stale LC financials check - only for Disbursement mode with local counsel fee
+        const localCounselFee = Number(matter.local_counsel_fee) || 0;
+        if (localCounselFee > 0 && matter.local_counsel_billing === 'Disb') {
+          const localCounsels = (matter as any).matter_local_counsels || [];
+          
+          if (localCounsels.length === 0) {
+            // No LC records at all
+            alerts.push({
+              id: `stale-lc-${matter.id}`,
+              type: 'Stale LC Financials',
+              matterId: matter.id,
+              matterName: matter.matter_name,
+              matterNumber: matter.matter_number,
+              cmNumber,
+              clientName,
+              currency: feeCurrency,
+              message: `No LC financials recorded`,
+            });
+          } else {
+            // Check if any LC has stale data (no update or 10+ days old)
+            const staleLCs = localCounsels.filter((lc: any) => {
+              if (!lc.last_updated) return true;
+              const daysSinceUpdate = differenceInDays(today, parseISO(lc.last_updated));
+              return daysSinceUpdate >= 10;
+            });
+            
+            if (staleLCs.length > 0) {
+              alerts.push({
+                id: `stale-lc-${matter.id}`,
+                type: 'Stale LC Financials',
+                matterId: matter.id,
+                matterName: matter.matter_name,
+                matterNumber: matter.matter_number,
+                cmNumber,
+                clientName,
+                currency: feeCurrency,
+                message: `${staleLCs.length} LC firm${staleLCs.length > 1 ? 's' : ''} not updated in 10+ days`,
+              });
+            }
+          }
         }
-      });
+    });
 
 
       // Generate pipeline alerts
@@ -384,9 +427,9 @@ export function useDashboard(excludedMatterIds: string[] = []) {
         totalPaid: totalPaidUsd,
         avgCollectionRate,
         openMattersCount: liveMatters?.length || 0,
-        alerts: alerts.sort((a, b) => {
-          const priority: Record<string, number> = { 'Over Budget': 1, 'Near Budget': 2, 'Poor Collection': 3, 'High WIP': 4, 'Stale Financials': 5 };
-          return (priority[a.type] || 99) - (priority[b.type] || 99);
+      alerts: alerts.sort((a, b) => {
+        const priority: Record<string, number> = { 'Over Budget': 1, 'Near Budget': 2, 'Poor Collection': 3, 'High WIP': 4, 'Stale Financials': 5, 'Stale LC Financials': 6 };
+        return (priority[a.type] || 99) - (priority[b.type] || 99);
         }),
         pipelineAlerts: pipelineAlerts.sort((a, b) => {
           // RFP deadlines first

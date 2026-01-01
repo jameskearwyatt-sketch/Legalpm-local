@@ -395,14 +395,8 @@ export default function Matters() {
                           <TableHead className="text-right min-w-[110px]">
                             <SortableHeader field="local_counsel">Local Budget</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right min-w-[90px]">
-                            <SortableHeader field="wip">WIP</SortableHeader>
-                          </TableHead>
-                          <TableHead className="text-right min-w-[100px]">
-                            <SortableHeader field="ar">AR (Billed)</SortableHeader>
-                          </TableHead>
-                          <TableHead className="text-right min-w-[90px]">
-                            <SortableHeader field="paid">Paid</SortableHeader>
+                          <TableHead className="text-right min-w-[130px]">
+                            Financials
                           </TableHead>
                           <TableHead className="text-right min-w-[110px]">
                             <SortableHeader field="budget_burn">Budget Burn</SortableHeader>
@@ -516,44 +510,54 @@ export default function Matters() {
                                 {formatCurrency(matter.local_counsel_fee, matter.fee_currency)}
                               </TableCell>
                               <TableCell className="p-1">
-                                <EditableFinancialCell
-                                  value={matter.latest_snapshot?.wip_amount || 0}
-                                  currency={matter.fee_currency}
-                                  onSave={async (value) => {
-                                    await upsertTodaySnapshot.mutateAsync({
-                                      matterId: matter.id,
-                                      field: 'wip_amount',
-                                      value,
-                                    });
-                                  }}
-                                />
-                              </TableCell>
-                              <TableCell className="p-1">
-                                <EditableFinancialCell
-                                  value={matter.latest_snapshot?.billed_amount || 0}
-                                  currency={matter.fee_currency}
-                                  onSave={async (value) => {
-                                    await upsertTodaySnapshot.mutateAsync({
-                                      matterId: matter.id,
-                                      field: 'billed_amount',
-                                      value,
-                                    });
-                                  }}
-                                />
-                              </TableCell>
-                              <TableCell className="p-1">
-                                <EditableFinancialCell
-                                  value={matter.latest_snapshot?.paid_amount || 0}
-                                  currency={matter.fee_currency}
-                                  onSave={async (value) => {
-                                    await upsertTodaySnapshot.mutateAsync({
-                                      matterId: matter.id,
-                                      field: 'paid_amount',
-                                      value,
-                                    });
-                                  }}
-                                  className="text-success"
-                                />
+                                <div className="flex flex-col gap-0.5 text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span className="text-[10px] text-muted-foreground leading-tight">WIP:</span>
+                                    <EditableFinancialCell
+                                      value={matter.latest_snapshot?.wip_amount || 0}
+                                      currency={matter.fee_currency}
+                                      compact
+                                      onSave={async (value) => {
+                                        await upsertTodaySnapshot.mutateAsync({
+                                          matterId: matter.id,
+                                          field: 'wip_amount',
+                                          value,
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span className="text-[10px] text-muted-foreground leading-tight">Billed:</span>
+                                    <EditableFinancialCell
+                                      value={matter.latest_snapshot?.billed_amount || 0}
+                                      currency={matter.fee_currency}
+                                      compact
+                                      onSave={async (value) => {
+                                        await upsertTodaySnapshot.mutateAsync({
+                                          matterId: matter.id,
+                                          field: 'billed_amount',
+                                          value,
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span className="text-[10px] text-muted-foreground leading-tight">Paid:</span>
+                                    <EditableFinancialCell
+                                      value={matter.latest_snapshot?.paid_amount || 0}
+                                      currency={matter.fee_currency}
+                                      compact
+                                      onSave={async (value) => {
+                                        await upsertTodaySnapshot.mutateAsync({
+                                          matterId: matter.id,
+                                          field: 'paid_amount',
+                                          value,
+                                        });
+                                      }}
+                                      className="text-success"
+                                    />
+                                  </div>
+                                </div>
                               </TableCell>
                               <TableCell className="text-right text-muted-foreground">
                                 {formatCurrency(budgetBurn, matter.fee_currency)}

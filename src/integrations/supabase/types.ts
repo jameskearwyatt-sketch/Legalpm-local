@@ -411,6 +411,9 @@ export type Database = {
           fee_type: Database["public"]["Enums"]["fee_type"] | null
           id: string
           is_multi_client: boolean
+          lc_billed: number
+          lc_last_updated: string | null
+          lc_wip: number
           lead_partner: string | null
           local_counsel_billing: string | null
           local_counsel_fee: number
@@ -463,6 +466,9 @@ export type Database = {
           fee_type?: Database["public"]["Enums"]["fee_type"] | null
           id?: string
           is_multi_client?: boolean
+          lc_billed?: number
+          lc_last_updated?: string | null
+          lc_wip?: number
           lead_partner?: string | null
           local_counsel_billing?: string | null
           local_counsel_fee?: number
@@ -515,6 +521,9 @@ export type Database = {
           fee_type?: Database["public"]["Enums"]["fee_type"] | null
           id?: string
           is_multi_client?: boolean
+          lc_billed?: number
+          lc_last_updated?: string | null
+          lc_wip?: number
           lead_partner?: string | null
           local_counsel_billing?: string | null
           local_counsel_fee?: number

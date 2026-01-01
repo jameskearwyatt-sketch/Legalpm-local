@@ -278,6 +278,11 @@ export default function MatterDetail() {
         different_billing_currency: matter.different_billing_currency || false,
         agreed_billing_amount: matter.agreed_billing_amount || 0,
         quote_currency: matter.quote_currency || matter.fee_currency || 'GBP',
+        // Local counsel financial tracking
+        local_counsel_billing: matter.local_counsel_billing || '',
+        lc_wip: (matter as any).lc_wip || 0,
+        lc_billed: (matter as any).lc_billed || 0,
+        lc_last_updated: (matter as any).lc_last_updated || '',
       });
       setHasChanges(false);
     }
@@ -336,13 +341,14 @@ export default function MatterDetail() {
 
       // Clean up empty date strings to null
       const cleanData = { ...formData };
-      const dateFields = ['start_date', 'target_close_date', 'opportunity_receipt_date', 'clarifications_date', 'submission_deadline', 'decision_date'];
+      const dateFields = ['start_date', 'target_close_date', 'opportunity_receipt_date', 'clarifications_date', 'submission_deadline', 'decision_date', 'lc_last_updated'];
       dateFields.forEach(field => {
         if (cleanData[field] === '') {
           cleanData[field] = null;
         }
       });
       if (cleanData.deal_currency === '') cleanData.deal_currency = null;
+      if (cleanData.local_counsel_billing === '') cleanData.local_counsel_billing = null;
 
       await updateMatter.mutateAsync({
         id: matter.id,
@@ -393,6 +399,12 @@ export default function MatterDetail() {
   const billedAmount = latestSnapshot?.billed_amount || 0;
   const paidAmount = latestSnapshot?.paid_amount || 0;
   
+  // LC financial data
+  const lcWip = formData.lc_wip || 0;
+  const lcBilled = formData.lc_billed || 0;
+  const lcBillingMode = formData.local_counsel_billing || matter?.local_counsel_billing || '';
+  const isLcDisbursement = lcBillingMode === 'Disb';
+  
   // Calculate effective budget - account for billing currency conversion
   const feeUpperEnd = formData.fee_amount_upper_end || matter.fee_amount_upper_end || 0;
   const agreedBillingAmount = formData.agreed_billing_amount || matter.agreed_billing_amount || 0;
@@ -405,7 +417,7 @@ export default function MatterDetail() {
     : 1;
   
   // Use effective values for display (in billing currency when applicable)
-  const budget = differentBillingCurrency && agreedBillingAmount > 0 
+  const totalBudget = differentBillingCurrency && agreedBillingAmount > 0 
     ? agreedBillingAmount 
     : feeUpperEnd;
   const bmFee = differentBillingCurrency && agreedBillingAmount > 0
@@ -415,13 +427,24 @@ export default function MatterDetail() {
     ? (formData.local_counsel_fee || matter.local_counsel_fee || 0) * mandatedRate
     : (formData.local_counsel_fee || matter.local_counsel_fee || 0);
   const currency = differentBillingCurrency && agreedBillingAmount > 0
-    ? (formData.fee_currency || matter.fee_currency || 'GBP') // billing currency is the fee_currency when different_billing_currency is true
+    ? (formData.fee_currency || matter.fee_currency || 'GBP')
     : (formData.fee_currency || matter.fee_currency || 'GBP');
   
-  // Total budget burn = WIP + AR (Billed) only - paid amounts are a subset of billed, not additional spend
-  const totalUsed = wipAmount + billedAmount;
-  const remainingBudget = budget - totalUsed;
-  const budgetUsedPercent = budget > 0 ? (totalUsed / budget) * 100 : 0;
+  // BM Budget Burn = BM WIP + BM Billed (from snapshots - this is BM only)
+  const bmTotalUsed = wipAmount + billedAmount;
+  const bmHeadroom = bmFee - bmTotalUsed;
+  const bmBudgetUsedPercent = bmFee > 0 ? (bmTotalUsed / bmFee) * 100 : 0;
+  
+  // LC Budget Burn = LC WIP + LC Billed
+  const lcTotalUsed = lcWip + lcBilled;
+  const lcHeadroom = localCounsel - lcTotalUsed;
+  const lcBudgetUsedPercent = localCounsel > 0 ? (lcTotalUsed / localCounsel) * 100 : 0;
+  
+  // Total headroom = BM headroom + LC headroom
+  const totalHeadroom = bmHeadroom + lcHeadroom;
+  const totalUsed = bmTotalUsed + lcTotalUsed;
+  const totalBudgetUsedPercent = totalBudget > 0 ? (totalUsed / totalBudget) * 100 : 0;
+  
   const collectionRate = billedAmount > 0 ? (paidAmount / billedAmount) * 100 : 100;
 
   const isPipeline = formData.category === 'Pipeline';
@@ -530,44 +553,78 @@ export default function MatterDetail() {
                 )}
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* BM Budget Progress */}
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Budget Used</span>
+                    <span className="text-muted-foreground">BM Budget Used</span>
                     <span className={cn(
                       "font-medium",
-                      budgetUsedPercent > 100 && "text-danger",
-                      budgetUsedPercent >= 80 && budgetUsedPercent <= 100 && "text-warning",
-                      budgetUsedPercent < 80 && "text-success"
+                      bmBudgetUsedPercent > 100 && "text-danger",
+                      bmBudgetUsedPercent >= 80 && bmBudgetUsedPercent <= 100 && "text-warning",
+                      bmBudgetUsedPercent < 80 && "text-success"
                     )}>
-                      {budgetUsedPercent.toFixed(1)}%
+                      {bmBudgetUsedPercent.toFixed(1)}%
                     </span>
                   </div>
                   <Progress 
-                    value={Math.min(budgetUsedPercent, 100)} 
+                    value={Math.min(bmBudgetUsedPercent, 100)} 
                     className={cn(
                       "h-3",
-                      budgetUsedPercent > 100 && "[&>div]:bg-danger",
-                      budgetUsedPercent >= 80 && budgetUsedPercent <= 100 && "[&>div]:bg-warning",
-                      budgetUsedPercent < 80 && "[&>div]:bg-success"
+                      bmBudgetUsedPercent > 100 && "[&>div]:bg-danger",
+                      bmBudgetUsedPercent >= 80 && bmBudgetUsedPercent <= 100 && "[&>div]:bg-warning",
+                      bmBudgetUsedPercent < 80 && "[&>div]:bg-success"
                     )}
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 rounded-lg bg-muted/50">
-                    <p className="text-sm text-muted-foreground">Total Budget</p>
-                    <p className="text-xl font-heading font-bold">{formatCurrency(budget, currency)}</p>
-                  </div>
+                {/* Headroom Grid */}
+                <div className={cn("grid gap-4", localCounsel > 0 ? "grid-cols-3" : "grid-cols-2")}>
                   <div className={cn(
                     "p-4 rounded-lg",
-                    remainingBudget < 0 ? "bg-danger/10" : "bg-success/10"
+                    bmHeadroom < 0 ? "bg-danger/10" : "bg-success/10"
                   )}>
-                    <p className="text-sm text-muted-foreground">Remaining</p>
+                    <p className="text-sm text-muted-foreground">BM Headroom</p>
                     <p className={cn(
                       "text-xl font-heading font-bold",
-                      remainingBudget < 0 ? "text-danger" : "text-success"
+                      bmHeadroom < 0 ? "text-danger" : "text-success"
                     )}>
-                      {formatCurrency(remainingBudget, currency)}
+                      {formatCurrency(bmHeadroom, currency)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      of {formatCurrency(bmFee, currency)}
+                    </p>
+                  </div>
+                  {localCounsel > 0 && (
+                    <div className={cn(
+                      "p-4 rounded-lg",
+                      lcHeadroom < 0 ? "bg-danger/10" : isLcDisbursement ? "bg-success/10" : "bg-muted/50"
+                    )}>
+                      <p className="text-sm text-muted-foreground">LC Headroom</p>
+                      <p className={cn(
+                        "text-xl font-heading font-bold",
+                        lcHeadroom < 0 ? "text-danger" : isLcDisbursement ? "text-success" : "text-muted-foreground"
+                      )}>
+                        {formatCurrency(lcHeadroom, currency)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        of {formatCurrency(localCounsel, currency)}
+                        {!isLcDisbursement && lcBillingMode === 'Direct' && " (Direct)"}
+                      </p>
+                    </div>
+                  )}
+                  <div className={cn(
+                    "p-4 rounded-lg",
+                    totalHeadroom < 0 ? "bg-danger/10" : "bg-primary/10"
+                  )}>
+                    <p className="text-sm text-muted-foreground">Total Headroom</p>
+                    <p className={cn(
+                      "text-xl font-heading font-bold",
+                      totalHeadroom < 0 ? "text-danger" : "text-primary"
+                    )}>
+                      {formatCurrency(totalHeadroom, currency)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      of {formatCurrency(totalBudget, currency)}
                     </p>
                   </div>
                 </div>
@@ -614,6 +671,70 @@ export default function MatterDetail() {
           </div>
         )}
 
+        {/* Local Counsel Financials - only show when LC fee exists and billing mode is Disbursement */}
+        {!isPipeline && localCounsel > 0 && isLcDisbursement && (
+          <Card className="shadow-card border-l-4 border-l-primary">
+            <CardHeader>
+              <CardTitle className="text-lg font-heading">Local Counsel Financials</CardTitle>
+              <CardDescription>
+                {formData.lc_last_updated 
+                  ? `Last updated ${formatDate(formData.lc_last_updated)}`
+                  : 'No LC financial data recorded yet'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>LC WIP</Label>
+                  <Input
+                    type="number"
+                    value={formData.lc_wip || ''}
+                    onChange={(e) => {
+                      updateField('lc_wip', parseFloat(e.target.value) || 0);
+                      updateField('lc_last_updated', new Date().toISOString().split('T')[0]);
+                    }}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>LC Billed</Label>
+                  <Input
+                    type="number"
+                    value={formData.lc_billed || ''}
+                    onChange={(e) => {
+                      updateField('lc_billed', parseFloat(e.target.value) || 0);
+                      updateField('lc_last_updated', new Date().toISOString().split('T')[0]);
+                    }}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Last Updated</Label>
+                  <ClearableDateInput 
+                    value={formData.lc_last_updated || ''} 
+                    onChange={(value) => updateField('lc_last_updated', value)} 
+                  />
+                </div>
+              </div>
+              <div className="flex justify-between items-center py-3 bg-muted/50 rounded-lg px-4">
+                <span className="text-muted-foreground">LC Budget Burn</span>
+                <div className="text-right">
+                  <span className={cn(
+                    "text-lg font-semibold",
+                    lcBudgetUsedPercent > 100 && "text-danger",
+                    lcBudgetUsedPercent >= 80 && lcBudgetUsedPercent <= 100 && "text-warning",
+                    lcBudgetUsedPercent < 80 && "text-success"
+                  )}>
+                    {lcBudgetUsedPercent.toFixed(1)}%
+                  </span>
+                  <p className="text-xs text-muted-foreground">
+                    {formatCurrency(lcTotalUsed, currency)} of {formatCurrency(localCounsel, currency)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
         {/* Financial Trends Chart - only for non-pipeline matters with snapshots */}
         {!isPipeline && snapshots && snapshots.length > 0 && (
           <Card className="shadow-card">
@@ -657,12 +778,12 @@ export default function MatterDetail() {
                     />
                     <Legend />
                     <ReferenceLine 
-                      y={budget} 
+                      y={bmFee} 
                       stroke="hsl(var(--destructive))" 
                       strokeWidth={2}
                       strokeDasharray="5 5"
                       label={{ 
-                        value: 'Budget', 
+                        value: 'BM Budget', 
                         position: 'right',
                         fill: 'hsl(var(--destructive))',
                         fontSize: 12

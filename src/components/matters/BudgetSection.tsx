@@ -776,17 +776,19 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 <Plus className="h-4 w-4 mr-2" />
                 Add Work Item
               </Button>
-              <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-                <DialogTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-dashed"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Import from Engagement Letter
-                  </Button>
-                </DialogTrigger>
+              {/* Only show Import from Engagement Letter for the very first budget (no existing versions) */}
+              {!hasExistingBudget && (
+                <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="border-dashed"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Import from Engagement Letter
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent className="max-w-2xl">
                   <DialogHeader>
                     <DialogTitle>Import Budget from Engagement Letter</DialogTitle>
@@ -855,6 +857,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                   </DialogFooter>
                 </DialogContent>
               </Dialog>
+              )}
             </div>
           )}
         </div>

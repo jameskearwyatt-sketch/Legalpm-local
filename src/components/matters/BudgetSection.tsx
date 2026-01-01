@@ -336,7 +336,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           <div className="grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground px-1">
             <div className="col-span-5">Work Item</div>
             <div className="col-span-3">Provider</div>
-            <div className="col-span-3 text-right">Fee ({currency})</div>
+            <div className="col-span-3 text-right">Upper End Fee ({currency})</div>
             <div className="col-span-1"></div>
           </div>
 

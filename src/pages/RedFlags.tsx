@@ -22,6 +22,7 @@ const alertTypeConfig: Record<Alert['type'], { icon: React.ReactNode; color: str
   'High WIP': { icon: <Clock className="h-4 w-4" />, color: 'text-warning' },
   'Poor Collection': { icon: <TrendingDown className="h-4 w-4" />, color: 'text-warning' },
   'Stale Financials': { icon: <CalendarX className="h-4 w-4" />, color: 'text-warning' },
+  'Stale LC Financials': { icon: <CalendarX className="h-4 w-4" />, color: 'text-warning' },
 };
 
 export default function RedFlags() {
@@ -44,7 +45,7 @@ export default function RedFlags() {
     return acc;
   }, {} as Record<Alert['type'], Alert[]>) || {};
 
-  const alertTypeOrder: Alert['type'][] = ['Over Budget', 'Near Budget', 'Poor Collection', 'High WIP', 'Stale Financials'];
+  const alertTypeOrder: Alert['type'][] = ['Over Budget', 'Near Budget', 'Poor Collection', 'High WIP', 'Stale Financials', 'Stale LC Financials'];
 
   if (isLoading) {
     return (
@@ -89,7 +90,7 @@ export default function RedFlags() {
         ) : (
           <div className="space-y-6">
             {/* Summary Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               {alertTypeOrder.map((type) => {
                 const count = alertsByType[type]?.length || 0;
                 const config = alertTypeConfig[type];

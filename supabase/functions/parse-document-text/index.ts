@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -33,16 +34,18 @@ serve(async (req) => {
       extractedText = await file.text();
       console.log('Extracted text from plain text file, length:', extractedText.length);
     }
-    // Handle PDF files using pdf-parse via external service or basic extraction
+    // Handle PDF files
     else if (fileType === 'application/pdf' || fileName.endsWith('.pdf')) {
-      // Use Lovable AI to extract text from PDF via the document parsing gateway
       const arrayBuffer = await file.arrayBuffer();
-      const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      // Use Deno's base64 encoder which handles large files properly
+      const base64Content = base64Encode(arrayBuffer);
       
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) {
         throw new Error("LOVABLE_API_KEY is not configured");
       }
+
+      console.log('Sending PDF to AI for text extraction, base64 length:', base64Content.length);
 
       // Use AI to extract text from the PDF
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -81,6 +84,12 @@ serve(async (req) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("AI gateway error for PDF:", response.status, errorText);
+        if (response.status === 429) {
+          throw new Error("Rate limit exceeded. Please try again in a moment.");
+        }
+        if (response.status === 402) {
+          throw new Error("AI credits exhausted. Please add credits to continue.");
+        }
         throw new Error(`Failed to extract text from PDF: ${response.status}`);
       }
 
@@ -96,7 +105,8 @@ serve(async (req) => {
       fileName.endsWith('.doc')
     ) {
       const arrayBuffer = await file.arrayBuffer();
-      const base64Content = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      // Use Deno's base64 encoder which handles large files properly
+      const base64Content = base64Encode(arrayBuffer);
       
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       if (!LOVABLE_API_KEY) {
@@ -107,6 +117,8 @@ serve(async (req) => {
       const mimeType = fileName.endsWith('.docx') 
         ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
         : 'application/msword';
+
+      console.log('Sending Word doc to AI for text extraction, base64 length:', base64Content.length);
 
       // Use AI to extract text from the Word document
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -145,6 +157,12 @@ serve(async (req) => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error("AI gateway error for Word:", response.status, errorText);
+        if (response.status === 429) {
+          throw new Error("Rate limit exceeded. Please try again in a moment.");
+        }
+        if (response.status === 402) {
+          throw new Error("AI credits exhausted. Please add credits to continue.");
+        }
         throw new Error(`Failed to extract text from Word document: ${response.status}`);
       }
 

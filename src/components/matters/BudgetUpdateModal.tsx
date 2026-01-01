@@ -221,43 +221,45 @@ export function BudgetUpdateModal({
               </p>
             </div>
 
-            {/* AI Summarization Section */}
-            <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
-              <div className="flex items-center gap-2 text-sm font-medium">
-                <FileText className="h-4 w-4" />
-                Paste correspondence for AI summary
+            <div className="space-y-3">
+              <Label>Why is this budget being updated?</Label>
+              
+              {/* Paste correspondence for AI summary */}
+              <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <FileText className="h-3.5 w-3.5" />
+                  Paste correspondence to auto-generate rationale
+                </div>
+                <Textarea
+                  value={pastedText}
+                  onChange={(e) => setPastedText(e.target.value)}
+                  placeholder="Paste email exchange or client notes here..."
+                  rows={3}
+                  className="text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSummarize}
+                  disabled={isSummarizing || !pastedText.trim()}
+                  className="w-full"
+                >
+                  {isSummarizing ? (
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-3 w-3" />
+                  )}
+                  Summarize with AI
+                </Button>
               </div>
-              <Textarea
-                value={pastedText}
-                onChange={(e) => setPastedText(e.target.value)}
-                placeholder="Paste email exchange or notes here and click 'Summarize' to auto-generate the rationale..."
-                rows={4}
-                className="text-xs"
-              />
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={handleSummarize}
-                disabled={isSummarizing || !pastedText.trim()}
-                className="w-full"
-              >
-                {isSummarizing ? (
-                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                ) : (
-                  <Sparkles className="mr-2 h-3 w-3" />
-                )}
-                Summarize with AI
-              </Button>
-            </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Rationale / Notes</Label>
+              {/* Notes/Rationale field */}
               <Textarea
                 id="notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Describe the background to this budget update..."
+                placeholder="Or type your rationale here..."
                 rows={3}
               />
             </div>

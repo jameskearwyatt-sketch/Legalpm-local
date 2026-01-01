@@ -201,10 +201,10 @@ export default function MatterForm() {
     if (matterClients && matterClients.length > 0) {
       setClientAllocations(
         matterClients.map(mc => ({
-          client_id: mc.client_id,
+          client_id: mc.client_id || '',
           cm_number: mc.cm_number || '',
-          is_master: mc.is_master,
-          fee_percentage: mc.fee_percentage,
+          is_master: mc.is_master === true, // Ensure boolean
+          fee_percentage: mc.fee_percentage || 0,
         }))
       );
       setIsMultiClient(true);

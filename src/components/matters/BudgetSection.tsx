@@ -337,26 +337,52 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       if (line_item_updates && Array.isArray(line_item_updates) && line_item_updates.length > 0) {
         const newSuggestedIndices = new Set<number>();
         let updatedItems = [...draftItems];
+        let updatesCount = 0;
+        let newCount = 0;
         
         for (const update of line_item_updates) {
           if (!update.work_item || typeof update.fee_amount !== 'number') continue;
           
-          // Try to match existing item by similar work item name
-          const existingIndex = updatedItems.findIndex(item => 
-            item.work_item.toLowerCase().includes(update.work_item.toLowerCase().substring(0, 10)) ||
-            update.work_item.toLowerCase().includes(item.work_item.toLowerCase().substring(0, 10))
-          );
+          // If AI provided a matched_index and it's not a new item, use that directly
+          let targetIndex = -1;
           
-          if (existingIndex >= 0 && !update.is_new) {
-            // Update existing item
-            updatedItems[existingIndex] = {
-              ...updatedItems[existingIndex],
+          if (!update.is_new && typeof update.matched_index === 'number' && update.matched_index >= 0 && update.matched_index < updatedItems.length) {
+            targetIndex = update.matched_index;
+          } else if (!update.is_new) {
+            // Fallback: fuzzy match by work item name and provider preference
+            const normalizedUpdateName = update.work_item.toLowerCase().replace(/[^a-z0-9]/g, '');
+            
+            // First try exact provider + name match
+            targetIndex = updatedItems.findIndex(item => {
+              const normalizedItemName = item.work_item.toLowerCase().replace(/[^a-z0-9]/g, '');
+              const providerMatch = !update.provider || item.provider === update.provider;
+              return providerMatch && (
+                normalizedItemName.includes(normalizedUpdateName.substring(0, 8)) ||
+                normalizedUpdateName.includes(normalizedItemName.substring(0, 8))
+              );
+            });
+            
+            // If no match with provider, try without
+            if (targetIndex < 0) {
+              targetIndex = updatedItems.findIndex(item => {
+                const normalizedItemName = item.work_item.toLowerCase().replace(/[^a-z0-9]/g, '');
+                return normalizedItemName.includes(normalizedUpdateName.substring(0, 8)) ||
+                       normalizedUpdateName.includes(normalizedItemName.substring(0, 8));
+              });
+            }
+          }
+          
+          if (targetIndex >= 0) {
+            // Update existing item at the matched index
+            updatedItems[targetIndex] = {
+              ...updatedItems[targetIndex],
               fee_amount: update.fee_amount,
-              provider: update.provider || updatedItems[existingIndex].provider,
+              provider: update.provider || updatedItems[targetIndex].provider,
             };
-            newSuggestedIndices.add(existingIndex);
+            newSuggestedIndices.add(targetIndex);
+            updatesCount++;
           } else {
-            // Add as new item
+            // Add as new item at the end
             const newIndex = updatedItems.length;
             updatedItems.push({
               work_item: update.work_item,
@@ -364,12 +390,17 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
               fee_amount: update.fee_amount,
             });
             newSuggestedIndices.add(newIndex);
+            newCount++;
           }
         }
         
         setDraftItems(updatedItems);
         setAiSuggestedIndices(newSuggestedIndices);
-        toast.success(`AI suggested ${line_item_updates.length} budget update(s). Review the highlighted items.`);
+        const message = [
+          updatesCount > 0 ? `${updatesCount} update(s)` : '',
+          newCount > 0 ? `${newCount} new item(s)` : ''
+        ].filter(Boolean).join(' and ');
+        toast.success(`AI suggested ${message}. Review highlighted items.`);
       } else if (summary) {
         toast.success('Rationale summarized and added to notes');
       } else {

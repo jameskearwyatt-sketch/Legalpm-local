@@ -40,15 +40,25 @@ serve(async (req) => {
     // Build context about current line items if provided
     let currentBudgetContext = '';
     if (currentLineItems && Array.isArray(currentLineItems) && currentLineItems.length > 0) {
-      currentBudgetContext = '\n\nCurrent budget line items:\n' + 
+      currentBudgetContext = '\n\nCURRENT BUDGET LINE ITEMS (use these indices for matching):\n' + 
         currentLineItems.map((item: any, i: number) => 
-          `${i + 1}. ${item.work_item} (${item.provider}): ${item.fee_amount}`
+          `[Index ${i}] "${item.work_item}" by ${item.provider}: ${item.fee_amount}`
         ).join('\n');
     }
 
     const systemPrompt = `You are a legal budget amendment assistant. Analyze correspondence about budget changes and extract:
 1. A brief summary explaining why the budget is being amended (2-3 sentences)
-2. Any specific budget line item changes mentioned (new items, updated amounts, etc.)
+2. Specific budget line item changes - CRITICALLY distinguishing between UPDATES to existing items vs genuinely NEW items
+
+CRITICAL MATCHING RULES:
+- You will be given the CURRENT BUDGET LINE ITEMS with their indices
+- For ANY change that relates to an existing work item (even if worded slightly differently), set is_new=false and provide the matched_index
+- "Due diligence" updates should match existing "Due Diligence" items
+- "DD" is shorthand for "Due Diligence" 
+- "Structuring" updates match "Structuring" items
+- Amount increases/decreases to existing items are UPDATES (is_new=false), NOT new items
+- Only set is_new=true for genuinely new work streams not already in the budget
+- When matching, prefer the item with the same provider if multiple similar items exist
 
 Guidelines for summary:
 - Be very concise (2-3 sentences maximum)
@@ -58,13 +68,14 @@ Guidelines for summary:
 
 Guidelines for budget changes:
 - Extract any monetary amounts mentioned with their associated work items
-- If an existing work item amount is changing, note the new amount
-- If new work items are being added, extract them
-- If items are being removed, note that
 - Amounts should be numbers only (no currency symbols)
-- Provider should be either "Baker McKenzie" or "Local Counsel"`;
+- Provider should be either "Baker McKenzie" or "Local Counsel"
+- ALWAYS check if a mentioned item matches an existing budget item before marking as new`;
 
-    const userPrompt = `Analyze the following correspondence and extract the budget amendment details.${currentBudgetContext}
+    const userPrompt = `Analyze the following correspondence and extract the budget amendment details.
+${currentBudgetContext}
+
+IMPORTANT: For each budget change mentioned, check if it matches any existing item above. If it does, use matched_index and is_new=false.
 
 ${budgetChange ? `Budget change context: ${budgetChange}\n\n` : ''}Correspondence/Notes:
 ${text}`;
@@ -104,7 +115,7 @@ ${text}`;
                       properties: {
                         work_item: {
                           type: 'string',
-                          description: 'Name/description of the work item (e.g., "Due diligence review", "Regulatory advice")'
+                          description: 'Name/description of the work item. Use the EXACT name from existing items when updating.'
                         },
                         provider: {
                           type: 'string',
@@ -117,7 +128,11 @@ ${text}`;
                         },
                         is_new: {
                           type: 'boolean',
-                          description: 'True if this is a new line item being added, false if updating existing'
+                          description: 'FALSE if this updates an existing budget item (even with different wording). TRUE only for genuinely new work not in current budget.'
+                        },
+                        matched_index: {
+                          type: 'number',
+                          description: 'When is_new=false, provide the index number of the matching existing budget item from the list provided.'
                         }
                       },
                       required: ['work_item', 'provider', 'fee_amount', 'is_new']

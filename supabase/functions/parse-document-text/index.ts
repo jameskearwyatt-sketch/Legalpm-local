@@ -25,7 +25,18 @@ serve(async (req) => {
 
     const fileName = file.name.toLowerCase();
     const fileType = file.type;
-    console.log(`Processing file: ${file.name}, type: ${fileType}, size: ${file.size}`);
+    const fileSize = file.size;
+    console.log(`Processing file: ${file.name}, type: ${fileType}, size: ${fileSize}`);
+
+    // Check file size limit (5MB for PDFs/Word docs to avoid memory issues)
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    if (fileSize > MAX_FILE_SIZE) {
+      const sizeMB = (fileSize / 1024 / 1024).toFixed(1);
+      return new Response(
+        JSON.stringify({ error: `File too large (${sizeMB}MB). Maximum size is 5MB. Please use a smaller file or extract the text manually.` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     let extractedText = '';
 

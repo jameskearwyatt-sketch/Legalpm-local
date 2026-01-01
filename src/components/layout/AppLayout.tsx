@@ -70,7 +70,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <Scale className="h-5 w-5 text-sidebar-primary-foreground" />
             </div>
             <div>
-              <h1 className="text-lg font-heading font-semibold text-sidebar-foreground">Matter Budget</h1>
+              <h1 className="text-lg font-heading font-semibold text-sidebar-foreground">Legal Practice Manager</h1>
             </div>
           </div>
 
@@ -141,7 +141,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </button>
         <div className="flex items-center gap-2">
           <Scale className="h-6 w-6 text-primary" />
-          <span className="font-heading font-semibold">Matter Budget</span>
+          <span className="font-heading font-semibold">Legal Practice Manager</span>
         </div>
       </header>
 
@@ -153,7 +153,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
               <div className="flex items-center gap-2">
                 <Scale className="h-6 w-6 text-sidebar-primary" />
-                <span className="font-heading font-semibold text-sidebar-foreground">Matter Budget</span>
+                <span className="font-heading font-semibold text-sidebar-foreground">Legal Practice Manager</span>
               </div>
               <button
                 onClick={() => setMobileMenuOpen(false)}

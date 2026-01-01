@@ -43,13 +43,14 @@ import {
   X,
   Calculator,
   FileText,
-  Calendar
+  Calendar,
+  Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
-type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date';
+type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split';
 
 interface FlaggedMatter {
   id: string;
@@ -103,6 +104,12 @@ const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; descr
     description: 'No start date logged for this matter',
     field: 'start_date'
   },
+  invalid_client_split: {
+    label: 'Invalid Client Split',
+    icon: <Users className="h-4 w-4" />,
+    description: 'Multi-client fee percentages missing or don\'t total 100%',
+    field: null
+  },
 };
 
 export default function Flags() {
@@ -150,9 +157,41 @@ export default function Flags() {
     enabled: !!user && liveMatterIds.length > 0,
   });
 
+  // Fetch matter_clients for multi-client matters
+  const multiClientMatterIds = liveMatters.filter(m => m.is_multi_client).map(m => m.id);
+  const { data: matterClients } = useQuery({
+    queryKey: ['matter-clients-for-flags', multiClientMatterIds],
+    queryFn: async () => {
+      if (multiClientMatterIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('matter_clients')
+        .select('matter_id, fee_percentage')
+        .in('matter_id', multiClientMatterIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && multiClientMatterIds.length > 0,
+  });
+
   // Build sets for quick lookup
   const mattersWithBudget = new Set(budgetVersions?.map(bv => bv.matter_id) || []);
   const mattersWithAssumptions = new Set(assumptions?.map(a => a.matter_id) || []);
+  
+  // Calculate which multi-client matters have invalid splits
+  const mattersWithInvalidSplit = new Set<string>();
+  if (matterClients) {
+    const splitsByMatter = new Map<string, number>();
+    matterClients.forEach(mc => {
+      const current = splitsByMatter.get(mc.matter_id) || 0;
+      splitsByMatter.set(mc.matter_id, current + Number(mc.fee_percentage));
+    });
+    multiClientMatterIds.forEach(matterId => {
+      const total = splitsByMatter.get(matterId) || 0;
+      if (Math.abs(total - 100) > 0.01) {
+        mattersWithInvalidSplit.add(matterId);
+      }
+    });
+  }
 
   const handleClearFlag = async () => {
     if (!confirmDialog) return;
@@ -207,6 +246,7 @@ export default function Flags() {
       if (!mattersWithBudget.has(matter.id)) flags.push('no_budget_finalized');
       if (!mattersWithAssumptions.has(matter.id)) flags.push('no_assumptions');
       if (!matter.start_date) flags.push('no_start_date');
+      if (matter.is_multi_client && mattersWithInvalidSplit.has(matter.id)) flags.push('invalid_client_split');
       
       return {
         id: matter.id,
@@ -231,6 +271,7 @@ export default function Flags() {
     no_budget_finalized: 0,
     no_assumptions: 0,
     no_start_date: 0,
+    invalid_client_split: 0,
   };
   
   flaggedMatters.forEach(m => {
@@ -262,8 +303,8 @@ export default function Flags() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-          {(['engagement_letter', 'aml_kyc', 'matter_open', 'conflicts', 'no_budget_finalized', 'no_assumptions', 'no_start_date'] as FlagType[]).map((key) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
+          {(['engagement_letter', 'aml_kyc', 'matter_open', 'conflicts', 'no_budget_finalized', 'no_assumptions', 'no_start_date', 'invalid_client_split'] as FlagType[]).map((key) => (
             <Card key={key} className={cn(
               "shadow-card transition-colors",
               flagCounts[key] > 0 ? "border-warning/50" : "border-success/30"

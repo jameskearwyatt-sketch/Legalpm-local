@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useRef } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -49,6 +50,13 @@ const flagConfig: Record<PipelineFlagType, { label: string; icon: React.ReactNod
 
 export default function PipelineFlags() {
   const { matters, isLoading } = useMatters();
+  const tableRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollToTable = () => {
+    if (tableRef.current) {
+      tableRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   // Only check Pipeline matters
   const pipelineMatters = matters.filter(m => m.category === 'Pipeline');
@@ -143,10 +151,13 @@ export default function PipelineFlags() {
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 gap-4">
-          <Card className={cn(
-            "shadow-card transition-colors",
-            flagCounts.rfp_upcoming > 0 ? "border-orange-300 dark:border-orange-700" : "border-success/30"
-          )}>
+          <Card 
+            className={cn(
+              "shadow-card transition-all cursor-pointer hover:shadow-md",
+              flagCounts.rfp_upcoming > 0 ? "border-orange-300 dark:border-orange-700" : "border-success/30"
+            )}
+            onClick={() => flagCounts.rfp_upcoming > 0 && scrollToTable()}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className={cn(
@@ -165,10 +176,13 @@ export default function PipelineFlags() {
             </CardContent>
           </Card>
 
-          <Card className={cn(
-            "shadow-card transition-colors",
-            flagCounts.rfp_overdue > 0 ? "border-purple-300 dark:border-purple-700" : "border-success/30"
-          )}>
+          <Card 
+            className={cn(
+              "shadow-card transition-all cursor-pointer hover:shadow-md",
+              flagCounts.rfp_overdue > 0 ? "border-purple-300 dark:border-purple-700" : "border-success/30"
+            )}
+            onClick={() => flagCounts.rfp_overdue > 0 && scrollToTable()}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
                 <div className={cn(
@@ -189,7 +203,7 @@ export default function PipelineFlags() {
         </div>
 
         {/* Flagged Matters Table */}
-        <Card className="shadow-card">
+        <Card className="shadow-card" ref={tableRef}>
           <CardHeader>
             <CardTitle className="text-lg font-heading">Pipeline Matters Requiring Attention</CardTitle>
             <CardDescription>

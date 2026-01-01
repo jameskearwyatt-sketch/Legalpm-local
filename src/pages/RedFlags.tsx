@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useRef } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -26,6 +27,14 @@ const alertTypeConfig: Record<Alert['type'], { icon: React.ReactNode; color: str
 
 export default function RedFlags() {
   const { data: stats, isLoading } = useDashboard();
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const scrollToSection = (type: Alert['type']) => {
+    const ref = sectionRefs.current[type];
+    if (ref) {
+      ref.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   // Group alerts by type
   const alertsByType = stats?.alerts?.reduce((acc, alert) => {
@@ -86,7 +95,14 @@ export default function RedFlags() {
                 const count = alertsByType[type]?.length || 0;
                 const config = alertTypeConfig[type];
                 return (
-                  <Card key={type} className={cn("shadow-card", count > 0 && "border-l-4 border-l-warning")}>
+                  <Card 
+                    key={type} 
+                    className={cn(
+                      "shadow-card cursor-pointer transition-all hover:shadow-md", 
+                      count > 0 && "border-l-4 border-l-warning"
+                    )}
+                    onClick={() => count > 0 && scrollToSection(type)}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-1">
                         <span className={config.color}>{config.icon}</span>
@@ -107,7 +123,11 @@ export default function RedFlags() {
               const config = alertTypeConfig[type];
               
               return (
-                <Card key={type} className="shadow-card">
+                <Card 
+                  key={type} 
+                  className="shadow-card"
+                  ref={(el) => { sectionRefs.current[type] = el; }}
+                >
                   <CardHeader className="flex flex-row items-center justify-between pb-3">
                     <CardTitle className="font-heading text-lg flex items-center gap-2">
                       <span className={config.color}>{config.icon}</span>

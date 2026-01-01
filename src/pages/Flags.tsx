@@ -38,7 +38,7 @@ import {
   Hash
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split' | 'no_cm_number';
@@ -125,12 +125,20 @@ export default function Flags() {
   const { matters, isLoading, updateMatter } = useMatters();
   const { user } = useAuth();
   const { toast } = useToast();
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
     matterId: string;
     matterName: string;
     flagType: FlagType;
   } | null>(null);
+
+  const scrollToSection = (type: FlagType) => {
+    const ref = sectionRefs.current[type];
+    if (ref) {
+      ref.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   // Only check Live matters for admin flags
   const liveMatters = matters.filter(m => m.category === 'Live');
@@ -322,7 +330,14 @@ export default function Flags() {
                 const count = mattersByFlagType[type]?.length || 0;
                 const config = flagConfig[type];
                 return (
-                  <Card key={type} className={cn("shadow-card", count > 0 && "border-l-4 border-l-warning")}>
+                  <Card 
+                    key={type} 
+                    className={cn(
+                      "shadow-card cursor-pointer transition-all hover:shadow-md", 
+                      count > 0 && "border-l-4 border-l-warning"
+                    )}
+                    onClick={() => count > 0 && scrollToSection(type)}
+                  >
                     <CardContent className="p-4">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-warning">{config.icon}</span>
@@ -344,7 +359,11 @@ export default function Flags() {
               const canClear = config.field !== null;
               
               return (
-                <Card key={type} className="shadow-card">
+                <Card 
+                  key={type} 
+                  className="shadow-card"
+                  ref={(el) => { sectionRefs.current[type] = el; }}
+                >
                   <CardHeader className="flex flex-row items-center justify-between pb-3">
                     <CardTitle className="font-heading text-lg flex items-center gap-2">
                       <span className="text-warning">{config.icon}</span>

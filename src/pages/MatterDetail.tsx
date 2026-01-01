@@ -252,6 +252,10 @@ export default function MatterDetail() {
         decision_date: matter.decision_date || '',
         pipeline_outcome: matter.pipeline_outcome || null,
         status: matter.status,
+        // Billing currency fields
+        different_billing_currency: matter.different_billing_currency || false,
+        agreed_billing_amount: matter.agreed_billing_amount || 0,
+        quote_currency: matter.quote_currency || matter.fee_currency || 'GBP',
       });
       setHasChanges(false);
     }
@@ -367,16 +371,36 @@ export default function MatterDetail() {
   const billedAmount = latestSnapshot?.billed_amount || 0;
   const paidAmount = latestSnapshot?.paid_amount || 0;
   
-  // Use fee_amount_upper_end as the budget, not agreed_budget_amount
-  const budget = formData.fee_amount_upper_end || matter.fee_amount_upper_end || 0;
-  const bmFee = formData.bm_fee_component || matter.bm_fee_component || 0;
-  const localCounsel = formData.local_counsel_fee || matter.local_counsel_fee || 0;
+  // Calculate effective budget - account for billing currency conversion
+  const feeUpperEnd = formData.fee_amount_upper_end || matter.fee_amount_upper_end || 0;
+  const agreedBillingAmount = formData.agreed_billing_amount || matter.agreed_billing_amount || 0;
+  const differentBillingCurrency = formData.different_billing_currency ?? matter.different_billing_currency ?? false;
+  const quoteCurrency = formData.quote_currency || matter.quote_currency || formData.fee_currency || matter.fee_currency || 'GBP';
+  
+  // Calculate mandated exchange rate if different billing currency is enabled
+  const mandatedRate = (differentBillingCurrency && feeUpperEnd > 0 && agreedBillingAmount > 0)
+    ? agreedBillingAmount / feeUpperEnd
+    : 1;
+  
+  // Use effective values for display (in billing currency when applicable)
+  const budget = differentBillingCurrency && agreedBillingAmount > 0 
+    ? agreedBillingAmount 
+    : feeUpperEnd;
+  const bmFee = differentBillingCurrency && agreedBillingAmount > 0
+    ? (formData.bm_fee_component || matter.bm_fee_component || 0) * mandatedRate
+    : (formData.bm_fee_component || matter.bm_fee_component || 0);
+  const localCounsel = differentBillingCurrency && agreedBillingAmount > 0
+    ? (formData.local_counsel_fee || matter.local_counsel_fee || 0) * mandatedRate
+    : (formData.local_counsel_fee || matter.local_counsel_fee || 0);
+  const currency = differentBillingCurrency && agreedBillingAmount > 0
+    ? (formData.fee_currency || matter.fee_currency || 'GBP') // billing currency is the fee_currency when different_billing_currency is true
+    : (formData.fee_currency || matter.fee_currency || 'GBP');
+  
   // Total budget burn = WIP + AR (Billed) only - paid amounts are a subset of billed, not additional spend
   const totalUsed = wipAmount + billedAmount;
   const remainingBudget = budget - totalUsed;
   const budgetUsedPercent = budget > 0 ? (totalUsed / budget) * 100 : 0;
   const collectionRate = billedAmount > 0 ? (paidAmount / billedAmount) * 100 : 100;
-  const currency = formData.fee_currency || matter.fee_currency || 'GBP';
 
   const isPipeline = formData.category === 'Pipeline';
   const relevantStages = formData.category === 'Pipeline' ? pipelineStages : formData.category === 'Live' ? liveStages : allStages;

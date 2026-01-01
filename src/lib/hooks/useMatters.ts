@@ -51,6 +51,12 @@ export interface Matter {
   submitted: boolean;
   decision_date: string | null;
   pipeline_outcome: PipelineOutcome | null;
+  // Billing currency fields
+  different_billing_currency: boolean;
+  agreed_billing_amount: number;
+  quote_currency: string | null;
+  billing_currency: string | null;
+  is_multi_client: boolean;
   created_at: string;
   updated_at: string;
   clients?: {

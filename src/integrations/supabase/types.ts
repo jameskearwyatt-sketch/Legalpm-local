@@ -414,6 +414,7 @@ export type Database = {
           lead_partner: string | null
           local_counsel_billing: string | null
           local_counsel_fee: number
+          matter_managing_attorney: string | null
           matter_name: string
           matter_number: string
           matter_open: boolean
@@ -465,6 +466,7 @@ export type Database = {
           lead_partner?: string | null
           local_counsel_billing?: string | null
           local_counsel_fee?: number
+          matter_managing_attorney?: string | null
           matter_name: string
           matter_number: string
           matter_open?: boolean
@@ -516,6 +518,7 @@ export type Database = {
           lead_partner?: string | null
           local_counsel_billing?: string | null
           local_counsel_fee?: number
+          matter_managing_attorney?: string | null
           matter_name?: string
           matter_number?: string
           matter_open?: boolean

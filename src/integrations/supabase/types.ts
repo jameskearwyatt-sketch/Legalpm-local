@@ -73,6 +73,7 @@ export type Database = {
           created_at: string
           fee_amount: number
           id: string
+          lc_firm_name: string | null
           matter_id: string
           provider: string
           sort_order: number
@@ -85,6 +86,7 @@ export type Database = {
           created_at?: string
           fee_amount?: number
           id?: string
+          lc_firm_name?: string | null
           matter_id: string
           provider: string
           sort_order?: number
@@ -97,6 +99,7 @@ export type Database = {
           created_at?: string
           fee_amount?: number
           id?: string
+          lc_firm_name?: string | null
           matter_id?: string
           provider?: string
           sort_order?: number
@@ -374,6 +377,53 @@ export type Database = {
           },
           {
             foreignKeyName: "matter_clients_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      matter_local_counsels: {
+        Row: {
+          allocated_budget: number
+          billed_amount: number
+          created_at: string
+          firm_name: string
+          id: string
+          last_updated: string | null
+          matter_id: string
+          updated_at: string
+          user_id: string
+          wip_amount: number
+        }
+        Insert: {
+          allocated_budget?: number
+          billed_amount?: number
+          created_at?: string
+          firm_name: string
+          id?: string
+          last_updated?: string | null
+          matter_id: string
+          updated_at?: string
+          user_id: string
+          wip_amount?: number
+        }
+        Update: {
+          allocated_budget?: number
+          billed_amount?: number
+          created_at?: string
+          firm_name?: string
+          id?: string
+          last_updated?: string | null
+          matter_id?: string
+          updated_at?: string
+          user_id?: string
+          wip_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matter_local_counsels_matter_id_fkey"
             columns: ["matter_id"]
             isOneToOne: false
             referencedRelation: "matters"

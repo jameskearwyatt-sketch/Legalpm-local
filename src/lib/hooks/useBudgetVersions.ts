@@ -12,6 +12,7 @@ export interface BudgetLineItem {
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
   sort_order: number;
+  lc_firm_name: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -35,6 +36,7 @@ export interface DraftLineItem {
   work_item: string;
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
+  lc_firm_name?: string;
 }
 
 export interface FinalizeBudgetInput {
@@ -131,6 +133,7 @@ export function useBudgetVersions(matterId?: string) {
           provider: item.provider,
           fee_amount: item.fee_amount,
           sort_order: index,
+          lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
         }));
 
         const { error: itemsError } = await supabase

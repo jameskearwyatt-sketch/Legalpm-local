@@ -50,7 +50,7 @@ import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
-type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split';
+type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split' | 'no_cm_number';
 
 interface FlaggedMatter {
   id: string;
@@ -108,6 +108,12 @@ const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; descr
     label: 'Invalid Client Split',
     icon: <Users className="h-4 w-4" />,
     description: 'Multi-client fee percentages missing or don\'t total 100%',
+    field: null
+  },
+  no_cm_number: {
+    label: 'No CM Number',
+    icon: <FileText className="h-4 w-4" />,
+    description: 'Client matter number not set',
     field: null
   },
 };
@@ -247,6 +253,7 @@ export default function Flags() {
       if (!mattersWithAssumptions.has(matter.id)) flags.push('no_assumptions');
       if (!matter.start_date) flags.push('no_start_date');
       if (matter.is_multi_client && mattersWithInvalidSplit.has(matter.id)) flags.push('invalid_client_split');
+      if (!matter.cm_number || matter.cm_number.trim() === '') flags.push('no_cm_number');
       
       return {
         id: matter.id,
@@ -272,6 +279,7 @@ export default function Flags() {
     no_assumptions: 0,
     no_start_date: 0,
     invalid_client_split: 0,
+    no_cm_number: 0,
   };
   
   flaggedMatters.forEach(m => {
@@ -303,8 +311,8 @@ export default function Flags() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-4">
-          {(['engagement_letter', 'aml_kyc', 'matter_open', 'conflicts', 'no_budget_finalized', 'no_assumptions', 'no_start_date', 'invalid_client_split'] as FlagType[]).map((key) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          {(['engagement_letter', 'aml_kyc', 'matter_open', 'conflicts', 'no_budget_finalized', 'no_assumptions', 'no_start_date', 'invalid_client_split', 'no_cm_number'] as FlagType[]).map((key) => (
             <Card key={key} className={cn(
               "shadow-card transition-colors",
               flagCounts[key] > 0 ? "border-warning/50" : "border-success/30"

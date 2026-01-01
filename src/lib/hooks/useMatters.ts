@@ -163,14 +163,40 @@ export function useMatters() {
         const budget = matter.agreed_budget_amount || 0;
         const feeUpperEnd = matter.fee_amount_upper_end || 0;
         
+        // Check for different billing currency scenario
+        const matterAny = matter as any;
+        const differentBillingCurrency = matterAny.different_billing_currency ?? false;
+        const quoteCurrency = matterAny.quote_currency || matter.fee_currency;
+        const billingCurrency = matterAny.billing_currency || matter.fee_currency;
+        const agreedBillingAmount = matterAny.agreed_billing_amount || 0;
+        
+        // Calculate mandated exchange rate if different billing currency is enabled
+        const mandatedRate = (differentBillingCurrency && feeUpperEnd > 0 && agreedBillingAmount > 0)
+          ? agreedBillingAmount / feeUpperEnd
+          : 1;
+        
+        // Effective values for display (in billing currency when applicable)
+        const effectiveFeeUpperEnd = differentBillingCurrency && agreedBillingAmount > 0 
+          ? agreedBillingAmount 
+          : feeUpperEnd;
+        const effectiveBmFee = differentBillingCurrency && agreedBillingAmount > 0
+          ? matter.bm_fee_component * mandatedRate
+          : matter.bm_fee_component;
+        const effectiveLocalCounselFee = differentBillingCurrency && agreedBillingAmount > 0
+          ? matter.local_counsel_fee * mandatedRate
+          : matter.local_counsel_fee;
+        const effectiveCurrency = differentBillingCurrency && agreedBillingAmount > 0
+          ? billingCurrency
+          : matter.fee_currency;
+        
         const totalUsed = billedAmount + wipAmount;
         const remainingBudget = budget - totalUsed;
         const budgetUsedPercent = budget > 0 ? (totalUsed / budget) * 100 : 0;
         const collectionRate = billedAmount > 0 ? (paidAmount / billedAmount) * 100 : 0;
         
-        // Headroom calculation: Fee Amount - (AR + WIP) - paid is subset of billed
-        const headroom = feeUpperEnd - totalUsed;
-        const headroomPercent = feeUpperEnd > 0 ? (headroom / feeUpperEnd) * 100 : 0;
+        // Headroom calculation uses effective (billing currency) figures
+        const headroom = effectiveFeeUpperEnd - totalUsed;
+        const headroomPercent = effectiveFeeUpperEnd > 0 ? (headroom / effectiveFeeUpperEnd) * 100 : 0;
 
         return {
           ...matter,
@@ -186,6 +212,16 @@ export function useMatters() {
           headroom,
           headroom_percent: headroomPercent,
           total_paid_ar_wip: totalUsed, // Budget burn = WIP + Billed
+          // Add effective values for display
+          effective_fee_upper_end: effectiveFeeUpperEnd,
+          effective_bm_fee: effectiveBmFee,
+          effective_local_counsel_fee: effectiveLocalCounselFee,
+          effective_currency: effectiveCurrency,
+          mandated_rate: mandatedRate,
+          quote_currency: quoteCurrency,
+          billing_currency: billingCurrency,
+          different_billing_currency: differentBillingCurrency,
+          agreed_billing_amount: agreedBillingAmount,
         } as MatterWithFinancials;
       }) || [];
     },

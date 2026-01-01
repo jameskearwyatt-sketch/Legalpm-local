@@ -373,7 +373,9 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           <div className="grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground px-1">
             <div className="col-span-5">Work Item</div>
             <div className="col-span-3">Provider</div>
-            <div className="col-span-3 text-right">Upper End Fee ({currency})</div>
+            <div className="col-span-3 text-right">
+              Upper End Fee ({differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency})
+            </div>
             <div className="col-span-1"></div>
           </div>
 
@@ -382,56 +384,75 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : (
-            draftItems.map((item, index) => (
-              <div key={index} className="grid grid-cols-12 gap-2 items-center">
-                <div className="col-span-5">
-                  <Input
-                    value={item.work_item}
-                    onChange={(e) => updateLineItem(index, 'work_item', e.target.value)}
-                    placeholder="e.g., Due diligence review"
-                    disabled={!isEditing && hasExistingBudget}
-                  />
-                </div>
-                <div className="col-span-3">
-                  <Select
-                    value={item.provider}
-                    onValueChange={(v) => updateLineItem(index, 'provider', v)}
-                    disabled={!isEditing && hasExistingBudget}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {providerOptions.map((p) => (
-                        <SelectItem key={p} value={p}>{p}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-3">
-                  <Input
-                    type="number"
-                    value={item.fee_amount || ''}
-                    onChange={(e) => updateLineItem(index, 'fee_amount', e.target.value)}
-                    placeholder="0"
-                    className="text-right"
-                    disabled={!isEditing && hasExistingBudget}
-                  />
-                </div>
-                <div className="col-span-1 flex justify-center">
-                  {(isEditing || !hasExistingBudget) && draftItems.length > 1 && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                      onClick={() => removeLineItem(index)}
+            draftItems.map((item, index) => {
+              const displayAmount = differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                ? (item.fee_amount || 0) * mandatedRate
+                : item.fee_amount || 0;
+              const showConversion = differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && !isEditing && hasExistingBudget;
+              
+              return (
+                <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                  <div className="col-span-5">
+                    <Input
+                      value={item.work_item}
+                      onChange={(e) => updateLineItem(index, 'work_item', e.target.value)}
+                      placeholder="e.g., Due diligence review"
+                      disabled={!isEditing && hasExistingBudget}
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <Select
+                      value={item.provider}
+                      onValueChange={(v) => updateLineItem(index, 'provider', v)}
+                      disabled={!isEditing && hasExistingBudget}
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  )}
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {providerOptions.map((p) => (
+                          <SelectItem key={p} value={p}>{p}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-3">
+                    {isEditing || !hasExistingBudget ? (
+                      <Input
+                        type="number"
+                        value={item.fee_amount || ''}
+                        onChange={(e) => updateLineItem(index, 'fee_amount', e.target.value)}
+                        placeholder="0"
+                        className="text-right"
+                      />
+                    ) : (
+                      <div className="text-right">
+                        <div className="font-medium">
+                          {formatCurrency(displayAmount, differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency)}
+                        </div>
+                        {showConversion && (
+                          <div className="text-xs text-muted-foreground">
+                            (quoted: {formatCurrency(item.fee_amount || 0, quoteCurrency)})
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="col-span-1 flex justify-center">
+                    {(isEditing || !hasExistingBudget) && draftItems.length > 1 && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        onClick={() => removeLineItem(index)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
 
           {/* Add Line Item Button and Import Button */}
@@ -531,9 +552,20 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
 
         {/* Totals */}
         <div className="border-t pt-4 space-y-2">
-          <div className="flex justify-between text-sm">
+          <div className="flex justify-between items-end text-sm">
             <span className="text-muted-foreground">Baker McKenzie Total:</span>
-            <span className="font-medium">{formatCurrency(bmTotal)}</span>
+            <div className="text-right">
+              <span className="font-medium">
+                {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                  ? formatCurrency(bmTotal * mandatedRate, billingCurrency)
+                  : formatCurrency(bmTotal, quoteCurrency)}
+              </span>
+              {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  (quoted: {formatCurrency(bmTotal, quoteCurrency)})
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex justify-between items-start text-sm">
             <div className="flex flex-col gap-1">
@@ -586,15 +618,30 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 );
               })()}
             </div>
-            <span className="font-medium">{formatCurrency(localCounselTotal)}</span>
+            <div className="text-right">
+              <span className="font-medium">
+                {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                  ? formatCurrency(localCounselTotal * mandatedRate, billingCurrency)
+                  : formatCurrency(localCounselTotal, quoteCurrency)}
+              </span>
+              {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && localCounselTotal > 0 && (
+                <div className="text-xs text-muted-foreground">
+                  (quoted: {formatCurrency(localCounselTotal, quoteCurrency)})
+                </div>
+              )}
+            </div>
           </div>
           <div className="flex justify-between items-end text-base font-semibold border-t pt-2">
             <span>Overall Budget:</span>
             <div className="text-right">
-              <span className="text-primary">{formatCurrency(overallTotal, quoteCurrency)}</span>
+              <span className="text-primary">
+                {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                  ? formatCurrency(overallTotal * mandatedRate, billingCurrency)
+                  : formatCurrency(overallTotal, quoteCurrency)}
+              </span>
               {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && (
                 <div className="text-xs text-muted-foreground font-normal">
-                  ({formatCurrency(overallTotal * mandatedRate, billingCurrency)})
+                  (quoted: {formatCurrency(overallTotal, quoteCurrency)})
                 </div>
               )}
             </div>

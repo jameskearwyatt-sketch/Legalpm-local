@@ -590,14 +590,16 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
               const showConversion = differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && !isEditing && hasExistingBudget;
               const isAiSuggested = aiSuggestedIndices.has(index);
               
-              // Get original value for comparison during editing
-              const originalItem = originalItems[index];
+              // Get original value for comparison during editing - match by ID, not index
+              const originalItem = item.id 
+                ? originalItems.find(orig => orig.id === item.id) 
+                : undefined; // New items without ID have no original
               const originalFee = originalItem?.fee_amount || 0;
               const originalDisplayFee = isInBillingCurrencyMode ? originalFee * mandatedRate : originalFee;
               const newFee = item.fee_amount || 0;
               const newDisplayFee = isInBillingCurrencyMode ? newFee * mandatedRate : newFee;
               const hasChanged = isEditing && hasExistingBudget && originalItem && Math.abs(newFee - originalFee) > 0.01;
-              const isNewItem = isEditing && hasExistingBudget && !originalItem;
+              const isNewItem = isEditing && hasExistingBudget && !item.id; // New items don't have an ID
               
               // Editing mode with comparison columns
               if (isEditing && hasExistingBudget) {

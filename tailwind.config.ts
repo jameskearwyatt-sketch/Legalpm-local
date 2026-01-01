@@ -13,6 +13,9 @@ export default {
       },
     },
     extend: {
+      gridTemplateColumns: {
+        '14': 'repeat(14, minmax(0, 1fr))',
+      },
       fontFamily: {
         heading: ['Outfit', 'sans-serif'],
         body: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],

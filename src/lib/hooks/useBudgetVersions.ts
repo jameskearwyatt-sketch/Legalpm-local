@@ -13,6 +13,8 @@ export interface BudgetLineItem {
   fee_amount: number;
   sort_order: number;
   lc_firm_name: string | null;
+  is_optional: boolean;
+  is_included: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -37,6 +39,8 @@ export interface DraftLineItem {
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
   lc_firm_name?: string;
+  is_optional?: boolean;
+  is_included?: boolean;
 }
 
 export interface FinalizeBudgetInput {
@@ -91,11 +95,14 @@ export function useBudgetVersions(matterId?: string) {
   // Finalize budget (create new version)
   const finalizeBudget = useMutation({
     mutationFn: async (input: FinalizeBudgetInput) => {
-      // Calculate totals
-      const bmTotal = input.line_items
+      // Calculate totals - only include items that are not optional OR are optional and included
+      const includedItems = input.line_items.filter(item => 
+        !item.is_optional || (item.is_optional && item.is_included !== false)
+      );
+      const bmTotal = includedItems
         .filter(item => item.provider === 'Baker McKenzie')
         .reduce((sum, item) => sum + item.fee_amount, 0);
-      const localCounselTotal = input.line_items
+      const localCounselTotal = includedItems
         .filter(item => item.provider === 'Local Counsel')
         .reduce((sum, item) => sum + item.fee_amount, 0);
       const totalAmount = bmTotal + localCounselTotal;
@@ -134,6 +141,8 @@ export function useBudgetVersions(matterId?: string) {
           fee_amount: item.fee_amount,
           sort_order: index,
           lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
+          is_optional: item.is_optional ?? false,
+          is_included: item.is_included ?? true,
         }));
 
         const { error: itemsError } = await supabase
@@ -229,6 +238,143 @@ export function useBudgetVersions(matterId?: string) {
     },
   });
 
+  // Toggle is_included for an optional line item (quick toggle without full budget update)
+  const toggleLineItemIncluded = useMutation({
+    mutationFn: async ({ lineItemId, isIncluded }: { lineItemId: string; isIncluded: boolean }) => {
+      const { error } = await supabase
+        .from('budget_line_items')
+        .update({ is_included: isIncluded })
+        .eq('id', lineItemId);
+
+      if (error) throw error;
+
+      // Recalculate and update matter totals based on current line items
+      if (latestVersion) {
+        const { data: allItems, error: fetchError } = await supabase
+          .from('budget_line_items')
+          .select('*')
+          .eq('budget_version_id', latestVersion.id);
+
+        if (fetchError) throw fetchError;
+
+        // Update the item in memory for calculation
+        const updatedItems = (allItems || []).map(item => 
+          item.id === lineItemId ? { ...item, is_included: isIncluded } : item
+        );
+
+        // Calculate new totals - only include items that are not optional OR are optional and included
+        const includedItems = updatedItems.filter(item => 
+          !item.is_optional || (item.is_optional && item.is_included)
+        );
+        const bmTotal = includedItems
+          .filter(item => item.provider === 'Baker McKenzie')
+          .reduce((sum, item) => sum + Number(item.fee_amount), 0);
+        const localCounselTotal = includedItems
+          .filter(item => item.provider === 'Local Counsel')
+          .reduce((sum, item) => sum + Number(item.fee_amount), 0);
+        const totalAmount = bmTotal + localCounselTotal;
+
+        // Update budget version totals
+        await supabase
+          .from('budget_versions')
+          .update({
+            total_amount: totalAmount,
+            bm_total: bmTotal,
+            local_counsel_total: localCounselTotal,
+          })
+          .eq('id', latestVersion.id);
+
+        // Update matter totals
+        await supabase
+          .from('matters')
+          .update({
+            fee_amount_upper_end: totalAmount,
+            bm_fee_component: bmTotal,
+            local_counsel_fee: localCounselTotal,
+          })
+          .eq('id', matterId!);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budget-line-items'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-versions', matterId] });
+      queryClient.invalidateQueries({ queryKey: ['matters'] });
+      queryClient.invalidateQueries({ queryKey: ['matter', matterId] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to toggle item', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Update is_optional flag for a line item
+  const updateLineItemOptional = useMutation({
+    mutationFn: async ({ lineItemId, isOptional }: { lineItemId: string; isOptional: boolean }) => {
+      // When marking as optional, default to not included. When unmarking, set to included.
+      const { error } = await supabase
+        .from('budget_line_items')
+        .update({ 
+          is_optional: isOptional,
+          is_included: isOptional ? false : true 
+        })
+        .eq('id', lineItemId);
+
+      if (error) throw error;
+
+      // Recalculate totals after changing optional status
+      if (latestVersion) {
+        const { data: allItems, error: fetchError } = await supabase
+          .from('budget_line_items')
+          .select('*')
+          .eq('budget_version_id', latestVersion.id);
+
+        if (fetchError) throw fetchError;
+
+        // Update the item in memory for calculation
+        const updatedItems = (allItems || []).map(item => 
+          item.id === lineItemId ? { ...item, is_optional: isOptional, is_included: isOptional ? false : true } : item
+        );
+
+        const includedItems = updatedItems.filter(item => 
+          !item.is_optional || (item.is_optional && item.is_included)
+        );
+        const bmTotal = includedItems
+          .filter(item => item.provider === 'Baker McKenzie')
+          .reduce((sum, item) => sum + Number(item.fee_amount), 0);
+        const localCounselTotal = includedItems
+          .filter(item => item.provider === 'Local Counsel')
+          .reduce((sum, item) => sum + Number(item.fee_amount), 0);
+        const totalAmount = bmTotal + localCounselTotal;
+
+        await supabase
+          .from('budget_versions')
+          .update({
+            total_amount: totalAmount,
+            bm_total: bmTotal,
+            local_counsel_total: localCounselTotal,
+          })
+          .eq('id', latestVersion.id);
+
+        await supabase
+          .from('matters')
+          .update({
+            fee_amount_upper_end: totalAmount,
+            bm_fee_component: bmTotal,
+            local_counsel_fee: localCounselTotal,
+          })
+          .eq('id', matterId!);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budget-line-items'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-versions', matterId] });
+      queryClient.invalidateQueries({ queryKey: ['matters'] });
+      queryClient.invalidateQueries({ queryKey: ['matter', matterId] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to update item', description: error.message, variant: 'destructive' });
+    },
+  });
+
   return {
     versions: versionsQuery.data || [],
     latestVersion,
@@ -239,5 +385,7 @@ export function useBudgetVersions(matterId?: string) {
     finalizeBudget,
     deleteBudgetVersion,
     fetchLineItems,
+    toggleLineItemIncluded,
+    updateLineItemOptional,
   };
 }

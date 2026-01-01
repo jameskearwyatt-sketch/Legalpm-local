@@ -73,6 +73,8 @@ export type Database = {
           created_at: string
           fee_amount: number
           id: string
+          is_included: boolean
+          is_optional: boolean
           lc_firm_name: string | null
           matter_id: string
           provider: string
@@ -86,6 +88,8 @@ export type Database = {
           created_at?: string
           fee_amount?: number
           id?: string
+          is_included?: boolean
+          is_optional?: boolean
           lc_firm_name?: string | null
           matter_id: string
           provider: string
@@ -99,6 +103,8 @@ export type Database = {
           created_at?: string
           fee_amount?: number
           id?: string
+          is_included?: boolean
+          is_optional?: boolean
           lc_firm_name?: string | null
           matter_id?: string
           provider?: string

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -63,6 +64,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     finalizeBudget,
     deleteBudgetVersion,
     fetchLineItems,
+    toggleLineItemIncluded,
+    updateLineItemOptional,
   } = useBudgetVersions(matterId);
   
   const { localCounsels, syncLocalCounselsFromBudget } = useLocalCounsels(matterId);
@@ -127,6 +130,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         provider: item.provider,
         fee_amount: item.fee_amount,
         lc_firm_name: item.lc_firm_name || undefined,
+        is_optional: item.is_optional,
+        is_included: item.is_included,
       })));
     } else if (!hasExistingBudget && draftItems.length === 0) {
       // Add one empty line for new budgets
@@ -404,14 +409,26 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     setImportText('');
   };
 
-  // Calculate totals (current draft)
-  const bmTotal = draftItems
+  // Calculate totals (current draft) - only include items that are not optional OR are optional and included
+  const includedDraftItems = draftItems.filter(item => 
+    !item.is_optional || (item.is_optional && item.is_included !== false)
+  );
+  const bmTotal = includedDraftItems
     .filter(item => item.provider === 'Baker McKenzie')
     .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
-  const localCounselTotal = draftItems
+  const localCounselTotal = includedDraftItems
     .filter(item => item.provider === 'Local Counsel')
     .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
   const overallTotal = bmTotal + localCounselTotal;
+
+  // Calculate totals including ALL items (for reference)
+  const allItemsBmTotal = draftItems
+    .filter(item => item.provider === 'Baker McKenzie')
+    .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+  const allItemsLcTotal = draftItems
+    .filter(item => item.provider === 'Local Counsel')
+    .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+  const hasOptionalItems = draftItems.some(item => item.is_optional);
 
   // Calculate original totals for comparison during editing
   const originalBmTotal = originalItems
@@ -700,24 +717,28 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         <div className="space-y-3">
           {/* Header row - different layout when editing vs viewing */}
           {isEditing && hasExistingBudget ? (
-            <div className="grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground px-1">
+            <div className="grid grid-cols-14 gap-2 text-sm font-medium text-muted-foreground px-1">
               <div className="col-span-4">Work Item</div>
               <div className="col-span-2">Provider</div>
               <div className="col-span-2 text-right">
                 Current
               </div>
-              <div className="col-span-3 text-right">
+              <div className="col-span-2 text-right">
                 New ({differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency})
               </div>
+              <div className="col-span-1 text-center text-xs">Opt.</div>
+              <div className="col-span-2 text-center text-xs">Include</div>
               <div className="col-span-1"></div>
             </div>
           ) : (
-            <div className="grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground px-1">
-              <div className="col-span-5">Work Item</div>
+            <div className="grid grid-cols-14 gap-2 text-sm font-medium text-muted-foreground px-1">
+              <div className="col-span-4">Work Item</div>
               <div className="col-span-3">Provider</div>
-              <div className="col-span-3 text-right">
+              <div className="col-span-2 text-right">
                 Upper End Fee ({differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency})
               </div>
+              <div className="col-span-1 text-center text-xs">Opt.</div>
+              <div className="col-span-2 text-center text-xs">Include</div>
               <div className="col-span-1"></div>
             </div>
           )}
@@ -761,9 +782,10 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                   <div key={index} className="space-y-1">
                     <div 
                       className={cn(
-                        "grid grid-cols-12 gap-2 items-center rounded-md transition-colors py-1",
+                        "grid grid-cols-14 gap-2 items-center rounded-md transition-colors py-1",
                         isAiSuggested && "bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700 px-1 -mx-1",
-                        isNewItem && !isAiSuggested && "bg-green-50 dark:bg-green-950/30 ring-1 ring-green-300 dark:ring-green-700 px-1 -mx-1"
+                        isNewItem && !isAiSuggested && "bg-green-50 dark:bg-green-950/30 ring-1 ring-green-300 dark:ring-green-700 px-1 -mx-1",
+                        item.is_optional && !item.is_included && "opacity-50"
                       )}
                     >
                       <div className="col-span-4">
@@ -807,7 +829,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                         )}
                       </div>
                       {/* New value - editable */}
-                      <div className="col-span-3">
+                      <div className="col-span-2">
                         <Input
                           type="number"
                           value={isInBillingCurrencyMode 
@@ -821,6 +843,34 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                             hasChanged && !isAiSuggested && "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/30 font-medium",
                             isNewItem && !isAiSuggested && "border-green-400 dark:border-green-600"
                           )}
+                        />
+                      </div>
+                      {/* Optional checkbox */}
+                      <div className="col-span-1 flex justify-center">
+                        <Checkbox
+                          checked={item.is_optional ?? false}
+                          onCheckedChange={(checked) => {
+                            const updated = [...draftItems];
+                            updated[index] = { 
+                              ...updated[index], 
+                              is_optional: checked === true,
+                              is_included: checked === true ? false : true 
+                            };
+                            setDraftItems(updated);
+                          }}
+                        />
+                      </div>
+                      {/* Include toggle - only enabled when item is optional */}
+                      <div className="col-span-2 flex justify-center">
+                        <Switch
+                          checked={item.is_included ?? true}
+                          onCheckedChange={(checked) => {
+                            const updated = [...draftItems];
+                            updated[index] = { ...updated[index], is_included: checked };
+                            setDraftItems(updated);
+                          }}
+                          disabled={!item.is_optional}
+                          className={cn(!item.is_optional && "opacity-30")}
                         />
                       </div>
                       <div className="col-span-1 flex justify-center">
@@ -869,11 +919,12 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 <div key={index} className="space-y-1">
                   <div 
                     className={cn(
-                      "grid grid-cols-12 gap-2 items-center rounded-md transition-colors",
-                      isAiSuggested && isEditing && "bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700 p-1 -mx-1"
+                      "grid grid-cols-14 gap-2 items-center rounded-md transition-colors",
+                      isAiSuggested && isEditing && "bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700 p-1 -mx-1",
+                      item.is_optional && !item.is_included && hasExistingBudget && "opacity-50"
                     )}
                   >
-                    <div className="col-span-5">
+                    <div className="col-span-4">
                       <Input
                         value={item.work_item}
                         onChange={(e) => handleItemEdit(index, 'work_item', e.target.value)}
@@ -902,7 +953,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                         </SelectContent>
                       </Select>
                     </div>
-                    <div className="col-span-3">
+                    <div className="col-span-2">
                       {!hasExistingBudget ? (
                         <Input
                           type="number"
@@ -925,6 +976,65 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                           )}
                         </div>
                       )}
+                    </div>
+                    {/* Optional checkbox */}
+                    <div className="col-span-1 flex justify-center">
+                      {hasExistingBudget && item.id ? (
+                        <Checkbox
+                          checked={item.is_optional ?? false}
+                          onCheckedChange={(checked) => {
+                            if (item.id) {
+                              updateLineItemOptional.mutate({ 
+                                lineItemId: item.id, 
+                                isOptional: checked === true 
+                              });
+                            }
+                          }}
+                          disabled={updateLineItemOptional.isPending}
+                        />
+                      ) : !hasExistingBudget ? (
+                        <Checkbox
+                          checked={item.is_optional ?? false}
+                          onCheckedChange={(checked) => {
+                            const updated = [...draftItems];
+                            updated[index] = { 
+                              ...updated[index], 
+                              is_optional: checked === true,
+                              is_included: checked === true ? false : true 
+                            };
+                            setDraftItems(updated);
+                          }}
+                        />
+                      ) : null}
+                    </div>
+                    {/* Include toggle - enabled when item is optional */}
+                    <div className="col-span-2 flex justify-center">
+                      {hasExistingBudget && item.id ? (
+                        <Switch
+                          checked={item.is_included ?? true}
+                          onCheckedChange={(checked) => {
+                            if (item.id) {
+                              toggleLineItemIncluded.mutate({ 
+                                lineItemId: item.id, 
+                                isIncluded: checked 
+                              });
+                            }
+                          }}
+                          disabled={!item.is_optional || toggleLineItemIncluded.isPending}
+                          className={cn(!item.is_optional && "opacity-30")}
+                        />
+                      ) : !hasExistingBudget ? (
+                        <Switch
+                          checked={item.is_included ?? true}
+                          onCheckedChange={(checked) => {
+                            const updated = [...draftItems];
+                            updated[index] = { ...updated[index], is_included: checked };
+                            setDraftItems(updated);
+                          }}
+                          disabled={!item.is_optional}
+                          className={cn(!item.is_optional && "opacity-30")}
+                        />
+                      ) : null}
                     </div>
                     <div className="col-span-1 flex justify-center">
                       {!hasExistingBudget && draftItems.length > 1 && (

@@ -98,8 +98,13 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const hasExistingBudget = versions.length > 0;
 
   // Initialize draft items from latest version when available
+  // Only sync when NOT editing to preserve user edits
   useEffect(() => {
-    if (latestLineItems.length > 0 && !isEditing) {
+    if (isEditing) {
+      // Don't overwrite draft items while editing
+      return;
+    }
+    if (latestLineItems.length > 0) {
       setDraftItems(latestLineItems.map(item => ({
         id: item.id,
         work_item: item.work_item,
@@ -110,7 +115,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       // Add one empty line for new budgets
       setDraftItems([{ work_item: '', provider: 'Baker McKenzie', fee_amount: 0 }]);
     }
-  }, [latestLineItems, hasExistingBudget]);
+  }, [latestLineItems, hasExistingBudget, isEditing]);
 
   // Currency conversion helpers
   const differentBillingCurrency = (matter as any)?.different_billing_currency ?? false;

@@ -10,6 +10,12 @@ export interface TrendDataPoint {
   paid: number;
 }
 
+export interface LiveMatter {
+  id: string;
+  matterName: string;
+  clientName: string;
+}
+
 export interface DashboardStats {
   totalBudget: number;
   totalWip: number;
@@ -20,6 +26,7 @@ export interface DashboardStats {
   alerts: Alert[];
   pipelineAlerts: PipelineAlert[];
   trendData: TrendDataPoint[];
+  liveMatters: LiveMatter[];
 }
 
 export interface Alert {
@@ -45,11 +52,11 @@ export interface PipelineAlert {
   message: string;
 }
 
-export function useDashboard() {
+export function useDashboard(excludedMatterIds: string[] = []) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['dashboard', user?.id],
+    queryKey: ['dashboard', user?.id, excludedMatterIds.sort().join(',')],
     queryFn: async () => {
       // Get all Live matters with their clients
       const { data: liveMatters, error: mattersError } = await supabase
@@ -75,6 +82,13 @@ export function useDashboard() {
 
       const matterIds = liveMatters?.map(m => m.id) || [];
       
+      // Build live matters list for the UI (always includes all matters)
+      const liveMattersForUI: LiveMatter[] = (liveMatters || []).map(matter => ({
+        id: matter.id,
+        matterName: matter.matter_name,
+        clientName: matter.clients?.name || 'Unknown Client',
+      }));
+
       if (matterIds.length === 0 && (!pipelineMatters || pipelineMatters.length === 0)) {
         return {
           totalBudget: 0,
@@ -86,8 +100,12 @@ export function useDashboard() {
           alerts: [],
           pipelineAlerts: [],
           trendData: [],
+          liveMatters: liveMattersForUI,
         } as DashboardStats;
       }
+
+      // Create set of excluded matter IDs for quick lookup
+      const excludedSet = new Set(excludedMatterIds);
 
       // Get latest snapshots for each matter
       const { data: snapshots } = matterIds.length > 0 ? await supabase
@@ -114,6 +132,8 @@ export function useDashboard() {
 
       liveMatters?.forEach(matter => {
         const snapshot = snapshotMap.get(matter.id);
+        const isExcluded = excludedSet.has(matter.id);
+        
         // Use bm_fee_component as the BM fee and convert to USD using exchange_rate
         const bmFee = Number(matter.bm_fee_component) || 0;
         const exchangeRate = Number(matter.exchange_rate) || 1;
@@ -134,11 +154,14 @@ export function useDashboard() {
           effectiveBmFee = agreedBillingAmount * bmProportion;
         }
 
-        // Convert to USD using exchange rate
-        totalBmFeesUsd += effectiveBmFee * exchangeRate;
-        totalWipUsd += wipAmount * exchangeRate;
-        totalBilledUsd += billedAmount * exchangeRate;
-        totalPaidUsd += paidAmount * exchangeRate;
+        // Only include in financial totals if not excluded
+        if (!isExcluded) {
+          // Convert to USD using exchange rate
+          totalBmFeesUsd += effectiveBmFee * exchangeRate;
+          totalWipUsd += wipAmount * exchangeRate;
+          totalBilledUsd += billedAmount * exchangeRate;
+          totalPaidUsd += paidAmount * exchangeRate;
+        }
 
         const totalUsed = billedAmount + wipAmount;
         const budgetUsedPercent = budget > 0 ? (totalUsed / budget) * 100 : 0;
@@ -328,9 +351,12 @@ export function useDashboard() {
         matterExchangeRates.set(matter.id, Number(matter.exchange_rate) || 1);
       });
 
-      // Group all snapshots by date and aggregate
+      // Group all snapshots by date and aggregate (excluding excluded matters)
       const trendByDate = new Map<string, { wip: number; billed: number; paid: number }>();
       snapshots?.forEach(snap => {
+        // Skip excluded matters for trend data
+        if (excludedSet.has(snap.matter_id)) return;
+        
         const dateKey = snap.as_of_date;
         const exchangeRate = matterExchangeRates.get(snap.matter_id) || 1;
         
@@ -384,6 +410,7 @@ export function useDashboard() {
           return 0;
         }),
         trendData: sortedTrendData,
+        liveMatters: liveMattersForUI,
       } as DashboardStats;
     },
     enabled: !!user,

@@ -1,9 +1,11 @@
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/ui/stat-card';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useDashboard } from '@/lib/hooks/useDashboard';
 import { 
   DollarSign, 
@@ -16,12 +18,29 @@ import {
   CheckCircle,
   Loader2,
   Rocket,
-  CalendarClock
+  CalendarClock,
+  ListChecks
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 export default function Dashboard() {
-  const { data: stats, isLoading } = useDashboard();
+  const [excludedMatterIds, setExcludedMatterIds] = useState<string[]>([]);
+  const { data: stats, isLoading } = useDashboard(excludedMatterIds);
+
+  const includedMatterIds = useMemo(() => {
+    if (!stats?.liveMatters) return new Set<string>();
+    const allIds = new Set(stats.liveMatters.map(m => m.id));
+    excludedMatterIds.forEach(id => allIds.delete(id));
+    return allIds;
+  }, [stats?.liveMatters, excludedMatterIds]);
+
+  const handleMatterToggle = (matterId: string, checked: boolean) => {
+    setExcludedMatterIds(prev => 
+      checked 
+        ? prev.filter(id => id !== matterId)
+        : [...prev, matterId]
+    );
+  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -178,6 +197,47 @@ export default function Dashboard() {
                 <p className="text-sm font-medium text-muted-foreground">No financial data yet</p>
                 <p className="text-xs text-muted-foreground mt-1">Add snapshots to your matters to see trends</p>
               </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Live Matters Filter Section */}
+        <Card className="shadow-card">
+          <CardHeader className="flex flex-row items-center justify-between py-3">
+            <CardTitle className="font-heading text-lg flex items-center gap-2">
+              <ListChecks className="h-5 w-5 text-primary" />
+              Live Matters
+            </CardTitle>
+            <span className="text-sm text-muted-foreground">
+              {includedMatterIds.size} of {stats?.liveMatters?.length || 0} included in financials
+            </span>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {stats?.liveMatters && stats.liveMatters.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-2 max-h-48 overflow-y-auto">
+                {stats.liveMatters.map((matter) => {
+                  const isIncluded = !excludedMatterIds.includes(matter.id);
+                  return (
+                    <label
+                      key={matter.id}
+                      className="flex items-center gap-2 py-1 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1"
+                    >
+                      <Checkbox
+                        checked={isIncluded}
+                        onCheckedChange={(checked) => handleMatterToggle(matter.id, !!checked)}
+                        className="h-3.5 w-3.5"
+                      />
+                      <span className={`text-xs truncate ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
+                        <span className="font-medium">{matter.clientName}</span>
+                        <span className="text-muted-foreground"> – </span>
+                        <span>{matter.matterName}</span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">No live matters</p>
             )}
           </CardContent>
         </Card>

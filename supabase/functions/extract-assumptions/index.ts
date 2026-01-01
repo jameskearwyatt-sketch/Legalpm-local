@@ -5,24 +5,177 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Standard assumption labels for consistent categorization across all matters
+// Refined assumption categories with clear, non-overlapping definitions
 const ASSUMPTION_LABELS = [
-  "Document Revisions",
-  "Transaction Scope", 
-  "Negotiation Style",
-  "Timeline",
-  "Counterparty Cooperation",
-  "Jurisdiction",
-  "Due Diligence",
-  "Third Party Involvement",
-  "Regulatory Approvals",
-  "Complexity Level",
-  "Language",
-  "Disputes",
-  "Financing Conditions",
-  "Staffing",
+  "Document Drafting",
+  "Document Negotiation", 
+  "Transaction Structure",
+  "Transaction Timeline",
+  "Due Diligence Scope",
+  "Counterparty Conduct",
+  "Third Party Approvals",
+  "Regulatory & Compliance",
+  "Jurisdiction & Governing Law",
+  "Financing Arrangements",
+  "Disputes & Litigation",
+  "Staffing & Resourcing",
+  "Client Responsibilities",
+  "Excluded Work",
   "Other"
 ];
+
+// Detailed category definitions for AI guidance
+const CATEGORY_DEFINITIONS = {
+  "Document Drafting": {
+    description: "Assumptions about document creation, revision rounds, and drafting complexity",
+    examples: [
+      "Maximum number of document drafts or revisions",
+      "Use of standard/template documents vs bespoke drafting",
+      "Single language documentation",
+      "Reasonable length/complexity of agreements"
+    ],
+    keywords: ["draft", "revision", "mark-up", "turn", "iteration", "template", "standard form", "bespoke"]
+  },
+  "Document Negotiation": {
+    description: "Assumptions about the negotiation process and style between parties",
+    examples: [
+      "Negotiations conducted in cooperative manner",
+      "Commercial points already agreed",
+      "No fundamental renegotiation of terms",
+      "Single counterparty (not multiple)"
+    ],
+    keywords: ["negotiate", "cooperative", "commercial terms", "agreed", "conventional", "adversarial"]
+  },
+  "Transaction Structure": {
+    description: "Assumptions about the nature, scope and structure of the deal itself",
+    examples: [
+      "Single jurisdiction transaction",
+      "Standard deal structure with no unusual features",
+      "No post-completion price adjustment mechanisms",
+      "No earn-out or deferred consideration"
+    ],
+    keywords: ["structure", "scope", "transaction", "deal", "arrangement", "mechanism", "straightforward"]
+  },
+  "Transaction Timeline": {
+    description: "Assumptions about timing, deadlines, and duration of the matter",
+    examples: [
+      "Completion within X months",
+      "No requirement for urgent/expedited work",
+      "Normal business hours working",
+      "No extended pauses or delays"
+    ],
+    keywords: ["timeline", "completion", "deadline", "duration", "expedited", "urgent", "months", "weeks"]
+  },
+  "Due Diligence Scope": {
+    description: "Assumptions about investigation, review and verification work",
+    examples: [
+      "Limited/proportionate due diligence",
+      "No title investigation required",
+      "Reliance on vendor due diligence",
+      "Data room review only (no site visits)"
+    ],
+    keywords: ["due diligence", "review", "investigation", "verification", "data room", "disclosure"]
+  },
+  "Counterparty Conduct": {
+    description: "Assumptions about how the other party/parties will behave and respond",
+    examples: [
+      "Counterparty responds promptly to queries",
+      "Experienced counterparty counsel",
+      "No unreasonable delays from other side",
+      "Counterparty has authority to proceed"
+    ],
+    keywords: ["counterparty", "other side", "seller", "buyer", "respond", "cooperat", "delay"]
+  },
+  "Third Party Approvals": {
+    description: "Assumptions about consents, approvals and involvement of third parties (non-regulatory)",
+    examples: [
+      "No landlord consents required",
+      "No third party financing conditions",
+      "Lender cooperation assumed",
+      "No minority shareholder issues"
+    ],
+    keywords: ["third party", "consent", "approval", "lender", "bank", "landlord", "shareholder"]
+  },
+  "Regulatory & Compliance": {
+    description: "Assumptions about regulatory approvals, filings, and compliance matters",
+    examples: [
+      "No competition/antitrust filings required",
+      "No FDI/national security review",
+      "Standard regulatory approval timeline",
+      "No sanctions or export control issues"
+    ],
+    keywords: ["regulatory", "compliance", "filing", "approval", "competition", "antitrust", "FDI", "sanction"]
+  },
+  "Jurisdiction & Governing Law": {
+    description: "Assumptions about applicable law, jurisdiction, and geographic scope",
+    examples: [
+      "English law governed documents",
+      "Single jurisdiction matters only",
+      "No cross-border elements requiring local advice",
+      "No novel legal issues"
+    ],
+    keywords: ["jurisdiction", "governing law", "English law", "cross-border", "local counsel", "foreign"]
+  },
+  "Financing Arrangements": {
+    description: "Assumptions about financing, funding, and payment structures",
+    examples: [
+      "Transaction funded from existing facilities",
+      "No complex financing structures",
+      "No intercreditor issues",
+      "No equity fundraising required"
+    ],
+    keywords: ["financing", "funding", "loan", "facility", "equity", "debt", "intercreditor"]
+  },
+  "Disputes & Litigation": {
+    description: "Assumptions about absence of disputes, claims, or contentious matters",
+    examples: [
+      "No disputes arise during the transaction",
+      "No threatened or actual litigation",
+      "No warranty claims anticipated",
+      "No employment disputes"
+    ],
+    keywords: ["dispute", "litigation", "claim", "contentious", "warranty", "indemnity"]
+  },
+  "Staffing & Resourcing": {
+    description: "Assumptions about team composition, availability, and working patterns",
+    examples: [
+      "Appropriate fee-earner mix available",
+      "No requirement for partner attendance at all meetings",
+      "Normal working hours (no weekend work)",
+      "Existing team familiarity with client"
+    ],
+    keywords: ["staff", "team", "partner", "associate", "resource", "availability", "hours"]
+  },
+  "Client Responsibilities": {
+    description: "Assumptions about what the client will provide, do, or be responsible for",
+    examples: [
+      "Client provides complete and accurate information",
+      "Client responds promptly to requests",
+      "Client coordinates other advisors",
+      "Client has appropriate internal authority"
+    ],
+    keywords: ["client", "you", "provide", "instruction", "internal", "board", "management"]
+  },
+  "Excluded Work": {
+    description: "Work explicitly not covered by the fee estimate",
+    examples: [
+      "Tax advice excluded",
+      "IP due diligence not included",
+      "Environmental surveys not covered",
+      "Post-completion matters separate"
+    ],
+    keywords: ["exclude", "not include", "not cover", "separate", "additional", "outside scope"]
+  },
+  "Other": {
+    description: "Assumptions that don't fit neatly into other categories",
+    examples: [
+      "Market conditions remain stable",
+      "No material adverse changes",
+      "Force majeure events do not occur"
+    ],
+    keywords: []
+  }
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -46,49 +199,48 @@ serve(async (req) => {
 
     console.log("Extracting assumptions from engagement letter, text length:", text.length);
 
-    const systemPrompt = `You are an expert legal analyst specializing in law firm engagement letters and fee arrangements. Your task is to identify and extract the ASSUMPTIONS that underpin the fee estimate or fee cap in an engagement letter.
+    // Build detailed category guidance for the AI
+    const categoryGuidance = Object.entries(CATEGORY_DEFINITIONS)
+      .map(([label, def]) => {
+        const examples = def.examples.map(e => `  - "${e}"`).join('\n');
+        return `**${label}**: ${def.description}\nExamples:\n${examples}`;
+      })
+      .join('\n\n');
 
-WHAT ARE ASSUMPTIONS?
-Assumptions are the shared understandings that explain what a fee estimate is based on. They describe the expected shape, pace, and complexity of the work at the point the estimate is given. For example:
-- Document revision limits (e.g., "assumes 3 rounds of mark-ups")
-- Transaction proceeding as commercially agreed
-- Negotiations conducted in a conventional, cooperative manner
-- Deal completing within a reasonable timeframe
-- Limited due diligence scope
-- No unexpected regulatory issues
+    const systemPrompt = `You are an expert legal analyst specializing in law firm engagement letters and fee arrangements. Your task is to extract ASSUMPTIONS that underpin fee estimates with PRECISE categorization.
 
-IMPORTANT INSTRUCTIONS:
-1. Carefully read the engagement letter and identify ALL stated or implied assumptions
-2. For each assumption, assign ONE label from this exact list: ${ASSUMPTION_LABELS.join(", ")}
-3. Extract the actual text or paraphrase the assumption clearly
-4. Be thorough - capture every assumption that could affect the fee estimate
-5. If an assumption doesn't fit other categories, use "Other"
+## WHAT ARE ASSUMPTIONS?
+Assumptions are the conditions, expectations, and limitations that define the basis of a fee estimate. They explain what the fee covers and what circumstances would cause the fee to change. Good assumptions are:
+- SPECIFIC: "Maximum 3 rounds of mark-ups" not "reasonable revisions"
+- ACTIONABLE: Clear enough to reference if the assumption breaks down
+- COMPLETE: Captures the full scope limitation
 
-LABEL DEFINITIONS:
-- Document Revisions: Limits on drafting rounds, mark-up iterations
-- Transaction Scope: What's included/excluded from the work
-- Negotiation Style: Expected behavior of parties (cooperative, conventional)
-- Timeline: Expected duration, milestones, closing dates
-- Counterparty Cooperation: Assumptions about other parties' responsiveness
-- Jurisdiction: Geographic or legal jurisdiction scope
-- Due Diligence: Scope and depth of review/investigation work
-- Third Party Involvement: Assumptions about advisors, banks, regulators
-- Regulatory Approvals: Expected regulatory processes
-- Complexity Level: Assumed transaction complexity
-- Language: Document language assumptions
-- Disputes: Assumptions about no disputes arising
-- Financing Conditions: Assumptions about financing arrangements
-- Staffing: Team composition or availability assumptions
-- Other: Anything that doesn't fit above categories`;
+## CATEGORIZATION RULES
+You MUST categorize each assumption into EXACTLY ONE category. Choose the category that best matches the PRIMARY nature of the assumption:
 
-    const userPrompt = `Extract all fee-related assumptions from the following engagement letter text. Be thorough and capture every assumption that could affect the fee estimate.
+${categoryGuidance}
 
-Engagement Letter Text:
+## CRITICAL INSTRUCTIONS
+1. READ CAREFULLY: Many assumptions are embedded in fee paragraphs, scope sections, or caveats
+2. BE PRECISE: Extract the actual language or paraphrase clearly
+3. AVOID OVERLAP: Each assumption belongs to ONE category - pick the most specific match
+4. AVOID DUPLICATES: Don't extract the same assumption twice with different wording
+5. NORMALIZE TEXT: Clean up the assumption text to be clear, standalone statements
+6. IDENTIFY PATTERNS: Common assumptions often appear as "we assume...", "this assumes...", "on the basis that...", "subject to...", "excludes...", "does not cover..."
+7. CHECK EXCLUSIONS: Work described as "excluded" or "not covered" goes in "Excluded Work"
+8. FLAG REUSABILITY: Mark assumptions that are STANDARD (commonly used across similar deals) vs BESPOKE (specific to this transaction)`;
+
+    const userPrompt = `Extract ALL fee-related assumptions from this engagement letter. Be thorough - look in fee sections, scope sections, caveats, and general terms.
+
+For each assumption:
+1. Categorize it precisely using the category definitions provided
+2. Extract or clearly paraphrase the assumption text
+3. Indicate if it's a STANDARD assumption (commonly reusable) or BESPOKE (specific to this deal)
+
+Engagement Letter:
 ---
 ${text}
----
-
-Extract and categorize all assumptions.`;
+---`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -107,7 +259,7 @@ Extract and categorize all assumptions.`;
             type: "function",
             function: {
               name: "extract_assumptions",
-              description: "Extract and categorize assumptions from engagement letter",
+              description: "Extract and categorize assumptions from engagement letter with reusability flag",
               parameters: {
                 type: "object",
                 properties: {
@@ -119,14 +271,18 @@ Extract and categorize all assumptions.`;
                         label: { 
                           type: "string", 
                           enum: ASSUMPTION_LABELS,
-                          description: "Category label for the assumption" 
+                          description: "The single best-fit category for this assumption" 
                         },
                         assumption_text: { 
                           type: "string", 
-                          description: "The actual assumption text or clear paraphrase" 
+                          description: "Clear, standalone statement of the assumption (normalized text, not raw quotes with ellipses)" 
+                        },
+                        is_standard: {
+                          type: "boolean",
+                          description: "True if this is a commonly reusable standard assumption, false if bespoke to this specific deal"
                         }
                       },
-                      required: ["label", "assumption_text"],
+                      required: ["label", "assumption_text", "is_standard"],
                       additionalProperties: false
                     }
                   }
@@ -173,9 +329,21 @@ Extract and categorize all assumptions.`;
     const result = JSON.parse(toolCall.function.arguments);
     console.log("Extracted assumptions:", result.assumptions?.length || 0);
 
+    // Deduplicate assumptions by normalized text
+    const seen = new Set<string>();
+    const dedupedAssumptions = (result.assumptions || []).filter((a: { assumption_text: string }) => {
+      const normalized = a.assumption_text.toLowerCase().trim();
+      if (seen.has(normalized)) return false;
+      seen.add(normalized);
+      return true;
+    });
+
+    console.log("After deduplication:", dedupedAssumptions.length);
+
     return new Response(JSON.stringify({ 
-      assumptions: result.assumptions || [],
-      labels: ASSUMPTION_LABELS 
+      assumptions: dedupedAssumptions,
+      labels: ASSUMPTION_LABELS,
+      category_definitions: CATEGORY_DEFINITIONS
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

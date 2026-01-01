@@ -153,10 +153,18 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     setDraftItems(draftItems.filter((_, i) => i !== index));
   };
 
+  // Check if we're in billing currency mode for editing
+  const isInBillingCurrencyMode = differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0;
+
   const updateLineItem = (index: number, field: keyof DraftLineItem, value: string | number) => {
     const updated = [...draftItems];
     if (field === 'fee_amount') {
-      updated[index][field] = typeof value === 'string' ? parseFloat(value) || 0 : value;
+      let parsedValue = typeof value === 'string' ? parseFloat(value) || 0 : value;
+      // If in billing currency mode, convert back to quote currency for storage
+      if (isInBillingCurrencyMode && mandatedRate > 0) {
+        parsedValue = parsedValue / mandatedRate;
+      }
+      updated[index][field] = parsedValue;
     } else if (field === 'provider') {
       updated[index][field] = value as 'Baker McKenzie' | 'Local Counsel';
     } else {
@@ -420,7 +428,9 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                     {isEditing || !hasExistingBudget ? (
                       <Input
                         type="number"
-                        value={item.fee_amount || ''}
+                        value={isInBillingCurrencyMode 
+                          ? (Math.round((item.fee_amount || 0) * mandatedRate) || '') 
+                          : (item.fee_amount || '')}
                         onChange={(e) => updateLineItem(index, 'fee_amount', e.target.value)}
                         placeholder="0"
                         className="text-right"

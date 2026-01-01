@@ -289,10 +289,10 @@ export function MultiClientSection({
                     type="number"
                     min="0"
                     max="100"
-                    step="0.1"
+                    step="0.01"
                     value={allocation.fee_percentage || ''}
                     onChange={(e) => updateAllocation(index, 'fee_percentage', parseFloat(e.target.value) || 0)}
-                    placeholder="e.g., 50"
+                    placeholder="e.g., 33.33"
                     className="h-9"
                   />
                 </div>

@@ -375,59 +375,59 @@ export default function Matters() {
                   <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="min-w-[180px] sticky left-0 z-20 bg-background">
+                      <TableHead className="min-w-[140px] sticky left-0 z-20 bg-background">
                         <SortableHeader field="matter_name">Client / Matter</SortableHeader>
                       </TableHead>
                       {!isPipelineOrLost && (
-                        <TableHead className="w-20">Status</TableHead>
+                        <TableHead className="w-16">Status</TableHead>
                       )}
-                      <TableHead className="text-right min-w-[120px]">
+                      <TableHead className="text-right min-w-[90px]">
                         <SortableHeader field="fee_amount">Budget</SortableHeader>
                       </TableHead>
                       {isPipelineOrLost && (
-                        <TableHead className="text-right min-w-[100px]">USD</TableHead>
+                        <TableHead className="text-right min-w-[80px]">USD</TableHead>
                       )}
                       {isLive && (
                         <>
-                          <TableHead className="text-right min-w-[100px]">
+                          <TableHead className="text-right min-w-[85px]">
                             <SortableHeader field="bm_fee">BM Budget</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right min-w-[110px]">
-                            <SortableHeader field="local_counsel">Local Budget</SortableHeader>
+                          <TableHead className="text-right min-w-[85px]">
+                            <SortableHeader field="local_counsel">Local</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right min-w-[130px]">
+                          <TableHead className="text-right min-w-[110px]">
                             Financials
                           </TableHead>
-                          <TableHead className="text-right min-w-[110px]">
-                            <SortableHeader field="budget_burn">Budget Burn</SortableHeader>
+                          <TableHead className="text-right min-w-[80px]">
+                            <SortableHeader field="budget_burn">Burn</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right min-w-[100px]">
+                          <TableHead className="text-right min-w-[80px]">
                             <SortableHeader field="headroom">Headroom</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right min-w-[60px]">
+                          <TableHead className="text-right min-w-[45px]">
                             <SortableHeader field="headroom_pct">%</SortableHeader>
                           </TableHead>
                         </>
                       )}
                       {isPipelineOrLost && (
-                        <TableHead>Source</TableHead>
+                        <TableHead className="min-w-[70px]">Source</TableHead>
                       )}
                       {isPipeline && (
                         <>
-                          <TableHead>Clarifications</TableHead>
-                          <TableHead>Submission</TableHead>
-                          <TableHead>Decision</TableHead>
-                          <TableHead>Submitted</TableHead>
-                          <TableHead>Outcome</TableHead>
+                          <TableHead className="min-w-[75px]">Clarif.</TableHead>
+                          <TableHead className="min-w-[75px]">Submit</TableHead>
+                          <TableHead className="min-w-[70px]">Decision</TableHead>
+                          <TableHead className="min-w-[60px]">Sent</TableHead>
+                          <TableHead className="min-w-[65px]">Outcome</TableHead>
                         </>
                       )}
                       {!isLost && (
-                        <TableHead className="min-w-[120px]">
+                        <TableHead className="min-w-[90px]">
                           <SortableHeader field="stage">Stage</SortableHeader>
                         </TableHead>
                       )}
-                      <TableHead className="min-w-[100px]">Practice</TableHead>
-                      <TableHead className="w-16 min-w-[64px]">Actions</TableHead>
+                      <TableHead className="min-w-[70px]">Practice</TableHead>
+                      <TableHead className="w-12 min-w-[48px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

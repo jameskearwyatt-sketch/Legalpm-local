@@ -18,6 +18,7 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
   });
   const [theadClone, setTheadClone] = useState<HTMLElement | null>(null);
   const [scrollableEl, setScrollableEl] = useState<HTMLElement | null>(null);
+  const [columnWidths, setColumnWidths] = useState<number[]>([]);
 
   useEffect(() => {
     setMounted(true);
@@ -68,6 +69,18 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
     };
   }, [mounted]);
 
+  // Capture column widths from the original table
+  const captureColumnWidths = useCallback(() => {
+    if (!theadClone) return;
+    
+    const headerCells = theadClone.querySelectorAll('th');
+    const widths: number[] = [];
+    headerCells.forEach((cell) => {
+      widths.push(cell.getBoundingClientRect().width);
+    });
+    setColumnWidths(widths);
+  }, [theadClone]);
+
   const updateStickyState = useCallback(() => {
     const container = containerRef.current;
     const thead = theadClone;
@@ -81,24 +94,34 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
     const topOffset = window.innerWidth < 1024 ? 64 : 0;
     const shouldShow = theadRect.top < topOffset && containerRect.bottom > topOffset + 60;
 
+    // Capture column widths when we're about to show or while showing
+    if (shouldShow) {
+      captureColumnWidths();
+    }
+
     setStickyInfo({
       show: shouldShow,
       left: containerRect.left,
       width: containerRect.width,
       scrollLeft: scrollableEl?.scrollLeft || 0,
     });
-  }, [theadClone, scrollableEl]);
+  }, [theadClone, scrollableEl, captureColumnWidths]);
 
   useEffect(() => {
     if (!mounted || !theadClone) return;
 
+    // Initial capture of column widths
+    captureColumnWidths();
     updateStickyState();
 
     window.addEventListener('scroll', updateStickyState, true);
     window.addEventListener('resize', updateStickyState);
     scrollableEl?.addEventListener('scroll', updateStickyState);
 
-    const resizeObserver = new ResizeObserver(updateStickyState);
+    const resizeObserver = new ResizeObserver(() => {
+      captureColumnWidths();
+      updateStickyState();
+    });
     if (containerRef.current) resizeObserver.observe(containerRef.current);
 
     return () => {
@@ -107,7 +130,7 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
       scrollableEl?.removeEventListener('scroll', updateStickyState);
       resizeObserver.disconnect();
     };
-  }, [updateStickyState, mounted, theadClone, scrollableEl]);
+  }, [updateStickyState, captureColumnWidths, mounted, theadClone, scrollableEl]);
 
   // Sync horizontal scroll when sticky header is shown
   const handleStickyScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -118,12 +141,31 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
 
   const topOffset = typeof window !== 'undefined' && window.innerWidth < 1024 ? 64 : 0;
 
+  // Generate inline styles for column widths
+  const getStyledTheadHtml = () => {
+    if (!theadClone || columnWidths.length === 0) return '';
+    
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = theadClone.innerHTML;
+    
+    const cells = tempDiv.querySelectorAll('th');
+    cells.forEach((cell, index) => {
+      if (columnWidths[index] !== undefined) {
+        cell.style.width = `${columnWidths[index]}px`;
+        cell.style.minWidth = `${columnWidths[index]}px`;
+        cell.style.maxWidth = `${columnWidths[index]}px`;
+      }
+    });
+    
+    return tempDiv.innerHTML;
+  };
+
   return (
     <div ref={containerRef} className={cn("relative", className)}>
       {children}
 
       {/* Fixed sticky header clone via portal */}
-      {mounted && stickyInfo.show && theadClone && createPortal(
+      {mounted && stickyInfo.show && theadClone && columnWidths.length > 0 && createPortal(
         <div
           style={{
             position: 'fixed',
@@ -143,10 +185,13 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
               if (el) el.scrollLeft = stickyInfo.scrollLeft;
             }}
           >
-            <table className="w-full caption-bottom text-sm" style={{ minWidth: scrollableEl?.scrollWidth }}>
+            <table 
+              className="w-full caption-bottom text-sm" 
+              style={{ minWidth: scrollableEl?.scrollWidth, tableLayout: 'fixed' }}
+            >
               <thead
                 className="bg-background [&_tr]:border-b"
-                dangerouslySetInnerHTML={{ __html: theadClone.innerHTML }}
+                dangerouslySetInnerHTML={{ __html: getStyledTheadHtml() }}
               />
             </table>
           </div>

@@ -241,12 +241,17 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     }
   };
 
+  const [isUploadingFile, setIsUploadingFile] = useState(false);
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    const fileName = file.name.toLowerCase();
+    const fileType = file.type;
+
     // For text files, read directly
-    if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+    if (fileType === 'text/plain' || fileName.endsWith('.txt')) {
       const text = await file.text();
       setImportText(text);
       setImportTab('paste');
@@ -254,9 +259,50 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       return;
     }
 
-    // For PDF/DOCX, we'll use the parse-excel function which can handle documents
-    // Or inform user to paste text
-    toast.info('For PDF/Word files, please copy the text content and paste it.');
+    // For PDF and Word files, use the parse-document-text edge function
+    const isPDF = fileType === 'application/pdf' || fileName.endsWith('.pdf');
+    const isWord = fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+                   fileType === 'application/msword' ||
+                   fileName.endsWith('.docx') || 
+                   fileName.endsWith('.doc');
+
+    if (isPDF || isWord) {
+      setIsUploadingFile(true);
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-document-text`,
+          {
+            method: 'POST',
+            body: formData,
+          }
+        );
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || 'Failed to parse document');
+        }
+
+        const result = await response.json();
+        if (result.text) {
+          setImportText(result.text);
+          setImportTab('paste');
+          toast.success('Document parsed. Review the extracted text and click Import.');
+        } else {
+          throw new Error('No text extracted from document');
+        }
+      } catch (error) {
+        console.error('Error parsing document:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to parse document');
+      } finally {
+        setIsUploadingFile(false);
+      }
+      return;
+    }
+
+    toast.error('Unsupported file type. Please upload a PDF, Word document, or text file.');
   };
 
   // Calculate totals (current draft)
@@ -814,21 +860,29 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                       <div className="border-2 border-dashed rounded-lg p-8 text-center">
                         <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                         <p className="text-sm text-muted-foreground mb-2">
-                          Upload a text file (.txt)
+                          Upload a PDF, Word document, or text file
                         </p>
                         <p className="text-xs text-muted-foreground mb-4">
-                          For PDF or Word documents, please copy the text and use the Paste Text tab
+                          Supported formats: .pdf, .docx, .doc, .txt
                         </p>
                         <input
                           type="file"
-                          accept=".txt,text/plain"
+                          accept=".txt,.pdf,.doc,.docx,text/plain,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                           onChange={handleFileUpload}
                           className="hidden"
                           id="engagement-file-upload"
+                          disabled={isUploadingFile}
                         />
-                        <Button variant="outline" size="sm" asChild>
+                        <Button variant="outline" size="sm" asChild disabled={isUploadingFile}>
                           <label htmlFor="engagement-file-upload" className="cursor-pointer">
-                            Choose File
+                            {isUploadingFile ? (
+                              <>
+                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                Extracting text...
+                              </>
+                            ) : (
+                              'Choose File'
+                            )}
                           </label>
                         </Button>
                       </div>

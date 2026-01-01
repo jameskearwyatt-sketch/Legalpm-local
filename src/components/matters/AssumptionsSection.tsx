@@ -564,7 +564,10 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
                               <Badge className={labelColors[assumption.label] || labelColors['Other']}>
                                 {assumption.label}
                               </Badge>
-                              <p className="text-sm">{assumption.assumption_text}</p>
+                              <p className="text-sm flex items-start gap-2">
+                                <span className="text-muted-foreground">•</span>
+                                <span>{assumption.assumption_text}</span>
+                              </p>
                             </div>
                           </div>
                         </div>
@@ -658,6 +661,7 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
                         </div>
                       ) : (
                         <>
+                          <span className="text-muted-foreground">•</span>
                           <span className="flex-1 text-sm">{assumption.assumption_text}</span>
                           <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                             <Button

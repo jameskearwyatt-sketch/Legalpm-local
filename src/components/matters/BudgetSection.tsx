@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Loader2, ChevronDown, History, Check, FileText, Upload } from 'lucide-react';
+import { Plus, Trash2, Loader2, ChevronDown, History, Check, FileText, Upload, Sparkles } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
@@ -64,6 +64,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [notes, setNotes] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const [pastedText, setPastedText] = useState('');
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
   // Silent update for local counsel billing (no toast)
   const updateLocalCounselBilling = async (value: 'Direct' | 'Disb' | null) => {
@@ -292,6 +294,40 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       })));
     }
     setNotes('');
+    setPastedText('');
+  };
+
+  // AI summarization for budget update rationale
+  const handleSummarizeRationale = async () => {
+    if (!pastedText.trim()) {
+      toast.error('Please paste some text first');
+      return;
+    }
+
+    setIsSummarizing(true);
+    try {
+      const response = await supabase.functions.invoke('summarize-amendment-rationale', {
+        body: { 
+          text: pastedText,
+          budgetChange: undefined, // We don't have previous/new budget context here
+        },
+      });
+
+      if (response.error) throw response.error;
+      
+      if (response.data?.summary) {
+        setNotes(response.data.summary);
+        setPastedText(''); // Clear the pasted text after successful summarization
+        toast.success('Rationale summarized and added to notes');
+      } else {
+        throw new Error('No summary returned');
+      }
+    } catch (error) {
+      console.error('Error summarizing:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to summarize. Please try again.');
+    } finally {
+      setIsSummarizing(false);
+    }
   };
 
   const loadVersionItems = async (versionId: string) => {
@@ -741,7 +777,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
 
         {/* Notes - shown for both initial and updates */}
         {(isEditing || !hasExistingBudget) && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label>{hasExistingBudget ? 'Update Notes' : 'Budget Notes'}</Label>
             <Textarea
               value={notes}
@@ -751,6 +787,38 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 : "Any notes about this budget (optional)"}
               rows={2}
             />
+            
+            {/* AI Summarization for budget updates - only show when editing existing budget */}
+            {hasExistingBudget && (
+              <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+                  <FileText className="h-3.5 w-3.5" />
+                  Paste correspondence to auto-generate rationale
+                </div>
+                <Textarea
+                  value={pastedText}
+                  onChange={(e) => setPastedText(e.target.value)}
+                  placeholder="Paste email exchange or client notes here..."
+                  rows={3}
+                  className="text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleSummarizeRationale}
+                  disabled={isSummarizing || !pastedText.trim()}
+                  className="w-full"
+                >
+                  {isSummarizing ? (
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-3 w-3" />
+                  )}
+                  Summarize with AI
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

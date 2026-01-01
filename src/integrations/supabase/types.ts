@@ -365,6 +365,7 @@ export type Database = {
           id: string
           is_multi_client: boolean
           lead_partner: string | null
+          local_counsel_billing: string | null
           local_counsel_fee: number
           matter_name: string
           matter_number: string
@@ -411,6 +412,7 @@ export type Database = {
           id?: string
           is_multi_client?: boolean
           lead_partner?: string | null
+          local_counsel_billing?: string | null
           local_counsel_fee?: number
           matter_name: string
           matter_number: string
@@ -457,6 +459,7 @@ export type Database = {
           id?: string
           is_multi_client?: boolean
           lead_partner?: string | null
+          local_counsel_billing?: string | null
           local_counsel_fee?: number
           matter_name?: string
           matter_number?: string

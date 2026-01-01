@@ -549,32 +549,54 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
                       {extractedAssumptions.map((assumption, index) => (
                         <div 
                           key={index}
-                          className={`border rounded-lg p-3 space-y-2 cursor-pointer transition-colors ${
+                          className={`border rounded-lg p-3 space-y-2 transition-colors ${
                             assumption.selected 
                               ? 'bg-background border-primary/50' 
                               : 'bg-muted/30 border-muted opacity-60'
                           }`}
-                          onClick={() => toggleAssumptionSelection(index)}
                         >
                           <div className="flex items-start gap-3">
                             <Checkbox 
                               checked={assumption.selected}
                               onCheckedChange={() => toggleAssumptionSelection(index)}
-                              onClick={(e) => e.stopPropagation()}
                               className="mt-1"
                             />
                             <div className="flex-1 space-y-2">
                               <div className="flex items-center gap-2">
-                                <Badge className={labelColors[assumption.label] || labelColors['Other']}>
-                                  {assumption.label}
-                                </Badge>
+                                <Select
+                                  value={assumption.label}
+                                  onValueChange={(newLabel) => {
+                                    setExtractedAssumptions(prev => 
+                                      prev.map((a, i) => i === index ? { ...a, label: newLabel } : a)
+                                    );
+                                  }}
+                                >
+                                  <SelectTrigger 
+                                    className={`w-auto h-auto py-0.5 px-2 text-xs font-medium border-0 ${labelColors[assumption.label] || labelColors['Other']}`}
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    <SelectValue>{assumption.label}</SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {ASSUMPTION_LABELS.map((label) => (
+                                      <SelectItem key={label} value={label}>
+                                        <span className={`px-1.5 py-0.5 rounded text-xs ${labelColors[label] || labelColors['Other']}`}>
+                                          {label}
+                                        </span>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                                 {assumption.is_standard && (
                                   <Badge variant="outline" className="text-xs border-primary/50 text-primary">
                                     Standard
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-sm flex items-start gap-2">
+                              <p 
+                                className="text-sm flex items-start gap-2 cursor-pointer"
+                                onClick={() => toggleAssumptionSelection(index)}
+                              >
                                 <span className="text-muted-foreground">•</span>
                                 <span>{assumption.assumption_text}</span>
                               </p>

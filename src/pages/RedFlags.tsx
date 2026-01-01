@@ -12,7 +12,9 @@ import {
   DollarSign,
   TrendingDown,
   Clock,
-  CalendarX
+  CalendarX,
+  ShieldAlert,
+  UserX
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +25,8 @@ const alertTypeConfig: Record<Alert['type'], { icon: React.ReactNode; color: str
   'Poor Collection': { icon: <TrendingDown className="h-4 w-4" />, color: 'text-warning' },
   'LC Billing Missing': { icon: <AlertTriangle className="h-4 w-4" />, color: 'text-warning' },
   'Stale Financials': { icon: <CalendarX className="h-4 w-4" />, color: 'text-warning' },
+  'AML Not Complete': { icon: <ShieldAlert className="h-4 w-4" />, color: 'text-warning' },
+  'Billing Partner Missing': { icon: <UserX className="h-4 w-4" />, color: 'text-warning' },
 };
 
 export default function RedFlags() {
@@ -45,7 +49,7 @@ export default function RedFlags() {
     return acc;
   }, {} as Record<Alert['type'], Alert[]>) || {};
 
-  const alertTypeOrder: Alert['type'][] = ['Over Budget', 'Near Budget', 'Poor Collection', 'High WIP', 'LC Billing Missing', 'Stale Financials'];
+  const alertTypeOrder: Alert['type'][] = ['Over Budget', 'Near Budget', 'Poor Collection', 'High WIP', 'LC Billing Missing', 'Stale Financials', 'AML Not Complete', 'Billing Partner Missing'];
 
   if (isLoading) {
     return (

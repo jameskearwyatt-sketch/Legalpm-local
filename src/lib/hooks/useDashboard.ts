@@ -31,7 +31,7 @@ export interface DashboardStats {
 
 export interface Alert {
   id: string;
-  type: 'Over Budget' | 'Near Budget' | 'High WIP' | 'Poor Collection' | 'LC Billing Missing' | 'Stale Financials';
+  type: 'Over Budget' | 'Near Budget' | 'High WIP' | 'Poor Collection' | 'LC Billing Missing' | 'Stale Financials' | 'AML Not Complete' | 'Billing Partner Missing';
   matterId: string;
   matterName: string;
   matterNumber: string;
@@ -291,6 +291,36 @@ export function useDashboard(excludedMatterIds: string[] = []) {
             message: `No financial data recorded`,
           });
         }
+
+        // AML/KYC not complete check
+        if (!matter.aml_kyc_complete) {
+          alerts.push({
+            id: `aml-${matter.id}`,
+            type: 'AML Not Complete',
+            matterId: matter.id,
+            matterName: matter.matter_name,
+            matterNumber: matter.matter_number,
+            cmNumber,
+            clientName,
+            currency: feeCurrency,
+            message: `AML/KYC check not completed`,
+          });
+        }
+
+        // Billing partner not specified check
+        if (!matter.lead_partner || matter.lead_partner.trim() === '') {
+          alerts.push({
+            id: `partner-${matter.id}`,
+            type: 'Billing Partner Missing',
+            matterId: matter.id,
+            matterName: matter.matter_name,
+            matterNumber: matter.matter_number,
+            cmNumber,
+            clientName,
+            currency: feeCurrency,
+            message: `Billing partner not specified`,
+          });
+        }
       });
 
 
@@ -400,7 +430,7 @@ export function useDashboard(excludedMatterIds: string[] = []) {
         avgCollectionRate,
         openMattersCount: liveMatters?.length || 0,
         alerts: alerts.sort((a, b) => {
-          const priority: Record<string, number> = { 'Over Budget': 1, 'Near Budget': 2, 'Poor Collection': 3, 'High WIP': 4, 'LC Billing Missing': 5, 'Stale Financials': 6 };
+          const priority: Record<string, number> = { 'Over Budget': 1, 'Near Budget': 2, 'Poor Collection': 3, 'High WIP': 4, 'LC Billing Missing': 5, 'Stale Financials': 6, 'AML Not Complete': 7, 'Billing Partner Missing': 8 };
           return (priority[a.type] || 99) - (priority[b.type] || 99);
         }),
         pipelineAlerts: pipelineAlerts.sort((a, b) => {

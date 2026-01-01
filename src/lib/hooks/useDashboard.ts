@@ -31,7 +31,7 @@ export interface DashboardStats {
 
 export interface Alert {
   id: string;
-  type: 'Over Budget' | 'Near Budget' | 'High WIP' | 'Poor Collection' | 'LC Billing Missing' | 'Stale Financials';
+  type: 'Over Budget' | 'Near Budget' | 'High WIP' | 'Poor Collection' | 'Stale Financials';
   matterId: string;
   matterName: string;
   matterNumber: string;
@@ -243,21 +243,6 @@ export function useDashboard(excludedMatterIds: string[] = []) {
           });
         }
 
-        // Local counsel billing not set check
-        const localCounselFee = Number(matter.local_counsel_fee) || 0;
-        if (localCounselFee > 0 && !matter.local_counsel_billing) {
-          alerts.push({
-            id: `lc-billing-${matter.id}`,
-            type: 'LC Billing Missing',
-            matterId: matter.id,
-            matterName: matter.matter_name,
-            matterNumber: matter.matter_number,
-            cmNumber,
-            clientName,
-            currency: feeCurrency,
-            message: `Local counsel billing method not set`,
-          });
-        }
 
         // Stale financials check - no update in 10+ days
         if (snapshot?.updated_at) {
@@ -400,7 +385,7 @@ export function useDashboard(excludedMatterIds: string[] = []) {
         avgCollectionRate,
         openMattersCount: liveMatters?.length || 0,
         alerts: alerts.sort((a, b) => {
-          const priority: Record<string, number> = { 'Over Budget': 1, 'Near Budget': 2, 'Poor Collection': 3, 'High WIP': 4, 'LC Billing Missing': 5, 'Stale Financials': 6 };
+          const priority: Record<string, number> = { 'Over Budget': 1, 'Near Budget': 2, 'Poor Collection': 3, 'High WIP': 4, 'Stale Financials': 5 };
           return (priority[a.type] || 99) - (priority[b.type] || 99);
         }),
         pipelineAlerts: pipelineAlerts.sort((a, b) => {

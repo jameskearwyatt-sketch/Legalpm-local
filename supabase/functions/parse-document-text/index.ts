@@ -1,10 +1,54 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import JSZip from "https://esm.sh/jszip@3.10.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Extract text from DOCX file (which is a ZIP containing XML)
+async function extractTextFromDocx(arrayBuffer: ArrayBuffer): Promise<string> {
+  try {
+    const zip = new JSZip();
+    const contents = await zip.loadAsync(arrayBuffer);
+    
+    // The main document content is in word/document.xml
+    const documentXml = await contents.file("word/document.xml")?.async("string");
+    
+    if (!documentXml) {
+      throw new Error("Could not find document.xml in DOCX file");
+    }
+    
+    // Parse the XML and extract text content
+    // Remove XML tags and extract text between <w:t> tags
+    const textMatches = documentXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+    const paragraphBreaks = documentXml.match(/<\/w:p>/g) || [];
+    
+    // Build text by processing the XML structure
+    let result = '';
+    let currentParagraph = '';
+    
+    // Split by paragraph markers and process
+    const paragraphs = documentXml.split(/<\/w:p>/);
+    
+    for (const para of paragraphs) {
+      const texts = para.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+      const paraText = texts
+        .map(t => t.replace(/<w:t[^>]*>([^<]*)<\/w:t>/, '$1'))
+        .join('');
+      
+      if (paraText.trim()) {
+        result += paraText + '\n';
+      }
+    }
+    
+    return result.trim();
+  } catch (error) {
+    console.error("Error parsing DOCX:", error);
+    throw new Error("Failed to parse Word document");
+  }
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -108,82 +152,27 @@ serve(async (req) => {
       extractedText = data.choices?.[0]?.message?.content || '';
       console.log('Extracted text from PDF via AI, length:', extractedText.length);
     }
-    // Handle Word documents (.docx)
+    // Handle Word documents (.docx) - parse directly using JSZip
     else if (
       fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
-      fileName.endsWith('.docx') ||
-      fileType === 'application/msword' ||
-      fileName.endsWith('.doc')
+      fileName.endsWith('.docx')
     ) {
       const arrayBuffer = await file.arrayBuffer();
-      // Use Deno's base64 encoder which handles large files properly
-      const base64Content = base64Encode(arrayBuffer);
+      console.log('Parsing DOCX file directly...');
       
-      const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-      if (!LOVABLE_API_KEY) {
-        throw new Error("LOVABLE_API_KEY is not configured");
-      }
-
-      // Determine the mime type
-      const mimeType = fileName.endsWith('.docx') 
-        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-        : 'application/msword';
-
-      console.log('Sending Word doc to AI for text extraction, base64 length:', base64Content.length);
-
-      // Use AI to extract text from the Word document
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { 
-              role: "system", 
-              content: "You are a document text extractor. Extract all text content from the provided document. Return ONLY the raw text content, preserving the structure and formatting as much as possible. Do not add any commentary or explanations." 
-            },
-            { 
-              role: "user", 
-              content: [
-                {
-                  type: "file",
-                  file: {
-                    filename: file.name,
-                    file_data: `data:${mimeType};base64,${base64Content}`
-                  }
-                },
-                {
-                  type: "text",
-                  text: "Extract all text content from this Word document. Return only the extracted text."
-                }
-              ]
-            }
-          ],
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("AI gateway error for Word:", response.status, errorText);
-        if (response.status === 429) {
-          throw new Error("Rate limit exceeded. Please try again in a moment.");
-        }
-        if (response.status === 402) {
-          throw new Error("AI credits exhausted. Please add credits to continue.");
-        }
-        throw new Error(`Failed to extract text from Word document: ${response.status}`);
-      }
-
-      const data = await response.json();
-      extractedText = data.choices?.[0]?.message?.content || '';
-      console.log('Extracted text from Word via AI, length:', extractedText.length);
+      extractedText = await extractTextFromDocx(arrayBuffer);
+      console.log('Extracted text from DOCX, length:', extractedText.length);
+    }
+    // Handle old Word documents (.doc) - these are binary and need different handling
+    else if (fileType === 'application/msword' || fileName.endsWith('.doc')) {
+      return new Response(
+        JSON.stringify({ error: 'Old .doc format is not supported. Please save your document as .docx or PDF and try again.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
     else {
       return new Response(
-        JSON.stringify({ error: `Unsupported file type: ${fileType}. Please upload a PDF, Word document, or text file.` }),
+        JSON.stringify({ error: `Unsupported file type: ${fileType}. Please upload a PDF, Word document (.docx), or text file.` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

@@ -17,6 +17,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { useMatter, useMatters, MatterCategory, MatterStage, FeeType, MatterSource, PipelineOutcome } from '@/lib/hooks/useMatters';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { BudgetSection } from '@/components/matters/BudgetSection';
@@ -43,7 +48,8 @@ import {
   RefreshCw,
   Pencil,
   Check,
-  X
+  X,
+  ChevronDown
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -731,12 +737,36 @@ export default function MatterDetail() {
 
         {/* Budget Section - only for non-pipeline matters */}
         {!isPipeline && (
-          <BudgetSection matterId={id!} currency={currency} />
+          <Collapsible defaultOpen={false} className="group">
+            <CollapsibleTrigger className="w-full">
+              <Card className="shadow-card hover:bg-muted/50 transition-colors cursor-pointer">
+                <CardHeader className="flex flex-row items-center justify-between py-4">
+                  <CardTitle className="text-lg font-heading">Budget</CardTitle>
+                  <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                </CardHeader>
+              </Card>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <BudgetSection matterId={id!} currency={currency} />
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         {/* Assumptions Section - only for non-pipeline matters */}
         {!isPipeline && (
-          <AssumptionsSection matterId={id!} />
+          <Collapsible defaultOpen={false} className="group">
+            <CollapsibleTrigger className="w-full">
+              <Card className="shadow-card hover:bg-muted/50 transition-colors cursor-pointer">
+                <CardHeader className="flex flex-row items-center justify-between py-4">
+                  <CardTitle className="text-lg font-heading">Assumptions</CardTitle>
+                  <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+                </CardHeader>
+              </Card>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2">
+              <AssumptionsSection matterId={id!} />
+            </CollapsibleContent>
+          </Collapsible>
         )}
 
         {/* Pipeline Information (conditionally shown) */}

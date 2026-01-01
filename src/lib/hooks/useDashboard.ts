@@ -16,7 +16,7 @@ export interface DashboardStats {
 
 export interface Alert {
   id: string;
-  type: 'Over Budget' | 'Near Budget' | 'High WIP' | 'Poor Collection' | 'LC Billing Missing';
+  type: 'Over Budget' | 'Near Budget' | 'High WIP' | 'Poor Collection' | 'LC Billing Missing' | 'Stale Financials';
   matterId: string;
   matterName: string;
   matterNumber: string;
@@ -225,6 +225,39 @@ export function useDashboard() {
             message: `Local counsel billing method not set`,
           });
         }
+
+        // Stale financials check - no update in 10+ days
+        if (snapshot?.updated_at) {
+          const snapshotUpdatedAt = parseISO(snapshot.updated_at);
+          const daysSinceUpdate = differenceInDays(today, snapshotUpdatedAt);
+          if (daysSinceUpdate >= 10) {
+            alerts.push({
+              id: `stale-${matter.id}`,
+              type: 'Stale Financials',
+              matterId: matter.id,
+              matterName: matter.matter_name,
+              matterNumber: matter.matter_number,
+              cmNumber,
+              clientName,
+              currency: feeCurrency,
+              message: `Financials not updated for ${daysSinceUpdate} days`,
+              value: daysSinceUpdate,
+            });
+          }
+        } else if (budget > 0) {
+          // No snapshot at all for a matter with a budget
+          alerts.push({
+            id: `stale-${matter.id}`,
+            type: 'Stale Financials',
+            matterId: matter.id,
+            matterName: matter.matter_name,
+            matterNumber: matter.matter_number,
+            cmNumber,
+            clientName,
+            currency: feeCurrency,
+            message: `No financial data recorded`,
+          });
+        }
       });
 
       // Generate pipeline alerts
@@ -286,7 +319,7 @@ export function useDashboard() {
         avgCollectionRate,
         openMattersCount: liveMatters?.length || 0,
         alerts: alerts.sort((a, b) => {
-          const priority: Record<string, number> = { 'Over Budget': 1, 'Near Budget': 2, 'Poor Collection': 3, 'High WIP': 4, 'LC Billing Missing': 5 };
+          const priority: Record<string, number> = { 'Over Budget': 1, 'Near Budget': 2, 'Poor Collection': 3, 'High WIP': 4, 'LC Billing Missing': 5, 'Stale Financials': 6 };
           return (priority[a.type] || 99) - (priority[b.type] || 99);
         }),
         pipelineAlerts: pipelineAlerts.sort((a, b) => {

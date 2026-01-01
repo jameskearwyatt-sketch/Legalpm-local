@@ -1,16 +1,6 @@
 import { Link } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { TableScrollControls } from '@/components/ui/table-scroll-controls';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,12 +29,13 @@ import {
   AlertTriangle,
   CheckCircle2,
   Loader2,
-  ExternalLink,
+  ArrowRight,
   X,
   Calculator,
   FileText,
   Calendar,
-  Users
+  Users,
+  Hash
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -112,11 +103,23 @@ const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; descr
   },
   no_cm_number: {
     label: 'No CM Number',
-    icon: <FileText className="h-4 w-4" />,
+    icon: <Hash className="h-4 w-4" />,
     description: 'Client matter number not set',
     field: null
   },
 };
+
+const flagTypeOrder: FlagType[] = [
+  'engagement_letter', 
+  'aml_kyc', 
+  'matter_open', 
+  'conflicts', 
+  'no_cm_number',
+  'no_budget_finalized', 
+  'no_assumptions', 
+  'no_start_date', 
+  'invalid_client_split'
+];
 
 export default function Flags() {
   const { matters, isLoading, updateMatter } = useMatters();
@@ -209,7 +212,7 @@ export default function Flags() {
     if (!fieldToUpdate) {
       toast({
         title: "Cannot clear this flag directly",
-        description: "This flag requires adding data (budget, assumptions, or start date) via the matter details page.",
+        description: "This flag requires adding data via the matter details page.",
         variant: "destructive",
       });
       setConfirmDialog(null);
@@ -237,18 +240,15 @@ export default function Flags() {
     setConfirmDialog(null);
   };
 
-  // Build flagged matters list (admin flags only)
+  // Build flagged matters list
   const flaggedMatters: FlaggedMatter[] = liveMatters
     .map(matter => {
       const flags: FlagType[] = [];
       
-      // Admin flags only
       if (!matter.assignment_letter_signed) flags.push('engagement_letter');
       if (!matter.aml_kyc_complete) flags.push('aml_kyc');
       if (!matter.matter_open) flags.push('matter_open');
       if (!matter.conflicts_check) flags.push('conflicts');
-      
-      // New flags
       if (!mattersWithBudget.has(matter.id)) flags.push('no_budget_finalized');
       if (!mattersWithAssumptions.has(matter.id)) flags.push('no_assumptions');
       if (!matter.start_date) flags.push('no_start_date');
@@ -266,175 +266,147 @@ export default function Flags() {
         flags,
       };
     })
-    .filter(m => m.flags.length > 0)
-    .sort((a, b) => b.flags.length - a.flags.length);
+    .filter(m => m.flags.length > 0);
 
-  // Count by flag type
-  const flagCounts: Record<FlagType, number> = {
-    engagement_letter: 0,
-    aml_kyc: 0,
-    matter_open: 0,
-    conflicts: 0,
-    no_budget_finalized: 0,
-    no_assumptions: 0,
-    no_start_date: 0,
-    invalid_client_split: 0,
-    no_cm_number: 0,
-  };
-  
-  flaggedMatters.forEach(m => {
-    m.flags.forEach(f => flagCounts[f]++);
+  // Group matters by flag type
+  const mattersByFlagType: Record<FlagType, FlaggedMatter[]> = {} as Record<FlagType, FlaggedMatter[]>;
+  flagTypeOrder.forEach(type => {
+    mattersByFlagType[type] = flaggedMatters.filter(m => m.flags.includes(type));
   });
 
-  const totalFlags = Object.values(flagCounts).reduce((a, b) => a + b, 0);
+  const totalFlags = flagTypeOrder.reduce((sum, type) => sum + mattersByFlagType[type].length, 0);
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center h-96">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8 space-y-6">
+      <div className="p-6 lg:p-8 space-y-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl lg:text-3xl font-heading font-bold text-foreground flex items-center gap-3">
-              <Flag className="h-7 w-7 text-warning" />
+              <Flag className="h-8 w-8 text-warning" />
               Admin Flags
             </h1>
             <p className="text-muted-foreground mt-1">
-              Track compliance items for live matters
+              {totalFlags > 0 
+                ? `${totalFlags} issue${totalFlags !== 1 ? 's' : ''} requiring attention across your live matters`
+                : 'All clear - no issues requiring attention'}
             </p>
           </div>
-          {totalFlags === 0 && !isLoading && (
-            <div className="flex items-center gap-2 text-success">
-              <CheckCircle2 className="h-5 w-5" />
-              <span className="font-medium">All clear!</span>
+        </div>
+
+        {totalFlags === 0 ? (
+          <Card className="shadow-card">
+            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+              <CheckCircle2 className="h-16 w-16 text-success mb-4" />
+              <h2 className="text-xl font-heading font-semibold text-foreground mb-2">All Clear!</h2>
+              <p className="text-muted-foreground max-w-md">
+                There are no admin flags across your live matters. All compliance items are complete.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+              {flagTypeOrder.map((type) => {
+                const count = mattersByFlagType[type]?.length || 0;
+                const config = flagConfig[type];
+                return (
+                  <Card key={type} className={cn("shadow-card", count > 0 && "border-l-4 border-l-warning")}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-warning">{config.icon}</span>
+                        <span className="text-2xl font-bold text-foreground">{count}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{config.label}</p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
-          )}
-        </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          {(['engagement_letter', 'aml_kyc', 'matter_open', 'conflicts', 'no_budget_finalized', 'no_assumptions', 'no_start_date', 'invalid_client_split', 'no_cm_number'] as FlagType[]).map((key) => (
-            <Card key={key} className={cn(
-              "shadow-card transition-colors",
-              flagCounts[key] > 0 ? "border-warning/50" : "border-success/30"
-            )}>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-3">
-                  <div className={cn(
-                    "p-2 rounded-lg",
-                    flagCounts[key] > 0 ? "bg-warning/10 text-warning" : "bg-success/10 text-success"
-                  )}>
-                    {flagConfig[key].icon}
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold">{flagCounts[key]}</p>
-                    <p className="text-xs text-muted-foreground">{flagConfig[key].label}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Flagged Matters Table */}
-        <Card className="shadow-card">
-          <CardHeader>
-            <CardTitle className="text-lg font-heading">Matters Requiring Attention</CardTitle>
-            <CardDescription>
-              {flaggedMatters.length} {flaggedMatters.length === 1 ? 'matter' : 'matters'} with outstanding admin items
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : flaggedMatters.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <CheckCircle2 className="h-12 w-12 text-success mb-4" />
-                <h3 className="text-lg font-medium text-foreground">All items complete</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  No outstanding admin flags on any active matters
-                </p>
-              </div>
-            ) : (
-              <TableScrollControls>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="min-w-[200px]">Matter</TableHead>
-                      <TableHead>Outstanding Items</TableHead>
-                      <TableHead className="w-20"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {flaggedMatters.map((matter) => (
-                      <TableRow key={matter.id} className="group">
-                        <TableCell>
-                          <p className="text-sm text-muted-foreground">{matter.client_name}</p>
-                          <p className="font-medium text-foreground">{matter.matter_name}</p>
-                          <p className="text-xs text-muted-foreground">{matter.matter_number}</p>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-2">
-                            {matter.flags.map((flag) => (
-                              <span
-                                key={flag}
-                                className="inline-flex items-center gap-1.5 text-xs px-2 py-1.5 rounded-full border bg-warning/10 text-warning border-warning/30 group/flag relative"
-                              >
-                                {flagConfig[flag].icon}
-                                {flagConfig[flag].label}
-                                <TooltipProvider delayDuration={100}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        onClick={() => setConfirmDialog({
-                                          open: true,
-                                          matterId: matter.id,
-                                          matterName: matter.matter_name,
-                                          flagType: flag
-                                        })}
-                                        className="ml-1 p-0.5 rounded-full hover:bg-warning/30 transition-colors"
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top">
-                                      <p>Clear</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </span>
-                            ))}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link to={`/matters/${matter.id}/edit`}>
-                              <ExternalLink className="h-4 w-4" />
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableScrollControls>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Tips */}
-        <Card className="shadow-card bg-muted/30">
-          <CardContent className="pt-6">
-            <h4 className="font-medium text-foreground mb-2">Tips for Clearing Admin Flags</h4>
-            <ul className="text-sm text-muted-foreground space-y-1">
-              <li>• Click the edit button on any matter to update its admin status</li>
-              <li>• Ensure engagement letters are signed before work begins</li>
-              <li>• Complete AML/KYC checks as required by firm policy</li>
-              <li>• Only Live matters are checked - Pipeline, Closed and Lost matters are excluded</li>
-            </ul>
-          </CardContent>
-        </Card>
+            {/* Flag Lists by Type */}
+            {flagTypeOrder.map((type) => {
+              const mattersWithFlag = mattersByFlagType[type];
+              if (!mattersWithFlag || mattersWithFlag.length === 0) return null;
+              
+              const config = flagConfig[type];
+              const canClear = config.field !== null;
+              
+              return (
+                <Card key={type} className="shadow-card">
+                  <CardHeader className="flex flex-row items-center justify-between pb-3">
+                    <CardTitle className="font-heading text-lg flex items-center gap-2">
+                      <span className="text-warning">{config.icon}</span>
+                      {config.label}
+                    </CardTitle>
+                    <span className="text-sm text-muted-foreground">
+                      {mattersWithFlag.length} matter{mattersWithFlag.length !== 1 ? 's' : ''}
+                    </span>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">{config.description}</p>
+                    <div className="space-y-2">
+                      {mattersWithFlag.map((matter) => (
+                        <div
+                          key={matter.id}
+                          className="flex items-center gap-4 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                        >
+                          <Link
+                            to={`/matters/${matter.id}`}
+                            className="flex-1 min-w-0 flex items-center gap-4"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {matter.matter_name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {matter.client_name} • {matter.matter_number}
+                              </p>
+                            </div>
+                            <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+                          </Link>
+                          {canClear && (
+                            <TooltipProvider delayDuration={100}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    onClick={() => setConfirmDialog({
+                                      open: true,
+                                      matterId: matter.id,
+                                      matterName: matter.matter_name,
+                                      flagType: type
+                                    })}
+                                    className="p-1.5 rounded-full hover:bg-warning/20 text-warning transition-colors flex-shrink-0"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                  <p>Clear flag</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Confirmation Dialog */}

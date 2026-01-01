@@ -68,6 +68,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [isSummarizing, setIsSummarizing] = useState(false);
   // Track which line items were AI-suggested (by index)
   const [aiSuggestedIndices, setAiSuggestedIndices] = useState<Set<number>>(new Set());
+  // Store original values when editing starts for comparison
+  const [originalItems, setOriginalItems] = useState<DraftLineItem[]>([]);
 
   // Silent update for local counsel billing (no toast)
   const updateLocalCounselBilling = async (value: 'Direct' | 'Disb' | null) => {
@@ -269,6 +271,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     setIsEditing(false);
     setAiSuggestedIndices(new Set()); // Clear AI suggestions after finalizing
     setPastedText('');
+    setOriginalItems([]); // Clear original items after finalizing
   };
 
   const handleDeleteVersion = async (versionId: string) => {
@@ -280,6 +283,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   };
 
   const startEditing = () => {
+    // Store original items for comparison display
+    setOriginalItems([...draftItems]);
     setIsEditing(true);
     if (draftItems.length === 0) {
       setDraftItems([{ work_item: '', provider: 'Baker McKenzie', fee_amount: 0 }]);
@@ -300,6 +305,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     setNotes('');
     setPastedText('');
     setAiSuggestedIndices(new Set());
+    setOriginalItems([]);
   };
 
   // AI summarization for budget update rationale - also extracts budget changes
@@ -511,14 +517,29 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       <CardContent className="space-y-4">
         {/* Budget Line Items */}
         <div className="space-y-3">
-          <div className="grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground px-1">
-            <div className="col-span-5">Work Item</div>
-            <div className="col-span-3">Provider</div>
-            <div className="col-span-3 text-right">
-              Upper End Fee ({differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency})
+          {/* Header row - different layout when editing vs viewing */}
+          {isEditing && hasExistingBudget ? (
+            <div className="grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground px-1">
+              <div className="col-span-4">Work Item</div>
+              <div className="col-span-2">Provider</div>
+              <div className="col-span-2 text-right">
+                Current
+              </div>
+              <div className="col-span-3 text-right">
+                New ({differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency})
+              </div>
+              <div className="col-span-1"></div>
             </div>
-            <div className="col-span-1"></div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-12 gap-2 text-sm font-medium text-muted-foreground px-1">
+              <div className="col-span-5">Work Item</div>
+              <div className="col-span-3">Provider</div>
+              <div className="col-span-3 text-right">
+                Upper End Fee ({differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency})
+              </div>
+              <div className="col-span-1"></div>
+            </div>
+          )}
 
           {/* AI Suggestions Legend */}
           {isEditing && aiSuggestedIndices.size > 0 && (
@@ -542,6 +563,100 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
               const showConversion = differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && !isEditing && hasExistingBudget;
               const isAiSuggested = aiSuggestedIndices.has(index);
               
+              // Get original value for comparison during editing
+              const originalItem = originalItems[index];
+              const originalFee = originalItem?.fee_amount || 0;
+              const originalDisplayFee = isInBillingCurrencyMode ? originalFee * mandatedRate : originalFee;
+              const newFee = item.fee_amount || 0;
+              const newDisplayFee = isInBillingCurrencyMode ? newFee * mandatedRate : newFee;
+              const hasChanged = isEditing && hasExistingBudget && originalItem && Math.abs(newFee - originalFee) > 0.01;
+              const isNewItem = isEditing && hasExistingBudget && !originalItem;
+              
+              // Editing mode with comparison columns
+              if (isEditing && hasExistingBudget) {
+                return (
+                  <div 
+                    key={index} 
+                    className={cn(
+                      "grid grid-cols-12 gap-2 items-center rounded-md transition-colors py-1",
+                      isAiSuggested && "bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700 px-1 -mx-1",
+                      isNewItem && !isAiSuggested && "bg-green-50 dark:bg-green-950/30 ring-1 ring-green-300 dark:ring-green-700 px-1 -mx-1"
+                    )}
+                  >
+                    <div className="col-span-4">
+                      <Input
+                        value={item.work_item}
+                        onChange={(e) => handleItemEdit(index, 'work_item', e.target.value)}
+                        placeholder="e.g., Due diligence review"
+                        className={cn(
+                          "text-sm",
+                          isAiSuggested && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-medium",
+                          isNewItem && !isAiSuggested && "border-green-400 dark:border-green-600"
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Select
+                        value={item.provider}
+                        onValueChange={(v) => handleItemEdit(index, 'provider', v)}
+                      >
+                        <SelectTrigger className={cn(
+                          "text-sm",
+                          isAiSuggested && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300"
+                        )}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {providerOptions.map((p) => (
+                            <SelectItem key={p} value={p}>{p}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {/* Current (original) value - read only */}
+                    <div className="col-span-2 text-right">
+                      {originalItem ? (
+                        <span className="text-muted-foreground text-sm">
+                          {formatCurrency(originalDisplayFee, differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-green-600 dark:text-green-400 italic">NEW</span>
+                      )}
+                    </div>
+                    {/* New value - editable */}
+                    <div className="col-span-3">
+                      <Input
+                        type="number"
+                        value={isInBillingCurrencyMode 
+                          ? (Math.round(newDisplayFee) || '') 
+                          : (newFee || '')}
+                        onChange={(e) => handleItemEdit(index, 'fee_amount', e.target.value)}
+                        placeholder="0"
+                        className={cn(
+                          "text-right text-sm",
+                          isAiSuggested && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-medium",
+                          hasChanged && !isAiSuggested && "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/30 font-medium",
+                          isNewItem && !isAiSuggested && "border-green-400 dark:border-green-600"
+                        )}
+                      />
+                    </div>
+                    <div className="col-span-1 flex justify-center">
+                      {draftItems.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => removeLineItem(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              }
+              
+              // Normal viewing mode (no budget yet or just viewing)
               return (
                 <div 
                   key={index} 
@@ -580,7 +695,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                     </Select>
                   </div>
                   <div className="col-span-3">
-                    {isEditing || !hasExistingBudget ? (
+                    {!hasExistingBudget ? (
                       <Input
                         type="number"
                         value={isInBillingCurrencyMode 
@@ -588,10 +703,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                           : (item.fee_amount || '')}
                         onChange={(e) => handleItemEdit(index, 'fee_amount', e.target.value)}
                         placeholder="0"
-                        className={cn(
-                          "text-right",
-                          isAiSuggested && isEditing && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-medium"
-                        )}
+                        className="text-right"
                       />
                     ) : (
                       <div className="text-right">
@@ -607,7 +719,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                     )}
                   </div>
                   <div className="col-span-1 flex justify-center">
-                    {(isEditing || !hasExistingBudget) && draftItems.length > 1 && (
+                    {!hasExistingBudget && draftItems.length > 1 && (
                       <Button
                         variant="ghost"
                         size="icon"

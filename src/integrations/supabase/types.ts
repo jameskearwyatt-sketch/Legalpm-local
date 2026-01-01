@@ -286,6 +286,47 @@ export type Database = {
           },
         ]
       }
+      matter_assumptions: {
+        Row: {
+          assumption_text: string
+          created_at: string
+          id: string
+          label: string
+          matter_id: string
+          source_document: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assumption_text: string
+          created_at?: string
+          id?: string
+          label: string
+          matter_id: string
+          source_document?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assumption_text?: string
+          created_at?: string
+          id?: string
+          label?: string
+          matter_id?: string
+          source_document?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matter_assumptions_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matter_clients: {
         Row: {
           client_id: string

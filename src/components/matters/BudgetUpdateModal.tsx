@@ -18,8 +18,10 @@ import {
 } from '@/components/ui/accordion';
 import { useBudgetAmendments } from '@/lib/hooks/useBudgetAmendments';
 import { useMatters } from '@/lib/hooks/useMatters';
-import { Loader2, History } from 'lucide-react';
+import { Loader2, History, Sparkles, FileText } from 'lucide-react';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface BudgetUpdateModalProps {
   matterId: string;
@@ -41,9 +43,12 @@ export function BudgetUpdateModal({
   const [newBmFee, setNewBmFee] = useState(currentBmFee.toString());
   const [newLocalCounsel, setNewLocalCounsel] = useState(currentLocalCounsel.toString());
   const [notes, setNotes] = useState('');
+  const [pastedText, setPastedText] = useState('');
+  const [isSummarizing, setIsSummarizing] = useState(false);
   
   const { amendments, isLoading, createAmendment } = useBudgetAmendments(matterId);
   const { updateMatter } = useMatters();
+  const { toast } = useToast();
 
   const formatCurrency = (value: number) => {
     const symbols: Record<string, string> = {
@@ -56,6 +61,61 @@ export function BudgetUpdateModal({
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
+  };
+
+  const handleSummarize = async () => {
+    if (!pastedText.trim()) {
+      toast({
+        title: 'No text to summarize',
+        description: 'Please paste some text first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSummarizing(true);
+    try {
+      const newBudgetNum = parseFloat(newBudget.replace(/,/g, '')) || 0;
+      const newBmFeeNum = parseFloat(newBmFee.replace(/,/g, '')) || 0;
+      
+      // Build budget change context
+      let budgetChange = '';
+      if (newBudgetNum !== currentBudget) {
+        budgetChange += `Total budget: ${formatCurrency(currentBudget)} → ${formatCurrency(newBudgetNum)}. `;
+      }
+      if (newBmFeeNum !== currentBmFee) {
+        budgetChange += `BM fee: ${formatCurrency(currentBmFee)} → ${formatCurrency(newBmFeeNum)}. `;
+      }
+
+      const { data, error } = await supabase.functions.invoke('summarize-amendment-rationale', {
+        body: { 
+          text: pastedText,
+          budgetChange: budgetChange || undefined,
+        },
+      });
+
+      if (error) throw error;
+      
+      if (data?.summary) {
+        setNotes(data.summary);
+        setPastedText(''); // Clear the pasted text after successful summarization
+        toast({
+          title: 'Summary generated',
+          description: 'The rationale has been summarized and added to notes.',
+        });
+      } else {
+        throw new Error('No summary returned');
+      }
+    } catch (error) {
+      console.error('Error summarizing:', error);
+      toast({
+        title: 'Failed to summarize',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSummarizing(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,6 +147,7 @@ export function BudgetUpdateModal({
 
     setOpen(false);
     setNotes('');
+    setPastedText('');
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -96,6 +157,7 @@ export function BudgetUpdateModal({
       setNewBmFee(currentBmFee.toString());
       setNewLocalCounsel(currentLocalCounsel.toString());
       setNotes('');
+      setPastedText('');
     }
   };
 
@@ -110,7 +172,7 @@ export function BudgetUpdateModal({
           Update
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Update Budget Agreement</DialogTitle>
         </DialogHeader>
@@ -159,8 +221,38 @@ export function BudgetUpdateModal({
               </p>
             </div>
 
+            {/* AI Summarization Section */}
+            <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <FileText className="h-4 w-4" />
+                Paste correspondence for AI summary
+              </div>
+              <Textarea
+                value={pastedText}
+                onChange={(e) => setPastedText(e.target.value)}
+                placeholder="Paste email exchange or notes here and click 'Summarize' to auto-generate the rationale..."
+                rows={4}
+                className="text-xs"
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={handleSummarize}
+                disabled={isSummarizing || !pastedText.trim()}
+                className="w-full"
+              >
+                {isSummarizing ? (
+                  <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="mr-2 h-3 w-3" />
+                )}
+                Summarize with AI
+              </Button>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
+              <Label htmlFor="notes">Rationale / Notes</Label>
               <Textarea
                 id="notes"
                 value={notes}

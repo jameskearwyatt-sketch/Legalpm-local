@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.parse-engagement-letter]
 verify_jwt = false
+
+[functions.summarize-amendment-rationale]
+verify_jwt = false

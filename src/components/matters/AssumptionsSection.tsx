@@ -54,25 +54,26 @@ interface AssumptionsSectionProps {
 export interface ExtractedAssumption {
   label: string;
   assumption_text: string;
+  is_standard: boolean;
   selected: boolean;
 }
 
-// Color mapping for assumption labels
+// Color mapping for assumption labels - updated for new categories
 const labelColors: Record<string, string> = {
-  "Document Revisions": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
-  "Transaction Scope": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
-  "Negotiation Style": "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
-  "Timeline": "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
-  "Counterparty Cooperation": "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
-  "Jurisdiction": "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
-  "Due Diligence": "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
-  "Third Party Involvement": "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
-  "Regulatory Approvals": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
-  "Complexity Level": "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
-  "Language": "bg-lime-100 text-lime-800 dark:bg-lime-900 dark:text-lime-200",
-  "Disputes": "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200",
-  "Financing Conditions": "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
-  "Staffing": "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
+  "Document Drafting": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+  "Document Negotiation": "bg-sky-100 text-sky-800 dark:bg-sky-900 dark:text-sky-200",
+  "Transaction Structure": "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+  "Transaction Timeline": "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+  "Due Diligence Scope": "bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200",
+  "Counterparty Conduct": "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200",
+  "Third Party Approvals": "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200",
+  "Regulatory & Compliance": "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+  "Jurisdiction & Governing Law": "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200",
+  "Financing Arrangements": "bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200",
+  "Disputes & Litigation": "bg-rose-100 text-rose-800 dark:bg-rose-900 dark:text-rose-200",
+  "Staffing & Resourcing": "bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200",
+  "Client Responsibilities": "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+  "Excluded Work": "bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200",
   "Other": "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
 };
 
@@ -88,8 +89,9 @@ export async function extractAssumptionsFromText(text: string): Promise<Extracte
   if (error) throw error;
   
   if (data.assumptions && data.assumptions.length > 0) {
-    return data.assumptions.map((a: { label: string; assumption_text: string }) => ({
+    return data.assumptions.map((a: { label: string; assumption_text: string; is_standard?: boolean }) => ({
       ...a,
+      is_standard: a.is_standard ?? false,
       selected: true, // Default all to selected
     }));
   }
@@ -237,6 +239,7 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
         selectedAssumptions.map(a => ({
           label: a.label,
           assumption_text: a.assumption_text,
+          is_standard: a.is_standard,
           source_document: 'Engagement Letter Import',
         }))
       );
@@ -561,9 +564,16 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
                               className="mt-1"
                             />
                             <div className="flex-1 space-y-2">
-                              <Badge className={labelColors[assumption.label] || labelColors['Other']}>
-                                {assumption.label}
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge className={labelColors[assumption.label] || labelColors['Other']}>
+                                  {assumption.label}
+                                </Badge>
+                                {assumption.is_standard && (
+                                  <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                                    Standard
+                                  </Badge>
+                                )}
+                              </div>
                               <p className="text-sm flex items-start gap-2">
                                 <span className="text-muted-foreground">•</span>
                                 <span>{assumption.assumption_text}</span>

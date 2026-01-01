@@ -30,6 +30,9 @@ import { AssumptionsSection } from '@/components/matters/AssumptionsSection';
 import { useClients } from '@/lib/hooks/useClients';
 import { useExchangeRates, getExchangeRate } from '@/lib/hooks/useExchangeRates';
 import { useMatterClients, UpdateMatterClientInput } from '@/lib/hooks/useMatterClients';
+import { useAuth } from '@/lib/auth';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -199,12 +202,29 @@ function EditableMatterClients({ matterClients, updateMatterClient }: EditableMa
 export default function MatterDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: matter, isLoading: matterLoading } = useMatter(id!);
   const { deleteMatter, updateMatter } = useMatters();
   const { snapshots } = useSnapshots(id);
   const { clients, isLoading: clientsLoading } = useClients();
   const { data: exchangeRatesData, refetch: refetchRates } = useExchangeRates();
   const { matterClients, updateMatterClient } = useMatterClients(id);
+  
+  // Fetch current user's profile for "Me" checkbox functionality
+  const { data: userProfile } = useQuery({
+    queryKey: ['user-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
   
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -242,6 +262,7 @@ export default function MatterDetail() {
         fee_type: matter.fee_type || null,
         source: matter.source || null,
         originator: matter.originator || '',
+        matter_managing_attorney: (matter as any).matter_managing_attorney || '',
         deal_currency: matter.deal_currency || '',
         deal_value: matter.deal_value || undefined,
         cm_number: matter.cm_number || '',
@@ -775,11 +796,55 @@ export default function MatterDetail() {
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Billing Partner</Label>
-                <Input value={formData.lead_partner || ''} onChange={(e) => updateField('lead_partner', e.target.value)} placeholder="e.g., James Wyatt" />
+                <div className="flex items-center gap-2">
+                  <Input 
+                    value={formData.lead_partner || ''} 
+                    onChange={(e) => updateField('lead_partner', e.target.value)} 
+                    placeholder="e.g., James Wyatt"
+                    className="flex-1"
+                  />
+                  {userProfile?.full_name && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Checkbox 
+                        id="billing_partner_me"
+                        checked={formData.lead_partner === userProfile.full_name}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            updateField('lead_partner', userProfile.full_name);
+                          }
+                        }}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="billing_partner_me" className="text-xs font-normal cursor-pointer whitespace-nowrap">Me</Label>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="space-y-2">
                 <Label>MMA</Label>
-                <Input value={formData.originator || ''} onChange={(e) => updateField('originator', e.target.value)} />
+                <div className="flex items-center gap-2">
+                  <Input 
+                    value={formData.matter_managing_attorney || ''} 
+                    onChange={(e) => updateField('matter_managing_attorney', e.target.value)} 
+                    placeholder="Matter Managing Attorney"
+                    className="flex-1"
+                  />
+                  {userProfile?.full_name && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Checkbox 
+                        id="mma_me"
+                        checked={formData.matter_managing_attorney === userProfile.full_name}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            updateField('matter_managing_attorney', userProfile.full_name);
+                          }
+                        }}
+                        className="h-4 w-4"
+                      />
+                      <Label htmlFor="mma_me" className="text-xs font-normal cursor-pointer whitespace-nowrap">Me</Label>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
             {/* Hide start date and target close date for pipeline matters */}

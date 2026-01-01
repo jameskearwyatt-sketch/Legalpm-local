@@ -35,13 +35,15 @@ import {
   FileText,
   Calendar,
   Users,
-  Hash
+  Hash,
+  UserX,
+  Briefcase
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useRef } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
-type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split' | 'no_cm_number';
+type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split' | 'no_cm_number' | 'no_mma' | 'no_billing_partner';
 
 interface FlaggedMatter {
   id: string;
@@ -107,6 +109,18 @@ const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; descr
     description: 'Client matter number not set',
     field: null
   },
+  no_mma: {
+    label: 'MMA Not Specified',
+    icon: <UserX className="h-4 w-4" />,
+    description: 'Matter Managing Attorney not specified',
+    field: null
+  },
+  no_billing_partner: {
+    label: 'Billing Partner Not Specified',
+    icon: <Briefcase className="h-4 w-4" />,
+    description: 'Billing partner not specified for this matter',
+    field: null
+  },
 };
 
 const flagTypeOrder: FlagType[] = [
@@ -115,6 +129,8 @@ const flagTypeOrder: FlagType[] = [
   'matter_open', 
   'conflicts', 
   'no_cm_number',
+  'no_mma',
+  'no_billing_partner',
   'no_budget_finalized', 
   'no_assumptions', 
   'no_start_date', 
@@ -262,6 +278,10 @@ export default function Flags() {
       if (!matter.start_date) flags.push('no_start_date');
       if (matter.is_multi_client && mattersWithInvalidSplit.has(matter.id)) flags.push('invalid_client_split');
       if (!matter.cm_number || matter.cm_number.trim() === '') flags.push('no_cm_number');
+      // Cast to any to access new field until types are regenerated
+      const mma = (matter as any).matter_managing_attorney;
+      if (!mma || mma.trim() === '') flags.push('no_mma');
+      if (!matter.lead_partner || matter.lead_partner.trim() === '') flags.push('no_billing_partner');
       
       return {
         id: matter.id,

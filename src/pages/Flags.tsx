@@ -17,10 +17,20 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
 import { useMatters } from '@/lib/hooks/useMatters';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth';
+import { format } from 'date-fns';
 import { 
   Flag, 
   FileSignature, 
@@ -33,14 +43,15 @@ import {
   X,
   Calculator,
   FileText,
-  Calendar,
+  Calendar as CalendarIcon,
   Users,
   Hash,
   UserX,
-  Briefcase
+  Briefcase,
+  Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
 type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split' | 'no_cm_number' | 'no_mma' | 'no_billing_partner';
@@ -93,7 +104,7 @@ const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; descr
   },
   no_start_date: {
     label: 'No Start Date',
-    icon: <Calendar className="h-4 w-4" />,
+    icon: <CalendarIcon className="h-4 w-4" />,
     description: 'No start date logged for this matter',
     field: 'start_date'
   },
@@ -113,13 +124,13 @@ const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; descr
     label: 'MMA Not Specified',
     icon: <UserX className="h-4 w-4" />,
     description: 'Matter Managing Attorney not specified',
-    field: null
+    field: 'matter_managing_attorney'
   },
   no_billing_partner: {
     label: 'Billing Partner Not Specified',
     icon: <Briefcase className="h-4 w-4" />,
     description: 'Billing partner not specified for this matter',
-    field: null
+    field: 'lead_partner'
   },
 };
 
@@ -137,6 +148,184 @@ const flagTypeOrder: FlagType[] = [
   'invalid_client_split'
 ];
 
+// Inline editor component for MMA and Billing Partner flags
+function PersonInlineEditor({ 
+  matterId, 
+  matterName,
+  fieldName,
+  userName,
+  onUpdate 
+}: { 
+  matterId: string; 
+  matterName: string;
+  fieldName: 'matter_managing_attorney' | 'lead_partner';
+  userName: string | null;
+  onUpdate: (id: string, data: any) => Promise<void>;
+}) {
+  const [isMe, setIsMe] = useState(false);
+  const [customName, setCustomName] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
+
+  const handleMeChange = async (checked: boolean) => {
+    if (checked && userName) {
+      setIsMe(true);
+      setCustomName('');
+      setIsSaving(true);
+      try {
+        await onUpdate(matterId, { [fieldName]: userName });
+        toast({
+          title: "Updated",
+          description: `${fieldName === 'matter_managing_attorney' ? 'MMA' : 'Billing Partner'} set to ${userName} for ${matterName}`,
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to update. Please try again.",
+          variant: "destructive",
+        });
+        setIsMe(false);
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      setIsMe(false);
+    }
+  };
+
+  const handleCustomNameSave = async () => {
+    if (!customName.trim()) return;
+    setIsSaving(true);
+    try {
+      await onUpdate(matterId, { [fieldName]: customName.trim() });
+      toast({
+        title: "Updated",
+        description: `${fieldName === 'matter_managing_attorney' ? 'MMA' : 'Billing Partner'} set to ${customName.trim()} for ${matterName}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+      <div className="flex items-center gap-1.5">
+        <Checkbox 
+          id={`me-${matterId}-${fieldName}`}
+          checked={isMe}
+          onCheckedChange={handleMeChange}
+          disabled={isSaving || !userName}
+        />
+        <label 
+          htmlFor={`me-${matterId}-${fieldName}`} 
+          className="text-xs text-muted-foreground cursor-pointer"
+        >
+          Me
+        </label>
+      </div>
+      <div className="flex items-center gap-1">
+        <Input
+          placeholder="Name..."
+          value={customName}
+          onChange={(e) => setCustomName(e.target.value)}
+          className="h-7 w-24 text-xs"
+          disabled={isSaving || isMe}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleCustomNameSave();
+            }
+          }}
+        />
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 w-7 p-0"
+          disabled={isSaving || isMe || !customName.trim()}
+          onClick={handleCustomNameSave}
+        >
+          {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// Inline date picker for start date flag
+function DateInlineEditor({ 
+  matterId, 
+  matterName,
+  onUpdate 
+}: { 
+  matterId: string; 
+  matterName: string;
+  onUpdate: (id: string, data: any) => Promise<void>;
+}) {
+  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [open, setOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
+
+  const handleDateSelect = async (selectedDate: Date | undefined) => {
+    if (!selectedDate) return;
+    setDate(selectedDate);
+    setIsSaving(true);
+    try {
+      await onUpdate(matterId, { start_date: format(selectedDate, 'yyyy-MM-dd') });
+      toast({
+        title: "Updated",
+        description: `Start date set to ${format(selectedDate, 'PP')} for ${matterName}`,
+      });
+      setOpen(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-7 text-xs gap-1"
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <Loader2 className="h-3 w-3 animate-spin" />
+            ) : (
+              <CalendarIcon className="h-3 w-3" />
+            )}
+            Set Date
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="end">
+          <Calendar
+            mode="single"
+            selected={date}
+            onSelect={handleDateSelect}
+            initialFocus
+            className="pointer-events-auto"
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 export default function Flags() {
   const { matters, isLoading, updateMatter } = useMatters();
   const { user } = useAuth();
@@ -148,6 +337,22 @@ export default function Flags() {
     matterName: string;
     flagType: FlagType;
   } | null>(null);
+
+  // Fetch current user's profile for the "Me" checkbox
+  const { data: userProfile } = useQuery({
+    queryKey: ['user-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
 
   const scrollToSection = (type: FlagType) => {
     const ref = sectionRefs.current[type];
@@ -246,7 +451,7 @@ export default function Flags() {
     try {
       await updateMatter.mutateAsync({
         id: matterId,
-        [fieldToUpdate]: fieldToUpdate === 'start_date' ? new Date().toISOString().split('T')[0] : true
+        [fieldToUpdate]: true
       });
       
       toast({
@@ -262,6 +467,10 @@ export default function Flags() {
     }
     
     setConfirmDialog(null);
+  };
+
+  const handleInlineUpdate = async (matterId: string, data: any) => {
+    await updateMatter.mutateAsync({ id: matterId, ...data });
   };
 
   // Build flagged matters list
@@ -303,6 +512,47 @@ export default function Flags() {
   });
 
   const totalFlags = flagTypeOrder.reduce((sum, type) => sum + mattersByFlagType[type].length, 0);
+
+  // Check if flag type has inline editor
+  const hasInlineEditor = (type: FlagType) => {
+    return type === 'no_mma' || type === 'no_billing_partner' || type === 'no_start_date';
+  };
+
+  // Render inline editor based on flag type
+  const renderInlineEditor = (type: FlagType, matter: FlaggedMatter) => {
+    if (type === 'no_mma') {
+      return (
+        <PersonInlineEditor
+          matterId={matter.id}
+          matterName={matter.matter_name}
+          fieldName="matter_managing_attorney"
+          userName={userProfile?.full_name || null}
+          onUpdate={handleInlineUpdate}
+        />
+      );
+    }
+    if (type === 'no_billing_partner') {
+      return (
+        <PersonInlineEditor
+          matterId={matter.id}
+          matterName={matter.matter_name}
+          fieldName="lead_partner"
+          userName={userProfile?.full_name || null}
+          onUpdate={handleInlineUpdate}
+        />
+      );
+    }
+    if (type === 'no_start_date') {
+      return (
+        <DateInlineEditor
+          matterId={matter.id}
+          matterName={matter.matter_name}
+          onUpdate={handleInlineUpdate}
+        />
+      );
+    }
+    return null;
+  };
 
   if (isLoading) {
     return (
@@ -376,7 +626,8 @@ export default function Flags() {
               if (!mattersWithFlag || mattersWithFlag.length === 0) return null;
               
               const config = flagConfig[type];
-              const canClear = config.field !== null;
+              const canClear = config.field !== null && !hasInlineEditor(type);
+              const showInlineEditor = hasInlineEditor(type);
               
               return (
                 <Card 
@@ -415,6 +666,7 @@ export default function Flags() {
                             </div>
                             <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
                           </Link>
+                          {showInlineEditor && renderInlineEditor(type, matter)}
                           {canClear && (
                             <TooltipProvider delayDuration={100}>
                               <Tooltip>

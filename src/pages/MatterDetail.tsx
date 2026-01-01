@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -590,6 +591,91 @@ export default function MatterDetail() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {/* Financial Trends Chart - only for non-pipeline matters with snapshots */}
+        {!isPipeline && snapshots && snapshots.length > 0 && (
+          <Card className="shadow-card">
+            <CardHeader>
+              <CardTitle className="text-lg font-heading">Financial Trends</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart 
+                    data={(() => {
+                      // Sort snapshots by date and format for chart
+                      const sortedSnapshots = [...snapshots]
+                        .sort((a, b) => a.as_of_date.localeCompare(b.as_of_date))
+                        .map(snap => ({
+                          date: format(new Date(snap.as_of_date), 'MMM d'),
+                          wip: snap.wip_amount || 0,
+                          ar: snap.billed_amount || 0,
+                          paid: snap.paid_amount || 0,
+                        }));
+                      return sortedSnapshots;
+                    })()}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="date" className="text-xs" />
+                    <YAxis 
+                      className="text-xs" 
+                      tickFormatter={(value) => {
+                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                        if (value >= 1000) return `${(value / 1000).toFixed(0)}k`;
+                        return value.toString();
+                      }}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => formatCurrency(value, currency)}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: 'var(--radius)',
+                      }}
+                    />
+                    <Legend />
+                    <ReferenceLine 
+                      y={budget} 
+                      stroke="hsl(var(--destructive))" 
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      label={{ 
+                        value: 'Budget', 
+                        position: 'right',
+                        fill: 'hsl(var(--destructive))',
+                        fontSize: 12
+                      }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="wip" 
+                      name="WIP"
+                      stroke="hsl(var(--chart-3))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--chart-3))' }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="ar" 
+                      name="AR"
+                      stroke="hsl(var(--chart-1))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--chart-1))' }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="paid" 
+                      name="Paid"
+                      stroke="hsl(var(--chart-2))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--chart-2))' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
         )}
 
         {/* Category & Status */}

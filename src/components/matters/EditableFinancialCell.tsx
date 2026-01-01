@@ -8,9 +8,10 @@ interface EditableFinancialCellProps {
   currency: string;
   onSave: (value: number) => Promise<void>;
   className?: string;
+  compact?: boolean;
 }
 
-export function EditableFinancialCell({ value, currency, onSave, className }: EditableFinancialCellProps) {
+export function EditableFinancialCell({ value, currency, onSave, className, compact }: EditableFinancialCellProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState(value.toString());
   const [isSaving, setIsSaving] = useState(false);
@@ -91,26 +92,29 @@ export function EditableFinancialCell({ value, currency, onSave, className }: Ed
               if (!isSaving) handleCancel();
             }, 150);
           }}
-          className="h-7 w-24 text-right text-sm"
+          className={cn(
+            "text-right",
+            compact ? "h-5 w-16 text-xs px-1" : "h-7 w-24 text-sm"
+          )}
           disabled={isSaving}
         />
         {isSaving ? (
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <Loader2 className={cn("animate-spin text-muted-foreground", compact ? "h-3 w-3" : "h-4 w-4")} />
         ) : (
           <>
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={handleSave}
-              className="p-1 hover:bg-success/20 rounded text-success"
+              className="p-0.5 hover:bg-success/20 rounded text-success"
             >
-              <Check className="h-3 w-3" />
+              <Check className={compact ? "h-2.5 w-2.5" : "h-3 w-3"} />
             </button>
             <button
               onMouseDown={(e) => e.preventDefault()}
               onClick={handleCancel}
-              className="p-1 hover:bg-destructive/20 rounded text-destructive"
+              className="p-0.5 hover:bg-destructive/20 rounded text-destructive"
             >
-              <X className="h-3 w-3" />
+              <X className={compact ? "h-2.5 w-2.5" : "h-3 w-3"} />
             </button>
           </>
         )}
@@ -122,15 +126,19 @@ export function EditableFinancialCell({ value, currency, onSave, className }: Ed
     <button
       onClick={() => setIsEditing(true)}
       className={cn(
-        "text-right w-full px-2 py-1 rounded transition-all cursor-pointer group",
+        "text-right rounded transition-all cursor-pointer group",
         "border border-dashed border-primary/30 hover:border-primary hover:bg-primary/5",
+        compact ? "px-1 py-0 text-xs" : "w-full px-2 py-1",
         className
       )}
       title="Click to edit"
     >
-      <span className="flex items-center justify-end gap-1">
+      <span className={cn("flex items-center justify-end", compact ? "gap-0.5" : "gap-1")}>
         {formatCurrency(value)}
-        <Pencil className="h-3 w-3 text-primary/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <Pencil className={cn(
+          "text-primary/50 opacity-0 group-hover:opacity-100 transition-opacity",
+          compact ? "h-2 w-2" : "h-3 w-3"
+        )} />
       </span>
     </button>
   );

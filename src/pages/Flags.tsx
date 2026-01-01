@@ -30,7 +30,7 @@ import { useMatters } from '@/lib/hooks/useMatters';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth';
-import { format } from 'date-fns';
+import { format, differenceInDays, parseISO } from 'date-fns';
 import { 
   Flag, 
   FileSignature, 
@@ -54,7 +54,7 @@ import { cn } from '@/lib/utils';
 import { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
-type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split' | 'no_cm_number' | 'no_mma' | 'no_billing_partner' | 'no_lc_billing';
+type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split' | 'no_cm_number' | 'no_mma' | 'no_billing_partner' | 'no_lc_billing' | 'stale_lc_financials';
 
 interface FlaggedMatter {
   id: string;
@@ -138,6 +138,12 @@ const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; descr
     description: 'Local counsel fee exists but billing method not specified',
     field: 'local_counsel_billing'
   },
+  stale_lc_financials: {
+    label: 'Stale LC Financials',
+    icon: <CalendarIcon className="h-4 w-4" />,
+    description: 'Local counsel financials not updated in 10+ days (Disbursement mode)',
+    field: null
+  },
 };
 
 const flagTypeOrder: FlagType[] = [
@@ -149,6 +155,7 @@ const flagTypeOrder: FlagType[] = [
   'no_mma',
   'no_billing_partner',
   'no_lc_billing',
+  'stale_lc_financials',
   'no_budget_finalized', 
   'no_assumptions', 
   'no_start_date', 
@@ -502,6 +509,20 @@ export default function Flags() {
       const localCounselFee = Number(matter.local_counsel_fee) || 0;
       if (localCounselFee > 0 && (!matter.local_counsel_billing || matter.local_counsel_billing.trim() === '')) {
         flags.push('no_lc_billing');
+      }
+      
+      // Stale LC financials check - only for Disbursement mode
+      if (localCounselFee > 0 && matter.local_counsel_billing === 'Disb') {
+        const lcLastUpdated = (matter as any).lc_last_updated;
+        if (!lcLastUpdated) {
+          // No LC financials recorded at all
+          flags.push('stale_lc_financials');
+        } else {
+          const daysSinceUpdate = differenceInDays(new Date(), parseISO(lcLastUpdated));
+          if (daysSinceUpdate >= 10) {
+            flags.push('stale_lc_financials');
+          }
+        }
       }
       
       return {

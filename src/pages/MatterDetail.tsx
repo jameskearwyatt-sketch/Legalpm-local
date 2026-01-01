@@ -20,6 +20,7 @@ import {
 import { useMatter, useMatters, MatterCategory, MatterStage, FeeType, MatterSource, PipelineOutcome } from '@/lib/hooks/useMatters';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { BudgetSection } from '@/components/matters/BudgetSection';
+import { AssumptionsSection } from '@/components/matters/AssumptionsSection';
 import { useClients } from '@/lib/hooks/useClients';
 import { useExchangeRates, getExchangeRate } from '@/lib/hooks/useExchangeRates';
 import { useMatterClients, UpdateMatterClientInput } from '@/lib/hooks/useMatterClients';
@@ -731,6 +732,11 @@ export default function MatterDetail() {
         {/* Budget Section - only for non-pipeline matters */}
         {!isPipeline && (
           <BudgetSection matterId={id!} currency={currency} />
+        )}
+
+        {/* Assumptions Section - only for non-pipeline matters */}
+        {!isPipeline && (
+          <AssumptionsSection matterId={id!} />
         )}
 
         {/* Pipeline Information (conditionally shown) */}

@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.parse-document-text]
 verify_jwt = false
+
+[functions.extract-assumptions]
+verify_jwt = false

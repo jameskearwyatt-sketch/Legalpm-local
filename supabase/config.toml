@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.summarize-amendment-rationale]
 verify_jwt = false
+
+[functions.parse-document-text]
+verify_jwt = false

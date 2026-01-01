@@ -44,7 +44,7 @@ export default function Dashboard() {
 
   const kpiCards = [
     {
-      title: 'Live Matters: BM Budget',
+      title: 'Live Matters: Total BM Budget',
       value: formatCurrency(stats?.totalBudget || 0),
       icon: <DollarSign className="h-5 w-5" />,
       variant: 'default' as const,

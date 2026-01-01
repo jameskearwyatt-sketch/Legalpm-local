@@ -401,14 +401,14 @@ export default function Matters() {
                           <TableHead className="text-right min-w-[85px]">
                             <SortableHeader field="bm_fee">BM Budget</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right min-w-[85px]">
-                            <SortableHeader field="local_counsel">Local</SortableHeader>
+                          <TableHead className="text-right min-w-[95px]">
+                            <SortableHeader field="local_counsel">Local Budget</SortableHeader>
                           </TableHead>
                           <TableHead className="text-right min-w-[110px]">
                             Financials
                           </TableHead>
-                          <TableHead className="text-right min-w-[80px]">
-                            <SortableHeader field="budget_burn">Burn</SortableHeader>
+                          <TableHead className="text-right min-w-[95px]">
+                            <SortableHeader field="budget_burn">Budget Burn</SortableHeader>
                           </TableHead>
                           <TableHead className="text-right min-w-[80px]">
                             <SortableHeader field="headroom">Headroom</SortableHeader>

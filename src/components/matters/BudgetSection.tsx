@@ -35,6 +35,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useBudgetVersions, DraftLineItem, BudgetLineItem } from '@/lib/hooks/useBudgetVersions';
+import { useLocalCounsels } from '@/lib/hooks/useLocalCounsels';
 import { useMatter } from '@/lib/hooks/useMatters';
 import { useAssumptions } from '@/lib/hooks/useAssumptions';
 import { extractAssumptionsFromText, ExtractedAssumption, labelColors } from '@/components/matters/AssumptionsSection';
@@ -63,6 +64,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     deleteBudgetVersion,
     fetchLineItems,
   } = useBudgetVersions(matterId);
+  
+  const { localCounsels, syncLocalCounselsFromBudget } = useLocalCounsels(matterId);
 
   const [draftItems, setDraftItems] = useState<DraftLineItem[]>([]);
   const [notes, setNotes] = useState('');
@@ -123,6 +126,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         work_item: item.work_item,
         provider: item.provider,
         fee_amount: item.fee_amount,
+        lc_firm_name: item.lc_firm_name || undefined,
       })));
     } else if (!hasExistingBudget && draftItems.length === 0) {
       // Add one empty line for new budgets
@@ -195,6 +199,12 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         newItem.fee_amount = parsedValue;
       } else if (field === 'provider') {
         newItem.provider = value as 'Baker McKenzie' | 'Local Counsel';
+        // Clear LC firm name when switching away from Local Counsel
+        if (value !== 'Local Counsel') {
+          newItem.lc_firm_name = undefined;
+        }
+      } else if (field === 'lc_firm_name') {
+        newItem.lc_firm_name = value as string;
       } else {
         newItem.work_item = value as string;
       }
@@ -202,6 +212,14 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     });
     setDraftItems(updated);
   };
+  
+  // Get unique LC firm names from current draft items and existing local counsels
+  const existingLcFirmNames = [
+    ...new Set([
+      ...localCounsels.map(lc => lc.firm_name),
+      ...draftItems.filter(item => item.provider === 'Local Counsel' && item.lc_firm_name).map(item => item.lc_firm_name!)
+    ])
+  ].sort();
 
   // Import from engagement letter
   const handleImportFromEngagementLetter = async (textContent: string) => {
@@ -413,6 +431,15 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       line_items: validItems,
       notes: notes.trim() || undefined,
     });
+    
+    // Sync local counsel entries from budget line items
+    const lcLineItems = validItems
+      .filter(item => item.provider === 'Local Counsel' && item.lc_firm_name)
+      .map(item => ({ firm_name: item.lc_firm_name!, fee_amount: item.fee_amount }));
+    
+    if (lcLineItems.length > 0) {
+      await syncLocalCounselsFromBudget.mutateAsync(lcLineItems);
+    }
 
     setNotes('');
     setIsEditing(false);
@@ -731,34 +758,140 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
               // Editing mode with comparison columns
               if (isEditing && hasExistingBudget) {
                 return (
+                  <div key={index} className="space-y-1">
+                    <div 
+                      className={cn(
+                        "grid grid-cols-12 gap-2 items-center rounded-md transition-colors py-1",
+                        isAiSuggested && "bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700 px-1 -mx-1",
+                        isNewItem && !isAiSuggested && "bg-green-50 dark:bg-green-950/30 ring-1 ring-green-300 dark:ring-green-700 px-1 -mx-1"
+                      )}
+                    >
+                      <div className="col-span-4">
+                        <Input
+                          value={item.work_item}
+                          onChange={(e) => handleItemEdit(index, 'work_item', e.target.value)}
+                          placeholder="e.g., Due diligence review"
+                          className={cn(
+                            "text-sm",
+                            isAiSuggested && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-medium",
+                            isNewItem && !isAiSuggested && "border-green-400 dark:border-green-600"
+                          )}
+                        />
+                      </div>
+                      <div className="col-span-2">
+                        <Select
+                          value={item.provider}
+                          onValueChange={(v) => handleItemEdit(index, 'provider', v)}
+                        >
+                          <SelectTrigger className={cn(
+                            "text-sm",
+                            isAiSuggested && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300"
+                          )}>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {providerOptions.map((p) => (
+                              <SelectItem key={p} value={p}>{p}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {/* Current (original) value - read only */}
+                      <div className="col-span-2 text-right">
+                        {originalItem ? (
+                          <span className="text-muted-foreground text-sm">
+                            {formatCurrency(originalDisplayFee, differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-green-600 dark:text-green-400 italic">NEW</span>
+                        )}
+                      </div>
+                      {/* New value - editable */}
+                      <div className="col-span-3">
+                        <Input
+                          type="number"
+                          value={isInBillingCurrencyMode 
+                            ? (Math.round(newDisplayFee) || '') 
+                            : (newFee || '')}
+                          onChange={(e) => handleItemEdit(index, 'fee_amount', e.target.value)}
+                          placeholder="0"
+                          className={cn(
+                            "text-right text-sm",
+                            isAiSuggested && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-medium",
+                            hasChanged && !isAiSuggested && "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/30 font-medium",
+                            isNewItem && !isAiSuggested && "border-green-400 dark:border-green-600"
+                          )}
+                        />
+                      </div>
+                      <div className="col-span-1 flex justify-center">
+                        {draftItems.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => removeLineItem(index)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {/* LC Firm Name input - shown when provider is Local Counsel */}
+                    {item.provider === 'Local Counsel' && (
+                      <div className="grid grid-cols-12 gap-2 items-center pl-4">
+                        <div className="col-span-4">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">LC Firm:</span>
+                            <Input
+                              value={item.lc_firm_name || ''}
+                              onChange={(e) => handleItemEdit(index, 'lc_firm_name', e.target.value)}
+                              placeholder="e.g., Smith & Partners"
+                              className="text-sm h-8"
+                              list={`lc-firms-${index}`}
+                            />
+                            {existingLcFirmNames.length > 0 && (
+                              <datalist id={`lc-firms-${index}`}>
+                                {existingLcFirmNames.map(name => (
+                                  <option key={name} value={name} />
+                                ))}
+                              </datalist>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              
+              // Normal viewing mode (no budget yet or just viewing)
+              return (
+                <div key={index} className="space-y-1">
                   <div 
-                    key={index} 
                     className={cn(
-                      "grid grid-cols-12 gap-2 items-center rounded-md transition-colors py-1",
-                      isAiSuggested && "bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700 px-1 -mx-1",
-                      isNewItem && !isAiSuggested && "bg-green-50 dark:bg-green-950/30 ring-1 ring-green-300 dark:ring-green-700 px-1 -mx-1"
+                      "grid grid-cols-12 gap-2 items-center rounded-md transition-colors",
+                      isAiSuggested && isEditing && "bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700 p-1 -mx-1"
                     )}
                   >
-                    <div className="col-span-4">
+                    <div className="col-span-5">
                       <Input
                         value={item.work_item}
                         onChange={(e) => handleItemEdit(index, 'work_item', e.target.value)}
                         placeholder="e.g., Due diligence review"
+                        disabled={!isEditing && hasExistingBudget}
                         className={cn(
-                          "text-sm",
-                          isAiSuggested && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-medium",
-                          isNewItem && !isAiSuggested && "border-green-400 dark:border-green-600"
+                          isAiSuggested && isEditing && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-medium"
                         )}
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-3">
                       <Select
                         value={item.provider}
                         onValueChange={(v) => handleItemEdit(index, 'provider', v)}
+                        disabled={!isEditing && hasExistingBudget}
                       >
                         <SelectTrigger className={cn(
-                          "text-sm",
-                          isAiSuggested && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300"
+                          isAiSuggested && isEditing && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300"
                         )}>
                           <SelectValue />
                         </SelectTrigger>
@@ -769,35 +902,32 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                         </SelectContent>
                       </Select>
                     </div>
-                    {/* Current (original) value - read only */}
-                    <div className="col-span-2 text-right">
-                      {originalItem ? (
-                        <span className="text-muted-foreground text-sm">
-                          {formatCurrency(originalDisplayFee, differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency)}
-                        </span>
+                    <div className="col-span-3">
+                      {!hasExistingBudget ? (
+                        <Input
+                          type="number"
+                          value={isInBillingCurrencyMode 
+                            ? (Math.round((item.fee_amount || 0) * mandatedRate) || '') 
+                            : (item.fee_amount || '')}
+                          onChange={(e) => handleItemEdit(index, 'fee_amount', e.target.value)}
+                          placeholder="0"
+                          className="text-right"
+                        />
                       ) : (
-                        <span className="text-xs text-green-600 dark:text-green-400 italic">NEW</span>
+                        <div className="text-right">
+                          <div className="font-medium">
+                            {formatCurrency(displayAmount, differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency)}
+                          </div>
+                          {showConversion && (
+                            <div className="text-xs text-muted-foreground">
+                              (quoted: {formatCurrency(item.fee_amount || 0, quoteCurrency)})
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
-                    {/* New value - editable */}
-                    <div className="col-span-3">
-                      <Input
-                        type="number"
-                        value={isInBillingCurrencyMode 
-                          ? (Math.round(newDisplayFee) || '') 
-                          : (newFee || '')}
-                        onChange={(e) => handleItemEdit(index, 'fee_amount', e.target.value)}
-                        placeholder="0"
-                        className={cn(
-                          "text-right text-sm",
-                          isAiSuggested && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-medium",
-                          hasChanged && !isAiSuggested && "border-amber-400 dark:border-amber-600 bg-amber-50 dark:bg-amber-950/30 font-medium",
-                          isNewItem && !isAiSuggested && "border-green-400 dark:border-green-600"
-                        )}
-                      />
-                    </div>
                     <div className="col-span-1 flex justify-center">
-                      {draftItems.length > 1 && (
+                      {!hasExistingBudget && draftItems.length > 1 && (
                         <Button
                           variant="ghost"
                           size="icon"
@@ -809,83 +939,38 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                       )}
                     </div>
                   </div>
-                );
-              }
-              
-              // Normal viewing mode (no budget yet or just viewing)
-              return (
-                <div 
-                  key={index} 
-                  className={cn(
-                    "grid grid-cols-12 gap-2 items-center rounded-md transition-colors",
-                    isAiSuggested && isEditing && "bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700 p-1 -mx-1"
-                  )}
-                >
-                  <div className="col-span-5">
-                    <Input
-                      value={item.work_item}
-                      onChange={(e) => handleItemEdit(index, 'work_item', e.target.value)}
-                      placeholder="e.g., Due diligence review"
-                      disabled={!isEditing && hasExistingBudget}
-                      className={cn(
-                        isAiSuggested && isEditing && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-medium"
-                      )}
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <Select
-                      value={item.provider}
-                      onValueChange={(v) => handleItemEdit(index, 'provider', v)}
-                      disabled={!isEditing && hasExistingBudget}
-                    >
-                      <SelectTrigger className={cn(
-                        isAiSuggested && isEditing && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300"
-                      )}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {providerOptions.map((p) => (
-                          <SelectItem key={p} value={p}>{p}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-3">
-                    {!hasExistingBudget ? (
-                      <Input
-                        type="number"
-                        value={isInBillingCurrencyMode 
-                          ? (Math.round((item.fee_amount || 0) * mandatedRate) || '') 
-                          : (item.fee_amount || '')}
-                        onChange={(e) => handleItemEdit(index, 'fee_amount', e.target.value)}
-                        placeholder="0"
-                        className="text-right"
-                      />
-                    ) : (
-                      <div className="text-right">
-                        <div className="font-medium">
-                          {formatCurrency(displayAmount, differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency)}
+                  {/* LC Firm Name input - shown when provider is Local Counsel and editing/creating */}
+                  {item.provider === 'Local Counsel' && (!hasExistingBudget || isEditing) && (
+                    <div className="grid grid-cols-12 gap-2 items-center pl-4">
+                      <div className="col-span-5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">LC Firm:</span>
+                          <Input
+                            value={item.lc_firm_name || ''}
+                            onChange={(e) => handleItemEdit(index, 'lc_firm_name', e.target.value)}
+                            placeholder="e.g., Smith & Partners"
+                            className="text-sm h-8"
+                            list={`lc-firms-normal-${index}`}
+                          />
+                          {existingLcFirmNames.length > 0 && (
+                            <datalist id={`lc-firms-normal-${index}`}>
+                              {existingLcFirmNames.map(name => (
+                                <option key={name} value={name} />
+                              ))}
+                            </datalist>
+                          )}
                         </div>
-                        {showConversion && (
-                          <div className="text-xs text-muted-foreground">
-                            (quoted: {formatCurrency(item.fee_amount || 0, quoteCurrency)})
-                          </div>
-                        )}
                       </div>
-                    )}
-                  </div>
-                  <div className="col-span-1 flex justify-center">
-                    {!hasExistingBudget && draftItems.length > 1 && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => removeLineItem(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                  {/* LC Firm Name display - shown when viewing existing budget */}
+                  {item.provider === 'Local Counsel' && hasExistingBudget && !isEditing && item.lc_firm_name && (
+                    <div className="grid grid-cols-12 gap-2 items-center pl-4">
+                      <div className="col-span-5">
+                        <span className="text-xs text-muted-foreground">LC Firm: {item.lc_firm_name}</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })

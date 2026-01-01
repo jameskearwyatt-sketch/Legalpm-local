@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -34,6 +36,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useBudgetVersions, DraftLineItem, BudgetLineItem } from '@/lib/hooks/useBudgetVersions';
 import { useMatter } from '@/lib/hooks/useMatters';
+import { useAssumptions } from '@/lib/hooks/useAssumptions';
+import { extractAssumptionsFromText, ExtractedAssumption, labelColors } from '@/components/matters/AssumptionsSection';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -94,6 +98,15 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [isImporting, setIsImporting] = useState(false);
   const [importTab, setImportTab] = useState<'paste' | 'upload'>('paste');
   const fileInputRef = useState<HTMLInputElement | null>(null);
+  
+  // Assumptions import after budget import
+  const [showAssumptionsOffer, setShowAssumptionsOffer] = useState(false);
+  const [pendingAssumptionsText, setPendingAssumptionsText] = useState('');
+  const [isExtractingAssumptions, setIsExtractingAssumptions] = useState(false);
+  const [extractedAssumptions, setExtractedAssumptions] = useState<ExtractedAssumption[]>([]);
+  const [showAssumptionsPreview, setShowAssumptionsPreview] = useState(false);
+  
+  const { createBulkAssumptions } = useAssumptions(matterId);
 
   const hasExistingBudget = versions.length > 0;
 
@@ -231,8 +244,11 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       }
 
       setIsImportOpen(false);
-      setImportText('');
       toast.success(`Imported ${items.length} budget items as draft`);
+      
+      // Offer to import assumptions from the same text
+      setPendingAssumptionsText(textContent);
+      setShowAssumptionsOffer(true);
     } catch (error) {
       console.error('Error importing engagement letter:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to parse engagement letter');
@@ -303,6 +319,70 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     }
 
     toast.error('Unsupported file type. Please upload a PDF, Word document, or text file.');
+  };
+
+  // Assumptions import handlers
+  const handleExtractAssumptions = async () => {
+    if (!pendingAssumptionsText.trim()) return;
+    
+    setIsExtractingAssumptions(true);
+    try {
+      const extracted = await extractAssumptionsFromText(pendingAssumptionsText);
+      if (extracted.length > 0) {
+        setExtractedAssumptions(extracted);
+        setShowAssumptionsOffer(false);
+        setShowAssumptionsPreview(true);
+        toast.success(`Found ${extracted.length} assumptions`);
+      } else {
+        toast.info('No assumptions found in the document');
+        setShowAssumptionsOffer(false);
+      }
+    } catch (error) {
+      console.error('Error extracting assumptions:', error);
+      toast.error('Failed to extract assumptions');
+    } finally {
+      setIsExtractingAssumptions(false);
+    }
+  };
+
+  const toggleAssumptionSelection = (index: number) => {
+    setExtractedAssumptions(prev => 
+      prev.map((a, i) => i === index ? { ...a, selected: !a.selected } : a)
+    );
+  };
+
+  const selectedAssumptionsCount = extractedAssumptions.filter(a => a.selected).length;
+
+  const handleImportSelectedAssumptions = async () => {
+    const selected = extractedAssumptions.filter(a => a.selected);
+    if (selected.length === 0) {
+      toast.error('Please select at least one assumption');
+      return;
+    }
+
+    try {
+      await createBulkAssumptions.mutateAsync(
+        selected.map(a => ({
+          label: a.label,
+          assumption_text: a.assumption_text,
+          source_document: 'Engagement Letter Import',
+        }))
+      );
+      setShowAssumptionsPreview(false);
+      setExtractedAssumptions([]);
+      setPendingAssumptionsText('');
+      setImportText('');
+    } catch (error) {
+      // Error handled in hook
+    }
+  };
+
+  const skipAssumptionsImport = () => {
+    setShowAssumptionsOffer(false);
+    setShowAssumptionsPreview(false);
+    setExtractedAssumptions([]);
+    setPendingAssumptionsText('');
+    setImportText('');
   };
 
   // Calculate totals (current draft)
@@ -1436,6 +1516,120 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           </Collapsible>
         )}
       </CardContent>
+
+      {/* Assumptions Import Offer Dialog */}
+      <Dialog open={showAssumptionsOffer} onOpenChange={setShowAssumptionsOffer}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Import Assumptions?</DialogTitle>
+            <DialogDescription>
+              Would you like to also extract and import assumptions from the same engagement letter?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={skipAssumptionsImport}>
+              Skip
+            </Button>
+            <Button onClick={handleExtractAssumptions} disabled={isExtractingAssumptions}>
+              {isExtractingAssumptions ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  Extracting...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-1" />
+                  Yes, Extract Assumptions
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assumptions Preview Dialog */}
+      <Dialog open={showAssumptionsPreview} onOpenChange={(open) => {
+        if (!open) skipAssumptionsImport();
+      }}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Import Assumptions</DialogTitle>
+            <DialogDescription>
+              Select the assumptions you want to import ({selectedAssumptionsCount} of {extractedAssumptions.length} selected)
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="flex gap-2 justify-end">
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setExtractedAssumptions(prev => prev.map(a => ({ ...a, selected: true })))}
+              >
+                Select All
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setExtractedAssumptions(prev => prev.map(a => ({ ...a, selected: false })))}
+              >
+                Deselect All
+              </Button>
+            </div>
+            
+            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
+              {extractedAssumptions.map((assumption, index) => (
+                <div 
+                  key={index}
+                  className={`border rounded-lg p-3 space-y-2 cursor-pointer transition-colors ${
+                    assumption.selected 
+                      ? 'bg-background border-primary/50' 
+                      : 'bg-muted/30 border-muted opacity-60'
+                  }`}
+                  onClick={() => toggleAssumptionSelection(index)}
+                >
+                  <div className="flex items-start gap-3">
+                    <Checkbox 
+                      checked={assumption.selected}
+                      onCheckedChange={() => toggleAssumptionSelection(index)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="mt-1"
+                    />
+                    <div className="flex-1 space-y-2">
+                      <Badge className={labelColors[assumption.label] || labelColors['Other']}>
+                        {assumption.label}
+                      </Badge>
+                      <p className="text-sm">{assumption.assumption_text}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={skipAssumptionsImport}>
+              Skip
+            </Button>
+            <Button 
+              onClick={handleImportSelectedAssumptions}
+              disabled={createBulkAssumptions.isPending || selectedAssumptionsCount === 0}
+            >
+              {createBulkAssumptions.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Check className="h-4 w-4 mr-1" />
+                  Import {selectedAssumptionsCount} Assumption{selectedAssumptionsCount !== 1 ? 's' : ''}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

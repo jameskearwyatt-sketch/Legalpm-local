@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -51,6 +51,12 @@ interface AssumptionsSectionProps {
   matterId: string;
 }
 
+export interface ExtractedAssumption {
+  label: string;
+  assumption_text: string;
+  selected: boolean;
+}
+
 // Color mapping for assumption labels
 const labelColors: Record<string, string> = {
   "Document Revisions": "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
@@ -70,6 +76,27 @@ const labelColors: Record<string, string> = {
   "Other": "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200",
 };
 
+// Export the label colors for use in other components
+export { labelColors };
+
+// Export a function to extract assumptions that can be reused
+export async function extractAssumptionsFromText(text: string): Promise<ExtractedAssumption[]> {
+  const { data, error } = await supabase.functions.invoke('extract-assumptions', {
+    body: { text },
+  });
+
+  if (error) throw error;
+  
+  if (data.assumptions && data.assumptions.length > 0) {
+    return data.assumptions.map((a: { label: string; assumption_text: string }) => ({
+      ...a,
+      selected: true, // Default all to selected
+    }));
+  }
+  
+  return [];
+}
+
 export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
   const { 
     assumptions, 
@@ -87,7 +114,7 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
   const [importText, setImportText] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
-  const [extractedAssumptions, setExtractedAssumptions] = useState<Array<{ label: string; assumption_text: string }>>([]);
+  const [extractedAssumptions, setExtractedAssumptions] = useState<ExtractedAssumption[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   
   // Add/Edit form state
@@ -165,16 +192,12 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
 
     setIsExtracting(true);
     try {
-      const { data, error } = await supabase.functions.invoke('extract-assumptions', {
-        body: { text: importText },
-      });
-
-      if (error) throw error;
+      const extracted = await extractAssumptionsFromText(importText);
       
-      if (data.assumptions && data.assumptions.length > 0) {
-        setExtractedAssumptions(data.assumptions);
+      if (extracted.length > 0) {
+        setExtractedAssumptions(extracted);
         setShowPreview(true);
-        toast.success(`Found ${data.assumptions.length} assumptions`);
+        toast.success(`Found ${extracted.length} assumptions`);
       } else {
         toast.info('No assumptions found in the document');
       }
@@ -186,12 +209,32 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
     }
   };
 
+  const toggleAssumptionSelection = (index: number) => {
+    setExtractedAssumptions(prev => 
+      prev.map((a, i) => i === index ? { ...a, selected: !a.selected } : a)
+    );
+  };
+
+  const selectAllAssumptions = () => {
+    setExtractedAssumptions(prev => prev.map(a => ({ ...a, selected: true })));
+  };
+
+  const deselectAllAssumptions = () => {
+    setExtractedAssumptions(prev => prev.map(a => ({ ...a, selected: false })));
+  };
+
+  const selectedCount = extractedAssumptions.filter(a => a.selected).length;
+
   const handleImportAssumptions = async () => {
-    if (extractedAssumptions.length === 0) return;
+    const selectedAssumptions = extractedAssumptions.filter(a => a.selected);
+    if (selectedAssumptions.length === 0) {
+      toast.error('Please select at least one assumption to import');
+      return;
+    }
 
     try {
       await createBulkAssumptions.mutateAsync(
-        extractedAssumptions.map(a => ({
+        selectedAssumptions.map(a => ({
           label: a.label,
           assumption_text: a.assumption_text,
           source_document: 'Engagement Letter Import',
@@ -466,28 +509,64 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
                 <>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h4 className="font-medium">
-                        Found {extractedAssumptions.length} assumptions
-                      </h4>
-                      <Button 
-                        variant="ghost" 
-                        size="sm"
-                        onClick={() => setShowPreview(false)}
-                      >
-                        Back to Text
-                      </Button>
+                      <div className="flex items-center gap-4">
+                        <h4 className="font-medium">
+                          Found {extractedAssumptions.length} assumptions
+                        </h4>
+                        <span className="text-sm text-muted-foreground">
+                          ({selectedCount} selected)
+                        </span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={selectAllAssumptions}
+                        >
+                          Select All
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={deselectAllAssumptions}
+                        >
+                          Deselect All
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={() => setShowPreview(false)}
+                        >
+                          Back to Text
+                        </Button>
+                      </div>
                     </div>
                     
                     <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
                       {extractedAssumptions.map((assumption, index) => (
                         <div 
                           key={index}
-                          className="border rounded-lg p-3 space-y-2"
+                          className={`border rounded-lg p-3 space-y-2 cursor-pointer transition-colors ${
+                            assumption.selected 
+                              ? 'bg-background border-primary/50' 
+                              : 'bg-muted/30 border-muted opacity-60'
+                          }`}
+                          onClick={() => toggleAssumptionSelection(index)}
                         >
-                          <Badge className={labelColors[assumption.label] || labelColors['Other']}>
-                            {assumption.label}
-                          </Badge>
-                          <p className="text-sm">{assumption.assumption_text}</p>
+                          <div className="flex items-start gap-3">
+                            <Checkbox 
+                              checked={assumption.selected}
+                              onCheckedChange={() => toggleAssumptionSelection(index)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-1"
+                            />
+                            <div className="flex-1 space-y-2">
+                              <Badge className={labelColors[assumption.label] || labelColors['Other']}>
+                                {assumption.label}
+                              </Badge>
+                              <p className="text-sm">{assumption.assumption_text}</p>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -499,7 +578,7 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
                     </Button>
                     <Button 
                       onClick={handleImportAssumptions}
-                      disabled={createBulkAssumptions.isPending}
+                      disabled={createBulkAssumptions.isPending || selectedCount === 0}
                     >
                       {createBulkAssumptions.isPending ? (
                         <>
@@ -509,7 +588,7 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
                       ) : (
                         <>
                           <Check className="h-4 w-4 mr-1" />
-                          Import {extractedAssumptions.length} Assumptions
+                          Import {selectedCount} Assumption{selectedCount !== 1 ? 's' : ''}
                         </>
                       )}
                     </Button>

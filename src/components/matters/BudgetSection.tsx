@@ -168,19 +168,25 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const isInBillingCurrencyMode = differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0;
 
   const updateLineItem = (index: number, field: keyof DraftLineItem, value: string | number) => {
-    const updated = [...draftItems];
-    if (field === 'fee_amount') {
-      let parsedValue = typeof value === 'string' ? parseFloat(value) || 0 : value;
-      // If in billing currency mode, convert back to quote currency for storage
-      if (isInBillingCurrencyMode && mandatedRate > 0) {
-        parsedValue = parsedValue / mandatedRate;
+    // Create new array with new object at index to avoid mutating originalItems
+    const updated = draftItems.map((item, i) => {
+      if (i !== index) return item;
+      // Create new object for the edited item
+      const newItem = { ...item };
+      if (field === 'fee_amount') {
+        let parsedValue = typeof value === 'string' ? parseFloat(value) || 0 : value;
+        // If in billing currency mode, convert back to quote currency for storage
+        if (isInBillingCurrencyMode && mandatedRate > 0) {
+          parsedValue = parsedValue / mandatedRate;
+        }
+        newItem.fee_amount = parsedValue;
+      } else if (field === 'provider') {
+        newItem.provider = value as 'Baker McKenzie' | 'Local Counsel';
+      } else {
+        newItem.work_item = value as string;
       }
-      updated[index][field] = parsedValue;
-    } else if (field === 'provider') {
-      updated[index][field] = value as 'Baker McKenzie' | 'Local Counsel';
-    } else {
-      updated[index][field] = value as string;
-    }
+      return newItem;
+    });
     setDraftItems(updated);
   };
 
@@ -297,8 +303,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   };
 
   const startEditing = () => {
-    // Store original items for comparison display
-    setOriginalItems([...draftItems]);
+    // Store DEEP COPY of original items for comparison display (prevent mutation)
+    setOriginalItems(draftItems.map(item => ({ ...item })));
     setIsEditing(true);
     if (draftItems.length === 0) {
       setDraftItems([{ work_item: '', provider: 'Baker McKenzie', fee_amount: 0 }]);

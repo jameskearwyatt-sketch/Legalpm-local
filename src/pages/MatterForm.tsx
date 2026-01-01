@@ -23,6 +23,7 @@ import { MultiClientSection, ClientAllocation } from '@/components/matters/Multi
 import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 import { z } from 'zod';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const matterSchema = z.object({
   client_id: z.string().min(1, 'Client is required'),
@@ -241,29 +242,40 @@ export default function MatterForm() {
       // Validate multi-client if enabled
       if (isMultiClient) {
         if (clientAllocations.length === 0) {
-          setErrors({ client_id: 'At least one client is required for multi-client matters' });
+          const msg = 'At least one client is required for multi-client matters';
+          setErrors({ client_id: msg });
+          toast.error(msg);
           return;
         }
         
         const totalPercentage = clientAllocations.reduce((sum, a) => sum + (a.fee_percentage || 0), 0);
         if (Math.abs(totalPercentage - 100) > 0.01) {
-          setErrors({ client_id: 'Fee percentages must total 100%' });
+          const msg = 'Fee percentages must total 100%';
+          setErrors({ client_id: msg });
+          toast.error(msg);
           return;
         }
         
-        if (!clientAllocations.some(a => a.is_master)) {
-          setErrors({ client_id: 'One client must be designated as the master matter' });
+        const hasMaster = clientAllocations.some(a => a.is_master === true);
+        if (!hasMaster) {
+          const msg = 'One client must be designated as the master matter';
+          setErrors({ client_id: msg });
+          toast.error(msg);
           return;
         }
         
-        const masterClient = clientAllocations.find(a => a.is_master);
+        const masterClient = clientAllocations.find(a => a.is_master === true);
         if (masterClient && !masterClient.cm_number) {
-          setErrors({ client_id: 'Master matter must have a C/M number' });
+          const msg = 'Master matter must have a C/M number';
+          setErrors({ client_id: msg });
+          toast.error(msg);
           return;
         }
         
         if (clientAllocations.some(a => !a.client_id)) {
-          setErrors({ client_id: 'All client allocations must have a client selected' });
+          const msg = 'All client allocations must have a client selected';
+          setErrors({ client_id: msg });
+          toast.error(msg);
           return;
         }
       }
@@ -276,7 +288,7 @@ export default function MatterForm() {
       // For multi-client, set client_id to the master client
       let dataToValidate = { ...formData };
       if (isMultiClient) {
-        const masterClient = clientAllocations.find(a => a.is_master);
+        const masterClient = clientAllocations.find(a => a.is_master === true);
         dataToValidate.client_id = masterClient?.client_id || '';
         dataToValidate.cm_number = masterClient?.cm_number || '';
       }

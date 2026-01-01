@@ -169,8 +169,13 @@ export function useMatters() {
         const budget = matter.agreed_budget_amount || 0;
         const feeUpperEnd = matter.fee_amount_upper_end || 0;
         
-        // Check for different billing currency scenario
+        // Local counsel financials (stored directly on matter)
         const matterAny = matter as any;
+        const lcWip = matterAny.lc_wip || 0;
+        const lcBilled = matterAny.lc_billed || 0;
+        const localCounselBilling = matterAny.local_counsel_billing;
+        
+        // Check for different billing currency scenario
         const differentBillingCurrency = matterAny.different_billing_currency ?? false;
         const quoteCurrency = matterAny.quote_currency || matter.fee_currency;
         const billingCurrency = matterAny.billing_currency || matter.fee_currency;
@@ -195,12 +200,28 @@ export function useMatters() {
           ? billingCurrency
           : matter.fee_currency;
         
-        const totalUsed = billedAmount + wipAmount;
+        // BM budget burn (from snapshots)
+        const bmTotalUsed = billedAmount + wipAmount;
+        
+        // LC budget burn (only for Disbursement mode, from matter fields)
+        const lcTotalUsed = localCounselBilling === 'Disb' ? (lcWip + lcBilled) : 0;
+        
+        // Total budget burn includes both BM and LC (when in Disb mode)
+        const totalUsed = bmTotalUsed + lcTotalUsed;
+        
         const remainingBudget = budget - totalUsed;
         const budgetUsedPercent = budget > 0 ? (totalUsed / budget) * 100 : 0;
         const collectionRate = billedAmount > 0 ? (paidAmount / billedAmount) * 100 : 0;
         
-        // Headroom calculation uses effective (billing currency) figures
+        // BM Headroom (BM Budget - BM Used)
+        const bmHeadroom = effectiveBmFee - bmTotalUsed;
+        const bmHeadroomPercent = effectiveBmFee > 0 ? (bmHeadroom / effectiveBmFee) * 100 : 0;
+        
+        // LC Headroom (LC Budget - LC Used) - only relevant for Disb mode
+        const lcHeadroom = effectiveLocalCounselFee - lcTotalUsed;
+        const lcHeadroomPercent = effectiveLocalCounselFee > 0 ? (lcHeadroom / effectiveLocalCounselFee) * 100 : 0;
+        
+        // Total Headroom (Total Budget - Total Used)
         const headroom = effectiveFeeUpperEnd - totalUsed;
         const headroomPercent = effectiveFeeUpperEnd > 0 ? (headroom / effectiveFeeUpperEnd) * 100 : 0;
 

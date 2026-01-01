@@ -65,36 +65,39 @@ export function MultiClientSection({
   }, [clientAllocations]);
 
   const addClient = () => {
-    onAllocationsChange([
-      ...clientAllocations,
-      {
-        client_id: '',
-        cm_number: '',
-        is_master: clientAllocations.length === 0, // First client is master by default
-        fee_percentage: 0,
-      },
-    ]);
+    const newAllocation: ClientAllocation = {
+      client_id: '',
+      cm_number: '',
+      is_master: clientAllocations.length === 0, // First client is master by default
+      fee_percentage: 0,
+    };
+    onAllocationsChange([...clientAllocations, newAllocation]);
   };
 
   const removeClient = (index: number) => {
-    const updated = clientAllocations.filter((_, i) => i !== index);
-    // If we removed the master, make the first remaining one the master
-    if (updated.length > 0 && !updated.some(a => a.is_master)) {
-      updated[0].is_master = true;
-    }
+    const removedWasMaster = clientAllocations[index]?.is_master === true;
+    const updated = clientAllocations
+      .filter((_, i) => i !== index)
+      .map((allocation, i) => ({
+        ...allocation,
+        // If we removed the master, make the first remaining one the master
+        is_master: removedWasMaster && i === 0 ? true : allocation.is_master === true,
+      }));
     onAllocationsChange(updated);
   };
 
   const updateAllocation = (index: number, field: keyof ClientAllocation, value: any) => {
+    // Prevent unchecking the master - you can only transfer it to another client
+    if (field === 'is_master' && value === false) {
+      // Don't allow unchecking the current master directly
+      return;
+    }
+    
     // Create a deep copy to avoid mutating state directly
     const updated = clientAllocations.map((allocation, i) => {
       // If setting a new master, unset others
       if (field === 'is_master' && value === true) {
-        if (i === index) {
-          return { ...allocation, is_master: true };
-        } else {
-          return { ...allocation, is_master: false };
-        }
+        return { ...allocation, is_master: i === index };
       }
       
       // Update the target allocation

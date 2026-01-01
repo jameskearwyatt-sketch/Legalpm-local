@@ -248,7 +248,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     toast.info('For PDF/Word files, please copy the text content and paste it.');
   };
 
-  // Calculate totals
+  // Calculate totals (current draft)
   const bmTotal = draftItems
     .filter(item => item.provider === 'Baker McKenzie')
     .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
@@ -256,6 +256,15 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     .filter(item => item.provider === 'Local Counsel')
     .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
   const overallTotal = bmTotal + localCounselTotal;
+
+  // Calculate original totals for comparison during editing
+  const originalBmTotal = originalItems
+    .filter(item => item.provider === 'Baker McKenzie')
+    .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+  const originalLcTotal = originalItems
+    .filter(item => item.provider === 'Local Counsel')
+    .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+  const originalOverallTotal = originalBmTotal + originalLcTotal;
 
   const handleFinalize = async () => {
     // Filter out empty items
@@ -379,14 +388,21 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           }
           
           if (targetIndex >= 0) {
-            // Update existing item at the matched index
-            updatedItems[targetIndex] = {
-              ...updatedItems[targetIndex],
-              fee_amount: update.fee_amount,
-              provider: update.provider || updatedItems[targetIndex].provider,
-            };
-            newSuggestedIndices.add(targetIndex);
-            updatesCount++;
+            // Check if the fee actually changed before marking as AI suggested
+            const currentFee = updatedItems[targetIndex].fee_amount || 0;
+            const feeChanged = Math.abs(currentFee - update.fee_amount) > 0.01;
+            
+            if (feeChanged) {
+              // Update existing item at the matched index
+              updatedItems[targetIndex] = {
+                ...updatedItems[targetIndex],
+                fee_amount: update.fee_amount,
+                provider: update.provider || updatedItems[targetIndex].provider,
+              };
+              newSuggestedIndices.add(targetIndex);
+              updatesCount++;
+            }
+            // If fee didn't change, skip this item entirely
           } else {
             // Add as new item at the end
             const newIndex = updatedItems.length;
@@ -832,25 +848,80 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
 
         {/* Totals */}
         <div className="border-t pt-4 space-y-2">
-          <div className="flex justify-between items-end text-sm">
-            <span className="text-muted-foreground">Baker McKenzie Total:</span>
-            <div className="text-right">
-              <span className="font-medium">
-                {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                  ? formatCurrency(bmTotal * mandatedRate, billingCurrency)
-                  : formatCurrency(bmTotal, quoteCurrency)}
-              </span>
-              {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && (
-                <div className="text-xs text-muted-foreground">
-                  (quoted: {formatCurrency(bmTotal, quoteCurrency)})
-                </div>
-              )}
+          {/* Show header row for Current vs New during editing */}
+          {isEditing && hasExistingBudget && originalItems.length > 0 && (
+            <div className="grid grid-cols-3 gap-2 text-xs font-medium text-muted-foreground mb-2">
+              <div></div>
+              <div className="text-right">Current</div>
+              <div className="text-right">New</div>
             </div>
+          )}
+          
+          {/* Baker McKenzie Total */}
+          <div className={cn(
+            "flex justify-between items-end text-sm",
+            isEditing && hasExistingBudget && originalItems.length > 0 && "grid grid-cols-3 gap-2"
+          )}>
+            <span className="text-muted-foreground">Baker McKenzie Total:</span>
+            {isEditing && hasExistingBudget && originalItems.length > 0 ? (
+              <>
+                <div className="text-right text-muted-foreground">
+                  {formatCurrency(
+                    differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                      ? originalBmTotal * mandatedRate
+                      : originalBmTotal,
+                    differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                  )}
+                </div>
+                <div className={cn(
+                  "text-right font-medium",
+                  Math.abs(bmTotal - originalBmTotal) > 0.01 && "text-blue-600 dark:text-blue-400"
+                )}>
+                  {formatCurrency(
+                    differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                      ? bmTotal * mandatedRate
+                      : bmTotal,
+                    differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                  )}
+                  {Math.abs(bmTotal - originalBmTotal) > 0.01 && (
+                    <span className={cn(
+                      "ml-1 text-xs",
+                      bmTotal > originalBmTotal ? "text-amber-600" : "text-green-600"
+                    )}>
+                      ({bmTotal > originalBmTotal ? '+' : ''}{formatCurrency(
+                        differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                          ? (bmTotal - originalBmTotal) * mandatedRate
+                          : bmTotal - originalBmTotal,
+                        differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                      )})
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="text-right">
+                <span className="font-medium">
+                  {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                    ? formatCurrency(bmTotal * mandatedRate, billingCurrency)
+                    : formatCurrency(bmTotal, quoteCurrency)}
+                </span>
+                {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    (quoted: {formatCurrency(bmTotal, quoteCurrency)})
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <div className="flex justify-between items-start text-sm">
+          
+          {/* Local Counsel Total */}
+          <div className={cn(
+            "flex justify-between items-start text-sm",
+            isEditing && hasExistingBudget && originalItems.length > 0 && "grid grid-cols-3 gap-2 items-center"
+          )}>
             <div className="flex flex-col gap-1">
               <span className="text-muted-foreground">Local Counsel Total:</span>
-              {localCounselTotal > 0 && (() => {
+              {!isEditing && localCounselTotal > 0 && (() => {
                 const hasSelection = matter?.local_counsel_billing === 'Disb' || matter?.local_counsel_billing === 'Direct';
                 return (
                   <div className="flex items-center gap-2">
@@ -898,33 +969,112 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 );
               })()}
             </div>
-            <div className="text-right">
-              <span className="font-medium">
-                {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                  ? formatCurrency(localCounselTotal * mandatedRate, billingCurrency)
-                  : formatCurrency(localCounselTotal, quoteCurrency)}
-              </span>
-              {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && localCounselTotal > 0 && (
-                <div className="text-xs text-muted-foreground">
-                  (quoted: {formatCurrency(localCounselTotal, quoteCurrency)})
+            {isEditing && hasExistingBudget && originalItems.length > 0 ? (
+              <>
+                <div className="text-right text-muted-foreground">
+                  {formatCurrency(
+                    differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                      ? originalLcTotal * mandatedRate
+                      : originalLcTotal,
+                    differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                  )}
                 </div>
-              )}
-            </div>
+                <div className={cn(
+                  "text-right font-medium",
+                  Math.abs(localCounselTotal - originalLcTotal) > 0.01 && "text-blue-600 dark:text-blue-400"
+                )}>
+                  {formatCurrency(
+                    differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                      ? localCounselTotal * mandatedRate
+                      : localCounselTotal,
+                    differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                  )}
+                  {Math.abs(localCounselTotal - originalLcTotal) > 0.01 && (
+                    <span className={cn(
+                      "ml-1 text-xs",
+                      localCounselTotal > originalLcTotal ? "text-amber-600" : "text-green-600"
+                    )}>
+                      ({localCounselTotal > originalLcTotal ? '+' : ''}{formatCurrency(
+                        differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                          ? (localCounselTotal - originalLcTotal) * mandatedRate
+                          : localCounselTotal - originalLcTotal,
+                        differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                      )})
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="text-right">
+                <span className="font-medium">
+                  {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                    ? formatCurrency(localCounselTotal * mandatedRate, billingCurrency)
+                    : formatCurrency(localCounselTotal, quoteCurrency)}
+                </span>
+                {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && localCounselTotal > 0 && (
+                  <div className="text-xs text-muted-foreground">
+                    (quoted: {formatCurrency(localCounselTotal, quoteCurrency)})
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <div className="flex justify-between items-end text-base font-semibold border-t pt-2">
+          
+          {/* Overall Budget Total */}
+          <div className={cn(
+            "flex justify-between items-end text-base font-semibold border-t pt-2",
+            isEditing && hasExistingBudget && originalItems.length > 0 && "grid grid-cols-3 gap-2"
+          )}>
             <span>Overall Budget:</span>
-            <div className="text-right">
-              <span className="text-primary">
-                {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                  ? formatCurrency(overallTotal * mandatedRate, billingCurrency)
-                  : formatCurrency(overallTotal, quoteCurrency)}
-              </span>
-              {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && (
-                <div className="text-xs text-muted-foreground font-normal">
-                  (quoted: {formatCurrency(overallTotal, quoteCurrency)})
+            {isEditing && hasExistingBudget && originalItems.length > 0 ? (
+              <>
+                <div className="text-right text-muted-foreground font-normal">
+                  {formatCurrency(
+                    differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                      ? originalOverallTotal * mandatedRate
+                      : originalOverallTotal,
+                    differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                  )}
                 </div>
-              )}
-            </div>
+                <div className={cn(
+                  "text-right",
+                  Math.abs(overallTotal - originalOverallTotal) > 0.01 ? "text-blue-600 dark:text-blue-400" : "text-primary"
+                )}>
+                  {formatCurrency(
+                    differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                      ? overallTotal * mandatedRate
+                      : overallTotal,
+                    differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                  )}
+                  {Math.abs(overallTotal - originalOverallTotal) > 0.01 && (
+                    <span className={cn(
+                      "ml-1 text-sm",
+                      overallTotal > originalOverallTotal ? "text-amber-600" : "text-green-600"
+                    )}>
+                      ({overallTotal > originalOverallTotal ? '+' : ''}{formatCurrency(
+                        differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                          ? (overallTotal - originalOverallTotal) * mandatedRate
+                          : overallTotal - originalOverallTotal,
+                        differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                      )})
+                    </span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="text-right">
+                <span className="text-primary">
+                  {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                    ? formatCurrency(overallTotal * mandatedRate, billingCurrency)
+                    : formatCurrency(overallTotal, quoteCurrency)}
+                </span>
+                {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && (
+                  <div className="text-xs text-muted-foreground font-normal">
+                    (quoted: {formatCurrency(overallTotal, quoteCurrency)})
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

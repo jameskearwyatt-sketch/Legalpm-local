@@ -134,7 +134,7 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">;
 
-function toast({ ...props }: Toast) {
+function toast({ duration, ...props }: Toast & { duration?: number }) {
   const id = genId();
 
   const update = (props: ToasterToast) =>
@@ -155,6 +155,14 @@ function toast({ ...props }: Toast) {
       },
     },
   });
+
+  // Auto-dismiss non-destructive toasts after 2 seconds (or custom duration)
+  const autoDismissDelay = duration ?? (props.variant === "destructive" ? undefined : 2000);
+  if (autoDismissDelay) {
+    setTimeout(() => {
+      dismiss();
+    }, autoDismissDelay);
+  }
 
   return {
     id: id,

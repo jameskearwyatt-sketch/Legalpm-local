@@ -86,16 +86,25 @@ export function MultiClientSection({
   };
 
   const updateAllocation = (index: number, field: keyof ClientAllocation, value: any) => {
-    const updated = [...clientAllocations];
+    // Create a deep copy to avoid mutating state directly
+    const updated = clientAllocations.map((allocation, i) => {
+      // If setting a new master, unset others
+      if (field === 'is_master' && value === true) {
+        if (i === index) {
+          return { ...allocation, is_master: true };
+        } else {
+          return { ...allocation, is_master: false };
+        }
+      }
+      
+      // Update the target allocation
+      if (i === index) {
+        return { ...allocation, [field]: value };
+      }
+      
+      return { ...allocation };
+    });
     
-    // If setting a new master, unset the previous one
-    if (field === 'is_master' && value === true) {
-      updated.forEach((a, i) => {
-        if (i !== index) a.is_master = false;
-      });
-    }
-    
-    (updated[index] as any)[field] = value;
     onAllocationsChange(updated);
   };
 
@@ -301,7 +310,7 @@ export function MultiClientSection({
                   <div className="flex items-center space-x-2 pb-2">
                     <Checkbox
                       id={`is_master_${index}`}
-                      checked={allocation.is_master}
+                      checked={allocation.is_master === true}
                       onCheckedChange={(checked) => updateAllocation(index, 'is_master', checked === true)}
                     />
                     <Label htmlFor={`is_master_${index}`} className="text-xs font-normal cursor-pointer">

@@ -28,6 +28,9 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useMatters } from '@/lib/hooks/useMatters';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/lib/auth';
 import { 
   Flag, 
   FileSignature, 
@@ -37,13 +40,16 @@ import {
   CheckCircle2,
   Loader2,
   ExternalLink,
-  X
+  X,
+  Calculator,
+  FileText,
+  Calendar
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
-type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts';
+type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date';
 
 interface FlaggedMatter {
   id: string;
@@ -54,7 +60,7 @@ interface FlaggedMatter {
   flags: FlagType[];
 }
 
-const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; description: string; field: string }> = {
+const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; description: string; field: string | null }> = {
   engagement_letter: {
     label: 'No Engagement Letter',
     icon: <FileSignature className="h-4 w-4" />,
@@ -79,10 +85,29 @@ const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; descr
     description: 'Conflicts check not completed',
     field: 'conflicts_check'
   },
+  no_budget_finalized: {
+    label: 'No Budget Finalized',
+    icon: <Calculator className="h-4 w-4" />,
+    description: 'No detailed budget version finalized',
+    field: null
+  },
+  no_assumptions: {
+    label: 'No Assumptions',
+    icon: <FileText className="h-4 w-4" />,
+    description: 'No assumptions logged for this matter',
+    field: null
+  },
+  no_start_date: {
+    label: 'No Start Date',
+    icon: <Calendar className="h-4 w-4" />,
+    description: 'No start date logged for this matter',
+    field: 'start_date'
+  },
 };
 
 export default function Flags() {
   const { matters, isLoading, updateMatter } = useMatters();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [confirmDialog, setConfirmDialog] = useState<{
     open: boolean;
@@ -91,16 +116,65 @@ export default function Flags() {
     flagType: FlagType;
   } | null>(null);
 
+  // Only check Live matters for admin flags
+  const liveMatters = matters.filter(m => m.category === 'Live');
+  const liveMatterIds = liveMatters.map(m => m.id);
+
+  // Fetch budget versions for live matters
+  const { data: budgetVersions } = useQuery({
+    queryKey: ['budget-versions-for-flags', liveMatterIds],
+    queryFn: async () => {
+      if (liveMatterIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('budget_versions')
+        .select('matter_id')
+        .in('matter_id', liveMatterIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && liveMatterIds.length > 0,
+  });
+
+  // Fetch assumptions for live matters
+  const { data: assumptions } = useQuery({
+    queryKey: ['assumptions-for-flags', liveMatterIds],
+    queryFn: async () => {
+      if (liveMatterIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('matter_assumptions')
+        .select('matter_id')
+        .in('matter_id', liveMatterIds);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!user && liveMatterIds.length > 0,
+  });
+
+  // Build sets for quick lookup
+  const mattersWithBudget = new Set(budgetVersions?.map(bv => bv.matter_id) || []);
+  const mattersWithAssumptions = new Set(assumptions?.map(a => a.matter_id) || []);
+
   const handleClearFlag = async () => {
     if (!confirmDialog) return;
     
     const { matterId, flagType, matterName } = confirmDialog;
     const fieldToUpdate = flagConfig[flagType].field;
     
+    // Can't clear flags that don't have a direct field to update
+    if (!fieldToUpdate) {
+      toast({
+        title: "Cannot clear this flag directly",
+        description: "This flag requires adding data (budget, assumptions, or start date) via the matter details page.",
+        variant: "destructive",
+      });
+      setConfirmDialog(null);
+      return;
+    }
+    
     try {
       await updateMatter.mutateAsync({
         id: matterId,
-        [fieldToUpdate]: true
+        [fieldToUpdate]: fieldToUpdate === 'start_date' ? new Date().toISOString().split('T')[0] : true
       });
       
       toast({
@@ -118,9 +192,6 @@ export default function Flags() {
     setConfirmDialog(null);
   };
 
-  // Only check Live matters for admin flags
-  const liveMatters = matters.filter(m => m.category === 'Live');
-
   // Build flagged matters list (admin flags only)
   const flaggedMatters: FlaggedMatter[] = liveMatters
     .map(matter => {
@@ -131,6 +202,11 @@ export default function Flags() {
       if (!matter.aml_kyc_complete) flags.push('aml_kyc');
       if (!matter.matter_open) flags.push('matter_open');
       if (!matter.conflicts_check) flags.push('conflicts');
+      
+      // New flags
+      if (!mattersWithBudget.has(matter.id)) flags.push('no_budget_finalized');
+      if (!mattersWithAssumptions.has(matter.id)) flags.push('no_assumptions');
+      if (!matter.start_date) flags.push('no_start_date');
       
       return {
         id: matter.id,
@@ -152,6 +228,9 @@ export default function Flags() {
     aml_kyc: 0,
     matter_open: 0,
     conflicts: 0,
+    no_budget_finalized: 0,
+    no_assumptions: 0,
+    no_start_date: 0,
   };
   
   flaggedMatters.forEach(m => {
@@ -183,8 +262,8 @@ export default function Flags() {
         </div>
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {(['engagement_letter', 'aml_kyc', 'matter_open', 'conflicts'] as FlagType[]).map((key) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+          {(['engagement_letter', 'aml_kyc', 'matter_open', 'conflicts', 'no_budget_finalized', 'no_assumptions', 'no_start_date'] as FlagType[]).map((key) => (
             <Card key={key} className={cn(
               "shadow-card transition-colors",
               flagCounts[key] > 0 ? "border-warning/50" : "border-success/30"

@@ -341,14 +341,6 @@ export default function Matters() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="text-right">
-                <p className="text-sm text-muted-foreground">
-                  {isClosed ? 'Total BM Fees Paid (USD)' : 'Total Budgeted BM Fees (USD)'}
-                </p>
-                <p className="text-2xl font-bold text-foreground">
-                  ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(isClosed ? closedFeesPaid : categoryTotals)}
-                </p>
-              </div>
             </div>
           </CardContent>
         </Card>

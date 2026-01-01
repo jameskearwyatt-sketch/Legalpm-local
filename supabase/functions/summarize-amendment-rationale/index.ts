@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, budgetChange } = await req.json();
+    const { text, budgetChange, currentLineItems } = await req.json();
 
     if (!text || typeof text !== 'string') {
       return new Response(
@@ -37,21 +37,39 @@ serve(async (req) => {
       );
     }
 
-    const systemPrompt = `You are a legal budget amendment assistant. Your task is to analyze correspondence or notes about a budget change and produce a brief, professional summary explaining why the budget is being amended.
+    // Build context about current line items if provided
+    let currentBudgetContext = '';
+    if (currentLineItems && Array.isArray(currentLineItems) && currentLineItems.length > 0) {
+      currentBudgetContext = '\n\nCurrent budget line items:\n' + 
+        currentLineItems.map((item: any, i: number) => 
+          `${i + 1}. ${item.work_item} (${item.provider}): ${item.fee_amount}`
+        ).join('\n');
+    }
 
-Guidelines:
+    const systemPrompt = `You are a legal budget amendment assistant. Analyze correspondence about budget changes and extract:
+1. A brief summary explaining why the budget is being amended (2-3 sentences)
+2. Any specific budget line item changes mentioned (new items, updated amounts, etc.)
+
+Guidelines for summary:
 - Be very concise (2-3 sentences maximum)
 - Focus on the key reason for the budget change
 - Use professional legal/business language
-- If the text mentions specific scope changes, additional work, or client requests, highlight those
-- Do not include greetings, signatures, or irrelevant details
-- Write in third person (e.g., "Budget increased due to..." not "We are increasing...")`;
+- Write in third person (e.g., "Budget increased due to...")
 
-    const userPrompt = budgetChange 
-      ? `Based on the following correspondence/notes, summarize the rationale for this budget amendment:\n\nBudget change context: ${budgetChange}\n\nCorrespondence/Notes:\n${text}`
-      : `Based on the following correspondence/notes, summarize the rationale for this budget amendment:\n\n${text}`;
+Guidelines for budget changes:
+- Extract any monetary amounts mentioned with their associated work items
+- If an existing work item amount is changing, note the new amount
+- If new work items are being added, extract them
+- If items are being removed, note that
+- Amounts should be numbers only (no currency symbols)
+- Provider should be either "Baker McKenzie" or "Local Counsel"`;
 
-    console.log('Calling Lovable AI to summarize amendment rationale...');
+    const userPrompt = `Analyze the following correspondence and extract the budget amendment details.${currentBudgetContext}
+
+${budgetChange ? `Budget change context: ${budgetChange}\n\n` : ''}Correspondence/Notes:
+${text}`;
+
+    console.log('Calling Lovable AI to analyze amendment...');
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -65,6 +83,53 @@ Guidelines:
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'extract_budget_amendment',
+              description: 'Extract budget amendment summary and line item changes from correspondence',
+              parameters: {
+                type: 'object',
+                properties: {
+                  summary: {
+                    type: 'string',
+                    description: 'A brief 2-3 sentence summary of why the budget is being amended'
+                  },
+                  line_item_updates: {
+                    type: 'array',
+                    description: 'List of budget line item changes (updates to existing items or new items)',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        work_item: {
+                          type: 'string',
+                          description: 'Name/description of the work item (e.g., "Due diligence review", "Regulatory advice")'
+                        },
+                        provider: {
+                          type: 'string',
+                          enum: ['Baker McKenzie', 'Local Counsel'],
+                          description: 'Who is providing this service'
+                        },
+                        fee_amount: {
+                          type: 'number',
+                          description: 'The fee amount as a number (no currency symbols)'
+                        },
+                        is_new: {
+                          type: 'boolean',
+                          description: 'True if this is a new line item being added, false if updating existing'
+                        }
+                      },
+                      required: ['work_item', 'provider', 'fee_amount', 'is_new']
+                    }
+                  }
+                },
+                required: ['summary']
+              }
+            }
+          }
+        ],
+        tool_choice: { type: 'function', function: { name: 'extract_budget_amendment' } }
       }),
     });
 
@@ -90,20 +155,44 @@ Guidelines:
     }
 
     const data = await response.json();
-    const summary = data.choices?.[0]?.message?.content?.trim();
+    console.log('AI response:', JSON.stringify(data, null, 2));
 
-    if (!summary) {
-      console.error('No summary in AI response:', data);
+    // Extract the tool call result
+    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+    if (!toolCall || toolCall.function?.name !== 'extract_budget_amendment') {
+      // Fallback: try to get regular content
+      const fallbackSummary = data.choices?.[0]?.message?.content?.trim();
+      if (fallbackSummary) {
+        return new Response(
+          JSON.stringify({ summary: fallbackSummary, line_item_updates: [] }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      console.error('No tool call in AI response:', data);
       return new Response(
-        JSON.stringify({ error: 'Failed to generate summary' }),
+        JSON.stringify({ error: 'Failed to extract budget information' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('Successfully generated summary');
+    let extractedData;
+    try {
+      extractedData = JSON.parse(toolCall.function.arguments);
+    } catch (e) {
+      console.error('Failed to parse tool arguments:', toolCall.function.arguments);
+      return new Response(
+        JSON.stringify({ error: 'Failed to parse AI response' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Successfully extracted amendment data:', extractedData);
 
     return new Response(
-      JSON.stringify({ summary }),
+      JSON.stringify({ 
+        summary: extractedData.summary || '',
+        line_item_updates: extractedData.line_item_updates || []
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

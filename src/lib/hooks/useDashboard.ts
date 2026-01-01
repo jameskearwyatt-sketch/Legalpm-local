@@ -101,6 +101,7 @@ export function useDashboard() {
       let totalPaidUsd = 0;
       const alerts: Alert[] = [];
       const pipelineAlerts: PipelineAlert[] = [];
+      const today = new Date();
 
       liveMatters?.forEach(matter => {
         const snapshot = snapshotMap.get(matter.id);
@@ -260,8 +261,8 @@ export function useDashboard() {
         }
       });
 
+
       // Generate pipeline alerts
-      const today = new Date();
       pipelineMatters?.forEach(matter => {
         const clientName = matter.clients?.name || 'Unknown Client';
         const cmNumber = matter.cm_number && matter.cm_number.trim() !== '' 

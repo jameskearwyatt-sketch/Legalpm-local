@@ -7,6 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useDashboard } from '@/lib/hooks/useDashboard';
+import { useMatters } from '@/lib/hooks/useMatters';
+import { useAuth } from '@/lib/auth';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 import { 
   DollarSign, 
   FileText, 
@@ -26,6 +30,73 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function Dashboard() {
   const [excludedMatterIds, setExcludedMatterIds] = useState<string[]>([]);
   const { data: stats, isLoading } = useDashboard(excludedMatterIds);
+  const { matters } = useMatters();
+  const { user } = useAuth();
+
+  // Fetch current user's profile for the "Me" filter
+  const { data: userProfile } = useQuery({
+    queryKey: ['user-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  const userName = userProfile?.full_name || '';
+
+  // Categorize matters into "my matters" and "not my matters"
+  const { myMatterIds, notMyMatterIds } = useMemo(() => {
+    if (!stats?.liveMatters || !userName) {
+      return { myMatterIds: new Set<string>(), notMyMatterIds: new Set<string>() };
+    }
+
+    const myIds = new Set<string>();
+    const notMyIds = new Set<string>();
+
+    // Get the full matter data to check MMA and lead_partner
+    const liveMattersMap = new Map(matters.filter(m => m.category === 'Live').map(m => [m.id, m]));
+
+    stats.liveMatters.forEach(liveMatter => {
+      const fullMatter = liveMattersMap.get(liveMatter.id);
+      if (!fullMatter) {
+        notMyIds.add(liveMatter.id);
+        return;
+      }
+
+      const mma = (fullMatter as any).matter_managing_attorney || '';
+      const billingPartner = fullMatter.lead_partner || '';
+
+      // Check if user is MMA or Billing Partner (case-insensitive comparison)
+      const isMMA = mma.toLowerCase().trim() === userName.toLowerCase().trim();
+      const isBillingPartner = billingPartner.toLowerCase().trim() === userName.toLowerCase().trim();
+
+      if (isMMA || isBillingPartner) {
+        myIds.add(liveMatter.id);
+      } else {
+        notMyIds.add(liveMatter.id);
+      }
+    });
+
+    return { myMatterIds: myIds, notMyMatterIds: notMyIds };
+  }, [stats?.liveMatters, matters, userName]);
+
+  // Calculate master checkbox states
+  const myMattersAllIncluded = useMemo(() => {
+    if (myMatterIds.size === 0) return false;
+    return Array.from(myMatterIds).every(id => !excludedMatterIds.includes(id));
+  }, [myMatterIds, excludedMatterIds]);
+
+  const notMyMattersAllIncluded = useMemo(() => {
+    if (notMyMatterIds.size === 0) return false;
+    return Array.from(notMyMatterIds).every(id => !excludedMatterIds.includes(id));
+  }, [notMyMatterIds, excludedMatterIds]);
 
   const includedMatterIds = useMemo(() => {
     if (!stats?.liveMatters) return new Set<string>();
@@ -40,6 +111,34 @@ export default function Dashboard() {
         ? prev.filter(id => id !== matterId)
         : [...prev, matterId]
     );
+  };
+
+  const handleMyMattersToggle = (checked: boolean) => {
+    if (checked) {
+      // Include all my matters (remove from excluded)
+      setExcludedMatterIds(prev => prev.filter(id => !myMatterIds.has(id)));
+    } else {
+      // Exclude all my matters
+      setExcludedMatterIds(prev => {
+        const newExcluded = new Set(prev);
+        myMatterIds.forEach(id => newExcluded.add(id));
+        return Array.from(newExcluded);
+      });
+    }
+  };
+
+  const handleNotMyMattersToggle = (checked: boolean) => {
+    if (checked) {
+      // Include all not-my matters (remove from excluded)
+      setExcludedMatterIds(prev => prev.filter(id => !notMyMatterIds.has(id)));
+    } else {
+      // Exclude all not-my matters
+      setExcludedMatterIds(prev => {
+        const newExcluded = new Set(prev);
+        notMyMatterIds.forEach(id => newExcluded.add(id));
+        return Array.from(newExcluded);
+      });
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -214,28 +313,62 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent className="pt-0">
             {stats?.liveMatters && stats.liveMatters.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-6 gap-y-2 max-h-48 overflow-y-auto">
-                {stats.liveMatters.map((matter) => {
-                  const isIncluded = !excludedMatterIds.includes(matter.id);
-                  return (
-                    <label
-                      key={matter.id}
-                      className="flex items-center gap-2 py-1 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1"
-                    >
+              <>
+                {/* Master Toggle Checkboxes */}
+                {userName && (
+                  <div className="flex flex-wrap gap-6 mb-4 pb-3 border-b border-border">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
-                        checked={isIncluded}
-                        onCheckedChange={(checked) => handleMatterToggle(matter.id, !!checked)}
-                        className="h-3.5 w-3.5"
+                        checked={myMattersAllIncluded}
+                        onCheckedChange={(checked) => handleMyMattersToggle(!!checked)}
+                        className="h-4 w-4"
                       />
-                      <span className={`text-xs truncate ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
-                        <span className="font-medium">{matter.clientName}</span>
-                        <span className="text-muted-foreground"> – </span>
-                        <span>{matter.matterName}</span>
+                      <span className="text-sm font-medium text-foreground">
+                        Matters Where I Am MMA and/or Billing Partner
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        ({myMatterIds.size})
                       </span>
                     </label>
-                  );
-                })}
-              </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Checkbox
+                        checked={notMyMattersAllIncluded}
+                        onCheckedChange={(checked) => handleNotMyMattersToggle(!!checked)}
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm font-medium text-foreground">
+                        Matters Where I Am Not MMA or Billing Partner
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        ({notMyMatterIds.size})
+                      </span>
+                    </label>
+                  </div>
+                )}
+                {/* Individual Matter Checkboxes */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-2 max-h-48 overflow-y-auto">
+                  {stats.liveMatters.map((matter) => {
+                    const isIncluded = !excludedMatterIds.includes(matter.id);
+                    return (
+                      <label
+                        key={matter.id}
+                        className="flex items-center gap-2 py-1 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1"
+                      >
+                        <Checkbox
+                          checked={isIncluded}
+                          onCheckedChange={(checked) => handleMatterToggle(matter.id, !!checked)}
+                          className="h-3.5 w-3.5"
+                        />
+                        <span className={`text-xs truncate ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
+                          <span className="font-medium">{matter.clientName}</span>
+                          <span className="text-muted-foreground"> – </span>
+                          <span>{matter.matterName}</span>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">No live matters</p>
             )}

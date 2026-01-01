@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.parse-excel]
 verify_jwt = false
+
+[functions.parse-engagement-letter]
+verify_jwt = false

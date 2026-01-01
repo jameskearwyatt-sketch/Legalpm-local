@@ -718,27 +718,27 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           {/* Header row - different layout when editing vs viewing */}
           {isEditing && hasExistingBudget ? (
             <div className="grid grid-cols-14 gap-2 text-sm font-medium text-muted-foreground px-1">
-              <div className="col-span-4">Work Item</div>
+              <div className={hasOptionalItems ? "col-span-4" : "col-span-4"}>Work Item</div>
               <div className="col-span-2">Provider</div>
               <div className="col-span-2 text-right">
                 Current
               </div>
-              <div className="col-span-2 text-right">
+              <div className={hasOptionalItems ? "col-span-2" : "col-span-4"} style={{ textAlign: 'right' }}>
                 New ({differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency})
               </div>
               <div className="col-span-1 text-center text-xs">Opt.</div>
-              <div className="col-span-2 text-center text-xs">Include</div>
+              {hasOptionalItems && <div className="col-span-2 text-center text-xs">Include</div>}
               <div className="col-span-1"></div>
             </div>
           ) : (
             <div className="grid grid-cols-14 gap-2 text-sm font-medium text-muted-foreground px-1">
               <div className="col-span-4">Work Item</div>
-              <div className="col-span-3">Provider</div>
+              <div className={hasOptionalItems ? "col-span-3" : "col-span-5"}>Provider</div>
               <div className="col-span-2 text-right">
                 Upper End Fee ({differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency})
               </div>
               <div className="col-span-1 text-center text-xs">Opt.</div>
-              <div className="col-span-2 text-center text-xs">Include</div>
+              {hasOptionalItems && <div className="col-span-2 text-center text-xs">Include</div>}
               <div className="col-span-1"></div>
             </div>
           )}
@@ -860,19 +860,20 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                           }}
                         />
                       </div>
-                      {/* Include toggle - only enabled when item is optional */}
-                      <div className="col-span-2 flex justify-center">
-                        <Switch
-                          checked={item.is_included ?? true}
-                          onCheckedChange={(checked) => {
-                            const updated = [...draftItems];
-                            updated[index] = { ...updated[index], is_included: checked };
-                            setDraftItems(updated);
-                          }}
-                          disabled={!item.is_optional}
-                          className={cn(!item.is_optional && "opacity-30")}
-                        />
-                      </div>
+                      {/* Include toggle - only shown when item is optional */}
+                      {item.is_optional && (
+                        <div className="col-span-2 flex justify-center">
+                          <Switch
+                            checked={item.is_included ?? true}
+                            onCheckedChange={(checked) => {
+                              const updated = [...draftItems];
+                              updated[index] = { ...updated[index], is_included: checked };
+                              setDraftItems(updated);
+                            }}
+                          />
+                        </div>
+                      )}
+                      {!item.is_optional && hasOptionalItems && <div className="col-span-2" />}
                       <div className="col-span-1 flex justify-center">
                         {draftItems.length > 1 && (
                           <Button
@@ -1007,35 +1008,36 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                         />
                       ) : null}
                     </div>
-                    {/* Include toggle - enabled when item is optional */}
-                    <div className="col-span-2 flex justify-center">
-                      {hasExistingBudget && item.id ? (
-                        <Switch
-                          checked={item.is_included ?? true}
-                          onCheckedChange={(checked) => {
-                            if (item.id) {
-                              toggleLineItemIncluded.mutate({ 
-                                lineItemId: item.id, 
-                                isIncluded: checked 
-                              });
-                            }
-                          }}
-                          disabled={!item.is_optional || toggleLineItemIncluded.isPending}
-                          className={cn(!item.is_optional && "opacity-30")}
-                        />
-                      ) : !hasExistingBudget ? (
-                        <Switch
-                          checked={item.is_included ?? true}
-                          onCheckedChange={(checked) => {
-                            const updated = [...draftItems];
-                            updated[index] = { ...updated[index], is_included: checked };
-                            setDraftItems(updated);
-                          }}
-                          disabled={!item.is_optional}
-                          className={cn(!item.is_optional && "opacity-30")}
-                        />
-                      ) : null}
-                    </div>
+                    {/* Include toggle - only shown when item is optional */}
+                    {item.is_optional ? (
+                      <div className="col-span-2 flex justify-center">
+                        {hasExistingBudget && item.id ? (
+                          <Switch
+                            checked={item.is_included ?? true}
+                            onCheckedChange={(checked) => {
+                              if (item.id) {
+                                toggleLineItemIncluded.mutate({ 
+                                  lineItemId: item.id, 
+                                  isIncluded: checked 
+                                });
+                              }
+                            }}
+                            disabled={toggleLineItemIncluded.isPending}
+                          />
+                        ) : !hasExistingBudget ? (
+                          <Switch
+                            checked={item.is_included ?? true}
+                            onCheckedChange={(checked) => {
+                              const updated = [...draftItems];
+                              updated[index] = { ...updated[index], is_included: checked };
+                              setDraftItems(updated);
+                            }}
+                          />
+                        ) : null}
+                      </div>
+                    ) : hasOptionalItems ? (
+                      <div className="col-span-2" />
+                    ) : null}
                     <div className="col-span-1 flex justify-center">
                       {!hasExistingBudget && draftItems.length > 1 && (
                         <Button

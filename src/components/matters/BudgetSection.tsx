@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +30,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Plus, Trash2, Loader2, ChevronDown, History, Check } from 'lucide-react';
 import { useBudgetVersions, DraftLineItem, BudgetLineItem } from '@/lib/hooks/useBudgetVersions';
+import { useMatter } from '@/lib/hooks/useMatters';
+import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -40,6 +43,8 @@ interface BudgetSectionProps {
 const providerOptions = ['Baker McKenzie', 'Local Counsel'] as const;
 
 export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
+  const queryClient = useQueryClient();
+  const { data: matter } = useMatter(matterId);
   const {
     versions,
     latestVersion,
@@ -55,6 +60,13 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [notes, setNotes] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  // Silent update for local counsel billing (no toast)
+  const updateLocalCounselBilling = async (value: 'Direct' | 'Disb' | null) => {
+    await supabase.from('matters').update({ local_counsel_billing: value }).eq('id', matterId);
+    queryClient.invalidateQueries({ queryKey: ['matter', matterId] });
+    queryClient.invalidateQueries({ queryKey: ['matters'] });
+  };
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [selectedVersionItems, setSelectedVersionItems] = useState<BudgetLineItem[]>([]);
   const [loadingVersionItems, setLoadingVersionItems] = useState(false);
@@ -326,8 +338,57 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
             <span className="text-muted-foreground">Baker McKenzie Total:</span>
             <span className="font-medium">{formatCurrency(bmTotal)}</span>
           </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Local Counsel Total:</span>
+          <div className="flex justify-between items-start text-sm">
+            <div className="flex flex-col gap-1">
+              <span className="text-muted-foreground">Local Counsel Total:</span>
+              {localCounselTotal > 0 && (() => {
+                const hasSelection = matter?.local_counsel_billing === 'Disb' || matter?.local_counsel_billing === 'Direct';
+                return (
+                  <div className="flex items-center gap-2">
+                    <label 
+                      className={cn(
+                        "flex items-center gap-1 cursor-pointer text-xs",
+                        hasSelection ? "text-success" : "text-destructive"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={matter?.local_counsel_billing === 'Disb'}
+                        onChange={async () => {
+                          const newValue = matter?.local_counsel_billing === 'Disb' ? null : 'Disb';
+                          await updateLocalCounselBilling(newValue);
+                        }}
+                        className={cn(
+                          "h-3 w-3 rounded-sm border cursor-pointer accent-current",
+                          matter?.local_counsel_billing === 'Disb' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                        )}
+                      />
+                      Disb
+                    </label>
+                    <label 
+                      className={cn(
+                        "flex items-center gap-1 cursor-pointer text-xs",
+                        hasSelection ? "text-success" : "text-destructive"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={matter?.local_counsel_billing === 'Direct'}
+                        onChange={async () => {
+                          const newValue = matter?.local_counsel_billing === 'Direct' ? null : 'Direct';
+                          await updateLocalCounselBilling(newValue);
+                        }}
+                        className={cn(
+                          "h-3 w-3 rounded-sm border cursor-pointer accent-current",
+                          matter?.local_counsel_billing === 'Direct' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                        )}
+                      />
+                      Direct
+                    </label>
+                  </div>
+                );
+              })()}
+            </div>
             <span className="font-medium">{formatCurrency(localCounselTotal)}</span>
           </div>
           <div className="flex justify-between text-base font-semibold border-t pt-2">

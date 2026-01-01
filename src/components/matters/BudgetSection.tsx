@@ -66,6 +66,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [pastedText, setPastedText] = useState('');
   const [isSummarizing, setIsSummarizing] = useState(false);
+  // Track which line items were AI-suggested (by index)
+  const [aiSuggestedIndices, setAiSuggestedIndices] = useState<Set<number>>(new Set());
 
   // Silent update for local counsel billing (no toast)
   const updateLocalCounselBilling = async (value: 'Direct' | 'Disb' | null) => {
@@ -265,6 +267,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
 
     setNotes('');
     setIsEditing(false);
+    setAiSuggestedIndices(new Set()); // Clear AI suggestions after finalizing
+    setPastedText('');
   };
 
   const handleDeleteVersion = async (versionId: string) => {
@@ -295,9 +299,10 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     }
     setNotes('');
     setPastedText('');
+    setAiSuggestedIndices(new Set());
   };
 
-  // AI summarization for budget update rationale
+  // AI summarization for budget update rationale - also extracts budget changes
   const handleSummarizeRationale = async () => {
     if (!pastedText.trim()) {
       toast.error('Please paste some text first');
@@ -306,27 +311,88 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
 
     setIsSummarizing(true);
     try {
+      // Send current line items for context
+      const currentLineItems = draftItems.map(item => ({
+        work_item: item.work_item,
+        provider: item.provider,
+        fee_amount: item.fee_amount,
+      }));
+
       const response = await supabase.functions.invoke('summarize-amendment-rationale', {
         body: { 
           text: pastedText,
-          budgetChange: undefined, // We don't have previous/new budget context here
+          currentLineItems,
         },
       });
 
       if (response.error) throw response.error;
       
-      if (response.data?.summary) {
-        setNotes(response.data.summary);
-        setPastedText(''); // Clear the pasted text after successful summarization
+      const { summary, line_item_updates } = response.data || {};
+      
+      if (summary) {
+        setNotes(summary);
+      }
+      
+      // Process line item updates from AI
+      if (line_item_updates && Array.isArray(line_item_updates) && line_item_updates.length > 0) {
+        const newSuggestedIndices = new Set<number>();
+        let updatedItems = [...draftItems];
+        
+        for (const update of line_item_updates) {
+          if (!update.work_item || typeof update.fee_amount !== 'number') continue;
+          
+          // Try to match existing item by similar work item name
+          const existingIndex = updatedItems.findIndex(item => 
+            item.work_item.toLowerCase().includes(update.work_item.toLowerCase().substring(0, 10)) ||
+            update.work_item.toLowerCase().includes(item.work_item.toLowerCase().substring(0, 10))
+          );
+          
+          if (existingIndex >= 0 && !update.is_new) {
+            // Update existing item
+            updatedItems[existingIndex] = {
+              ...updatedItems[existingIndex],
+              fee_amount: update.fee_amount,
+              provider: update.provider || updatedItems[existingIndex].provider,
+            };
+            newSuggestedIndices.add(existingIndex);
+          } else {
+            // Add as new item
+            const newIndex = updatedItems.length;
+            updatedItems.push({
+              work_item: update.work_item,
+              provider: update.provider || 'Baker McKenzie',
+              fee_amount: update.fee_amount,
+            });
+            newSuggestedIndices.add(newIndex);
+          }
+        }
+        
+        setDraftItems(updatedItems);
+        setAiSuggestedIndices(newSuggestedIndices);
+        toast.success(`AI suggested ${line_item_updates.length} budget update(s). Review the highlighted items.`);
+      } else if (summary) {
         toast.success('Rationale summarized and added to notes');
       } else {
-        throw new Error('No summary returned');
+        throw new Error('No data returned from AI');
       }
+      
+      setPastedText(''); // Clear the pasted text after successful processing
     } catch (error) {
       console.error('Error summarizing:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to summarize. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to process. Please try again.');
     } finally {
       setIsSummarizing(false);
+    }
+  };
+
+  // Clear AI suggestion highlighting when user manually edits an item
+  const handleItemEdit = (index: number, field: keyof DraftLineItem, value: string | number) => {
+    updateLineItem(index, field, value);
+    // Remove from AI suggested when user edits
+    if (aiSuggestedIndices.has(index)) {
+      const newIndices = new Set(aiSuggestedIndices);
+      newIndices.delete(index);
+      setAiSuggestedIndices(newIndices);
     }
   };
 
@@ -423,6 +489,16 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
             <div className="col-span-1"></div>
           </div>
 
+          {/* AI Suggestions Legend */}
+          {isEditing && aiSuggestedIndices.size > 0 && (
+            <div className="flex items-center gap-2 text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 px-2 py-1 rounded-md">
+              <Sparkles className="h-3 w-3" />
+              <span>
+                AI suggested {aiSuggestedIndices.size} update(s) — highlighted in blue. Review and edit as needed.
+              </span>
+            </div>
+          )}
+
           {isLoadingLineItems && !isEditing ? (
             <div className="flex justify-center py-4">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -433,24 +509,36 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 ? (item.fee_amount || 0) * mandatedRate
                 : item.fee_amount || 0;
               const showConversion = differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && !isEditing && hasExistingBudget;
+              const isAiSuggested = aiSuggestedIndices.has(index);
               
               return (
-                <div key={index} className="grid grid-cols-12 gap-2 items-center">
+                <div 
+                  key={index} 
+                  className={cn(
+                    "grid grid-cols-12 gap-2 items-center rounded-md transition-colors",
+                    isAiSuggested && isEditing && "bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700 p-1 -mx-1"
+                  )}
+                >
                   <div className="col-span-5">
                     <Input
                       value={item.work_item}
-                      onChange={(e) => updateLineItem(index, 'work_item', e.target.value)}
+                      onChange={(e) => handleItemEdit(index, 'work_item', e.target.value)}
                       placeholder="e.g., Due diligence review"
                       disabled={!isEditing && hasExistingBudget}
+                      className={cn(
+                        isAiSuggested && isEditing && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-medium"
+                      )}
                     />
                   </div>
                   <div className="col-span-3">
                     <Select
                       value={item.provider}
-                      onValueChange={(v) => updateLineItem(index, 'provider', v)}
+                      onValueChange={(v) => handleItemEdit(index, 'provider', v)}
                       disabled={!isEditing && hasExistingBudget}
                     >
-                      <SelectTrigger>
+                      <SelectTrigger className={cn(
+                        isAiSuggested && isEditing && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300"
+                      )}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -467,9 +555,12 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                         value={isInBillingCurrencyMode 
                           ? (Math.round((item.fee_amount || 0) * mandatedRate) || '') 
                           : (item.fee_amount || '')}
-                        onChange={(e) => updateLineItem(index, 'fee_amount', e.target.value)}
+                        onChange={(e) => handleItemEdit(index, 'fee_amount', e.target.value)}
                         placeholder="0"
-                        className="text-right"
+                        className={cn(
+                          "text-right",
+                          isAiSuggested && isEditing && "border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 font-medium"
+                        )}
                       />
                     ) : (
                       <div className="text-right">

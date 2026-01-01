@@ -399,8 +399,11 @@ export default function Matters() {
                           <TableHead className="text-right min-w-[110px]">
                             Financials
                           </TableHead>
-                          <TableHead className="text-right min-w-[95px]">
-                            <SortableHeader field="budget_burn">Budget Burn</SortableHeader>
+                          <TableHead className="text-right min-w-[75px]">
+                            <SortableHeader field="budget_burn">BM Burn</SortableHeader>
+                          </TableHead>
+                          <TableHead className="text-right min-w-[75px]">
+                            LC Burn
                           </TableHead>
                           <TableHead className="text-right min-w-[80px]">
                             <SortableHeader field="headroom">Headroom</SortableHeader>
@@ -619,6 +622,13 @@ export default function Matters() {
                               </TableCell>
                               <TableCell className="text-right text-muted-foreground">
                                 {formatCurrency(budgetBurn, (matter as any).effective_currency ?? matter.fee_currency)}
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {matter.local_counsel_billing === 'Disb' && matter.local_counsel_fee > 0 ? (
+                                  formatCurrency(((matter as any).lc_wip || 0) + ((matter as any).lc_billed || 0), (matter as any).effective_currency ?? matter.fee_currency)
+                                ) : (
+                                  <span className="text-muted-foreground/50">-</span>
+                                )}
                               </TableCell>
                               <TableCell className={cn(
                                 "text-right font-medium",

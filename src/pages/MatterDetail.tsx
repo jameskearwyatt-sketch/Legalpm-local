@@ -30,6 +30,7 @@ import { AssumptionsSection } from '@/components/matters/AssumptionsSection';
 import { useClients } from '@/lib/hooks/useClients';
 import { useExchangeRates, getExchangeRate } from '@/lib/hooks/useExchangeRates';
 import { useMatterClients, UpdateMatterClientInput } from '@/lib/hooks/useMatterClients';
+import { useLocalCounsels } from '@/lib/hooks/useLocalCounsels';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -209,6 +210,15 @@ export default function MatterDetail() {
   const { clients, isLoading: clientsLoading } = useClients();
   const { data: exchangeRatesData, refetch: refetchRates } = useExchangeRates();
   const { matterClients, updateMatterClient } = useMatterClients(id);
+  const { 
+    localCounsels, 
+    updateLocalCounsel, 
+    totalWip: lcTotalWip, 
+    totalBilled: lcTotalBilled,
+    totalAllocatedBudget: lcTotalAllocatedBudget,
+    totalBurn: lcTotalBurn,
+    isLoading: lcLoading 
+  } = useLocalCounsels(id);
   
   // Fetch current user's profile for "Me" checkbox functionality
   const { data: userProfile } = useQuery({
@@ -399,11 +409,13 @@ export default function MatterDetail() {
   const billedAmount = latestSnapshot?.billed_amount || 0;
   const paidAmount = latestSnapshot?.paid_amount || 0;
   
-  // LC financial data
-  const lcWip = formData.lc_wip || 0;
-  const lcBilled = formData.lc_billed || 0;
+  // LC financial data - use aggregated data from useLocalCounsels hook
   const lcBillingMode = formData.local_counsel_billing || matter?.local_counsel_billing || '';
   const isLcDisbursement = lcBillingMode === 'Disb';
+  
+  // LC totals from hook (aggregated from matter_local_counsels table)
+  const lcWip = lcTotalWip;
+  const lcBilled = lcTotalBilled;
   
   // Calculate effective budget - account for billing currency conversion
   const feeUpperEnd = formData.fee_amount_upper_end || matter.fee_amount_upper_end || 0;
@@ -435,7 +447,7 @@ export default function MatterDetail() {
   const bmHeadroom = bmFee - bmTotalUsed;
   const bmBudgetUsedPercent = bmFee > 0 ? (bmTotalUsed / bmFee) * 100 : 0;
   
-  // LC Budget Burn = LC WIP + LC Billed
+  // LC Budget Burn = LC WIP + LC Billed (from aggregated local counsels)
   const lcTotalUsed = lcWip + lcBilled;
   const lcHeadroom = localCounsel - lcTotalUsed;
   const lcBudgetUsedPercent = localCounsel > 0 ? (lcTotalUsed / localCounsel) * 100 : 0;
@@ -677,61 +689,118 @@ export default function MatterDetail() {
             <CardHeader>
               <CardTitle className="text-lg font-heading">Local Counsel Financials</CardTitle>
               <CardDescription>
-                {formData.lc_last_updated 
-                  ? `Last updated ${formatDate(formData.lc_last_updated)}`
-                  : 'No LC financial data recorded yet'}
+                {localCounsels.length > 0 
+                  ? `${localCounsels.length} local counsel firm${localCounsels.length > 1 ? 's' : ''}`
+                  : 'No local counsel firms configured yet'}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid sm:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>LC WIP</Label>
-                  <Input
-                    type="number"
-                    value={formData.lc_wip || ''}
-                    onChange={(e) => {
-                      updateField('lc_wip', parseFloat(e.target.value) || 0);
-                      updateField('lc_last_updated', new Date().toISOString().split('T')[0]);
-                    }}
-                    placeholder="0"
-                  />
+              {lcLoading ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
-                <div className="space-y-2">
-                  <Label>LC Billed</Label>
-                  <Input
-                    type="number"
-                    value={formData.lc_billed || ''}
-                    onChange={(e) => {
-                      updateField('lc_billed', parseFloat(e.target.value) || 0);
-                      updateField('lc_last_updated', new Date().toISOString().split('T')[0]);
-                    }}
-                    placeholder="0"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Last Updated</Label>
-                  <ClearableDateInput 
-                    value={formData.lc_last_updated || ''} 
-                    onChange={(value) => updateField('lc_last_updated', value)} 
-                  />
-                </div>
-              </div>
-              <div className="flex justify-between items-center py-3 bg-muted/50 rounded-lg px-4">
-                <span className="text-muted-foreground">LC Budget Burn</span>
-                <div className="text-right">
-                  <span className={cn(
-                    "text-lg font-semibold",
-                    lcBudgetUsedPercent > 100 && "text-danger",
-                    lcBudgetUsedPercent >= 80 && lcBudgetUsedPercent <= 100 && "text-warning",
-                    lcBudgetUsedPercent < 80 && "text-success"
-                  )}>
-                    {lcBudgetUsedPercent.toFixed(1)}%
-                  </span>
-                  <p className="text-xs text-muted-foreground">
-                    {formatCurrency(lcTotalUsed, currency)} of {formatCurrency(localCounsel, currency)}
-                  </p>
-                </div>
-              </div>
+              ) : localCounsels.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  Add local counsel work items in the Budget section to track their financials here.
+                </p>
+              ) : (
+                <>
+                  {/* Per-firm breakdown */}
+                  <div className="space-y-4">
+                    {localCounsels.map((lc) => {
+                      const firmBurn = (lc.wip_amount || 0) + (lc.billed_amount || 0);
+                      const firmBudgetPercent = lc.allocated_budget > 0 ? (firmBurn / lc.allocated_budget) * 100 : 0;
+                      
+                      return (
+                        <div key={lc.id} className="border rounded-lg p-4 space-y-3">
+                          <div className="flex justify-between items-center">
+                            <h4 className="font-medium text-sm">{lc.firm_name}</h4>
+                            <span className="text-xs text-muted-foreground">
+                              Budget: {formatCurrency(lc.allocated_budget, currency)}
+                            </span>
+                          </div>
+                          <div className="grid sm:grid-cols-3 gap-3">
+                            <div className="space-y-1">
+                              <Label className="text-xs">WIP</Label>
+                              <Input
+                                type="number"
+                                value={lc.wip_amount || ''}
+                                onChange={(e) => {
+                                  updateLocalCounsel.mutate({
+                                    id: lc.id,
+                                    wip_amount: parseFloat(e.target.value) || 0,
+                                    last_updated: new Date().toISOString().split('T')[0],
+                                  });
+                                }}
+                                placeholder="0"
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Billed</Label>
+                              <Input
+                                type="number"
+                                value={lc.billed_amount || ''}
+                                onChange={(e) => {
+                                  updateLocalCounsel.mutate({
+                                    id: lc.id,
+                                    billed_amount: parseFloat(e.target.value) || 0,
+                                    last_updated: new Date().toISOString().split('T')[0],
+                                  });
+                                }}
+                                placeholder="0"
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Last Updated</Label>
+                              <ClearableDateInput 
+                                value={lc.last_updated || ''} 
+                                onChange={(value) => {
+                                  updateLocalCounsel.mutate({
+                                    id: lc.id,
+                                    last_updated: value || null,
+                                  });
+                                }}
+                                className="h-8 text-sm"
+                              />
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">Burn</span>
+                            <span className={cn(
+                              "font-medium",
+                              firmBudgetPercent > 100 && "text-danger",
+                              firmBudgetPercent >= 80 && firmBudgetPercent <= 100 && "text-warning",
+                              firmBudgetPercent < 80 && "text-success"
+                            )}>
+                              {formatCurrency(firmBurn, currency)} ({firmBudgetPercent.toFixed(0)}%)
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  
+                  {/* Total LC summary */}
+                  <div className="flex justify-between items-center py-3 bg-muted/50 rounded-lg px-4">
+                    <span className="text-muted-foreground font-medium">Total LC Budget Burn</span>
+                    <div className="text-right">
+                      <span className={cn(
+                        "text-lg font-semibold",
+                        lcBudgetUsedPercent > 100 && "text-danger",
+                        lcBudgetUsedPercent >= 80 && lcBudgetUsedPercent <= 100 && "text-warning",
+                        lcBudgetUsedPercent < 80 && "text-success"
+                      )}>
+                        {lcBudgetUsedPercent.toFixed(1)}%
+                      </span>
+                      <p className="text-xs text-muted-foreground">
+                        {formatCurrency(lcTotalUsed, currency)} of {formatCurrency(localCounsel, currency)}
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         )}

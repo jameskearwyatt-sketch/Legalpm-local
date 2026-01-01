@@ -151,6 +151,12 @@ export function useMatters() {
         .select('*')
         .in('matter_id', matterIds)
         .order('as_of_date', { ascending: false });
+      
+      // Get all local counsel data for aggregation
+      const { data: localCounsels } = await supabase
+        .from('matter_local_counsels')
+        .select('*')
+        .in('matter_id', matterIds);
 
       // Create a map of matter_id to latest snapshot
       const snapshotMap = new Map<string, any>();
@@ -158,6 +164,17 @@ export function useMatters() {
         if (!snapshotMap.has(snap.matter_id)) {
           snapshotMap.set(snap.matter_id, snap);
         }
+      });
+      
+      // Create a map of matter_id to aggregated LC financials
+      const lcAggregateMap = new Map<string, { totalWip: number; totalBilled: number; totalAllocated: number }>();
+      localCounsels?.forEach(lc => {
+        const existing = lcAggregateMap.get(lc.matter_id) || { totalWip: 0, totalBilled: 0, totalAllocated: 0 };
+        lcAggregateMap.set(lc.matter_id, {
+          totalWip: existing.totalWip + (lc.wip_amount || 0),
+          totalBilled: existing.totalBilled + (lc.billed_amount || 0),
+          totalAllocated: existing.totalAllocated + (lc.allocated_budget || 0),
+        });
       });
 
       // Combine matters with their financial data
@@ -169,11 +186,14 @@ export function useMatters() {
         const budget = matter.agreed_budget_amount || 0;
         const feeUpperEnd = matter.fee_amount_upper_end || 0;
         
-        // Local counsel financials (stored directly on matter)
+        // Local counsel financials - prefer aggregated from matter_local_counsels table
         const matterAny = matter as any;
-        const lcWip = matterAny.lc_wip || 0;
-        const lcBilled = matterAny.lc_billed || 0;
+        const lcAggregate = lcAggregateMap.get(matter.id);
         const localCounselBilling = matterAny.local_counsel_billing;
+        
+        // Use aggregated LC data from the new table if available, otherwise fall back to old fields
+        const lcWip = lcAggregate?.totalWip ?? (matterAny.lc_wip || 0);
+        const lcBilled = lcAggregate?.totalBilled ?? (matterAny.lc_billed || 0);
         
         // Check for different billing currency scenario
         const differentBillingCurrency = matterAny.different_billing_currency ?? false;
@@ -203,7 +223,7 @@ export function useMatters() {
         // BM budget burn (from snapshots)
         const bmTotalUsed = billedAmount + wipAmount;
         
-        // LC budget burn (only for Disbursement mode, from matter fields)
+        // LC budget burn (only for Disbursement mode)
         const lcTotalUsed = localCounselBilling === 'Disb' ? (lcWip + lcBilled) : 0;
         
         // Total budget burn includes both BM and LC (when in Disb mode)

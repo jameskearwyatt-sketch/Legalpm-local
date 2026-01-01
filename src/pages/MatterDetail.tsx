@@ -961,15 +961,42 @@ export default function MatterDetail() {
           <CardContent className="space-y-4">
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Client</Label>
-                <Select value={formData.client_id} onValueChange={(v) => updateField('client_id', v)} disabled={clientsLoading}>
-                  <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
-                  <SelectContent>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                <div className="flex items-center justify-between">
+                  <Label>Client{matter.is_multi_client ? 's' : ''}</Label>
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0 text-xs"
+                    asChild
+                  >
+                    <Link to={`/matters/${id}/edit`}>
+                      {matter.is_multi_client ? 'Add/Edit Clients' : 'Convert to Multi-Client'}
+                    </Link>
+                  </Button>
+                </div>
+                {matter.is_multi_client && matterClients && matterClients.length > 0 ? (
+                  <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+                    {matterClients.map((mc) => (
+                      <div key={mc.id} className="flex items-center justify-between text-sm">
+                        <span className="font-medium">{mc.clients?.name}</span>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <span>{mc.cm_number || '—'}</span>
+                          <span>({mc.fee_percentage}%)</span>
+                          {mc.is_master && <span className="text-primary text-xs">★</span>}
+                        </div>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </div>
+                ) : (
+                  <Select value={formData.client_id} onValueChange={(v) => updateField('client_id', v)} disabled={clientsLoading}>
+                    <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
+                    <SelectContent>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="space-y-2">
                 <Label>Practice Area</Label>

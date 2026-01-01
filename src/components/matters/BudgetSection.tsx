@@ -28,7 +28,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Loader2, ChevronDown, History, Check } from 'lucide-react';
+import { Plus, Trash2, Loader2, ChevronDown, History, Check, FileText, Upload } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 import { useBudgetVersions, DraftLineItem, BudgetLineItem } from '@/lib/hooks/useBudgetVersions';
 import { useMatter } from '@/lib/hooks/useMatters';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,6 +73,13 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [selectedVersionItems, setSelectedVersionItems] = useState<BudgetLineItem[]>([]);
   const [loadingVersionItems, setLoadingVersionItems] = useState(false);
+  
+  // Import from engagement letter state
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [importTab, setImportTab] = useState<'paste' | 'upload'>('paste');
+  const fileInputRef = useState<HTMLInputElement | null>(null);
 
   const hasExistingBudget = versions.length > 0;
 
@@ -116,6 +126,75 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       updated[index][field] = value as string;
     }
     setDraftItems(updated);
+  };
+
+  // Import from engagement letter
+  const handleImportFromEngagementLetter = async (textContent: string) => {
+    if (!textContent.trim()) {
+      toast.error('Please provide text to parse');
+      return;
+    }
+
+    setIsImporting(true);
+    try {
+      const response = await supabase.functions.invoke('parse-engagement-letter', {
+        body: { text: textContent, currency }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to parse engagement letter');
+      }
+
+      const { items } = response.data;
+      
+      if (!items || items.length === 0) {
+        toast.error('No budget items found in the text');
+        return;
+      }
+
+      // Convert to draft items and append to existing items
+      const newItems: DraftLineItem[] = items.map((item: any) => ({
+        work_item: item.work_item?.substring(0, 100) || '',
+        provider: item.provider === 'Local Counsel' ? 'Local Counsel' : 'Baker McKenzie',
+        fee_amount: Number(item.fee_amount) || 0,
+      }));
+
+      // Filter out empty placeholder items and add new ones
+      const existingNonEmpty = draftItems.filter(item => item.work_item.trim() !== '');
+      setDraftItems([...existingNonEmpty, ...newItems]);
+      
+      // Start editing mode if not already
+      if (!isEditing && hasExistingBudget) {
+        setIsEditing(true);
+      }
+
+      setIsImportOpen(false);
+      setImportText('');
+      toast.success(`Imported ${items.length} budget items as draft`);
+    } catch (error) {
+      console.error('Error importing engagement letter:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to parse engagement letter');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // For text files, read directly
+    if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+      const text = await file.text();
+      setImportText(text);
+      setImportTab('paste');
+      toast.success('File loaded. Review and click Import.');
+      return;
+    }
+
+    // For PDF/DOCX, we'll use the parse-excel function which can handle documents
+    // Or inform user to paste text
+    toast.info('For PDF/Word files, please copy the text content and paste it.');
   };
 
   // Calculate totals
@@ -318,17 +397,98 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
             ))
           )}
 
-          {/* Add Line Item Button */}
+          {/* Add Line Item Button and Import Button */}
           {(isEditing || !hasExistingBudget) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={addLineItem}
-              className="w-full border-dashed"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Work Item
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={addLineItem}
+                className="flex-1 border-dashed"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Work Item
+              </Button>
+              <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-dashed"
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Import from Engagement Letter
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Import Budget from Engagement Letter</DialogTitle>
+                    <DialogDescription>
+                      Paste engagement letter text or upload a file. AI will extract work items, providers, and fees as draft items for your review.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <Tabs value={importTab} onValueChange={(v) => setImportTab(v as 'paste' | 'upload')}>
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="paste">Paste Text</TabsTrigger>
+                      <TabsTrigger value="upload">Upload File</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="paste" className="space-y-4">
+                      <Textarea
+                        placeholder="Paste the engagement letter or fee arrangement text here..."
+                        value={importText}
+                        onChange={(e) => setImportText(e.target.value)}
+                        rows={12}
+                        className="font-mono text-sm"
+                      />
+                    </TabsContent>
+                    <TabsContent value="upload" className="space-y-4">
+                      <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                        <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground mb-2">
+                          Upload a text file (.txt)
+                        </p>
+                        <p className="text-xs text-muted-foreground mb-4">
+                          For PDF or Word documents, please copy the text and use the Paste Text tab
+                        </p>
+                        <input
+                          type="file"
+                          accept=".txt,text/plain"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="engagement-file-upload"
+                        />
+                        <Button variant="outline" size="sm" asChild>
+                          <label htmlFor="engagement-file-upload" className="cursor-pointer">
+                            Choose File
+                          </label>
+                        </Button>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsImportOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={() => handleImportFromEngagementLetter(importText)}
+                      disabled={isImporting || !importText.trim()}
+                    >
+                      {isImporting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Parsing...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="h-4 w-4 mr-2" />
+                          Import as Draft
+                        </>
+                      )}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
           )}
         </div>
 

@@ -92,7 +92,7 @@ export function useSnapshots(matterId?: string) {
           .select()
           .single();
         if (error) throw error;
-        return data;
+        return { data, matterId };
       } else {
         // Get the latest snapshot to copy other values
         const { data: latestSnapshot } = await supabase
@@ -117,11 +117,13 @@ export function useSnapshots(matterId?: string) {
           .select()
           .single();
         if (error) throw error;
-        return data;
+        return { data, matterId };
       }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['snapshots'] });
+      queryClient.invalidateQueries({ queryKey: ['snapshots', result.matterId] });
+      queryClient.invalidateQueries({ queryKey: ['matter', result.matterId] });
       queryClient.invalidateQueries({ queryKey: ['matters'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },

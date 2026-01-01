@@ -506,8 +506,56 @@ export default function Matters() {
                                   )}
                                 </div>
                               </TableCell>
-                              <TableCell className="text-right text-muted-foreground">
-                                {formatCurrency(matter.local_counsel_fee, matter.fee_currency)}
+                              <TableCell className="text-right">
+                                <div className="flex flex-col items-end gap-0.5">
+                                  <span className="text-muted-foreground">
+                                    {formatCurrency(matter.local_counsel_fee, matter.fee_currency)}
+                                  </span>
+                                  {(matter.local_counsel_fee || 0) > 0 && (
+                                    <div className="flex items-center gap-1.5">
+                                      <label 
+                                        className={cn(
+                                          "flex items-center gap-0.5 cursor-pointer text-[9px] leading-none",
+                                          matter.local_counsel_billing === 'Disb' ? "text-success" : "text-destructive"
+                                        )}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={matter.local_counsel_billing === 'Disb'}
+                                          onChange={async () => {
+                                            const newValue = matter.local_counsel_billing === 'Disb' ? null : 'Disb';
+                                            await updateMatter.mutateAsync({ id: matter.id, local_counsel_billing: newValue });
+                                          }}
+                                          className={cn(
+                                            "h-2.5 w-2.5 rounded-sm border cursor-pointer accent-current",
+                                            matter.local_counsel_billing === 'Disb' ? "border-success" : "border-destructive"
+                                          )}
+                                        />
+                                        Disb
+                                      </label>
+                                      <label 
+                                        className={cn(
+                                          "flex items-center gap-0.5 cursor-pointer text-[9px] leading-none",
+                                          matter.local_counsel_billing === 'Direct' ? "text-success" : "text-destructive"
+                                        )}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={matter.local_counsel_billing === 'Direct'}
+                                          onChange={async () => {
+                                            const newValue = matter.local_counsel_billing === 'Direct' ? null : 'Direct';
+                                            await updateMatter.mutateAsync({ id: matter.id, local_counsel_billing: newValue });
+                                          }}
+                                          className={cn(
+                                            "h-2.5 w-2.5 rounded-sm border cursor-pointer accent-current",
+                                            matter.local_counsel_billing === 'Direct' ? "border-success" : "border-destructive"
+                                          )}
+                                        />
+                                        Direct
+                                      </label>
+                                    </div>
+                                  )}
+                                </div>
                               </TableCell>
                               <TableCell className="p-1">
                                 <div className="flex flex-col gap-0.5 text-right">

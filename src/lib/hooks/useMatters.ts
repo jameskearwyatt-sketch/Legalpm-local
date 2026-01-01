@@ -34,6 +34,7 @@ export interface Matter {
   current_stage: MatterStage | null;
   fee_amount_upper_end: number;
   local_counsel_fee: number;
+  local_counsel_billing: 'Direct' | 'Disb' | null;
   bm_fee_component: number;
   exchange_rate: number;
   fee_currency: string;
@@ -96,6 +97,7 @@ export interface CreateMatterInput {
   current_stage?: MatterStage | null;
   fee_amount_upper_end?: number;
   local_counsel_fee?: number;
+  local_counsel_billing?: 'Direct' | 'Disb' | null;
   bm_fee_component?: number;
   exchange_rate?: number;
   fee_currency?: string;

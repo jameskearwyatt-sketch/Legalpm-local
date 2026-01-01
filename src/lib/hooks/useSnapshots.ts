@@ -74,6 +74,7 @@ export function useSnapshots(matterId?: string) {
   const upsertTodaySnapshot = useMutation({
     mutationFn: async ({ matterId, field, value }: { matterId: string; field: 'wip_amount' | 'billed_amount' | 'paid_amount'; value: number }) => {
       const today = new Date().toISOString().split('T')[0];
+      const now = new Date().toISOString();
       
       // Check if a snapshot exists for today
       const { data: existing } = await supabase
@@ -84,10 +85,10 @@ export function useSnapshots(matterId?: string) {
         .maybeSingle();
 
       if (existing) {
-        // Update existing snapshot
+        // Update existing snapshot - explicitly set updated_at to now
         const { data, error } = await supabase
           .from('financial_snapshots')
-          .update({ [field]: value })
+          .update({ [field]: value, updated_at: now })
           .eq('id', existing.id)
           .select()
           .single();
@@ -113,6 +114,7 @@ export function useSnapshots(matterId?: string) {
             wip_amount: field === 'wip_amount' ? value : (latestSnapshot?.wip_amount || 0),
             billed_amount: field === 'billed_amount' ? value : (latestSnapshot?.billed_amount || 0),
             paid_amount: field === 'paid_amount' ? value : (latestSnapshot?.paid_amount || 0),
+            updated_at: now,
           })
           .select()
           .single();

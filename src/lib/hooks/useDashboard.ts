@@ -111,9 +111,21 @@ export function useDashboard() {
         const wipAmount = Number(snapshot?.wip_amount) || 0;
         const billedAmount = Number(snapshot?.billed_amount) || 0;
         const paidAmount = Number(snapshot?.paid_amount) || 0;
+        
+        // Calculate effective BM fee - accounts for billing currency conversion
+        const differentBillingCurrency = matter.different_billing_currency || false;
+        const agreedBillingAmount = Number(matter.agreed_billing_amount) || 0;
+        const originalFeeUpperEnd = Number(matter.fee_amount_upper_end) || 0;
+        
+        let effectiveBmFee = bmFee;
+        if (differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0) {
+          // Calculate BM portion of the billing currency amount
+          const bmProportion = bmFee / originalFeeUpperEnd;
+          effectiveBmFee = agreedBillingAmount * bmProportion;
+        }
 
         // Convert to USD using exchange rate
-        totalBmFeesUsd += bmFee * exchangeRate;
+        totalBmFeesUsd += effectiveBmFee * exchangeRate;
         totalWipUsd += wipAmount * exchangeRate;
         totalBilledUsd += billedAmount * exchangeRate;
         totalPaidUsd += paidAmount * exchangeRate;

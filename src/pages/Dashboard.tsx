@@ -120,70 +120,71 @@ export default function Dashboard() {
           ))}
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-6">
-          {/* Trend Chart */}
-          <Card className="shadow-card">
-            <CardHeader>
-              <CardTitle className="font-heading text-lg">Financial Trends</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {hasData ? (
-                <div className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={trendData}>
-                      <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="date" className="text-xs" />
-                      <YAxis 
-                        className="text-xs" 
-                        tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                      />
-                      <Tooltip 
-                        formatter={(value: number) => formatCurrency(value)}
-                        contentStyle={{
-                          backgroundColor: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: 'var(--radius)',
-                        }}
-                      />
-                      <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="wip" 
-                        name="WIP"
-                        stroke="hsl(var(--chart-3))" 
-                        strokeWidth={2}
-                        dot={{ fill: 'hsl(var(--chart-3))' }}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="billed" 
-                        name="Billed"
-                        stroke="hsl(var(--chart-1))" 
-                        strokeWidth={2}
-                        dot={{ fill: 'hsl(var(--chart-1))' }}
-                      />
-                      <Line 
-                        type="monotone" 
-                        dataKey="paid" 
-                        name="Paid"
-                        stroke="hsl(var(--chart-2))" 
-                        strokeWidth={2}
-                        dot={{ fill: 'hsl(var(--chart-2))' }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-72 text-center">
-                  <TrendingUp className="h-12 w-12 text-muted-foreground/50 mb-3" />
-                  <p className="text-sm font-medium text-muted-foreground">No financial data yet</p>
-                  <p className="text-xs text-muted-foreground mt-1">Add snapshots to your matters to see trends</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        {/* Financial Trends - Full Width */}
+        <Card className="shadow-card">
+          <CardHeader>
+            <CardTitle className="font-heading text-lg">Financial Trends</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {hasData ? (
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trendData}>
+                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                    <XAxis dataKey="date" className="text-xs" />
+                    <YAxis 
+                      className="text-xs" 
+                      tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => formatCurrency(value)}
+                      contentStyle={{
+                        backgroundColor: 'hsl(var(--card))',
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: 'var(--radius)',
+                      }}
+                    />
+                    <Legend />
+                    <Line 
+                      type="monotone" 
+                      dataKey="wip" 
+                      name="WIP"
+                      stroke="hsl(var(--chart-3))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--chart-3))' }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="billed" 
+                      name="Billed"
+                      stroke="hsl(var(--chart-1))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--chart-1))' }}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="paid" 
+                      name="Paid"
+                      stroke="hsl(var(--chart-2))" 
+                      strokeWidth={2}
+                      dot={{ fill: 'hsl(var(--chart-2))' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-72 text-center">
+                <TrendingUp className="h-12 w-12 text-muted-foreground/50 mb-3" />
+                <p className="text-sm font-medium text-muted-foreground">No financial data yet</p>
+                <p className="text-xs text-muted-foreground mt-1">Add snapshots to your matters to see trends</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
-          {/* Alerts */}
+        {/* Red Flags and Pipeline Flags - Side by Side */}
+        <div className="grid lg:grid-cols-2 gap-6">
+          {/* Red Flags */}
           <Card className="shadow-card">
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="font-heading text-lg flex items-center gap-2">
@@ -230,67 +231,67 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
-        </div>
 
-        {/* Pipeline Flags Section */}
-        <Card className="shadow-card">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="font-heading text-lg flex items-center gap-2">
-              <Rocket className="h-5 w-5 text-amber-500" />
-              Pipeline Flags
-            </CardTitle>
-            <span className="text-sm text-muted-foreground">
-              {stats?.pipelineAlerts?.length || 0} items
-            </span>
-          </CardHeader>
-          <CardContent>
-            {stats?.pipelineAlerts && stats.pipelineAlerts.length > 0 ? (
-              <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                {stats.pipelineAlerts.map((alert) => (
-                  <Link
-                    key={alert.id}
-                    to={`/matters/${alert.matterId}`}
-                    className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
-                  >
-                    <div className={`p-2 rounded-lg flex-shrink-0 ${
-                      alert.type === 'RFP Deadline Soon' 
-                        ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' 
-                        : 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
-                    }`}>
-                      {alert.type === 'RFP Deadline Soon' ? (
-                        <Clock className="h-4 w-4" />
-                      ) : (
-                        <CalendarClock className="h-4 w-4" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {alert.matterName}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {alert.clientName} • {alert.cmNumber}
-                      </p>
-                      <p className={`text-xs mt-1 font-medium ${
+          {/* Pipeline Flags */}
+          <Card className="shadow-card">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="font-heading text-lg flex items-center gap-2">
+                <Rocket className="h-5 w-5 text-amber-500" />
+                Pipeline Flags
+              </CardTitle>
+              <span className="text-sm text-muted-foreground">
+                {stats?.pipelineAlerts?.length || 0} items
+              </span>
+            </CardHeader>
+            <CardContent>
+              {stats?.pipelineAlerts && stats.pipelineAlerts.length > 0 ? (
+                <div className="space-y-3 max-h-64 overflow-y-auto">
+                  {stats.pipelineAlerts.map((alert) => (
+                    <Link
+                      key={alert.id}
+                      to={`/matters/${alert.matterId}`}
+                      className="flex items-start gap-3 p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                    >
+                      <div className={`p-2 rounded-lg flex-shrink-0 ${
                         alert.type === 'RFP Deadline Soon' 
-                          ? 'text-orange-600 dark:text-orange-400' 
-                          : 'text-purple-600 dark:text-purple-400'
+                          ? 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400' 
+                          : 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
                       }`}>
-                        {alert.message}
-                      </p>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0 mt-1" />
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <CheckCircle className="h-12 w-12 text-success mb-3" />
-                <p className="text-sm font-medium text-foreground">All clear!</p>
-                <p className="text-xs text-muted-foreground">No pipeline deadlines requiring attention</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                        {alert.type === 'RFP Deadline Soon' ? (
+                          <Clock className="h-4 w-4" />
+                        ) : (
+                          <CalendarClock className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {alert.matterName}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {alert.clientName} • {alert.cmNumber}
+                        </p>
+                        <p className={`text-xs mt-1 font-medium ${
+                          alert.type === 'RFP Deadline Soon' 
+                            ? 'text-orange-600 dark:text-orange-400' 
+                            : 'text-purple-600 dark:text-purple-400'
+                        }`}>
+                          {alert.message}
+                        </p>
+                      </div>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0 mt-1" />
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <CheckCircle className="h-12 w-12 text-success mb-3" />
+                  <p className="text-sm font-medium text-foreground">All clear!</p>
+                  <p className="text-xs text-muted-foreground">No pipeline deadlines requiring attention</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </AppLayout>
   );

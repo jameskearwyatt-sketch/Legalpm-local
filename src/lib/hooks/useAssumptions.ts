@@ -10,6 +10,7 @@ export interface Assumption {
   label: string;
   assumption_text: string;
   source_document: string | null;
+  is_standard: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -19,29 +20,32 @@ export interface CreateAssumptionInput {
   label: string;
   assumption_text: string;
   source_document?: string;
+  is_standard?: boolean;
 }
 
 export interface UpdateAssumptionInput {
   id: string;
   label?: string;
   assumption_text?: string;
+  is_standard?: boolean;
 }
 
+// Refined assumption categories with clear, non-overlapping definitions
 export const ASSUMPTION_LABELS = [
-  "Document Revisions",
-  "Transaction Scope", 
-  "Negotiation Style",
-  "Timeline",
-  "Counterparty Cooperation",
-  "Jurisdiction",
-  "Due Diligence",
-  "Third Party Involvement",
-  "Regulatory Approvals",
-  "Complexity Level",
-  "Language",
-  "Disputes",
-  "Financing Conditions",
-  "Staffing",
+  "Document Drafting",
+  "Document Negotiation", 
+  "Transaction Structure",
+  "Transaction Timeline",
+  "Due Diligence Scope",
+  "Counterparty Conduct",
+  "Third Party Approvals",
+  "Regulatory & Compliance",
+  "Jurisdiction & Governing Law",
+  "Financing Arrangements",
+  "Disputes & Litigation",
+  "Staffing & Resourcing",
+  "Client Responsibilities",
+  "Excluded Work",
   "Other"
 ] as const;
 

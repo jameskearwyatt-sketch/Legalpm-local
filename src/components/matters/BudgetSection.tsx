@@ -365,6 +365,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         selected.map(a => ({
           label: a.label,
           assumption_text: a.assumption_text,
+          is_standard: a.is_standard,
           source_document: 'Engagement Letter Import',
         }))
       );
@@ -1596,9 +1597,16 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                       className="mt-1"
                     />
                     <div className="flex-1 space-y-2">
-                      <Badge className={labelColors[assumption.label] || labelColors['Other']}>
-                        {assumption.label}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className={labelColors[assumption.label] || labelColors['Other']}>
+                          {assumption.label}
+                        </Badge>
+                        {assumption.is_standard && (
+                          <Badge variant="outline" className="text-xs border-primary/50 text-primary">
+                            Standard
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-sm flex items-start gap-2">
                         <span className="text-muted-foreground">•</span>
                         <span>{assumption.assumption_text}</span>

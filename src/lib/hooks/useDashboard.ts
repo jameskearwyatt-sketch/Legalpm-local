@@ -1,7 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
-import { differenceInDays, parseISO, isAfter } from 'date-fns';
+import { differenceInDays, parseISO, isAfter, format } from 'date-fns';
+
+export interface TrendDataPoint {
+  date: string;
+  wip: number;
+  billed: number;
+  paid: number;
+}
 
 export interface DashboardStats {
   totalBudget: number;
@@ -12,6 +19,7 @@ export interface DashboardStats {
   openMattersCount: number;
   alerts: Alert[];
   pipelineAlerts: PipelineAlert[];
+  trendData: TrendDataPoint[];
 }
 
 export interface Alert {
@@ -77,6 +85,7 @@ export function useDashboard() {
           openMattersCount: 0,
           alerts: [],
           pipelineAlerts: [],
+          trendData: [],
         } as DashboardStats;
       }
 
@@ -312,6 +321,51 @@ export function useDashboard() {
 
       const avgCollectionRate = totalBilledUsd > 0 ? (totalPaidUsd / totalBilledUsd) * 100 : 100;
 
+      // Build historical trend data from all snapshots
+      // Create a map of matter_id to exchange_rate for currency conversion
+      const matterExchangeRates = new Map<string, number>();
+      liveMatters?.forEach(matter => {
+        matterExchangeRates.set(matter.id, Number(matter.exchange_rate) || 1);
+      });
+
+      // Group all snapshots by date and aggregate
+      const trendByDate = new Map<string, { wip: number; billed: number; paid: number }>();
+      snapshots?.forEach(snap => {
+        const dateKey = snap.as_of_date;
+        const exchangeRate = matterExchangeRates.get(snap.matter_id) || 1;
+        
+        const existing = trendByDate.get(dateKey) || { wip: 0, billed: 0, paid: 0 };
+        existing.wip += (Number(snap.wip_amount) || 0) * exchangeRate;
+        existing.billed += (Number(snap.billed_amount) || 0) * exchangeRate;
+        existing.paid += (Number(snap.paid_amount) || 0) * exchangeRate;
+        trendByDate.set(dateKey, existing);
+      });
+
+      // Convert to array and sort by date
+      const trendData: TrendDataPoint[] = Array.from(trendByDate.entries())
+        .map(([dateStr, values]) => ({
+          date: format(parseISO(dateStr), 'MMM d'),
+          wip: Math.round(values.wip),
+          billed: Math.round(values.billed),
+          paid: Math.round(values.paid),
+        }))
+        .sort((a, b) => {
+          // Re-parse for proper date sorting
+          const dateA = trendByDate.keys();
+          const dateB = trendByDate.keys();
+          return 0; // We need the original dates for sorting
+        });
+
+      // Better sorting approach - use the original date keys
+      const sortedTrendData: TrendDataPoint[] = Array.from(trendByDate.entries())
+        .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+        .map(([dateStr, values]) => ({
+          date: format(parseISO(dateStr), 'MMM d'),
+          wip: Math.round(values.wip),
+          billed: Math.round(values.billed),
+          paid: Math.round(values.paid),
+        }));
+
       return {
         totalBudget: totalBmFeesUsd,
         totalWip: totalWipUsd,
@@ -329,6 +383,7 @@ export function useDashboard() {
           if (a.type !== 'RFP Deadline Soon' && b.type === 'RFP Deadline Soon') return 1;
           return 0;
         }),
+        trendData: sortedTrendData,
       } as DashboardStats;
     },
     enabled: !!user,

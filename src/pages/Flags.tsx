@@ -54,7 +54,7 @@ import { cn } from '@/lib/utils';
 import { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
-type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split' | 'no_cm_number' | 'no_mma' | 'no_billing_partner';
+type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split' | 'no_cm_number' | 'no_mma' | 'no_billing_partner' | 'no_lc_billing';
 
 interface FlaggedMatter {
   id: string;
@@ -132,6 +132,12 @@ const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; descr
     description: 'Billing partner not specified for this matter',
     field: 'lead_partner'
   },
+  no_lc_billing: {
+    label: 'Local Counsel Billing Missing',
+    icon: <AlertTriangle className="h-4 w-4" />,
+    description: 'Local counsel fee exists but billing method not specified',
+    field: 'local_counsel_billing'
+  },
 };
 
 const flagTypeOrder: FlagType[] = [
@@ -142,6 +148,7 @@ const flagTypeOrder: FlagType[] = [
   'no_cm_number',
   'no_mma',
   'no_billing_partner',
+  'no_lc_billing',
   'no_budget_finalized', 
   'no_assumptions', 
   'no_start_date', 
@@ -491,6 +498,11 @@ export default function Flags() {
       const mma = (matter as any).matter_managing_attorney;
       if (!mma || mma.trim() === '') flags.push('no_mma');
       if (!matter.lead_partner || matter.lead_partner.trim() === '') flags.push('no_billing_partner');
+      // Local counsel billing missing check
+      const localCounselFee = Number(matter.local_counsel_fee) || 0;
+      if (localCounselFee > 0 && (!matter.local_counsel_billing || matter.local_counsel_billing.trim() === '')) {
+        flags.push('no_lc_billing');
+      }
       
       return {
         id: matter.id,

@@ -115,7 +115,7 @@ export default function Auth() {
             <Scale className="h-8 w-8 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl font-heading font-bold text-foreground">Matter Budget</h1>
+            <h1 className="text-2xl font-heading font-bold text-foreground">Legal Practice Manager</h1>
             <p className="text-sm text-muted-foreground">Legal Financial Tracking</p>
           </div>
         </div>

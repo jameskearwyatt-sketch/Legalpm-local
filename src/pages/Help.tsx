@@ -17,7 +17,7 @@ export default function Help() {
         <div>
           <h1 className="text-2xl lg:text-3xl font-heading font-bold text-foreground">Help & Documentation</h1>
           <p className="text-muted-foreground mt-1">
-            Learn how Matter Budget Tracker works and how to get the most from it
+            Learn how Legal Practice Manager works and how to get the most from it
           </p>
         </div>
 
@@ -29,7 +29,7 @@ export default function Help() {
               Key Concepts
             </CardTitle>
             <CardDescription>
-              Understanding the core entities in Matter Budget Tracker
+              Understanding the core entities in Legal Practice Manager
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">

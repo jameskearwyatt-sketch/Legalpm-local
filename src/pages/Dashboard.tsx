@@ -81,11 +81,9 @@ export default function Dashboard() {
     },
   ];
 
-  // Only show chart with actual data - no sample data
-  const hasData = (stats?.totalWip || 0) + (stats?.totalBilled || 0) + (stats?.totalPaid || 0) > 0;
-  const trendData = hasData ? [
-    { month: 'Current', wip: stats?.totalWip || 0, billed: stats?.totalBilled || 0, paid: stats?.totalPaid || 0 },
-  ] : [];
+  // Use actual trend data from snapshots
+  const trendData = stats?.trendData || [];
+  const hasData = trendData.length > 0;
 
   return (
     <AppLayout>
@@ -134,10 +132,10 @@ export default function Dashboard() {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={trendData}>
                       <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                      <XAxis dataKey="month" className="text-xs" />
+                      <XAxis dataKey="date" className="text-xs" />
                       <YAxis 
                         className="text-xs" 
-                        tickFormatter={(value) => `$${(value / 1000)}k`}
+                        tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                       />
                       <Tooltip 
                         formatter={(value: number) => formatCurrency(value)}

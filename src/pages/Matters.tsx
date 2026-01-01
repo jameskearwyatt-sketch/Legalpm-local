@@ -513,9 +513,10 @@ export default function Matters() {
                               <TableCell className="text-right font-medium">
                                 <div className="flex flex-col items-end">
                                   <span>{formatCurrency((matter as any).effective_bm_fee ?? matter.bm_fee_component, (matter as any).effective_currency ?? matter.fee_currency)}</span>
-                                  {!(matter as any).different_billing_currency && matter.fee_currency !== 'USD' && (
+                                  {/* Always show USD equivalent for non-USD currencies */}
+                                  {((matter as any).effective_currency ?? matter.fee_currency) !== 'USD' && (
                                     <span className="text-[10px] text-muted-foreground/70 font-normal">
-                                      ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(matter.bm_fee_component * (matter.exchange_rate || 1))}
+                                      ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(((matter as any).effective_bm_fee ?? matter.bm_fee_component) * (matter.exchange_rate || 1))}
                                     </span>
                                   )}
                                 </div>

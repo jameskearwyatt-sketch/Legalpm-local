@@ -718,28 +718,26 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           {/* Header row - different layout when editing vs viewing */}
           {isEditing && hasExistingBudget ? (
             <div className="grid grid-cols-14 gap-2 text-sm font-medium text-muted-foreground px-1">
-              <div className={hasOptionalItems ? "col-span-4" : "col-span-4"}>Work Item</div>
+              <div className="col-span-4">Work Item</div>
               <div className="col-span-2">Provider</div>
+              <div className="col-span-2 text-right">Current</div>
               <div className="col-span-2 text-right">
-                Current
-              </div>
-              <div className={hasOptionalItems ? "col-span-2" : "col-span-4"} style={{ textAlign: 'right' }}>
                 New ({differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency})
               </div>
-              <div className="col-span-1 text-center text-xs">Opt.</div>
+              <div className="col-span-1 text-center text-xs">Optional?</div>
               {hasOptionalItems && <div className="col-span-2 text-center text-xs">Include</div>}
-              <div className="col-span-1"></div>
+              <div className={hasOptionalItems ? "col-span-1" : "col-span-3"}></div>
             </div>
           ) : (
             <div className="grid grid-cols-14 gap-2 text-sm font-medium text-muted-foreground px-1">
               <div className="col-span-4">Work Item</div>
-              <div className={hasOptionalItems ? "col-span-3" : "col-span-5"}>Provider</div>
+              <div className="col-span-3">Provider</div>
               <div className="col-span-2 text-right">
                 Upper End Fee ({differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency})
               </div>
-              <div className="col-span-1 text-center text-xs">Opt.</div>
+              <div className="col-span-1 text-center text-xs">Optional?</div>
               {hasOptionalItems && <div className="col-span-2 text-center text-xs">Include</div>}
-              <div className="col-span-1"></div>
+              <div className={hasOptionalItems ? "col-span-1" : "col-span-3"}></div>
             </div>
           )}
 

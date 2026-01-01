@@ -33,11 +33,14 @@ serve(async (req) => {
 For each work item you identify, you must:
 1. Create a SHORT one-line description (max 50 characters) - just a subject heading, not a full sentence
 2. Determine if the work is done by "Baker McKenzie" or "Local Counsel" based on context clues
-3. Extract or estimate the fee amount as a number (no currency symbols)
+3. Extract the UPPER END fee amount as a number (no currency symbols)
 
-Rules:
+CRITICAL RULE FOR FEE RANGES:
+- If fees are given as a range (e.g., "$50,000 - $75,000", "between 50k and 100k", "£30,000 to £50,000"), you MUST extract ONLY the UPPER END of the range
+- Examples: "$10,000 - $20,000" → use 20000, "between 5k and 15k" → use 15000
+
+Other rules:
 - Keep descriptions extremely brief (e.g., "Due diligence review", "Contract drafting", "Regulatory filings")
-- If fees are given as ranges, use the upper end
 - If fees are percentages or hourly, estimate a reasonable fixed amount or use 0
 - If you can't determine the provider, default to "Baker McKenzie"
 - If you can't determine the fee, use 0
@@ -90,7 +93,7 @@ Return the extracted items.`;
                         },
                         fee_amount: { 
                           type: "number", 
-                          description: "Fee amount as a number (0 if unknown)" 
+                          description: "Upper end fee amount as a number. For ranges, use ONLY the upper value (0 if unknown)" 
                         }
                       },
                       required: ["work_item", "provider", "fee_amount"],

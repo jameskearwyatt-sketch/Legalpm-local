@@ -44,6 +44,7 @@ interface BudgetSectionProps {
 }
 
 const providerOptions = ['Baker McKenzie', 'Local Counsel'] as const;
+const currencyOptions = ['GBP', 'USD', 'EUR', 'CHF', 'AUD', 'CAD', 'SGD', 'SEK', 'Ringgit'] as const;
 
 export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const queryClient = useQueryClient();
@@ -67,6 +68,13 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   // Silent update for local counsel billing (no toast)
   const updateLocalCounselBilling = async (value: 'Direct' | 'Disb' | null) => {
     await supabase.from('matters').update({ local_counsel_billing: value }).eq('id', matterId);
+    queryClient.invalidateQueries({ queryKey: ['matter', matterId] });
+    queryClient.invalidateQueries({ queryKey: ['matters'] });
+  };
+
+  // Update different billing currency fields
+  const updateBillingCurrencyField = async (field: string, value: any) => {
+    await supabase.from('matters').update({ [field]: value }).eq('id', matterId);
     queryClient.invalidateQueries({ queryKey: ['matter', matterId] });
     queryClient.invalidateQueries({ queryKey: ['matters'] });
   };
@@ -98,12 +106,41 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     }
   }, [latestLineItems, hasExistingBudget]);
 
-  const formatCurrency = (value: number) => {
+  // Currency conversion helpers
+  const differentBillingCurrency = (matter as any)?.different_billing_currency ?? false;
+  const quoteCurrency = (matter as any)?.quote_currency || currency;
+  const billingCurrency = (matter as any)?.billing_currency || currency;
+  const agreedBillingAmount = (matter as any)?.agreed_billing_amount || 0;
+  const originalFeeUpperEnd = matter?.fee_amount_upper_end || 0;
+  
+  // Calculate mandated exchange rate (billing currency per quote currency)
+  const mandatedRate = (differentBillingCurrency && originalFeeUpperEnd > 0 && agreedBillingAmount > 0)
+    ? agreedBillingAmount / originalFeeUpperEnd
+    : 1;
+
+  const formatCurrency = (value: number, curr?: string) => {
     const symbols: Record<string, string> = {
       GBP: '£', USD: '$', EUR: '€', Ringgit: 'RM ', CHF: 'CHF ', AUD: 'A$', CAD: 'C$', SGD: 'S$', SEK: 'kr ',
     };
-    const symbol = symbols[currency] || currency + ' ';
+    const targetCurrency = curr || currency;
+    const symbol = symbols[targetCurrency] || targetCurrency + ' ';
     return symbol + new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
+  };
+
+  // Format with conversion for different billing currency
+  const formatWithConversion = (value: number) => {
+    if (differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0) {
+      const convertedValue = value * mandatedRate;
+      return (
+        <div className="flex flex-col items-end">
+          <span>{formatCurrency(value, quoteCurrency)}</span>
+          <span className="text-xs text-muted-foreground">
+            ({formatCurrency(convertedValue, billingCurrency)})
+          </span>
+        </div>
+      );
+    }
+    return formatCurrency(value);
   };
 
   const formatDate = (date: string) => format(new Date(date), 'dd MMM yyyy HH:mm');
@@ -551,10 +588,98 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
             </div>
             <span className="font-medium">{formatCurrency(localCounselTotal)}</span>
           </div>
-          <div className="flex justify-between text-base font-semibold border-t pt-2">
+          <div className="flex justify-between items-end text-base font-semibold border-t pt-2">
             <span>Overall Budget:</span>
-            <span className="text-primary">{formatCurrency(overallTotal)}</span>
+            <div className="text-right">
+              <span className="text-primary">{formatCurrency(overallTotal, quoteCurrency)}</span>
+              {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && (
+                <div className="text-xs text-muted-foreground font-normal">
+                  ({formatCurrency(overallTotal * mandatedRate, billingCurrency)})
+                </div>
+              )}
+            </div>
           </div>
+        </div>
+
+        {/* Different Billing Currency Section */}
+        <div className="border-t pt-4 space-y-4">
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={differentBillingCurrency}
+                onChange={async (e) => {
+                  await updateBillingCurrencyField('different_billing_currency', e.target.checked);
+                  if (!e.target.checked) {
+                    // Reset related fields when unchecked
+                    await updateBillingCurrencyField('quote_currency', null);
+                    await updateBillingCurrencyField('billing_currency', null);
+                    await updateBillingCurrencyField('agreed_billing_amount', 0);
+                  }
+                }}
+                className="h-4 w-4 rounded border cursor-pointer"
+              />
+              <span className="text-sm">Was fee quoted in a different currency to the currency in which fees will be billed?</span>
+            </label>
+          </div>
+
+          {differentBillingCurrency && (
+            <div className="space-y-4 pl-6 border-l-2 border-muted ml-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-sm">Currency in which fee was quoted</Label>
+                  <Select
+                    value={quoteCurrency}
+                    onValueChange={(v) => updateBillingCurrencyField('quote_currency', v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currencyOptions.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm">Currency in which fees will be billed</Label>
+                  <Select
+                    value={billingCurrency}
+                    onValueChange={(v) => updateBillingCurrencyField('billing_currency', v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {currencyOptions.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-sm">Upper end estimate agreed with client in billing currency ({billingCurrency})</Label>
+                <Input
+                  type="number"
+                  value={agreedBillingAmount || ''}
+                  onChange={(e) => updateBillingCurrencyField('agreed_billing_amount', parseFloat(e.target.value) || 0)}
+                  placeholder="0"
+                  className="max-w-xs"
+                />
+              </div>
+              {agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && (
+                <div className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
+                  <span className="font-medium">Mandated exchange rate:</span>{' '}
+                  {mandatedRate.toFixed(4)} {billingCurrency}/{quoteCurrency}
+                  <span className="block text-xs mt-1">
+                    ({formatCurrency(originalFeeUpperEnd, quoteCurrency)} → {formatCurrency(agreedBillingAmount, billingCurrency)})
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Notes - shown for both initial and updates */}

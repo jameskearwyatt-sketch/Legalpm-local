@@ -339,9 +339,11 @@ export type Database = {
       }
       matters: {
         Row: {
+          agreed_billing_amount: number
           agreed_budget_amount: number
           aml_kyc_complete: boolean
           assignment_letter_signed: boolean
+          billing_currency: string | null
           billing_terms: string | null
           bm_fee_component: number
           budget_notes: string | null
@@ -357,6 +359,7 @@ export type Database = {
           deal_currency: string | null
           deal_value: number | null
           decision_date: string | null
+          different_billing_currency: boolean
           exchange_rate: number
           fee_amount_upper_end: number
           fee_currency: string
@@ -376,6 +379,7 @@ export type Database = {
             | Database["public"]["Enums"]["pipeline_outcome"]
             | null
           practice_area: string | null
+          quote_currency: string | null
           source: Database["public"]["Enums"]["matter_source"] | null
           start_date: string | null
           status: Database["public"]["Enums"]["matter_status"]
@@ -386,9 +390,11 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          agreed_billing_amount?: number
           agreed_budget_amount?: number
           aml_kyc_complete?: boolean
           assignment_letter_signed?: boolean
+          billing_currency?: string | null
           billing_terms?: string | null
           bm_fee_component?: number
           budget_notes?: string | null
@@ -404,6 +410,7 @@ export type Database = {
           deal_currency?: string | null
           deal_value?: number | null
           decision_date?: string | null
+          different_billing_currency?: boolean
           exchange_rate?: number
           fee_amount_upper_end?: number
           fee_currency?: string
@@ -423,6 +430,7 @@ export type Database = {
             | Database["public"]["Enums"]["pipeline_outcome"]
             | null
           practice_area?: string | null
+          quote_currency?: string | null
           source?: Database["public"]["Enums"]["matter_source"] | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["matter_status"]
@@ -433,9 +441,11 @@ export type Database = {
           user_id: string
         }
         Update: {
+          agreed_billing_amount?: number
           agreed_budget_amount?: number
           aml_kyc_complete?: boolean
           assignment_letter_signed?: boolean
+          billing_currency?: string | null
           billing_terms?: string | null
           bm_fee_component?: number
           budget_notes?: string | null
@@ -451,6 +461,7 @@ export type Database = {
           deal_currency?: string | null
           deal_value?: number | null
           decision_date?: string | null
+          different_billing_currency?: boolean
           exchange_rate?: number
           fee_amount_upper_end?: number
           fee_currency?: string
@@ -470,6 +481,7 @@ export type Database = {
             | Database["public"]["Enums"]["pipeline_outcome"]
             | null
           practice_area?: string | null
+          quote_currency?: string | null
           source?: Database["public"]["Enums"]["matter_source"] | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["matter_status"]

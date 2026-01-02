@@ -102,6 +102,7 @@ interface EditableRateCardProps {
   currencySymbol: string;
   onSave: (rateCard: RateCard) => Promise<void>;
   isSaving?: boolean;
+  afaDiscount?: number;
 }
 
 export function EditableRateCard({
@@ -109,6 +110,7 @@ export function EditableRateCard({
   currencySymbol,
   onSave,
   isSaving = false,
+  afaDiscount = 0,
 }: EditableRateCardProps) {
   const [feeEarners, setFeeEarners] = useState<FeeEarner[]>(() => rateCardToArray(rateCard));
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -165,9 +167,16 @@ export function EditableRateCard({
     return levelInfo?.label || level;
   };
 
+  const afaDiscountMultiplier = 1 - (afaDiscount / 100);
+  const hasAfaDiscount = afaDiscount > 0;
+
+  const formatRate = (rate: number) => {
+    return `${currencySymbol}${rate.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  };
+
   return (
     <>
-      <Card className="max-w-md">
+      <Card className={hasAfaDiscount ? "max-w-xl" : "max-w-md"}>
         <CardHeader className="pb-2 px-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
@@ -181,9 +190,21 @@ export function EditableRateCard({
           </div>
         </CardHeader>
         <CardContent className="px-4 pb-3 pt-0">
+          {/* Header row when AFA discount is applied */}
+          {hasAfaDiscount && (
+            <div className={`grid ${hasAfaDiscount ? 'grid-cols-[100px_1fr_auto_80px_auto_80px_28px]' : 'grid-cols-[100px_1fr_auto_80px_28px]'} items-center gap-2 py-1 border-b mb-1`}>
+              <span className="text-xs font-medium text-muted-foreground">Level</span>
+              <span className="text-xs font-medium text-muted-foreground">Label</span>
+              <span></span>
+              <span className="text-xs font-medium text-muted-foreground text-right">Rate</span>
+              <span></span>
+              <span className="text-xs font-medium text-red-600 text-right">AFA Rate</span>
+              <span></span>
+            </div>
+          )}
           <div className="space-y-1">
             {sortedEarners.map((earner) => (
-              <div key={earner.key} className="grid grid-cols-[100px_1fr_auto_80px_28px] items-center gap-2 py-1">
+              <div key={earner.key} className={`grid ${hasAfaDiscount ? 'grid-cols-[100px_1fr_auto_80px_auto_80px_28px]' : 'grid-cols-[100px_1fr_auto_80px_28px]'} items-center gap-2 py-1`}>
                 <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded text-center truncate">
                   {getLevelBadge(earner.level)}
                 </span>
@@ -200,6 +221,14 @@ export function EditableRateCard({
                   onChange={(e) => updateFeeEarner(earner.key, parseFloat(e.target.value) || 0)}
                   className="h-7 text-right text-sm px-2"
                 />
+                {hasAfaDiscount && (
+                  <>
+                    <span className="text-xs text-muted-foreground w-4 text-right">{currencySymbol}</span>
+                    <span className="text-sm font-medium text-red-600 text-right bg-red-50 px-2 py-1 rounded h-7 flex items-center justify-end">
+                      {Math.round(earner.rate * afaDiscountMultiplier).toLocaleString('en-GB')}
+                    </span>
+                  </>
+                )}
                 <Button
                   variant="ghost"
                   size="icon"

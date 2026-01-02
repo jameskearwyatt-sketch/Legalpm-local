@@ -39,6 +39,7 @@ interface DraggableProposalItemProps {
   viewingHistoricalVersion: boolean;
   customCategories?: string[];
   onAddCustomCategory?: (category: string) => void;
+  afaDiscountMultiplier?: number;
 }
 
 export function DraggableProposalItem({
@@ -52,6 +53,7 @@ export function DraggableProposalItem({
   viewingHistoricalVersion,
   customCategories = [],
   onAddCustomCategory,
+  afaDiscountMultiplier = 1,
 }: DraggableProposalItemProps) {
   const [isCustomCategoryDialogOpen, setIsCustomCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -276,21 +278,27 @@ export function DraggableProposalItem({
       {/* Lower Estimate */}
       <TableCell>
         {viewingHistoricalVersion ? (
-          <span className="text-sm font-medium">{formatCurrency(item.fee_lower ?? item.fee_amount)}</span>
+          <span className="text-sm font-medium">
+            {formatCurrency((item.fee_lower ?? item.fee_amount) * (item.provider === 'Baker McKenzie' ? afaDiscountMultiplier : 1))}
+          </span>
         ) : (
           <div className="flex items-center gap-1">
             <span className="text-xs text-muted-foreground">{formatCurrency(0).charAt(0)}</span>
             <Input
               type="text"
-              value={((item.fee_lower ?? item.fee_amount) || 0).toLocaleString('en-GB')}
+              value={Math.round(((item.fee_lower ?? item.fee_amount) || 0) * (item.provider === 'Baker McKenzie' ? afaDiscountMultiplier : 1)).toLocaleString('en-GB')}
               onChange={(e) => {
                 const rawValue = e.target.value.replace(/,/g, '');
-                const numericValue = parseFloat(rawValue) || 0;
+                // Reverse the discount to get the base value
+                const displayedValue = parseFloat(rawValue) || 0;
+                const baseValue = item.provider === 'Baker McKenzie' && afaDiscountMultiplier !== 1 
+                  ? Math.round(displayedValue / afaDiscountMultiplier) 
+                  : displayedValue;
                 // When editing lower, also update fee_amount to midpoint
                 const upper = item.fee_upper ?? item.fee_amount ?? 0;
-                const midpoint = Math.round((numericValue + upper) / 2);
+                const midpoint = Math.round((baseValue + upper) / 2);
                 onUpdate(index, {
-                  fee_lower: numericValue,
+                  fee_lower: baseValue,
                   fee_amount: midpoint,
                   pricing_method: 'manual'
                 });
@@ -305,21 +313,27 @@ export function DraggableProposalItem({
       {/* Upper Estimate */}
       <TableCell>
         {viewingHistoricalVersion ? (
-          <span className="text-sm font-medium">{formatCurrency(item.fee_upper ?? item.fee_amount)}</span>
+          <span className="text-sm font-medium">
+            {formatCurrency((item.fee_upper ?? item.fee_amount) * (item.provider === 'Baker McKenzie' ? afaDiscountMultiplier : 1))}
+          </span>
         ) : (
           <div className="flex items-center gap-1">
             <span className="text-xs text-muted-foreground">{formatCurrency(0).charAt(0)}</span>
             <Input
               type="text"
-              value={((item.fee_upper ?? item.fee_amount) || 0).toLocaleString('en-GB')}
+              value={Math.round(((item.fee_upper ?? item.fee_amount) || 0) * (item.provider === 'Baker McKenzie' ? afaDiscountMultiplier : 1)).toLocaleString('en-GB')}
               onChange={(e) => {
                 const rawValue = e.target.value.replace(/,/g, '');
-                const numericValue = parseFloat(rawValue) || 0;
+                // Reverse the discount to get the base value
+                const displayedValue = parseFloat(rawValue) || 0;
+                const baseValue = item.provider === 'Baker McKenzie' && afaDiscountMultiplier !== 1 
+                  ? Math.round(displayedValue / afaDiscountMultiplier) 
+                  : displayedValue;
                 // When editing upper, also update fee_amount to midpoint
                 const lower = item.fee_lower ?? item.fee_amount ?? 0;
-                const midpoint = Math.round((lower + numericValue) / 2);
+                const midpoint = Math.round((lower + baseValue) / 2);
                 onUpdate(index, {
-                  fee_upper: numericValue,
+                  fee_upper: baseValue,
                   fee_amount: midpoint,
                   pricing_method: 'manual'
                 });

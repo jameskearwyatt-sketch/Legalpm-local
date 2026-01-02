@@ -164,21 +164,32 @@ export default function PricingProposalDetail() {
     }
   }, [savedItems]);
 
-  // Calculate work items totals
+  // AFA discount multiplier for dynamic application
+  const afaDiscountMultiplier = 1 - (assumptions.afaDiscount / 100);
+
+  // Calculate work items totals with AFA discount applied
   const workItemTotals = useMemo(() => {
     const includedItems = draftItems.filter(item => 
       !item.is_optional || (item.is_optional && item.is_included !== false)
     );
+    
+    // Apply AFA discount to Baker McKenzie fees only (Local Counsel fees are pass-through)
     const bmTotal = includedItems
       .filter(item => item.provider === 'Baker McKenzie')
-      .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+      .reduce((sum, item) => sum + ((item.fee_amount || 0) * afaDiscountMultiplier), 0);
     const localCounselTotal = includedItems
       .filter(item => item.provider === 'Local Counsel')
       .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
     
-    // Calculate lower and upper totals
-    const lowerTotal = includedItems.reduce((sum, item) => sum + (item.fee_lower ?? item.fee_amount ?? 0), 0);
-    const upperTotal = includedItems.reduce((sum, item) => sum + (item.fee_upper ?? item.fee_amount ?? 0), 0);
+    // Calculate lower and upper totals with AFA discount applied to BM fees
+    const lowerTotal = includedItems.reduce((sum, item) => {
+      const baseFee = item.fee_lower ?? item.fee_amount ?? 0;
+      return sum + (item.provider === 'Baker McKenzie' ? baseFee * afaDiscountMultiplier : baseFee);
+    }, 0);
+    const upperTotal = includedItems.reduce((sum, item) => {
+      const baseFee = item.fee_upper ?? item.fee_amount ?? 0;
+      return sum + (item.provider === 'Baker McKenzie' ? baseFee * afaDiscountMultiplier : baseFee);
+    }, 0);
     
     return {
       bmTotal,
@@ -187,7 +198,7 @@ export default function PricingProposalDetail() {
       lowerTotal,
       upperTotal,
     };
-  }, [draftItems]);
+  }, [draftItems, afaDiscountMultiplier]);
 
   // Calculate hours with decay for negotiation turns
   const calculateNegotiationHours = (baseHours: number, decay: number, turns: number) => {
@@ -1047,6 +1058,11 @@ export default function PricingProposalDetail() {
                     ? versions.find(v => v.id === selectedVersionId)?.version_number || proposal.current_version
                     : proposal.current_version}
                 </Badge>
+                {assumptions.afaDiscount > 0 && (
+                  <Badge variant="destructive" className="bg-red-600 text-white">
+                    AFA discount applied: {assumptions.afaDiscount}%
+                  </Badge>
+                )}
               </div>
               <p className="text-muted-foreground">
                 {proposal.client?.name} • {proposal.currency}
@@ -1386,6 +1402,7 @@ export default function PricingProposalDetail() {
                                   viewingHistoricalVersion={viewingHistoricalVersion}
                                   customCategories={customCategories}
                                   onAddCustomCategory={addCustomCategory}
+                                  afaDiscountMultiplier={afaDiscountMultiplier}
                                 />
                               ))}
                             </SortableContext>
@@ -1629,6 +1646,7 @@ export default function PricingProposalDetail() {
                 toast({ title: 'Rate card saved' });
               }}
               isSaving={updateProposal.isPending}
+              afaDiscount={assumptions.afaDiscount}
             />
           </TabsContent>
 

@@ -290,21 +290,23 @@ export function AskAIButton() {
       </Dialog>
 
       {/* Floating Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className={cn(
-          "fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-xl transition-all duration-300 relative",
-          "bg-gradient-to-br from-orange-500 via-pink-500 to-purple-600",
-          "hover:from-orange-400 hover:via-pink-400 hover:to-purple-500",
-          "hover:shadow-2xl hover:shadow-pink-500/30 hover:scale-110",
-          "flex items-center justify-center text-white",
-          "ring-2 ring-white/20 ring-offset-2 ring-offset-background",
-          !isOpen && "ai-button-alive",
-          isOpen && "rotate-90"
-        )}
-      >
-        {isOpen ? <X className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
-      </button>
+      <div className="fixed bottom-6 right-6 z-50">
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            "relative h-14 w-14 rounded-full shadow-xl transition-all duration-300",
+            "bg-gradient-to-br from-orange-500 via-pink-500 to-purple-600",
+            "hover:from-orange-400 hover:via-pink-400 hover:to-purple-500",
+            "hover:shadow-2xl hover:shadow-pink-500/30 hover:scale-110",
+            "flex items-center justify-center text-white",
+            "ring-2 ring-white/20 ring-offset-2 ring-offset-background",
+            !isOpen && "ai-button-alive",
+            isOpen && "rotate-90"
+          )}
+        >
+          {isOpen ? <X className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
+        </button>
+      </div>
 
       {/* Chat Panel */}
       {isOpen && (

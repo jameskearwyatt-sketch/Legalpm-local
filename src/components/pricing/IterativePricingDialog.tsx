@@ -24,6 +24,8 @@ export interface FeeOwnerHours {
   [key: string]: number;
 }
 
+type DecayOption = '75' | '50' | '25';
+
 interface IterativePricingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -63,7 +65,7 @@ export function IterativePricingDialog({
   });
   
   const [numTurns, setNumTurns] = useState(initialTurns);
-  const [itemType, setItemType] = useState(initialItemType);
+  const [decayPercent, setDecayPercent] = useState<DecayOption>('75');
 
   // Reset when dialog opens with new values
   useEffect(() => {
@@ -75,15 +77,19 @@ export function IterativePricingDialog({
         trainee: initialHours.trainee || 0,
       });
       setNumTurns(initialTurns);
-      setItemType(initialItemType);
+      // Map old item types to decay percentages or use default
+      if (initialItemType === 'negotiation' || initialItemType === 'due_diligence') {
+        setDecayPercent('75');
+      } else {
+        setDecayPercent('75');
+      }
     }
   }, [open, initialHours, initialTurns, initialItemType]);
 
-  // Get decay factor based on item type
+  // Get decay factor from selected percentage (e.g. 75% decay means each turn takes 25% of the previous)
   const getDecayFactor = () => {
-    if (itemType === 'negotiation') return assumptions.negotiatedDocsDecay;
-    if (itemType === 'due_diligence') return assumptions.ddDecay;
-    return 1; // No decay for documentation/meeting
+    const percent = parseInt(decayPercent);
+    return (100 - percent) / 100; // 75% decay = 0.25 multiplier
   };
 
   // Calculate total hours with decay
@@ -146,13 +152,13 @@ export function IterativePricingDialog({
       marginPercent: totalFee > 0 ? ((totalFee - totalCost) / totalFee) * 100 : 0,
       decay,
     };
-  }, [feeOwnerHours, numTurns, itemType, rateCard, assumptions]);
+  }, [feeOwnerHours, numTurns, decayPercent, rateCard, assumptions]);
 
   const handleApply = () => {
     onApply({
       feeOwnerHours,
       numTurns,
-      itemType,
+      itemType: 'iterative', // Just use a generic type since we removed the type column
       calculatedFee: calculation.totalFee,
     });
     onOpenChange(false);
@@ -179,20 +185,6 @@ export function IterativePricingDialog({
           {/* Left Column - Configuration */}
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Item Type</Label>
-              <Select value={itemType} onValueChange={setItemType}>
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="documentation">Documentation (no decay)</SelectItem>
-                  <SelectItem value="negotiation">Negotiation ({(assumptions.negotiatedDocsDecay * 100).toFixed(0)}%)</SelectItem>
-                  <SelectItem value="due_diligence">Due Diligence ({(assumptions.ddDecay * 100).toFixed(0)}%)</SelectItem>
-                  <SelectItem value="meeting">Meeting (no decay)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
               <Label className="text-xs">Number of Turns</Label>
               <Input
                 type="number"
@@ -202,13 +194,22 @@ export function IterativePricingDialog({
                 className="h-8"
               />
             </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Decay</Label>
+              <Select value={decayPercent} onValueChange={(v) => setDecayPercent(v as DecayOption)}>
+                <SelectTrigger className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="75">75% decay</SelectItem>
+                  <SelectItem value="50">50% decay</SelectItem>
+                  <SelectItem value="25">25% decay</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="bg-muted/50 p-3 rounded-lg text-xs text-muted-foreground">
-              <p className="font-medium mb-1">How it works:</p>
-              <ol className="list-decimal list-inside space-y-0.5">
-                <li>Enter hours for first turn</li>
-                <li>Set turns & type</li>
-                <li>Decay auto-applies</li>
-              </ol>
+              <p className="font-medium mb-1">Decay explained:</p>
+              <p>{decayPercent}% decay means turn 2 takes {decayPercent}% less time than turn 1, turn 3 takes {decayPercent}% less time than turn 2, and so on.</p>
             </div>
           </div>
 

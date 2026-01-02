@@ -80,39 +80,48 @@ export function AskAIButton() {
   return (
     <>
       {/* Floating Button */}
-      <Button
+      <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-lg transition-all duration-200",
-          "bg-primary hover:bg-primary/90 text-primary-foreground",
+          "fixed bottom-6 right-6 z-50 h-14 w-14 rounded-full shadow-xl transition-all duration-300",
+          "bg-gradient-to-br from-orange-500 via-pink-500 to-purple-600",
+          "hover:from-orange-400 hover:via-pink-400 hover:to-purple-500",
+          "hover:shadow-2xl hover:shadow-pink-500/30 hover:scale-110",
+          "flex items-center justify-center text-white",
+          "ring-2 ring-white/20 ring-offset-2 ring-offset-background",
           isOpen && "rotate-90"
         )}
-        size="icon"
       >
         {isOpen ? <X className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
-      </Button>
+      </button>
 
       {/* Chat Panel */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-3rem)] rounded-lg border bg-card shadow-xl">
-          {/* Header */}
-          <div className="flex items-center gap-2 border-b px-4 py-3">
-            <Sparkles className="h-5 w-5 text-primary" />
-            <div>
-              <h3 className="font-semibold text-card-foreground">Ask AI</h3>
-              <p className="text-xs text-muted-foreground">
-                Ask questions about your matters and budgets
-              </p>
+        <div className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-3rem)] rounded-xl border-0 shadow-2xl shadow-pink-500/20 overflow-hidden animate-scale-in">
+          {/* Header with gradient */}
+          <div className="bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 px-4 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+                <Sparkles className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white">Ask AI</h3>
+                <p className="text-xs text-white/80">
+                  Your intelligent legal assistant
+                </p>
+              </div>
             </div>
           </div>
 
           {/* Messages */}
-          <ScrollArea className="h-80 p-4">
+          <ScrollArea className="h-80 bg-card p-4">
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
-                <MessageCircle className="mb-2 h-8 w-8 opacity-50" />
-                <p className="text-sm">Ask me anything about your data.</p>
-                <p className="mt-1 text-xs">
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-orange-500/10 via-pink-500/10 to-purple-600/10">
+                  <MessageCircle className="h-6 w-6 text-pink-500" />
+                </div>
+                <p className="text-sm font-medium">Ask me anything about your data</p>
+                <p className="mt-2 text-xs opacity-70">
                   e.g., "What should I quote for a carbon marketing agreement?"
                 </p>
               </div>
@@ -122,19 +131,21 @@ export function AskAIButton() {
                   <div
                     key={index}
                     className={cn(
-                      "rounded-lg px-3 py-2 text-sm",
+                      "rounded-xl px-4 py-3 text-sm",
                       message.role === "user"
-                        ? "ml-8 bg-primary text-primary-foreground"
-                        : "mr-8 bg-muted text-muted-foreground"
+                        ? "ml-8 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 text-white shadow-md"
+                        : "mr-8 bg-muted text-foreground border border-border"
                     )}
                   >
                     <p className="whitespace-pre-wrap">{message.content}</p>
                   </div>
                 ))}
                 {isLoading && (
-                  <div className="mr-8 flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Thinking...</span>
+                  <div className="mr-8 flex items-center gap-2 rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground border border-border">
+                    <Loader2 className="h-4 w-4 animate-spin text-pink-500" />
+                    <span className="bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent font-medium">
+                      Thinking...
+                    </span>
                   </div>
                 )}
               </div>
@@ -142,24 +153,28 @@ export function AskAIButton() {
           </ScrollArea>
 
           {/* Input */}
-          <div className="border-t p-3">
+          <div className="border-t border-border bg-card p-3">
             <div className="flex gap-2">
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Ask a question..."
-                className="min-h-[44px] max-h-32 resize-none"
+                className="min-h-[44px] max-h-32 resize-none rounded-xl border-muted focus:border-pink-500/50 focus:ring-pink-500/20"
                 rows={1}
               />
-              <Button
+              <button
                 onClick={handleSubmit}
                 disabled={!input.trim() || isLoading}
-                size="icon"
-                className="shrink-0"
+                className={cn(
+                  "shrink-0 h-11 w-11 rounded-xl flex items-center justify-center transition-all",
+                  "bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 text-white",
+                  "hover:shadow-lg hover:shadow-pink-500/30 hover:scale-105",
+                  "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none"
+                )}
               >
                 <Send className="h-4 w-4" />
-              </Button>
+              </button>
             </div>
           </div>
         </div>

@@ -151,10 +151,9 @@ serve(async (req) => {
       console.error("Error fetching clients:", clientsError);
     }
 
-    // Build context for the AI
+    // Build context for the AI (exclude internal matter numbers like MAT-XXX-001)
     const mattersContext = (matters || []).map((m: any) => ({
       name: m.matter_name,
-      number: m.matter_number,
       client: m.clients?.name,
       sector: m.clients?.group_sector,
       practiceArea: m.practice_area,
@@ -175,7 +174,6 @@ serve(async (req) => {
       const items = (lineItems || []).filter((li: any) => li.budget_version_id === bv.id);
       return {
         matterName: matter?.matter_name,
-        matterNumber: matter?.matter_number,
         practiceArea: matter?.practice_area,
         version: bv.version_number,
         total: bv.total_amount,
@@ -196,7 +194,6 @@ serve(async (req) => {
       const matter = (matters || []).find((m: any) => m.id === inv.matter_id);
       return {
         matterName: matter?.matter_name,
-        invoiceNumber: inv.invoice_number,
         billed: inv.billed_amount,
         paid: inv.paid_amount,
         status: inv.status,
@@ -211,12 +208,14 @@ When answering questions about pricing or quotes:
 2. Analyze the budget amounts and fee structures from comparable matters
 3. Consider the range of fees quoted (budget amounts, BM fees, local counsel fees)
 4. Provide a clear recommendation with specific justification
-5. Reference specific matters by name/number to support your answer
+5. Reference specific matters by their NAME only (never use internal system IDs or codes)
 
 When giving price recommendations:
 - Provide a specific figure or range
-- Explain what similar matters you based this on
+- Explain what similar matters you based this on (by name, not by ID)
 - Note any relevant factors that might affect the price
+
+IMPORTANT: Never reference internal system matter numbers or IDs. Always refer to matters by their descriptive name only.
 
 Keep your answers concise but informative. Always justify your recommendations with specific data points.
 

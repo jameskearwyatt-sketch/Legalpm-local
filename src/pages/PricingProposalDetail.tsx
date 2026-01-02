@@ -923,20 +923,20 @@ export default function PricingProposalDetail() {
                       <Table>
                         <TableHeader>
                           <TableRow>
+                            <TableHead className="w-[30px]"></TableHead>
+                            <TableHead className="min-w-[280px]">Work Item</TableHead>
+                            <TableHead className="w-[110px]">Category</TableHead>
+                            <TableHead className="w-[100px]">Type</TableHead>
+                            <TableHead className="w-[120px]">Provider</TableHead>
+                            <TableHead className="text-right w-[70px]">Ptnr</TableHead>
+                            <TableHead className="text-right w-[70px]">Assoc</TableHead>
+                            <TableHead className="text-right w-[55px]">Turns</TableHead>
+                            <TableHead className="text-right w-[90px]">Calc</TableHead>
+                            <TableHead className="text-right w-[90px]">Fee</TableHead>
+                            <TableHead className="w-[70px]">Method</TableHead>
+                            <TableHead className="text-center w-[45px]">Opt</TableHead>
+                            <TableHead className="text-center w-[45px]">Inc</TableHead>
                             <TableHead className="w-[40px]"></TableHead>
-                            <TableHead className="min-w-[200px]">Work Item</TableHead>
-                            <TableHead className="min-w-[120px]">Category</TableHead>
-                            <TableHead className="min-w-[120px]">Type</TableHead>
-                            <TableHead className="min-w-[130px]">Provider</TableHead>
-                            <TableHead className="text-right min-w-[80px]">Partner Hrs</TableHead>
-                            <TableHead className="text-right min-w-[80px]">Assoc Hrs</TableHead>
-                            <TableHead className="text-right min-w-[60px]">Turns</TableHead>
-                            <TableHead className="text-right min-w-[100px]">Calc Fee</TableHead>
-                            <TableHead className="text-right min-w-[100px]">Fee</TableHead>
-                            <TableHead className="min-w-[80px]">Method</TableHead>
-                            <TableHead className="text-center min-w-[60px]">Opt</TableHead>
-                            <TableHead className="text-center min-w-[60px]">Inc</TableHead>
-                            <TableHead className="w-[60px]"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -950,12 +950,13 @@ export default function PricingProposalDetail() {
                                 <TableCell>
                                   <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
                                 </TableCell>
-                                <TableCell>
-                                  <Input
+                                <TableCell className="align-top py-2">
+                                  <Textarea
                                     value={item.work_item}
                                     onChange={(e) => updateItem(index, { work_item: e.target.value })}
-                                    className="min-w-[180px]"
+                                    className="min-w-[250px] text-sm resize-none"
                                     placeholder="Work item description"
+                                    rows={2}
                                   />
                                 </TableCell>
                                 <TableCell>

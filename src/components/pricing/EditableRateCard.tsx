@@ -4,11 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Save, Loader2, Users } from "lucide-react";
 import { RateCard } from "@/lib/hooks/usePricingProposals";
 
+// Fee earner levels
+const LEVELS = [
+  { value: "partner", label: "Partner" },
+  { value: "counsel", label: "Counsel" },
+  { value: "seniorAssociate", label: "Senior Associate" },
+  { value: "associate", label: "Associate" },
+  { value: "trainee", label: "Trainee" },
+] as const;
+
+type LevelValue = typeof LEVELS[number]["value"];
+
 interface FeeEarner {
   key: string;
+  level: LevelValue;
   label: string;
   rate: number;
 }
@@ -16,18 +29,39 @@ interface FeeEarner {
 // Default labels with numbered suffix
 const DEFAULT_LABELS: Record<string, string> = {
   partner: "Partner 1",
+  counsel: "Counsel 1",
   seniorAssociate: "Senior Associate 1",
   associate: "Associate 1",
   trainee: "Trainee 1",
 };
 
+// Level order for sorting (after rate)
+const LEVEL_ORDER: Record<LevelValue, number> = {
+  partner: 0,
+  counsel: 1,
+  seniorAssociate: 2,
+  associate: 3,
+  trainee: 4,
+};
+
 // Convert RateCard to array format for dynamic editing
 function rateCardToArray(rateCard: RateCard): FeeEarner[] {
-  return Object.entries(rateCard).map(([key, value]) => ({
-    key,
-    label: DEFAULT_LABELS[key] || formatLabel(key),
-    rate: value.rate,
-  }));
+  return Object.entries(rateCard).map(([key, value]) => {
+    // Try to determine level from key
+    let level: LevelValue = "associate";
+    if (key.includes("partner") || key.startsWith("partner")) level = "partner";
+    else if (key.includes("counsel") || key.startsWith("counsel")) level = "counsel";
+    else if (key.includes("seniorAssociate") || key.startsWith("seniorAssociate")) level = "seniorAssociate";
+    else if (key.includes("trainee") || key.startsWith("trainee")) level = "trainee";
+    else if (key.includes("associate") || key.startsWith("associate")) level = "associate";
+    
+    return {
+      key,
+      level,
+      label: DEFAULT_LABELS[key] || formatLabel(key),
+      rate: value.rate,
+    };
+  });
 }
 
 function formatLabel(key: string): string {
@@ -37,11 +71,12 @@ function formatLabel(key: string): string {
     .trim();
 }
 
-function generateKey(label: string): string {
-  return label
+function generateKey(level: string, label: string): string {
+  const baseKey = label
     .toLowerCase()
     .replace(/\s+/g, '')
     .replace(/[^a-z0-9]/g, '');
+  return `${level}_${baseKey}_${Date.now()}`;
 }
 
 // Convert array back to RateCard format (with required defaults)
@@ -77,6 +112,7 @@ export function EditableRateCard({
 }: EditableRateCardProps) {
   const [feeEarners, setFeeEarners] = useState<FeeEarner[]>(() => rateCardToArray(rateCard));
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [newEarnerLevel, setNewEarnerLevel] = useState<LevelValue>("associate");
   const [newEarnerLabel, setNewEarnerLabel] = useState("");
   const [newEarnerRate, setNewEarnerRate] = useState(0);
 
@@ -99,17 +135,16 @@ export function EditableRateCard({
   const addFeeEarner = () => {
     if (!newEarnerLabel.trim()) return;
     
-    const key = generateKey(newEarnerLabel);
-    if (feeEarners.some(e => e.key === key)) {
-      return; // Already exists
-    }
+    const key = generateKey(newEarnerLevel, newEarnerLabel);
 
     setFeeEarners(prev => [...prev, {
       key,
+      level: newEarnerLevel,
       label: newEarnerLabel.trim(),
       rate: newEarnerRate,
     }]);
 
+    setNewEarnerLevel("associate");
     setNewEarnerLabel("");
     setNewEarnerRate(0);
     setIsAddDialogOpen(false);
@@ -117,6 +152,11 @@ export function EditableRateCard({
 
   const handleSave = async () => {
     await onSave(arrayToRateCard(feeEarners));
+  };
+
+  const getLevelBadge = (level: LevelValue) => {
+    const levelInfo = LEVELS.find(l => l.value === level);
+    return levelInfo?.label || level;
   };
 
   return (
@@ -138,6 +178,9 @@ export function EditableRateCard({
           <div className="space-y-1">
             {sortedEarners.map((earner) => (
               <div key={earner.key} className="flex items-center gap-2 py-1">
+                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
+                  {getLevelBadge(earner.level)}
+                </span>
                 <span className="text-sm font-medium flex-1 min-w-0 truncate">{earner.label}</span>
                 <Input
                   type="number"
@@ -184,11 +227,26 @@ export function EditableRateCard({
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Role / Title</Label>
+              <Label>Level</Label>
+              <Select value={newEarnerLevel} onValueChange={(v) => setNewEarnerLevel(v as LevelValue)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select level" />
+                </SelectTrigger>
+                <SelectContent>
+                  {LEVELS.map((level) => (
+                    <SelectItem key={level.value} value={level.value}>
+                      {level.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Label</Label>
               <Input
                 value={newEarnerLabel}
                 onChange={(e) => setNewEarnerLabel(e.target.value)}
-                placeholder="e.g., Partner 2, Counsel"
+                placeholder="e.g., Lead Partner, Jane Smith"
               />
             </div>
             <div className="space-y-2">

@@ -30,22 +30,31 @@ serve(async (req) => {
 
     const systemPrompt = `You are an expert legal billing analyst. Your task is to parse engagement letter or fee arrangement text and extract budget line items.
 
-For each work item you identify, you must:
+CRITICAL CONSISTENCY RULES - YOU MUST FOLLOW THESE EXACTLY:
+
+GRANULARITY RULES (follow precisely):
+1. Extract work items at the TASK level, not the phase level or sub-task level
+2. A "task" is a discrete billable activity (e.g., "Due diligence review", "Draft SPA", "Negotiate ancillary documents")
+3. DO NOT split into sub-tasks (e.g., don't split "Due diligence" into "Review contracts", "Review IP", "Review employment" unless the document explicitly prices them separately)
+4. DO NOT merge tasks into phases (e.g., don't combine "Draft SPA" and "Negotiate SPA" into just "SPA work")
+5. Only create separate line items when the source document explicitly lists them as separate priced items
+
+EXTRACTION RULES:
 1. Create a SHORT one-line description (max 50 characters) - just a subject heading, not a full sentence
 2. Determine if the work is done by "Baker McKenzie" or "Local Counsel" based on context clues
 3. Extract the UPPER END fee amount as a number (no currency symbols)
 
-CRITICAL RULE FOR FEE RANGES:
-- If fees are given as a range (e.g., "$50,000 - $75,000", "between 50k and 100k", "£30,000 to £50,000"), you MUST extract ONLY the UPPER END of the range
+FEE RANGE RULE:
+- If fees are given as a range (e.g., "$50,000 - $75,000"), extract ONLY the UPPER END
 - Examples: "$10,000 - $20,000" → use 20000, "between 5k and 15k" → use 15000
 
-Other rules:
+OTHER RULES:
 - Keep descriptions extremely brief (e.g., "Due diligence review", "Contract drafting", "Regulatory filings")
 - If fees are percentages or hourly, estimate a reasonable fixed amount or use 0
 - If you can't determine the provider, default to "Baker McKenzie"
 - If you can't determine the fee, use 0
 - Look for terms like "local counsel", "local law firm", "in-country", "domestic counsel" to identify Local Counsel items
-- Parse ALL work items mentioned, even if fees aren't explicitly stated for each`;
+- ONLY extract items that are explicitly mentioned in the text - do not infer or add items that might be needed`;
 
     const userPrompt = `Parse the following engagement letter/fee arrangement and extract budget line items. Currency context: ${currency || 'GBP'}
 

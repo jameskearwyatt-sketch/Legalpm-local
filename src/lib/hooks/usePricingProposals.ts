@@ -350,6 +350,86 @@ export function usePricingProposal(proposalId?: string) {
     },
   });
 
+  // Update current version (overwrites existing items)
+  const updateCurrentVersion = useMutation({
+    mutationFn: async ({ items, notes }: { items: DraftProposalItem[]; notes?: string }) => {
+      if (!latestVersion) throw new Error('No version to update');
+
+      // Calculate totals
+      const includedItems = items.filter(item => 
+        !item.is_optional || (item.is_optional && item.is_included !== false)
+      );
+      const bmTotal = includedItems
+        .filter(item => item.provider === 'Baker McKenzie')
+        .reduce((sum, item) => sum + item.fee_amount, 0);
+      const localCounselTotal = includedItems
+        .filter(item => item.provider === 'Local Counsel')
+        .reduce((sum, item) => sum + item.fee_amount, 0);
+      const totalAmount = bmTotal + localCounselTotal;
+
+      // Update version totals and notes
+      const { error: versionError } = await supabase
+        .from('pricing_proposal_versions')
+        .update({
+          total_amount: totalAmount,
+          bm_total: bmTotal,
+          local_counsel_total: localCounselTotal,
+          notes: notes || null,
+        })
+        .eq('id', latestVersion.id);
+
+      if (versionError) throw versionError;
+
+      // Delete existing items for this version
+      const { error: deleteError } = await supabase
+        .from('pricing_proposal_items')
+        .delete()
+        .eq('version_id', latestVersion.id);
+
+      if (deleteError) throw deleteError;
+
+      // Re-insert all items
+      if (items.length > 0) {
+        const itemsToInsert = items.map((item, index) => ({
+          version_id: latestVersion.id,
+          proposal_id: proposalId!,
+          user_id: user!.id,
+          work_item: item.work_item,
+          provider: item.provider,
+          fee_amount: item.fee_amount,
+          pricing_method: item.pricing_method,
+          category: item.category || null,
+          lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
+          is_optional: item.is_optional ?? false,
+          is_included: item.is_included ?? true,
+          sort_order: index,
+          ai_rationale: item.ai_rationale || null,
+          partner_hours: item.partner_hours ?? 0,
+          associate_hours: item.associate_hours ?? 0,
+          num_turns: item.num_turns ?? 1,
+          item_type: item.item_type ?? 'documentation',
+        }));
+
+        const { error: itemsError } = await supabase
+          .from('pricing_proposal_items')
+          .insert(itemsToInsert);
+
+        if (itemsError) throw itemsError;
+      }
+
+      return latestVersion;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pricing-proposal-versions', proposalId] });
+      queryClient.invalidateQueries({ queryKey: ['pricing-proposal-items'] });
+      queryClient.invalidateQueries({ queryKey: ['pricing-proposal', proposalId] });
+      toast({ title: 'Current version updated' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to update version', description: error.message, variant: 'destructive' });
+    },
+  });
+
   // Save new version with items
   const saveVersion = useMutation({
     mutationFn: async ({ items, notes }: { items: DraftProposalItem[]; notes?: string }) => {
@@ -426,7 +506,7 @@ export function usePricingProposal(proposalId?: string) {
       queryClient.invalidateQueries({ queryKey: ['pricing-proposal-items'] });
       queryClient.invalidateQueries({ queryKey: ['pricing-proposal', proposalId] });
       queryClient.invalidateQueries({ queryKey: ['pricing-proposals'] });
-      toast({ title: 'Version saved successfully' });
+      toast({ title: 'New version saved' });
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to save version', description: error.message, variant: 'destructive' });
@@ -547,6 +627,7 @@ export function usePricingProposal(proposalId?: string) {
     isLoadingItems: itemsQuery.isLoading,
     error: proposalQuery.error,
     updateProposal,
+    updateCurrentVersion,
     saveVersion,
     markAsAgreed,
     fetchVersionItems,

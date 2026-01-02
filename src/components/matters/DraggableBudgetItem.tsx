@@ -128,20 +128,41 @@ export function DraggableBudgetItem({
         </div>
 
         {/* Provider */}
-        <div className="col-span-2">
+        <div className="col-span-2 flex gap-1">
           <Select
             value={item.provider}
-            onValueChange={(v) => onEdit(index, 'provider', v)}
+            onValueChange={(v) => {
+              onEdit(index, 'provider', v);
+              // Clear lc_firm_name if switching to Baker McKenzie
+              if (v === 'Baker McKenzie') {
+                onEdit(index, 'lc_firm_name', '');
+              }
+            }}
           >
-            <SelectTrigger className="text-sm">
+            <SelectTrigger className="text-sm flex-1">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-popover z-50">
               {providerOptions.map((p) => (
                 <SelectItem key={p} value={p}>{p}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {item.provider === 'Local Counsel' && existingLcFirmNames.length > 0 && (
+            <Select
+              value={item.lc_firm_name || ''}
+              onValueChange={(v) => onEdit(index, 'lc_firm_name', v)}
+            >
+              <SelectTrigger className="text-sm flex-1">
+                <SelectValue placeholder="Select firm" />
+              </SelectTrigger>
+              <SelectContent className="bg-popover z-50">
+                {existingLcFirmNames.map((firm) => (
+                  <SelectItem key={firm} value={firm}>{firm}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {/* Current (original) value */}
@@ -240,21 +261,42 @@ export function DraggableBudgetItem({
       </div>
 
       {/* Provider */}
-      <div className="col-span-2">
+      <div className="col-span-2 flex gap-1">
         <Select
           value={item.provider}
-          onValueChange={(v) => onEdit(index, 'provider', v)}
+          onValueChange={(v) => {
+            onEdit(index, 'provider', v);
+            if (v === 'Baker McKenzie') {
+              onEdit(index, 'lc_firm_name', '');
+            }
+          }}
           disabled={hasExistingBudget}
         >
-          <SelectTrigger className="text-sm">
+          <SelectTrigger className="text-sm flex-1">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent>
+          <SelectContent className="bg-popover z-50">
             {providerOptions.map((p) => (
               <SelectItem key={p} value={p}>{p}</SelectItem>
             ))}
           </SelectContent>
         </Select>
+        {item.provider === 'Local Counsel' && existingLcFirmNames.length > 0 && (
+          <Select
+            value={item.lc_firm_name || ''}
+            onValueChange={(v) => onEdit(index, 'lc_firm_name', v)}
+            disabled={hasExistingBudget}
+          >
+            <SelectTrigger className="text-sm flex-1">
+              <SelectValue placeholder="Select firm" />
+            </SelectTrigger>
+            <SelectContent className="bg-popover z-50">
+              {existingLcFirmNames.map((firm) => (
+                <SelectItem key={firm} value={firm}>{firm}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       {/* Fee Amount */}

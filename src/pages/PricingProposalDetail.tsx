@@ -1188,8 +1188,8 @@ export default function PricingProposalDetail() {
             <div className="grid gap-4 md:grid-cols-4">
               <Card>
                 <CardContent className="pt-6">
-                  <p className="text-sm font-medium text-muted-foreground">Total Fee</p>
-                  <p className="text-2xl font-bold">{formatCurrency(workItemTotals.total)}</p>
+                  <p className="text-sm font-medium text-muted-foreground">Estimated Range</p>
+                  <p className="text-2xl font-bold">{formatCurrency(workItemTotals.lowerTotal)} - {formatCurrency(workItemTotals.upperTotal)}</p>
                 </CardContent>
               </Card>
               <Card>

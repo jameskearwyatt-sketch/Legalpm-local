@@ -385,6 +385,18 @@ export default function PricingProposalDetail() {
     setHasUnsavedChanges(true);
   };
 
+  // Move work item up or down
+  const moveItem = (index: number, direction: 'up' | 'down') => {
+    setDraftItems(prev => {
+      const newItems = [...prev];
+      const targetIndex = direction === 'up' ? index - 1 : index + 1;
+      if (targetIndex < 0 || targetIndex >= newItems.length) return prev;
+      [newItems[index], newItems[targetIndex]] = [newItems[targetIndex], newItems[index]];
+      return newItems;
+    });
+    setHasUnsavedChanges(true);
+  };
+
   // Open iterative pricing dialog for a work item
   const openIterativePricing = (index: number) => {
     setIterativeDialogIndex(index);
@@ -1024,6 +1036,7 @@ export default function PricingProposalDetail() {
                         <TableHeader>
                           <TableRow>
                             <TableHead className="w-[30px]"></TableHead>
+                            <TableHead className="w-[40px]"></TableHead>
                             <TableHead className="min-w-[280px]">Work Item</TableHead>
                             <TableHead className="w-[110px]">Category</TableHead>
                             <TableHead className="w-[120px]">Provider</TableHead>
@@ -1032,7 +1045,6 @@ export default function PricingProposalDetail() {
                             <TableHead className="w-[70px]">Method</TableHead>
                             <TableHead className="text-center w-[45px]">Opt</TableHead>
                             <TableHead className="text-center w-[45px]">Inc</TableHead>
-                            <TableHead className="w-[40px]"></TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -1079,7 +1091,7 @@ export default function PricingProposalDetail() {
                                     "border-t-2",
                                     categoryBorderColors[cat]
                                   )}>
-                                    <TableCell colSpan={10} className="py-2">
+                                    <TableCell colSpan={11} className="py-2">
                                       <span className={cn("font-semibold text-sm", categoryTextColors[cat])}>
                                         {item.category}
                                       </span>
@@ -1091,7 +1103,7 @@ export default function PricingProposalDetail() {
                                 lastCategory = '__uncategorized__';
                                 result.push(
                                   <TableRow key="category-uncategorized" className="bg-muted/30 border-t-2 border-muted">
-                                    <TableCell colSpan={10} className="py-2">
+                                    <TableCell colSpan={11} className="py-2">
                                       <span className="font-semibold text-sm text-muted-foreground">
                                         Uncategorized
                                       </span>
@@ -1105,9 +1117,43 @@ export default function PricingProposalDetail() {
                                   key={originalIndex}
                                   className={item.is_optional && !item.is_included ? 'opacity-50' : ''}
                                 >
-                                  <TableCell>
+                                  <TableCell className="py-2">
                                     {!viewingHistoricalVersion && (
-                                      <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                                      <div className="flex flex-col gap-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => moveItem(originalIndex, 'up')}
+                                          disabled={originalIndex === 0}
+                                          className="h-6 w-6"
+                                          title="Move up"
+                                        >
+                                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+                                        </Button>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => moveItem(originalIndex, 'down')}
+                                          disabled={originalIndex === draftItems.length - 1}
+                                          className="h-6 w-6"
+                                          title="Move down"
+                                        >
+                                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </TableCell>
+                                  <TableCell className="py-2">
+                                    {!viewingHistoricalVersion && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => removeItem(originalIndex)}
+                                        className="h-8 w-8"
+                                        title="Delete item"
+                                      >
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
                                     )}
                                   </TableCell>
                                   <TableCell className="align-top py-2">
@@ -1252,18 +1298,6 @@ export default function PricingProposalDetail() {
                                       onCheckedChange={(checked) => updateItem(originalIndex, { is_included: checked })}
                                       disabled={!item.is_optional || viewingHistoricalVersion}
                                     />
-                                  </TableCell>
-                                  <TableCell>
-                                    {!viewingHistoricalVersion && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => removeItem(originalIndex)}
-                                        className="h-8 w-8"
-                                      >
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                      </Button>
-                                    )}
                                   </TableCell>
                                 </TableRow>
                               );

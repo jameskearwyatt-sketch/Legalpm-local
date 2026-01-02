@@ -398,9 +398,35 @@ export default function PricingProposalDetail() {
 
   // Update work item
   const updateItem = (index: number, updates: Partial<DraftProposalItem>) => {
-    setDraftItems(prev => prev.map((item, i) => 
-      i === index ? { ...item, ...updates } : item
-    ));
+    setDraftItems(prev => {
+      const updatedItems = prev.map((item, i) => 
+        i === index ? { ...item, ...updates } : item
+      );
+      
+      // If category changed, auto-sort to group with same category items
+      if ('category' in updates && updates.category) {
+        const categoryOrder = Object.fromEntries(
+          BUDGET_CATEGORIES.map((cat, idx) => [cat, idx])
+        );
+        
+        updatedItems.sort((a, b) => {
+          const catA = a.category || '';
+          const catB = b.category || '';
+          
+          // Uncategorized items go to the end
+          if (!catA && catB) return 1;
+          if (catA && !catB) return -1;
+          if (!catA && !catB) return 0;
+          
+          // Sort by category order
+          const orderA = categoryOrder[catA] ?? 999;
+          const orderB = categoryOrder[catB] ?? 999;
+          return orderA - orderB;
+        });
+      }
+      
+      return updatedItems;
+    });
     setHasUnsavedChanges(true);
   };
 

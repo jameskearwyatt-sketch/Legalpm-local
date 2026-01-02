@@ -98,12 +98,25 @@ export function AskAIButton() {
     }
 
     try {
-      // Request microphone permission first
+      // Check current permission status first
+      const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      console.log('Microphone permission status:', permissionStatus.state);
+      
+      if (permissionStatus.state === 'denied') {
+        alert('Microphone access is blocked. To enable it:\n\n1. Click the lock/site icon in your browser address bar\n2. Find "Microphone" and change it to "Allow"\n3. Refresh the page and try again');
+        return;
+      }
+
+      // Request microphone permission
       await navigator.mediaDevices.getUserMedia({ audio: true });
       console.log('Microphone permission granted');
-    } catch (err) {
-      console.error('Microphone permission denied:', err);
-      alert('Please allow microphone access to use voice input.');
+    } catch (err: any) {
+      console.error('Microphone permission error:', err);
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        alert('Microphone access is blocked. To enable it:\n\n1. Click the lock/site icon in your browser address bar\n2. Find "Microphone" and change it to "Allow"\n3. Refresh the page and try again');
+      } else {
+        alert('Could not access microphone: ' + err.message);
+      }
       return;
     }
 

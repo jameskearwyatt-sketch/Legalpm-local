@@ -79,38 +79,63 @@ export function CategorizedBudgetView({
     useSensor(KeyboardSensor)
   );
 
-  // Group items by category
-  const groupedItems = useMemo(() => {
-    const groups: Record<string, { items: DraftLineItem[]; indices: number[] }> = {};
-    
-    // Initialize all categories
-    BUDGET_CATEGORIES.forEach(cat => {
-      groups[cat] = { items: [], indices: [] };
+  // Get unique provider names (Baker McKenzie + each LC firm)
+  const providerNames = useMemo(() => {
+    const lcFirms = new Set<string>();
+    items.forEach(item => {
+      if (item.provider === 'Local Counsel' && item.lc_firm_name) {
+        lcFirms.add(item.lc_firm_name);
+      }
     });
+    return ['Baker McKenzie', ...Array.from(lcFirms).sort()];
+  }, [items]);
+
+  // Create composite group key from category and provider
+  const getGroupKey = (category: string, provider: string, lcFirmName?: string | null) => {
+    const providerName = provider === 'Local Counsel' && lcFirmName ? lcFirmName : 'Baker McKenzie';
+    return `${category}|${providerName}`;
+  };
+
+  // Group items by category AND provider
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, { items: DraftLineItem[]; indices: number[]; category: BudgetCategory; providerName: string }> = {};
     
     // Group items
     items.forEach((item, index) => {
-      const category = item.category || 'Other';
-      if (!groups[category]) {
-        groups[category] = { items: [], indices: [] };
+      const category = (item.category || 'Other') as BudgetCategory;
+      const providerName = item.provider === 'Local Counsel' && item.lc_firm_name ? item.lc_firm_name : 'Baker McKenzie';
+      const key = `${category}|${providerName}`;
+      
+      if (!groups[key]) {
+        groups[key] = { items: [], indices: [], category, providerName };
       }
-      groups[category].items.push(item);
-      groups[category].indices.push(index);
+      groups[key].items.push(item);
+      groups[key].indices.push(index);
     });
     
     return groups;
   }, [items]);
 
-  // Calculate subtotals per category
-  const categorySubtotals = useMemo(() => {
+  // Get all possible group keys in order (category order, then provider order)
+  const orderedGroupKeys = useMemo(() => {
+    const keys: string[] = [];
+    BUDGET_CATEGORIES.forEach(category => {
+      providerNames.forEach(providerName => {
+        keys.push(`${category}|${providerName}`);
+      });
+    });
+    return keys;
+  }, [providerNames]);
+
+  // Calculate subtotals per group
+  const groupSubtotals = useMemo(() => {
     const subtotals: Record<string, number> = {};
     
-    BUDGET_CATEGORIES.forEach(cat => {
-      const categoryItems = groupedItems[cat]?.items || [];
-      const includedItems = categoryItems.filter(item => 
+    Object.entries(groupedItems).forEach(([key, group]) => {
+      const includedItems = group.items.filter(item => 
         !item.is_optional || (item.is_optional && item.is_included !== false)
       );
-      subtotals[cat] = includedItems.reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+      subtotals[key] = includedItems.reduce((sum, item) => sum + (item.fee_amount || 0), 0);
     });
     
     return subtotals;
@@ -287,15 +312,19 @@ export function CategorizedBudgetView({
         onDragEnd={handleDragEnd}
       >
         <div className="space-y-4">
-          {BUDGET_CATEGORIES.map(category => {
-            const group = groupedItems[category];
+          {orderedGroupKeys.map(groupKey => {
+            const group = groupedItems[groupKey];
+            const [category, providerName] = groupKey.split('|') as [BudgetCategory, string];
+            
             if (!group || group.items.length === 0) {
-              // Show empty category as drop target when editing
+              // Show empty groups as drop targets when editing
               if (isEditing || !hasExistingBudget) {
                 return (
                   <CategoryGroup
-                    key={category}
+                    key={groupKey}
                     category={category}
+                    providerName={providerName}
+                    groupKey={groupKey}
                     subtotal={0}
                     formatCurrency={formatCurrency}
                     currency={differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : currency}
@@ -312,13 +341,15 @@ export function CategorizedBudgetView({
             }
             
             const displaySubtotal = differentBillingCurrency && agreedBillingAmount > 0
-              ? categorySubtotals[category] * mandatedRate
-              : categorySubtotals[category];
+              ? (groupSubtotals[groupKey] || 0) * mandatedRate
+              : (groupSubtotals[groupKey] || 0);
             
             return (
               <CategoryGroup
-                key={category}
+                key={groupKey}
                 category={category}
+                providerName={providerName}
+                groupKey={groupKey}
                 subtotal={displaySubtotal}
                 formatCurrency={formatCurrency}
                 currency={differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : currency}

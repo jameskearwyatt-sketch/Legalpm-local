@@ -7,6 +7,8 @@ import { BudgetCategory } from '@/lib/hooks/useBudgetVersions';
 
 interface CategoryGroupProps {
   category: BudgetCategory;
+  providerName?: string;
+  groupKey: string;
   subtotal: number;
   formatCurrency: (value: number, currency?: string) => string;
   currency: string;
@@ -41,6 +43,8 @@ const categoryTextColors: Record<BudgetCategory, string> = {
 
 export function CategoryGroup({
   category,
+  providerName,
+  groupKey,
   subtotal,
   formatCurrency,
   currency,
@@ -51,12 +55,17 @@ export function CategoryGroup({
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   const { setNodeRef, isOver } = useDroppable({
-    id: `category-${category}`,
+    id: `group-${groupKey}`,
     data: {
       type: 'category',
       category,
+      providerName,
+      groupKey,
     },
   });
+
+  // Display name shows category and provider
+  const displayName = providerName ? `${category} - ${providerName}` : category;
 
   return (
     <div
@@ -86,7 +95,7 @@ export function CategoryGroup({
             )
           )}
           <span className={cn('font-semibold text-sm', categoryTextColors[category])}>
-            {category}
+            {displayName}
           </span>
         </div>
         {!isEmpty && subtotal > 0 && (

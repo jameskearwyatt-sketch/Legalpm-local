@@ -61,23 +61,51 @@ export function AskAIButton() {
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
+  const [interimText, setInterimText] = useState("");
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // Check if speech recognition is supported
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    setSpeechSupported(!!SpeechRecognition);
+    const isSupported = !!SpeechRecognition;
+    setSpeechSupported(isSupported);
+    console.log('Speech Recognition supported:', isSupported);
   }, []);
 
-  const toggleListening = () => {
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+    };
+  }, []);
+
+  const toggleListening = async () => {
+    console.log('toggleListening called, isListening:', isListening);
+    
     if (isListening) {
       recognitionRef.current?.stop();
       setIsListening(false);
+      setInterimText("");
       return;
     }
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
+    if (!SpeechRecognition) {
+      console.error('SpeechRecognition not available');
+      return;
+    }
+
+    try {
+      // Request microphone permission first
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      console.log('Microphone permission granted');
+    } catch (err) {
+      console.error('Microphone permission denied:', err);
+      alert('Please allow microphone access to use voice input.');
+      return;
+    }
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
@@ -85,6 +113,7 @@ export function AskAIButton() {
     recognition.lang = 'en-US';
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
+      console.log('Speech recognition result received');
       let finalTranscript = '';
       let interimTranscript = '';
 
@@ -97,22 +126,37 @@ export function AskAIButton() {
         }
       }
 
+      // Show interim results in real-time
+      setInterimText(interimTranscript);
+
       if (finalTranscript) {
-        setInput(prev => prev + finalTranscript);
+        console.log('Final transcript:', finalTranscript);
+        setInput(prev => prev + finalTranscript + ' ');
+        setInterimText("");
       }
     };
 
-    recognition.onerror = () => {
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error:', event.error);
       setIsListening(false);
+      setInterimText("");
     };
 
     recognition.onend = () => {
+      console.log('Speech recognition ended');
       setIsListening(false);
+      setInterimText("");
     };
 
     recognitionRef.current = recognition;
-    recognition.start();
-    setIsListening(true);
+    
+    try {
+      recognition.start();
+      console.log('Speech recognition started');
+      setIsListening(true);
+    } catch (err) {
+      console.error('Failed to start recognition:', err);
+    }
   };
 
   const handleSubmit = async () => {
@@ -252,12 +296,18 @@ export function AskAIButton() {
 
           {/* Input */}
           <div className="border-t border-border bg-card p-3">
+            {/* Show interim speech text */}
+            {interimText && (
+              <div className="mb-2 text-xs text-muted-foreground italic px-2">
+                {interimText}...
+              </div>
+            )}
             <div className="flex gap-2">
               <Textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={isListening ? "Listening..." : "Ask a question..."}
+                placeholder={isListening ? "Speak now..." : "Ask a question..."}
                 className={cn(
                   "min-h-[44px] max-h-32 resize-none rounded-xl border-muted focus:border-pink-500/50 focus:ring-pink-500/20",
                   isListening && "border-pink-500/50 bg-pink-500/5"

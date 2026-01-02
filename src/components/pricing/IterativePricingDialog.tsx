@@ -164,143 +164,117 @@ export function IterativePricingDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Calculator className="h-5 w-5" />
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="flex items-center gap-2 text-base">
+            <Calculator className="h-4 w-4" />
             Iterative Pricing Calculator
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-sm">
             {workItemName || 'Configure pricing based on hours, turns, and decay factors'}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          {/* Instructions */}
-          <div className="bg-muted/50 p-4 rounded-lg flex gap-3">
-            <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
-            <div className="text-sm text-muted-foreground space-y-1">
-              <p><strong>How it works:</strong></p>
-              <ol className="list-decimal list-inside space-y-1">
-                <li>Enter hours for each fee owner for the <strong>first turn</strong></li>
-                <li>Select whether this is a process/negotiation or document/due diligence</li>
-                <li>Set the number of turns (iterations)</li>
-                <li>The calculator applies the decay factor from assumptions for subsequent turns</li>
-              </ol>
-            </div>
-          </div>
-
-          {/* Configuration Row */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Item Type</Label>
+        <div className="grid grid-cols-3 gap-4 py-2">
+          {/* Left Column - Configuration */}
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs">Item Type</Label>
               <Select value={itemType} onValueChange={setItemType}>
-                <SelectTrigger>
+                <SelectTrigger className="h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="documentation">Documentation (no decay)</SelectItem>
-                  <SelectItem value="negotiation">Negotiation/Process ({(assumptions.negotiatedDocsDecay * 100).toFixed(0)}% decay)</SelectItem>
-                  <SelectItem value="due_diligence">Due Diligence ({(assumptions.ddDecay * 100).toFixed(0)}% decay)</SelectItem>
+                  <SelectItem value="negotiation">Negotiation ({(assumptions.negotiatedDocsDecay * 100).toFixed(0)}%)</SelectItem>
+                  <SelectItem value="due_diligence">Due Diligence ({(assumptions.ddDecay * 100).toFixed(0)}%)</SelectItem>
                   <SelectItem value="meeting">Meeting (no decay)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Number of Turns</Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Number of Turns</Label>
               <Input
                 type="number"
                 value={numTurns}
                 onChange={(e) => setNumTurns(Math.max(1, parseInt(e.target.value) || 1))}
                 min={1}
+                className="h-8"
               />
             </div>
+            <div className="bg-muted/50 p-3 rounded-lg text-xs text-muted-foreground">
+              <p className="font-medium mb-1">How it works:</p>
+              <ol className="list-decimal list-inside space-y-0.5">
+                <li>Enter hours for first turn</li>
+                <li>Set turns & type</li>
+                <li>Decay auto-applies</li>
+              </ol>
+            </div>
           </div>
 
-          {/* Hours Input Table */}
+          {/* Middle Column - Hours Input */}
           <div className="space-y-2">
-            <Label>Hours per Fee Owner (First Turn)</Label>
-            <div className="border rounded-lg overflow-hidden">
-              <table className="w-full">
-                <thead className="bg-muted/50">
-                  <tr>
-                    <th className="text-left p-3 text-sm font-medium">Grade</th>
-                    <th className="text-right p-3 text-sm font-medium">Rate</th>
-                    <th className="text-right p-3 text-sm font-medium w-28">First Turn Hrs</th>
-                    <th className="text-right p-3 text-sm font-medium">Total Hrs</th>
-                    <th className="text-right p-3 text-sm font-medium">Fee</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {calculation.breakdown.map((grade) => (
-                    <tr key={grade.key} className="border-t">
-                      <td className="p-3 font-medium">{grade.label}</td>
-                      <td className="p-3 text-right text-muted-foreground">
-                        {formatCurrency(grade.effectiveRate)}
-                      </td>
-                      <td className="p-3">
-                        <Input
-                          type="number"
-                          value={feeOwnerHours[grade.key] || 0}
-                          onChange={(e) => setFeeOwnerHours(prev => ({
-                            ...prev,
-                            [grade.key]: parseFloat(e.target.value) || 0
-                          }))}
-                          min={0}
-                          step={0.5}
-                          className="w-24 text-right ml-auto"
-                        />
-                      </td>
-                      <td className="p-3 text-right">
-                        {grade.totalHours.toFixed(1)}
-                      </td>
-                      <td className="p-3 text-right font-medium">
-                        {formatCurrency(grade.fee)}
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="border-t bg-muted/30 font-bold">
-                    <td className="p-3">Total</td>
-                    <td className="p-3"></td>
-                    <td className="p-3"></td>
-                    <td className="p-3 text-right">{calculation.totalHours.toFixed(1)}</td>
-                    <td className="p-3 text-right">{formatCurrency(calculation.totalFee)}</td>
-                  </tr>
-                </tbody>
-              </table>
+            <Label className="text-xs">Hours (First Turn)</Label>
+            <div className="space-y-1.5">
+              {calculation.breakdown.map((grade) => (
+                <div key={grade.key} className="flex items-center gap-2">
+                  <span className="text-xs w-20 truncate">{grade.label}</span>
+                  <Input
+                    type="number"
+                    value={feeOwnerHours[grade.key] || 0}
+                    onChange={(e) => setFeeOwnerHours(prev => ({
+                      ...prev,
+                      [grade.key]: parseFloat(e.target.value) || 0
+                    }))}
+                    min={0}
+                    step={0.5}
+                    className="w-16 h-7 text-right text-sm"
+                  />
+                  <span className="text-xs text-muted-foreground">→ {grade.totalHours.toFixed(1)}h</span>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Summary */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-primary/5 p-4 rounded-lg text-center">
-              <p className="text-sm text-muted-foreground">Calculated Fee</p>
-              <p className="text-2xl font-bold">{formatCurrency(calculation.totalFee)}</p>
+          {/* Right Column - Summary */}
+          <div className="space-y-2">
+            <Label className="text-xs">Breakdown</Label>
+            <div className="space-y-1.5">
+              {calculation.breakdown.filter(g => g.fee > 0).map((grade) => (
+                <div key={grade.key} className="flex justify-between text-xs">
+                  <span>{grade.label}</span>
+                  <span className="font-medium">{formatCurrency(grade.fee)}</span>
+                </div>
+              ))}
+              <div className="border-t pt-1.5 mt-1.5 flex justify-between text-sm font-bold">
+                <span>Total</span>
+                <span>{formatCurrency(calculation.totalFee)}</span>
+              </div>
             </div>
-            <div className="bg-muted/50 p-4 rounded-lg text-center">
-              <p className="text-sm text-muted-foreground">Total Hours</p>
-              <p className="text-2xl font-bold">{calculation.totalHours.toFixed(1)}</p>
-            </div>
-            <div className="bg-muted/50 p-4 rounded-lg text-center">
-              <p className="text-sm text-muted-foreground">Margin</p>
-              <p className="text-2xl font-bold">{calculation.marginPercent.toFixed(0)}%</p>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              <div className="bg-primary/10 p-2 rounded text-center">
+                <p className="text-[10px] text-muted-foreground">Fee</p>
+                <p className="text-sm font-bold">{formatCurrency(calculation.totalFee)}</p>
+              </div>
+              <div className="bg-muted/50 p-2 rounded text-center">
+                <p className="text-[10px] text-muted-foreground">Hours</p>
+                <p className="text-sm font-bold">{calculation.totalHours.toFixed(1)}</p>
+              </div>
             </div>
           </div>
-
-          {numTurns > 1 && calculation.decay < 1 && (
-            <p className="text-sm text-muted-foreground">
-              * Decay factor of {(calculation.decay * 100).toFixed(0)}% applied. 
-              Each subsequent turn uses {(calculation.decay * 100).toFixed(0)}% of the previous turn's hours.
-            </p>
-          )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        {numTurns > 1 && calculation.decay < 1 && (
+          <p className="text-xs text-muted-foreground">
+            Decay: {(calculation.decay * 100).toFixed(0)}% per turn
+          </p>
+        )}
+
+        <DialogFooter className="pt-2">
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleApply}>
-            <Calculator className="h-4 w-4 mr-2" />
+          <Button size="sm" onClick={handleApply}>
             Apply {formatCurrency(calculation.totalFee)}
           </Button>
         </DialogFooter>

@@ -148,12 +148,13 @@ export function CategorizedBudgetView({
 
   // Auto-categorize items using AI
   const handleAutoCategorize = async () => {
-    const uncategorizedItems = items
+    // Categorize all items with work_item text, not just uncategorized ones
+    const itemsToCategorize = items
       .map((item, index) => ({ ...item, index }))
-      .filter(item => !item.category && item.work_item.trim());
+      .filter(item => item.work_item.trim());
     
-    if (uncategorizedItems.length === 0) {
-      toast.info('All items are already categorized');
+    if (itemsToCategorize.length === 0) {
+      toast.info('No items to categorize');
       return;
     }
 
@@ -161,7 +162,7 @@ export function CategorizedBudgetView({
     try {
       const response = await supabase.functions.invoke('categorize-budget-items', {
         body: { 
-          items: uncategorizedItems.map(item => ({
+          items: itemsToCategorize.map(item => ({
             index: item.index,
             work_item: item.work_item
           }))
@@ -263,7 +264,7 @@ export function CategorizedBudgetView({
           variant="outline"
           size="sm"
           onClick={handleAutoCategorize}
-          disabled={isCategorizing || uncategorizedCount === 0}
+          disabled={isCategorizing || items.filter(i => i.work_item.trim()).length === 0}
         >
           {isCategorizing ? (
             <>

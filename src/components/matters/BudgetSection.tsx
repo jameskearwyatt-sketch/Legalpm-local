@@ -31,7 +31,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Loader2, ChevronDown, History, Check, FileText, Upload, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Loader2, ChevronDown, History, Check, FileText, Upload, Sparkles, TrendingUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
@@ -44,6 +44,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CategorizedBudgetView } from './CategorizedBudgetView';
+import { DetailedWipUpdateModal } from './DetailedWipUpdateModal';
 import { formatCurrency as sharedFormatCurrency } from '@/lib/currencyUtils';
 
 interface BudgetSectionProps {
@@ -68,6 +69,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     fetchLineItems,
     toggleLineItemIncluded,
     updateLineItemOptional,
+    updateDetailedWip,
   } = useBudgetVersions(matterId);
   
   const { localCounsels, syncLocalCounselsFromBudget } = useLocalCounsels(matterId);
@@ -114,6 +116,9 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [extractedAssumptions, setExtractedAssumptions] = useState<ExtractedAssumption[]>([]);
   const [showAssumptionsPreview, setShowAssumptionsPreview] = useState(false);
   
+  // Detailed WIP Update state
+  const [isDetailedWipOpen, setIsDetailedWipOpen] = useState(false);
+  
   const { createBulkAssumptions } = useAssumptions(matterId);
 
   const hasExistingBudget = versions.length > 0;
@@ -135,6 +140,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         is_optional: item.is_optional,
         is_included: item.is_included,
         category: item.category || undefined,
+        wip_amount: item.wip_amount,
+        wip_updated_at: item.wip_updated_at,
       })));
     } else if (!hasExistingBudget && draftItems.length === 0) {
       // Add one empty line for new budgets
@@ -694,6 +701,17 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 Paste Information
               </Button>
             </>
+          )}
+          {/* Detailed WIP Update button - show when budget exists and not editing */}
+          {hasExistingBudget && latestVersion && !isEditing && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsDetailedWipOpen(true)}
+            >
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Detailed WIP Update
+            </Button>
           )}
           {hasExistingBudget && latestVersion && (
             <span className="text-sm text-muted-foreground">
@@ -1512,6 +1530,18 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Detailed WIP Update Modal */}
+      <DetailedWipUpdateModal
+        isOpen={isDetailedWipOpen}
+        onClose={() => setIsDetailedWipOpen(false)}
+        lineItems={latestLineItems}
+        onFinalize={async (wipUpdates) => {
+          await updateDetailedWip.mutateAsync({ matterId, wipUpdates });
+        }}
+        formatCurrency={formatCurrency}
+        currency={quoteCurrency}
+      />
     </Card>
   );
 }

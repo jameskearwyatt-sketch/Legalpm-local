@@ -82,6 +82,8 @@ export type Database = {
           sort_order: number
           updated_at: string
           user_id: string
+          wip_amount: number
+          wip_updated_at: string | null
           work_item: string
         }
         Insert: {
@@ -98,6 +100,8 @@ export type Database = {
           sort_order?: number
           updated_at?: string
           user_id: string
+          wip_amount?: number
+          wip_updated_at?: string | null
           work_item: string
         }
         Update: {
@@ -114,6 +118,8 @@ export type Database = {
           sort_order?: number
           updated_at?: string
           user_id?: string
+          wip_amount?: number
+          wip_updated_at?: string | null
           work_item?: string
         }
         Relationships: [

@@ -961,160 +961,225 @@ export default function PricingProposalDetail() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {draftItems.map((item, index) => {
-                            const calcFee = item.provider === 'Baker McKenzie' ? calculateIterativePrice(item) : 0;
-                            return (
-                              <TableRow 
-                                key={index}
-                                className={item.is_optional && !item.is_included ? 'opacity-50' : ''}
-                              >
-                                <TableCell>
-                                  <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                                </TableCell>
-                                <TableCell className="align-top py-2">
-                                  <Textarea
-                                    value={item.work_item}
-                                    onChange={(e) => updateItem(index, { work_item: e.target.value })}
-                                    className="min-w-[250px] text-sm resize-none"
-                                    placeholder="Work item description"
-                                    rows={2}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Select
-                                    value={item.category || ''}
-                                    onValueChange={(value) => updateItem(index, { category: value || null })}
-                                  >
-                                    <SelectTrigger 
-                                      className={cn(
-                                        "w-[120px] text-xs",
-                                        item.category && categoryBgColors[item.category as keyof typeof categoryBgColors],
-                                        item.category && categoryBorderColors[item.category as keyof typeof categoryBorderColors],
-                                        item.category && categoryTextColors[item.category as keyof typeof categoryTextColors]
-                                      )}
+                          {(() => {
+                            // Group items by category for rendering
+                            const categorizedItems = [...draftItems].map((item, originalIndex) => ({
+                              item,
+                              originalIndex
+                            }));
+                            
+                            // Sort by category (using BUDGET_CATEGORIES order), uncategorized at end
+                            const categoryOrder = Object.fromEntries(
+                              BUDGET_CATEGORIES.map((cat, idx) => [cat, idx])
+                            );
+                            
+                            categorizedItems.sort((a, b) => {
+                              const catA = a.item.category || '';
+                              const catB = b.item.category || '';
+                              
+                              // Uncategorized items go to the end
+                              if (!catA && catB) return 1;
+                              if (catA && !catB) return -1;
+                              if (!catA && !catB) return 0;
+                              
+                              // Sort by category order
+                              const orderA = categoryOrder[catA] ?? 999;
+                              const orderB = categoryOrder[catB] ?? 999;
+                              return orderA - orderB;
+                            });
+                            
+                            let lastCategory: string | null = null;
+                            
+                            return categorizedItems.flatMap(({ item, originalIndex }) => {
+                              const calcFee = item.provider === 'Baker McKenzie' ? calculateIterativePrice(item) : 0;
+                              const showCategoryHeader = item.category && item.category !== lastCategory;
+                              const result: React.ReactNode[] = [];
+                              
+                              if (showCategoryHeader) {
+                                lastCategory = item.category;
+                                const cat = item.category as keyof typeof categoryBgColors;
+                                result.push(
+                                  <TableRow key={`category-${item.category}`} className={cn(
+                                    categoryBgColors[cat],
+                                    "border-t-2",
+                                    categoryBorderColors[cat]
+                                  )}>
+                                    <TableCell colSpan={11} className="py-2">
+                                      <span className={cn("font-semibold text-sm", categoryTextColors[cat])}>
+                                        {item.category}
+                                      </span>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              } else if (!item.category && lastCategory !== null && lastCategory !== '__uncategorized__') {
+                                // Add separator before uncategorized items
+                                lastCategory = '__uncategorized__';
+                                result.push(
+                                  <TableRow key="category-uncategorized" className="bg-muted/30 border-t-2 border-muted">
+                                    <TableCell colSpan={11} className="py-2">
+                                      <span className="font-semibold text-sm text-muted-foreground">
+                                        Uncategorized
+                                      </span>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              }
+                              
+                              result.push(
+                                <TableRow 
+                                  key={originalIndex}
+                                  className={item.is_optional && !item.is_included ? 'opacity-50' : ''}
+                                >
+                                  <TableCell>
+                                    <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                                  </TableCell>
+                                  <TableCell className="align-top py-2">
+                                    <Textarea
+                                      value={item.work_item}
+                                      onChange={(e) => updateItem(originalIndex, { work_item: e.target.value })}
+                                      className="min-w-[250px] text-sm resize-none"
+                                      placeholder="Work item description"
+                                      rows={2}
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Select
+                                      value={item.category || ''}
+                                      onValueChange={(value) => updateItem(originalIndex, { category: value || null })}
                                     >
-                                      <SelectValue placeholder="Category" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {BUDGET_CATEGORIES.map(cat => (
-                                        <SelectItem 
-                                          key={cat} 
-                                          value={cat}
-                                          className={cn(
-                                            categoryBgColors[cat],
-                                            categoryTextColors[cat],
-                                            "my-0.5"
-                                          )}
-                                        >
-                                          {cat}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                </TableCell>
-                                <TableCell>
-                                  <Select
-                                    value={item.item_type || 'documentation'}
-                                    onValueChange={(value: ItemType) => updateItem(index, { item_type: value })}
-                                  >
-                                    <SelectTrigger className="w-[120px]">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="documentation">Documentation</SelectItem>
-                                      <SelectItem value="negotiation">Negotiation</SelectItem>
-                                      <SelectItem value="due_diligence">Due Diligence</SelectItem>
-                                      <SelectItem value="meeting">Meeting</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </TableCell>
-                                <TableCell>
-                                  <Select
-                                    value={item.provider}
-                                    onValueChange={(value: 'Baker McKenzie' | 'Local Counsel') => 
-                                      updateItem(index, { provider: value })
-                                    }
-                                  >
-                                    <SelectTrigger className="w-[130px]">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="Baker McKenzie">Baker McKenzie</SelectItem>
-                                      <SelectItem value="Local Counsel">Local Counsel</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  {item.provider === 'Baker McKenzie' ? (
+                                      <SelectTrigger 
+                                        className={cn(
+                                          "w-[120px] text-xs",
+                                          item.category && categoryBgColors[item.category as keyof typeof categoryBgColors],
+                                          item.category && categoryBorderColors[item.category as keyof typeof categoryBorderColors],
+                                          item.category && categoryTextColors[item.category as keyof typeof categoryTextColors]
+                                        )}
+                                      >
+                                        <SelectValue placeholder="Category" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {BUDGET_CATEGORIES.map(cat => (
+                                          <SelectItem 
+                                            key={cat} 
+                                            value={cat}
+                                            className={cn(
+                                              categoryBgColors[cat],
+                                              categoryTextColors[cat],
+                                              "my-0.5"
+                                            )}
+                                          >
+                                            {cat}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Select
+                                      value={item.item_type || 'documentation'}
+                                      onValueChange={(value: ItemType) => updateItem(originalIndex, { item_type: value })}
+                                    >
+                                      <SelectTrigger className="w-[120px]">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="documentation">Documentation</SelectItem>
+                                        <SelectItem value="negotiation">Negotiation</SelectItem>
+                                        <SelectItem value="due_diligence">Due Diligence</SelectItem>
+                                        <SelectItem value="meeting">Meeting</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Select
+                                      value={item.provider}
+                                      onValueChange={(value: 'Baker McKenzie' | 'Local Counsel') => 
+                                        updateItem(originalIndex, { provider: value })
+                                      }
+                                    >
+                                      <SelectTrigger className="w-[130px]">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="Baker McKenzie">Baker McKenzie</SelectItem>
+                                        <SelectItem value="Local Counsel">Local Counsel</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    {item.provider === 'Baker McKenzie' ? (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => openIterativePricing(originalIndex)}
+                                        title="Iterative pricing calculator"
+                                        className="h-8 w-8"
+                                      >
+                                        <Calculator className="h-4 w-4 text-primary" />
+                                      </Button>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Input
+                                      type="number"
+                                      value={item.fee_amount || ''}
+                                      onChange={(e) => updateItem(originalIndex, { 
+                                        fee_amount: parseFloat(e.target.value) || 0,
+                                        pricing_method: 'manual'
+                                      })}
+                                      className="w-[100px] text-right"
+                                      placeholder="0"
+                                    />
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={
+                                        item.pricing_method === 'ai_suggested' 
+                                          ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                                          : item.pricing_method === 'iterative'
+                                          ? 'bg-green-50 text-green-700 border-green-200'
+                                          : ''
+                                      }
+                                    >
+                                      {item.pricing_method === 'ai_suggested' ? '✨ AI' : 
+                                       item.pricing_method === 'iterative' ? '📊 Iter' : '✏️ Man'}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Checkbox
+                                      checked={item.is_optional}
+                                      onCheckedChange={(checked) => updateItem(originalIndex, { 
+                                        is_optional: !!checked,
+                                        is_included: checked ? false : true
+                                      })}
+                                    />
+                                  </TableCell>
+                                  <TableCell className="text-center">
+                                    <Switch
+                                      checked={item.is_included}
+                                      onCheckedChange={(checked) => updateItem(originalIndex, { is_included: checked })}
+                                      disabled={!item.is_optional}
+                                    />
+                                  </TableCell>
+                                  <TableCell>
                                     <Button
                                       variant="ghost"
                                       size="icon"
-                                      onClick={() => openIterativePricing(index)}
-                                      title="Iterative pricing calculator"
+                                      onClick={() => removeItem(originalIndex)}
                                       className="h-8 w-8"
                                     >
-                                      <Calculator className="h-4 w-4 text-primary" />
+                                      <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
-                                  ) : (
-                                    <span className="text-muted-foreground">-</span>
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={item.fee_amount || ''}
-                                    onChange={(e) => updateItem(index, { 
-                                      fee_amount: parseFloat(e.target.value) || 0,
-                                      pricing_method: 'manual'
-                                    })}
-                                    className="w-[100px] text-right"
-                                    placeholder="0"
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Badge 
-                                    variant="outline" 
-                                    className={
-                                      item.pricing_method === 'ai_suggested' 
-                                        ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                                        : item.pricing_method === 'iterative'
-                                        ? 'bg-green-50 text-green-700 border-green-200'
-                                        : ''
-                                    }
-                                  >
-                                    {item.pricing_method === 'ai_suggested' ? '✨ AI' : 
-                                     item.pricing_method === 'iterative' ? '📊 Iter' : '✏️ Man'}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <Checkbox
-                                    checked={item.is_optional}
-                                    onCheckedChange={(checked) => updateItem(index, { 
-                                      is_optional: !!checked,
-                                      is_included: checked ? false : true
-                                    })}
-                                  />
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  <Switch
-                                    checked={item.is_included}
-                                    onCheckedChange={(checked) => updateItem(index, { is_included: checked })}
-                                    disabled={!item.is_optional}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    onClick={() => removeItem(index)}
-                                    className="h-8 w-8"
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                              
+                              return result;
+                            });
+                          })()}
                         </TableBody>
                       </Table>
                     </div>
@@ -1250,6 +1315,23 @@ export default function PricingProposalDetail() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div className="grid gap-2 max-w-md">
+                  <Label>Fee Currency</Label>
+                  <Select
+                    value={proposal?.currency || 'GBP'}
+                    onValueChange={(value) => updateProposal.mutate({ currency: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="GBP">GBP (£)</SelectItem>
+                      <SelectItem value="USD">USD ($)</SelectItem>
+                      <SelectItem value="EUR">EUR (€)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 <div className="grid gap-2 max-w-md">
                   <Label>AFA Discount (%)</Label>
                   <Input

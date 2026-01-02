@@ -128,6 +128,12 @@ export function EditableRateCard({
     ));
   };
 
+  const updateFeeEarnerLabel = (key: string, label: string) => {
+    setFeeEarners(prev => prev.map(earner => 
+      earner.key === key ? { ...earner, label } : earner
+    ));
+  };
+
   const removeFeeEarner = (key: string) => {
     setFeeEarners(prev => prev.filter(earner => earner.key !== key));
   };
@@ -181,14 +187,19 @@ export function EditableRateCard({
                 <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
                   {getLevelBadge(earner.level)}
                 </span>
-                <span className="text-sm font-medium flex-1 min-w-0 truncate">{earner.label}</span>
+                <Input
+                  value={earner.label}
+                  onChange={(e) => updateFeeEarnerLabel(earner.key, e.target.value)}
+                  className="text-sm font-medium flex-1 min-w-0 h-7 px-2"
+                  placeholder="Label"
+                />
+                <span className="text-xs text-muted-foreground">{currencySymbol}</span>
                 <Input
                   type="number"
                   value={earner.rate}
                   onChange={(e) => updateFeeEarner(earner.key, parseFloat(e.target.value) || 0)}
                   className="w-20 h-7 text-right text-sm px-2"
                 />
-                <span className="text-xs text-muted-foreground w-6">{currencySymbol}</span>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -250,13 +261,16 @@ export function EditableRateCard({
               />
             </div>
             <div className="space-y-2">
-              <Label>Billing Rate ({currencySymbol})</Label>
-              <Input
-                type="number"
-                value={newEarnerRate}
-                onChange={(e) => setNewEarnerRate(parseFloat(e.target.value) || 0)}
-                min={0}
-              />
+              <Label>Billing Rate</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">{currencySymbol}</span>
+                <Input
+                  type="number"
+                  value={newEarnerRate}
+                  onChange={(e) => setNewEarnerRate(parseFloat(e.target.value) || 0)}
+                  min={0}
+                />
+              </div>
             </div>
           </div>
           <DialogFooter>

@@ -380,6 +380,30 @@ export function CategorizedBudgetView({
             </div>
           );
         })}
+        
+        {/* Total Box */}
+        {(() => {
+          const grandTotal = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0);
+          if (grandTotal === 0) return null;
+          
+          const displayGrandTotal = differentBillingCurrency && agreedBillingAmount > 0
+            ? grandTotal * mandatedRate
+            : grandTotal;
+          const displayCurrency = differentBillingCurrency && agreedBillingAmount > 0 
+            ? billingCurrency 
+            : currency;
+          
+          return (
+            <div className="rounded-md px-3 py-2 border bg-primary/10 border-primary/30">
+              <div className="text-xs font-medium text-primary">
+                Total
+              </div>
+              <div className="text-sm font-semibold text-primary">
+                {formatCurrency(displayGrandTotal, displayCurrency)}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       <DndContext

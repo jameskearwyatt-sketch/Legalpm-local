@@ -26,11 +26,33 @@ export function AskAIButton() {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("ask-ai", {
-        body: { question: userMessage },
-      });
+      // Get current session to pass auth token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
 
-      if (error) throw error;
+      if (!accessToken) {
+        throw new Error("Not authenticated");
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ask-ai`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({ question: userMessage }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
 
       setMessages((prev) => [
         ...prev,
@@ -38,9 +60,10 @@ export function AskAIButton() {
       ]);
     } catch (error) {
       console.error("Error asking AI:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Sorry, I encountered an error. Please try again." },
+        { role: "assistant", content: `Sorry, I encountered an error: ${errorMessage}` },
       ]);
     } finally {
       setIsLoading(false);

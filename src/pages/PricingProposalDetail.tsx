@@ -56,6 +56,21 @@ import { cn } from "@/lib/utils";
 import { IterativePricingDialog, FeeOwnerHours } from "@/components/pricing/IterativePricingDialog";
 import { EditableRateCard } from "@/components/pricing/EditableRateCard";
 import { CategorizedProposalView, categoryBgColors, categoryTextColors, categoryBorderColors } from "@/components/pricing/CategorizedProposalView";
+import {
+  DndContext,
+  DragEndEvent,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { DraggableProposalItem } from "@/components/pricing/DraggableProposalItem";
 
 type PricingMethod = 'ai_suggested' | 'pricing_tool' | 'manual' | 'iterative';
 type ItemType = 'documentation' | 'negotiation' | 'due_diligence' | 'meeting';
@@ -103,6 +118,16 @@ export default function PricingProposalDetail() {
   // Iterative pricing dialog state
   const [iterativeDialogOpen, setIterativeDialogOpen] = useState(false);
   const [iterativeDialogIndex, setIterativeDialogIndex] = useState<number | null>(null);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor)
+  );
 
   // Sync local state with proposal data
   useEffect(() => {
@@ -385,15 +410,15 @@ export default function PricingProposalDetail() {
     setHasUnsavedChanges(true);
   };
 
-  // Move work item up or down
-  const moveItem = (index: number, direction: 'up' | 'down') => {
-    setDraftItems(prev => {
-      const newItems = [...prev];
-      const targetIndex = direction === 'up' ? index - 1 : index + 1;
-      if (targetIndex < 0 || targetIndex >= newItems.length) return prev;
-      [newItems[index], newItems[targetIndex]] = [newItems[targetIndex], newItems[index]];
-      return newItems;
-    });
+  // Handle drag end for reordering items
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = parseInt(active.id as string);
+    const newIndex = parseInt(over.id as string);
+
+    setDraftItems(prev => arrayMove(prev, oldIndex, newIndex));
     setHasUnsavedChanges(true);
   };
 
@@ -1030,285 +1055,52 @@ export default function PricingProposalDetail() {
                     <p>No work items yet. Upload an RFP or add items manually.</p>
                   </div>
                 ) : (
-                  <TableScrollControls>
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-[30px]"></TableHead>
-                            <TableHead className="w-[40px]"></TableHead>
-                            <TableHead className="min-w-[280px]">Work Item</TableHead>
-                            <TableHead className="w-[110px]">Category</TableHead>
-                            <TableHead className="w-[120px]">Provider</TableHead>
-                            <TableHead className="w-[50px] text-center">Calc</TableHead>
-                            <TableHead className="text-right w-[90px]">Fee</TableHead>
-                            <TableHead className="w-[70px]">Method</TableHead>
-                            <TableHead className="text-center w-[45px]">Opt</TableHead>
-                            <TableHead className="text-center w-[45px]">Inc</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {(() => {
-                            // Group items by category for rendering
-                            const categorizedItems = [...draftItems].map((item, originalIndex) => ({
-                              item,
-                              originalIndex
-                            }));
-                            
-                            // Sort by category (using BUDGET_CATEGORIES order), uncategorized at end
-                            const categoryOrder = Object.fromEntries(
-                              BUDGET_CATEGORIES.map((cat, idx) => [cat, idx])
-                            );
-                            
-                            categorizedItems.sort((a, b) => {
-                              const catA = a.item.category || '';
-                              const catB = b.item.category || '';
-                              
-                              // Uncategorized items go to the end
-                              if (!catA && catB) return 1;
-                              if (catA && !catB) return -1;
-                              if (!catA && !catB) return 0;
-                              
-                              // Sort by category order
-                              const orderA = categoryOrder[catA] ?? 999;
-                              const orderB = categoryOrder[catB] ?? 999;
-                              return orderA - orderB;
-                            });
-                            
-                            let lastCategory: string | null = null;
-                            
-                            return categorizedItems.flatMap(({ item, originalIndex }) => {
-                              const calcFee = item.provider === 'Baker McKenzie' ? calculateIterativePrice(item) : 0;
-                              const showCategoryHeader = item.category && item.category !== lastCategory;
-                              const result: React.ReactNode[] = [];
-                              
-                              if (showCategoryHeader) {
-                                lastCategory = item.category;
-                                const cat = item.category as keyof typeof categoryBgColors;
-                                result.push(
-                                  <TableRow key={`category-${item.category}`} className={cn(
-                                    categoryBgColors[cat],
-                                    "border-t-2",
-                                    categoryBorderColors[cat]
-                                  )}>
-                                    <TableCell colSpan={11} className="py-2">
-                                      <span className={cn("font-semibold text-sm", categoryTextColors[cat])}>
-                                        {item.category}
-                                      </span>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              } else if (!item.category && lastCategory !== null && lastCategory !== '__uncategorized__') {
-                                // Add separator before uncategorized items
-                                lastCategory = '__uncategorized__';
-                                result.push(
-                                  <TableRow key="category-uncategorized" className="bg-muted/30 border-t-2 border-muted">
-                                    <TableCell colSpan={11} className="py-2">
-                                      <span className="font-semibold text-sm text-muted-foreground">
-                                        Uncategorized
-                                      </span>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              }
-                              
-                              result.push(
-                                <TableRow 
-                                  key={originalIndex}
-                                  className={item.is_optional && !item.is_included ? 'opacity-50' : ''}
-                                >
-                                  <TableCell className="py-2">
-                                    {!viewingHistoricalVersion && (
-                                      <div className="flex flex-col gap-1">
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() => moveItem(originalIndex, 'up')}
-                                          disabled={originalIndex === 0}
-                                          className="h-6 w-6"
-                                          title="Move up"
-                                        >
-                                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m18 15-6-6-6 6"/></svg>
-                                        </Button>
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() => moveItem(originalIndex, 'down')}
-                                          disabled={originalIndex === draftItems.length - 1}
-                                          className="h-6 w-6"
-                                          title="Move down"
-                                        >
-                                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
-                                        </Button>
-                                      </div>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="py-2">
-                                    {!viewingHistoricalVersion && (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => removeItem(originalIndex)}
-                                        className="h-8 w-8"
-                                        title="Delete item"
-                                      >
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                      </Button>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="align-top py-2">
-                                    {viewingHistoricalVersion ? (
-                                      <p className="min-w-[250px] text-sm whitespace-pre-wrap">{item.work_item}</p>
-                                    ) : (
-                                      <Textarea
-                                        value={item.work_item}
-                                        onChange={(e) => updateItem(originalIndex, { work_item: e.target.value })}
-                                        className="min-w-[250px] text-sm resize-none"
-                                        placeholder="Work item description"
-                                        rows={2}
-                                      />
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {viewingHistoricalVersion ? (
-                                      item.category ? (
-                                        <Badge className={cn(
-                                          "text-xs",
-                                          categoryBgColors[item.category as keyof typeof categoryBgColors],
-                                          categoryBorderColors[item.category as keyof typeof categoryBorderColors],
-                                          categoryTextColors[item.category as keyof typeof categoryTextColors]
-                                        )}>
-                                          {item.category}
-                                        </Badge>
-                                      ) : (
-                                        <span className="text-muted-foreground text-xs">-</span>
-                                      )
-                                    ) : (
-                                      <Select
-                                        value={item.category || ''}
-                                        onValueChange={(value) => updateItem(originalIndex, { category: value || null })}
-                                      >
-                                        <SelectTrigger 
-                                          className={cn(
-                                            "w-[120px] text-xs",
-                                            item.category && categoryBgColors[item.category as keyof typeof categoryBgColors],
-                                            item.category && categoryBorderColors[item.category as keyof typeof categoryBorderColors],
-                                            item.category && categoryTextColors[item.category as keyof typeof categoryTextColors]
-                                          )}
-                                        >
-                                          <SelectValue placeholder="Category" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          {BUDGET_CATEGORIES.map(cat => (
-                                            <SelectItem 
-                                              key={cat} 
-                                              value={cat}
-                                              className={cn(
-                                                categoryBgColors[cat],
-                                                categoryTextColors[cat],
-                                                "my-0.5"
-                                              )}
-                                            >
-                                              {cat}
-                                            </SelectItem>
-                                          ))}
-                                        </SelectContent>
-                                      </Select>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {viewingHistoricalVersion ? (
-                                      <span className="text-sm">{item.provider}</span>
-                                    ) : (
-                                      <Select
-                                        value={item.provider}
-                                        onValueChange={(value: 'Baker McKenzie' | 'Local Counsel') => 
-                                          updateItem(originalIndex, { provider: value })
-                                        }
-                                      >
-                                        <SelectTrigger className="w-[130px]">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="Baker McKenzie">Baker McKenzie</SelectItem>
-                                          <SelectItem value="Local Counsel">Local Counsel</SelectItem>
-                                        </SelectContent>
-                                      </Select>
-                                    )}
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    {item.provider === 'Baker McKenzie' && !viewingHistoricalVersion ? (
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        onClick={() => openIterativePricing(originalIndex)}
-                                        title="Iterative pricing calculator"
-                                        className="h-8 w-8"
-                                      >
-                                        <Calculator className="h-4 w-4 text-primary" />
-                                      </Button>
-                                    ) : (
-                                      <span className="text-muted-foreground">-</span>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {viewingHistoricalVersion ? (
-                                      <span className="text-sm font-medium">{formatCurrency(item.fee_amount || 0)}</span>
-                                    ) : (
-                                      <Input
-                                        type="number"
-                                        value={item.fee_amount || ''}
-                                        onChange={(e) => updateItem(originalIndex, { 
-                                          fee_amount: parseFloat(e.target.value) || 0,
-                                          pricing_method: 'manual'
-                                        })}
-                                        className="w-[100px] text-right"
-                                        placeholder="0"
-                                      />
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge 
-                                      variant="outline" 
-                                      className={
-                                        item.pricing_method === 'ai_suggested' 
-                                          ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                                          : item.pricing_method === 'iterative'
-                                          ? 'bg-green-50 text-green-700 border-green-200'
-                                          : ''
-                                      }
-                                    >
-                                      {item.pricing_method === 'ai_suggested' ? '✨ AI' : 
-                                       item.pricing_method === 'iterative' ? '📊 Iter' : '✏️ Man'}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    <Checkbox
-                                      checked={item.is_optional}
-                                      onCheckedChange={(checked) => updateItem(originalIndex, { 
-                                        is_optional: !!checked,
-                                        is_included: checked ? false : true
-                                      })}
-                                      disabled={viewingHistoricalVersion}
-                                    />
-                                  </TableCell>
-                                  <TableCell className="text-center">
-                                    <Switch
-                                      checked={item.is_included}
-                                      onCheckedChange={(checked) => updateItem(originalIndex, { is_included: checked })}
-                                      disabled={!item.is_optional || viewingHistoricalVersion}
-                                    />
-                                  </TableCell>
-                                </TableRow>
-                              );
-                              
-                              return result;
-                            });
-                          })()}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </TableScrollControls>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <TableScrollControls>
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[30px]"></TableHead>
+                              <TableHead className="w-[40px]"></TableHead>
+                              <TableHead className="min-w-[280px]">Work Item</TableHead>
+                              <TableHead className="w-[110px]">Category</TableHead>
+                              <TableHead className="w-[120px]">Provider</TableHead>
+                              <TableHead className="w-[50px] text-center">Calc</TableHead>
+                              <TableHead className="text-right w-[90px]">Fee</TableHead>
+                              <TableHead className="w-[70px]">Method</TableHead>
+                              <TableHead className="text-center w-[45px]">Opt</TableHead>
+                              <TableHead className="text-center w-[45px]">Inc</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            <SortableContext
+                              items={draftItems.map((_, index) => index.toString())}
+                              strategy={verticalListSortingStrategy}
+                            >
+                              {draftItems.map((item, index) => (
+                                <DraggableProposalItem
+                                  key={index}
+                                  id={index.toString()}
+                                  item={item}
+                                  index={index}
+                                  onUpdate={updateItem}
+                                  onRemove={removeItem}
+                                  onOpenIterativePricing={openIterativePricing}
+                                  formatCurrency={formatCurrency}
+                                  viewingHistoricalVersion={viewingHistoricalVersion}
+                                />
+                              ))}
+                            </SortableContext>
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </TableScrollControls>
+                  </DndContext>
                 )}
               </CardContent>
             </Card>

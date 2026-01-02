@@ -17,6 +17,27 @@ import { cn } from '@/lib/utils';
 
 const providerOptions = ['Baker McKenzie', 'Local Counsel'] as const;
 
+// Get health color based on WIP percentage of estimate
+function getHealthColor(wipAmount: number, feeAmount: number): { bg: string; text: string; indicator: string } {
+  if (feeAmount <= 0 || wipAmount === 0) {
+    return { bg: '', text: 'text-muted-foreground', indicator: 'bg-muted-foreground' };
+  }
+  
+  const percentage = (wipAmount / feeAmount) * 100;
+  
+  if (percentage <= 50) {
+    return { bg: '', text: 'text-green-600 dark:text-green-400', indicator: 'bg-green-500' };
+  } else if (percentage <= 70) {
+    return { bg: '', text: 'text-lime-600 dark:text-lime-400', indicator: 'bg-lime-500' };
+  } else if (percentage <= 85) {
+    return { bg: '', text: 'text-amber-600 dark:text-amber-400', indicator: 'bg-amber-500' };
+  } else if (percentage <= 100) {
+    return { bg: '', text: 'text-orange-600 dark:text-orange-400', indicator: 'bg-orange-500' };
+  } else {
+    return { bg: 'bg-red-50 dark:bg-red-950/30', text: 'text-red-600 dark:text-red-400', indicator: 'bg-red-500' };
+  }
+}
+
 interface DraggableBudgetItemProps {
   id: string;
   item: DraftLineItem;
@@ -231,16 +252,22 @@ export function DraggableBudgetItem({
   }
 
   // Normal viewing mode (no budget yet or just viewing)
+  const wipAmount = item.wip_amount || 0;
+  const wipHealth = getHealthColor(wipAmount, item.fee_amount || 0);
+  const hasWipData = wipAmount > 0;
+  const wipPercentage = (item.fee_amount || 0) > 0 ? Math.round((wipAmount / (item.fee_amount || 1)) * 100) : 0;
+  
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={cn(
         'grid gap-2 items-center rounded-md py-1 px-1 transition-colors',
-        hasExistingBudget ? 'grid-cols-[auto_1fr_auto_auto_auto_auto_auto]' : 'grid-cols-12',
+        hasExistingBudget ? 'grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto]' : 'grid-cols-12',
         isDragging && 'opacity-50',
         isAiSuggested && 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700',
-        item.is_optional && !item.is_included && hasExistingBudget && 'opacity-50'
+        item.is_optional && !item.is_included && hasExistingBudget && 'opacity-50',
+        wipHealth.bg
       )}
     >
       {/* Drag Handle */}
@@ -305,7 +332,7 @@ export function DraggableBudgetItem({
         )}
       </div>
 
-      {/* Fee Amount */}
+      {/* Fee Amount (Estimate) */}
       <div className={cn(!hasExistingBudget && 'col-span-2')}>
         {!hasExistingBudget ? (
           <Input
@@ -319,12 +346,35 @@ export function DraggableBudgetItem({
           />
         ) : (
           <div className="text-right min-w-[80px]">
+            <div className="text-xs text-muted-foreground">Estimate</div>
             <div className="font-medium text-sm">
               {formatCurrency(displayAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
             </div>
           </div>
         )}
       </div>
+
+      {/* WIP Amount - only show when budget exists */}
+      {hasExistingBudget && (
+        <div className="text-right min-w-[80px]">
+          <div className="text-xs text-muted-foreground">WIP</div>
+          <div className={cn('font-medium text-sm flex items-center justify-end gap-1', hasWipData && wipHealth.text)}>
+            {hasWipData && (
+              <div className={cn('w-2 h-2 rounded-full flex-shrink-0', wipHealth.indicator)} />
+            )}
+            <span>
+              {hasWipData 
+                ? formatCurrency(isInBillingCurrencyMode ? wipAmount * mandatedRate : wipAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)
+                : '-'}
+            </span>
+            {hasWipData && (
+              <span className={cn('text-xs', wipHealth.text)}>
+                ({wipPercentage}%)
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Category selector */}
       <div className={cn(!hasExistingBudget && 'col-span-2')}>

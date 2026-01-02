@@ -73,6 +73,7 @@ export default function PricingProposalDetail() {
     items: savedItems, 
     isLoading,
     updateProposal,
+    updateCurrentVersion,
     saveVersion,
     markAsAgreed,
     fetchVersionItems,
@@ -563,8 +564,18 @@ export default function PricingProposalDetail() {
     }
   };
 
-  // Save version
-  const handleSaveVersion = async () => {
+  // Save as current version (overwrites)
+  const handleSaveCurrentVersion = async () => {
+    await updateCurrentVersion.mutateAsync({
+      items: draftItems,
+      notes: versionNotes,
+    });
+    setHasUnsavedChanges(false);
+    setVersionNotes("");
+  };
+
+  // Save as new version
+  const handleSaveNewVersion = async () => {
     await saveVersion.mutateAsync({
       items: draftItems,
       notes: versionNotes,
@@ -760,14 +771,6 @@ export default function PricingProposalDetail() {
                 </Button>
                 {proposal.status === 'Draft' && (
                   <>
-                    <Button 
-                      variant="outline" 
-                      onClick={handleSaveVersion}
-                      disabled={!hasUnsavedChanges || saveVersion.isPending}
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      Save Version
-                    </Button>
                 <Dialog open={isSendToMatterOpen} onOpenChange={setIsSendToMatterOpen}>
                   <DialogTrigger asChild>
                     <Button>
@@ -1305,16 +1308,9 @@ export default function PricingProposalDetail() {
                       value={versionNotes}
                       onChange={(e) => setVersionNotes(e.target.value)}
                       placeholder="Describe the changes in this version..."
+                      disabled={viewingHistoricalVersion}
                     />
                   </div>
-                  <Button onClick={handleSaveVersion} disabled={saveVersion.isPending}>
-                    {saveVersion.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save as V{(proposal.current_version || 0) + 1}
-                  </Button>
                 </CardContent>
               </Card>
             )}
@@ -1641,6 +1637,42 @@ export default function PricingProposalDetail() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Bottom Save Bar */}
+        {proposal.status === 'Draft' && !viewingHistoricalVersion && (
+          <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <div className="container flex items-center justify-end gap-3 py-3 px-6">
+              {hasUnsavedChanges && (
+                <span className="text-sm text-muted-foreground mr-auto">
+                  You have unsaved changes
+                </span>
+              )}
+              <Button 
+                variant="outline" 
+                onClick={handleSaveCurrentVersion}
+                disabled={!hasUnsavedChanges || updateCurrentVersion.isPending || saveVersion.isPending}
+              >
+                {updateCurrentVersion.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save as Current Version
+              </Button>
+              <Button 
+                onClick={handleSaveNewVersion}
+                disabled={!hasUnsavedChanges || updateCurrentVersion.isPending || saveVersion.isPending}
+              >
+                {saveVersion.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save as New Version (V{(proposal.current_version || 0) + 1})
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Iterative Pricing Dialog */}
         <IterativePricingDialog

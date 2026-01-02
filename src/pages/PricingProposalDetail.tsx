@@ -34,8 +34,10 @@ import {
   Users,
   Clock,
   Percent,
-  DollarSign
+  DollarSign,
+  HelpCircle
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
   usePricingProposal, 
   DraftProposalItem, 
@@ -43,7 +45,8 @@ import {
   RateCard,
   ProposalAssumptions,
   DEFAULT_RATE_CARD,
-  DEFAULT_ASSUMPTIONS
+  DEFAULT_ASSUMPTIONS,
+  EstimationMethod
 } from "@/lib/hooks/usePricingProposals";
 import { useMatters } from "@/lib/hooks/useMatters";
 import { supabase } from "@/integrations/supabase/client";
@@ -186,15 +189,27 @@ export default function PricingProposalDetail() {
     return Math.round((totalPartnerHours * partnerRate) + (totalAssociateHours * associateRate));
   };
 
-  // Calculate summary from work items
-  // Estimate hours for non-iterative items using pyramid structure
-  // Standard law firm pyramid: Partner (fewest) -> Senior Associate -> Associate -> Trainee (most)
+  // Estimate hours for non-iterative items based on estimation method
+  // Pyramid: Partner (fewest) -> Senior Associate -> Associate -> Trainee (most)
+  // Partner-heavy: Flat structure with similar hours across grades
+  // Junior-heavy: Most hours at trainee/associate level, minimal partner involvement
+  const getEstimationDistribution = (method: EstimationMethod) => {
+    switch (method) {
+      case 'partner-heavy':
+        // Flat structure: partner does about the same as others
+        return { partner: 0.25, seniorAssoc: 0.25, associate: 0.25, trainee: 0.25 };
+      case 'junior-heavy':
+        // Partner does little to no hours, most at trainee/junior level
+        return { partner: 0.05, seniorAssoc: 0.10, associate: 0.40, trainee: 0.45 };
+      case 'pyramid':
+      default:
+        // Standard pyramid: Partner (fewest) -> Trainee (most)
+        return { partner: 0.10, seniorAssoc: 0.20, associate: 0.35, trainee: 0.35 };
+    }
+  };
+
   const estimateHoursFromFee = (feeAmount: number, discountMultiplier: number) => {
-    // Pyramid distribution: Partner 10%, Senior Associate 20%, Associate 35%, Trainee 35%
-    const partnerPct = 0.10;
-    const seniorAssocPct = 0.20;
-    const associatePct = 0.35;
-    const traineePct = 0.35;
+    const dist = getEstimationDistribution(assumptions.estimationMethod || 'pyramid');
     
     // Discounted rates
     const partnerRate = rateCard.partner.rate * discountMultiplier;
@@ -202,21 +217,21 @@ export default function PricingProposalDetail() {
     const associateRate = rateCard.associate.rate * discountMultiplier;
     const traineeRate = rateCard.trainee.rate * discountMultiplier;
     
-    // Weighted average rate based on pyramid
-    const blendedRateFromPyramid = 
-      (partnerPct * partnerRate) + 
-      (seniorAssocPct * seniorAssocRate) + 
-      (associatePct * associateRate) + 
-      (traineePct * traineeRate);
+    // Weighted average rate based on distribution
+    const blendedRateFromDist = 
+      (dist.partner * partnerRate) + 
+      (dist.seniorAssoc * seniorAssocRate) + 
+      (dist.associate * associateRate) + 
+      (dist.trainee * traineeRate);
     
     // Total estimated hours
-    const totalEstimatedHours = blendedRateFromPyramid > 0 ? feeAmount / blendedRateFromPyramid : 0;
+    const totalEstimatedHours = blendedRateFromDist > 0 ? feeAmount / blendedRateFromDist : 0;
     
     return {
-      partnerHours: totalEstimatedHours * partnerPct,
-      seniorAssociateHours: totalEstimatedHours * seniorAssocPct,
-      associateHours: totalEstimatedHours * associatePct,
-      traineeHours: totalEstimatedHours * traineePct,
+      partnerHours: totalEstimatedHours * dist.partner,
+      seniorAssociateHours: totalEstimatedHours * dist.seniorAssoc,
+      associateHours: totalEstimatedHours * dist.associate,
+      traineeHours: totalEstimatedHours * dist.trainee,
     };
   };
 
@@ -777,6 +792,10 @@ export default function PricingProposalDetail() {
         {/* Main Content with Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="grid w-full grid-cols-5 max-w-3xl">
+            <TabsTrigger value="assumptions">
+              <Calculator className="h-4 w-4 mr-2" />
+              Assumptions
+            </TabsTrigger>
             <TabsTrigger value="items">
               <FileText className="h-4 w-4 mr-2" />
               Work Items
@@ -784,10 +803,6 @@ export default function PricingProposalDetail() {
             <TabsTrigger value="summary">
               <TrendingUp className="h-4 w-4 mr-2" />
               Summary
-            </TabsTrigger>
-            <TabsTrigger value="assumptions">
-              <Calculator className="h-4 w-4 mr-2" />
-              Assumptions
             </TabsTrigger>
             <TabsTrigger value="rates">
               <Users className="h-4 w-4 mr-2" />
@@ -1227,97 +1242,77 @@ export default function PricingProposalDetail() {
 
           {/* ASSUMPTIONS TAB */}
           <TabsContent value="assumptions" className="space-y-6">
-            <div className="grid gap-6 md:grid-cols-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calculator className="h-5 w-5" />
-                    Pricing Parameters
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-2">
-                    <Label>AFA Discount (%)</Label>
-                    <Input
-                      type="number"
-                      value={assumptions.afaDiscount}
-                      onChange={(e) => setAssumptions(prev => ({ ...prev, afaDiscount: parseFloat(e.target.value) || 0 }))}
-                      min={0}
-                      max={100}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Number of Negotiation Turns</Label>
-                    <Input
-                      type="number"
-                      value={assumptions.numNegotiationTurns}
-                      onChange={(e) => setAssumptions(prev => ({ ...prev, numNegotiationTurns: parseInt(e.target.value) || 1 }))}
-                      min={1}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Negotiation Decay Factor</Label>
-                    <Input
-                      type="number"
-                      value={assumptions.negotiatedDocsDecay}
-                      onChange={(e) => setAssumptions(prev => ({ ...prev, negotiatedDocsDecay: parseFloat(e.target.value) || 0.5 }))}
-                      min={0}
-                      max={1}
-                      step={0.05}
-                    />
-                    <p className="text-xs text-muted-foreground">Each subsequent turn = previous × this factor</p>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Due Diligence Decay Factor</Label>
-                    <Input
-                      type="number"
-                      value={assumptions.ddDecay}
-                      onChange={(e) => setAssumptions(prev => ({ ...prev, ddDecay: parseFloat(e.target.value) || 0.35 }))}
-                      min={0}
-                      max={1}
-                      step={0.05}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calculator className="h-5 w-5" />
+                  Pricing Parameters
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-2 max-w-md">
+                  <Label>AFA Discount (%)</Label>
+                  <Input
+                    type="number"
+                    value={assumptions.afaDiscount}
+                    onChange={(e) => setAssumptions(prev => ({ ...prev, afaDiscount: parseFloat(e.target.value) || 0 }))}
+                    min={0}
+                    max={100}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Discount applied to standard billing rates for alternative fee arrangements
+                  </p>
+                </div>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Meetings</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-2">
-                    <Label>Number of Additional Meetings</Label>
-                    <Input
-                      type="number"
-                      value={assumptions.numMeetings}
-                      onChange={(e) => setAssumptions(prev => ({ ...prev, numMeetings: parseInt(e.target.value) || 0 }))}
-                      min={0}
-                    />
+                <div className="grid gap-2 max-w-md">
+                  <div className="flex items-center gap-2">
+                    <Label>Hours Estimation Method</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-sm">
+                            When work items are priced manually or by AI (rather than iteratively), 
+                            this determines how hours are estimated across fee earner grades for 
+                            summary calculations and blended rate.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
-                  <div className="grid gap-2">
-                    <Label>Partner Hours per Meeting</Label>
-                    <Input
-                      type="number"
-                      value={assumptions.meetingHoursPartner}
-                      onChange={(e) => setAssumptions(prev => ({ ...prev, meetingHoursPartner: parseFloat(e.target.value) || 0 }))}
-                      min={0}
-                      step={0.5}
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Associate Hours per Meeting</Label>
-                    <Input
-                      type="number"
-                      value={assumptions.meetingHoursAssociate}
-                      onChange={(e) => setAssumptions(prev => ({ ...prev, meetingHoursAssociate: parseFloat(e.target.value) || 0 }))}
-                      min={0}
-                      step={0.5}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                  <Select
+                    value={assumptions.estimationMethod || 'pyramid'}
+                    onValueChange={(value: EstimationMethod) => setAssumptions(prev => ({ ...prev, estimationMethod: value }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select estimation method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pyramid">
+                        <div className="flex flex-col items-start">
+                          <span>Pyramid</span>
+                          <span className="text-xs text-muted-foreground">Partner least hours, trainee most</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="partner-heavy">
+                        <div className="flex flex-col items-start">
+                          <span>Partner-heavy</span>
+                          <span className="text-xs text-muted-foreground">Flat structure, similar hours across grades</span>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="junior-heavy">
+                        <div className="flex flex-col items-start">
+                          <span>Junior-heavy</span>
+                          <span className="text-xs text-muted-foreground">Minimal partner, most hours at junior level</span>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
 
             <div className="flex justify-end">
               <Button onClick={saveProposalSettings} disabled={updateProposal.isPending}>

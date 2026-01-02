@@ -22,6 +22,8 @@ export interface WorkPhase {
   traineeHours: number;
 }
 
+export type EstimationMethod = 'pyramid' | 'partner-heavy' | 'junior-heavy';
+
 export interface ProposalAssumptions {
   negotiatedDocsDecay: number;
   ddDecay: number;
@@ -30,6 +32,7 @@ export interface ProposalAssumptions {
   meetingHoursAssociate: number;
   numNegotiationTurns: number;
   afaDiscount: number;
+  estimationMethod: EstimationMethod;
 }
 
 export const DEFAULT_RATE_CARD: RateCard = {
@@ -56,6 +59,7 @@ export const DEFAULT_ASSUMPTIONS: ProposalAssumptions = {
   meetingHoursAssociate: 2,
   numNegotiationTurns: 3,
   afaDiscount: 0,
+  estimationMethod: 'pyramid',
 };
 
 export interface PricingProposal {

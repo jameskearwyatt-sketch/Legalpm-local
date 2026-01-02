@@ -782,6 +782,7 @@ export type Database = {
       }
       pricing_proposals: {
         Row: {
+          assumptions: Json | null
           client_id: string
           created_at: string
           currency: string
@@ -789,11 +790,14 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          rate_card: Json | null
           status: string
           updated_at: string
           user_id: string
+          work_phases: Json | null
         }
         Insert: {
+          assumptions?: Json | null
           client_id: string
           created_at?: string
           currency?: string
@@ -801,11 +805,14 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          rate_card?: Json | null
           status?: string
           updated_at?: string
           user_id: string
+          work_phases?: Json | null
         }
         Update: {
+          assumptions?: Json | null
           client_id?: string
           created_at?: string
           currency?: string
@@ -813,9 +820,11 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          rate_card?: Json | null
           status?: string
           updated_at?: string
           user_id?: string
+          work_phases?: Json | null
         }
         Relationships: [
           {

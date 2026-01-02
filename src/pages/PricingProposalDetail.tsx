@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,9 +27,25 @@ import {
   Wand2,
   GripVertical,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  TrendingUp,
+  Calculator,
+  Users,
+  Clock,
+  Percent,
+  DollarSign
 } from "lucide-react";
-import { usePricingProposal, DraftProposalItem, BUDGET_CATEGORIES } from "@/lib/hooks/usePricingProposals";
+import { 
+  usePricingProposal, 
+  DraftProposalItem, 
+  BUDGET_CATEGORIES,
+  RateCard,
+  WorkPhase,
+  ProposalAssumptions,
+  DEFAULT_RATE_CARD,
+  DEFAULT_WORK_PHASES,
+  DEFAULT_ASSUMPTIONS
+} from "@/lib/hooks/usePricingProposals";
 import { useMatters } from "@/lib/hooks/useMatters";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -57,7 +73,7 @@ export default function PricingProposalDetail() {
   
   const { matters } = useMatters();
 
-  // Local state for editing
+  // Local state for editing work items
   const [draftItems, setDraftItems] = useState<DraftProposalItem[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isExtractingRfp, setIsExtractingRfp] = useState(false);
@@ -67,6 +83,20 @@ export default function PricingProposalDetail() {
   const [versionNotes, setVersionNotes] = useState("");
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [isViewingHistory, setIsViewingHistory] = useState(false);
+
+  // Local state for proposal-specific settings
+  const [rateCard, setRateCard] = useState<RateCard>(DEFAULT_RATE_CARD);
+  const [workPhases, setWorkPhases] = useState<WorkPhase[]>(DEFAULT_WORK_PHASES);
+  const [assumptions, setAssumptions] = useState<ProposalAssumptions>(DEFAULT_ASSUMPTIONS);
+
+  // Sync local state with proposal data
+  useEffect(() => {
+    if (proposal) {
+      setRateCard(proposal.rate_card || DEFAULT_RATE_CARD);
+      setWorkPhases(proposal.work_phases || DEFAULT_WORK_PHASES);
+      setAssumptions(proposal.assumptions || DEFAULT_ASSUMPTIONS);
+    }
+  }, [proposal]);
 
   // Initialize draft items from saved items
   useMemo(() => {
@@ -86,8 +116,8 @@ export default function PricingProposalDetail() {
     }
   }, [savedItems]);
 
-  // Calculate totals
-  const totals = useMemo(() => {
+  // Calculate work items totals
+  const workItemTotals = useMemo(() => {
     const includedItems = draftItems.filter(item => 
       !item.is_optional || (item.is_optional && item.is_included !== false)
     );
@@ -104,13 +134,151 @@ export default function PricingProposalDetail() {
     };
   }, [draftItems]);
 
+  // Calculate hours with decay for negotiation turns
+  const calculateNegotiationHours = (baseHours: number, decay: number, turns: number) => {
+    let total = baseHours;
+    let currentHours = baseHours;
+    for (let i = 1; i < turns; i++) {
+      currentHours = currentHours * decay;
+      total += currentHours;
+    }
+    return total;
+  };
+
+  // Calculate summary from phases and rate card
+  const summary = useMemo(() => {
+    const phases = workPhases;
+    const rates = rateCard;
+    const ass = assumptions;
+
+    // Base hours from phases
+    const basePartnerHours = phases.reduce((sum, p) => sum + p.partnerHours, 0);
+    const baseSeniorAssociateHours = phases.reduce((sum, p) => sum + p.seniorAssociateHours, 0);
+    const baseAssociateHours = phases.reduce((sum, p) => sum + p.associateHours, 0);
+    const baseTraineeHours = phases.reduce((sum, p) => sum + p.traineeHours, 0);
+
+    // DD phase with decay
+    const ddPhase = phases.find(p => p.name.includes("Due Diligence"));
+    const ddPartnerHours = ddPhase ? calculateNegotiationHours(ddPhase.partnerHours, ass.ddDecay, ass.numNegotiationTurns) : 0;
+    const ddSeniorAssociateHours = ddPhase ? calculateNegotiationHours(ddPhase.seniorAssociateHours, ass.ddDecay, ass.numNegotiationTurns) : 0;
+    const ddAssociateHours = ddPhase ? calculateNegotiationHours(ddPhase.associateHours, ass.ddDecay, ass.numNegotiationTurns) : 0;
+
+    // Negotiation phase with decay
+    const negPhase = phases.find(p => p.name.includes("Negotiation"));
+    const negPartnerHours = negPhase ? calculateNegotiationHours(negPhase.partnerHours, ass.negotiatedDocsDecay, ass.numNegotiationTurns) : 0;
+    const negSeniorAssociateHours = negPhase ? calculateNegotiationHours(negPhase.seniorAssociateHours, ass.negotiatedDocsDecay, ass.numNegotiationTurns) : 0;
+    const negAssociateHours = negPhase ? calculateNegotiationHours(negPhase.associateHours, ass.negotiatedDocsDecay, ass.numNegotiationTurns) : 0;
+
+    // Meeting hours
+    const meetingPartnerHours = ass.numMeetings * ass.meetingHoursPartner;
+    const meetingAssociateHours = ass.numMeetings * ass.meetingHoursAssociate;
+
+    // Total hours
+    const totalPartnerHours = basePartnerHours + meetingPartnerHours + (negPartnerHours - (negPhase?.partnerHours || 0)) + (ddPartnerHours - (ddPhase?.partnerHours || 0));
+    const totalSeniorAssociateHours = baseSeniorAssociateHours + (negSeniorAssociateHours - (negPhase?.seniorAssociateHours || 0)) + (ddSeniorAssociateHours - (ddPhase?.seniorAssociateHours || 0));
+    const totalAssociateHours = baseAssociateHours + meetingAssociateHours + (negAssociateHours - (negPhase?.associateHours || 0)) + (ddAssociateHours - (ddPhase?.associateHours || 0));
+    const totalTraineeHours = baseTraineeHours;
+
+    // Apply AFA discount
+    const discountMultiplier = 1 - (ass.afaDiscount / 100);
+    const afaPartnerRate = rates.partner.rate * discountMultiplier;
+    const afaSeniorAssociateRate = rates.seniorAssociate.rate * discountMultiplier;
+    const afaAssociateRate = rates.associate.rate * discountMultiplier;
+    const afaTraineeRate = rates.trainee.rate * discountMultiplier;
+
+    // Revenue
+    const partnerRevenue = totalPartnerHours * afaPartnerRate;
+    const seniorAssociateRevenue = totalSeniorAssociateHours * afaSeniorAssociateRate;
+    const associateRevenue = totalAssociateHours * afaAssociateRate;
+    const traineeRevenue = totalTraineeHours * afaTraineeRate;
+    const totalRevenue = partnerRevenue + seniorAssociateRevenue + associateRevenue + traineeRevenue;
+
+    // Cost
+    const partnerCost = totalPartnerHours * rates.partner.cost;
+    const seniorAssociateCost = totalSeniorAssociateHours * rates.seniorAssociate.cost;
+    const associateCost = totalAssociateHours * rates.associate.cost;
+    const traineeCost = totalTraineeHours * rates.trainee.cost;
+    const totalCost = partnerCost + seniorAssociateCost + associateCost + traineeCost;
+
+    // Margin
+    const margin = totalRevenue - totalCost;
+    const marginPercent = totalRevenue > 0 ? (margin / totalRevenue) * 100 : 0;
+
+    // Blended rate
+    const totalHours = totalPartnerHours + totalSeniorAssociateHours + totalAssociateHours + totalTraineeHours;
+    const blendedRate = totalHours > 0 ? totalRevenue / totalHours : 0;
+
+    return {
+      totalPartnerHours,
+      totalSeniorAssociateHours,
+      totalAssociateHours,
+      totalTraineeHours,
+      totalHours,
+      afaPartnerRate,
+      afaSeniorAssociateRate,
+      afaAssociateRate,
+      afaTraineeRate,
+      partnerRevenue,
+      seniorAssociateRevenue,
+      associateRevenue,
+      traineeRevenue,
+      totalRevenue,
+      partnerCost,
+      seniorAssociateCost,
+      associateCost,
+      traineeCost,
+      totalCost,
+      margin,
+      marginPercent,
+      blendedRate,
+    };
+  }, [workPhases, rateCard, assumptions]);
+
   const currencySymbol = proposal?.currency === "GBP" ? "£" : proposal?.currency === "USD" ? "$" : "€";
 
   const formatCurrency = (value: number) => {
     return `${currencySymbol}${value.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
   };
 
-  // Add new item
+  const formatHours = (value: number) => {
+    return value.toFixed(1);
+  };
+
+  // Save proposal settings (rate card, work phases, assumptions)
+  const saveProposalSettings = async () => {
+    await updateProposal.mutateAsync({
+      rate_card: rateCard,
+      work_phases: workPhases,
+      assumptions: assumptions,
+    });
+    toast({ title: 'Settings saved' });
+  };
+
+  // Work phases handlers
+  const updatePhaseHours = (phaseId: string, field: keyof WorkPhase, value: number) => {
+    setWorkPhases(prev => prev.map(p => 
+      p.id === phaseId ? { ...p, [field]: value } : p
+    ));
+  };
+
+  const addWorkPhase = () => {
+    const newId = String(Date.now());
+    setWorkPhases(prev => [...prev, {
+      id: newId,
+      name: "New Phase",
+      description: "",
+      partnerHours: 0,
+      seniorAssociateHours: 0,
+      associateHours: 0,
+      traineeHours: 0,
+    }]);
+  };
+
+  const removeWorkPhase = (phaseId: string) => {
+    setWorkPhases(prev => prev.filter(p => p.id !== phaseId));
+  };
+
+  // Add new work item
   const addItem = () => {
     setDraftItems(prev => [...prev, {
       work_item: "",
@@ -124,7 +292,7 @@ export default function PricingProposalDetail() {
     setHasUnsavedChanges(true);
   };
 
-  // Update item
+  // Update work item
   const updateItem = (index: number, updates: Partial<DraftProposalItem>) => {
     setDraftItems(prev => prev.map((item, i) => 
       i === index ? { ...item, ...updates } : item
@@ -132,7 +300,7 @@ export default function PricingProposalDetail() {
     setHasUnsavedChanges(true);
   };
 
-  // Remove item
+  // Remove work item
   const removeItem = (index: number) => {
     setDraftItems(prev => prev.filter((_, i) => i !== index));
     setHasUnsavedChanges(true);
@@ -146,11 +314,9 @@ export default function PricingProposalDetail() {
     setIsExtractingRfp(true);
 
     try {
-      // Read file content
       const formData = new FormData();
       formData.append('file', file);
 
-      // Use parse-document-text edge function
       const { data, error } = await supabase.functions.invoke('parse-document-text', {
         body: formData,
       });
@@ -159,7 +325,6 @@ export default function PricingProposalDetail() {
 
       const documentText = data.text;
 
-      // Now use parse-engagement-letter to extract work items
       const { data: extractedData, error: extractError } = await supabase.functions.invoke('parse-engagement-letter', {
         body: { 
           text: documentText,
@@ -316,13 +481,12 @@ export default function PricingProposalDetail() {
       'Included': item.is_included ? 'Yes' : 'No',
     }));
 
-    // Add totals row
     worksheetData.push({
       '#': '',
       'Work Item': 'TOTAL',
       'Provider': '',
       'Category': '',
-      'Fee Amount': totals.total,
+      'Fee Amount': workItemTotals.total,
       'Pricing Method': '',
       'Optional': '',
       'Included': '',
@@ -386,7 +550,7 @@ export default function PricingProposalDetail() {
       <AppLayout>
         <div className="text-center py-12">
           <p className="text-muted-foreground">Proposal not found</p>
-          <Button className="mt-4" onClick={() => navigate('/pricing/proposals')}>
+          <Button className="mt-4" onClick={() => navigate('/pricing')}>
             Back to Proposals
           </Button>
         </div>
@@ -400,7 +564,7 @@ export default function PricingProposalDetail() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/pricing/proposals')}>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/pricing')}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
@@ -469,9 +633,9 @@ export default function PricingProposalDetail() {
                       </div>
                       <div className="bg-muted p-4 rounded-lg">
                         <p className="font-medium">Proposal Summary</p>
-                        <p className="text-2xl font-bold">{formatCurrency(totals.total)}</p>
+                        <p className="text-2xl font-bold">{formatCurrency(workItemTotals.total)}</p>
                         <p className="text-sm text-muted-foreground">
-                          BM: {formatCurrency(totals.bmTotal)} • LC: {formatCurrency(totals.localCounselTotal)}
+                          BM: {formatCurrency(workItemTotals.bmTotal)} • LC: {formatCurrency(workItemTotals.localCounselTotal)}
                         </p>
                       </div>
                     </div>
@@ -498,38 +662,55 @@ export default function PricingProposalDetail() {
           </div>
         </div>
 
-        {/* Main Content */}
+        {/* Main Content with Tabs */}
         <Tabs defaultValue="items" className="space-y-4">
-          <TabsList>
+          <TabsList className="grid w-full grid-cols-6 max-w-4xl">
             <TabsTrigger value="items">
               <FileText className="h-4 w-4 mr-2" />
               Work Items
             </TabsTrigger>
+            <TabsTrigger value="summary">
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Summary
+            </TabsTrigger>
+            <TabsTrigger value="assumptions">
+              <Calculator className="h-4 w-4 mr-2" />
+              Assumptions
+            </TabsTrigger>
+            <TabsTrigger value="phases">
+              <FileText className="h-4 w-4 mr-2" />
+              Work Phases
+            </TabsTrigger>
+            <TabsTrigger value="rates">
+              <Users className="h-4 w-4 mr-2" />
+              Rate Card
+            </TabsTrigger>
             <TabsTrigger value="history">
               <History className="h-4 w-4 mr-2" />
-              Version History
+              History
             </TabsTrigger>
           </TabsList>
 
+          {/* WORK ITEMS TAB */}
           <TabsContent value="items" className="space-y-4">
             {/* Summary Cards */}
             <div className="grid gap-4 md:grid-cols-4">
               <Card>
                 <CardContent className="pt-6">
                   <p className="text-sm font-medium text-muted-foreground">Total</p>
-                  <p className="text-2xl font-bold">{formatCurrency(totals.total)}</p>
+                  <p className="text-2xl font-bold">{formatCurrency(workItemTotals.total)}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-6">
                   <p className="text-sm font-medium text-muted-foreground">Baker McKenzie</p>
-                  <p className="text-2xl font-bold">{formatCurrency(totals.bmTotal)}</p>
+                  <p className="text-2xl font-bold">{formatCurrency(workItemTotals.bmTotal)}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-6">
                   <p className="text-sm font-medium text-muted-foreground">Local Counsel</p>
-                  <p className="text-2xl font-bold">{formatCurrency(totals.localCounselTotal)}</p>
+                  <p className="text-2xl font-bold">{formatCurrency(workItemTotals.localCounselTotal)}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -761,6 +942,477 @@ export default function PricingProposalDetail() {
             )}
           </TabsContent>
 
+          {/* SUMMARY TAB */}
+          <TabsContent value="summary" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Fee</p>
+                      <p className="text-2xl font-bold">{formatCurrency(summary.totalRevenue)}</p>
+                    </div>
+                    <DollarSign className="h-8 w-8 text-muted-foreground/30" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Total Hours</p>
+                      <p className="text-2xl font-bold">{formatHours(summary.totalHours)}</p>
+                    </div>
+                    <Clock className="h-8 w-8 text-muted-foreground/30" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Margin</p>
+                      <p className="text-2xl font-bold">{formatCurrency(summary.margin)}</p>
+                    </div>
+                    <TrendingUp className="h-8 w-8 text-muted-foreground/30" />
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Margin %</p>
+                      <p className="text-2xl font-bold">{summary.marginPercent.toFixed(1)}%</p>
+                    </div>
+                    <Percent className="h-8 w-8 text-muted-foreground/30" />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Fee Breakdown by Grade</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Grade</TableHead>
+                      <TableHead className="text-right">Hours</TableHead>
+                      <TableHead className="text-right">Rate</TableHead>
+                      <TableHead className="text-right">Revenue</TableHead>
+                      <TableHead className="text-right">Cost</TableHead>
+                      <TableHead className="text-right">Margin</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">Partner</TableCell>
+                      <TableCell className="text-right">{formatHours(summary.totalPartnerHours)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.afaPartnerRate)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.partnerRevenue)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.partnerCost)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.partnerRevenue - summary.partnerCost)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Senior Associate</TableCell>
+                      <TableCell className="text-right">{formatHours(summary.totalSeniorAssociateHours)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.afaSeniorAssociateRate)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.seniorAssociateRevenue)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.seniorAssociateCost)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.seniorAssociateRevenue - summary.seniorAssociateCost)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Associate</TableCell>
+                      <TableCell className="text-right">{formatHours(summary.totalAssociateHours)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.afaAssociateRate)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.associateRevenue)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.associateCost)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.associateRevenue - summary.associateCost)}</TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Trainee</TableCell>
+                      <TableCell className="text-right">{formatHours(summary.totalTraineeHours)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.afaTraineeRate)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.traineeRevenue)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.traineeCost)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.traineeRevenue - summary.traineeCost)}</TableCell>
+                    </TableRow>
+                    <TableRow className="font-bold bg-muted/50">
+                      <TableCell>Total</TableCell>
+                      <TableCell className="text-right">{formatHours(summary.totalHours)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.blendedRate)} (blended)</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.totalRevenue)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.totalCost)}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(summary.margin)}</TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* ASSUMPTIONS TAB */}
+          <TabsContent value="assumptions" className="space-y-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Calculator className="h-5 w-5" />
+                    Pricing Parameters
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label>AFA Discount (%)</Label>
+                    <Input
+                      type="number"
+                      value={assumptions.afaDiscount}
+                      onChange={(e) => setAssumptions(prev => ({ ...prev, afaDiscount: parseFloat(e.target.value) || 0 }))}
+                      min={0}
+                      max={100}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Number of Negotiation Turns</Label>
+                    <Input
+                      type="number"
+                      value={assumptions.numNegotiationTurns}
+                      onChange={(e) => setAssumptions(prev => ({ ...prev, numNegotiationTurns: parseInt(e.target.value) || 1 }))}
+                      min={1}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Negotiation Decay Factor</Label>
+                    <Input
+                      type="number"
+                      value={assumptions.negotiatedDocsDecay}
+                      onChange={(e) => setAssumptions(prev => ({ ...prev, negotiatedDocsDecay: parseFloat(e.target.value) || 0.5 }))}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                    />
+                    <p className="text-xs text-muted-foreground">Each subsequent turn = previous × this factor</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Due Diligence Decay Factor</Label>
+                    <Input
+                      type="number"
+                      value={assumptions.ddDecay}
+                      onChange={(e) => setAssumptions(prev => ({ ...prev, ddDecay: parseFloat(e.target.value) || 0.35 }))}
+                      min={0}
+                      max={1}
+                      step={0.05}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Meetings</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-2">
+                    <Label>Number of Additional Meetings</Label>
+                    <Input
+                      type="number"
+                      value={assumptions.numMeetings}
+                      onChange={(e) => setAssumptions(prev => ({ ...prev, numMeetings: parseInt(e.target.value) || 0 }))}
+                      min={0}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Partner Hours per Meeting</Label>
+                    <Input
+                      type="number"
+                      value={assumptions.meetingHoursPartner}
+                      onChange={(e) => setAssumptions(prev => ({ ...prev, meetingHoursPartner: parseFloat(e.target.value) || 0 }))}
+                      min={0}
+                      step={0.5}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Associate Hours per Meeting</Label>
+                    <Input
+                      type="number"
+                      value={assumptions.meetingHoursAssociate}
+                      onChange={(e) => setAssumptions(prev => ({ ...prev, meetingHoursAssociate: parseFloat(e.target.value) || 0 }))}
+                      min={0}
+                      step={0.5}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="flex justify-end">
+              <Button onClick={saveProposalSettings} disabled={updateProposal.isPending}>
+                {updateProposal.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save Assumptions
+              </Button>
+            </div>
+          </TabsContent>
+
+          {/* WORK PHASES TAB */}
+          <TabsContent value="phases" className="space-y-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Work Phases</CardTitle>
+                  <CardDescription>Define the phases and hours for this proposal</CardDescription>
+                </div>
+                <Button onClick={addWorkPhase} size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Phase
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Phase</TableHead>
+                      <TableHead className="text-right">Partner</TableHead>
+                      <TableHead className="text-right">Sr. Assoc</TableHead>
+                      <TableHead className="text-right">Associate</TableHead>
+                      <TableHead className="text-right">Trainee</TableHead>
+                      <TableHead className="w-[60px]"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {workPhases.map((phase) => (
+                      <TableRow key={phase.id}>
+                        <TableCell>
+                          <Input
+                            value={phase.name}
+                            onChange={(e) => setWorkPhases(prev => prev.map(p => 
+                              p.id === phase.id ? { ...p, name: e.target.value } : p
+                            ))}
+                            className="font-medium"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={phase.partnerHours}
+                            onChange={(e) => updatePhaseHours(phase.id, 'partnerHours', parseFloat(e.target.value) || 0)}
+                            className="w-20 text-right"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={phase.seniorAssociateHours}
+                            onChange={(e) => updatePhaseHours(phase.id, 'seniorAssociateHours', parseFloat(e.target.value) || 0)}
+                            className="w-20 text-right"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={phase.associateHours}
+                            onChange={(e) => updatePhaseHours(phase.id, 'associateHours', parseFloat(e.target.value) || 0)}
+                            className="w-20 text-right"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="number"
+                            value={phase.traineeHours}
+                            onChange={(e) => updatePhaseHours(phase.id, 'traineeHours', parseFloat(e.target.value) || 0)}
+                            className="w-20 text-right"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => removeWorkPhase(phase.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    <TableRow className="font-bold bg-muted/50">
+                      <TableCell>Total</TableCell>
+                      <TableCell className="text-right">{workPhases.reduce((s, p) => s + p.partnerHours, 0)}</TableCell>
+                      <TableCell className="text-right">{workPhases.reduce((s, p) => s + p.seniorAssociateHours, 0)}</TableCell>
+                      <TableCell className="text-right">{workPhases.reduce((s, p) => s + p.associateHours, 0)}</TableCell>
+                      <TableCell className="text-right">{workPhases.reduce((s, p) => s + p.traineeHours, 0)}</TableCell>
+                      <TableCell></TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-end">
+              <Button onClick={saveProposalSettings} disabled={updateProposal.isPending}>
+                {updateProposal.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save Work Phases
+              </Button>
+            </div>
+          </TabsContent>
+
+          {/* RATE CARD TAB */}
+          <TabsContent value="rates" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Rate Card</CardTitle>
+                <CardDescription>Set the billing rates and costs for this proposal</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Grade</TableHead>
+                      <TableHead className="text-right">Billing Rate ({currencySymbol})</TableHead>
+                      <TableHead className="text-right">Cost Rate ({currencySymbol})</TableHead>
+                      <TableHead className="text-right">Margin</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="font-medium">Partner</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={rateCard.partner.rate}
+                          onChange={(e) => setRateCard(prev => ({ 
+                            ...prev, 
+                            partner: { ...prev.partner, rate: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-28 text-right ml-auto"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={rateCard.partner.cost}
+                          onChange={(e) => setRateCard(prev => ({ 
+                            ...prev, 
+                            partner: { ...prev.partner, cost: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-28 text-right ml-auto"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {((rateCard.partner.rate - rateCard.partner.cost) / rateCard.partner.rate * 100).toFixed(0)}%
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Senior Associate</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={rateCard.seniorAssociate.rate}
+                          onChange={(e) => setRateCard(prev => ({ 
+                            ...prev, 
+                            seniorAssociate: { ...prev.seniorAssociate, rate: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-28 text-right ml-auto"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={rateCard.seniorAssociate.cost}
+                          onChange={(e) => setRateCard(prev => ({ 
+                            ...prev, 
+                            seniorAssociate: { ...prev.seniorAssociate, cost: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-28 text-right ml-auto"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {((rateCard.seniorAssociate.rate - rateCard.seniorAssociate.cost) / rateCard.seniorAssociate.rate * 100).toFixed(0)}%
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Associate</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={rateCard.associate.rate}
+                          onChange={(e) => setRateCard(prev => ({ 
+                            ...prev, 
+                            associate: { ...prev.associate, rate: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-28 text-right ml-auto"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={rateCard.associate.cost}
+                          onChange={(e) => setRateCard(prev => ({ 
+                            ...prev, 
+                            associate: { ...prev.associate, cost: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-28 text-right ml-auto"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {((rateCard.associate.rate - rateCard.associate.cost) / rateCard.associate.rate * 100).toFixed(0)}%
+                      </TableCell>
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="font-medium">Trainee</TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={rateCard.trainee.rate}
+                          onChange={(e) => setRateCard(prev => ({ 
+                            ...prev, 
+                            trainee: { ...prev.trainee, rate: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-28 text-right ml-auto"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Input
+                          type="number"
+                          value={rateCard.trainee.cost}
+                          onChange={(e) => setRateCard(prev => ({ 
+                            ...prev, 
+                            trainee: { ...prev.trainee, cost: parseFloat(e.target.value) || 0 }
+                          }))}
+                          className="w-28 text-right ml-auto"
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {((rateCard.trainee.rate - rateCard.trainee.cost) / rateCard.trainee.rate * 100).toFixed(0)}%
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+
+            <div className="flex justify-end">
+              <Button onClick={saveProposalSettings} disabled={updateProposal.isPending}>
+                {updateProposal.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4 mr-2" />
+                )}
+                Save Rate Card
+              </Button>
+            </div>
+          </TabsContent>
+
+          {/* HISTORY TAB */}
           <TabsContent value="history">
             <Card>
               <CardHeader>

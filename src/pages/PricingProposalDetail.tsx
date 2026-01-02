@@ -35,7 +35,8 @@ import {
   Clock,
   Percent,
   DollarSign,
-  HelpCircle
+  HelpCircle,
+  RotateCcw
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
@@ -1319,6 +1320,28 @@ export default function PricingProposalDetail() {
                       <Sparkles className="h-4 w-4 mr-2" />
                     )}
                     AI Price All
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      setDraftItems(prev => prev.map(item => ({
+                        ...item,
+                        fee_amount: 0,
+                        fee_lower: 0,
+                        fee_upper: 0,
+                        pricing_method: 'manual' as const,
+                        ai_rationale: null,
+                        partner_hours: 0,
+                        associate_hours: 0,
+                        num_turns: 1,
+                      })));
+                      setHasUnsavedChanges(true);
+                      toast({ title: 'All pricing cleared' });
+                    }}
+                    disabled={draftItems.length === 0}
+                  >
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Clear Pricing
                   </Button>
                   <Button onClick={addItem}>
                     <Plus className="h-4 w-4 mr-2" />

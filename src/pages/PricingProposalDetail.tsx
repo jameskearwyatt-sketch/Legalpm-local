@@ -1433,7 +1433,7 @@ export default function PricingProposalDetail() {
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Estimate Range</p>
+                      <p className="text-sm font-medium text-muted-foreground">Estimated Range</p>
                       <p className="text-2xl font-bold">{formatCurrency(workItemTotals.lowerTotal)} - {formatCurrency(workItemTotals.upperTotal)}</p>
                     </div>
                     <DollarSign className="h-8 w-8 text-muted-foreground/30" />

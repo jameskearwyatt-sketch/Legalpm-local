@@ -104,6 +104,9 @@ export default function PricingProposalDetail() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isExtractingRfp, setIsExtractingRfp] = useState(false);
   const [isGeneratingAiPricing, setIsGeneratingAiPricing] = useState(false);
+  const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
+  const [pastedText, setPastedText] = useState("");
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
   
   const [isDeletingVersion, setIsDeletingVersion] = useState(false);
   const [isSendToMatterOpen, setIsSendToMatterOpen] = useState(false);
@@ -516,17 +519,26 @@ export default function PricingProposalDetail() {
       if (extractError) throw extractError;
 
       if (extractedData.items && extractedData.items.length > 0) {
-        const newItems: DraftProposalItem[] = extractedData.items.map((item: any) => ({
-          work_item: item.work_item,
-          provider: item.provider === 'Local Counsel' ? 'Local Counsel' : 'Baker McKenzie',
-          fee_amount: item.fee_amount || 0,
-          pricing_method: 'ai_suggested' as PricingMethod,
-          category: item.category || null,
-          lc_firm_name: item.lc_firm_name,
-          is_optional: false,
-          is_included: true,
-          ai_rationale: 'Extracted from RFP document',
-        }));
+        const newItems: DraftProposalItem[] = extractedData.items.map((item: any) => {
+          const feeAmount = item.fee_amount || 0;
+          // Apply ±10% spread for AI-extracted items
+          const feeLower = Math.round(feeAmount * 0.9);
+          const feeUpper = Math.round(feeAmount * 1.1);
+          
+          return {
+            work_item: item.work_item,
+            provider: item.provider === 'Local Counsel' ? 'Local Counsel' : 'Baker McKenzie',
+            fee_amount: feeAmount,
+            fee_lower: feeLower,
+            fee_upper: feeUpper,
+            pricing_method: 'ai_suggested' as PricingMethod,
+            category: item.category || null,
+            lc_firm_name: item.lc_firm_name,
+            is_optional: false,
+            is_included: true,
+            ai_rationale: 'Extracted from RFP document',
+          };
+        });
 
         setDraftItems(prev => [...prev, ...newItems]);
         setHasUnsavedChanges(true);
@@ -542,6 +554,69 @@ export default function PricingProposalDetail() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  // Handle paste text submission
+  const handlePasteTextSubmit = async () => {
+    if (!pastedText.trim()) {
+      toast({ title: 'Please enter some text to analyze', variant: 'destructive' });
+      return;
+    }
+
+    setIsExtractingRfp(true);
+    setIsPasteDialogOpen(false);
+
+    try {
+      const { data: extractedData, error: extractError } = await supabase.functions.invoke('parse-engagement-letter', {
+        body: { 
+          text: pastedText,
+          currency: proposal?.currency || 'GBP'
+        },
+      });
+
+      if (extractError) throw extractError;
+
+      if (extractedData.items && extractedData.items.length > 0) {
+        const newItems: DraftProposalItem[] = extractedData.items.map((item: any) => {
+          const feeAmount = item.fee_amount || 0;
+          const feeLower = Math.round(feeAmount * 0.9);
+          const feeUpper = Math.round(feeAmount * 1.1);
+          
+          return {
+            work_item: item.work_item,
+            provider: item.provider === 'Local Counsel' ? 'Local Counsel' : 'Baker McKenzie',
+            fee_amount: feeAmount,
+            fee_lower: feeLower,
+            fee_upper: feeUpper,
+            pricing_method: 'ai_suggested' as PricingMethod,
+            category: item.category || null,
+            lc_firm_name: item.lc_firm_name,
+            is_optional: false,
+            is_included: true,
+            ai_rationale: 'Extracted from pasted text',
+          };
+        });
+
+        setDraftItems(prev => [...prev, ...newItems]);
+        setHasUnsavedChanges(true);
+        toast({ title: `Extracted ${newItems.length} work items from text` });
+      } else {
+        toast({ title: 'No work items found in text', variant: 'destructive' });
+      }
+    } catch (error: any) {
+      console.error('Text extraction error:', error);
+      toast({ title: 'Failed to extract work items', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsExtractingRfp(false);
+      setPastedText("");
+    }
+  };
+
+  // Add custom category
+  const addCustomCategory = (categoryName: string) => {
+    if (categoryName && !customCategories.includes(categoryName) && !(BUDGET_CATEGORIES as readonly string[]).includes(categoryName)) {
+      setCustomCategories(prev => [...prev, categoryName]);
     }
   };
 
@@ -562,16 +637,25 @@ export default function PricingProposalDetail() {
       if (error) throw error;
 
       if (data.suggestions && data.suggestions.length > 0) {
-        const newItems: DraftProposalItem[] = data.suggestions.map((item: any) => ({
-          work_item: item.work_item,
-          provider: item.provider === 'Local Counsel' ? 'Local Counsel' : 'Baker McKenzie',
-          fee_amount: item.fee_amount || 0,
-          pricing_method: 'ai_suggested' as PricingMethod,
-          category: item.category || null,
-          is_optional: true,
-          is_included: false,
-          ai_rationale: item.rationale || 'AI suggested additional work item',
-        }));
+        const newItems: DraftProposalItem[] = data.suggestions.map((item: any) => {
+          const feeAmount = item.fee_amount || 0;
+          // Apply ±10% spread for AI-suggested items
+          const feeLower = Math.round(feeAmount * 0.9);
+          const feeUpper = Math.round(feeAmount * 1.1);
+          
+          return {
+            work_item: item.work_item,
+            provider: item.provider === 'Local Counsel' ? 'Local Counsel' : 'Baker McKenzie',
+            fee_amount: feeAmount,
+            fee_lower: feeLower,
+            fee_upper: feeUpper,
+            pricing_method: 'ai_suggested' as PricingMethod,
+            category: item.category || null,
+            is_optional: true,
+            is_included: false,
+            ai_rationale: item.rationale || 'AI suggested additional work item',
+          };
+        });
 
         setDraftItems(prev => [...prev, ...newItems]);
         setHasUnsavedChanges(true);
@@ -622,9 +706,16 @@ export default function PricingProposalDetail() {
               item.work_item?.startsWith(p.work_item)
             );
             if (priceInfo) {
+              const feeAmount = priceInfo.fee_amount || 0;
+              // Apply ±10% spread for AI-priced items
+              const feeLower = Math.round(feeAmount * 0.9);
+              const feeUpper = Math.round(feeAmount * 1.1);
+              
               return {
                 ...item,
-                fee_amount: priceInfo.fee_amount,
+                fee_amount: feeAmount,
+                fee_lower: feeLower,
+                fee_upper: feeUpper,
                 pricing_method: 'ai_suggested' as PricingMethod,
                 ai_rationale: priceInfo.rationale || 'AI suggested pricing',
               };
@@ -1150,6 +1241,39 @@ export default function PricingProposalDetail() {
                     )}
                     Upload RFP
                   </Button>
+                  <Dialog open={isPasteDialogOpen} onOpenChange={setIsPasteDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" disabled={isExtractingRfp}>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Paste Information
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl">
+                      <DialogHeader>
+                        <DialogTitle>Paste RFP or Scope Information</DialogTitle>
+                        <DialogDescription>
+                          Paste text from an RFP, engagement letter, or scope document. The AI will analyze it and extract work items.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4">
+                        <Textarea
+                          value={pastedText}
+                          onChange={(e) => setPastedText(e.target.value)}
+                          placeholder="Paste your RFP text, engagement letter, or scope description here..."
+                          className="min-h-[300px]"
+                        />
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsPasteDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handlePasteTextSubmit} disabled={!pastedText.trim()}>
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          Analyze Text
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                   <Button 
                     variant="outline" 
                     onClick={generateAiSuggestions}
@@ -1260,6 +1384,8 @@ export default function PricingProposalDetail() {
                                   onOpenIterativePricing={openIterativePricing}
                                   formatCurrency={formatCurrency}
                                   viewingHistoricalVersion={viewingHistoricalVersion}
+                                  customCategories={customCategories}
+                                  onAddCustomCategory={addCustomCategory}
                                 />
                               ))}
                             </SortableContext>

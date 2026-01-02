@@ -396,93 +396,6 @@ export function useBudgetVersions(matterId?: string) {
     },
   });
 
-  // Update WIP amounts for multiple line items and create a snapshot
-  const updateDetailedWip = useMutation({
-    mutationFn: async ({ matterId, wipUpdates }: { matterId: string; wipUpdates: { id: string; wip_amount: number }[] }) => {
-      const now = new Date().toISOString();
-      const today = now.split('T')[0];
-      
-      // Update all line items with new WIP amounts
-      for (const update of wipUpdates) {
-        const { error } = await supabase
-          .from('budget_line_items')
-          .update({ 
-            wip_amount: update.wip_amount,
-            wip_updated_at: now
-          })
-          .eq('id', update.id);
-        
-        if (error) throw error;
-      }
-      
-      // Calculate total WIP
-      const totalWip = wipUpdates.reduce((sum, item) => sum + item.wip_amount, 0);
-      
-      // Create or update financial snapshot for today
-      const { data: existingSnapshot } = await supabase
-        .from('financial_snapshots')
-        .select('*')
-        .eq('matter_id', matterId)
-        .eq('as_of_date', today)
-        .maybeSingle();
-      
-      if (existingSnapshot) {
-        // Update existing snapshot
-        const { error } = await supabase
-          .from('financial_snapshots')
-          .update({ 
-            wip_amount: totalWip,
-            updated_at: now,
-            notes: existingSnapshot.notes 
-              ? `${existingSnapshot.notes}\n[Detailed WIP Update]` 
-              : '[Detailed WIP Update]'
-          })
-          .eq('id', existingSnapshot.id);
-        
-        if (error) throw error;
-      } else {
-        // Get latest snapshot for billed/paid amounts
-        const { data: latestSnapshot } = await supabase
-          .from('financial_snapshots')
-          .select('*')
-          .eq('matter_id', matterId)
-          .order('as_of_date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        
-        // Create new snapshot
-        const { error } = await supabase
-          .from('financial_snapshots')
-          .insert({
-            matter_id: matterId,
-            user_id: user!.id,
-            as_of_date: today,
-            wip_amount: totalWip,
-            billed_amount: latestSnapshot?.billed_amount || 0,
-            paid_amount: latestSnapshot?.paid_amount || 0,
-            notes: '[Detailed WIP Update]'
-          });
-        
-        if (error) throw error;
-      }
-      
-      return { totalWip };
-    },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['budget-line-items'] });
-      queryClient.invalidateQueries({ queryKey: ['budget-versions', variables.matterId] });
-      queryClient.invalidateQueries({ queryKey: ['snapshots', variables.matterId] });
-      queryClient.invalidateQueries({ queryKey: ['snapshots'] });
-      queryClient.invalidateQueries({ queryKey: ['matters'] });
-      queryClient.invalidateQueries({ queryKey: ['matter', variables.matterId] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast({ title: 'Detailed WIP update saved successfully' });
-    },
-    onError: (error: Error) => {
-      toast({ title: 'Failed to update WIP', description: error.message, variant: 'destructive' });
-    },
-  });
-
   return {
     versions: versionsQuery.data || [],
     latestVersion,
@@ -495,6 +408,5 @@ export function useBudgetVersions(matterId?: string) {
     fetchLineItems,
     toggleLineItemIncluded,
     updateLineItemOptional,
-    updateDetailedWip,
   };
 }

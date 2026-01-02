@@ -718,8 +718,10 @@ export default function PricingProposalDetail() {
       { key: 'estimate', width: 18 },
     ];
     
-    // Title row
-    const titleRow = worksheet.addRow([proposal?.name || 'Pricing Proposal', '', '', '']);
+    // Title row with client name and proposal name
+    const clientName = proposal?.client?.name || 'Client';
+    const proposalName = proposal?.name || 'Pricing Proposal';
+    const titleRow = worksheet.addRow([`${clientName} - ${proposalName}`, '', '', '']);
     titleRow.font = { bold: true, size: 16 };
     titleRow.height = 28;
     worksheet.mergeCells('A1:D1');
@@ -737,6 +739,8 @@ export default function PricingProposalDetail() {
     };
     headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
     headerRow.height = 24;
+    // Align Estimate header to right
+    headerRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'right' };
     headerRow.eachCell(cell => {
       cell.border = {
         bottom: { style: 'medium', color: { argb: 'FF1a365d' } }
@@ -806,7 +810,7 @@ export default function PricingProposalDetail() {
     });
     
     // Grand total row
-    const totalRow = worksheet.addRow(['', 'TOTAL FEE', '', grandTotal]);
+    const totalRow = worksheet.addRow(['', 'TOTAL ESTIMATE', '', grandTotal]);
     totalRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
     totalRow.fill = {
       type: 'pattern',

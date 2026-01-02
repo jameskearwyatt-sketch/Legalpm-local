@@ -13,6 +13,8 @@ const CATEGORIES = [
   'Meetings',
   'Regulatory',
   'Closing',
+  'Tax',
+  'Legal Opinions',
   'Other'
 ] as const;
 
@@ -47,7 +49,9 @@ serve(async (req) => {
 4. Meetings - Client meetings, calls, attendance, conferences, internal meetings
 5. Regulatory - Filings, compliance, government approvals, regulatory submissions, permits
 6. Closing - Closing mechanics, completion, signing, execution, post-completion matters
-7. Other - Anything that doesn't fit the above categories
+7. Tax - Tax advice, tax review, tax structuring, tax documents, tax due diligence, stamp duty, transfer taxes, withholding taxes
+8. Legal Opinions - Legal opinions, opinion letters, capacity opinions, enforceability opinions, third party opinions
+9. Other - Anything that doesn't fit the above categories
 
 For each work item provided, return its index and the most appropriate category.`;
 
@@ -87,7 +91,7 @@ Return the categorization in the exact format requested.`;
                       index: { type: 'number', description: 'The index of the work item' },
                       category: { 
                         type: 'string', 
-                        enum: ['Due Diligence', 'Documentation', 'Negotiations', 'Meetings', 'Regulatory', 'Closing', 'Other'],
+                        enum: ['Due Diligence', 'Documentation', 'Negotiations', 'Meetings', 'Regulatory', 'Closing', 'Tax', 'Legal Opinions', 'Other'],
                         description: 'The category for this work item'
                       }
                     },

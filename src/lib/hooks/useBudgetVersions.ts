@@ -27,6 +27,8 @@ export const BUDGET_CATEGORIES = [
   'Meetings',
   'Regulatory',
   'Closing',
+  'Tax',
+  'Legal Opinions',
   'Other'
 ] as const;
 

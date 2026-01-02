@@ -202,13 +202,17 @@ export function DraggableProposalItem({
           <div className="flex items-center gap-1">
             <span className="text-xs text-muted-foreground">{formatCurrency(0).charAt(0)}</span>
             <Input
-              type="number"
-              value={item.fee_amount || ''}
-              onChange={(e) => onUpdate(index, {
-                fee_amount: parseFloat(e.target.value) || 0,
-                pricing_method: 'manual'
-              })}
-              className="w-[100px] text-right"
+              type="text"
+              value={(item.fee_amount || 0).toLocaleString('en-GB')}
+              onChange={(e) => {
+                const rawValue = e.target.value.replace(/,/g, '');
+                const numericValue = parseFloat(rawValue) || 0;
+                onUpdate(index, {
+                  fee_amount: numericValue,
+                  pricing_method: 'manual'
+                });
+              }}
+              className="w-[110px] text-right"
               placeholder="0"
             />
           </div>

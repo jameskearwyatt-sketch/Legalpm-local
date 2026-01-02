@@ -31,7 +31,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Loader2, ChevronDown, History, Check, FileText, Upload, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Loader2, ChevronDown, History, Check, FileText, Upload, Sparkles, LayoutGrid, List } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
@@ -43,6 +43,7 @@ import { extractAssumptionsFromText, ExtractedAssumption, labelColors } from '@/
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { CategorizedBudgetView } from './CategorizedBudgetView';
 
 interface BudgetSectionProps {
   matterId: string;
@@ -80,6 +81,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [aiSuggestedIndices, setAiSuggestedIndices] = useState<Set<number>>(new Set());
   // Store original values when editing starts for comparison
   const [originalItems, setOriginalItems] = useState<DraftLineItem[]>([]);
+  // View mode: 'list' or 'categorized'
+  const [viewMode, setViewMode] = useState<'list' | 'categorized'>('categorized');
 
   // Silent update for local counsel billing (no toast)
   const updateLocalCounselBilling = async (value: 'Direct' | 'Disb' | null) => {
@@ -132,6 +135,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         lc_firm_name: item.lc_firm_name || undefined,
         is_optional: item.is_optional,
         is_included: item.is_included,
+        category: item.category || undefined,
       })));
     } else if (!hasExistingBudget && draftItems.length === 0) {
       // Add one empty line for new budgets
@@ -713,8 +717,51 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* View Mode Toggle */}
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('list')}
+          >
+            <List className="h-4 w-4 mr-1" />
+            List
+          </Button>
+          <Button
+            variant={viewMode === 'categorized' ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setViewMode('categorized')}
+          >
+            <LayoutGrid className="h-4 w-4 mr-1" />
+            Categories
+          </Button>
+        </div>
+
         {/* Budget Line Items */}
+        {viewMode === 'categorized' ? (
+          <CategorizedBudgetView
+            items={draftItems}
+            onItemsChange={setDraftItems}
+            onItemEdit={handleItemEdit}
+            onRemoveItem={removeLineItem}
+            isEditing={isEditing}
+            hasExistingBudget={hasExistingBudget}
+            formatCurrency={formatCurrency}
+            currency={currency}
+            billingCurrency={billingCurrency}
+            quoteCurrency={quoteCurrency}
+            differentBillingCurrency={differentBillingCurrency}
+            agreedBillingAmount={agreedBillingAmount}
+            mandatedRate={mandatedRate}
+            existingLcFirmNames={existingLcFirmNames}
+            hasOptionalItems={hasOptionalItems}
+            aiSuggestedIndices={aiSuggestedIndices}
+            originalItems={originalItems}
+            updateLineItemOptional={updateLineItemOptional}
+          />
+        ) : (
         <div className="space-y-3">
+          {/* Budget Line Items */}
           {/* Header row - different layout when editing vs viewing */}
           {isEditing && hasExistingBudget ? (
             <div className="grid grid-cols-14 gap-2 text-sm font-medium text-muted-foreground px-1">
@@ -1191,6 +1238,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
             </div>
           )}
         </div>
+        )}
 
         {/* Totals */}
         <div className="border-t pt-4 space-y-2">

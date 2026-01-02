@@ -70,6 +70,7 @@ export type Database = {
       budget_line_items: {
         Row: {
           budget_version_id: string
+          category: string | null
           created_at: string
           fee_amount: number
           id: string
@@ -85,6 +86,7 @@ export type Database = {
         }
         Insert: {
           budget_version_id: string
+          category?: string | null
           created_at?: string
           fee_amount?: number
           id?: string
@@ -100,6 +102,7 @@ export type Database = {
         }
         Update: {
           budget_version_id?: string
+          category?: string | null
           created_at?: string
           fee_amount?: number
           id?: string

@@ -15,9 +15,22 @@ export interface BudgetLineItem {
   lc_firm_name: string | null;
   is_optional: boolean;
   is_included: boolean;
+  category: string | null;
   created_at: string;
   updated_at: string;
 }
+
+export const BUDGET_CATEGORIES = [
+  'Due Diligence',
+  'Documentation',
+  'Negotiations', 
+  'Meetings',
+  'Regulatory',
+  'Closing',
+  'Other'
+] as const;
+
+export type BudgetCategory = typeof BUDGET_CATEGORIES[number];
 
 export interface BudgetVersion {
   id: string;
@@ -41,6 +54,7 @@ export interface DraftLineItem {
   lc_firm_name?: string;
   is_optional?: boolean;
   is_included?: boolean;
+  category?: string | null;
 }
 
 export interface FinalizeBudgetInput {
@@ -143,6 +157,7 @@ export function useBudgetVersions(matterId?: string) {
           lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
           is_optional: item.is_optional ?? false,
           is_included: item.is_included ?? true,
+          category: item.category || null,
         }));
 
         const { error: itemsError } = await supabase

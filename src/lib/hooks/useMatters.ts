@@ -269,6 +269,9 @@ export function useMatters() {
           billing_currency: billingCurrency,
           different_billing_currency: differentBillingCurrency,
           agreed_billing_amount: agreedBillingAmount,
+          // Override legacy lc_wip/lc_billed with aggregated values from matter_local_counsels
+          lc_wip: lcWip,
+          lc_billed: lcBilled,
         } as MatterWithFinancials;
       }) || [];
     },

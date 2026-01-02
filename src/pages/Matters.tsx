@@ -403,7 +403,7 @@ export default function Matters() {
                             <SortableHeader field="budget_burn">BM Burn</SortableHeader>
                           </TableHead>
                           <TableHead className="text-right min-w-[75px]">
-                            LC Burn
+                            Local Burn
                           </TableHead>
                           <TableHead className="text-right min-w-[80px]">
                             <SortableHeader field="headroom">Headroom</SortableHeader>

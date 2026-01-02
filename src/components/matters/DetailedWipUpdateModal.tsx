@@ -14,6 +14,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertTriangle, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BudgetLineItem } from '@/lib/hooks/useBudgetVersions';
+import { useDetailedWipUpdates } from '@/lib/hooks/useDetailedWipUpdates';
 
 interface WipLineItem {
   id: string;
@@ -29,7 +30,7 @@ interface DetailedWipUpdateModalProps {
   isOpen: boolean;
   onClose: () => void;
   lineItems: BudgetLineItem[];
-  onFinalize: (wipUpdates: { id: string; wip_amount: number }[]) => Promise<void>;
+  matterId: string;
   formatCurrency: (value: number, currency?: string) => string;
   currency: string;
 }
@@ -69,10 +70,11 @@ export function DetailedWipUpdateModal({
   isOpen,
   onClose,
   lineItems,
-  onFinalize,
+  matterId,
   formatCurrency,
   currency,
 }: DetailedWipUpdateModalProps) {
+  const { createWipUpdate } = useDetailedWipUpdates(matterId);
   const [wipItems, setWipItems] = useState<WipLineItem[]>([]);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [hasAcknowledged, setHasAcknowledged] = useState(false);
@@ -105,7 +107,18 @@ export function DetailedWipUpdateModal({
   const handleFinalize = async () => {
     setIsFinalizing(true);
     try {
-      await onFinalize(wipItems.map(item => ({ id: item.id, wip_amount: item.wip_amount })));
+      await createWipUpdate.mutateAsync({
+        matterId,
+        wipItems: wipItems.map(item => ({
+          budget_line_item_id: item.id,
+          work_item: item.work_item,
+          provider: item.provider,
+          category: item.category,
+          lc_firm_name: item.lc_firm_name,
+          fee_amount: item.fee_amount,
+          wip_amount: item.wip_amount,
+        })),
+      });
       onClose();
     } catch (error) {
       console.error('Error finalizing WIP update:', error);

@@ -201,6 +201,88 @@ export type Database = {
         }
         Relationships: []
       }
+      detailed_wip_update_items: {
+        Row: {
+          budget_line_item_id: string
+          category: string | null
+          created_at: string
+          fee_amount: number
+          id: string
+          lc_firm_name: string | null
+          provider: string
+          wip_amount: number
+          wip_update_id: string
+          work_item: string
+        }
+        Insert: {
+          budget_line_item_id: string
+          category?: string | null
+          created_at?: string
+          fee_amount?: number
+          id?: string
+          lc_firm_name?: string | null
+          provider: string
+          wip_amount?: number
+          wip_update_id: string
+          work_item: string
+        }
+        Update: {
+          budget_line_item_id?: string
+          category?: string | null
+          created_at?: string
+          fee_amount?: number
+          id?: string
+          lc_firm_name?: string | null
+          provider?: string
+          wip_amount?: number
+          wip_update_id?: string
+          work_item?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "detailed_wip_update_items_wip_update_id_fkey"
+            columns: ["wip_update_id"]
+            isOneToOne: false
+            referencedRelation: "detailed_wip_updates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      detailed_wip_updates: {
+        Row: {
+          created_at: string
+          id: string
+          matter_id: string
+          total_wip_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          matter_id: string
+          total_wip_amount?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          matter_id?: string
+          total_wip_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "detailed_wip_updates_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       financial_snapshots: {
         Row: {
           as_of_date: string

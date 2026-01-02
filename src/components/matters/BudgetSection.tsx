@@ -45,6 +45,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CategorizedBudgetView } from './CategorizedBudgetView';
 import { DetailedWipUpdateModal } from './DetailedWipUpdateModal';
+import { WipHistoryModal } from './WipHistoryModal';
 import { formatCurrency as sharedFormatCurrency } from '@/lib/currencyUtils';
 
 interface BudgetSectionProps {
@@ -69,7 +70,6 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     fetchLineItems,
     toggleLineItemIncluded,
     updateLineItemOptional,
-    updateDetailedWip,
   } = useBudgetVersions(matterId);
   
   const { localCounsels, syncLocalCounselsFromBudget } = useLocalCounsels(matterId);
@@ -118,6 +118,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   
   // Detailed WIP Update state
   const [isDetailedWipOpen, setIsDetailedWipOpen] = useState(false);
+  const [isWipHistoryOpen, setIsWipHistoryOpen] = useState(false);
   
   const { createBulkAssumptions } = useAssumptions(matterId);
 
@@ -704,14 +705,24 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           )}
           {/* Detailed WIP Update button - show when budget exists and not editing */}
           {hasExistingBudget && latestVersion && !isEditing && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setIsDetailedWipOpen(true)}
-            >
-              <TrendingUp className="h-4 w-4 mr-2" />
-              Detailed WIP Update
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsDetailedWipOpen(true)}
+              >
+                <TrendingUp className="h-4 w-4 mr-2" />
+                Detailed WIP Update
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsWipHistoryOpen(true)}
+              >
+                <History className="h-4 w-4 mr-2" />
+                WIP History
+              </Button>
+            </>
           )}
           {hasExistingBudget && latestVersion && (
             <span className="text-sm text-muted-foreground">
@@ -1536,9 +1547,16 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         isOpen={isDetailedWipOpen}
         onClose={() => setIsDetailedWipOpen(false)}
         lineItems={latestLineItems}
-        onFinalize={async (wipUpdates) => {
-          await updateDetailedWip.mutateAsync({ matterId, wipUpdates });
-        }}
+        matterId={matterId}
+        formatCurrency={formatCurrency}
+        currency={quoteCurrency}
+      />
+
+      {/* WIP History Modal */}
+      <WipHistoryModal
+        isOpen={isWipHistoryOpen}
+        onClose={() => setIsWipHistoryOpen(false)}
+        matterId={matterId}
         formatCurrency={formatCurrency}
         currency={quoteCurrency}
       />

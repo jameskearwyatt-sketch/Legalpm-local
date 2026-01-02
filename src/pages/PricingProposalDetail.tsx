@@ -53,6 +53,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import { cn } from "@/lib/utils";
+import { getCurrencySymbol } from "@/lib/currencyUtils";
 import { IterativePricingDialog, FeeOwnerHours } from "@/components/pricing/IterativePricingDialog";
 import { EditableRateCard } from "@/components/pricing/EditableRateCard";
 import { CategorizedProposalView, categoryBgColors, categoryTextColors, categoryBorderColors } from "@/components/pricing/CategorizedProposalView";
@@ -660,32 +661,105 @@ export default function PricingProposalDetail() {
     setVersionNotes("");
   };
 
-  // Export to Excel
+  // Export to Excel with nice formatting
   const exportToExcel = () => {
-    const worksheetData = draftItems.map((item, index) => ({
-      '#': index + 1,
-      'Work Item': item.work_item,
-      'Provider': item.provider,
-      'Category': item.category || '',
-      'Fee Amount': item.fee_amount,
-      'Pricing Method': item.pricing_method === 'ai_suggested' ? 'AI Suggested' : 
-                        item.pricing_method === 'pricing_tool' ? 'Pricing Tool' : 'Manual',
-      'Optional': item.is_optional ? 'Yes' : 'No',
-      'Included': item.is_included ? 'Yes' : 'No',
-    }));
-
-    worksheetData.push({
-      '#': '',
-      'Work Item': 'TOTAL',
-      'Provider': '',
-      'Category': '',
-      'Fee Amount': workItemTotals.total,
-      'Pricing Method': '',
-      'Optional': '',
-      'Included': '',
-    } as any);
-
-    const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+    const currencySymbol = getCurrencySymbol(proposal?.currency || 'GBP');
+    
+    // Category order for sorting
+    const categoryOrder: Record<string, number> = {
+      'Pre-signing': 1,
+      'Signing': 2,
+      'Completion': 3,
+      'Post-completion': 4,
+      'Project management': 5,
+      '': 6 // Uncategorized last
+    };
+    
+    // Filter included items and sort by category
+    const sortedItems = [...draftItems]
+      .filter(item => item.is_included || !item.is_optional)
+      .sort((a, b) => {
+        const orderA = categoryOrder[a.category || ''] ?? 99;
+        const orderB = categoryOrder[b.category || ''] ?? 99;
+        return orderA - orderB;
+      });
+    
+    // Group by category and calculate subtotals
+    const categorizedData: { category: string; items: typeof sortedItems; subtotal: number }[] = [];
+    let currentCategory = '';
+    let currentItems: typeof sortedItems = [];
+    let currentSubtotal = 0;
+    
+    sortedItems.forEach(item => {
+      const cat = item.category || 'Other';
+      if (cat !== currentCategory && currentItems.length > 0) {
+        categorizedData.push({ category: currentCategory, items: currentItems, subtotal: currentSubtotal });
+        currentItems = [];
+        currentSubtotal = 0;
+      }
+      currentCategory = cat;
+      currentItems.push(item);
+      currentSubtotal += item.fee_amount;
+    });
+    if (currentItems.length > 0) {
+      categorizedData.push({ category: currentCategory, items: currentItems, subtotal: currentSubtotal });
+    }
+    
+    // Build worksheet data with headers, rows, subtotals
+    const wsData: (string | number)[][] = [];
+    
+    // Title row
+    wsData.push([proposal?.name || 'Pricing Proposal', '', '', '']);
+    wsData.push(['', '', '', '']);
+    
+    // Header row
+    wsData.push(['Category', 'Work Item', 'Provider', 'Estimate']);
+    
+    let grandTotal = 0;
+    const subtotalRows: number[] = [];
+    const headerRow = 2; // 0-indexed row 2 is the header
+    
+    categorizedData.forEach(({ category, items, subtotal }) => {
+      items.forEach((item, idx) => {
+        wsData.push([
+          idx === 0 ? category : '', // Only show category on first row of group
+          item.work_item,
+          item.provider,
+          item.fee_amount
+        ]);
+      });
+      // Subtotal row
+      subtotalRows.push(wsData.length);
+      wsData.push(['', `${category} Subtotal`, '', subtotal]);
+      grandTotal += subtotal;
+      // Empty row between categories
+      wsData.push(['', '', '', '']);
+    });
+    
+    // Grand total row
+    const grandTotalRow = wsData.length;
+    wsData.push(['', 'TOTAL FEE', '', grandTotal]);
+    
+    // Create worksheet
+    const worksheet = XLSX.utils.aoa_to_sheet(wsData);
+    
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 20 }, // Category
+      { wch: 50 }, // Work Item
+      { wch: 18 }, // Provider
+      { wch: 15 }, // Estimate
+    ];
+    
+    // Format currency cells (column D, index 3)
+    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:D1');
+    for (let row = headerRow + 1; row <= range.e.r; row++) {
+      const cellRef = XLSX.utils.encode_cell({ r: row, c: 3 });
+      if (worksheet[cellRef] && typeof worksheet[cellRef].v === 'number') {
+        worksheet[cellRef].z = `"${currencySymbol}"#,##0`;
+      }
+    }
+    
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Pricing Proposal");
 

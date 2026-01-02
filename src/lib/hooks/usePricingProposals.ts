@@ -3,6 +3,60 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { BUDGET_CATEGORIES } from './useBudgetVersions';
+import { Json } from '@/integrations/supabase/types';
+
+export interface RateCard {
+  partner: { rate: number; cost: number };
+  seniorAssociate: { rate: number; cost: number };
+  associate: { rate: number; cost: number };
+  trainee: { rate: number; cost: number };
+}
+
+export interface WorkPhase {
+  id: string;
+  name: string;
+  description: string;
+  partnerHours: number;
+  seniorAssociateHours: number;
+  associateHours: number;
+  traineeHours: number;
+}
+
+export interface ProposalAssumptions {
+  negotiatedDocsDecay: number;
+  ddDecay: number;
+  numMeetings: number;
+  meetingHoursPartner: number;
+  meetingHoursAssociate: number;
+  numNegotiationTurns: number;
+  afaDiscount: number;
+}
+
+export const DEFAULT_RATE_CARD: RateCard = {
+  partner: { rate: 850, cost: 425 },
+  seniorAssociate: { rate: 650, cost: 260 },
+  associate: { rate: 450, cost: 180 },
+  trainee: { rate: 250, cost: 100 },
+};
+
+export const DEFAULT_WORK_PHASES: WorkPhase[] = [
+  { id: "1", name: "Initial Review & Kick-off", description: "Review materials, client meetings, team briefing", partnerHours: 4, seniorAssociateHours: 6, associateHours: 8, traineeHours: 4 },
+  { id: "2", name: "Due Diligence", description: "Legal due diligence review and reporting", partnerHours: 8, seniorAssociateHours: 20, associateHours: 40, traineeHours: 20 },
+  { id: "3", name: "Documentation - First Draft", description: "Drafting of transaction documents", partnerHours: 10, seniorAssociateHours: 30, associateHours: 40, traineeHours: 10 },
+  { id: "4", name: "Negotiation & Mark-ups", description: "Negotiation rounds and document revisions", partnerHours: 15, seniorAssociateHours: 25, associateHours: 30, traineeHours: 5 },
+  { id: "5", name: "Closing & Completion", description: "Closing mechanics, conditions precedent, completion", partnerHours: 6, seniorAssociateHours: 10, associateHours: 15, traineeHours: 8 },
+  { id: "6", name: "Project Management", description: "Ongoing project management and coordination", partnerHours: 5, seniorAssociateHours: 8, associateHours: 5, traineeHours: 2 },
+];
+
+export const DEFAULT_ASSUMPTIONS: ProposalAssumptions = {
+  negotiatedDocsDecay: 0.5,
+  ddDecay: 0.35,
+  numMeetings: 0,
+  meetingHoursPartner: 3,
+  meetingHoursAssociate: 2,
+  numNegotiationTurns: 3,
+  afaDiscount: 0,
+};
 
 export interface PricingProposal {
   id: string;
@@ -13,6 +67,9 @@ export interface PricingProposal {
   currency: string;
   status: 'Draft' | 'Agreed';
   current_version: number;
+  rate_card: RateCard | null;
+  work_phases: WorkPhase[] | null;
+  assumptions: ProposalAssumptions | null;
   created_at: string;
   updated_at: string;
   client?: {
@@ -72,6 +129,19 @@ export interface DraftProposalItem {
   ai_rationale?: string | null;
 }
 
+// Helper to safely parse JSON columns
+function parseJsonColumn<T>(value: Json | null, defaultValue: T): T {
+  if (!value) return defaultValue;
+  try {
+    if (typeof value === 'string') {
+      return JSON.parse(value) as T;
+    }
+    return value as T;
+  } catch {
+    return defaultValue;
+  }
+}
+
 export { BUDGET_CATEGORIES };
 
 export function usePricingProposals() {
@@ -92,7 +162,14 @@ export function usePricingProposals() {
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
-      return data as PricingProposal[];
+      
+      // Parse JSONB columns for each proposal
+      return (data || []).map(d => ({
+        ...d,
+        rate_card: parseJsonColumn<RateCard>(d.rate_card, DEFAULT_RATE_CARD),
+        work_phases: parseJsonColumn<WorkPhase[]>(d.work_phases, DEFAULT_WORK_PHASES),
+        assumptions: parseJsonColumn<ProposalAssumptions>(d.assumptions, DEFAULT_ASSUMPTIONS),
+      })) as PricingProposal[];
     },
     enabled: !!user,
   });
@@ -184,7 +261,14 @@ export function usePricingProposal(proposalId?: string) {
         .single();
 
       if (error) throw error;
-      return data as PricingProposal;
+      
+      // Parse JSONB columns with defaults
+      return {
+        ...data,
+        rate_card: parseJsonColumn<RateCard>(data.rate_card, DEFAULT_RATE_CARD),
+        work_phases: parseJsonColumn<WorkPhase[]>(data.work_phases, DEFAULT_WORK_PHASES),
+        assumptions: parseJsonColumn<ProposalAssumptions>(data.assumptions, DEFAULT_ASSUMPTIONS),
+      } as PricingProposal;
     },
     enabled: !!user && !!proposalId,
   });
@@ -237,10 +321,10 @@ export function usePricingProposal(proposalId?: string) {
 
   // Update proposal details
   const updateProposal = useMutation({
-    mutationFn: async (updates: Partial<Pick<PricingProposal, 'name' | 'description' | 'currency' | 'status'>>) => {
+    mutationFn: async (updates: Partial<Pick<PricingProposal, 'name' | 'description' | 'currency' | 'status' | 'rate_card' | 'work_phases' | 'assumptions'>>) => {
       const { error } = await supabase
         .from('pricing_proposals')
-        .update(updates)
+        .update(updates as any)
         .eq('id', proposalId!);
 
       if (error) throw error;

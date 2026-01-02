@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Trash2 } from 'lucide-react';
-import { DraftLineItem } from '@/lib/hooks/useBudgetVersions';
+import { DraftLineItem, BUDGET_CATEGORIES } from '@/lib/hooks/useBudgetVersions';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -23,6 +23,7 @@ interface DraggableBudgetItemProps {
   index: number;
   onEdit: (index: number, field: keyof DraftLineItem, value: string | number) => void;
   onRemove: (index: number) => void;
+  onCategoryChange: (index: number, category: string) => void;
   isEditing: boolean;
   hasExistingBudget: boolean;
   formatCurrency: (value: number, currency?: string) => string;
@@ -46,6 +47,7 @@ export function DraggableBudgetItem({
   index,
   onEdit,
   onRemove,
+  onCategoryChange,
   isEditing,
   hasExistingBudget,
   formatCurrency,
@@ -171,14 +173,21 @@ export function DraggableBudgetItem({
           />
         </div>
 
-        {/* Optional checkbox */}
-        <div className="col-span-1 flex justify-center">
-          <Checkbox
-            checked={item.is_optional ?? false}
-            onCheckedChange={(checked) => {
-              onEdit(index, 'is_optional' as any, checked === true ? 1 : 0);
-            }}
-          />
+        {/* Category selector */}
+        <div className="col-span-1">
+          <Select
+            value={item.category || 'Other'}
+            onValueChange={(v) => onCategoryChange(index, v)}
+          >
+            <SelectTrigger className="text-xs h-8 px-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {BUDGET_CATEGORIES.map((cat) => (
+                <SelectItem key={cat} value={cat} className="text-xs">{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {/* Delete button */}
@@ -269,42 +278,22 @@ export function DraggableBudgetItem({
         )}
       </div>
 
-      {/* Optional checkbox */}
-      <div className="col-span-1 flex justify-center">
-        {hasExistingBudget && item.id ? (
-          <Checkbox
-            checked={item.is_optional ?? false}
-            onCheckedChange={(checked) => {
-              if (item.id) {
-                updateLineItemOptional.mutate({ 
-                  lineItemId: item.id, 
-                  isOptional: checked === true 
-                });
-              }
-            }}
-            disabled={updateLineItemOptional.isPending}
-          />
-        ) : !hasExistingBudget ? (
-          <Checkbox
-            checked={item.is_optional ?? false}
-            onCheckedChange={(checked) => {
-              onEdit(index, 'is_optional' as any, checked === true ? 1 : 0);
-            }}
-          />
-        ) : null}
+      {/* Category selector */}
+      <div className="col-span-2">
+        <Select
+          value={item.category || 'Other'}
+          onValueChange={(v) => onCategoryChange(index, v)}
+        >
+          <SelectTrigger className="text-xs h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {BUDGET_CATEGORIES.map((cat) => (
+              <SelectItem key={cat} value={cat} className="text-xs">{cat}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
-
-      {/* Include toggle for optional items */}
-      {item.is_optional && hasExistingBudget && (
-        <div className="col-span-1 flex justify-center">
-          <Switch
-            checked={item.is_included ?? true}
-            onCheckedChange={(checked) => {
-              // Handle include toggle
-            }}
-          />
-        </div>
-      )}
 
       {/* Delete button */}
       <div className="col-span-1 flex justify-center">

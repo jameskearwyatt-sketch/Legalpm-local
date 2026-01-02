@@ -17,7 +17,7 @@ import {
 import { DraftLineItem, BUDGET_CATEGORIES, BudgetCategory } from '@/lib/hooks/useBudgetVersions';
 import { CategoryGroup } from './CategoryGroup';
 import { DraggableBudgetItem } from './DraggableBudgetItem';
-import { Loader2, Wand2 } from 'lucide-react';
+import { Loader2, Wand2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -27,6 +27,7 @@ interface CategorizedBudgetViewProps {
   onItemsChange: (items: DraftLineItem[]) => void;
   onItemEdit: (index: number, field: keyof DraftLineItem, value: string | number) => void;
   onRemoveItem: (index: number) => void;
+  onAddItem: () => void;
   isEditing: boolean;
   hasExistingBudget: boolean;
   formatCurrency: (value: number, currency?: string) => string;
@@ -41,6 +42,7 @@ interface CategorizedBudgetViewProps {
   aiSuggestedIndices: Set<number>;
   originalItems: DraftLineItem[];
   updateLineItemOptional: any;
+  matterId: string;
 }
 
 export function CategorizedBudgetView({
@@ -48,6 +50,7 @@ export function CategorizedBudgetView({
   onItemsChange,
   onItemEdit,
   onRemoveItem,
+  onAddItem,
   isEditing,
   hasExistingBudget,
   formatCurrency,
@@ -62,6 +65,7 @@ export function CategorizedBudgetView({
   aiSuggestedIndices,
   originalItems,
   updateLineItemOptional,
+  matterId,
 }: CategorizedBudgetViewProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isCategorizing, setIsCategorizing] = useState(false);
@@ -112,6 +116,36 @@ export function CategorizedBudgetView({
     return subtotals;
   }, [groupedItems]);
 
+  // Save category change to database
+  const saveCategoryToDb = async (itemId: string, category: string) => {
+    try {
+      const { error } = await supabase
+        .from('budget_line_items')
+        .update({ category })
+        .eq('id', itemId);
+      
+      if (error) {
+        console.error('Error saving category:', error);
+        toast.error('Failed to save category');
+      }
+    } catch (error) {
+      console.error('Error saving category:', error);
+    }
+  };
+
+  // Update item category locally and persist to DB if it has an ID
+  const updateItemCategory = (index: number, newCategory: string) => {
+    const updatedItems = [...items];
+    updatedItems[index] = { ...updatedItems[index], category: newCategory };
+    onItemsChange(updatedItems);
+    
+    // If item has an ID, persist to database immediately
+    const item = items[index];
+    if (item.id) {
+      saveCategoryToDb(item.id, newCategory);
+    }
+  };
+
   // Auto-categorize items using AI
   const handleAutoCategorize = async () => {
     const uncategorizedItems = items
@@ -147,13 +181,26 @@ export function CategorizedBudgetView({
 
       // Apply categorizations
       const updatedItems = [...items];
+      const itemsToSave: { id: string; category: string }[] = [];
+      
       categorizations.forEach((cat: { index: number; category: string }) => {
         if (updatedItems[cat.index]) {
           updatedItems[cat.index] = { ...updatedItems[cat.index], category: cat.category };
+          // If item has an ID, queue it for DB save
+          const item = items[cat.index];
+          if (item.id) {
+            itemsToSave.push({ id: item.id, category: cat.category });
+          }
         }
       });
       
       onItemsChange(updatedItems);
+      
+      // Save all categorized items to DB
+      for (const item of itemsToSave) {
+        await saveCategoryToDb(item.id, item.category);
+      }
+      
       toast.success(`Categorized ${categorizations.length} items`);
     } catch (error) {
       console.error('Error categorizing items:', error);
@@ -179,9 +226,7 @@ export function CategorizedBudgetView({
     // Check if dropping on a category header
     if (overData?.type === 'category') {
       const newCategory = overData.category as BudgetCategory;
-      const updatedItems = [...items];
-      updatedItems[activeIndex] = { ...updatedItems[activeIndex], category: newCategory };
-      onItemsChange(updatedItems);
+      updateItemCategory(activeIndex, newCategory);
       return;
     }
 
@@ -190,15 +235,17 @@ export function CategorizedBudgetView({
     if (!isNaN(overIndex) && items[overIndex]) {
       const newCategory = items[overIndex].category || 'Other';
       if (items[activeIndex].category !== newCategory) {
-        const updatedItems = [...items];
-        updatedItems[activeIndex] = { ...updatedItems[activeIndex], category: newCategory };
-        onItemsChange(updatedItems);
+        updateItemCategory(activeIndex, newCategory);
       }
     }
   };
 
+  // Handle manual category selection from dropdown
+  const handleCategoryChange = (index: number, newCategory: string) => {
+    updateItemCategory(index, newCategory);
+  };
+
   const activeItem = activeId !== null ? items[parseInt(activeId)] : null;
-  const activeIndex = activeId !== null ? parseInt(activeId) : -1;
 
   // Count uncategorized items
   const uncategorizedCount = items.filter(item => !item.category && item.work_item.trim()).length;
@@ -290,6 +337,7 @@ export function CategorizedBudgetView({
                         index={globalIndex}
                         onEdit={onItemEdit}
                         onRemove={onRemoveItem}
+                        onCategoryChange={handleCategoryChange}
                         isEditing={isEditing}
                         hasExistingBudget={hasExistingBudget}
                         formatCurrency={formatCurrency}
@@ -322,6 +370,19 @@ export function CategorizedBudgetView({
           )}
         </DragOverlay>
       </DndContext>
+
+      {/* Add Line Item Button */}
+      {(isEditing || !hasExistingBudget) && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onAddItem}
+          className="w-full border-dashed"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Work Item
+        </Button>
+      )}
     </div>
   );
 }

@@ -41,6 +41,7 @@ import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2
 import { format, differenceInDays, parseISO, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/currencyUtils';
 
 type SortField = 'matter_name' | 'fee_amount' | 'bm_fee' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'local_counsel' | 'stage';
 type SortDirection = 'asc' | 'desc';
@@ -146,24 +147,7 @@ export default function Matters() {
     return actions;
   };
 
-  const formatCurrency = (value: number, currency: string = 'GBP') => {
-    const symbols: Record<string, string> = {
-      GBP: '£',
-      USD: '$',
-      EUR: '€',
-      Ringgit: 'RM ',
-      CHF: 'CHF ',
-      AUD: 'A$',
-      CAD: 'C$',
-      SGD: 'S$',
-      SEK: 'kr ',
-    };
-    const symbol = symbols[currency] || currency + ' ';
-    return symbol + new Intl.NumberFormat('en-GB', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+  // Use shared formatCurrency from currencyUtils - imported at top
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {

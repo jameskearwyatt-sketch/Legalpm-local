@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { useDashboard } from '@/lib/hooks/useDashboard';
 import { useMatters } from '@/lib/hooks/useMatters';
 import { useAuth } from '@/lib/auth';
+import { formatCurrency } from '@/lib/currencyUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { 
@@ -141,14 +142,7 @@ export default function Dashboard() {
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+  // Use shared formatCurrency from currencyUtils - imported at top
 
   if (isLoading) {
     return (

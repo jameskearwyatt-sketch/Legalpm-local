@@ -192,7 +192,7 @@ export function useDashboard(excludedMatterIds: string[] = []) {
             cmNumber,
             clientName,
             currency: feeCurrency,
-            message: `Budget exceeded by ${currencySymbol}${(totalUsed - budget).toLocaleString()}`,
+            message: `Budget exceeded by ${currencySymbol}${new Intl.NumberFormat('en-GB').format(totalUsed - budget)}`,
             value: budgetUsedPercent,
           });
         }
@@ -223,7 +223,7 @@ export function useDashboard(excludedMatterIds: string[] = []) {
             cmNumber,
             clientName,
             currency: feeCurrency,
-            message: `WIP of ${currencySymbol}${wipAmount.toLocaleString()} with low billing`,
+            message: `WIP of ${currencySymbol}${new Intl.NumberFormat('en-GB').format(wipAmount)} with low billing`,
             value: wipAmount,
           });
         }

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Plus, Trash2, Save, Loader2, Users } from "lucide-react";
 import { RateCard } from "@/lib/hooks/usePricingProposals";
+import { getCurrencySymbol } from "@/lib/currencyUtils";
 
 // Fee earner levels
 const LEVELS = [
@@ -171,7 +172,7 @@ export function EditableRateCard({
   const hasAfaDiscount = afaDiscount > 0;
 
   const formatRate = (rate: number) => {
-    return `${currencySymbol}${rate.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    return `${currencySymbol}${new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(rate)}`;
   };
 
   return (
@@ -225,7 +226,7 @@ export function EditableRateCard({
                   <>
                     <span className="text-xs text-muted-foreground w-4 text-right">{currencySymbol}</span>
                     <span className="text-sm font-medium text-red-600 text-right bg-red-50 px-2 py-1 rounded h-7 flex items-center justify-end">
-                      {Math.round(earner.rate * afaDiscountMultiplier).toLocaleString('en-GB')}
+                      {new Intl.NumberFormat('en-GB').format(Math.round(earner.rate * afaDiscountMultiplier))}
                     </span>
                   </>
                 )}

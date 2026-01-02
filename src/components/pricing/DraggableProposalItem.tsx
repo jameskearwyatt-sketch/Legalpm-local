@@ -286,7 +286,7 @@ export function DraggableProposalItem({
             <span className="text-xs text-muted-foreground">{formatCurrency(0).charAt(0)}</span>
             <Input
               type="text"
-              value={Math.round(((item.fee_lower ?? item.fee_amount) || 0) * (item.provider === 'Baker McKenzie' ? afaDiscountMultiplier : 1)).toLocaleString('en-GB')}
+              value={new Intl.NumberFormat('en-GB').format(Math.round(((item.fee_lower ?? item.fee_amount) || 0) * (item.provider === 'Baker McKenzie' ? afaDiscountMultiplier : 1)))}
               onChange={(e) => {
                 const rawValue = e.target.value.replace(/,/g, '');
                 // Reverse the discount to get the base value
@@ -321,7 +321,7 @@ export function DraggableProposalItem({
             <span className="text-xs text-muted-foreground">{formatCurrency(0).charAt(0)}</span>
             <Input
               type="text"
-              value={Math.round(((item.fee_upper ?? item.fee_amount) || 0) * (item.provider === 'Baker McKenzie' ? afaDiscountMultiplier : 1)).toLocaleString('en-GB')}
+              value={new Intl.NumberFormat('en-GB').format(Math.round(((item.fee_upper ?? item.fee_amount) || 0) * (item.provider === 'Baker McKenzie' ? afaDiscountMultiplier : 1)))}
               onChange={(e) => {
                 const rawValue = e.target.value.replace(/,/g, '');
                 // Reverse the discount to get the base value

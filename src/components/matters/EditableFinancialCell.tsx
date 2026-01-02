@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Check, X, Loader2, Pencil } from 'lucide-react';
+import { formatCurrency } from '@/lib/currencyUtils';
 
 interface EditableFinancialCellProps {
   value: number;
@@ -17,24 +18,8 @@ export function EditableFinancialCell({ value, currency, onSave, className, comp
   const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const formatCurrency = (val: number) => {
-    const symbols: Record<string, string> = {
-      GBP: '£',
-      USD: '$',
-      EUR: '€',
-      Ringgit: 'RM ',
-      CHF: 'CHF ',
-      AUD: 'A$',
-      CAD: 'C$',
-      SGD: 'S$',
-      SEK: 'kr ',
-    };
-    const symbol = symbols[currency] || currency + ' ';
-    return symbol + new Intl.NumberFormat('en-GB', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(val);
-  };
+  // Use shared formatCurrency with proper currency
+  const formatValue = (val: number) => formatCurrency(val, currency);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -134,7 +119,7 @@ export function EditableFinancialCell({ value, currency, onSave, className, comp
       title="Click to edit"
     >
       <span className={cn("flex items-center justify-end", compact ? "gap-0.5" : "gap-1")}>
-        {formatCurrency(value)}
+        {formatValue(value)}
         <Pencil className={cn(
           "text-primary/50 opacity-0 group-hover:opacity-100 transition-opacity",
           compact ? "h-2 w-2" : "h-3 w-3"

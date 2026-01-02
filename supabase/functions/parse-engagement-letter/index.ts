@@ -73,6 +73,7 @@ Return the extracted items.`;
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
+        temperature: 0,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
@@ -82,12 +83,13 @@ Return the extracted items.`;
             type: "function",
             function: {
               name: "extract_budget_items",
-              description: "Extract budget line items from engagement letter text",
+              description: "Extract budget line items from engagement letter text. You MUST extract ALL billable work items mentioned in the document.",
               parameters: {
                 type: "object",
                 properties: {
                   items: {
                     type: "array",
+                    description: "Array of ALL work items found in the document. Extract every billable task mentioned.",
                     items: {
                       type: "object",
                       properties: {

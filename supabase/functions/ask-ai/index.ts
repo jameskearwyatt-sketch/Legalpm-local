@@ -64,6 +64,7 @@ serve(async (req) => {
         local_counsel_fee,
         fee_amount_upper_end,
         currency,
+        fee_currency,
         category,
         status,
         start_date,
@@ -192,45 +193,49 @@ serve(async (req) => {
 
     // Build context for the AI with explicit currency information
     const mattersContext = (matters || []).map((m: any) => {
-      const currency = m.currency || 'GBP';
+      // fee_currency is the currency used for quoting/budgeting (e.g., USD)
+      // currency is the billing currency (e.g., GBP)
+      const feeCurrency = m.fee_currency || m.currency || 'GBP';
+      const billingCurrency = m.currency || 'GBP';
       return {
         name: m.matter_name,
         client: m.clients?.name,
         sector: m.clients?.group_sector,
         practiceArea: m.practice_area,
         budgetType: m.budget_type,
-        // Include BOTH original values with currency AND converted values
+        // Budget/fee amounts are in fee_currency (quote currency)
         agreedBudget: {
           original: m.agreed_budget_amount,
-          originalCurrency: currency,
-          inGBP: convertToGBP(m.agreed_budget_amount, currency),
-          inUSD: convertToUSD(m.agreed_budget_amount, currency),
+          originalCurrency: billingCurrency,
+          inGBP: convertToGBP(m.agreed_budget_amount, billingCurrency),
+          inUSD: convertToUSD(m.agreed_budget_amount, billingCurrency),
         },
+        // BM fee and local counsel fees are in the fee_currency (quote currency)
         bmFee: {
           original: m.bm_fee_component,
-          originalCurrency: currency,
-          inGBP: convertToGBP(m.bm_fee_component, currency),
-          inUSD: convertToUSD(m.bm_fee_component, currency),
+          originalCurrency: feeCurrency,
+          inGBP: convertToGBP(m.bm_fee_component, feeCurrency),
+          inUSD: convertToUSD(m.bm_fee_component, feeCurrency),
         },
         localCounselFee: {
           original: m.local_counsel_fee,
-          originalCurrency: currency,
-          inGBP: convertToGBP(m.local_counsel_fee, currency),
-          inUSD: convertToUSD(m.local_counsel_fee, currency),
+          originalCurrency: feeCurrency,
+          inGBP: convertToGBP(m.local_counsel_fee, feeCurrency),
+          inUSD: convertToUSD(m.local_counsel_fee, feeCurrency),
         },
         feeUpperEnd: {
           original: m.fee_amount_upper_end,
-          originalCurrency: currency,
-          inGBP: convertToGBP(m.fee_amount_upper_end, currency),
-          inUSD: convertToUSD(m.fee_amount_upper_end, currency),
+          originalCurrency: feeCurrency,
+          inGBP: convertToGBP(m.fee_amount_upper_end, feeCurrency),
+          inUSD: convertToUSD(m.fee_amount_upper_end, feeCurrency),
         },
         category: m.category,
         status: m.status,
         dealValue: m.deal_value ? {
           original: m.deal_value,
-          originalCurrency: m.deal_currency || currency,
-          inGBP: convertToGBP(m.deal_value, m.deal_currency || currency),
-          inUSD: convertToUSD(m.deal_value, m.deal_currency || currency),
+          originalCurrency: m.deal_currency || billingCurrency,
+          inGBP: convertToGBP(m.deal_value, m.deal_currency || billingCurrency),
+          inUSD: convertToUSD(m.deal_value, m.deal_currency || billingCurrency),
         } : null,
       };
     });
@@ -238,28 +243,30 @@ serve(async (req) => {
     const budgetContext = (budgetVersions || []).map((bv: any) => {
       const matter = (matters || []).find((m: any) => m.id === bv.matter_id);
       const items = (lineItems || []).filter((li: any) => li.budget_version_id === bv.id);
-      const currency = matter?.currency || 'GBP';
+      // Use fee_currency for budget line items as they represent quote amounts
+      const feeCurrency = matter?.fee_currency || matter?.currency || 'GBP';
       return {
         matterName: matter?.matter_name,
         practiceArea: matter?.practice_area,
         version: bv.version_number,
+        budgetCurrency: feeCurrency,
         total: {
           original: bv.total_amount,
-          originalCurrency: currency,
-          inGBP: convertToGBP(bv.total_amount, currency),
-          inUSD: convertToUSD(bv.total_amount, currency),
+          originalCurrency: feeCurrency,
+          inGBP: convertToGBP(bv.total_amount, feeCurrency),
+          inUSD: convertToUSD(bv.total_amount, feeCurrency),
         },
         bmTotal: {
           original: bv.bm_total,
-          originalCurrency: currency,
-          inGBP: convertToGBP(bv.bm_total, currency),
-          inUSD: convertToUSD(bv.bm_total, currency),
+          originalCurrency: feeCurrency,
+          inGBP: convertToGBP(bv.bm_total, feeCurrency),
+          inUSD: convertToUSD(bv.bm_total, feeCurrency),
         },
         lcTotal: {
           original: bv.local_counsel_total,
-          originalCurrency: currency,
-          inGBP: convertToGBP(bv.local_counsel_total, currency),
-          inUSD: convertToUSD(bv.local_counsel_total, currency),
+          originalCurrency: feeCurrency,
+          inGBP: convertToGBP(bv.local_counsel_total, feeCurrency),
+          inUSD: convertToUSD(bv.local_counsel_total, feeCurrency),
         },
         lineItems: items.map((li: any) => ({
           workItem: li.work_item,
@@ -267,9 +274,9 @@ serve(async (req) => {
           category: li.category,
           amount: {
             original: li.fee_amount,
-            originalCurrency: currency,
-            inGBP: convertToGBP(li.fee_amount, currency),
-            inUSD: convertToUSD(li.fee_amount, currency),
+            originalCurrency: feeCurrency,
+            inGBP: convertToGBP(li.fee_amount, feeCurrency),
+            inUSD: convertToUSD(li.fee_amount, feeCurrency),
           },
           included: li.is_included,
         })),

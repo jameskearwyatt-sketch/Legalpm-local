@@ -183,28 +183,28 @@ export function EditableRateCard({
         <CardContent className="px-4 pb-3 pt-0">
           <div className="space-y-1">
             {sortedEarners.map((earner) => (
-              <div key={earner.key} className="flex items-center gap-2 py-1">
-                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded shrink-0">
+              <div key={earner.key} className="grid grid-cols-[100px_1fr_auto_80px_28px] items-center gap-2 py-1">
+                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded text-center truncate">
                   {getLevelBadge(earner.level)}
                 </span>
                 <Input
                   value={earner.label}
                   onChange={(e) => updateFeeEarnerLabel(earner.key, e.target.value)}
-                  className="text-sm font-medium flex-1 min-w-0 h-7 px-2"
+                  className="text-sm font-medium h-7 px-2"
                   placeholder="Label"
                 />
-                <span className="text-xs text-muted-foreground">{currencySymbol}</span>
+                <span className="text-xs text-muted-foreground w-4 text-right">{currencySymbol}</span>
                 <Input
                   type="number"
                   value={earner.rate}
                   onChange={(e) => updateFeeEarner(earner.key, parseFloat(e.target.value) || 0)}
-                  className="w-20 h-7 text-right text-sm px-2"
+                  className="h-7 text-right text-sm px-2"
                 />
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => removeFeeEarner(earner.key)}
-                  className="h-6 w-6 shrink-0"
+                  className="h-7 w-7"
                 >
                   <Trash2 className="h-3 w-3 text-destructive" />
                 </Button>

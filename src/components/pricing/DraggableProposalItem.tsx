@@ -199,16 +199,19 @@ export function DraggableProposalItem({
         {viewingHistoricalVersion ? (
           <span className="text-sm font-medium">{formatCurrency(item.fee_amount || 0)}</span>
         ) : (
-          <Input
-            type="number"
-            value={item.fee_amount || ''}
-            onChange={(e) => onUpdate(index, {
-              fee_amount: parseFloat(e.target.value) || 0,
-              pricing_method: 'manual'
-            })}
-            className="w-[100px] text-right"
-            placeholder="0"
-          />
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-muted-foreground">{formatCurrency(0).charAt(0)}</span>
+            <Input
+              type="number"
+              value={item.fee_amount || ''}
+              onChange={(e) => onUpdate(index, {
+                fee_amount: parseFloat(e.target.value) || 0,
+                pricing_method: 'manual'
+              })}
+              className="w-[100px] text-right"
+              placeholder="0"
+            />
+          </div>
         )}
       </TableCell>
 

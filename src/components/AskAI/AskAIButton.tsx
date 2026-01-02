@@ -3,6 +3,14 @@ import { MessageCircle, X, Send, Loader2, Sparkles, Mic, MicOff } from "lucide-r
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -62,6 +70,8 @@ export function AskAIButton() {
   const [isListening, setIsListening] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const [interimText, setInterimText] = useState("");
+  const [showPermissionDialog, setShowPermissionDialog] = useState(false);
+  const [permissionDenied, setPermissionDenied] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // Check if speech recognition is supported
@@ -69,7 +79,6 @@ export function AskAIButton() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const isSupported = !!SpeechRecognition;
     setSpeechSupported(isSupported);
-    console.log('Speech Recognition supported:', isSupported);
   }, []);
 
   // Cleanup on unmount
@@ -81,44 +90,25 @@ export function AskAIButton() {
     };
   }, []);
 
-  const toggleListening = async () => {
-    console.log('toggleListening called, isListening:', isListening);
+  const requestMicrophoneAccess = async () => {
+    setShowPermissionDialog(false);
     
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      setInterimText("");
-      return;
-    }
-
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      console.error('SpeechRecognition not available');
-      return;
-    }
-
     try {
-      // Check current permission status first
-      const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
-      console.log('Microphone permission status:', permissionStatus.state);
-      
-      if (permissionStatus.state === 'denied') {
-        alert('Microphone access is blocked. To enable it:\n\n1. Click the lock/site icon in your browser address bar\n2. Find "Microphone" and change it to "Allow"\n3. Refresh the page and try again');
-        return;
-      }
-
-      // Request microphone permission
+      // This triggers the browser's native permission prompt
       await navigator.mediaDevices.getUserMedia({ audio: true });
-      console.log('Microphone permission granted');
+      setPermissionDenied(false);
+      // Start listening after permission granted
+      startListening();
     } catch (err: any) {
       console.error('Microphone permission error:', err);
-      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        alert('Microphone access is blocked. To enable it:\n\n1. Click the lock/site icon in your browser address bar\n2. Find "Microphone" and change it to "Allow"\n3. Refresh the page and try again');
-      } else {
-        alert('Could not access microphone: ' + err.message);
-      }
-      return;
+      setPermissionDenied(true);
+      setShowPermissionDialog(true);
     }
+  };
+
+  const startListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
 
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
@@ -126,7 +116,6 @@ export function AskAIButton() {
     recognition.lang = 'en-US';
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      console.log('Speech recognition result received');
       let finalTranscript = '';
       let interimTranscript = '';
 
@@ -139,24 +128,20 @@ export function AskAIButton() {
         }
       }
 
-      // Show interim results in real-time
       setInterimText(interimTranscript);
 
       if (finalTranscript) {
-        console.log('Final transcript:', finalTranscript);
         setInput(prev => prev + finalTranscript + ' ');
         setInterimText("");
       }
     };
 
-    recognition.onerror = (event: any) => {
-      console.error('Speech recognition error:', event.error);
+    recognition.onerror = () => {
       setIsListening(false);
       setInterimText("");
     };
 
     recognition.onend = () => {
-      console.log('Speech recognition ended');
       setIsListening(false);
       setInterimText("");
     };
@@ -165,10 +150,43 @@ export function AskAIButton() {
     
     try {
       recognition.start();
-      console.log('Speech recognition started');
       setIsListening(true);
     } catch (err) {
       console.error('Failed to start recognition:', err);
+    }
+  };
+
+  const toggleListening = async () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      setInterimText("");
+      return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return;
+
+    // Check if we already have permission
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
+      
+      if (permissionStatus.state === 'granted') {
+        // Already have permission, start listening
+        startListening();
+      } else if (permissionStatus.state === 'denied') {
+        // Permission was denied, show dialog with instructions
+        setPermissionDenied(true);
+        setShowPermissionDialog(true);
+      } else {
+        // Permission not yet decided, show dialog to request
+        setPermissionDenied(false);
+        setShowPermissionDialog(true);
+      }
+    } catch {
+      // Permissions API not supported, show dialog anyway
+      setPermissionDenied(false);
+      setShowPermissionDialog(true);
     }
   };
 
@@ -234,6 +252,43 @@ export function AskAIButton() {
 
   return (
     <>
+      {/* Microphone Permission Dialog */}
+      <Dialog open={showPermissionDialog} onOpenChange={setShowPermissionDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-orange-500/20 via-pink-500/20 to-purple-600/20">
+              <Mic className="h-8 w-8 text-pink-500" />
+            </div>
+            <DialogTitle className="text-center">
+              {permissionDenied ? "Microphone Access Blocked" : "Microphone Access Required"}
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              {permissionDenied 
+                ? "You previously blocked microphone access. To enable it, click the lock icon in your browser's address bar, find 'Microphone', and change it to 'Allow'. Then refresh the page."
+                : "To use voice input, we need access to your microphone. Click 'Allow Access' below, then approve the browser prompt."
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-col gap-2 sm:flex-col">
+            {!permissionDenied && (
+              <Button 
+                onClick={requestMicrophoneAccess}
+                className="w-full bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 hover:from-orange-400 hover:via-pink-400 hover:to-purple-500"
+              >
+                Allow Access
+              </Button>
+            )}
+            <Button 
+              variant="outline" 
+              onClick={() => setShowPermissionDialog(false)}
+              className="w-full"
+            >
+              {permissionDenied ? "Close" : "Not Now"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Floating Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}

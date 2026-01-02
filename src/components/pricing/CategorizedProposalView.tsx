@@ -129,6 +129,26 @@ export function CategorizedProposalView({
         }
       });
       
+      // Sort items by category order, uncategorized at end
+      const categoryOrder = Object.fromEntries(
+        BUDGET_CATEGORIES.map((cat, idx) => [cat, idx])
+      );
+      
+      updatedItems.sort((a, b) => {
+        const catA = a.category || '';
+        const catB = b.category || '';
+        
+        // Uncategorized items go to the end
+        if (!catA && catB) return 1;
+        if (catA && !catB) return -1;
+        if (!catA && !catB) return 0;
+        
+        // Sort by category order
+        const orderA = categoryOrder[catA] ?? 999;
+        const orderB = categoryOrder[catB] ?? 999;
+        return orderA - orderB;
+      });
+      
       onItemsChange(updatedItems);
       toast.success(`Categorized ${categorizations.length} items`);
     } catch (error) {

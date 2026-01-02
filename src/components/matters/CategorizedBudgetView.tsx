@@ -21,6 +21,32 @@ import { Loader2, Wand2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+
+// Category color maps for summary boxes
+const categoryBgColors: Record<BudgetCategory, string> = {
+  'Due Diligence': 'bg-blue-100 dark:bg-blue-900/40',
+  'Documentation': 'bg-purple-100 dark:bg-purple-900/40',
+  'Negotiations': 'bg-amber-100 dark:bg-amber-900/40',
+  'Meetings': 'bg-green-100 dark:bg-green-900/40',
+  'Regulatory': 'bg-red-100 dark:bg-red-900/40',
+  'Closing': 'bg-teal-100 dark:bg-teal-900/40',
+  'Tax': 'bg-orange-100 dark:bg-orange-900/40',
+  'Legal Opinions': 'bg-indigo-100 dark:bg-indigo-900/40',
+  'Other': 'bg-gray-100 dark:bg-gray-800/50',
+};
+
+const categoryTextColors: Record<BudgetCategory, string> = {
+  'Due Diligence': 'text-blue-700 dark:text-blue-300',
+  'Documentation': 'text-purple-700 dark:text-purple-300',
+  'Negotiations': 'text-amber-700 dark:text-amber-300',
+  'Meetings': 'text-green-700 dark:text-green-300',
+  'Regulatory': 'text-red-700 dark:text-red-300',
+  'Closing': 'text-teal-700 dark:text-teal-300',
+  'Tax': 'text-orange-700 dark:text-orange-300',
+  'Legal Opinions': 'text-indigo-700 dark:text-indigo-300',
+  'Other': 'text-gray-700 dark:text-gray-300',
+};
 
 interface CategorizedBudgetViewProps {
   items: DraftLineItem[];
@@ -140,6 +166,25 @@ export function CategorizedBudgetView({
     
     return subtotals;
   }, [groupedItems]);
+
+  // Calculate totals per master category (combining all providers)
+  const categoryTotals = useMemo(() => {
+    const totals: Record<BudgetCategory, number> = {} as Record<BudgetCategory, number>;
+    
+    BUDGET_CATEGORIES.forEach(category => {
+      totals[category] = 0;
+    });
+    
+    items.forEach(item => {
+      const category = (item.category || 'Other') as BudgetCategory;
+      const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
+      if (isIncluded) {
+        totals[category] += item.fee_amount || 0;
+      }
+    });
+    
+    return totals;
+  }, [items]);
 
   // Save category change to database
   const saveCategoryToDb = async (itemId: string, category: string) => {
@@ -303,6 +348,38 @@ export function CategorizedBudgetView({
             </>
           )}
         </Button>
+      </div>
+
+      {/* Category Summary Boxes */}
+      <div className="flex flex-wrap gap-2">
+        {BUDGET_CATEGORIES.map(category => {
+          const total = categoryTotals[category];
+          if (total === 0) return null;
+          
+          const displayTotal = differentBillingCurrency && agreedBillingAmount > 0
+            ? total * mandatedRate
+            : total;
+          const displayCurrency = differentBillingCurrency && agreedBillingAmount > 0 
+            ? billingCurrency 
+            : currency;
+          
+          return (
+            <div
+              key={category}
+              className={cn(
+                'rounded-md px-3 py-2 border',
+                categoryBgColors[category]
+              )}
+            >
+              <div className={cn('text-xs font-medium', categoryTextColors[category])}>
+                {category}
+              </div>
+              <div className={cn('text-sm font-semibold', categoryTextColors[category])}>
+                {formatCurrency(displayTotal, displayCurrency)}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <DndContext

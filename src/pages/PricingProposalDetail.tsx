@@ -488,12 +488,18 @@ export default function PricingProposalDetail() {
   }) => {
     if (iterativeDialogIndex === null) return;
     
+    // Apply ±10% spread for iterative pricing (same as AI-generated)
+    const feeLower = Math.round(result.calculatedFee * 0.9);
+    const feeUpper = Math.round(result.calculatedFee * 1.1);
+    
     updateItem(iterativeDialogIndex, {
       partner_hours: result.feeOwnerHours.partner || 0,
       associate_hours: result.feeOwnerHours.associate || 0,
       num_turns: result.numTurns,
       item_type: result.itemType as 'documentation' | 'negotiation' | 'due_diligence' | 'meeting',
       fee_amount: result.calculatedFee,
+      fee_lower: feeLower,
+      fee_upper: feeUpper,
       pricing_method: 'pricing_tool',
     });
   };

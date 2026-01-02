@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2, Calculator } from 'lucide-react';
+import { GripVertical, Trash2, Calculator, Plus } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -15,6 +16,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { DraftProposalItem, BUDGET_CATEGORIES } from '@/lib/hooks/usePricingProposals';
 import { categoryBgColors, categoryTextColors, categoryBorderColors } from '@/components/pricing/CategorizedProposalView';
@@ -28,6 +37,8 @@ interface DraggableProposalItemProps {
   onOpenIterativePricing: (index: number) => void;
   formatCurrency: (value: number) => string;
   viewingHistoricalVersion: boolean;
+  customCategories?: string[];
+  onAddCustomCategory?: (category: string) => void;
 }
 
 export function DraggableProposalItem({
@@ -39,7 +50,12 @@ export function DraggableProposalItem({
   onOpenIterativePricing,
   formatCurrency,
   viewingHistoricalVersion,
+  customCategories = [],
+  onAddCustomCategory,
 }: DraggableProposalItemProps) {
+  const [isCustomCategoryDialogOpen, setIsCustomCategoryDialogOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  
   const {
     attributes,
     listeners,
@@ -52,6 +68,18 @@ export function DraggableProposalItem({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
+  };
+
+  // Combine standard and custom categories
+  const allCategories = [...BUDGET_CATEGORIES, ...customCategories];
+
+  const handleAddCustomCategory = () => {
+    if (newCategoryName.trim() && onAddCustomCategory) {
+      onAddCustomCategory(newCategoryName.trim());
+      onUpdate(index, { category: newCategoryName.trim() });
+      setNewCategoryName('');
+      setIsCustomCategoryDialogOpen(false);
+    }
   };
 
   return (
@@ -122,36 +150,87 @@ export function DraggableProposalItem({
             <span className="text-muted-foreground text-xs">-</span>
           )
         ) : (
-          <Select
-            value={item.category || ''}
-            onValueChange={(value) => onUpdate(index, { category: value || null })}
-          >
-            <SelectTrigger
-              className={cn(
-                "w-[120px] text-xs",
-                item.category && categoryBgColors[item.category as keyof typeof categoryBgColors],
-                item.category && categoryBorderColors[item.category as keyof typeof categoryBorderColors],
-                item.category && categoryTextColors[item.category as keyof typeof categoryTextColors]
-              )}
+          <>
+            <Select
+              value={item.category || ''}
+              onValueChange={(value) => {
+                if (value === '__create_custom__') {
+                  setIsCustomCategoryDialogOpen(true);
+                } else {
+                  onUpdate(index, { category: value || null });
+                }
+              }}
             >
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              {BUDGET_CATEGORIES.map(cat => (
-                <SelectItem
-                  key={cat}
-                  value={cat}
-                  className={cn(
-                    categoryBgColors[cat],
-                    categoryTextColors[cat],
-                    "my-0.5"
-                  )}
-                >
-                  {cat}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+              <SelectTrigger
+                className={cn(
+                  "w-[120px] text-xs",
+                  item.category && categoryBgColors[item.category as keyof typeof categoryBgColors],
+                  item.category && categoryBorderColors[item.category as keyof typeof categoryBorderColors],
+                  item.category && categoryTextColors[item.category as keyof typeof categoryTextColors]
+                )}
+              >
+                <SelectValue placeholder="Category" />
+              </SelectTrigger>
+              <SelectContent>
+                {allCategories.map(cat => (
+                  <SelectItem
+                    key={cat}
+                    value={cat}
+                    className={cn(
+                      categoryBgColors[cat as keyof typeof categoryBgColors],
+                      categoryTextColors[cat as keyof typeof categoryTextColors],
+                      "my-0.5"
+                    )}
+                  >
+                    {cat}
+                  </SelectItem>
+                ))}
+                {onAddCustomCategory && (
+                  <SelectItem
+                    value="__create_custom__"
+                    className="border-t mt-1 pt-1 text-primary"
+                  >
+                    <span className="flex items-center gap-1">
+                      <Plus className="h-3 w-3" />
+                      Create Custom...
+                    </span>
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            
+            {/* Custom Category Dialog */}
+            <Dialog open={isCustomCategoryDialogOpen} onOpenChange={setIsCustomCategoryDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create Custom Category</DialogTitle>
+                  <DialogDescription>
+                    Enter a name for your custom category. This category will only appear in this proposal.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                  <Input
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="Category name"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddCustomCategory();
+                      }
+                    }}
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsCustomCategoryDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleAddCustomCategory} disabled={!newCategoryName.trim()}>
+                    Create Category
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
         )}
       </TableCell>
 

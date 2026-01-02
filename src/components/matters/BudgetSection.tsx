@@ -667,6 +667,33 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg font-heading">Budget</CardTitle>
         <div className="flex items-center gap-2">
+          {/* Import buttons - show when editing or no budget yet */}
+          {(isEditing || !hasExistingBudget) && (
+            <>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setImportTab('upload');
+                  setIsImportOpen(true);
+                }}
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload RFP
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setImportTab('paste');
+                  setIsImportOpen(true);
+                }}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Paste Information
+              </Button>
+            </>
+          )}
           {hasExistingBudget && latestVersion && (
             <span className="text-sm text-muted-foreground">
               Version {latestVersion.version_number} • Finalized {formatDate(latestVersion.finalized_at)}
@@ -1378,6 +1405,106 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 <>
                   <Check className="h-4 w-4 mr-1" />
                   Import {selectedAssumptionsCount} Assumption{selectedAssumptionsCount !== 1 ? 's' : ''}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import from Engagement Letter Dialog */}
+      <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Import Budget Items</DialogTitle>
+            <DialogDescription>
+              Upload an RFP or engagement letter, or paste the text directly to extract budget line items.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Tabs value={importTab} onValueChange={(v) => setImportTab(v as 'paste' | 'upload')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="paste">
+                <FileText className="h-4 w-4 mr-2" />
+                Paste Text
+              </TabsTrigger>
+              <TabsTrigger value="upload">
+                <Upload className="h-4 w-4 mr-2" />
+                Upload File
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="paste" className="space-y-4 mt-4">
+              <Textarea
+                value={importText}
+                onChange={(e) => setImportText(e.target.value)}
+                placeholder="Paste the engagement letter or RFP text here..."
+                rows={12}
+                className="font-mono text-sm"
+              />
+            </TabsContent>
+            
+            <TabsContent value="upload" className="space-y-4 mt-4">
+              <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                <Upload className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground mb-4">
+                  Upload a PDF, Word document, or text file
+                </p>
+                <input
+                  type="file"
+                  accept=".pdf,.doc,.docx,.txt"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="budget-file-upload"
+                />
+                <Button asChild variant="outline" disabled={isUploadingFile}>
+                  {isUploadingFile ? (
+                    <span>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Parsing document...
+                    </span>
+                  ) : (
+                    <label htmlFor="budget-file-upload" className="cursor-pointer">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Choose File
+                    </label>
+                  )}
+                </Button>
+              </div>
+              {importText && (
+                <div className="space-y-2">
+                  <Label>Extracted Text (review before importing)</Label>
+                  <Textarea
+                    value={importText}
+                    onChange={(e) => setImportText(e.target.value)}
+                    rows={8}
+                    className="font-mono text-sm"
+                  />
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setIsImportOpen(false);
+              setImportText('');
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => handleImportFromEngagementLetter(importText)}
+              disabled={isImporting || !importText.trim()}
+            >
+              {isImporting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Parsing...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Import Budget Items
                 </>
               )}
             </Button>

@@ -70,7 +70,8 @@ export default function PricingProposalDetail() {
     updateProposal,
     saveVersion,
     markAsAgreed,
-    fetchVersionItems 
+    fetchVersionItems,
+    deleteVersion
   } = usePricingProposal(proposalId);
   
   const { matters } = useMatters();
@@ -80,6 +81,8 @@ export default function PricingProposalDetail() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isExtractingRfp, setIsExtractingRfp] = useState(false);
   const [isGeneratingAiPricing, setIsGeneratingAiPricing] = useState(false);
+  const [isCategorizing, setIsCategorizing] = useState(false);
+  const [isDeletingVersion, setIsDeletingVersion] = useState(false);
   const [isSendToMatterOpen, setIsSendToMatterOpen] = useState(false);
   const [selectedMatterId, setSelectedMatterId] = useState<string>("");
   const [versionNotes, setVersionNotes] = useState("");
@@ -574,6 +577,72 @@ export default function PricingProposalDetail() {
     toast({ title: `Viewing version ${versions.find(v => v.id === versionId)?.version_number || ''}` });
   };
 
+  // Delete version
+  const handleDeleteVersion = async (versionId: string) => {
+    if (versions.length <= 1) {
+      toast({ title: 'Cannot delete the only version', variant: 'destructive' });
+      return;
+    }
+    setIsDeletingVersion(true);
+    try {
+      await deleteVersion.mutateAsync(versionId);
+    } finally {
+      setIsDeletingVersion(false);
+    }
+  };
+
+  // Auto-categorize work items using AI
+  const handleAutoCategorize = async () => {
+    const itemsToCategorize = draftItems
+      .map((item, index) => ({ ...item, index }))
+      .filter(item => item.work_item.trim());
+    
+    if (itemsToCategorize.length === 0) {
+      toast({ title: 'No items to categorize' });
+      return;
+    }
+
+    setIsCategorizing(true);
+    try {
+      const response = await supabase.functions.invoke('categorize-budget-items', {
+        body: { 
+          items: itemsToCategorize.map(item => ({
+            index: item.index,
+            work_item: item.work_item
+          }))
+        }
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to categorize items');
+      }
+
+      const { categorizations } = response.data;
+      
+      if (!categorizations || categorizations.length === 0) {
+        toast({ title: 'No categorizations returned', variant: 'destructive' });
+        return;
+      }
+
+      // Apply categorizations
+      const updatedItems = [...draftItems];
+      categorizations.forEach((cat: { index: number; category: string }) => {
+        if (updatedItems[cat.index]) {
+          updatedItems[cat.index] = { ...updatedItems[cat.index], category: cat.category };
+        }
+      });
+      
+      setDraftItems(updatedItems);
+      setHasUnsavedChanges(true);
+      toast({ title: `Categorized ${categorizations.length} items` });
+    } catch (error) {
+      console.error('Error categorizing items:', error);
+      toast({ title: error instanceof Error ? error.message : 'Failed to categorize items', variant: 'destructive' });
+    } finally {
+      setIsCategorizing(false);
+    }
+  };
+
   // Client matters for the dropdown
   const clientMatters = matters.filter(m => m.client_id === proposal?.client_id);
 
@@ -810,6 +879,18 @@ export default function PricingProposalDetail() {
                     <Sparkles className="h-4 w-4 mr-2" />
                   )}
                   AI Price All
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleAutoCategorize}
+                  disabled={isCategorizing || draftItems.filter(i => i.work_item.trim()).length === 0}
+                >
+                  {isCategorizing ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Wand2 className="h-4 w-4 mr-2" />
+                  )}
+                  Auto-Categorize
                 </Button>
                 <Button onClick={addItem}>
                   <Plus className="h-4 w-4 mr-2" />
@@ -1088,7 +1169,7 @@ export default function PricingProposalDetail() {
 
           {/* SUMMARY TAB */}
           <TabsContent value="summary" className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-3">
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
@@ -1115,21 +1196,10 @@ export default function PricingProposalDetail() {
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Margin</p>
-                      <p className="text-2xl font-bold">{formatCurrency(summary.margin)}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Blended Rate</p>
+                      <p className="text-2xl font-bold">{formatCurrency(summary.blendedRate)}</p>
                     </div>
                     <TrendingUp className="h-8 w-8 text-muted-foreground/30" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground">Margin %</p>
-                      <p className="text-2xl font-bold">{summary.marginPercent.toFixed(1)}%</p>
-                    </div>
-                    <Percent className="h-8 w-8 text-muted-foreground/30" />
                   </div>
                 </CardContent>
               </Card>
@@ -1147,8 +1217,6 @@ export default function PricingProposalDetail() {
                       <TableHead className="text-right">Hours</TableHead>
                       <TableHead className="text-right">Rate</TableHead>
                       <TableHead className="text-right">Revenue</TableHead>
-                      <TableHead className="text-right">Cost</TableHead>
-                      <TableHead className="text-right">Margin</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1157,40 +1225,30 @@ export default function PricingProposalDetail() {
                       <TableCell className="text-right">{formatHours(summary.totalPartnerHours)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.afaPartnerRate)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.partnerRevenue)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(summary.partnerCost)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(summary.partnerRevenue - summary.partnerCost)}</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell className="font-medium">Senior Associate</TableCell>
                       <TableCell className="text-right">{formatHours(summary.totalSeniorAssociateHours)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.afaSeniorAssociateRate)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.seniorAssociateRevenue)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(summary.seniorAssociateCost)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(summary.seniorAssociateRevenue - summary.seniorAssociateCost)}</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell className="font-medium">Associate</TableCell>
                       <TableCell className="text-right">{formatHours(summary.totalAssociateHours)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.afaAssociateRate)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.associateRevenue)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(summary.associateCost)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(summary.associateRevenue - summary.associateCost)}</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell className="font-medium">Trainee</TableCell>
                       <TableCell className="text-right">{formatHours(summary.totalTraineeHours)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.afaTraineeRate)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.traineeRevenue)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(summary.traineeCost)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(summary.traineeRevenue - summary.traineeCost)}</TableCell>
                     </TableRow>
                     <TableRow className="font-bold bg-muted/50">
                       <TableCell>Total</TableCell>
                       <TableCell className="text-right">{formatHours(summary.totalHours)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.blendedRate)} (blended)</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.totalRevenue)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(summary.totalCost)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(summary.margin)}</TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>
@@ -1362,7 +1420,7 @@ export default function PricingProposalDetail() {
                           <TableCell>
                             {new Date(version.created_at).toLocaleDateString()}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="flex items-center gap-1">
                             <Button
                               variant="ghost"
                               size="sm"
@@ -1370,6 +1428,17 @@ export default function PricingProposalDetail() {
                             >
                               View
                             </Button>
+                            {versions.length > 1 && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleDeleteVersion(version.id)}
+                                disabled={isDeletingVersion}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}

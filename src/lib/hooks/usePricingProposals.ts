@@ -505,6 +505,35 @@ export function usePricingProposal(proposalId?: string) {
     },
   });
 
+  // Delete a specific version
+  const deleteVersion = useMutation({
+    mutationFn: async (versionId: string) => {
+      // First delete all items for this version
+      const { error: itemsError } = await supabase
+        .from('pricing_proposal_items')
+        .delete()
+        .eq('version_id', versionId);
+
+      if (itemsError) throw itemsError;
+
+      // Then delete the version itself
+      const { error: versionError } = await supabase
+        .from('pricing_proposal_versions')
+        .delete()
+        .eq('id', versionId);
+
+      if (versionError) throw versionError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pricing-proposal-versions', proposalId] });
+      queryClient.invalidateQueries({ queryKey: ['pricing-proposal-items'] });
+      toast({ title: 'Version deleted' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to delete version', description: error.message, variant: 'destructive' });
+    },
+  });
+
   return {
     proposal: proposalQuery.data,
     versions: versionsQuery.data || [],
@@ -517,5 +546,6 @@ export function usePricingProposal(proposalId?: string) {
     saveVersion,
     markAsAgreed,
     fetchVersionItems,
+    deleteVersion,
   };
 }

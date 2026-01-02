@@ -732,7 +732,11 @@ export default function PricingProposalDetail() {
                 <Badge variant={proposal.status === 'Agreed' ? 'default' : 'secondary'}>
                   {proposal.status}
                 </Badge>
-                <Badge variant="outline">V{proposal.current_version}</Badge>
+                <Badge variant="outline">
+                  V{viewingHistoricalVersion && selectedVersionId 
+                    ? versions.find(v => v.id === selectedVersionId)?.version_number || proposal.current_version
+                    : proposal.current_version}
+                </Badge>
               </div>
               <p className="text-muted-foreground">
                 {proposal.client?.name} • {proposal.currency}

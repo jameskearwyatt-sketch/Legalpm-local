@@ -68,6 +68,7 @@ interface CategorizedBudgetViewProps {
   aiSuggestedIndices: Set<number>;
   originalItems: DraftLineItem[];
   updateLineItemOptional: any;
+  toggleLineItemIncluded: any;
   matterId: string;
 }
 
@@ -91,6 +92,7 @@ export function CategorizedBudgetView({
   aiSuggestedIndices,
   originalItems,
   updateLineItemOptional,
+  toggleLineItemIncluded,
   matterId,
 }: CategorizedBudgetViewProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -485,6 +487,7 @@ export function CategorizedBudgetView({
                         isAiSuggested={aiSuggestedIndices.has(globalIndex)}
                         originalItem={originalItems.find(orig => orig.id === item.id)}
                         updateLineItemOptional={updateLineItemOptional}
+                        toggleLineItemIncluded={toggleLineItemIncluded}
                         canDelete={items.length > 1}
                       />
                     );

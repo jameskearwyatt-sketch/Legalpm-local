@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -56,6 +56,16 @@ export function IterativePricingDialog({
   initialItemType = 'documentation',
   onApply,
 }: IterativePricingDialogProps) {
+  // Track if user has interacted with this dialog instance
+  const hasUserInput = useRef(false);
+  
+  // Store last user-entered values to persist between close/reopen
+  const lastUserValues = useRef<{
+    hours: FeeOwnerHours;
+    turns: number;
+    decay: DecayOption;
+  } | null>(null);
+
   // Hours for each fee owner (first turn only)
   const [feeOwnerHours, setFeeOwnerHours] = useState<FeeOwnerHours>({
     partner: initialHours.partner || 0,
@@ -67,24 +77,54 @@ export function IterativePricingDialog({
   const [numTurns, setNumTurns] = useState(initialTurns);
   const [decayPercent, setDecayPercent] = useState<DecayOption>('75');
 
-  // Reset when dialog opens with new values
+  // Track user input
+  const handleHoursChange = (key: string, value: number) => {
+    hasUserInput.current = true;
+    setFeeOwnerHours(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleTurnsChange = (value: number) => {
+    hasUserInput.current = true;
+    setNumTurns(value);
+  };
+
+  const handleDecayChange = (value: DecayOption) => {
+    hasUserInput.current = true;
+    setDecayPercent(value);
+  };
+
+  // Store values when dialog closes
+  useEffect(() => {
+    if (!open && hasUserInput.current) {
+      lastUserValues.current = {
+        hours: { ...feeOwnerHours },
+        turns: numTurns,
+        decay: decayPercent,
+      };
+    }
+  }, [open, feeOwnerHours, numTurns, decayPercent]);
+
+  // Restore values when dialog opens
   useEffect(() => {
     if (open) {
-      setFeeOwnerHours({
-        partner: initialHours.partner || 0,
-        seniorAssociate: initialHours.seniorAssociate || 0,
-        associate: initialHours.associate || 0,
-        trainee: initialHours.trainee || 0,
-      });
-      setNumTurns(initialTurns);
-      // Map old item types to decay percentages or use default
-      if (initialItemType === 'negotiation' || initialItemType === 'due_diligence') {
-        setDecayPercent('75');
+      if (lastUserValues.current) {
+        // Restore last user-entered values
+        setFeeOwnerHours(lastUserValues.current.hours);
+        setNumTurns(lastUserValues.current.turns);
+        setDecayPercent(lastUserValues.current.decay);
       } else {
+        // First time opening - use initial values
+        setFeeOwnerHours({
+          partner: initialHours.partner || 0,
+          seniorAssociate: initialHours.seniorAssociate || 0,
+          associate: initialHours.associate || 0,
+          trainee: initialHours.trainee || 0,
+        });
+        setNumTurns(initialTurns);
         setDecayPercent('75');
       }
     }
-  }, [open, initialHours, initialTurns, initialItemType]);
+  }, [open]);
 
   // Get decay factor from selected percentage (e.g. 75% decay means each turn takes 25% of the previous)
   const getDecayFactor = () => {
@@ -189,14 +229,14 @@ export function IterativePricingDialog({
               <Input
                 type="number"
                 value={numTurns}
-                onChange={(e) => setNumTurns(Math.max(1, parseInt(e.target.value) || 1))}
+                onChange={(e) => handleTurnsChange(Math.max(1, parseInt(e.target.value) || 1))}
                 min={1}
                 className="h-8"
               />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">Decay</Label>
-              <Select value={decayPercent} onValueChange={(v) => setDecayPercent(v as DecayOption)}>
+              <Select value={decayPercent} onValueChange={(v) => handleDecayChange(v as DecayOption)}>
                 <SelectTrigger className="h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
@@ -223,10 +263,7 @@ export function IterativePricingDialog({
                   <Input
                     type="number"
                     value={feeOwnerHours[grade.key] || 0}
-                    onChange={(e) => setFeeOwnerHours(prev => ({
-                      ...prev,
-                      [grade.key]: parseFloat(e.target.value) || 0
-                    }))}
+                    onChange={(e) => handleHoursChange(grade.key, parseFloat(e.target.value) || 0)}
                     min={0}
                     step={0.5}
                     className="w-16 h-7 text-right text-sm"

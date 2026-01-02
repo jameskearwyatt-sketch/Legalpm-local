@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.extract-assumptions]
 verify_jwt = false
+
+[functions.categorize-budget-items]
+verify_jwt = false

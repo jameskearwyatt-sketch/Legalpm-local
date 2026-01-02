@@ -965,7 +965,7 @@ export default function PricingProposalDetail() {
             <div className="grid gap-4 md:grid-cols-4">
               <Card>
                 <CardContent className="pt-6">
-                  <p className="text-sm font-medium text-muted-foreground">Total</p>
+                  <p className="text-sm font-medium text-muted-foreground">Total Fee</p>
                   <p className="text-2xl font-bold">{formatCurrency(workItemTotals.total)}</p>
                 </CardContent>
               </Card>
@@ -1168,7 +1168,7 @@ export default function PricingProposalDetail() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Total Fee</p>
-                      <p className="text-2xl font-bold">{formatCurrency(summary.totalRevenue)}</p>
+                      <p className="text-2xl font-bold">{formatCurrency(workItemTotals.total)}</p>
                     </div>
                     <DollarSign className="h-8 w-8 text-muted-foreground/30" />
                   </div>

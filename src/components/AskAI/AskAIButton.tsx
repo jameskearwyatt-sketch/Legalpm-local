@@ -62,6 +62,8 @@ interface Message {
   content: string;
 }
 
+const STORAGE_KEY = 'ai-button-position';
+
 export function AskAIButton() {
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState("");
@@ -73,6 +75,38 @@ export function AskAIButton() {
   const [showPermissionDialog, setShowPermissionDialog] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+
+  // Dragging state
+  const [isDragging, setIsDragging] = useState(false);
+  const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const dragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
+  const buttonRef = useRef<HTMLDivElement>(null);
+
+  // Load saved position on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Validate position is within viewport
+        const maxX = window.innerWidth - 56;
+        const maxY = window.innerHeight - 56;
+        setPosition({
+          x: Math.min(Math.max(0, parsed.x), maxX),
+          y: Math.min(Math.max(0, parsed.y), maxY),
+        });
+      } catch {
+        // Invalid saved position, use default
+      }
+    }
+  }, []);
+
+  // Save position when it changes
+  useEffect(() => {
+    if (position) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(position));
+    }
+  }, [position]);
 
   // Check if speech recognition is supported
   useEffect(() => {
@@ -90,14 +124,61 @@ export function AskAIButton() {
     };
   }, []);
 
+  // Handle pointer events for dragging
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (isOpen) return; // Don't drag when panel is open
+    
+    const rect = buttonRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startPosX: position?.x ?? (window.innerWidth - rect.width - 24),
+      startPosY: position?.y ?? (window.innerHeight - rect.height - 24),
+    };
+
+    setIsDragging(false);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+
+    const deltaX = e.clientX - dragRef.current.startX;
+    const deltaY = e.clientY - dragRef.current.startY;
+
+    // Only start dragging if moved more than 5px
+    if (!isDragging && (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5)) {
+      setIsDragging(true);
+    }
+
+    if (isDragging || Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+      const buttonSize = 56;
+      const newX = Math.min(Math.max(0, dragRef.current.startPosX + deltaX), window.innerWidth - buttonSize);
+      const newY = Math.min(Math.max(0, dragRef.current.startPosY + deltaY), window.innerHeight - buttonSize);
+      setPosition({ x: newX, y: newY });
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    const wasDragging = isDragging;
+    dragRef.current = null;
+    setIsDragging(false);
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+
+    // If we weren't dragging, treat as a click
+    if (!wasDragging) {
+      setIsOpen(!isOpen);
+    }
+  };
+
   const requestMicrophoneAccess = async () => {
     setShowPermissionDialog(false);
     
     try {
-      // This triggers the browser's native permission prompt
       await navigator.mediaDevices.getUserMedia({ audio: true });
       setPermissionDenied(false);
-      // Start listening after permission granted
       startListening();
     } catch (err: any) {
       console.error('Microphone permission error:', err);
@@ -167,24 +248,19 @@ export function AskAIButton() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) return;
 
-    // Check if we already have permission
     try {
       const permissionStatus = await navigator.permissions.query({ name: 'microphone' as PermissionName });
       
       if (permissionStatus.state === 'granted') {
-        // Already have permission, start listening
         startListening();
       } else if (permissionStatus.state === 'denied') {
-        // Permission was denied, show dialog with instructions
         setPermissionDenied(true);
         setShowPermissionDialog(true);
       } else {
-        // Permission not yet decided, show dialog to request
         setPermissionDenied(false);
         setShowPermissionDialog(true);
       }
     } catch {
-      // Permissions API not supported, show dialog anyway
       setPermissionDenied(false);
       setShowPermissionDialog(true);
     }
@@ -199,7 +275,6 @@ export function AskAIButton() {
     setIsLoading(true);
 
     try {
-      // Get current session to pass auth token
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData?.session?.access_token;
 
@@ -250,6 +325,65 @@ export function AskAIButton() {
     }
   };
 
+  // Calculate button position style
+  const getButtonStyle = (): React.CSSProperties => {
+    if (position) {
+      return {
+        position: 'fixed',
+        left: position.x,
+        top: position.y,
+        right: 'auto',
+        bottom: 'auto',
+      };
+    }
+    // Default position: bottom-right corner
+    return {
+      position: 'fixed',
+      right: 24,
+      bottom: 24,
+    };
+  };
+
+  // Calculate chat panel position based on button position
+  const getChatPanelStyle = (): React.CSSProperties => {
+    if (position) {
+      const panelWidth = 384; // w-96 = 24rem = 384px
+      const panelHeight = 440; // Approximate height
+      const buttonSize = 56;
+      
+      // Try to position above the button
+      let top = position.y - panelHeight - 8;
+      let left = position.x - panelWidth / 2 + buttonSize / 2;
+      
+      // If panel would go off top, position below
+      if (top < 8) {
+        top = position.y + buttonSize + 8;
+      }
+      
+      // Keep within horizontal bounds
+      left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8));
+      
+      // If panel would go off bottom, position above regardless
+      if (top + panelHeight > window.innerHeight - 8) {
+        top = position.y - panelHeight - 8;
+      }
+      
+      return {
+        position: 'fixed',
+        left,
+        top,
+        right: 'auto',
+        bottom: 'auto',
+      };
+    }
+    // Default position
+    return {
+      position: 'fixed',
+      right: 24,
+      bottom: 96,
+    };
+  };
+
   return (
     <>
       {/* Microphone Permission Dialog */}
@@ -289,19 +423,28 @@ export function AskAIButton() {
         </DialogContent>
       </Dialog>
 
-      {/* Floating Button */}
-      <div className="fixed bottom-6 right-6 z-50">
+      {/* Floating Draggable Button */}
+      <div 
+        ref={buttonRef}
+        className="z-50"
+        style={getButtonStyle()}
+      >
         <button
-          onClick={() => setIsOpen(!isOpen)}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
           className={cn(
-            "relative h-14 w-14 rounded-full shadow-xl transition-all duration-300",
+            "relative h-14 w-14 rounded-full shadow-xl transition-all duration-300 touch-none select-none",
             "bg-gradient-to-br from-orange-500 via-pink-500 to-purple-600",
             "hover:from-orange-400 hover:via-pink-400 hover:to-purple-500",
-            "hover:shadow-2xl hover:shadow-pink-500/30 hover:scale-110",
+            "hover:shadow-2xl hover:shadow-pink-500/30",
+            !isDragging && "hover:scale-110",
             "flex items-center justify-center text-white",
             "ring-2 ring-white/20 ring-offset-2 ring-offset-background",
-            !isOpen && "ai-button-alive",
-            isOpen && "rotate-90"
+            !isOpen && !isDragging && "ai-button-alive",
+            isOpen && "rotate-90",
+            isDragging && "cursor-grabbing scale-110 shadow-2xl shadow-pink-500/40",
+            !isDragging && !isOpen && "cursor-grab"
           )}
         >
           {isOpen ? <X className="h-6 w-6" /> : <Sparkles className="h-6 w-6" />}
@@ -310,7 +453,10 @@ export function AskAIButton() {
 
       {/* Chat Panel */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-96 max-w-[calc(100vw-3rem)] rounded-xl border-0 shadow-2xl shadow-pink-500/20 overflow-hidden animate-scale-in">
+        <div 
+          className="z-50 w-96 max-w-[calc(100vw-3rem)] rounded-xl border-0 shadow-2xl shadow-pink-500/20 overflow-hidden animate-scale-in"
+          style={getChatPanelStyle()}
+        >
           {/* Header with gradient */}
           <div className="bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 px-4 py-4">
             <div className="flex items-center gap-3">

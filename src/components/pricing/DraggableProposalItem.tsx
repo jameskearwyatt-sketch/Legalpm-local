@@ -219,13 +219,13 @@ export function DraggableProposalItem({
           className={
             item.pricing_method === 'ai_suggested'
               ? 'bg-purple-50 text-purple-700 border-purple-200'
-              : item.pricing_method === 'iterative'
+              : item.pricing_method === 'pricing_tool'
                 ? 'bg-green-50 text-green-700 border-green-200'
                 : ''
           }
         >
           {item.pricing_method === 'ai_suggested' ? '✨ AI' :
-            item.pricing_method === 'iterative' ? '📊 Iter' : '✏️ Man'}
+            item.pricing_method === 'pricing_tool' ? '📊 Iter' : '✏️ Man'}
         </Badge>
       </TableCell>
 

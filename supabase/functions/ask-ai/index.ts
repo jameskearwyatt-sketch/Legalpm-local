@@ -151,40 +151,126 @@ serve(async (req) => {
       console.error("Error fetching clients:", clientsError);
     }
 
-    // Build context for the AI (exclude internal matter numbers like MAT-XXX-001)
-    const mattersContext = (matters || []).map((m: any) => ({
-      name: m.matter_name,
-      client: m.clients?.name,
-      sector: m.clients?.group_sector,
-      practiceArea: m.practice_area,
-      budgetType: m.budget_type,
-      agreedBudget: m.agreed_budget_amount,
-      bmFee: m.bm_fee_component,
-      localCounselFee: m.local_counsel_fee,
-      feeUpperEnd: m.fee_amount_upper_end,
-      currency: m.currency,
-      category: m.category,
-      status: m.status,
-      dealValue: m.deal_value,
-      dealCurrency: m.deal_currency,
-    }));
+    // Approximate exchange rates for currency conversion (to GBP as base)
+    // These are rough rates for AI estimation - not for actual billing
+    const exchangeRatesToGBP: Record<string, number> = {
+      'GBP': 1.0,
+      'USD': 0.79,
+      'EUR': 0.86,
+      'CHF': 0.89,
+      'JPY': 0.0053,
+      'AUD': 0.52,
+      'CAD': 0.59,
+      'SGD': 0.59,
+      'HKD': 0.10,
+      'CNY': 0.11,
+    };
+
+    const exchangeRatesToUSD: Record<string, number> = {
+      'GBP': 1.27,
+      'USD': 1.0,
+      'EUR': 1.09,
+      'CHF': 1.13,
+      'JPY': 0.0067,
+      'AUD': 0.66,
+      'CAD': 0.75,
+      'SGD': 0.75,
+      'HKD': 0.13,
+      'CNY': 0.14,
+    };
+
+    // Helper function to convert amounts
+    const convertToGBP = (amount: number, fromCurrency: string): number => {
+      const rate = exchangeRatesToGBP[fromCurrency] || 1.0;
+      return Math.round(amount * rate);
+    };
+
+    const convertToUSD = (amount: number, fromCurrency: string): number => {
+      const rate = exchangeRatesToUSD[fromCurrency] || 1.0;
+      return Math.round(amount * rate);
+    };
+
+    // Build context for the AI with explicit currency information
+    const mattersContext = (matters || []).map((m: any) => {
+      const currency = m.currency || 'GBP';
+      return {
+        name: m.matter_name,
+        client: m.clients?.name,
+        sector: m.clients?.group_sector,
+        practiceArea: m.practice_area,
+        budgetType: m.budget_type,
+        // Include BOTH original values with currency AND converted values
+        agreedBudget: {
+          original: m.agreed_budget_amount,
+          originalCurrency: currency,
+          inGBP: convertToGBP(m.agreed_budget_amount, currency),
+          inUSD: convertToUSD(m.agreed_budget_amount, currency),
+        },
+        bmFee: {
+          original: m.bm_fee_component,
+          originalCurrency: currency,
+          inGBP: convertToGBP(m.bm_fee_component, currency),
+          inUSD: convertToUSD(m.bm_fee_component, currency),
+        },
+        localCounselFee: {
+          original: m.local_counsel_fee,
+          originalCurrency: currency,
+          inGBP: convertToGBP(m.local_counsel_fee, currency),
+          inUSD: convertToUSD(m.local_counsel_fee, currency),
+        },
+        feeUpperEnd: {
+          original: m.fee_amount_upper_end,
+          originalCurrency: currency,
+          inGBP: convertToGBP(m.fee_amount_upper_end, currency),
+          inUSD: convertToUSD(m.fee_amount_upper_end, currency),
+        },
+        category: m.category,
+        status: m.status,
+        dealValue: m.deal_value ? {
+          original: m.deal_value,
+          originalCurrency: m.deal_currency || currency,
+          inGBP: convertToGBP(m.deal_value, m.deal_currency || currency),
+          inUSD: convertToUSD(m.deal_value, m.deal_currency || currency),
+        } : null,
+      };
+    });
 
     const budgetContext = (budgetVersions || []).map((bv: any) => {
       const matter = (matters || []).find((m: any) => m.id === bv.matter_id);
       const items = (lineItems || []).filter((li: any) => li.budget_version_id === bv.id);
+      const currency = matter?.currency || 'GBP';
       return {
         matterName: matter?.matter_name,
         practiceArea: matter?.practice_area,
         version: bv.version_number,
-        total: bv.total_amount,
-        bmTotal: bv.bm_total,
-        lcTotal: bv.local_counsel_total,
-        currency: matter?.currency,
+        total: {
+          original: bv.total_amount,
+          originalCurrency: currency,
+          inGBP: convertToGBP(bv.total_amount, currency),
+          inUSD: convertToUSD(bv.total_amount, currency),
+        },
+        bmTotal: {
+          original: bv.bm_total,
+          originalCurrency: currency,
+          inGBP: convertToGBP(bv.bm_total, currency),
+          inUSD: convertToUSD(bv.bm_total, currency),
+        },
+        lcTotal: {
+          original: bv.local_counsel_total,
+          originalCurrency: currency,
+          inGBP: convertToGBP(bv.local_counsel_total, currency),
+          inUSD: convertToUSD(bv.local_counsel_total, currency),
+        },
         lineItems: items.map((li: any) => ({
           workItem: li.work_item,
           provider: li.provider,
           category: li.category,
-          amount: li.fee_amount,
+          amount: {
+            original: li.fee_amount,
+            originalCurrency: currency,
+            inGBP: convertToGBP(li.fee_amount, currency),
+            inUSD: convertToUSD(li.fee_amount, currency),
+          },
           included: li.is_included,
         })),
       };
@@ -192,10 +278,22 @@ serve(async (req) => {
 
     const invoiceContext = (invoices || []).map((inv: any) => {
       const matter = (matters || []).find((m: any) => m.id === inv.matter_id);
+      const currency = matter?.currency || 'GBP';
       return {
         matterName: matter?.matter_name,
-        billed: inv.billed_amount,
-        paid: inv.paid_amount,
+        currency: currency,
+        billed: {
+          original: inv.billed_amount,
+          originalCurrency: currency,
+          inGBP: convertToGBP(inv.billed_amount, currency),
+          inUSD: convertToUSD(inv.billed_amount, currency),
+        },
+        paid: {
+          original: inv.paid_amount,
+          originalCurrency: currency,
+          inGBP: convertToGBP(inv.paid_amount, currency),
+          inUSD: convertToUSD(inv.paid_amount, currency),
+        },
         status: inv.status,
         date: inv.invoice_date,
       };
@@ -203,16 +301,30 @@ serve(async (req) => {
 
     const systemPrompt = `You are an intelligent legal matter and budget assistant. You have access to the user's matters, budgets, and financial data. Your role is to provide helpful, accurate answers based on this data.
 
+CRITICAL CURRENCY RULES:
+1. Each matter and budget has its OWN CURRENCY - pay close attention to the "originalCurrency" field
+2. NEVER mix currencies - a budget of 219,000 EUR is NOT the same as 219,000 GBP
+3. When comparing matters or calculating averages, ALWAYS use the converted values (inGBP or inUSD)
+4. When reporting final recommendations, ALWAYS report in GBP (pounds sterling) or USD (US dollars)
+5. Default to reporting in GBP unless the user specifically asks for USD
+6. When you reference a specific matter's budget, mention its original currency (e.g., "Matter X had a budget of €219,000, which is approximately £188,000")
+
+FORMAT FOR ANSWERS:
+- Give your main recommendation in GBP (e.g., "I recommend quoting approximately £150,000")
+- If helpful, also provide the USD equivalent in parentheses
+- When referencing source data, always clarify the original currency
+
 When answering questions about pricing or quotes:
 1. Look for similar matters by practice area, deal type, or client sector
-2. Analyze the budget amounts and fee structures from comparable matters
+2. Analyze the budget amounts using the CONVERTED values for fair comparison
 3. Consider the range of fees quoted (budget amounts, BM fees, local counsel fees)
 4. Provide a clear recommendation with specific justification
 5. Reference specific matters by their NAME only (never use internal system IDs or codes)
 
 When giving price recommendations:
-- Provide a specific figure or range
+- Provide a specific figure or range IN GBP (or USD if requested)
 - Explain what similar matters you based this on (by name, not by ID)
+- Clarify the original currencies of your source data
 - Note any relevant factors that might affect the price
 
 IMPORTANT: Never reference internal system matter numbers or IDs. Always refer to matters by their descriptive name only.

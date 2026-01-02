@@ -38,6 +38,7 @@ interface DraggableBudgetItemProps {
   isAiSuggested: boolean;
   originalItem?: DraftLineItem;
   updateLineItemOptional: any;
+  toggleLineItemIncluded: any;
   canDelete: boolean;
 }
 
@@ -62,6 +63,7 @@ export function DraggableBudgetItem({
   isAiSuggested,
   originalItem,
   updateLineItemOptional,
+  toggleLineItemIncluded,
   canDelete,
 }: DraggableBudgetItemProps) {
   const {
@@ -234,7 +236,8 @@ export function DraggableBudgetItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'grid grid-cols-12 gap-2 items-center rounded-md py-1 px-1 transition-colors',
+        'grid gap-2 items-center rounded-md py-1 px-1 transition-colors',
+        hasExistingBudget ? 'grid-cols-[auto_1fr_auto_auto_auto_auto_auto]' : 'grid-cols-12',
         isDragging && 'opacity-50',
         isAiSuggested && 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700',
         item.is_optional && !item.is_included && hasExistingBudget && 'opacity-50'
@@ -244,13 +247,16 @@ export function DraggableBudgetItem({
       <div
         {...attributes}
         {...listeners}
-        className="col-span-1 flex justify-center cursor-grab active:cursor-grabbing"
+        className={cn(
+          'flex justify-center cursor-grab active:cursor-grabbing',
+          !hasExistingBudget && 'col-span-1'
+        )}
       >
         <GripVertical className="h-4 w-4 text-muted-foreground" />
       </div>
 
       {/* Work Item */}
-      <div className="col-span-4">
+      <div className={cn(!hasExistingBudget && 'col-span-4')}>
         <Input
           value={item.work_item}
           onChange={(e) => onEdit(index, 'work_item', e.target.value)}
@@ -261,7 +267,7 @@ export function DraggableBudgetItem({
       </div>
 
       {/* Provider */}
-      <div className="col-span-2 flex gap-1">
+      <div className={cn('flex gap-1', !hasExistingBudget && 'col-span-2')}>
         <Select
           value={item.provider}
           onValueChange={(v) => {
@@ -300,7 +306,7 @@ export function DraggableBudgetItem({
       </div>
 
       {/* Fee Amount */}
-      <div className="col-span-2">
+      <div className={cn(!hasExistingBudget && 'col-span-2')}>
         {!hasExistingBudget ? (
           <Input
             type="number"
@@ -312,7 +318,7 @@ export function DraggableBudgetItem({
             className="text-right text-sm"
           />
         ) : (
-          <div className="text-right">
+          <div className="text-right min-w-[80px]">
             <div className="font-medium text-sm">
               {formatCurrency(displayAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
             </div>
@@ -321,12 +327,12 @@ export function DraggableBudgetItem({
       </div>
 
       {/* Category selector */}
-      <div className="col-span-2">
+      <div className={cn(!hasExistingBudget && 'col-span-2')}>
         <Select
           value={item.category || 'Other'}
           onValueChange={(v) => onCategoryChange(index, v)}
         >
-          <SelectTrigger className="text-xs h-8">
+          <SelectTrigger className="text-xs h-8 min-w-[100px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -337,8 +343,46 @@ export function DraggableBudgetItem({
         </Select>
       </div>
 
+      {/* Optional checkbox - only show when budget exists */}
+      {hasExistingBudget && item.id && (
+        <div className="flex items-center gap-1">
+          <Checkbox
+            id={`optional-${item.id}`}
+            checked={item.is_optional ?? false}
+            onCheckedChange={(checked) => {
+              updateLineItemOptional.mutate({ 
+                lineItemId: item.id!, 
+                isOptional: checked === true 
+              });
+            }}
+          />
+          <label htmlFor={`optional-${item.id}`} className="text-xs text-muted-foreground cursor-pointer">
+            Optional
+          </label>
+        </div>
+      )}
+
+      {/* Include toggle - only show for optional items when budget exists */}
+      {hasExistingBudget && item.id && item.is_optional && (
+        <div className="flex items-center gap-1">
+          <Switch
+            id={`include-${item.id}`}
+            checked={item.is_included ?? false}
+            onCheckedChange={(checked) => {
+              toggleLineItemIncluded.mutate({ 
+                lineItemId: item.id!, 
+                isIncluded: checked 
+              });
+            }}
+          />
+          <label htmlFor={`include-${item.id}`} className="text-xs text-muted-foreground cursor-pointer">
+            {item.is_included ? 'on' : 'off'}
+          </label>
+        </div>
+      )}
+
       {/* Delete button */}
-      <div className="col-span-1 flex justify-center">
+      <div className={cn('flex justify-center', !hasExistingBudget && 'col-span-1')}>
         {canDelete && !hasExistingBudget && (
           <Button
             variant="ghost"

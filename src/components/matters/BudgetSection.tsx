@@ -736,6 +736,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           aiSuggestedIndices={aiSuggestedIndices}
           originalItems={originalItems}
           updateLineItemOptional={updateLineItemOptional}
+          toggleLineItemIncluded={toggleLineItemIncluded}
           matterId={matterId}
         />
 

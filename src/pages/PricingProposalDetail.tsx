@@ -928,10 +928,7 @@ export default function PricingProposalDetail() {
                             <TableHead className="w-[110px]">Category</TableHead>
                             <TableHead className="w-[100px]">Type</TableHead>
                             <TableHead className="w-[120px]">Provider</TableHead>
-                            <TableHead className="text-right w-[70px]">Ptnr</TableHead>
-                            <TableHead className="text-right w-[70px]">Assoc</TableHead>
-                            <TableHead className="text-right w-[55px]">Turns</TableHead>
-                            <TableHead className="text-right w-[90px]">Calc</TableHead>
+                            <TableHead className="w-[50px] text-center">Calc</TableHead>
                             <TableHead className="text-right w-[90px]">Fee</TableHead>
                             <TableHead className="w-[70px]">Method</TableHead>
                             <TableHead className="text-center w-[45px]">Opt</TableHead>
@@ -1006,63 +1003,19 @@ export default function PricingProposalDetail() {
                                     </SelectContent>
                                   </Select>
                                 </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={item.partner_hours || ''}
-                                    onChange={(e) => updateItem(index, { 
-                                      partner_hours: parseFloat(e.target.value) || 0,
-                                    })}
-                                    className="w-[70px] text-right"
-                                    placeholder="0"
-                                    disabled={item.provider === 'Local Counsel'}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={item.associate_hours || ''}
-                                    onChange={(e) => updateItem(index, { 
-                                      associate_hours: parseFloat(e.target.value) || 0,
-                                    })}
-                                    className="w-[70px] text-right"
-                                    placeholder="0"
-                                    disabled={item.provider === 'Local Counsel'}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="number"
-                                    value={item.num_turns || 1}
-                                    onChange={(e) => updateItem(index, { 
-                                      num_turns: parseInt(e.target.value) || 1,
-                                    })}
-                                    className="w-[50px] text-right"
-                                    min={1}
-                                    disabled={item.provider === 'Local Counsel' || item.item_type === 'documentation' || item.item_type === 'meeting'}
-                                  />
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {item.provider === 'Baker McKenzie' && calcFee > 0 ? (
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span className="text-muted-foreground text-sm">
-                                        {formatCurrency(calcFee)}
-                                      </span>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-6 px-1.5"
-                                        onClick={() => updateItem(index, { 
-                                          fee_amount: calcFee,
-                                          pricing_method: 'iterative' as PricingMethod
-                                        })}
-                                        title="Apply calculated price"
-                                      >
-                                        <CheckCircle2 className="h-3.5 w-3.5" />
-                                      </Button>
-                                    </div>
+                                <TableCell className="text-center">
+                                  {item.provider === 'Baker McKenzie' ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => openIterativePricing(index)}
+                                      title="Iterative pricing calculator"
+                                      className="h-8 w-8"
+                                    >
+                                      <Calculator className="h-4 w-4 text-primary" />
+                                    </Button>
                                   ) : (
-                                    <span className="text-muted-foreground text-sm">-</span>
+                                    <span className="text-muted-foreground">-</span>
                                   )}
                                 </TableCell>
                                 <TableCell>
@@ -1108,18 +1061,7 @@ export default function PricingProposalDetail() {
                                     disabled={!item.is_optional}
                                   />
                                 </TableCell>
-                                <TableCell className="flex items-center gap-1">
-                                  {item.provider === 'Baker McKenzie' && (
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => openIterativePricing(index)}
-                                      title="Iterative pricing calculator"
-                                      className="h-8 w-8"
-                                    >
-                                      <Calculator className="h-4 w-4 text-primary" />
-                                    </Button>
-                                  )}
+                                <TableCell>
                                   <Button
                                     variant="ghost"
                                     size="icon"

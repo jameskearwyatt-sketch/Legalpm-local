@@ -640,9 +640,41 @@ export default function PricingProposalDetail() {
       item_type: item.item_type || 'documentation',
     })));
     setIsViewingHistory(true);
+    setHasUnsavedChanges(false);
     setActiveTab('items');
-    toast({ title: `Viewing version ${versions.find(v => v.id === versionId)?.version_number || ''}` });
+    const viewedVersion = versions.find(v => v.id === versionId);
+    toast({ title: `Viewing version ${viewedVersion?.version_number || ''}` });
   };
+
+  // Return to current/latest version
+  const handleReturnToCurrentVersion = async () => {
+    if (!latestVersion) return;
+    const currentItems = await fetchVersionItems(latestVersion.id);
+    setDraftItems(currentItems.map(item => ({
+      id: item.id,
+      work_item: item.work_item,
+      provider: item.provider,
+      fee_amount: item.fee_amount,
+      pricing_method: item.pricing_method,
+      category: item.category,
+      lc_firm_name: item.lc_firm_name || undefined,
+      is_optional: item.is_optional,
+      is_included: item.is_included,
+      ai_rationale: item.ai_rationale,
+      partner_hours: item.partner_hours || 0,
+      associate_hours: item.associate_hours || 0,
+      num_turns: item.num_turns || 1,
+      item_type: item.item_type || 'documentation',
+    })));
+    setSelectedVersionId(null);
+    setIsViewingHistory(false);
+    setHasUnsavedChanges(false);
+    toast({ title: 'Returned to current version' });
+  };
+
+  // Check if viewing a historical (non-current) version
+  const viewingHistoricalVersion = isViewingHistory && selectedVersionId && 
+    versions.find(v => v.id === selectedVersionId)?.version_number !== proposal?.current_version;
 
   // Delete version
   const handleDeleteVersion = async (versionId: string) => {
@@ -708,23 +740,30 @@ export default function PricingProposalDetail() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {hasUnsavedChanges && (
-              <Badge variant="destructive">Unsaved changes</Badge>
-            )}
-            <Button variant="outline" onClick={exportToExcel}>
-              <FileDown className="h-4 w-4 mr-2" />
-              Export Excel
-            </Button>
-            {proposal.status === 'Draft' && (
+            {viewingHistoricalVersion ? (
+              <Button onClick={handleReturnToCurrentVersion} variant="default">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Return to Current Version
+              </Button>
+            ) : (
               <>
-                <Button 
-                  variant="outline" 
-                  onClick={handleSaveVersion}
-                  disabled={!hasUnsavedChanges || saveVersion.isPending}
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Version
+                {hasUnsavedChanges && (
+                  <Badge variant="destructive">Unsaved changes</Badge>
+                )}
+                <Button variant="outline" onClick={exportToExcel}>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Export Excel
                 </Button>
+                {proposal.status === 'Draft' && (
+                  <>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleSaveVersion}
+                      disabled={!hasUnsavedChanges || saveVersion.isPending}
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      Save Version
+                    </Button>
                 <Dialog open={isSendToMatterOpen} onOpenChange={setIsSendToMatterOpen}>
                   <DialogTrigger asChild>
                     <Button>
@@ -786,6 +825,8 @@ export default function PricingProposalDetail() {
                 </Dialog>
               </>
             )}
+              </>
+            )}
           </div>
         </div>
 
@@ -816,6 +857,27 @@ export default function PricingProposalDetail() {
 
           {/* WORK ITEMS TAB */}
           <TabsContent value="items" className="space-y-4">
+            {/* Historical Version Banner */}
+            {viewingHistoricalVersion && (
+              <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <History className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                  <div>
+                    <p className="font-medium text-amber-800 dark:text-amber-200">
+                      Viewing Version {versions.find(v => v.id === selectedVersionId)?.version_number}
+                    </p>
+                    <p className="text-sm text-amber-600 dark:text-amber-400">
+                      This is a historical version (read-only). Current version is V{proposal.current_version}.
+                    </p>
+                  </div>
+                </div>
+                <Button onClick={handleReturnToCurrentVersion} variant="outline" className="border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Return to Current Version
+                </Button>
+              </div>
+            )}
+
             {/* Summary Cards */}
             <div className="grid gap-4 md:grid-cols-4">
               <Card>
@@ -844,67 +906,69 @@ export default function PricingProposalDetail() {
               </Card>
             </div>
 
-            {/* Action Buttons */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Add Work Items</CardTitle>
-                <CardDescription>
-                  Upload an RFP, get AI suggestions, or add items manually
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-3">
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx,.txt"
-                  onChange={handleRfpUpload}
-                  className="hidden"
-                />
-                <Button 
-                  variant="outline" 
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isExtractingRfp}
-                >
-                  {isExtractingRfp ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Upload className="h-4 w-4 mr-2" />
-                  )}
-                  Upload RFP
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={generateAiSuggestions}
-                  disabled={isGeneratingAiPricing}
-                >
-                  {isGeneratingAiPricing ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Wand2 className="h-4 w-4 mr-2" />
-                  )}
-                  AI Suggest Items
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={generateAiPricing}
-                  disabled={isGeneratingAiPricing}
-                >
-                  {isGeneratingAiPricing ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Sparkles className="h-4 w-4 mr-2" />
-                  )}
-                  AI Price All
-                </Button>
-                <Button onClick={addItem}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Item
-                </Button>
-              </CardContent>
-            </Card>
+            {/* Action Buttons - hide when viewing historical version */}
+            {!viewingHistoricalVersion && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Add Work Items</CardTitle>
+                  <CardDescription>
+                    Upload an RFP, get AI suggestions, or add items manually
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-wrap gap-3">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx,.txt"
+                    onChange={handleRfpUpload}
+                    className="hidden"
+                  />
+                  <Button 
+                    variant="outline" 
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isExtractingRfp}
+                  >
+                    {isExtractingRfp ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4 mr-2" />
+                    )}
+                    Upload RFP
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={generateAiSuggestions}
+                    disabled={isGeneratingAiPricing}
+                  >
+                    {isGeneratingAiPricing ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Wand2 className="h-4 w-4 mr-2" />
+                    )}
+                    AI Suggest Items
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={generateAiPricing}
+                    disabled={isGeneratingAiPricing}
+                  >
+                    {isGeneratingAiPricing ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2" />
+                    )}
+                    AI Price All
+                  </Button>
+                  <Button onClick={addItem}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Category Summary with Auto-Categorize */}
-            {draftItems.length > 0 && (
+            {draftItems.length > 0 && !viewingHistoricalVersion && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Category Breakdown</CardTitle>
@@ -928,9 +992,9 @@ export default function PricingProposalDetail() {
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Work Items</span>
-                  {isViewingHistory && (
-                    <Badge variant="outline" className="ml-2">
-                      Viewing historical version
+                  {viewingHistoricalVersion && (
+                    <Badge variant="secondary" className="ml-2">
+                      Read-only (historical)
                     </Badge>
                   )}
                 </CardTitle>
@@ -1031,83 +1095,112 @@ export default function PricingProposalDetail() {
                                   className={item.is_optional && !item.is_included ? 'opacity-50' : ''}
                                 >
                                   <TableCell>
-                                    <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                                    {!viewingHistoricalVersion && (
+                                      <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                                    )}
                                   </TableCell>
                                   <TableCell className="align-top py-2">
-                                    <Textarea
-                                      value={item.work_item}
-                                      onChange={(e) => updateItem(originalIndex, { work_item: e.target.value })}
-                                      className="min-w-[250px] text-sm resize-none"
-                                      placeholder="Work item description"
-                                      rows={2}
-                                    />
+                                    {viewingHistoricalVersion ? (
+                                      <p className="min-w-[250px] text-sm whitespace-pre-wrap">{item.work_item}</p>
+                                    ) : (
+                                      <Textarea
+                                        value={item.work_item}
+                                        onChange={(e) => updateItem(originalIndex, { work_item: e.target.value })}
+                                        className="min-w-[250px] text-sm resize-none"
+                                        placeholder="Work item description"
+                                        rows={2}
+                                      />
+                                    )}
                                   </TableCell>
                                   <TableCell>
-                                    <Select
-                                      value={item.category || ''}
-                                      onValueChange={(value) => updateItem(originalIndex, { category: value || null })}
-                                    >
-                                      <SelectTrigger 
-                                        className={cn(
-                                          "w-[120px] text-xs",
-                                          item.category && categoryBgColors[item.category as keyof typeof categoryBgColors],
-                                          item.category && categoryBorderColors[item.category as keyof typeof categoryBorderColors],
-                                          item.category && categoryTextColors[item.category as keyof typeof categoryTextColors]
-                                        )}
+                                    {viewingHistoricalVersion ? (
+                                      item.category ? (
+                                        <Badge className={cn(
+                                          "text-xs",
+                                          categoryBgColors[item.category as keyof typeof categoryBgColors],
+                                          categoryBorderColors[item.category as keyof typeof categoryBorderColors],
+                                          categoryTextColors[item.category as keyof typeof categoryTextColors]
+                                        )}>
+                                          {item.category}
+                                        </Badge>
+                                      ) : (
+                                        <span className="text-muted-foreground text-xs">-</span>
+                                      )
+                                    ) : (
+                                      <Select
+                                        value={item.category || ''}
+                                        onValueChange={(value) => updateItem(originalIndex, { category: value || null })}
                                       >
-                                        <SelectValue placeholder="Category" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {BUDGET_CATEGORIES.map(cat => (
-                                          <SelectItem 
-                                            key={cat} 
-                                            value={cat}
-                                            className={cn(
-                                              categoryBgColors[cat],
-                                              categoryTextColors[cat],
-                                              "my-0.5"
-                                            )}
-                                          >
-                                            {cat}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
+                                        <SelectTrigger 
+                                          className={cn(
+                                            "w-[120px] text-xs",
+                                            item.category && categoryBgColors[item.category as keyof typeof categoryBgColors],
+                                            item.category && categoryBorderColors[item.category as keyof typeof categoryBorderColors],
+                                            item.category && categoryTextColors[item.category as keyof typeof categoryTextColors]
+                                          )}
+                                        >
+                                          <SelectValue placeholder="Category" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {BUDGET_CATEGORIES.map(cat => (
+                                            <SelectItem 
+                                              key={cat} 
+                                              value={cat}
+                                              className={cn(
+                                                categoryBgColors[cat],
+                                                categoryTextColors[cat],
+                                                "my-0.5"
+                                              )}
+                                            >
+                                              {cat}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    )}
                                   </TableCell>
                                   <TableCell>
-                                    <Select
-                                      value={item.item_type || 'documentation'}
-                                      onValueChange={(value: ItemType) => updateItem(originalIndex, { item_type: value })}
-                                    >
-                                      <SelectTrigger className="w-[120px]">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="documentation">Documentation</SelectItem>
-                                        <SelectItem value="negotiation">Negotiation</SelectItem>
-                                        <SelectItem value="due_diligence">Due Diligence</SelectItem>
-                                        <SelectItem value="meeting">Meeting</SelectItem>
-                                      </SelectContent>
-                                    </Select>
+                                    {viewingHistoricalVersion ? (
+                                      <span className="text-sm capitalize">{item.item_type?.replace('_', ' ') || 'Documentation'}</span>
+                                    ) : (
+                                      <Select
+                                        value={item.item_type || 'documentation'}
+                                        onValueChange={(value: ItemType) => updateItem(originalIndex, { item_type: value })}
+                                      >
+                                        <SelectTrigger className="w-[120px]">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="documentation">Documentation</SelectItem>
+                                          <SelectItem value="negotiation">Negotiation</SelectItem>
+                                          <SelectItem value="due_diligence">Due Diligence</SelectItem>
+                                          <SelectItem value="meeting">Meeting</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    )}
                                   </TableCell>
                                   <TableCell>
-                                    <Select
-                                      value={item.provider}
-                                      onValueChange={(value: 'Baker McKenzie' | 'Local Counsel') => 
-                                        updateItem(originalIndex, { provider: value })
-                                      }
-                                    >
-                                      <SelectTrigger className="w-[130px]">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="Baker McKenzie">Baker McKenzie</SelectItem>
-                                        <SelectItem value="Local Counsel">Local Counsel</SelectItem>
-                                      </SelectContent>
-                                    </Select>
+                                    {viewingHistoricalVersion ? (
+                                      <span className="text-sm">{item.provider}</span>
+                                    ) : (
+                                      <Select
+                                        value={item.provider}
+                                        onValueChange={(value: 'Baker McKenzie' | 'Local Counsel') => 
+                                          updateItem(originalIndex, { provider: value })
+                                        }
+                                      >
+                                        <SelectTrigger className="w-[130px]">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="Baker McKenzie">Baker McKenzie</SelectItem>
+                                          <SelectItem value="Local Counsel">Local Counsel</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    )}
                                   </TableCell>
                                   <TableCell className="text-center">
-                                    {item.provider === 'Baker McKenzie' ? (
+                                    {item.provider === 'Baker McKenzie' && !viewingHistoricalVersion ? (
                                       <Button
                                         variant="ghost"
                                         size="icon"
@@ -1122,16 +1215,20 @@ export default function PricingProposalDetail() {
                                     )}
                                   </TableCell>
                                   <TableCell>
-                                    <Input
-                                      type="number"
-                                      value={item.fee_amount || ''}
-                                      onChange={(e) => updateItem(originalIndex, { 
-                                        fee_amount: parseFloat(e.target.value) || 0,
-                                        pricing_method: 'manual'
-                                      })}
-                                      className="w-[100px] text-right"
-                                      placeholder="0"
-                                    />
+                                    {viewingHistoricalVersion ? (
+                                      <span className="text-sm font-medium">{formatCurrency(item.fee_amount || 0)}</span>
+                                    ) : (
+                                      <Input
+                                        type="number"
+                                        value={item.fee_amount || ''}
+                                        onChange={(e) => updateItem(originalIndex, { 
+                                          fee_amount: parseFloat(e.target.value) || 0,
+                                          pricing_method: 'manual'
+                                        })}
+                                        className="w-[100px] text-right"
+                                        placeholder="0"
+                                      />
+                                    )}
                                   </TableCell>
                                   <TableCell>
                                     <Badge 
@@ -1155,24 +1252,27 @@ export default function PricingProposalDetail() {
                                         is_optional: !!checked,
                                         is_included: checked ? false : true
                                       })}
+                                      disabled={viewingHistoricalVersion}
                                     />
                                   </TableCell>
                                   <TableCell className="text-center">
                                     <Switch
                                       checked={item.is_included}
                                       onCheckedChange={(checked) => updateItem(originalIndex, { is_included: checked })}
-                                      disabled={!item.is_optional}
+                                      disabled={!item.is_optional || viewingHistoricalVersion}
                                     />
                                   </TableCell>
                                   <TableCell>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      onClick={() => removeItem(originalIndex)}
-                                      className="h-8 w-8"
-                                    >
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
+                                    {!viewingHistoricalVersion && (
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => removeItem(originalIndex)}
+                                        className="h-8 w-8"
+                                      >
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    )}
                                   </TableCell>
                                 </TableRow>
                               );
@@ -1428,7 +1528,7 @@ export default function PricingProposalDetail() {
               <CardHeader>
                 <CardTitle>Version History</CardTitle>
                 <CardDescription>
-                  View and compare previous versions of this proposal
+                  View and compare previous versions of this proposal. Current version is V{proposal.current_version}.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1439,6 +1539,7 @@ export default function PricingProposalDetail() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Version</TableHead>
+                        <TableHead>Status</TableHead>
                         <TableHead>Total</TableHead>
                         <TableHead>BM Total</TableHead>
                         <TableHead>LC Total</TableHead>
@@ -1448,46 +1549,87 @@ export default function PricingProposalDetail() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {versions.map((version) => (
-                        <TableRow key={version.id}>
-                          <TableCell>
-                            <Badge variant={version.version_number === proposal.current_version ? 'default' : 'outline'}>
-                              V{version.version_number}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            {formatCurrency(version.total_amount)}
-                          </TableCell>
-                          <TableCell>{formatCurrency(version.bm_total)}</TableCell>
-                          <TableCell>{formatCurrency(version.local_counsel_total)}</TableCell>
-                          <TableCell className="max-w-xs truncate">
-                            {version.notes || '-'}
-                          </TableCell>
-                          <TableCell>
-                            {new Date(version.created_at).toLocaleDateString()}
-                          </TableCell>
-                          <TableCell className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleViewVersion(version.id)}
-                            >
-                              View
-                            </Button>
-                            {versions.length > 1 && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleDeleteVersion(version.id)}
-                                disabled={isDeletingVersion}
-                              >
-                                <Trash2 className="h-4 w-4 text-destructive" />
-                              </Button>
+                      {versions.map((version) => {
+                        const isCurrent = version.version_number === proposal.current_version;
+                        const isViewing = selectedVersionId === version.id;
+                        
+                        return (
+                          <TableRow 
+                            key={version.id} 
+                            className={cn(
+                              isViewing && "bg-muted/50",
+                              isCurrent && "border-l-4 border-l-primary"
                             )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                          >
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={isCurrent ? 'default' : 'outline'}>
+                                  V{version.version_number}
+                                </Badge>
+                                {isViewing && (
+                                  <Badge variant="secondary" className="text-xs">
+                                    Viewing
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              {isCurrent ? (
+                                <Badge variant="default" className="bg-green-600 hover:bg-green-600">
+                                  Current
+                                </Badge>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">Historical</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-medium">
+                              {formatCurrency(version.total_amount)}
+                            </TableCell>
+                            <TableCell>{formatCurrency(version.bm_total)}</TableCell>
+                            <TableCell>{formatCurrency(version.local_counsel_total)}</TableCell>
+                            <TableCell className="max-w-xs truncate">
+                              {version.notes || '-'}
+                            </TableCell>
+                            <TableCell>
+                              {new Date(version.created_at).toLocaleDateString()}
+                            </TableCell>
+                            <TableCell className="flex items-center gap-1">
+                              {isCurrent ? (
+                                isViewingHistory ? (
+                                  <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={handleReturnToCurrentVersion}
+                                  >
+                                    Return to Current
+                                  </Button>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">Editing</span>
+                                )
+                              ) : (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleViewVersion(version.id)}
+                                >
+                                  View
+                                </Button>
+                              )}
+                              {versions.length > 1 && !isCurrent && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleDeleteVersion(version.id)}
+                                  disabled={isDeletingVersion}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 )}

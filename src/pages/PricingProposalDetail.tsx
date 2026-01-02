@@ -541,7 +541,12 @@ export default function PricingProposalDetail() {
       if (data.prices) {
         setDraftItems(prev => prev.map(item => {
           if (!item.fee_amount || item.fee_amount === 0) {
-            const priceInfo = data.prices.find((p: any) => p.work_item === item.work_item);
+            // Match by checking if the AI response work_item contains or starts with the original work_item
+            const priceInfo = data.prices.find((p: any) => 
+              p.work_item === item.work_item || 
+              p.work_item?.startsWith(item.work_item) ||
+              item.work_item?.startsWith(p.work_item)
+            );
             if (priceInfo) {
               return {
                 ...item,

@@ -671,6 +671,8 @@ export type Database = {
           category: string | null
           created_at: string
           fee_amount: number
+          fee_lower: number
+          fee_upper: number
           id: string
           is_included: boolean
           is_optional: boolean
@@ -693,6 +695,8 @@ export type Database = {
           category?: string | null
           created_at?: string
           fee_amount?: number
+          fee_lower?: number
+          fee_upper?: number
           id?: string
           is_included?: boolean
           is_optional?: boolean
@@ -715,6 +719,8 @@ export type Database = {
           category?: string | null
           created_at?: string
           fee_amount?: number
+          fee_lower?: number
+          fee_upper?: number
           id?: string
           is_included?: boolean
           is_optional?: boolean

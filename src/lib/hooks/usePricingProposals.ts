@@ -102,6 +102,8 @@ export interface PricingProposalItem {
   work_item: string;
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
+  fee_lower: number;
+  fee_upper: number;
   pricing_method: 'ai_suggested' | 'pricing_tool' | 'manual';
   category: string | null;
   lc_firm_name: string | null;
@@ -129,6 +131,8 @@ export interface DraftProposalItem {
   work_item: string;
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
+  fee_lower?: number;
+  fee_upper?: number;
   pricing_method: 'ai_suggested' | 'pricing_tool' | 'manual';
   category?: string | null;
   lc_firm_name?: string;
@@ -390,25 +394,41 @@ export function usePricingProposal(proposalId?: string) {
 
       // Re-insert all items
       if (items.length > 0) {
-        const itemsToInsert = items.map((item, index) => ({
-          version_id: latestVersion.id,
-          proposal_id: proposalId!,
-          user_id: user!.id,
-          work_item: item.work_item,
-          provider: item.provider,
-          fee_amount: item.fee_amount,
-          pricing_method: item.pricing_method,
-          category: item.category || null,
-          lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
-          is_optional: item.is_optional ?? false,
-          is_included: item.is_included ?? true,
-          sort_order: index,
-          ai_rationale: item.ai_rationale || null,
-          partner_hours: item.partner_hours ?? 0,
-          associate_hours: item.associate_hours ?? 0,
-          num_turns: item.num_turns ?? 1,
-          item_type: item.item_type ?? 'documentation',
-        }));
+        const itemsToInsert = items.map((item, index) => {
+          // Calculate fee_lower and fee_upper based on pricing method
+          const feeLower = item.fee_lower ?? (
+            item.pricing_method === 'manual' 
+              ? item.fee_amount 
+              : Math.round(item.fee_amount * 0.9)
+          );
+          const feeUpper = item.fee_upper ?? (
+            item.pricing_method === 'manual' 
+              ? item.fee_amount 
+              : Math.round(item.fee_amount * 1.1)
+          );
+          
+          return {
+            version_id: latestVersion.id,
+            proposal_id: proposalId!,
+            user_id: user!.id,
+            work_item: item.work_item,
+            provider: item.provider,
+            fee_amount: item.fee_amount,
+            fee_lower: feeLower,
+            fee_upper: feeUpper,
+            pricing_method: item.pricing_method,
+            category: item.category || null,
+            lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
+            is_optional: item.is_optional ?? false,
+            is_included: item.is_included ?? true,
+            sort_order: index,
+            ai_rationale: item.ai_rationale || null,
+            partner_hours: item.partner_hours ?? 0,
+            associate_hours: item.associate_hours ?? 0,
+            num_turns: item.num_turns ?? 1,
+            item_type: item.item_type ?? 'documentation',
+          };
+        });
 
         const { error: itemsError } = await supabase
           .from('pricing_proposal_items')
@@ -466,25 +486,41 @@ export function usePricingProposal(proposalId?: string) {
 
       // Create items
       if (items.length > 0) {
-        const itemsToInsert = items.map((item, index) => ({
-          version_id: version.id,
-          proposal_id: proposalId!,
-          user_id: user!.id,
-          work_item: item.work_item,
-          provider: item.provider,
-          fee_amount: item.fee_amount,
-          pricing_method: item.pricing_method,
-          category: item.category || null,
-          lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
-          is_optional: item.is_optional ?? false,
-          is_included: item.is_included ?? true,
-          sort_order: index,
-          ai_rationale: item.ai_rationale || null,
-          partner_hours: item.partner_hours ?? 0,
-          associate_hours: item.associate_hours ?? 0,
-          num_turns: item.num_turns ?? 1,
-          item_type: item.item_type ?? 'documentation',
-        }));
+        const itemsToInsert = items.map((item, index) => {
+          // Calculate fee_lower and fee_upper based on pricing method
+          const feeLower = item.fee_lower ?? (
+            item.pricing_method === 'manual' 
+              ? item.fee_amount 
+              : Math.round(item.fee_amount * 0.9)
+          );
+          const feeUpper = item.fee_upper ?? (
+            item.pricing_method === 'manual' 
+              ? item.fee_amount 
+              : Math.round(item.fee_amount * 1.1)
+          );
+          
+          return {
+            version_id: version.id,
+            proposal_id: proposalId!,
+            user_id: user!.id,
+            work_item: item.work_item,
+            provider: item.provider,
+            fee_amount: item.fee_amount,
+            fee_lower: feeLower,
+            fee_upper: feeUpper,
+            pricing_method: item.pricing_method,
+            category: item.category || null,
+            lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
+            is_optional: item.is_optional ?? false,
+            is_included: item.is_included ?? true,
+            sort_order: index,
+            ai_rationale: item.ai_rationale || null,
+            partner_hours: item.partner_hours ?? 0,
+            associate_hours: item.associate_hours ?? 0,
+            num_turns: item.num_turns ?? 1,
+            item_type: item.item_type ?? 'documentation',
+          };
+        });
 
         const { error: itemsError } = await supabase
           .from('pricing_proposal_items')

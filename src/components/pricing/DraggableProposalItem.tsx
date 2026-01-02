@@ -194,25 +194,58 @@ export function DraggableProposalItem({
         )}
       </TableCell>
 
-      {/* Fee */}
+      {/* Lower Estimate */}
       <TableCell>
         {viewingHistoricalVersion ? (
-          <span className="text-sm font-medium">{formatCurrency(item.fee_amount || 0)}</span>
+          <span className="text-sm font-medium">{formatCurrency(item.fee_lower ?? item.fee_amount)}</span>
         ) : (
           <div className="flex items-center gap-1">
             <span className="text-xs text-muted-foreground">{formatCurrency(0).charAt(0)}</span>
             <Input
               type="text"
-              value={(item.fee_amount || 0).toLocaleString('en-GB')}
+              value={((item.fee_lower ?? item.fee_amount) || 0).toLocaleString('en-GB')}
               onChange={(e) => {
                 const rawValue = e.target.value.replace(/,/g, '');
                 const numericValue = parseFloat(rawValue) || 0;
+                // When editing lower, also update fee_amount to midpoint
+                const upper = item.fee_upper ?? item.fee_amount ?? 0;
+                const midpoint = Math.round((numericValue + upper) / 2);
                 onUpdate(index, {
-                  fee_amount: numericValue,
+                  fee_lower: numericValue,
+                  fee_amount: midpoint,
                   pricing_method: 'manual'
                 });
               }}
-              className="w-[110px] text-right"
+              className="w-[100px] text-right"
+              placeholder="0"
+            />
+          </div>
+        )}
+      </TableCell>
+
+      {/* Upper Estimate */}
+      <TableCell>
+        {viewingHistoricalVersion ? (
+          <span className="text-sm font-medium">{formatCurrency(item.fee_upper ?? item.fee_amount)}</span>
+        ) : (
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-muted-foreground">{formatCurrency(0).charAt(0)}</span>
+            <Input
+              type="text"
+              value={((item.fee_upper ?? item.fee_amount) || 0).toLocaleString('en-GB')}
+              onChange={(e) => {
+                const rawValue = e.target.value.replace(/,/g, '');
+                const numericValue = parseFloat(rawValue) || 0;
+                // When editing upper, also update fee_amount to midpoint
+                const lower = item.fee_lower ?? item.fee_amount ?? 0;
+                const midpoint = Math.round((lower + numericValue) / 2);
+                onUpdate(index, {
+                  fee_upper: numericValue,
+                  fee_amount: midpoint,
+                  pricing_method: 'manual'
+                });
+              }}
+              className="w-[100px] text-right"
               placeholder="0"
             />
           </div>

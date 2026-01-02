@@ -172,10 +172,17 @@ export default function PricingProposalDetail() {
     const localCounselTotal = includedItems
       .filter(item => item.provider === 'Local Counsel')
       .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+    
+    // Calculate lower and upper totals
+    const lowerTotal = includedItems.reduce((sum, item) => sum + (item.fee_lower ?? item.fee_amount ?? 0), 0);
+    const upperTotal = includedItems.reduce((sum, item) => sum + (item.fee_upper ?? item.fee_amount ?? 0), 0);
+    
     return {
       bmTotal,
       localCounselTotal,
       total: bmTotal + localCounselTotal,
+      lowerTotal,
+      upperTotal,
     };
   }, [draftItems]);
 
@@ -390,6 +397,8 @@ export default function PricingProposalDetail() {
       work_item: "",
       provider: "Baker McKenzie",
       fee_amount: 0,
+      fee_lower: 0,
+      fee_upper: 0,
       pricing_method: "manual",
       category: null,
       is_optional: false,
@@ -686,24 +695,27 @@ export default function PricingProposalDetail() {
       });
     
     // Group by category and calculate subtotals
-    const categorizedData: { category: string; items: typeof sortedItems; subtotal: number }[] = [];
+    const categorizedData: { category: string; items: typeof sortedItems; subtotalLower: number; subtotalUpper: number }[] = [];
     let currentCategory = '';
     let currentItems: typeof sortedItems = [];
-    let currentSubtotal = 0;
+    let currentSubtotalLower = 0;
+    let currentSubtotalUpper = 0;
     
     sortedItems.forEach(item => {
       const cat = item.category || 'Other';
       if (cat !== currentCategory && currentItems.length > 0) {
-        categorizedData.push({ category: currentCategory, items: currentItems, subtotal: currentSubtotal });
+        categorizedData.push({ category: currentCategory, items: currentItems, subtotalLower: currentSubtotalLower, subtotalUpper: currentSubtotalUpper });
         currentItems = [];
-        currentSubtotal = 0;
+        currentSubtotalLower = 0;
+        currentSubtotalUpper = 0;
       }
       currentCategory = cat;
       currentItems.push(item);
-      currentSubtotal += item.fee_amount;
+      currentSubtotalLower += item.fee_lower ?? item.fee_amount;
+      currentSubtotalUpper += item.fee_upper ?? item.fee_amount;
     });
     if (currentItems.length > 0) {
-      categorizedData.push({ category: currentCategory, items: currentItems, subtotal: currentSubtotal });
+      categorizedData.push({ category: currentCategory, items: currentItems, subtotalLower: currentSubtotalLower, subtotalUpper: currentSubtotalUpper });
     }
     
     // Create workbook and worksheet
@@ -715,22 +727,23 @@ export default function PricingProposalDetail() {
       { key: 'category', width: 22 },
       { key: 'workItem', width: 55 },
       { key: 'provider', width: 20 },
-      { key: 'estimate', width: 18 },
+      { key: 'lowerEstimate', width: 16 },
+      { key: 'upperEstimate', width: 16 },
     ];
     
     // Title row with client name and proposal name
     const clientName = proposal?.client?.name || 'Client';
     const proposalName = proposal?.name || 'Pricing Proposal';
-    const titleRow = worksheet.addRow([`${clientName} - ${proposalName}`, '', '', '']);
+    const titleRow = worksheet.addRow([`${clientName} - ${proposalName}`, '', '', '', '']);
     titleRow.font = { bold: true, size: 16 };
     titleRow.height = 28;
-    worksheet.mergeCells('A1:D1');
+    worksheet.mergeCells('A1:E1');
     
     // Empty row
-    worksheet.addRow(['', '', '', '']);
+    worksheet.addRow(['', '', '', '', '']);
     
     // Header row
-    const headerRow = worksheet.addRow(['Category', 'Work Item', 'Provider', 'Estimate']);
+    const headerRow = worksheet.addRow(['Category', 'Work Item', 'Provider', 'Lower Est.', 'Upper Est.']);
     headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     headerRow.fill = {
       type: 'pattern',
@@ -739,15 +752,16 @@ export default function PricingProposalDetail() {
     };
     headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
     headerRow.height = 24;
-    // Align Estimate header to right
     headerRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'right' };
+    headerRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'right' };
     headerRow.eachCell(cell => {
       cell.border = {
         bottom: { style: 'medium', color: { argb: 'FF1a365d' } }
       };
     });
     
-    let grandTotal = 0;
+    let grandTotalLower = 0;
+    let grandTotalUpper = 0;
     let rowIndex = 0;
     
     // Colors for alternating rows
@@ -756,73 +770,47 @@ export default function PricingProposalDetail() {
     const subtotalBg = { argb: 'FFEDF2F7' };
     const totalBg = { argb: 'FF2D3748' };
     
-    categorizedData.forEach(({ category, items, subtotal }) => {
+    categorizedData.forEach(({ category, items, subtotalLower, subtotalUpper }) => {
       items.forEach((item, idx) => {
         const row = worksheet.addRow([
           idx === 0 ? category : '',
           item.work_item,
           item.provider,
-          item.fee_amount
+          item.fee_lower ?? item.fee_amount,
+          item.fee_upper ?? item.fee_amount
         ]);
-        
-        // Alternating row colors
-        row.fill = {
-          type: 'pattern',
-          pattern: 'solid',
-          fgColor: rowIndex % 2 === 0 ? white : lightGray
-        };
+        row.fill = { type: 'pattern', pattern: 'solid', fgColor: rowIndex % 2 === 0 ? white : lightGray };
         row.alignment = { vertical: 'middle' };
-        
-        // Format currency
         row.getCell(4).numFmt = `"${currencySymbol}"#,##0`;
         row.getCell(4).alignment = { horizontal: 'right' };
-        
-        // Bold category name
-        if (idx === 0) {
-          row.getCell(1).font = { bold: true };
-        }
-        
+        row.getCell(5).numFmt = `"${currencySymbol}"#,##0`;
+        row.getCell(5).alignment = { horizontal: 'right' };
+        if (idx === 0) row.getCell(1).font = { bold: true };
         rowIndex++;
       });
       
-      // Subtotal row
-      const subtotalRow = worksheet.addRow(['', `${category} Subtotal`, '', subtotal]);
+      const subtotalRow = worksheet.addRow(['', `${category} Subtotal`, '', subtotalLower, subtotalUpper]);
       subtotalRow.font = { bold: true };
-      subtotalRow.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: subtotalBg
-      };
+      subtotalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: subtotalBg };
       subtotalRow.getCell(4).numFmt = `"${currencySymbol}"#,##0`;
       subtotalRow.getCell(4).alignment = { horizontal: 'right' };
-      subtotalRow.eachCell(cell => {
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FFCBD5E0' } },
-          bottom: { style: 'thin', color: { argb: 'FFCBD5E0' } }
-        };
-      });
+      subtotalRow.getCell(5).numFmt = `"${currencySymbol}"#,##0`;
+      subtotalRow.getCell(5).alignment = { horizontal: 'right' };
       
-      grandTotal += subtotal;
-      
-      // Empty row between categories
-      worksheet.addRow(['', '', '', '']);
-      rowIndex = 0; // Reset for next category
+      grandTotalLower += subtotalLower;
+      grandTotalUpper += subtotalUpper;
+      worksheet.addRow(['', '', '', '', '']);
+      rowIndex = 0;
     });
     
-    // Grand total row
-    const totalRow = worksheet.addRow(['', 'TOTAL ESTIMATE', '', grandTotal]);
+    const totalRow = worksheet.addRow(['', 'TOTAL ESTIMATE', '', grandTotalLower, grandTotalUpper]);
     totalRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
-    totalRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: totalBg
-    };
+    totalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: totalBg };
     totalRow.height = 26;
     totalRow.getCell(4).numFmt = `"${currencySymbol}"#,##0`;
     totalRow.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' };
-    totalRow.eachCell(cell => {
-      cell.alignment = { vertical: 'middle' };
-    });
+    totalRow.getCell(5).numFmt = `"${currencySymbol}"#,##0`;
+    totalRow.getCell(5).alignment = { horizontal: 'right', vertical: 'middle' };
     
     // Generate and download file
     const buffer = await workbook.xlsx.writeBuffer();
@@ -1249,7 +1237,8 @@ export default function PricingProposalDetail() {
                               <TableHead className="w-[110px]">Category</TableHead>
                               <TableHead className="w-[120px]">Provider</TableHead>
                               <TableHead className="w-[50px] text-center">Calc</TableHead>
-                              <TableHead className="text-right w-[90px]">Fee</TableHead>
+                              <TableHead className="text-right w-[100px]">Lower Est.</TableHead>
+                              <TableHead className="text-right w-[100px]">Upper Est.</TableHead>
                               <TableHead className="w-[70px]">Method</TableHead>
                               <TableHead className="text-center w-[45px]">Opt</TableHead>
                               <TableHead className="text-center w-[45px]">Inc</TableHead>
@@ -1274,6 +1263,13 @@ export default function PricingProposalDetail() {
                                 />
                               ))}
                             </SortableContext>
+                            {/* Totals Row */}
+                            <TableRow className="bg-muted/50 font-semibold border-t-2">
+                              <TableCell colSpan={6} className="text-right">TOTALS</TableCell>
+                              <TableCell className="text-right">{formatCurrency(workItemTotals.lowerTotal)}</TableCell>
+                              <TableCell className="text-right">{formatCurrency(workItemTotals.upperTotal)}</TableCell>
+                              <TableCell colSpan={3}></TableCell>
+                            </TableRow>
                           </TableBody>
                         </Table>
                       </div>
@@ -1311,8 +1307,8 @@ export default function PricingProposalDetail() {
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Fee</p>
-                      <p className="text-2xl font-bold">{formatCurrency(workItemTotals.total)}</p>
+                      <p className="text-sm font-medium text-muted-foreground">Estimate Range</p>
+                      <p className="text-2xl font-bold">{formatCurrency(workItemTotals.lowerTotal)} - {formatCurrency(workItemTotals.upperTotal)}</p>
                     </div>
                     <DollarSign className="h-8 w-8 text-muted-foreground/30" />
                   </div>

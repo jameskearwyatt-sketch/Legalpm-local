@@ -34,6 +34,7 @@ import { useMatters, MatterWithFinancials, MatterCategory, MatterStage } from '@
 import { useClients } from '@/lib/hooks/useClients';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useAuth } from '@/lib/auth';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock } from 'lucide-react';
@@ -66,6 +67,31 @@ export default function Matters() {
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('matter_name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  // Fetch all matter_clients to support filtering by secondary clients on multi-client matters
+  const { data: allMatterClients = [] } = useQuery({
+    queryKey: ['all-matter-clients'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('matter_clients')
+        .select('matter_id, client_id');
+      if (error) throw error;
+      return data as { matter_id: string; client_id: string }[];
+    },
+    enabled: !!user,
+  });
+
+  // Build a map of matter_id -> array of client_ids for quick lookup
+  const matterToClientsMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    allMatterClients.forEach((mc) => {
+      if (!map[mc.matter_id]) {
+        map[mc.matter_id] = [];
+      }
+      map[mc.matter_id].push(mc.client_id);
+    });
+    return map;
+  }, [allMatterClients]);
 
   // Silent update for local counsel billing (no toast)
   const updateLocalCounselBilling = async (matterId: string, value: 'Direct' | 'Disb' | null) => {
@@ -168,9 +194,15 @@ export default function Matters() {
       );
     }
 
-    // Client filter
+    // Client filter - check both primary client and secondary clients (for multi-client matters)
     if (clientFilter !== 'all') {
-      result = result.filter((m) => m.client_id === clientFilter);
+      result = result.filter((m) => {
+        // Check primary client
+        if (m.client_id === clientFilter) return true;
+        // Check secondary clients from matter_clients table
+        const secondaryClients = matterToClientsMap[m.id] || [];
+        return secondaryClients.includes(clientFilter);
+      });
     }
 
     // Sort
@@ -232,7 +264,7 @@ export default function Matters() {
     });
 
     return result;
-  }, [matters, search, categoryFilter, clientFilter, sortField, sortDirection]);
+  }, [matters, search, categoryFilter, clientFilter, sortField, sortDirection, matterToClientsMap]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<MatterCategory, number> = { Live: 0, Pipeline: 0, Closed: 0, Lost: 0 };

@@ -174,7 +174,7 @@ export function TableScrollControls({ children, className }: TableScrollControls
         <div 
           style={{
             position: 'fixed',
-            bottom: '20px',
+            bottom: '80px',
             left: `${position.left + position.width / 2}px`,
             transform: 'translateX(-50%)',
             zIndex: 99999,

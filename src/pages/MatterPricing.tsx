@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -8,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TableScrollControls } from "@/components/ui/table-scroll-controls";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Calculator, Users, FileText, TrendingUp, Clock, Percent, DollarSign, Building } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calculator, Users, FileText, TrendingUp, Clock, Percent, DollarSign, Building, FolderOpen } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Rate card data - can be customized per firm
@@ -47,6 +49,7 @@ const DEFAULT_PHASES: WorkPhase[] = [
 ];
 
 export default function MatterPricing() {
+  const navigate = useNavigate();
   // Assumptions
   const [negotiatedDocsDecay, setNegotiatedDocsDecay] = useState(0.5);
   const [ddDecay, setDdDecay] = useState(0.35);
@@ -188,8 +191,12 @@ export default function MatterPricing() {
           </p>
         </div>
 
-        <Tabs defaultValue="summary" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4 max-w-2xl">
+        <Tabs defaultValue="proposals" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5 max-w-3xl">
+            <TabsTrigger value="proposals">
+              <FolderOpen className="h-4 w-4 mr-2" />
+              Proposals
+            </TabsTrigger>
             <TabsTrigger value="summary">
               <TrendingUp className="h-4 w-4 mr-2" />
               Summary
@@ -207,6 +214,31 @@ export default function MatterPricing() {
               Rate Card
             </TabsTrigger>
           </TabsList>
+
+          {/* PROPOSALS TAB */}
+          <TabsContent value="proposals" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FolderOpen className="h-5 w-5" />
+                  Pricing Proposals
+                </CardTitle>
+                <CardDescription>
+                  Create and manage draft pricing proposals for client matters before they become live matters
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center gap-4 py-8">
+                <p className="text-muted-foreground text-center max-w-md">
+                  Use Pricing Proposals to build and negotiate fee quotes with clients. 
+                  Upload RFPs, get AI suggestions, and track versions until agreed.
+                </p>
+                <Button onClick={() => navigate('/pricing/proposals')}>
+                  <FolderOpen className="h-4 w-4 mr-2" />
+                  Open Pricing Proposals
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* SUMMARY TAB */}
           <TabsContent value="summary" className="space-y-6">

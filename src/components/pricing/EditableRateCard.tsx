@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, Save, Loader2, Users } from "lucide-react";
@@ -14,11 +13,19 @@ interface FeeEarner {
   rate: number;
 }
 
+// Default labels with numbered suffix
+const DEFAULT_LABELS: Record<string, string> = {
+  partner: "Partner 1",
+  seniorAssociate: "Senior Associate 1",
+  associate: "Associate 1",
+  trainee: "Trainee 1",
+};
+
 // Convert RateCard to array format for dynamic editing
 function rateCardToArray(rateCard: RateCard): FeeEarner[] {
   return Object.entries(rateCard).map(([key, value]) => ({
     key,
-    label: formatLabel(key),
+    label: DEFAULT_LABELS[key] || formatLabel(key),
     rate: value.rate,
   }));
 }
@@ -73,6 +80,12 @@ export function EditableRateCard({
   const [newEarnerLabel, setNewEarnerLabel] = useState("");
   const [newEarnerRate, setNewEarnerRate] = useState(0);
 
+  // Sort by rate descending
+  const sortedEarners = useMemo(() => 
+    [...feeEarners].sort((a, b) => b.rate - a.rate),
+    [feeEarners]
+  );
+
   const updateFeeEarner = (key: string, value: number) => {
     setFeeEarners(prev => prev.map(earner => 
       earner.key === key ? { ...earner, rate: value } : earner
@@ -108,68 +121,54 @@ export function EditableRateCard({
 
   return (
     <>
-      <Card>
-        <CardHeader className="pb-3">
+      <Card className="max-w-md">
+        <CardHeader className="pb-2 px-4">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-base">
+            <CardTitle className="flex items-center gap-2 text-sm font-medium">
               <Users className="h-4 w-4" />
               Team Rate Card
             </CardTitle>
-            <Button variant="outline" size="sm" onClick={() => setIsAddDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" />
+            <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setIsAddDialogOpen(true)}>
+              <Plus className="h-3 w-3 mr-1" />
               Add
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3 pt-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="py-2">Fee Earner</TableHead>
-                <TableHead className="text-right py-2 w-[100px]">Rate ({currencySymbol})</TableHead>
-                <TableHead className="w-[40px] py-2"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {feeEarners.map((earner) => (
-                <TableRow key={earner.key}>
-                  <TableCell className="font-medium py-1.5">{earner.label}</TableCell>
-                  <TableCell className="py-1.5">
-                    <Input
-                      type="number"
-                      value={earner.rate}
-                      onChange={(e) => updateFeeEarner(earner.key, parseFloat(e.target.value) || 0)}
-                      className="w-24 h-8 text-right ml-auto text-sm"
-                    />
-                  </TableCell>
-                  <TableCell className="py-1.5">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeFeeEarner(earner.key)}
-                      className="h-7 w-7"
-                    >
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {feeEarners.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={3} className="text-center text-muted-foreground py-6 text-sm">
-                    No team members. Click "Add" to build your team.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+        <CardContent className="px-4 pb-3 pt-0">
+          <div className="space-y-1">
+            {sortedEarners.map((earner) => (
+              <div key={earner.key} className="flex items-center gap-2 py-1">
+                <span className="text-sm font-medium flex-1 min-w-0 truncate">{earner.label}</span>
+                <Input
+                  type="number"
+                  value={earner.rate}
+                  onChange={(e) => updateFeeEarner(earner.key, parseFloat(e.target.value) || 0)}
+                  className="w-20 h-7 text-right text-sm px-2"
+                />
+                <span className="text-xs text-muted-foreground w-6">{currencySymbol}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeFeeEarner(earner.key)}
+                  className="h-6 w-6 shrink-0"
+                >
+                  <Trash2 className="h-3 w-3 text-destructive" />
+                </Button>
+              </div>
+            ))}
+            {sortedEarners.length === 0 && (
+              <p className="text-center text-muted-foreground py-4 text-sm">
+                No team members. Click "Add" to build your team.
+              </p>
+            )}
+          </div>
 
-          <div className="flex justify-end pt-2">
-            <Button size="sm" onClick={handleSave} disabled={isSaving}>
+          <div className="flex justify-end pt-3 border-t mt-3">
+            <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={isSaving}>
               {isSaving ? (
-                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
               ) : (
-                <Save className="h-4 w-4 mr-1" />
+                <Save className="h-3 w-3 mr-1" />
               )}
               Save
             </Button>
@@ -179,7 +178,7 @@ export function EditableRateCard({
 
       {/* Add Team Member Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Add Team Member</DialogTitle>
           </DialogHeader>
@@ -189,7 +188,7 @@ export function EditableRateCard({
               <Input
                 value={newEarnerLabel}
                 onChange={(e) => setNewEarnerLabel(e.target.value)}
-                placeholder="e.g., Counsel, Paralegal"
+                placeholder="e.g., Partner 2, Counsel"
               />
             </div>
             <div className="space-y-2">

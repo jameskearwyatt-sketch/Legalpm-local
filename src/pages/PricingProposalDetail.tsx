@@ -606,10 +606,18 @@ export default function PricingProposalDetail() {
     }
   };
 
+  // Sanitize items before saving - map 'iterative' to 'pricing_tool' for DB constraint
+  const sanitizeItemsForSave = (items: typeof draftItems) => {
+    return items.map(item => ({
+      ...item,
+      pricing_method: item.pricing_method === 'iterative' as any ? 'pricing_tool' : item.pricing_method,
+    }));
+  };
+
   // Save as current version (overwrites)
   const handleSaveCurrentVersion = async () => {
     await updateCurrentVersion.mutateAsync({
-      items: draftItems,
+      items: sanitizeItemsForSave(draftItems),
       notes: versionNotes,
     });
     setHasUnsavedChanges(false);
@@ -619,7 +627,7 @@ export default function PricingProposalDetail() {
   // Save as new version
   const handleSaveNewVersion = async () => {
     await saveVersion.mutateAsync({
-      items: draftItems,
+      items: sanitizeItemsForSave(draftItems),
       notes: versionNotes,
     });
     setHasUnsavedChanges(false);

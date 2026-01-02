@@ -29,6 +29,7 @@ import { BudgetSection } from '@/components/matters/BudgetSection';
 import { AssumptionsSection } from '@/components/matters/AssumptionsSection';
 import { useClients } from '@/lib/hooks/useClients';
 import { useExchangeRates, getExchangeRate } from '@/lib/hooks/useExchangeRates';
+import { formatCurrency } from '@/lib/currencyUtils';
 import { useMatterClients, UpdateMatterClientInput } from '@/lib/hooks/useMatterClients';
 import { useLocalCounsels } from '@/lib/hooks/useLocalCounsels';
 import { useAuth } from '@/lib/auth';
@@ -326,13 +327,7 @@ export default function MatterDetail() {
     setHasChanges(true);
   };
 
-  const formatCurrency = (value: number, currency: string = 'GBP') => {
-    const currencySymbols: Record<string, string> = {
-      'GBP': '£', 'USD': '$', 'EUR': '€', 'Ringgit': 'RM', 'CHF': 'CHF ', 'AUD': 'A$', 'CAD': 'C$', 'SGD': 'S$'
-    };
-    const symbol = currencySymbols[currency] || currency + ' ';
-    return `${symbol}${value.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-  };
+  // Use shared formatCurrency from currencyUtils - imported at top
 
   const formatDate = (date: string | null) => {
     if (!date) return '-';

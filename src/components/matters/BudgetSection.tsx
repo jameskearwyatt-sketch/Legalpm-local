@@ -44,6 +44,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CategorizedBudgetView } from './CategorizedBudgetView';
+import { formatCurrency as sharedFormatCurrency } from '@/lib/currencyUtils';
 
 interface BudgetSectionProps {
   matterId: string;

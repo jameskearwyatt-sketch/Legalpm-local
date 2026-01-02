@@ -390,7 +390,7 @@ export default function PricingProposalDetail() {
   const currencySymbol = proposal?.currency === "GBP" ? "£" : proposal?.currency === "USD" ? "$" : "€";
 
   const formatCurrency = (value: number) => {
-    return `${currencySymbol}${value.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    return `${currencySymbol}${new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)}`;
   };
 
   const formatHours = (value: number) => {

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Calculator, Info } from "lucide-react";
 import { RateCard, ProposalAssumptions } from "@/lib/hooks/usePricingProposals";
+import { getCurrencySymbol } from "@/lib/currencyUtils";
 
 export interface FeeOwnerHours {
   [key: string]: number;
@@ -205,7 +206,7 @@ export function IterativePricingDialog({
   };
 
   const formatCurrency = (value: number) => {
-    return `${currencySymbol}${value.toLocaleString('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+    return `${currencySymbol}${new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)}`;
   };
 
   return (

@@ -1026,7 +1026,6 @@ export default function PricingProposalDetail() {
                             <TableHead className="w-[30px]"></TableHead>
                             <TableHead className="min-w-[280px]">Work Item</TableHead>
                             <TableHead className="w-[110px]">Category</TableHead>
-                            <TableHead className="w-[100px]">Type</TableHead>
                             <TableHead className="w-[120px]">Provider</TableHead>
                             <TableHead className="w-[50px] text-center">Calc</TableHead>
                             <TableHead className="text-right w-[90px]">Fee</TableHead>
@@ -1080,7 +1079,7 @@ export default function PricingProposalDetail() {
                                     "border-t-2",
                                     categoryBorderColors[cat]
                                   )}>
-                                    <TableCell colSpan={11} className="py-2">
+                                    <TableCell colSpan={10} className="py-2">
                                       <span className={cn("font-semibold text-sm", categoryTextColors[cat])}>
                                         {item.category}
                                       </span>
@@ -1092,7 +1091,7 @@ export default function PricingProposalDetail() {
                                 lastCategory = '__uncategorized__';
                                 result.push(
                                   <TableRow key="category-uncategorized" className="bg-muted/30 border-t-2 border-muted">
-                                    <TableCell colSpan={11} className="py-2">
+                                    <TableCell colSpan={10} className="py-2">
                                       <span className="font-semibold text-sm text-muted-foreground">
                                         Uncategorized
                                       </span>
@@ -1167,26 +1166,6 @@ export default function PricingProposalDetail() {
                                               {cat}
                                             </SelectItem>
                                           ))}
-                                        </SelectContent>
-                                      </Select>
-                                    )}
-                                  </TableCell>
-                                  <TableCell>
-                                    {viewingHistoricalVersion ? (
-                                      <span className="text-sm capitalize">{item.item_type?.replace('_', ' ') || 'Documentation'}</span>
-                                    ) : (
-                                      <Select
-                                        value={item.item_type || 'documentation'}
-                                        onValueChange={(value: ItemType) => updateItem(originalIndex, { item_type: value })}
-                                      >
-                                        <SelectTrigger className="w-[120px]">
-                                          <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                          <SelectItem value="documentation">Documentation</SelectItem>
-                                          <SelectItem value="negotiation">Negotiation</SelectItem>
-                                          <SelectItem value="due_diligence">Due Diligence</SelectItem>
-                                          <SelectItem value="meeting">Meeting</SelectItem>
                                         </SelectContent>
                                       </Select>
                                     )}

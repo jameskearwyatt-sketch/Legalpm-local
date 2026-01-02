@@ -664,6 +664,169 @@ export type Database = {
           },
         ]
       }
+      pricing_proposal_items: {
+        Row: {
+          ai_rationale: string | null
+          category: string | null
+          created_at: string
+          fee_amount: number
+          id: string
+          is_included: boolean
+          is_optional: boolean
+          lc_firm_name: string | null
+          pricing_method: string
+          proposal_id: string
+          provider: string
+          sort_order: number
+          updated_at: string
+          user_id: string
+          version_id: string
+          work_item: string
+        }
+        Insert: {
+          ai_rationale?: string | null
+          category?: string | null
+          created_at?: string
+          fee_amount?: number
+          id?: string
+          is_included?: boolean
+          is_optional?: boolean
+          lc_firm_name?: string | null
+          pricing_method?: string
+          proposal_id: string
+          provider?: string
+          sort_order?: number
+          updated_at?: string
+          user_id: string
+          version_id: string
+          work_item: string
+        }
+        Update: {
+          ai_rationale?: string | null
+          category?: string | null
+          created_at?: string
+          fee_amount?: number
+          id?: string
+          is_included?: boolean
+          is_optional?: boolean
+          lc_firm_name?: string | null
+          pricing_method?: string
+          proposal_id?: string
+          provider?: string
+          sort_order?: number
+          updated_at?: string
+          user_id?: string
+          version_id?: string
+          work_item?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_proposal_items_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_proposals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pricing_proposal_items_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_proposal_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pricing_proposal_versions: {
+        Row: {
+          bm_total: number
+          created_at: string
+          id: string
+          local_counsel_total: number
+          notes: string | null
+          proposal_id: string
+          total_amount: number
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          bm_total?: number
+          created_at?: string
+          id?: string
+          local_counsel_total?: number
+          notes?: string | null
+          proposal_id: string
+          total_amount?: number
+          user_id: string
+          version_number: number
+        }
+        Update: {
+          bm_total?: number
+          created_at?: string
+          id?: string
+          local_counsel_total?: number
+          notes?: string | null
+          proposal_id?: string
+          total_amount?: number
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_proposal_versions_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pricing_proposals: {
+        Row: {
+          client_id: string
+          created_at: string
+          currency: string
+          current_version: number
+          description: string | null
+          id: string
+          name: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          currency?: string
+          current_version?: number
+          description?: string | null
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          currency?: string
+          current_version?: number
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_proposals_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

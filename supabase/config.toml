@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.categorize-budget-items]
 verify_jwt = false
+
+[functions.ask-ai]
+verify_jwt = true

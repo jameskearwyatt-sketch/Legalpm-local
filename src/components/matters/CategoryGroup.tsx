@@ -22,6 +22,8 @@ const categoryColors: Record<BudgetCategory, string> = {
   'Meetings': 'bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700',
   'Regulatory': 'bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700',
   'Closing': 'bg-teal-100 dark:bg-teal-900/30 border-teal-300 dark:border-teal-700',
+  'Tax': 'bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700',
+  'Legal Opinions': 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-300 dark:border-indigo-700',
   'Other': 'bg-gray-100 dark:bg-gray-800/50 border-gray-300 dark:border-gray-600',
 };
 
@@ -32,6 +34,8 @@ const categoryTextColors: Record<BudgetCategory, string> = {
   'Meetings': 'text-green-700 dark:text-green-300',
   'Regulatory': 'text-red-700 dark:text-red-300',
   'Closing': 'text-teal-700 dark:text-teal-300',
+  'Tax': 'text-orange-700 dark:text-orange-300',
+  'Legal Opinions': 'text-indigo-700 dark:text-indigo-300',
   'Other': 'text-gray-700 dark:text-gray-300',
 };
 

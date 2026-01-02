@@ -12,7 +12,6 @@ interface FeeOwner {
   key: string;
   label: string;
   rate: number;
-  cost: number;
 }
 
 // Convert RateCard to array format for dynamic editing
@@ -21,7 +20,6 @@ function rateCardToArray(rateCard: RateCard): FeeOwner[] {
     key,
     label: formatLabel(key),
     rate: value.rate,
-    cost: value.cost,
   }));
 }
 
@@ -49,10 +47,10 @@ function arrayToRateCard(feeOwners: FeeOwner[]): RateCard {
   };
   feeOwners.forEach(owner => {
     if (owner.key in result) {
-      (result as any)[owner.key] = { rate: owner.rate, cost: owner.cost };
+      (result as any)[owner.key] = { rate: owner.rate, cost: 0 };
     } else {
       // For custom fee owners, we store them with their key
-      (result as any)[owner.key] = { rate: owner.rate, cost: owner.cost };
+      (result as any)[owner.key] = { rate: owner.rate, cost: 0 };
     }
   });
   return result;
@@ -75,11 +73,10 @@ export function EditableRateCard({
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newOwnerLabel, setNewOwnerLabel] = useState("");
   const [newOwnerRate, setNewOwnerRate] = useState(0);
-  const [newOwnerCost, setNewOwnerCost] = useState(0);
 
-  const updateFeeOwner = (key: string, field: 'rate' | 'cost', value: number) => {
+  const updateFeeOwner = (key: string, value: number) => {
     setFeeOwners(prev => prev.map(owner => 
-      owner.key === key ? { ...owner, [field]: value } : owner
+      owner.key === key ? { ...owner, rate: value } : owner
     ));
   };
 
@@ -99,22 +96,15 @@ export function EditableRateCard({
       key,
       label: newOwnerLabel.trim(),
       rate: newOwnerRate,
-      cost: newOwnerCost,
     }]);
 
     setNewOwnerLabel("");
     setNewOwnerRate(0);
-    setNewOwnerCost(0);
     setIsAddDialogOpen(false);
   };
 
   const handleSave = async () => {
     await onSave(arrayToRateCard(feeOwners));
-  };
-
-  const calculateMargin = (rate: number, cost: number) => {
-    if (rate === 0) return 0;
-    return ((rate - cost) / rate) * 100;
   };
 
   return (
@@ -143,8 +133,6 @@ export function EditableRateCard({
               <TableRow>
                 <TableHead>Fee Owner</TableHead>
                 <TableHead className="text-right">Billing Rate ({currencySymbol})</TableHead>
-                <TableHead className="text-right">Cost Rate ({currencySymbol})</TableHead>
-                <TableHead className="text-right">Margin</TableHead>
                 <TableHead className="w-[60px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -156,20 +144,9 @@ export function EditableRateCard({
                     <Input
                       type="number"
                       value={owner.rate}
-                      onChange={(e) => updateFeeOwner(owner.key, 'rate', parseFloat(e.target.value) || 0)}
+                      onChange={(e) => updateFeeOwner(owner.key, parseFloat(e.target.value) || 0)}
                       className="w-28 text-right ml-auto"
                     />
-                  </TableCell>
-                  <TableCell>
-                    <Input
-                      type="number"
-                      value={owner.cost}
-                      onChange={(e) => updateFeeOwner(owner.key, 'cost', parseFloat(e.target.value) || 0)}
-                      className="w-28 text-right ml-auto"
-                    />
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {calculateMargin(owner.rate, owner.cost).toFixed(0)}%
                   </TableCell>
                   <TableCell>
                     <Button
@@ -185,7 +162,7 @@ export function EditableRateCard({
               ))}
               {feeOwners.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
                     No team members added. Click "Add Team Member" to build your team.
                   </TableCell>
                 </TableRow>
@@ -221,25 +198,14 @@ export function EditableRateCard({
                 placeholder="e.g., Counsel, Junior Associate, Paralegal"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Billing Rate ({currencySymbol})</Label>
-                <Input
-                  type="number"
-                  value={newOwnerRate}
-                  onChange={(e) => setNewOwnerRate(parseFloat(e.target.value) || 0)}
-                  min={0}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Cost Rate ({currencySymbol})</Label>
-                <Input
-                  type="number"
-                  value={newOwnerCost}
-                  onChange={(e) => setNewOwnerCost(parseFloat(e.target.value) || 0)}
-                  min={0}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Billing Rate ({currencySymbol})</Label>
+              <Input
+                type="number"
+                value={newOwnerRate}
+                onChange={(e) => setNewOwnerRate(parseFloat(e.target.value) || 0)}
+                min={0}
+              />
             </div>
           </div>
           <DialogFooter>

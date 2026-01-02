@@ -52,6 +52,7 @@ import { useMatters } from "@/lib/hooks/useMatters";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 import { cn } from "@/lib/utils";
 import { getCurrencySymbol } from "@/lib/currencyUtils";
 import { IterativePricingDialog, FeeOwnerHours } from "@/components/pricing/IterativePricingDialog";
@@ -662,7 +663,7 @@ export default function PricingProposalDetail() {
   };
 
   // Export to Excel with nice formatting
-  const exportToExcel = () => {
+  const exportToExcel = async () => {
     const currencySymbol = getCurrencySymbol(proposal?.currency || 'GBP');
     
     // Category order for sorting
@@ -705,66 +706,131 @@ export default function PricingProposalDetail() {
       categorizedData.push({ category: currentCategory, items: currentItems, subtotal: currentSubtotal });
     }
     
-    // Build worksheet data with headers, rows, subtotals
-    const wsData: (string | number)[][] = [];
+    // Create workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Pricing Proposal');
+    
+    // Set column widths
+    worksheet.columns = [
+      { key: 'category', width: 22 },
+      { key: 'workItem', width: 55 },
+      { key: 'provider', width: 20 },
+      { key: 'estimate', width: 18 },
+    ];
     
     // Title row
-    wsData.push([proposal?.name || 'Pricing Proposal', '', '', '']);
-    wsData.push(['', '', '', '']);
+    const titleRow = worksheet.addRow([proposal?.name || 'Pricing Proposal', '', '', '']);
+    titleRow.font = { bold: true, size: 16 };
+    titleRow.height = 28;
+    worksheet.mergeCells('A1:D1');
+    
+    // Empty row
+    worksheet.addRow(['', '', '', '']);
     
     // Header row
-    wsData.push(['Category', 'Work Item', 'Provider', 'Estimate']);
+    const headerRow = worksheet.addRow(['Category', 'Work Item', 'Provider', 'Estimate']);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1a365d' } // Dark blue
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
+    headerRow.height = 24;
+    headerRow.eachCell(cell => {
+      cell.border = {
+        bottom: { style: 'medium', color: { argb: 'FF1a365d' } }
+      };
+    });
     
     let grandTotal = 0;
-    const subtotalRows: number[] = [];
-    const headerRow = 2; // 0-indexed row 2 is the header
+    let rowIndex = 0;
+    
+    // Colors for alternating rows
+    const lightGray = { argb: 'FFF7FAFC' };
+    const white = { argb: 'FFFFFFFF' };
+    const subtotalBg = { argb: 'FFEDF2F7' };
+    const totalBg = { argb: 'FF2D3748' };
     
     categorizedData.forEach(({ category, items, subtotal }) => {
       items.forEach((item, idx) => {
-        wsData.push([
-          idx === 0 ? category : '', // Only show category on first row of group
+        const row = worksheet.addRow([
+          idx === 0 ? category : '',
           item.work_item,
           item.provider,
           item.fee_amount
         ]);
+        
+        // Alternating row colors
+        row.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: rowIndex % 2 === 0 ? white : lightGray
+        };
+        row.alignment = { vertical: 'middle' };
+        
+        // Format currency
+        row.getCell(4).numFmt = `"${currencySymbol}"#,##0`;
+        row.getCell(4).alignment = { horizontal: 'right' };
+        
+        // Bold category name
+        if (idx === 0) {
+          row.getCell(1).font = { bold: true };
+        }
+        
+        rowIndex++;
       });
+      
       // Subtotal row
-      subtotalRows.push(wsData.length);
-      wsData.push(['', `${category} Subtotal`, '', subtotal]);
+      const subtotalRow = worksheet.addRow(['', `${category} Subtotal`, '', subtotal]);
+      subtotalRow.font = { bold: true };
+      subtotalRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: subtotalBg
+      };
+      subtotalRow.getCell(4).numFmt = `"${currencySymbol}"#,##0`;
+      subtotalRow.getCell(4).alignment = { horizontal: 'right' };
+      subtotalRow.eachCell(cell => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFCBD5E0' } },
+          bottom: { style: 'thin', color: { argb: 'FFCBD5E0' } }
+        };
+      });
+      
       grandTotal += subtotal;
+      
       // Empty row between categories
-      wsData.push(['', '', '', '']);
+      worksheet.addRow(['', '', '', '']);
+      rowIndex = 0; // Reset for next category
     });
     
     // Grand total row
-    const grandTotalRow = wsData.length;
-    wsData.push(['', 'TOTAL FEE', '', grandTotal]);
+    const totalRow = worksheet.addRow(['', 'TOTAL FEE', '', grandTotal]);
+    totalRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
+    totalRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: totalBg
+    };
+    totalRow.height = 26;
+    totalRow.getCell(4).numFmt = `"${currencySymbol}"#,##0`;
+    totalRow.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' };
+    totalRow.eachCell(cell => {
+      cell.alignment = { vertical: 'middle' };
+    });
     
-    // Create worksheet
-    const worksheet = XLSX.utils.aoa_to_sheet(wsData);
-    
-    // Set column widths
-    worksheet['!cols'] = [
-      { wch: 20 }, // Category
-      { wch: 50 }, // Work Item
-      { wch: 18 }, // Provider
-      { wch: 15 }, // Estimate
-    ];
-    
-    // Format currency cells (column D, index 3)
-    const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:D1');
-    for (let row = headerRow + 1; row <= range.e.r; row++) {
-      const cellRef = XLSX.utils.encode_cell({ r: row, c: 3 });
-      if (worksheet[cellRef] && typeof worksheet[cellRef].v === 'number') {
-        worksheet[cellRef].z = `"${currencySymbol}"#,##0`;
-      }
-    }
-    
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Pricing Proposal");
-
+    // Generate and download file
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
     const fileName = `${proposal?.name || 'Proposal'}_Pricing_V${proposal?.current_version || 1}.xlsx`;
-    XLSX.writeFile(workbook, fileName);
+    link.download = fileName;
+    link.click();
+    window.URL.revokeObjectURL(url);
+    
     toast({ title: 'Exported to Excel', description: fileName });
   };
 

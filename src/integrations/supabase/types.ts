@@ -667,13 +667,17 @@ export type Database = {
       pricing_proposal_items: {
         Row: {
           ai_rationale: string | null
+          associate_hours: number
           category: string | null
           created_at: string
           fee_amount: number
           id: string
           is_included: boolean
           is_optional: boolean
+          item_type: string
           lc_firm_name: string | null
+          num_turns: number
+          partner_hours: number
           pricing_method: string
           proposal_id: string
           provider: string
@@ -685,13 +689,17 @@ export type Database = {
         }
         Insert: {
           ai_rationale?: string | null
+          associate_hours?: number
           category?: string | null
           created_at?: string
           fee_amount?: number
           id?: string
           is_included?: boolean
           is_optional?: boolean
+          item_type?: string
           lc_firm_name?: string | null
+          num_turns?: number
+          partner_hours?: number
           pricing_method?: string
           proposal_id: string
           provider?: string
@@ -703,13 +711,17 @@ export type Database = {
         }
         Update: {
           ai_rationale?: string | null
+          associate_hours?: number
           category?: string | null
           created_at?: string
           fee_amount?: number
           id?: string
           is_included?: boolean
           is_optional?: boolean
+          item_type?: string
           lc_firm_name?: string | null
+          num_turns?: number
+          partner_hours?: number
           pricing_method?: string
           proposal_id?: string
           provider?: string

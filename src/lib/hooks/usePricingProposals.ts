@@ -98,13 +98,17 @@ export interface PricingProposalItem {
   work_item: string;
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
-  pricing_method: 'ai_suggested' | 'pricing_tool' | 'manual';
+  pricing_method: 'ai_suggested' | 'pricing_tool' | 'manual' | 'iterative';
   category: string | null;
   lc_firm_name: string | null;
   is_optional: boolean;
   is_included: boolean;
   sort_order: number;
   ai_rationale: string | null;
+  partner_hours: number;
+  associate_hours: number;
+  num_turns: number;
+  item_type: 'documentation' | 'negotiation' | 'due_diligence' | 'meeting';
   created_at: string;
   updated_at: string;
 }
@@ -121,12 +125,16 @@ export interface DraftProposalItem {
   work_item: string;
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
-  pricing_method: 'ai_suggested' | 'pricing_tool' | 'manual';
+  pricing_method: 'ai_suggested' | 'pricing_tool' | 'manual' | 'iterative';
   category?: string | null;
   lc_firm_name?: string;
   is_optional?: boolean;
   is_included?: boolean;
   ai_rationale?: string | null;
+  partner_hours?: number;
+  associate_hours?: number;
+  num_turns?: number;
+  item_type?: 'documentation' | 'negotiation' | 'due_diligence' | 'meeting';
 }
 
 // Helper to safely parse JSON columns
@@ -388,6 +396,10 @@ export function usePricingProposal(proposalId?: string) {
           is_included: item.is_included ?? true,
           sort_order: index,
           ai_rationale: item.ai_rationale || null,
+          partner_hours: item.partner_hours ?? 0,
+          associate_hours: item.associate_hours ?? 0,
+          num_turns: item.num_turns ?? 1,
+          item_type: item.item_type ?? 'documentation',
         }));
 
         const { error: itemsError } = await supabase

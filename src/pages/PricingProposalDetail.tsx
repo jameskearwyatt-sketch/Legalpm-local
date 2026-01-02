@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { TableScrollControls } from "@/components/ui/table-scroll-controls";
 import { 
   ArrowLeft, 
   Save, 
@@ -40,10 +41,8 @@ import {
   DraftProposalItem, 
   BUDGET_CATEGORIES,
   RateCard,
-  WorkPhase,
   ProposalAssumptions,
   DEFAULT_RATE_CARD,
-  DEFAULT_WORK_PHASES,
   DEFAULT_ASSUMPTIONS
 } from "@/lib/hooks/usePricingProposals";
 import { useMatters } from "@/lib/hooks/useMatters";
@@ -51,7 +50,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 
-type PricingMethod = 'ai_suggested' | 'pricing_tool' | 'manual';
+type PricingMethod = 'ai_suggested' | 'pricing_tool' | 'manual' | 'iterative';
+type ItemType = 'documentation' | 'negotiation' | 'due_diligence' | 'meeting';
 
 export default function PricingProposalDetail() {
   const { proposalId } = useParams<{ proposalId: string }>();
@@ -83,17 +83,16 @@ export default function PricingProposalDetail() {
   const [versionNotes, setVersionNotes] = useState("");
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [isViewingHistory, setIsViewingHistory] = useState(false);
+  const [activeTab, setActiveTab] = useState("items");
 
   // Local state for proposal-specific settings
   const [rateCard, setRateCard] = useState<RateCard>(DEFAULT_RATE_CARD);
-  const [workPhases, setWorkPhases] = useState<WorkPhase[]>(DEFAULT_WORK_PHASES);
   const [assumptions, setAssumptions] = useState<ProposalAssumptions>(DEFAULT_ASSUMPTIONS);
 
   // Sync local state with proposal data
   useEffect(() => {
     if (proposal) {
       setRateCard(proposal.rate_card || DEFAULT_RATE_CARD);
-      setWorkPhases(proposal.work_phases || DEFAULT_WORK_PHASES);
       setAssumptions(proposal.assumptions || DEFAULT_ASSUMPTIONS);
     }
   }, [proposal]);
@@ -112,6 +111,10 @@ export default function PricingProposalDetail() {
         is_optional: item.is_optional,
         is_included: item.is_included,
         ai_rationale: item.ai_rationale,
+        partner_hours: item.partner_hours || 0,
+        associate_hours: item.associate_hours || 0,
+        num_turns: item.num_turns || 1,
+        item_type: item.item_type || 'documentation',
       })));
     }
   }, [savedItems]);
@@ -145,74 +148,98 @@ export default function PricingProposalDetail() {
     return total;
   };
 
-  // Calculate summary from phases and rate card
+  // Calculate iterative price for a work item
+  const calculateIterativePrice = (item: DraftProposalItem) => {
+    const partnerHours = item.partner_hours || 0;
+    const associateHours = item.associate_hours || 0;
+    const numTurns = item.num_turns || 1;
+    const itemType = item.item_type || 'documentation';
+    
+    // Choose decay factor based on item type
+    let decayFactor = 1; // No decay for documentation
+    if (itemType === 'negotiation') {
+      decayFactor = assumptions.negotiatedDocsDecay;
+    } else if (itemType === 'due_diligence') {
+      decayFactor = assumptions.ddDecay;
+    }
+    
+    // Calculate total hours with decay
+    const totalPartnerHours = calculateNegotiationHours(partnerHours, decayFactor, numTurns);
+    const totalAssociateHours = calculateNegotiationHours(associateHours, decayFactor, numTurns);
+    
+    // Apply AFA discount
+    const discountMultiplier = 1 - (assumptions.afaDiscount / 100);
+    const partnerRate = rateCard.partner.rate * discountMultiplier;
+    const associateRate = rateCard.associate.rate * discountMultiplier;
+    
+    return Math.round((totalPartnerHours * partnerRate) + (totalAssociateHours * associateRate));
+  };
+
+  // Calculate summary from work items
   const summary = useMemo(() => {
-    const phases = workPhases;
     const rates = rateCard;
     const ass = assumptions;
+    const discountMultiplier = 1 - (ass.afaDiscount / 100);
 
-    // Base hours from phases
-    const basePartnerHours = phases.reduce((sum, p) => sum + p.partnerHours, 0);
-    const baseSeniorAssociateHours = phases.reduce((sum, p) => sum + p.seniorAssociateHours, 0);
-    const baseAssociateHours = phases.reduce((sum, p) => sum + p.associateHours, 0);
-    const baseTraineeHours = phases.reduce((sum, p) => sum + p.traineeHours, 0);
+    // Sum hours from all Baker McKenzie items
+    let totalPartnerHours = 0;
+    let totalAssociateHours = 0;
+    
+    draftItems
+      .filter(item => item.provider === 'Baker McKenzie' && (item.is_included !== false || !item.is_optional))
+      .forEach(item => {
+        const partnerHours = item.partner_hours || 0;
+        const associateHours = item.associate_hours || 0;
+        const numTurns = item.num_turns || 1;
+        const itemType = item.item_type || 'documentation';
+        
+        let decayFactor = 1;
+        if (itemType === 'negotiation') decayFactor = ass.negotiatedDocsDecay;
+        else if (itemType === 'due_diligence') decayFactor = ass.ddDecay;
+        
+        totalPartnerHours += calculateNegotiationHours(partnerHours, decayFactor, numTurns);
+        totalAssociateHours += calculateNegotiationHours(associateHours, decayFactor, numTurns);
+      });
 
-    // DD phase with decay
-    const ddPhase = phases.find(p => p.name.includes("Due Diligence"));
-    const ddPartnerHours = ddPhase ? calculateNegotiationHours(ddPhase.partnerHours, ass.ddDecay, ass.numNegotiationTurns) : 0;
-    const ddSeniorAssociateHours = ddPhase ? calculateNegotiationHours(ddPhase.seniorAssociateHours, ass.ddDecay, ass.numNegotiationTurns) : 0;
-    const ddAssociateHours = ddPhase ? calculateNegotiationHours(ddPhase.associateHours, ass.ddDecay, ass.numNegotiationTurns) : 0;
-
-    // Negotiation phase with decay
-    const negPhase = phases.find(p => p.name.includes("Negotiation"));
-    const negPartnerHours = negPhase ? calculateNegotiationHours(negPhase.partnerHours, ass.negotiatedDocsDecay, ass.numNegotiationTurns) : 0;
-    const negSeniorAssociateHours = negPhase ? calculateNegotiationHours(negPhase.seniorAssociateHours, ass.negotiatedDocsDecay, ass.numNegotiationTurns) : 0;
-    const negAssociateHours = negPhase ? calculateNegotiationHours(negPhase.associateHours, ass.negotiatedDocsDecay, ass.numNegotiationTurns) : 0;
-
-    // Meeting hours
+    // Add meeting hours
     const meetingPartnerHours = ass.numMeetings * ass.meetingHoursPartner;
     const meetingAssociateHours = ass.numMeetings * ass.meetingHoursAssociate;
+    totalPartnerHours += meetingPartnerHours;
+    totalAssociateHours += meetingAssociateHours;
 
-    // Total hours
-    const totalPartnerHours = basePartnerHours + meetingPartnerHours + (negPartnerHours - (negPhase?.partnerHours || 0)) + (ddPartnerHours - (ddPhase?.partnerHours || 0));
-    const totalSeniorAssociateHours = baseSeniorAssociateHours + (negSeniorAssociateHours - (negPhase?.seniorAssociateHours || 0)) + (ddSeniorAssociateHours - (ddPhase?.seniorAssociateHours || 0));
-    const totalAssociateHours = baseAssociateHours + meetingAssociateHours + (negAssociateHours - (negPhase?.associateHours || 0)) + (ddAssociateHours - (ddPhase?.associateHours || 0));
-    const totalTraineeHours = baseTraineeHours;
-
-    // Apply AFA discount
-    const discountMultiplier = 1 - (ass.afaDiscount / 100);
+    // Rates with discount
     const afaPartnerRate = rates.partner.rate * discountMultiplier;
     const afaSeniorAssociateRate = rates.seniorAssociate.rate * discountMultiplier;
     const afaAssociateRate = rates.associate.rate * discountMultiplier;
     const afaTraineeRate = rates.trainee.rate * discountMultiplier;
 
-    // Revenue
+    // Revenue - for now only using partner and associate 
     const partnerRevenue = totalPartnerHours * afaPartnerRate;
-    const seniorAssociateRevenue = totalSeniorAssociateHours * afaSeniorAssociateRate;
     const associateRevenue = totalAssociateHours * afaAssociateRate;
-    const traineeRevenue = totalTraineeHours * afaTraineeRate;
-    const totalRevenue = partnerRevenue + seniorAssociateRevenue + associateRevenue + traineeRevenue;
+    const seniorAssociateRevenue = 0;
+    const traineeRevenue = 0;
+    const totalRevenue = partnerRevenue + associateRevenue;
 
     // Cost
     const partnerCost = totalPartnerHours * rates.partner.cost;
-    const seniorAssociateCost = totalSeniorAssociateHours * rates.seniorAssociate.cost;
     const associateCost = totalAssociateHours * rates.associate.cost;
-    const traineeCost = totalTraineeHours * rates.trainee.cost;
-    const totalCost = partnerCost + seniorAssociateCost + associateCost + traineeCost;
+    const seniorAssociateCost = 0;
+    const traineeCost = 0;
+    const totalCost = partnerCost + associateCost;
 
     // Margin
     const margin = totalRevenue - totalCost;
     const marginPercent = totalRevenue > 0 ? (margin / totalRevenue) * 100 : 0;
 
     // Blended rate
-    const totalHours = totalPartnerHours + totalSeniorAssociateHours + totalAssociateHours + totalTraineeHours;
+    const totalHours = totalPartnerHours + totalAssociateHours;
     const blendedRate = totalHours > 0 ? totalRevenue / totalHours : 0;
 
     return {
       totalPartnerHours,
-      totalSeniorAssociateHours,
+      totalSeniorAssociateHours: 0,
       totalAssociateHours,
-      totalTraineeHours,
+      totalTraineeHours: 0,
       totalHours,
       afaPartnerRate,
       afaSeniorAssociateRate,
@@ -232,7 +259,7 @@ export default function PricingProposalDetail() {
       marginPercent,
       blendedRate,
     };
-  }, [workPhases, rateCard, assumptions]);
+  }, [draftItems, rateCard, assumptions]);
 
   const currencySymbol = proposal?.currency === "GBP" ? "£" : proposal?.currency === "USD" ? "$" : "€";
 
@@ -244,38 +271,13 @@ export default function PricingProposalDetail() {
     return value.toFixed(1);
   };
 
-  // Save proposal settings (rate card, work phases, assumptions)
+  // Save proposal settings (rate card, assumptions)
   const saveProposalSettings = async () => {
     await updateProposal.mutateAsync({
       rate_card: rateCard,
-      work_phases: workPhases,
       assumptions: assumptions,
     });
     toast({ title: 'Settings saved' });
-  };
-
-  // Work phases handlers
-  const updatePhaseHours = (phaseId: string, field: keyof WorkPhase, value: number) => {
-    setWorkPhases(prev => prev.map(p => 
-      p.id === phaseId ? { ...p, [field]: value } : p
-    ));
-  };
-
-  const addWorkPhase = () => {
-    const newId = String(Date.now());
-    setWorkPhases(prev => [...prev, {
-      id: newId,
-      name: "New Phase",
-      description: "",
-      partnerHours: 0,
-      seniorAssociateHours: 0,
-      associateHours: 0,
-      traineeHours: 0,
-    }]);
-  };
-
-  const removeWorkPhase = (phaseId: string) => {
-    setWorkPhases(prev => prev.filter(p => p.id !== phaseId));
   };
 
   // Add new work item
@@ -528,8 +530,14 @@ export default function PricingProposalDetail() {
       is_optional: item.is_optional,
       is_included: item.is_included,
       ai_rationale: item.ai_rationale,
+      partner_hours: item.partner_hours || 0,
+      associate_hours: item.associate_hours || 0,
+      num_turns: item.num_turns || 1,
+      item_type: item.item_type || 'documentation',
     })));
     setIsViewingHistory(true);
+    setActiveTab('items');
+    toast({ title: `Viewing version ${versions.find(v => v.id === versionId)?.version_number || ''}` });
   };
 
   // Client matters for the dropdown
@@ -663,8 +671,8 @@ export default function PricingProposalDetail() {
         </div>
 
         {/* Main Content with Tabs */}
-        <Tabs defaultValue="items" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6 max-w-4xl">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full grid-cols-5 max-w-3xl">
             <TabsTrigger value="items">
               <FileText className="h-4 w-4 mr-2" />
               Work Items
@@ -676,10 +684,6 @@ export default function PricingProposalDetail() {
             <TabsTrigger value="assumptions">
               <Calculator className="h-4 w-4 mr-2" />
               Assumptions
-            </TabsTrigger>
-            <TabsTrigger value="phases">
-              <FileText className="h-4 w-4 mr-2" />
-              Work Phases
             </TabsTrigger>
             <TabsTrigger value="rates">
               <Users className="h-4 w-4 mr-2" />
@@ -783,7 +787,14 @@ export default function PricingProposalDetail() {
             {/* Work Items Table */}
             <Card>
               <CardHeader>
-                <CardTitle>Work Items</CardTitle>
+                <CardTitle className="flex items-center justify-between">
+                  <span>Work Items</span>
+                  {isViewingHistory && (
+                    <Badge variant="outline" className="ml-2">
+                      Viewing historical version
+                    </Badge>
+                  )}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {draftItems.length === 0 ? (
@@ -792,124 +803,211 @@ export default function PricingProposalDetail() {
                     <p>No work items yet. Upload an RFP or add items manually.</p>
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-[40px]"></TableHead>
-                        <TableHead>Work Item</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead>Provider</TableHead>
-                        <TableHead className="text-right">Fee</TableHead>
-                        <TableHead>Method</TableHead>
-                        <TableHead className="text-center">Optional</TableHead>
-                        <TableHead className="text-center">Include</TableHead>
-                        <TableHead className="w-[60px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {draftItems.map((item, index) => (
-                        <TableRow 
-                          key={index}
-                          className={item.is_optional && !item.is_included ? 'opacity-50' : ''}
-                        >
-                          <TableCell>
-                            <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              value={item.work_item}
-                              onChange={(e) => updateItem(index, { work_item: e.target.value })}
-                              className="min-w-[200px]"
-                              placeholder="Work item description"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={item.category || ''}
-                              onValueChange={(value) => updateItem(index, { category: value || null })}
-                            >
-                              <SelectTrigger className="w-[140px]">
-                                <SelectValue placeholder="Category" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {BUDGET_CATEGORIES.map(cat => (
-                                  <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <Select
-                              value={item.provider}
-                              onValueChange={(value: 'Baker McKenzie' | 'Local Counsel') => 
-                                updateItem(index, { provider: value })
-                              }
-                            >
-                              <SelectTrigger className="w-[150px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Baker McKenzie">Baker McKenzie</SelectItem>
-                                <SelectItem value="Local Counsel">Local Counsel</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              value={item.fee_amount || ''}
-                              onChange={(e) => updateItem(index, { 
-                                fee_amount: parseFloat(e.target.value) || 0,
-                                pricing_method: 'manual'
-                              })}
-                              className="w-[120px] text-right"
-                              placeholder="0"
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant="outline" 
-                              className={
-                                item.pricing_method === 'ai_suggested' 
-                                  ? 'bg-purple-50 text-purple-700 border-purple-200' 
-                                  : item.pricing_method === 'pricing_tool'
-                                  ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                  : ''
-                              }
-                            >
-                              {item.pricing_method === 'ai_suggested' ? '✨ AI' : 
-                               item.pricing_method === 'pricing_tool' ? '📊 Tool' : '✏️ Manual'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Checkbox
-                              checked={item.is_optional}
-                              onCheckedChange={(checked) => updateItem(index, { 
-                                is_optional: !!checked,
-                                is_included: checked ? false : true
-                              })}
-                            />
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Switch
-                              checked={item.is_included}
-                              onCheckedChange={(checked) => updateItem(index, { is_included: checked })}
-                              disabled={!item.is_optional}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => removeItem(index)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  <TableScrollControls>
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-[40px]"></TableHead>
+                            <TableHead className="min-w-[200px]">Work Item</TableHead>
+                            <TableHead className="min-w-[120px]">Category</TableHead>
+                            <TableHead className="min-w-[120px]">Type</TableHead>
+                            <TableHead className="min-w-[130px]">Provider</TableHead>
+                            <TableHead className="text-right min-w-[80px]">Partner Hrs</TableHead>
+                            <TableHead className="text-right min-w-[80px]">Assoc Hrs</TableHead>
+                            <TableHead className="text-right min-w-[60px]">Turns</TableHead>
+                            <TableHead className="text-right min-w-[100px]">Calc Fee</TableHead>
+                            <TableHead className="text-right min-w-[100px]">Fee</TableHead>
+                            <TableHead className="min-w-[80px]">Method</TableHead>
+                            <TableHead className="text-center min-w-[60px]">Opt</TableHead>
+                            <TableHead className="text-center min-w-[60px]">Inc</TableHead>
+                            <TableHead className="w-[60px]"></TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {draftItems.map((item, index) => {
+                            const calcFee = item.provider === 'Baker McKenzie' ? calculateIterativePrice(item) : 0;
+                            return (
+                              <TableRow 
+                                key={index}
+                                className={item.is_optional && !item.is_included ? 'opacity-50' : ''}
+                              >
+                                <TableCell>
+                                  <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab" />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    value={item.work_item}
+                                    onChange={(e) => updateItem(index, { work_item: e.target.value })}
+                                    className="min-w-[180px]"
+                                    placeholder="Work item description"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Select
+                                    value={item.category || ''}
+                                    onValueChange={(value) => updateItem(index, { category: value || null })}
+                                  >
+                                    <SelectTrigger className="w-[120px]">
+                                      <SelectValue placeholder="Category" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {BUDGET_CATEGORIES.map(cat => (
+                                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                                <TableCell>
+                                  <Select
+                                    value={item.item_type || 'documentation'}
+                                    onValueChange={(value: ItemType) => updateItem(index, { item_type: value })}
+                                  >
+                                    <SelectTrigger className="w-[120px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="documentation">Documentation</SelectItem>
+                                      <SelectItem value="negotiation">Negotiation</SelectItem>
+                                      <SelectItem value="due_diligence">Due Diligence</SelectItem>
+                                      <SelectItem value="meeting">Meeting</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                                <TableCell>
+                                  <Select
+                                    value={item.provider}
+                                    onValueChange={(value: 'Baker McKenzie' | 'Local Counsel') => 
+                                      updateItem(index, { provider: value })
+                                    }
+                                  >
+                                    <SelectTrigger className="w-[130px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="Baker McKenzie">Baker McKenzie</SelectItem>
+                                      <SelectItem value="Local Counsel">Local Counsel</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={item.partner_hours || ''}
+                                    onChange={(e) => updateItem(index, { 
+                                      partner_hours: parseFloat(e.target.value) || 0,
+                                    })}
+                                    className="w-[70px] text-right"
+                                    placeholder="0"
+                                    disabled={item.provider === 'Local Counsel'}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={item.associate_hours || ''}
+                                    onChange={(e) => updateItem(index, { 
+                                      associate_hours: parseFloat(e.target.value) || 0,
+                                    })}
+                                    className="w-[70px] text-right"
+                                    placeholder="0"
+                                    disabled={item.provider === 'Local Counsel'}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={item.num_turns || 1}
+                                    onChange={(e) => updateItem(index, { 
+                                      num_turns: parseInt(e.target.value) || 1,
+                                    })}
+                                    className="w-[50px] text-right"
+                                    min={1}
+                                    disabled={item.provider === 'Local Counsel' || item.item_type === 'documentation' || item.item_type === 'meeting'}
+                                  />
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {item.provider === 'Baker McKenzie' && calcFee > 0 ? (
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span className="text-muted-foreground text-sm">
+                                        {formatCurrency(calcFee)}
+                                      </span>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-6 px-1.5"
+                                        onClick={() => updateItem(index, { 
+                                          fee_amount: calcFee,
+                                          pricing_method: 'iterative' as PricingMethod
+                                        })}
+                                        title="Apply calculated price"
+                                      >
+                                        <CheckCircle2 className="h-3.5 w-3.5" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <span className="text-muted-foreground text-sm">-</span>
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  <Input
+                                    type="number"
+                                    value={item.fee_amount || ''}
+                                    onChange={(e) => updateItem(index, { 
+                                      fee_amount: parseFloat(e.target.value) || 0,
+                                      pricing_method: 'manual'
+                                    })}
+                                    className="w-[100px] text-right"
+                                    placeholder="0"
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Badge 
+                                    variant="outline" 
+                                    className={
+                                      item.pricing_method === 'ai_suggested' 
+                                        ? 'bg-purple-50 text-purple-700 border-purple-200' 
+                                        : item.pricing_method === 'iterative'
+                                        ? 'bg-green-50 text-green-700 border-green-200'
+                                        : ''
+                                    }
+                                  >
+                                    {item.pricing_method === 'ai_suggested' ? '✨ AI' : 
+                                     item.pricing_method === 'iterative' ? '📊 Iter' : '✏️ Man'}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Checkbox
+                                    checked={item.is_optional}
+                                    onCheckedChange={(checked) => updateItem(index, { 
+                                      is_optional: !!checked,
+                                      is_included: checked ? false : true
+                                    })}
+                                  />
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Switch
+                                    checked={item.is_included}
+                                    onCheckedChange={(checked) => updateItem(index, { is_included: checked })}
+                                    disabled={!item.is_optional}
+                                  />
+                                </TableCell>
+                                <TableCell>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={() => removeItem(index)}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </TableScrollControls>
                 )}
               </CardContent>
             </Card>
@@ -1156,111 +1254,6 @@ export default function PricingProposalDetail() {
                   <Save className="h-4 w-4 mr-2" />
                 )}
                 Save Assumptions
-              </Button>
-            </div>
-          </TabsContent>
-
-          {/* WORK PHASES TAB */}
-          <TabsContent value="phases" className="space-y-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Work Phases</CardTitle>
-                  <CardDescription>Define the phases and hours for this proposal</CardDescription>
-                </div>
-                <Button onClick={addWorkPhase} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Phase
-                </Button>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Phase</TableHead>
-                      <TableHead className="text-right">Partner</TableHead>
-                      <TableHead className="text-right">Sr. Assoc</TableHead>
-                      <TableHead className="text-right">Associate</TableHead>
-                      <TableHead className="text-right">Trainee</TableHead>
-                      <TableHead className="w-[60px]"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {workPhases.map((phase) => (
-                      <TableRow key={phase.id}>
-                        <TableCell>
-                          <Input
-                            value={phase.name}
-                            onChange={(e) => setWorkPhases(prev => prev.map(p => 
-                              p.id === phase.id ? { ...p, name: e.target.value } : p
-                            ))}
-                            className="font-medium"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            value={phase.partnerHours}
-                            onChange={(e) => updatePhaseHours(phase.id, 'partnerHours', parseFloat(e.target.value) || 0)}
-                            className="w-20 text-right"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            value={phase.seniorAssociateHours}
-                            onChange={(e) => updatePhaseHours(phase.id, 'seniorAssociateHours', parseFloat(e.target.value) || 0)}
-                            className="w-20 text-right"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            value={phase.associateHours}
-                            onChange={(e) => updatePhaseHours(phase.id, 'associateHours', parseFloat(e.target.value) || 0)}
-                            className="w-20 text-right"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Input
-                            type="number"
-                            value={phase.traineeHours}
-                            onChange={(e) => updatePhaseHours(phase.id, 'traineeHours', parseFloat(e.target.value) || 0)}
-                            className="w-20 text-right"
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => removeWorkPhase(phase.id)}
-                          >
-                            <Trash2 className="h-4 w-4 text-destructive" />
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    <TableRow className="font-bold bg-muted/50">
-                      <TableCell>Total</TableCell>
-                      <TableCell className="text-right">{workPhases.reduce((s, p) => s + p.partnerHours, 0)}</TableCell>
-                      <TableCell className="text-right">{workPhases.reduce((s, p) => s + p.seniorAssociateHours, 0)}</TableCell>
-                      <TableCell className="text-right">{workPhases.reduce((s, p) => s + p.associateHours, 0)}</TableCell>
-                      <TableCell className="text-right">{workPhases.reduce((s, p) => s + p.traineeHours, 0)}</TableCell>
-                      <TableCell></TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            <div className="flex justify-end">
-              <Button onClick={saveProposalSettings} disabled={updateProposal.isPending}>
-                {updateProposal.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4 mr-2" />
-                )}
-                Save Work Phases
               </Button>
             </div>
           </TabsContent>

@@ -49,6 +49,8 @@ import { useMatters } from "@/lib/hooks/useMatters";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+import { IterativePricingDialog, FeeOwnerHours } from "@/components/pricing/IterativePricingDialog";
+import { EditableRateCard } from "@/components/pricing/EditableRateCard";
 
 type PricingMethod = 'ai_suggested' | 'pricing_tool' | 'manual' | 'iterative';
 type ItemType = 'documentation' | 'negotiation' | 'due_diligence' | 'meeting';
@@ -88,6 +90,10 @@ export default function PricingProposalDetail() {
   // Local state for proposal-specific settings
   const [rateCard, setRateCard] = useState<RateCard>(DEFAULT_RATE_CARD);
   const [assumptions, setAssumptions] = useState<ProposalAssumptions>(DEFAULT_ASSUMPTIONS);
+
+  // Iterative pricing dialog state
+  const [iterativeDialogOpen, setIterativeDialogOpen] = useState(false);
+  const [iterativeDialogIndex, setIterativeDialogIndex] = useState<number | null>(null);
 
   // Sync local state with proposal data
   useEffect(() => {
@@ -307,6 +313,34 @@ export default function PricingProposalDetail() {
     setDraftItems(prev => prev.filter((_, i) => i !== index));
     setHasUnsavedChanges(true);
   };
+
+  // Open iterative pricing dialog for a work item
+  const openIterativePricing = (index: number) => {
+    setIterativeDialogIndex(index);
+    setIterativeDialogOpen(true);
+  };
+
+  // Apply iterative pricing result to work item
+  const applyIterativePricing = (result: {
+    feeOwnerHours: FeeOwnerHours;
+    numTurns: number;
+    itemType: string;
+    calculatedFee: number;
+  }) => {
+    if (iterativeDialogIndex === null) return;
+    
+    updateItem(iterativeDialogIndex, {
+      partner_hours: result.feeOwnerHours.partner || 0,
+      associate_hours: result.feeOwnerHours.associate || 0,
+      num_turns: result.numTurns,
+      item_type: result.itemType as 'documentation' | 'negotiation' | 'due_diligence' | 'meeting',
+      fee_amount: result.calculatedFee,
+      pricing_method: 'iterative',
+    });
+  };
+
+  // Get current item for iterative dialog
+  const currentIterativeItem = iterativeDialogIndex !== null ? draftItems[iterativeDialogIndex] : null;
 
   // Handle RFP file upload
   const handleRfpUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -992,11 +1026,23 @@ export default function PricingProposalDetail() {
                                     disabled={!item.is_optional}
                                   />
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="flex items-center gap-1">
+                                  {item.provider === 'Baker McKenzie' && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={() => openIterativePricing(index)}
+                                      title="Iterative pricing calculator"
+                                      className="h-8 w-8"
+                                    >
+                                      <Calculator className="h-4 w-4 text-primary" />
+                                    </Button>
+                                  )}
                                   <Button
                                     variant="ghost"
                                     size="icon"
                                     onClick={() => removeItem(index)}
+                                    className="h-8 w-8"
                                   >
                                     <Trash2 className="h-4 w-4 text-destructive" />
                                   </Button>
@@ -1260,149 +1306,16 @@ export default function PricingProposalDetail() {
 
           {/* RATE CARD TAB */}
           <TabsContent value="rates" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Rate Card</CardTitle>
-                <CardDescription>Set the billing rates and costs for this proposal</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Grade</TableHead>
-                      <TableHead className="text-right">Billing Rate ({currencySymbol})</TableHead>
-                      <TableHead className="text-right">Cost Rate ({currencySymbol})</TableHead>
-                      <TableHead className="text-right">Margin</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="font-medium">Partner</TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={rateCard.partner.rate}
-                          onChange={(e) => setRateCard(prev => ({ 
-                            ...prev, 
-                            partner: { ...prev.partner, rate: parseFloat(e.target.value) || 0 }
-                          }))}
-                          className="w-28 text-right ml-auto"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={rateCard.partner.cost}
-                          onChange={(e) => setRateCard(prev => ({ 
-                            ...prev, 
-                            partner: { ...prev.partner, cost: parseFloat(e.target.value) || 0 }
-                          }))}
-                          className="w-28 text-right ml-auto"
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {((rateCard.partner.rate - rateCard.partner.cost) / rateCard.partner.rate * 100).toFixed(0)}%
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Senior Associate</TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={rateCard.seniorAssociate.rate}
-                          onChange={(e) => setRateCard(prev => ({ 
-                            ...prev, 
-                            seniorAssociate: { ...prev.seniorAssociate, rate: parseFloat(e.target.value) || 0 }
-                          }))}
-                          className="w-28 text-right ml-auto"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={rateCard.seniorAssociate.cost}
-                          onChange={(e) => setRateCard(prev => ({ 
-                            ...prev, 
-                            seniorAssociate: { ...prev.seniorAssociate, cost: parseFloat(e.target.value) || 0 }
-                          }))}
-                          className="w-28 text-right ml-auto"
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {((rateCard.seniorAssociate.rate - rateCard.seniorAssociate.cost) / rateCard.seniorAssociate.rate * 100).toFixed(0)}%
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Associate</TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={rateCard.associate.rate}
-                          onChange={(e) => setRateCard(prev => ({ 
-                            ...prev, 
-                            associate: { ...prev.associate, rate: parseFloat(e.target.value) || 0 }
-                          }))}
-                          className="w-28 text-right ml-auto"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={rateCard.associate.cost}
-                          onChange={(e) => setRateCard(prev => ({ 
-                            ...prev, 
-                            associate: { ...prev.associate, cost: parseFloat(e.target.value) || 0 }
-                          }))}
-                          className="w-28 text-right ml-auto"
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {((rateCard.associate.rate - rateCard.associate.cost) / rateCard.associate.rate * 100).toFixed(0)}%
-                      </TableCell>
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="font-medium">Trainee</TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={rateCard.trainee.rate}
-                          onChange={(e) => setRateCard(prev => ({ 
-                            ...prev, 
-                            trainee: { ...prev.trainee, rate: parseFloat(e.target.value) || 0 }
-                          }))}
-                          className="w-28 text-right ml-auto"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={rateCard.trainee.cost}
-                          onChange={(e) => setRateCard(prev => ({ 
-                            ...prev, 
-                            trainee: { ...prev.trainee, cost: parseFloat(e.target.value) || 0 }
-                          }))}
-                          className="w-28 text-right ml-auto"
-                        />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {((rateCard.trainee.rate - rateCard.trainee.cost) / rateCard.trainee.rate * 100).toFixed(0)}%
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-
-            <div className="flex justify-end">
-              <Button onClick={saveProposalSettings} disabled={updateProposal.isPending}>
-                {updateProposal.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4 mr-2" />
-                )}
-                Save Rate Card
-              </Button>
-            </div>
+            <EditableRateCard
+              rateCard={rateCard}
+              currencySymbol={currencySymbol}
+              onSave={async (newRateCard) => {
+                setRateCard(newRateCard);
+                await updateProposal.mutateAsync({ rate_card: newRateCard });
+                toast({ title: 'Rate card saved' });
+              }}
+              isSaving={updateProposal.isPending}
+            />
           </TabsContent>
 
           {/* HISTORY TAB */}
@@ -1467,6 +1380,23 @@ export default function PricingProposalDetail() {
             </Card>
           </TabsContent>
         </Tabs>
+
+        {/* Iterative Pricing Dialog */}
+        <IterativePricingDialog
+          open={iterativeDialogOpen}
+          onOpenChange={setIterativeDialogOpen}
+          workItemName={currentIterativeItem?.work_item || ''}
+          rateCard={rateCard}
+          assumptions={assumptions}
+          currencySymbol={currencySymbol}
+          initialHours={{
+            partner: currentIterativeItem?.partner_hours || 0,
+            associate: currentIterativeItem?.associate_hours || 0,
+          }}
+          initialTurns={currentIterativeItem?.num_turns || 1}
+          initialItemType={currentIterativeItem?.item_type || 'documentation'}
+          onApply={applyIterativePricing}
+        />
       </div>
     </AppLayout>
   );

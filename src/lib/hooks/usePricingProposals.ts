@@ -102,7 +102,7 @@ export interface PricingProposalItem {
   work_item: string;
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
-  pricing_method: 'ai_suggested' | 'pricing_tool' | 'manual' | 'iterative';
+  pricing_method: 'ai_suggested' | 'pricing_tool' | 'manual';
   category: string | null;
   lc_firm_name: string | null;
   is_optional: boolean;
@@ -129,7 +129,7 @@ export interface DraftProposalItem {
   work_item: string;
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
-  pricing_method: 'ai_suggested' | 'pricing_tool' | 'manual' | 'iterative';
+  pricing_method: 'ai_suggested' | 'pricing_tool' | 'manual';
   category?: string | null;
   lc_firm_name?: string;
   is_optional?: boolean;

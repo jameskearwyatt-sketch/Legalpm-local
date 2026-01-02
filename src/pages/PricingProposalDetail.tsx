@@ -72,7 +72,7 @@ import {
 } from '@dnd-kit/sortable';
 import { DraggableProposalItem } from "@/components/pricing/DraggableProposalItem";
 
-type PricingMethod = 'ai_suggested' | 'pricing_tool' | 'manual' | 'iterative';
+type PricingMethod = 'ai_suggested' | 'pricing_tool' | 'manual';
 type ItemType = 'documentation' | 'negotiation' | 'due_diligence' | 'meeting';
 
 export default function PricingProposalDetail() {
@@ -275,7 +275,7 @@ export default function PricingProposalDetail() {
     draftItems
       .filter(item => item.provider === 'Baker McKenzie' && (item.is_included !== false || !item.is_optional))
       .forEach(item => {
-        const isIterative = item.pricing_method === 'iterative';
+        const isIterative = item.pricing_method === 'pricing_tool';
         
         if (isIterative) {
           // Use actual hours data from iterative pricing
@@ -443,7 +443,7 @@ export default function PricingProposalDetail() {
       num_turns: result.numTurns,
       item_type: result.itemType as 'documentation' | 'negotiation' | 'due_diligence' | 'meeting',
       fee_amount: result.calculatedFee,
-      pricing_method: 'iterative',
+      pricing_method: 'pricing_tool',
     });
   };
 

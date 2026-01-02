@@ -185,6 +185,39 @@ export default function PricingProposalDetail() {
   };
 
   // Calculate summary from work items
+  // Estimate hours for non-iterative items using pyramid structure
+  // Standard law firm pyramid: Partner (fewest) -> Senior Associate -> Associate -> Trainee (most)
+  const estimateHoursFromFee = (feeAmount: number, discountMultiplier: number) => {
+    // Pyramid distribution: Partner 10%, Senior Associate 20%, Associate 35%, Trainee 35%
+    const partnerPct = 0.10;
+    const seniorAssocPct = 0.20;
+    const associatePct = 0.35;
+    const traineePct = 0.35;
+    
+    // Discounted rates
+    const partnerRate = rateCard.partner.rate * discountMultiplier;
+    const seniorAssocRate = rateCard.seniorAssociate.rate * discountMultiplier;
+    const associateRate = rateCard.associate.rate * discountMultiplier;
+    const traineeRate = rateCard.trainee.rate * discountMultiplier;
+    
+    // Weighted average rate based on pyramid
+    const blendedRateFromPyramid = 
+      (partnerPct * partnerRate) + 
+      (seniorAssocPct * seniorAssocRate) + 
+      (associatePct * associateRate) + 
+      (traineePct * traineeRate);
+    
+    // Total estimated hours
+    const totalEstimatedHours = blendedRateFromPyramid > 0 ? feeAmount / blendedRateFromPyramid : 0;
+    
+    return {
+      partnerHours: totalEstimatedHours * partnerPct,
+      seniorAssociateHours: totalEstimatedHours * seniorAssocPct,
+      associateHours: totalEstimatedHours * associatePct,
+      traineeHours: totalEstimatedHours * traineePct,
+    };
+  };
+
   const summary = useMemo(() => {
     const rates = rateCard;
     const ass = assumptions;
@@ -192,22 +225,39 @@ export default function PricingProposalDetail() {
 
     // Sum hours from all Baker McKenzie items
     let totalPartnerHours = 0;
+    let totalSeniorAssociateHours = 0;
     let totalAssociateHours = 0;
+    let totalTraineeHours = 0;
     
     draftItems
       .filter(item => item.provider === 'Baker McKenzie' && (item.is_included !== false || !item.is_optional))
       .forEach(item => {
-        const partnerHours = item.partner_hours || 0;
-        const associateHours = item.associate_hours || 0;
-        const numTurns = item.num_turns || 1;
-        const itemType = item.item_type || 'documentation';
+        const isIterative = item.pricing_method === 'iterative';
         
-        let decayFactor = 1;
-        if (itemType === 'negotiation') decayFactor = ass.negotiatedDocsDecay;
-        else if (itemType === 'due_diligence') decayFactor = ass.ddDecay;
-        
-        totalPartnerHours += calculateNegotiationHours(partnerHours, decayFactor, numTurns);
-        totalAssociateHours += calculateNegotiationHours(associateHours, decayFactor, numTurns);
+        if (isIterative) {
+          // Use actual hours data from iterative pricing
+          const partnerHours = item.partner_hours || 0;
+          const associateHours = item.associate_hours || 0;
+          const numTurns = item.num_turns || 1;
+          const itemType = item.item_type || 'documentation';
+          
+          let decayFactor = 1;
+          if (itemType === 'negotiation') decayFactor = ass.negotiatedDocsDecay;
+          else if (itemType === 'due_diligence') decayFactor = ass.ddDecay;
+          
+          totalPartnerHours += calculateNegotiationHours(partnerHours, decayFactor, numTurns);
+          totalAssociateHours += calculateNegotiationHours(associateHours, decayFactor, numTurns);
+        } else {
+          // Estimate hours using pyramid structure for manual/AI items
+          const feeAmount = item.fee_amount || 0;
+          if (feeAmount > 0) {
+            const estimated = estimateHoursFromFee(feeAmount, discountMultiplier);
+            totalPartnerHours += estimated.partnerHours;
+            totalSeniorAssociateHours += estimated.seniorAssociateHours;
+            totalAssociateHours += estimated.associateHours;
+            totalTraineeHours += estimated.traineeHours;
+          }
+        }
       });
 
     // Add meeting hours
@@ -222,33 +272,33 @@ export default function PricingProposalDetail() {
     const afaAssociateRate = rates.associate.rate * discountMultiplier;
     const afaTraineeRate = rates.trainee.rate * discountMultiplier;
 
-    // Revenue - for now only using partner and associate 
+    // Revenue by grade
     const partnerRevenue = totalPartnerHours * afaPartnerRate;
+    const seniorAssociateRevenue = totalSeniorAssociateHours * afaSeniorAssociateRate;
     const associateRevenue = totalAssociateHours * afaAssociateRate;
-    const seniorAssociateRevenue = 0;
-    const traineeRevenue = 0;
-    const totalRevenue = partnerRevenue + associateRevenue;
+    const traineeRevenue = totalTraineeHours * afaTraineeRate;
+    const totalRevenue = partnerRevenue + seniorAssociateRevenue + associateRevenue + traineeRevenue;
 
-    // Cost
+    // Cost by grade
     const partnerCost = totalPartnerHours * rates.partner.cost;
+    const seniorAssociateCost = totalSeniorAssociateHours * rates.seniorAssociate.cost;
     const associateCost = totalAssociateHours * rates.associate.cost;
-    const seniorAssociateCost = 0;
-    const traineeCost = 0;
-    const totalCost = partnerCost + associateCost;
+    const traineeCost = totalTraineeHours * rates.trainee.cost;
+    const totalCost = partnerCost + seniorAssociateCost + associateCost + traineeCost;
 
     // Margin
     const margin = totalRevenue - totalCost;
     const marginPercent = totalRevenue > 0 ? (margin / totalRevenue) * 100 : 0;
 
     // Blended rate
-    const totalHours = totalPartnerHours + totalAssociateHours;
+    const totalHours = totalPartnerHours + totalSeniorAssociateHours + totalAssociateHours + totalTraineeHours;
     const blendedRate = totalHours > 0 ? totalRevenue / totalHours : 0;
 
     return {
       totalPartnerHours,
-      totalSeniorAssociateHours: 0,
+      totalSeniorAssociateHours,
       totalAssociateHours,
-      totalTraineeHours: 0,
+      totalTraineeHours,
       totalHours,
       afaPartnerRate,
       afaSeniorAssociateRate,

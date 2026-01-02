@@ -49,8 +49,10 @@ import { useMatters } from "@/lib/hooks/useMatters";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
+import { cn } from "@/lib/utils";
 import { IterativePricingDialog, FeeOwnerHours } from "@/components/pricing/IterativePricingDialog";
 import { EditableRateCard } from "@/components/pricing/EditableRateCard";
+import { CategorizedProposalView, categoryBgColors, categoryTextColors, categoryBorderColors } from "@/components/pricing/CategorizedProposalView";
 
 type PricingMethod = 'ai_suggested' | 'pricing_tool' | 'manual' | 'iterative';
 type ItemType = 'documentation' | 'negotiation' | 'due_diligence' | 'meeting';
@@ -81,7 +83,7 @@ export default function PricingProposalDetail() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isExtractingRfp, setIsExtractingRfp] = useState(false);
   const [isGeneratingAiPricing, setIsGeneratingAiPricing] = useState(false);
-  const [isCategorizing, setIsCategorizing] = useState(false);
+  
   const [isDeletingVersion, setIsDeletingVersion] = useState(false);
   const [isSendToMatterOpen, setIsSendToMatterOpen] = useState(false);
   const [selectedMatterId, setSelectedMatterId] = useState<string>("");
@@ -641,57 +643,6 @@ export default function PricingProposalDetail() {
     }
   };
 
-  // Auto-categorize work items using AI
-  const handleAutoCategorize = async () => {
-    const itemsToCategorize = draftItems
-      .map((item, index) => ({ ...item, index }))
-      .filter(item => item.work_item.trim());
-    
-    if (itemsToCategorize.length === 0) {
-      toast({ title: 'No items to categorize' });
-      return;
-    }
-
-    setIsCategorizing(true);
-    try {
-      const response = await supabase.functions.invoke('categorize-budget-items', {
-        body: { 
-          items: itemsToCategorize.map(item => ({
-            index: item.index,
-            work_item: item.work_item
-          }))
-        }
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message || 'Failed to categorize items');
-      }
-
-      const { categorizations } = response.data;
-      
-      if (!categorizations || categorizations.length === 0) {
-        toast({ title: 'No categorizations returned', variant: 'destructive' });
-        return;
-      }
-
-      // Apply categorizations
-      const updatedItems = [...draftItems];
-      categorizations.forEach((cat: { index: number; category: string }) => {
-        if (updatedItems[cat.index]) {
-          updatedItems[cat.index] = { ...updatedItems[cat.index], category: cat.category };
-        }
-      });
-      
-      setDraftItems(updatedItems);
-      setHasUnsavedChanges(true);
-      toast({ title: `Categorized ${categorizations.length} items` });
-    } catch (error) {
-      console.error('Error categorizing items:', error);
-      toast({ title: error instanceof Error ? error.message : 'Failed to categorize items', variant: 'destructive' });
-    } finally {
-      setIsCategorizing(false);
-    }
-  };
 
   // Client matters for the dropdown
   const clientMatters = matters.filter(m => m.client_id === proposal?.client_id);
@@ -930,24 +881,32 @@ export default function PricingProposalDetail() {
                   )}
                   AI Price All
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={handleAutoCategorize}
-                  disabled={isCategorizing || draftItems.filter(i => i.work_item.trim()).length === 0}
-                >
-                  {isCategorizing ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Wand2 className="h-4 w-4 mr-2" />
-                  )}
-                  Auto-Categorize
-                </Button>
                 <Button onClick={addItem}>
                   <Plus className="h-4 w-4 mr-2" />
                   Add Item
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Category Summary with Auto-Categorize */}
+            {draftItems.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Category Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <CategorizedProposalView
+                    items={draftItems}
+                    onItemsChange={(updatedItems) => {
+                      setDraftItems(updatedItems);
+                      setHasUnsavedChanges(true);
+                    }}
+                    formatCurrency={formatCurrency}
+                    currencySymbol={currencySymbol}
+                  />
+                </CardContent>
+              </Card>
+            )}
 
             {/* Work Items Table */}
             <Card>
@@ -1011,12 +970,29 @@ export default function PricingProposalDetail() {
                                     value={item.category || ''}
                                     onValueChange={(value) => updateItem(index, { category: value || null })}
                                   >
-                                    <SelectTrigger className="w-[120px]">
+                                    <SelectTrigger 
+                                      className={cn(
+                                        "w-[120px] text-xs",
+                                        item.category && categoryBgColors[item.category as keyof typeof categoryBgColors],
+                                        item.category && categoryBorderColors[item.category as keyof typeof categoryBorderColors],
+                                        item.category && categoryTextColors[item.category as keyof typeof categoryTextColors]
+                                      )}
+                                    >
                                       <SelectValue placeholder="Category" />
                                     </SelectTrigger>
                                     <SelectContent>
                                       {BUDGET_CATEGORIES.map(cat => (
-                                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                                        <SelectItem 
+                                          key={cat} 
+                                          value={cat}
+                                          className={cn(
+                                            categoryBgColors[cat],
+                                            categoryTextColors[cat],
+                                            "my-0.5"
+                                          )}
+                                        >
+                                          {cat}
+                                        </SelectItem>
                                       ))}
                                     </SelectContent>
                                   </Select>

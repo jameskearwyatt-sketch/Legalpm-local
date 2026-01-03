@@ -37,11 +37,29 @@ export function WorkItemAllocator({
   // Get IDs of selected items
   const selectedIds = useMemo(() => new Set(allocations.map(a => a.id)), [allocations]);
 
-  // Sort items: selected first (in original budget order), then rest (in original budget order)
+  // Sort items: selected first (grouped by category in budget order), then rest (grouped by category in budget order)
   const sortedItems = useMemo(() => {
-    // Keep original order from budget (already sorted by sort_order which groups categories correctly)
-    const selected = budgetItems.filter(item => selectedIds.has(item.id));
-    const unselected = budgetItems.filter(item => !selectedIds.has(item.id));
+    // Build category order from original budget items (first occurrence determines order)
+    const categoryOrder: string[] = [];
+    budgetItems.forEach(item => {
+      const cat = item.category || '';
+      if (!categoryOrder.includes(cat)) {
+        categoryOrder.push(cat);
+      }
+    });
+    
+    // Sort function that uses category order from budget, then sort_order within category
+    const sortByBudgetOrder = (a: BudgetLineItem, b: BudgetLineItem) => {
+      const catA = a.category || '';
+      const catB = b.category || '';
+      if (catA !== catB) {
+        return categoryOrder.indexOf(catA) - categoryOrder.indexOf(catB);
+      }
+      return a.sort_order - b.sort_order;
+    };
+    
+    const selected = budgetItems.filter(item => selectedIds.has(item.id)).sort(sortByBudgetOrder);
+    const unselected = budgetItems.filter(item => !selectedIds.has(item.id)).sort(sortByBudgetOrder);
     return [...selected, ...unselected];
   }, [budgetItems, selectedIds]);
 

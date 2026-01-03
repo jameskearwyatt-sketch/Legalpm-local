@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/ui/stat-card';
@@ -44,6 +44,11 @@ export default function Dashboard() {
   const [excludedMatterIds, setExcludedMatterIds] = useState<string[]>([]);
   const [deleteConfirmDate, setDeleteConfirmDate] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [activeTooltipData, setActiveTooltipData] = useState<{ dataPoint: TrendDataPoint; payload: any[] } | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const isHoveringTooltipRef = useRef(false);
+  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { data: stats, isLoading } = useDashboard(excludedMatterIds);
   const { matters } = useMatters();
   const { user } = useAuth();
@@ -191,43 +196,43 @@ export default function Dashboard() {
     }
   };
 
-  // Custom tooltip component with delete button
-  const CustomTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload || !payload.length) return null;
+  // Handle chart mouse move to capture tooltip data and position
+  const handleChartMouseMove = useCallback((state: any) => {
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
     
-    const dataPoint = payload[0]?.payload as TrendDataPoint;
-    
-    return (
-      <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
-        <div className="flex items-center justify-between gap-4 mb-2">
-          <span className="font-medium text-sm">{label}</span>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={(e) => {
-              e.stopPropagation();
-              setDeleteConfirmDate(dataPoint.rawDate);
-            }}
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
-        <div className="space-y-1">
-          {payload.map((entry: any, index: number) => (
-            <div key={index} className="flex items-center gap-2 text-sm">
-              <div 
-                className="w-2.5 h-2.5 rounded-full" 
-                style={{ backgroundColor: entry.color }}
-              />
-              <span className="text-muted-foreground">{entry.name}:</span>
-              <span className="font-medium">{formatCurrency(entry.value)}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
+    if (state?.activePayload?.length && state.activeCoordinate) {
+      const dataPoint = state.activePayload[0]?.payload as TrendDataPoint;
+      setActiveTooltipData({ dataPoint, payload: state.activePayload });
+      setTooltipPosition({ x: state.activeCoordinate.x, y: state.activeCoordinate.y });
+    }
+  }, []);
+
+  const handleChartMouseLeave = useCallback(() => {
+    // Delay hiding to allow mouse to move to tooltip
+    hideTimeoutRef.current = setTimeout(() => {
+      if (!isHoveringTooltipRef.current) {
+        setActiveTooltipData(null);
+        setTooltipPosition(null);
+      }
+    }, 100);
+  }, []);
+
+  const handleTooltipMouseEnter = useCallback(() => {
+    isHoveringTooltipRef.current = true;
+    if (hideTimeoutRef.current) {
+      clearTimeout(hideTimeoutRef.current);
+      hideTimeoutRef.current = null;
+    }
+  }, []);
+
+  const handleTooltipMouseLeave = useCallback(() => {
+    isHoveringTooltipRef.current = false;
+    setActiveTooltipData(null);
+    setTooltipPosition(null);
+  }, []);
 
   // Use shared formatCurrency from currencyUtils - imported at top
 
@@ -327,19 +332,20 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             {hasData ? (
-              <div className="h-72">
+              <div className="h-72 relative">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trendData}>
+                  <LineChart 
+                    data={trendData}
+                    onMouseMove={handleChartMouseMove}
+                    onMouseLeave={handleChartMouseLeave}
+                  >
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="date" className="text-xs" />
                     <YAxis 
                       className="text-xs" 
                       tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                     />
-                    <Tooltip 
-                      content={<CustomTooltip />}
-                      wrapperStyle={{ outline: 'none' }}
-                    />
+                    <Tooltip content={() => null} />
                     <Legend />
                     <Line 
                       type="monotone" 
@@ -348,6 +354,7 @@ export default function Dashboard() {
                       stroke="hsl(var(--chart-3))" 
                       strokeWidth={2}
                       dot={{ fill: 'hsl(var(--chart-3))' }}
+                      activeDot={{ r: 6 }}
                     />
                     <Line 
                       type="monotone" 
@@ -356,6 +363,7 @@ export default function Dashboard() {
                       stroke="hsl(var(--chart-1))" 
                       strokeWidth={2}
                       dot={{ fill: 'hsl(var(--chart-1))' }}
+                      activeDot={{ r: 6 }}
                     />
                     <Line 
                       type="monotone" 
@@ -364,9 +372,54 @@ export default function Dashboard() {
                       stroke="hsl(var(--chart-2))" 
                       strokeWidth={2}
                       dot={{ fill: 'hsl(var(--chart-2))' }}
+                      activeDot={{ r: 6 }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
+                
+                {/* Custom positioned tooltip that stays still */}
+                {activeTooltipData && tooltipPosition && (
+                  <div
+                    ref={tooltipRef}
+                    className="absolute z-50 bg-card border border-border rounded-lg p-3 shadow-lg pointer-events-auto"
+                    style={{
+                      left: tooltipPosition.x + 15,
+                      top: tooltipPosition.y - 60,
+                      transform: 'translateY(-50%)',
+                    }}
+                    onMouseEnter={handleTooltipMouseEnter}
+                    onMouseLeave={handleTooltipMouseLeave}
+                  >
+                    <div className="flex items-center justify-between gap-4 mb-2">
+                      <span className="font-medium text-sm">{activeTooltipData.dataPoint.date}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteConfirmDate(activeTooltipData.dataPoint.rawDate);
+                          setActiveTooltipData(null);
+                          setTooltipPosition(null);
+                        }}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                    <div className="space-y-1">
+                      {activeTooltipData.payload.map((entry: any, index: number) => (
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                          <div 
+                            className="w-2.5 h-2.5 rounded-full" 
+                            style={{ backgroundColor: entry.color }}
+                          />
+                          <span className="text-muted-foreground">{entry.name}:</span>
+                          <span className="font-medium">{formatCurrency(entry.value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-72 text-center">

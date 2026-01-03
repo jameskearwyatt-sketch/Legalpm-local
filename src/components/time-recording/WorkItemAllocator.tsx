@@ -37,18 +37,11 @@ export function WorkItemAllocator({
   // Get IDs of selected items
   const selectedIds = useMemo(() => new Set(allocations.map(a => a.id)), [allocations]);
 
-  // Sort items: selected first (grouped by category), then rest (grouped by category)
+  // Sort items: selected first (in original budget order), then rest (in original budget order)
   const sortedItems = useMemo(() => {
-    // Sort by category then sort_order to maintain budget order
-    const sortByBudgetOrder = (a: BudgetLineItem, b: BudgetLineItem) => {
-      const catA = a.category || '';
-      const catB = b.category || '';
-      if (catA !== catB) return catA.localeCompare(catB);
-      return a.sort_order - b.sort_order;
-    };
-    
-    const selected = budgetItems.filter(item => selectedIds.has(item.id)).sort(sortByBudgetOrder);
-    const unselected = budgetItems.filter(item => !selectedIds.has(item.id)).sort(sortByBudgetOrder);
+    // Keep original order from budget (already sorted by sort_order which groups categories correctly)
+    const selected = budgetItems.filter(item => selectedIds.has(item.id));
+    const unselected = budgetItems.filter(item => !selectedIds.has(item.id));
     return [...selected, ...unselected];
   }, [budgetItems, selectedIds]);
 

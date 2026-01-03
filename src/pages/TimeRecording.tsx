@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { format, addDays, differenceInDays, eachDayOfInterval } from 'date-fns';
+import { format, addDays, differenceInDays, eachDayOfInterval, parseISO } from 'date-fns';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { WorkItemAllocator } from '@/components/time-recording/WorkItemAllocator';
+import { useTimeRecordingDrafts, TimeRecordingDraft } from '@/lib/hooks/useTimeRecordingDrafts';
 import { 
   CalendarIcon, 
   Clock, 
@@ -29,9 +30,23 @@ import {
   RotateCcw,
   AlertTriangle,
   Target,
-  ChevronDown
+  ChevronDown,
+  Save,
+  Trash2,
+  FolderOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -124,6 +139,11 @@ export default function TimeRecording() {
   // Step state
   const [step, setStep] = useState<Step>('mode-select');
   const [mode, setMode] = useState<'single' | 'multi' | null>(null);
+  const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  // Drafts
+  const { drafts, isLoading: draftsLoading, saveDraft, deleteDraft, deleteAllDrafts } = useTimeRecordingDrafts();
   
   // Date state
   const [singleDate, setSingleDate] = useState<Date>(new Date());
@@ -293,9 +313,99 @@ export default function TimeRecording() {
 
   const selectMode = (selectedMode: 'single' | 'multi') => {
     setMode(selectedMode);
+    setCurrentDraftId(null);
     initializeGrid();
     setStep('grid-input');
     setProcessedOutput(null);
+  };
+
+  // Load a draft
+  const loadDraft = (draft: TimeRecordingDraft) => {
+    setMode(draft.mode as 'single' | 'multi');
+    setCurrentDraftId(draft.id);
+    
+    if (draft.single_date) {
+      setSingleDate(parseISO(draft.single_date));
+    }
+    if (draft.date_range_from && draft.date_range_to) {
+      setDateRange({
+        from: parseISO(draft.date_range_from),
+        to: parseISO(draft.date_range_to),
+      });
+    }
+    
+    // Restore grid entries, converting date strings back to Date objects
+    const restoredEntries = (draft.grid_entries as GridRowEntry[]).map(entry => ({
+      ...entry,
+      selectedDays: entry.selectedDays?.map((d: any) => 
+        typeof d === 'string' ? parseISO(d) : new Date(d)
+      ) || [],
+    }));
+    setGridEntries(restoredEntries);
+    
+    // Restore processed output if polished
+    if (draft.is_polished && draft.processed_output) {
+      const restoredOutput = (draft.processed_output as DayOutput[]).map(day => ({
+        ...day,
+        date: typeof day.date === 'string' ? parseISO(day.date as any) : new Date(day.date),
+      }));
+      setProcessedOutput(restoredOutput);
+      setStep('output');
+    } else {
+      setProcessedOutput(null);
+      setStep('grid-input');
+    }
+    
+    toast({
+      title: 'Draft loaded',
+      description: `Loaded "${draft.name}"`,
+    });
+  };
+
+  // Save current state as draft
+  const handleSaveDraft = async () => {
+    if (!mode) return;
+    
+    setIsSaving(true);
+    try {
+      // Generate a default name based on date
+      const defaultName = mode === 'single' 
+        ? `Time for ${format(singleDate, 'd MMM yyyy')}`
+        : dateRange.from && dateRange.to
+          ? `Time for ${format(dateRange.from, 'd MMM')} - ${format(dateRange.to, 'd MMM yyyy')}`
+          : `Time recording ${format(new Date(), 'd MMM yyyy HH:mm')}`;
+      
+      // Serialize grid entries, converting Dates to ISO strings
+      const serializedEntries = gridEntries.map(entry => ({
+        ...entry,
+        selectedDays: entry.selectedDays.map(d => d.toISOString()),
+      }));
+      
+      // Serialize processed output if exists
+      const serializedOutput = processedOutput?.map(day => ({
+        ...day,
+        date: day.date.toISOString(),
+      })) || null;
+      
+      await saveDraft.mutateAsync({
+        id: currentDraftId || undefined,
+        name: defaultName,
+        mode,
+        singleDate: mode === 'single' ? singleDate : null,
+        dateRangeFrom: mode === 'multi' ? dateRange.from || null : null,
+        dateRangeTo: mode === 'multi' ? dateRange.to || null : null,
+        gridEntries: serializedEntries,
+        processedOutput: serializedOutput,
+        isPolished: !!processedOutput,
+      });
+      
+      // If this was a new draft, we need to get the ID from the response
+      // The hook will refetch the drafts list
+    } catch (err) {
+      console.error('Save draft error:', err);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const updateEntry = (id: string, updates: Partial<GridRowEntry>) => {
@@ -826,6 +936,7 @@ export default function TimeRecording() {
   const startOver = () => {
     setStep('mode-select');
     setMode(null);
+    setCurrentDraftId(null);
     setGridEntries([]);
     setProcessedOutput(null);
     setDateRange({ from: undefined, to: undefined });
@@ -841,7 +952,7 @@ export default function TimeRecording() {
 
   // Render mode selection
   const renderModeSelect = () => (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-8">
+    <div className="flex flex-col items-center justify-center space-y-8">
       <div className="text-center space-y-2">
         <h2 className="text-2xl font-semibold">How are you recording time today?</h2>
         <p className="text-muted-foreground">Choose your time recording mode</p>
@@ -888,6 +999,118 @@ export default function TimeRecording() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Saved Drafts Section */}
+      {drafts.length > 0 && (
+        <div className="w-full max-w-3xl space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FolderOpen className="h-5 w-5 text-muted-foreground" />
+              <h3 className="text-lg font-semibold">Saved Drafts</h3>
+              <Badge variant="secondary">{drafts.length}</Badge>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete All
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete all drafts?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete all {drafts.length} saved time recording drafts. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => deleteAllDrafts.mutate()}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete All
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+          
+          <div className="grid gap-3">
+            {drafts.map(draft => (
+              <Card key={draft.id} className="hover:bg-muted/50 transition-colors">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div 
+                      className="flex-1 cursor-pointer"
+                      onClick={() => loadDraft(draft)}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={cn(
+                          "w-2 h-2 rounded-full",
+                          draft.is_polished ? "bg-green-500" : "bg-amber-500"
+                        )} />
+                        <div>
+                          <p className="font-medium">{draft.name}</p>
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Badge variant="outline" className="text-xs">
+                              {draft.mode === 'single' ? 'Single Day' : 'Multi-Day'}
+                            </Badge>
+                            <span>•</span>
+                            <span>{draft.is_polished ? 'Polished' : 'Draft'}</span>
+                            <span>•</span>
+                            <span>Updated {format(new Date(draft.updated_at), 'd MMM yyyy HH:mm')}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => loadDraft(draft)}
+                      >
+                        <ArrowRight className="h-4 w-4" />
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete this draft?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will permanently delete "{draft.name}". This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteDraft.mutate(draft.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {draftsLoading && (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <span>Loading saved drafts...</span>
+        </div>
+      )}
     </div>
   );
 
@@ -1351,8 +1574,25 @@ export default function TimeRecording() {
         </CardContent>
       </Card>
 
-      {/* Process button at bottom */}
-      <div className="flex justify-end">
+      {/* Action buttons at bottom */}
+      <div className="flex justify-between">
+        <Button 
+          variant="outline"
+          onClick={handleSaveDraft}
+          disabled={isSaving || getTotalHours() === 0}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <Save className="mr-2 h-4 w-4" />
+              Save Draft
+            </>
+          )}
+        </Button>
         <Button 
           onClick={processEntries} 
           disabled={isProcessing || getTotalHours() === 0}
@@ -1390,6 +1630,23 @@ export default function TimeRecording() {
           <Button variant="outline" onClick={startOver}>
             <RotateCcw className="h-4 w-4 mr-2" />
             Start Over
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleSaveDraft}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="mr-2 h-4 w-4" />
+                Save
+              </>
+            )}
           </Button>
           <Button onClick={copyToClipboard}>
             {copied ? (

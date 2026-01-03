@@ -966,6 +966,51 @@ export type Database = {
         }
         Relationships: []
       }
+      time_recording_drafts: {
+        Row: {
+          created_at: string
+          date_range_from: string | null
+          date_range_to: string | null
+          grid_entries: Json
+          id: string
+          is_polished: boolean
+          mode: string
+          name: string
+          processed_output: Json | null
+          single_date: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date_range_from?: string | null
+          date_range_to?: string | null
+          grid_entries?: Json
+          id?: string
+          is_polished?: boolean
+          mode: string
+          name: string
+          processed_output?: Json | null
+          single_date?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date_range_from?: string | null
+          date_range_to?: string | null
+          grid_entries?: Json
+          id?: string
+          is_polished?: boolean
+          mode?: string
+          name?: string
+          processed_output?: Json | null
+          single_date?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

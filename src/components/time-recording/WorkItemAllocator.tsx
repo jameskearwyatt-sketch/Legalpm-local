@@ -10,6 +10,7 @@ interface BudgetLineItem {
   fee_amount: number;
   category: string | null;
   provider: string;
+  sort_order: number;
 }
 
 interface WorkItemAllocation {
@@ -36,10 +37,18 @@ export function WorkItemAllocator({
   // Get IDs of selected items
   const selectedIds = useMemo(() => new Set(allocations.map(a => a.id)), [allocations]);
 
-  // Sort items: selected first, then rest
+  // Sort items: selected first (grouped by category), then rest (grouped by category)
   const sortedItems = useMemo(() => {
-    const selected = budgetItems.filter(item => selectedIds.has(item.id));
-    const unselected = budgetItems.filter(item => !selectedIds.has(item.id));
+    // Sort by category then sort_order to maintain budget order
+    const sortByBudgetOrder = (a: BudgetLineItem, b: BudgetLineItem) => {
+      const catA = a.category || '';
+      const catB = b.category || '';
+      if (catA !== catB) return catA.localeCompare(catB);
+      return a.sort_order - b.sort_order;
+    };
+    
+    const selected = budgetItems.filter(item => selectedIds.has(item.id)).sort(sortByBudgetOrder);
+    const unselected = budgetItems.filter(item => !selectedIds.has(item.id)).sort(sortByBudgetOrder);
     return [...selected, ...unselected];
   }, [budgetItems, selectedIds]);
 

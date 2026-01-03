@@ -46,6 +46,7 @@ export default function Dashboard() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeTooltipData, setActiveTooltipData] = useState<{ dataPoint: TrendDataPoint; payload: any[] } | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
+  const [activeDataIndex, setActiveDataIndex] = useState<number | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const isHoveringTooltipRef = useRef(false);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -196,19 +197,26 @@ export default function Dashboard() {
     }
   };
 
-  // Handle chart mouse move to capture tooltip data and position
+  // Handle chart mouse move - only update when hovering a NEW data point
   const handleChartMouseMove = useCallback((state: any) => {
     if (hideTimeoutRef.current) {
       clearTimeout(hideTimeoutRef.current);
       hideTimeoutRef.current = null;
     }
     
-    if (state?.activePayload?.length && state.activeCoordinate) {
-      const dataPoint = state.activePayload[0]?.payload as TrendDataPoint;
-      setActiveTooltipData({ dataPoint, payload: state.activePayload });
-      setTooltipPosition({ x: state.activeCoordinate.x, y: state.activeCoordinate.y });
+    // Only update if we're hovering over a data point AND it's a different one
+    if (state?.activePayload?.length && state.activeCoordinate && state.activeTooltipIndex !== undefined) {
+      const newIndex = state.activeTooltipIndex;
+      
+      // Only update position if this is a different data point
+      if (newIndex !== activeDataIndex) {
+        const dataPoint = state.activePayload[0]?.payload as TrendDataPoint;
+        setActiveTooltipData({ dataPoint, payload: state.activePayload });
+        setTooltipPosition({ x: state.activeCoordinate.x, y: state.activeCoordinate.y });
+        setActiveDataIndex(newIndex);
+      }
     }
-  }, []);
+  }, [activeDataIndex]);
 
   const handleChartMouseLeave = useCallback(() => {
     // Delay hiding to allow mouse to move to tooltip
@@ -216,8 +224,9 @@ export default function Dashboard() {
       if (!isHoveringTooltipRef.current) {
         setActiveTooltipData(null);
         setTooltipPosition(null);
+        setActiveDataIndex(null);
       }
-    }, 100);
+    }, 150);
   }, []);
 
   const handleTooltipMouseEnter = useCallback(() => {
@@ -232,6 +241,7 @@ export default function Dashboard() {
     isHoveringTooltipRef.current = false;
     setActiveTooltipData(null);
     setTooltipPosition(null);
+    setActiveDataIndex(null);
   }, []);
 
   // Use shared formatCurrency from currencyUtils - imported at top

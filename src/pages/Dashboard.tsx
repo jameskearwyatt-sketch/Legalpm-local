@@ -6,12 +6,12 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useDashboard } from '@/lib/hooks/useDashboard';
+import { useDashboard, TrendDataPoint } from '@/lib/hooks/useDashboard';
 import { useMatters } from '@/lib/hooks/useMatters';
 import { useAuth } from '@/lib/auth';
 import { formatCurrency } from '@/lib/currencyUtils';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
   DollarSign, 
   FileText, 
@@ -24,15 +24,30 @@ import {
   Loader2,
   Rocket,
   CalendarClock,
-  ListChecks
+  ListChecks,
+  Trash2
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { toast } from '@/hooks/use-toast';
 
 export default function Dashboard() {
   const [excludedMatterIds, setExcludedMatterIds] = useState<string[]>([]);
+  const [deleteConfirmDate, setDeleteConfirmDate] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { data: stats, isLoading } = useDashboard(excludedMatterIds);
   const { matters } = useMatters();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   // Fetch current user's profile for the "Me" filter
   const { data: userProfile } = useQuery({
@@ -142,7 +157,80 @@ export default function Dashboard() {
     }
   };
 
+  // Delete all snapshots for a specific date
+  const handleDeleteDataPoint = async (rawDate: string) => {
+    if (!user?.id) return;
+    
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from('financial_snapshots')
+        .delete()
+        .eq('as_of_date', rawDate)
+        .eq('user_id', user.id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: 'Data point deleted',
+        description: 'The financial snapshots for this date have been removed.',
+      });
+      
+      // Invalidate the dashboard query to refresh data
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    } catch (error) {
+      console.error('Error deleting data point:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete data point. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteConfirmDate(null);
+    }
+  };
+
+  // Custom tooltip component with delete button
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload || !payload.length) return null;
+    
+    const dataPoint = payload[0]?.payload as TrendDataPoint;
+    
+    return (
+      <div className="bg-card border border-border rounded-lg p-3 shadow-lg">
+        <div className="flex items-center justify-between gap-4 mb-2">
+          <span className="font-medium text-sm">{label}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={(e) => {
+              e.stopPropagation();
+              setDeleteConfirmDate(dataPoint.rawDate);
+            }}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        <div className="space-y-1">
+          {payload.map((entry: any, index: number) => (
+            <div key={index} className="flex items-center gap-2 text-sm">
+              <div 
+                className="w-2.5 h-2.5 rounded-full" 
+                style={{ backgroundColor: entry.color }}
+              />
+              <span className="text-muted-foreground">{entry.name}:</span>
+              <span className="font-medium">{formatCurrency(entry.value)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   // Use shared formatCurrency from currencyUtils - imported at top
+
 
   if (isLoading) {
     return (
@@ -249,12 +337,8 @@ export default function Dashboard() {
                       tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
                     />
                     <Tooltip 
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{
-                        backgroundColor: 'hsl(var(--card))',
-                        border: '1px solid hsl(var(--border))',
-                        borderRadius: 'var(--radius)',
-                      }}
+                      content={<CustomTooltip />}
+                      wrapperStyle={{ outline: 'none' }}
                     />
                     <Legend />
                     <Line 
@@ -479,6 +563,35 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        <AlertDialog open={!!deleteConfirmDate} onOpenChange={(open) => !open && setDeleteConfirmDate(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete data point?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete all financial snapshots for this date across all matters. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => deleteConfirmDate && handleDeleteDataPoint(deleteConfirmDate)}
+                disabled={isDeleting}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );

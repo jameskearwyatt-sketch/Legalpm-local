@@ -5,6 +5,7 @@ import { differenceInDays, parseISO, isAfter, format } from 'date-fns';
 
 export interface TrendDataPoint {
   date: string;
+  rawDate: string; // Original ISO date for deletion
   wip: number;
   billed: number;
   paid: number;
@@ -395,26 +396,14 @@ export function useDashboard(excludedMatterIds: string[] = []) {
         trendByDate.set(dateKey, existing);
       });
 
-      // Convert to array and sort by date
-      const trendData: TrendDataPoint[] = Array.from(trendByDate.entries())
-        .map(([dateStr, values]) => ({
-          date: format(parseISO(dateStr), 'MMM d'),
-          wip: Math.round(values.wip),
-          billed: Math.round(values.billed),
-          paid: Math.round(values.paid),
-        }))
-        .sort((a, b) => {
-          // Re-parse for proper date sorting
-          const dateA = trendByDate.keys();
-          const dateB = trendByDate.keys();
-          return 0; // We need the original dates for sorting
-        });
+
 
       // Better sorting approach - use the original date keys
       const sortedTrendData: TrendDataPoint[] = Array.from(trendByDate.entries())
         .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
         .map(([dateStr, values]) => ({
           date: format(parseISO(dateStr), 'MMM d'),
+          rawDate: dateStr,
           wip: Math.round(values.wip),
           billed: Math.round(values.billed),
           paid: Math.round(values.paid),

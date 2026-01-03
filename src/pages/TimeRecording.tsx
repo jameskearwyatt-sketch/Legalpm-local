@@ -60,6 +60,7 @@ interface BudgetLineItem {
   fee_amount: number;
   category: string | null;
   provider: string;
+  sort_order: number;
 }
 
 interface WorkItemAllocation {
@@ -212,7 +213,7 @@ export default function TimeRecording() {
         
         const { data: items, error: itemsError } = await supabase
           .from('budget_line_items')
-          .select('id, work_item, fee_amount, category, provider, matter_id, is_included')
+          .select('id, work_item, fee_amount, category, provider, matter_id, is_included, sort_order')
           .in('budget_version_id', versionIds)
           .eq('is_included', true)
           .order('sort_order', { ascending: true });
@@ -231,6 +232,7 @@ export default function TimeRecording() {
             fee_amount: item.fee_amount,
             category: item.category,
             provider: item.provider,
+            sort_order: item.sort_order,
           });
         });
         

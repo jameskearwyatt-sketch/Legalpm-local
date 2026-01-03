@@ -4,16 +4,18 @@ import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 import { useMatters } from '@/lib/hooks/useMatters';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { WorkItemAllocator } from '@/components/time-recording/WorkItemAllocator';
 import { 
   CalendarIcon, 
   Clock, 
@@ -60,6 +62,12 @@ interface BudgetLineItem {
   provider: string;
 }
 
+interface WorkItemAllocation {
+  id: string;
+  name: string;
+  hours: number;
+}
+
 interface GridRowEntry {
   id: string;
   type: 'matter' | 'non-chargeable';
@@ -77,11 +85,10 @@ interface GridRowEntry {
   selectedDays: Date[];
   dayNarratives: { [dateKey: string]: string };
   otherDescription?: string;
-  // Work item selection
-  selectedWorkItemId?: string;
-  selectedWorkItemName?: string;
-  // For multi-day: work item per day
-  dayWorkItems: { [dateKey: string]: { id: string; name: string } };
+  // Work item allocations (multi-select with hour distribution)
+  workItemAllocations: WorkItemAllocation[];
+  // For multi-day: work item allocations per day
+  dayWorkItemAllocations: { [dateKey: string]: WorkItemAllocation[] };
 }
 
 interface DayOutputEntry {
@@ -256,7 +263,8 @@ export default function TimeRecording() {
         narrative: '',
         selectedDays: [],
         dayNarratives: {},
-        dayWorkItems: {},
+        workItemAllocations: [],
+        dayWorkItemAllocations: {},
       });
     });
     
@@ -272,7 +280,8 @@ export default function TimeRecording() {
         selectedDays: [],
         dayNarratives: {},
         otherDescription: '',
-        dayWorkItems: {},
+        workItemAllocations: [],
+        dayWorkItemAllocations: {},
       });
     });
     
@@ -301,16 +310,17 @@ export default function TimeRecording() {
         // Remove day
         const newSelectedDays = entry.selectedDays.filter(d => format(d, 'yyyy-MM-dd') !== dateKey);
         const newDayNarratives = { ...entry.dayNarratives };
-        const newDayWorkItems = { ...entry.dayWorkItems };
+        const newDayWorkItemAllocations = { ...entry.dayWorkItemAllocations };
         delete newDayNarratives[dateKey];
-        delete newDayWorkItems[dateKey];
-        return { ...entry, selectedDays: newSelectedDays, dayNarratives: newDayNarratives, dayWorkItems: newDayWorkItems };
+        delete newDayWorkItemAllocations[dateKey];
+        return { ...entry, selectedDays: newSelectedDays, dayNarratives: newDayNarratives, dayWorkItemAllocations: newDayWorkItemAllocations };
       } else {
         // Add day
         return { 
           ...entry, 
           selectedDays: [...entry.selectedDays, date].sort((a, b) => a.getTime() - b.getTime()),
-          dayNarratives: { ...entry.dayNarratives, [dateKey]: '' }
+          dayNarratives: { ...entry.dayNarratives, [dateKey]: '' },
+          dayWorkItemAllocations: { ...entry.dayWorkItemAllocations, [dateKey]: [] }
         };
       }
     }));
@@ -327,13 +337,13 @@ export default function TimeRecording() {
     }));
   };
 
-  const updateDayWorkItem = (entryId: string, date: Date, workItemId: string, workItemName: string) => {
+  const updateDayWorkItemAllocations = (entryId: string, date: Date, allocations: WorkItemAllocation[]) => {
     const dateKey = format(date, 'yyyy-MM-dd');
     setGridEntries(prev => prev.map(entry => {
       if (entry.id !== entryId) return entry;
       return { 
         ...entry, 
-        dayWorkItems: { ...entry.dayWorkItems, [dateKey]: { id: workItemId, name: workItemName } }
+        dayWorkItemAllocations: { ...entry.dayWorkItemAllocations, [dateKey]: allocations }
       };
     }));
   };
@@ -418,23 +428,49 @@ export default function TimeRecording() {
 
       if (mode === 'single') {
         // Single day: polish narratives and output
-        const polishedEntries = await Promise.all(
-          activeEntries.map(async (entry) => ({
-            id: entry.id,
-            type: entry.type,
-            matterNumber: entry.matterNumber,
-            matterName: entry.matterName,
-            clientName: entry.clientName,
-            cmNumber: entry.cmNumber,
-            nonChargeableCode: entry.nonChargeableCode,
-            nonChargeableName: entry.nonChargeableName,
-            otherDescription: entry.otherDescription,
-            hours: entry.hours,
-            narrative: entry.narrative,
-            polishedNarrative: await polishNarrative(entry.narrative),
-            workItemName: entry.selectedWorkItemName,
-          }))
-        );
+        // For multi-work-item allocations, we need to create separate entries for each allocated work item
+        const polishedEntries: DayOutputEntry[] = [];
+        
+        for (const entry of activeEntries) {
+          const polished = await polishNarrative(entry.narrative);
+          
+          if (entry.type === 'matter' && entry.workItemAllocations.length > 0) {
+            // Create separate output entries for each work item allocation
+            for (const allocation of entry.workItemAllocations) {
+              if (allocation.hours > 0) {
+                polishedEntries.push({
+                  id: `${entry.id}-${allocation.id}`,
+                  type: entry.type,
+                  matterNumber: entry.matterNumber,
+                  matterName: entry.matterName,
+                  clientName: entry.clientName,
+                  cmNumber: entry.cmNumber,
+                  hours: allocation.hours,
+                  narrative: entry.narrative,
+                  polishedNarrative: polished,
+                  workItemName: allocation.name,
+                });
+              }
+            }
+          } else {
+            // Non-matter entries or entries without allocations
+            polishedEntries.push({
+              id: entry.id,
+              type: entry.type,
+              matterNumber: entry.matterNumber,
+              matterName: entry.matterName,
+              clientName: entry.clientName,
+              cmNumber: entry.cmNumber,
+              nonChargeableCode: entry.nonChargeableCode,
+              nonChargeableName: entry.nonChargeableName,
+              otherDescription: entry.otherDescription,
+              hours: entry.hours,
+              narrative: entry.narrative,
+              polishedNarrative: polished,
+              workItemName: undefined,
+            });
+          }
+        }
 
         setProcessedOutput([{
           date: singleDate,
@@ -481,23 +517,44 @@ export default function TimeRecording() {
             const dateKey = format(date, 'yyyy-MM-dd');
             const rawNarrative = entry.dayNarratives[dateKey] || '';
             const polished = await polishNarrative(rawNarrative);
-            const dayWorkItem = entry.dayWorkItems[dateKey];
+            const dayAllocations = entry.dayWorkItemAllocations[dateKey] || [];
             
-            outputMap[dateKey].push({
-              id: `${entry.id}-${dateKey}`,
-              type: entry.type,
-              matterNumber: entry.matterNumber,
-              matterName: entry.matterName,
-              clientName: entry.clientName,
-              cmNumber: entry.cmNumber,
-              nonChargeableCode: entry.nonChargeableCode,
-              nonChargeableName: entry.nonChargeableName,
-              otherDescription: entry.otherDescription,
-              hours: hoursPerDay[i],
-              narrative: rawNarrative,
-              polishedNarrative: polished,
-              workItemName: dayWorkItem?.name,
-            });
+            if (entry.type === 'matter' && dayAllocations.length > 0) {
+              // Create separate output entries for each work item allocation
+              for (const allocation of dayAllocations) {
+                if (allocation.hours > 0) {
+                  outputMap[dateKey].push({
+                    id: `${entry.id}-${dateKey}-${allocation.id}`,
+                    type: entry.type,
+                    matterNumber: entry.matterNumber,
+                    matterName: entry.matterName,
+                    clientName: entry.clientName,
+                    cmNumber: entry.cmNumber,
+                    hours: allocation.hours,
+                    narrative: rawNarrative,
+                    polishedNarrative: polished,
+                    workItemName: allocation.name,
+                  });
+                }
+              }
+            } else {
+              // Non-matter entries or entries without allocations
+              outputMap[dateKey].push({
+                id: `${entry.id}-${dateKey}`,
+                type: entry.type,
+                matterNumber: entry.matterNumber,
+                matterName: entry.matterName,
+                clientName: entry.clientName,
+                cmNumber: entry.cmNumber,
+                nonChargeableCode: entry.nonChargeableCode,
+                nonChargeableName: entry.nonChargeableName,
+                otherDescription: entry.otherDescription,
+                hours: hoursPerDay[i],
+                narrative: rawNarrative,
+                polishedNarrative: polished,
+                workItemName: undefined,
+              });
+            }
           }
         }
 
@@ -1020,44 +1077,23 @@ export default function TimeRecording() {
                       <TableCell>
                         {entry.hours > 0 ? (
                           <div className="space-y-2">
-                            {/* Work Item Selector */}
+                            {/* Work Item Allocator */}
                             {entry.matterId && matterBudgetItems[entry.matterId]?.length > 0 ? (
-                              <Select
-                                value={entry.selectedWorkItemId || ''}
-                                onValueChange={(value) => {
-                                  const item = matterBudgetItems[entry.matterId!]?.find(i => i.id === value);
-                                  updateEntry(entry.id, { 
-                                    selectedWorkItemId: value, 
-                                    selectedWorkItemName: item?.work_item 
-                                  });
-                                }}
-                              >
-                                <SelectTrigger className={cn(
-                                  "w-full",
-                                  !entry.selectedWorkItemId && "border-amber-500 bg-amber-50 dark:bg-amber-950/20"
-                                )}>
-                                  <SelectValue placeholder="⚠️ Select work item from budget..." />
-                                </SelectTrigger>
-                                <SelectContent className="bg-background border max-h-60">
-                                  {matterBudgetItems[entry.matterId]?.map(item => (
-                                    <SelectItem key={item.id} value={item.id}>
-                                      <div className="flex flex-col">
-                                        <span>{item.work_item}</span>
-                                        {item.category && (
-                                          <span className="text-xs text-muted-foreground">{item.category}</span>
-                                        )}
-                                      </div>
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              <WorkItemAllocator
+                                budgetItems={matterBudgetItems[entry.matterId]}
+                                totalHours={entry.hours}
+                                allocations={entry.workItemAllocations}
+                                onAllocationsChange={(allocations) => 
+                                  updateEntry(entry.id, { workItemAllocations: allocations })
+                                }
+                              />
                             ) : entry.matterId && !matterBudgetItems[entry.matterId]?.length ? (
                               <div className="text-xs text-muted-foreground italic">
                                 No budget items found
                               </div>
                             ) : null}
-                            {/* Narrative Input - only show after work item selected (or if no budget items) */}
-                            {(entry.selectedWorkItemId || !matterBudgetItems[entry.matterId]?.length) && (
+                            {/* Narrative Input - only show after work items selected (or if no budget items) */}
+                            {(entry.workItemAllocations.length > 0 || !matterBudgetItems[entry.matterId]?.length) && (
                               <Input
                                 placeholder="Brief notes - AI will polish"
                                 value={entry.narrative}
@@ -1095,50 +1131,38 @@ export default function TimeRecording() {
                           {entry.selectedDays.length === 0 ? (
                             <span className="text-muted-foreground text-sm">Select days first</span>
                           ) : (
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                               {entry.selectedDays.map(date => {
                                 const dateKey = format(date, 'yyyy-MM-dd');
-                                const dayWorkItem = entry.dayWorkItems[dateKey];
+                                const dayAllocations = entry.dayWorkItemAllocations[dateKey] || [];
+                                // Calculate hours per day evenly
+                                const hoursPerDay = entry.hours / entry.selectedDays.length;
+                                const roundedHoursPerDay = Math.round(hoursPerDay * 4) / 4;
+                                
                                 return (
-                                  <div key={dateKey} className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                      <Badge variant="outline" className="shrink-0 text-xs">
-                                        {format(date, 'EEE d')}
-                                      </Badge>
-                                      {/* Work Item Selector for each day */}
-                                      {entry.matterId && matterBudgetItems[entry.matterId]?.length > 0 && (
-                                        <Select
-                                          value={dayWorkItem?.id || ''}
-                                          onValueChange={(value) => {
-                                            const item = matterBudgetItems[entry.matterId!]?.find(i => i.id === value);
-                                            if (item) {
-                                              updateDayWorkItem(entry.id, date, value, item.work_item);
-                                            }
-                                          }}
-                                        >
-                                          <SelectTrigger className={cn(
-                                            "flex-1",
-                                            !dayWorkItem && "border-amber-500 bg-amber-50 dark:bg-amber-950/20"
-                                          )}>
-                                            <SelectValue placeholder="⚠️ Select work item..." />
-                                          </SelectTrigger>
-                                          <SelectContent className="bg-background border max-h-60">
-                                            {matterBudgetItems[entry.matterId]?.map(item => (
-                                              <SelectItem key={item.id} value={item.id}>
-                                                <span>{item.work_item}</span>
-                                              </SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-                                      )}
-                                    </div>
-                                    {/* Narrative - only show after work item selected */}
-                                    {(dayWorkItem || !matterBudgetItems[entry.matterId]?.length) && (
+                                  <div key={dateKey} className="space-y-2 border-b pb-3 last:border-b-0 last:pb-0">
+                                    <Badge variant="outline" className="text-xs">
+                                      {format(date, 'EEE d MMM')} • {roundedHoursPerDay.toFixed(2)}h
+                                    </Badge>
+                                    
+                                    {/* Work Item Allocator for each day */}
+                                    {entry.matterId && matterBudgetItems[entry.matterId]?.length > 0 && (
+                                      <WorkItemAllocator
+                                        budgetItems={matterBudgetItems[entry.matterId]}
+                                        totalHours={roundedHoursPerDay}
+                                        allocations={dayAllocations}
+                                        onAllocationsChange={(allocations) => 
+                                          updateDayWorkItemAllocations(entry.id, date, allocations)
+                                        }
+                                      />
+                                    )}
+                                    
+                                    {/* Narrative - only show after work items selected */}
+                                    {(dayAllocations.length > 0 || !matterBudgetItems[entry.matterId]?.length) && (
                                       <Input
                                         placeholder="Brief notes for this day"
                                         value={entry.dayNarratives[dateKey] || ''}
                                         onChange={(e) => updateDayNarrative(entry.id, date, e.target.value)}
-                                        className="ml-12"
                                       />
                                     )}
                                   </div>

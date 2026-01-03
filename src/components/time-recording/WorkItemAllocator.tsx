@@ -1,7 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Lock, Unlock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BudgetLineItem {
@@ -34,6 +36,9 @@ export function WorkItemAllocator({
   onAllocationsChange,
   className,
 }: WorkItemAllocatorProps) {
+  // Track which items are locked
+  const [lockedIds, setLockedIds] = useState<Set<string>>(new Set());
+
   // Get IDs of selected items
   const selectedIds = useMemo(() => new Set(allocations.map(a => a.id)), [allocations]);
 
@@ -63,14 +68,32 @@ export function WorkItemAllocator({
     return [...selected, ...unselected];
   }, [budgetItems, selectedIds]);
 
+  // Toggle lock state for an item
+  const toggleLock = (itemId: string) => {
+    setLockedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemId)) {
+        newSet.delete(itemId);
+      } else {
+        newSet.add(itemId);
+      }
+      return newSet;
+    });
+  };
+
   // Toggle selection of a work item
   const toggleSelection = (item: BudgetLineItem) => {
     if (selectedIds.has(item.id)) {
-      // Remove from allocations
+      // Remove from allocations and unlock
       const newAllocations = allocations.filter(a => a.id !== item.id);
-      // Redistribute hours among remaining items
+      setLockedIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(item.id);
+        return newSet;
+      });
+      // Redistribute hours among remaining unlocked items
       if (newAllocations.length > 0) {
-        const redistributed = redistributeHours(newAllocations, totalHours);
+        const redistributed = redistributeHours(newAllocations, totalHours, lockedIds);
         onAllocationsChange(redistributed);
       } else {
         onAllocationsChange([]);
@@ -78,28 +101,44 @@ export function WorkItemAllocator({
     } else {
       // Add to allocations with 0 hours initially
       const newAllocations = [...allocations, { id: item.id, name: item.work_item, hours: 0 }];
-      // Redistribute hours
-      const redistributed = redistributeHours(newAllocations, totalHours);
+      // Redistribute hours among unlocked items
+      const redistributed = redistributeHours(newAllocations, totalHours, lockedIds);
       onAllocationsChange(redistributed);
     }
   };
 
-  // Redistribute hours evenly among all selected items
-  const redistributeHours = (items: WorkItemAllocation[], total: number): WorkItemAllocation[] => {
+  // Redistribute hours evenly among unlocked items
+  const redistributeHours = (items: WorkItemAllocation[], total: number, locked: Set<string>): WorkItemAllocation[] => {
     if (items.length === 0) return [];
     
-    const equalShare = total / items.length;
+    // Calculate locked total
+    const lockedTotal = items.filter(a => locked.has(a.id)).reduce((sum, a) => sum + a.hours, 0);
+    const remainingForUnlocked = total - lockedTotal;
+    
+    const unlockedItems = items.filter(a => !locked.has(a.id));
+    
+    if (unlockedItems.length === 0) {
+      return items; // All locked, can't redistribute
+    }
+    
+    const equalShare = remainingForUnlocked / unlockedItems.length;
     const roundedShare = roundToQuarter(equalShare);
     
     let allocated = 0;
-    return items.map((item, index) => {
-      if (index === items.length - 1) {
-        // Last item gets remainder
-        const remaining = roundToQuarter(total - allocated);
+    const unlockedUpdated = unlockedItems.map((item, index) => {
+      if (index === unlockedItems.length - 1) {
+        const remaining = roundToQuarter(remainingForUnlocked - allocated);
         return { ...item, hours: Math.max(0, remaining) };
       }
       allocated += roundedShare;
-      return { ...item, hours: roundedShare };
+      return { ...item, hours: Math.max(0, roundedShare) };
+    });
+    
+    // Merge back locked and unlocked
+    return items.map(item => {
+      if (locked.has(item.id)) return item;
+      const updated = unlockedUpdated.find(u => u.id === item.id);
+      return updated || item;
     });
   };
 
@@ -108,54 +147,74 @@ export function WorkItemAllocator({
     return Math.round(value * 4) / 4;
   };
 
-  // Handle slider change - auto-balance other sliders
+  // Calculate max hours available for unlocked sliders
+  const getMaxForUnlocked = (itemId: string): number => {
+    const lockedTotal = allocations
+      .filter(a => lockedIds.has(a.id) && a.id !== itemId)
+      .reduce((sum, a) => sum + a.hours, 0);
+    return Math.max(0, totalHours - lockedTotal);
+  };
+
+  // Handle slider change - auto-balance only unlocked sliders
   const handleSliderChange = (itemId: string, newHours: number) => {
-    const roundedNewHours = roundToQuarter(newHours);
+    const isLocked = lockedIds.has(itemId);
+    const maxAllowed = getMaxForUnlocked(itemId);
+    const clampedHours = Math.min(newHours, maxAllowed);
+    const roundedNewHours = roundToQuarter(clampedHours);
+    
     const currentItem = allocations.find(a => a.id === itemId);
     if (!currentItem) return;
 
+    // Get other allocations (excluding current)
     const otherAllocations = allocations.filter(a => a.id !== itemId);
-    if (otherAllocations.length === 0) {
-      // Only one item, just set its hours to total
-      onAllocationsChange([{ ...currentItem, hours: totalHours }]);
-      return;
-    }
-
-    // Calculate how much is left for others
-    const remainingForOthers = totalHours - roundedNewHours;
     
-    // Get current total of others
-    const currentOthersTotal = otherAllocations.reduce((sum, a) => sum + a.hours, 0);
+    // Separate locked and unlocked others
+    const lockedOthers = otherAllocations.filter(a => lockedIds.has(a.id));
+    const unlockedOthers = otherAllocations.filter(a => !lockedIds.has(a.id));
     
-    if (remainingForOthers <= 0) {
-      // Set current item to total, others to 0
+    if (unlockedOthers.length === 0 && !isLocked) {
+      // Only this item is unlocked, set it to remaining after locked
+      const lockedTotal = lockedOthers.reduce((sum, a) => sum + a.hours, 0);
       onAllocationsChange([
-        { ...currentItem, hours: totalHours },
-        ...otherAllocations.map(a => ({ ...a, hours: 0 }))
+        ...lockedOthers,
+        { ...currentItem, hours: roundToQuarter(totalHours - lockedTotal) }
       ]);
       return;
     }
 
-    // Scale other allocations proportionally
-    let scaledOthers: WorkItemAllocation[];
-    if (currentOthersTotal === 0) {
-      // Distribute equally among others
-      const equalShare = remainingForOthers / otherAllocations.length;
-      scaledOthers = otherAllocations.map((a, index) => {
-        if (index === otherAllocations.length - 1) {
-          const allocated = roundToQuarter(equalShare) * (otherAllocations.length - 1);
-          return { ...a, hours: roundToQuarter(remainingForOthers - allocated) };
+    // Calculate locked total (excluding current if it's locked)
+    const lockedTotal = lockedOthers.reduce((sum, a) => sum + a.hours, 0);
+    
+    // Calculate how much is left for unlocked others
+    const remainingForUnlockedOthers = totalHours - lockedTotal - roundedNewHours;
+    
+    // Get current total of unlocked others
+    const currentUnlockedOthersTotal = unlockedOthers.reduce((sum, a) => sum + a.hours, 0);
+    
+    let scaledUnlockedOthers: WorkItemAllocation[];
+    
+    if (remainingForUnlockedOthers <= 0) {
+      // Set all unlocked others to 0
+      scaledUnlockedOthers = unlockedOthers.map(a => ({ ...a, hours: 0 }));
+    } else if (currentUnlockedOthersTotal === 0) {
+      // Distribute equally among unlocked others
+      const equalShare = remainingForUnlockedOthers / unlockedOthers.length;
+      let allocated = 0;
+      scaledUnlockedOthers = unlockedOthers.map((a, index) => {
+        if (index === unlockedOthers.length - 1) {
+          return { ...a, hours: roundToQuarter(remainingForUnlockedOthers - allocated) };
         }
-        return { ...a, hours: roundToQuarter(equalShare) };
+        const share = roundToQuarter(equalShare);
+        allocated += share;
+        return { ...a, hours: share };
       });
     } else {
       // Scale proportionally
-      const scale = remainingForOthers / currentOthersTotal;
+      const scale = remainingForUnlockedOthers / currentUnlockedOthersTotal;
       let allocated = 0;
-      scaledOthers = otherAllocations.map((a, index) => {
-        if (index === otherAllocations.length - 1) {
-          // Last one gets remainder to ensure exact total
-          return { ...a, hours: roundToQuarter(remainingForOthers - allocated) };
+      scaledUnlockedOthers = unlockedOthers.map((a, index) => {
+        if (index === unlockedOthers.length - 1) {
+          return { ...a, hours: roundToQuarter(remainingForUnlockedOthers - allocated) };
         }
         const newH = roundToQuarter(a.hours * scale);
         allocated += newH;
@@ -166,7 +225,8 @@ export function WorkItemAllocator({
     // Reconstruct in original order
     const updatedAllocations = allocations.map(a => {
       if (a.id === itemId) return { ...a, hours: roundedNewHours };
-      const scaled = scaledOthers.find(s => s.id === a.id);
+      if (lockedIds.has(a.id)) return a; // Keep locked as-is
+      const scaled = scaledUnlockedOthers.find(s => s.id === a.id);
       return scaled || a;
     });
 
@@ -181,6 +241,7 @@ export function WorkItemAllocator({
   // Calculate if allocations sum to total (for validation display)
   const allocationTotal = allocations.reduce((sum, a) => sum + a.hours, 0);
   const isBalanced = Math.abs(allocationTotal - totalHours) < 0.01;
+  const lockedCount = allocations.filter(a => lockedIds.has(a.id)).length;
 
   if (budgetItems.length === 0) {
     return (
@@ -194,13 +255,19 @@ export function WorkItemAllocator({
     <div className={cn("space-y-2", className)}>
       {/* Summary badge */}
       {allocations.length > 0 && (
-        <div className="flex items-center gap-2 text-xs">
+        <div className="flex items-center gap-2 text-xs flex-wrap">
           <Badge variant={isBalanced ? "default" : "destructive"} className="text-xs">
             {allocationTotal.toFixed(2)}h / {totalHours.toFixed(2)}h allocated
           </Badge>
           <span className="text-muted-foreground">
             {allocations.length} work item{allocations.length !== 1 ? 's' : ''} selected
           </span>
+          {lockedCount > 0 && (
+            <Badge variant="secondary" className="text-xs">
+              <Lock className="h-3 w-3 mr-1" />
+              {lockedCount} locked
+            </Badge>
+          )}
         </div>
       )}
 
@@ -210,6 +277,7 @@ export function WorkItemAllocator({
           {sortedItems.map((item) => {
             const isSelected = selectedIds.has(item.id);
             const allocation = getAllocation(item.id);
+            const isLocked = lockedIds.has(item.id);
             
             return (
               <div
@@ -217,7 +285,9 @@ export function WorkItemAllocator({
                 className={cn(
                   "rounded-md p-2 transition-all",
                   isSelected 
-                    ? "bg-primary/10 border border-primary/30" 
+                    ? isLocked
+                      ? "bg-amber-500/10 border border-amber-500/30"
+                      : "bg-primary/10 border border-primary/30" 
                     : "hover:bg-muted/50"
                 )}
               >
@@ -234,7 +304,8 @@ export function WorkItemAllocator({
                     <div className="flex items-center gap-2">
                       <span className={cn(
                         "text-sm truncate",
-                        isSelected && "text-primary"
+                        isSelected && !isLocked && "text-primary",
+                        isLocked && "text-amber-600 dark:text-amber-400"
                       )}>
                         {item.work_item}
                       </span>
@@ -247,18 +318,36 @@ export function WorkItemAllocator({
                     
                     {/* Slider for selected items */}
                     {isSelected && allocation && totalHours > 0 && (
-                      <div className="mt-2 flex items-center gap-3">
+                      <div className="mt-2 flex items-center gap-2">
                         <Slider
                           value={[allocation.hours]}
                           min={0}
-                          max={totalHours}
+                          max={isLocked ? totalHours : getMaxForUnlocked(item.id)}
                           step={0.25}
                           onValueChange={([value]) => handleSliderChange(item.id, value)}
-                          className="flex-1"
+                          className={cn("flex-1", isLocked && "opacity-50")}
+                          disabled={isLocked}
                         />
-                        <span className="text-sm font-mono w-14 text-right">
+                        <span className={cn(
+                          "text-sm font-mono w-14 text-right",
+                          isLocked && "text-amber-600 dark:text-amber-400"
+                        )}>
                           {allocation.hours.toFixed(2)}h
                         </span>
+                        <Button
+                          type="button"
+                          variant={isLocked ? "secondary" : "ghost"}
+                          size="icon"
+                          className="h-7 w-7 shrink-0"
+                          onClick={() => toggleLock(item.id)}
+                          title={isLocked ? "Unlock" : "Lock"}
+                        >
+                          {isLocked ? (
+                            <Lock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                          ) : (
+                            <Unlock className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                        </Button>
                       </div>
                     )}
                   </div>

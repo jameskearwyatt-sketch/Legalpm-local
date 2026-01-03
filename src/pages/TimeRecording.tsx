@@ -95,6 +95,7 @@ interface GridRowEntry {
 interface DayOutputEntry {
   id: string;
   type: 'matter' | 'non-chargeable';
+  matterId?: string;
   matterNumber?: string;
   matterName?: string;
   clientName?: string;
@@ -443,6 +444,7 @@ export default function TimeRecording() {
                 polishedEntries.push({
                   id: `${entry.id}-${allocation.id}`,
                   type: entry.type,
+                  matterId: entry.matterId,
                   matterNumber: entry.matterNumber,
                   matterName: entry.matterName,
                   clientName: entry.clientName,
@@ -459,6 +461,7 @@ export default function TimeRecording() {
             polishedEntries.push({
               id: entry.id,
               type: entry.type,
+              matterId: entry.matterId,
               matterNumber: entry.matterNumber,
               matterName: entry.matterName,
               clientName: entry.clientName,
@@ -528,6 +531,7 @@ export default function TimeRecording() {
                   outputMap[dateKey].push({
                     id: `${entry.id}-${dateKey}-${allocation.id}`,
                     type: entry.type,
+                    matterId: entry.matterId,
                     matterNumber: entry.matterNumber,
                     matterName: entry.matterName,
                     clientName: entry.clientName,
@@ -544,6 +548,7 @@ export default function TimeRecording() {
               outputMap[dateKey].push({
                 id: `${entry.id}-${dateKey}`,
                 type: entry.type,
+                matterId: entry.matterId,
                 matterNumber: entry.matterNumber,
                 matterName: entry.matterName,
                 clientName: entry.clientName,
@@ -603,24 +608,42 @@ export default function TimeRecording() {
         continue;
       }
 
+      let lastMatterId: string | null = null;
+
       for (const entry of day.entries) {
         if (entry.type === 'matter') {
-          output += `CLIENT: ${entry.clientName || 'N/A'}\n`;
-          output += `MATTER: ${entry.matterName || 'N/A'}\n`;
-          output += `MATTER NUMBER: ${entry.cmNumber || 'N/A'}\n`;
-          if (entry.workItemName) {
-            output += `WORK ITEM: ${entry.workItemName}\n`;
+          // Only show client/matter header if different from previous entry
+          const isNewMatter = entry.matterId !== lastMatterId;
+          
+          if (isNewMatter) {
+            if (lastMatterId !== null) {
+              // Add extra spacing between matters
+              output += `\n`;
+            }
+            output += `CLIENT: ${entry.clientName || 'N/A'}\n`;
+            output += `MATTER: ${entry.matterName || 'N/A'}\n`;
+            output += `MATTER NUMBER: ${entry.cmNumber || 'N/A'}\n`;
+            output += `───────────────────────────────────────────────────────────────\n`;
+            lastMatterId = entry.matterId || null;
           }
+          
+          if (entry.workItemName) {
+            output += `  • WORK ITEM: ${entry.workItemName}\n`;
+          }
+          output += `    TIME: ${entry.hours} hours\n`;
+          output += `    NARRATIVE:\n    ${(entry.polishedNarrative || entry.narrative).replace(/\n/g, '\n    ')}\n\n`;
         } else {
+          // Non-chargeable entries reset the matter tracking
+          lastMatterId = null;
           const code = entry.nonChargeableCode ? ` (${entry.nonChargeableCode})` : '';
           output += `NON-CHARGEABLE: ${entry.nonChargeableName}${code}\n`;
           if (entry.otherDescription) {
             output += `Description: ${entry.otherDescription}\n`;
           }
+          output += `TIME: ${entry.hours} hours\n`;
+          output += `NARRATIVE:\n${entry.polishedNarrative || entry.narrative}\n`;
+          output += `───────────────────────────────────────────────────────────────\n\n`;
         }
-        output += `TIME: ${entry.hours} hours\n`;
-        output += `NARRATIVE:\n${entry.polishedNarrative || entry.narrative}\n`;
-        output += `───────────────────────────────────────────────────────────────\n\n`;
       }
     }
 
@@ -637,18 +660,22 @@ export default function TimeRecording() {
           <style>
             body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; }
             .day-header { background-color: #1e3a5f; color: white; padding: 8px 12px; margin-top: 16px; font-weight: bold; }
-            .entry { border: 1px solid #ddd; margin-bottom: 12px; }
-            .entry-header { background-color: #f5f5f5; padding: 8px 12px; border-bottom: 1px solid #ddd; }
-            .entry-body { padding: 8px 12px; }
+            .matter-block { border: 1px solid #ddd; margin-bottom: 12px; }
+            .matter-header { background-color: #f5f5f5; padding: 8px 12px; border-bottom: 1px solid #ddd; }
+            .work-item-entry { padding: 8px 12px; border-bottom: 1px solid #eee; }
+            .work-item-entry:last-child { border-bottom: none; }
             .label { font-weight: bold; color: #555; }
             .client-name { font-weight: bold; color: #1e3a5f; font-size: 12pt; }
             .matter-name { font-weight: 600; }
+            .work-item-name { color: #059669; font-weight: 500; }
             .hours { font-weight: bold; color: #2563eb; }
-            .narrative { margin-top: 8px; line-height: 1.4; }
+            .narrative { margin-top: 4px; line-height: 1.4; padding-left: 8px; border-left: 2px solid #e5e7eb; }
             .non-chargeable { color: #ea580c; font-weight: bold; }
-            table { border-collapse: collapse; width: 100%; margin-bottom: 8px; }
-            td { padding: 4px 8px; vertical-align: top; }
-            .label-col { width: 120px; }
+            .non-chargeable-block { border: 1px solid #fed7aa; margin-bottom: 12px; }
+            .non-chargeable-header { background-color: #fff7ed; padding: 8px 12px; border-bottom: 1px solid #fed7aa; }
+            table { border-collapse: collapse; width: 100%; }
+            td { padding: 2px 8px; vertical-align: top; }
+            .label-col { width: 100px; }
           </style>
         </head>
         <body>
@@ -662,22 +689,64 @@ export default function TimeRecording() {
         continue;
       }
 
-      for (const entry of day.entries) {
-        html += `<div class="entry">`;
-        html += `<div class="entry-header">`;
+      // Group entries by matter
+      let currentMatterId: string | null = null;
+      let matterBlockOpen = false;
+
+      for (let i = 0; i < day.entries.length; i++) {
+        const entry = day.entries[i];
+        const nextEntry = day.entries[i + 1];
         
         if (entry.type === 'matter') {
-          html += `<table>`;
-          html += `<tr><td class="label-col"><span class="label">Client:</span></td><td><span class="client-name">${entry.clientName || 'N/A'}</span></td></tr>`;
-          html += `<tr><td class="label-col"><span class="label">Matter:</span></td><td><span class="matter-name">${entry.matterName || 'N/A'}</span></td></tr>`;
-          html += `<tr><td class="label-col"><span class="label">Matter No:</span></td><td>${entry.cmNumber || 'N/A'}</td></tr>`;
-          if (entry.workItemName) {
-            html += `<tr><td class="label-col"><span class="label">Work Item:</span></td><td><span style="color: #059669; font-weight: 500;">${entry.workItemName}</span></td></tr>`;
+          const isNewMatter = entry.matterId !== currentMatterId;
+          const isLastOfMatter = !nextEntry || nextEntry.type !== 'matter' || nextEntry.matterId !== entry.matterId;
+          
+          if (isNewMatter) {
+            // Close previous matter block if open
+            if (matterBlockOpen) {
+              html += `</div>`; // Close matter-block
+            }
+            
+            // Start new matter block
+            html += `<div class="matter-block">`;
+            html += `<div class="matter-header">`;
+            html += `<table>`;
+            html += `<tr><td class="label-col"><span class="label">Client:</span></td><td><span class="client-name">${entry.clientName || 'N/A'}</span></td></tr>`;
+            html += `<tr><td class="label-col"><span class="label">Matter:</span></td><td><span class="matter-name">${entry.matterName || 'N/A'}</span></td></tr>`;
+            html += `<tr><td class="label-col"><span class="label">Matter No:</span></td><td>${entry.cmNumber || 'N/A'}</td></tr>`;
+            html += `</table>`;
+            html += `</div>`; // Close matter-header
+            
+            currentMatterId = entry.matterId || null;
+            matterBlockOpen = true;
           }
-          html += `<tr><td class="label-col"><span class="label">Time:</span></td><td><span class="hours">${entry.hours} hours</span></td></tr>`;
-          html += `</table>`;
+          
+          // Add work item entry
+          html += `<div class="work-item-entry">`;
+          if (entry.workItemName) {
+            html += `<div><span class="label">Work Item:</span> <span class="work-item-name">${entry.workItemName}</span></div>`;
+          }
+          html += `<div><span class="label">Time:</span> <span class="hours">${entry.hours} hours</span></div>`;
+          html += `<div class="narrative">${(entry.polishedNarrative || entry.narrative).replace(/\n/g, '<br>')}</div>`;
+          html += `</div>`; // Close work-item-entry
+          
+          // Close matter block if this is the last entry for this matter
+          if (isLastOfMatter && matterBlockOpen) {
+            html += `</div>`; // Close matter-block
+            matterBlockOpen = false;
+            currentMatterId = null;
+          }
         } else {
+          // Non-chargeable entry - close any open matter block first
+          if (matterBlockOpen) {
+            html += `</div>`; // Close matter-block
+            matterBlockOpen = false;
+            currentMatterId = null;
+          }
+          
           const code = entry.nonChargeableCode ? ` (${entry.nonChargeableCode})` : '';
+          html += `<div class="non-chargeable-block">`;
+          html += `<div class="non-chargeable-header">`;
           html += `<table>`;
           html += `<tr><td class="label-col"><span class="label">Code:</span></td><td><span class="non-chargeable">${entry.nonChargeableName}${code}</span></td></tr>`;
           if (entry.otherDescription) {
@@ -685,13 +754,16 @@ export default function TimeRecording() {
           }
           html += `<tr><td class="label-col"><span class="label">Time:</span></td><td><span class="hours">${entry.hours} hours</span></td></tr>`;
           html += `</table>`;
+          html += `</div>`;
+          html += `<div class="work-item-entry">`;
+          html += `<div class="narrative">${(entry.polishedNarrative || entry.narrative).replace(/\n/g, '<br>')}</div>`;
+          html += `</div>`;
+          html += `</div>`; // Close non-chargeable-block
         }
-        
-        html += `</div>`;
-        html += `<div class="entry-body">`;
-        html += `<span class="label">Narrative:</span>`;
-        html += `<div class="narrative">${(entry.polishedNarrative || entry.narrative).replace(/\n/g, '<br>')}</div>`;
-        html += `</div>`;
+      }
+      
+      // Close any remaining open matter block
+      if (matterBlockOpen) {
         html += `</div>`;
       }
     }

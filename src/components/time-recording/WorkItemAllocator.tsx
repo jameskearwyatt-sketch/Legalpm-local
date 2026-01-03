@@ -1,8 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 
 interface BudgetLineItem {
@@ -186,7 +185,7 @@ export function WorkItemAllocator({
       )}
 
       {/* Scrollable list */}
-      <ScrollArea className="max-h-64 border rounded-md">
+      <div className="max-h-64 overflow-y-auto border rounded-md">
         <div className="p-2 space-y-1">
           {sortedItems.map((item) => {
             const isSelected = selectedIds.has(item.id);
@@ -214,7 +213,7 @@ export function WorkItemAllocator({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={cn(
-                        "font-medium text-sm truncate",
+                        "text-sm truncate",
                         isSelected && "text-primary"
                       )}>
                         {item.work_item}
@@ -248,7 +247,7 @@ export function WorkItemAllocator({
             );
           })}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Warning if no items selected but hours entered */}
       {allocations.length === 0 && totalHours > 0 && (

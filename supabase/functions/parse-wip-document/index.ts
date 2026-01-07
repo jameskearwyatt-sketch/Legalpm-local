@@ -51,71 +51,60 @@ serve(async (req) => {
       fee_amount: item.fee_amount,
     }));
 
-    const systemPrompt = `You are an expert legal finance analyst specializing in parsing Work In Progress (WIP) reports and fee statements for law firms. Your task is to meticulously extract EVERY fee/WIP amount from the provided document and match them to budget line items.
+    const systemPrompt = `You are an expert legal finance analyst. Your job is to AGGRESSIVELY extract EVERY monetary amount from WIP/fee documents and match them to budget line items.
 
-CRITICAL: BE THOROUGH - Extract ALL amounts, not just obvious ones.
+CRITICAL PHILOSOPHY: BE MAXIMALLY AGGRESSIVE. The user will review, accept, amend, or reject your suggestions. It is BETTER to over-extract and propose uncertain matches than to miss anything. The user expects comprehensive extraction.
 
-YOUR TASK:
-1. SCAN THE ENTIRE DOCUMENT for any monetary amounts, fees, WIP figures, time costs, or unbilled amounts
-2. Look for amounts in TABLES, LISTS, PARAGRAPHS, SUMMARIES, TOTALS sections - everywhere
-3. Common formats include:
-   - Fee reports with work descriptions and amounts
-   - Time sheets with hours × rates = fees
-   - WIP aging reports
-   - Matter summaries with multiple line items
-   - Email excerpts mentioning amounts
+EXTRACT EVERYTHING:
+- Every monetary amount you can find (fees, WIP, costs, totals, subtotals, line items)
+- Amounts in tables, lists, paragraphs, headers, footers, summaries
+- Even amounts that seem like subtotals or aggregates - extract them all
+- Amounts with or without currency symbols
+- Amounts formatted as 1,234.56 or 1234.56 or £1,234
 
-MATCHING STRATEGY (be creative and flexible):
-1. Direct matches: "Due Diligence" → "Due Diligence Review"
-2. Abbreviation expansion: "DD" → "Due Diligence", "SPA" → "Share Purchase Agreement"  
-3. Category/phase matching: "Phase 1 work" → items in "Pre-Closing" category
-4. Provider matching: Firm names like "Local Counsel fees" → provider="Local Counsel"
-5. Partial matches: "Drafting" → "Drafting and negotiation of agreements"
-6. Semantic similarity: "Document review" ≈ "Documentation" ≈ "Reviewing documents"
+MATCH AGGRESSIVELY:
+1. If ANY part of the description matches, propose a match
+2. Use abbreviations liberally: "DD" = Due Diligence, "SPA" = Share Purchase Agreement, "CP" = Conditions Precedent, "Docs" = Documentation
+3. Match by category if the description is vague
+4. Match by provider/firm name if mentioned
+5. If something says "Legal fees" or "Professional fees" without specifics, match to the largest or most general budget item
+6. If you see a total, try to match its components; if you only see the total, still report it
+7. WHEN IN DOUBT, MAKE YOUR BEST GUESS with "low" confidence - let the user decide
 
-IMPORTANT RULES:
-- Extract amounts even if you're not 100% sure of the match - use "low" confidence
-- If an amount could match multiple items, pick the best one
-- Report ALL unmatched items so the user knows what couldn't be placed
-- Numbers should be extracted as-is (e.g., 1,234.56 becomes 1234.56)
-- Currency: The document may use ${currency} or other currencies - extract the number value
+NEVER SKIP AN AMOUNT. If you find an amount and cannot match it, put it in unmatched_items.
 
-BUDGET LINE ITEMS TO MATCH AGAINST:
+BUDGET LINE ITEMS TO MATCH:
 ${JSON.stringify(lineItemsContext, null, 2)}
 
-RESPOND WITH THIS EXACT JSON STRUCTURE:
+JSON RESPONSE FORMAT:
 {
   "matches": [
     {
-      "budget_line_item_id": "the-uuid-from-the-list-above",
-      "work_item": "the work_item text from the budget",
+      "budget_line_item_id": "uuid-from-list-above",
+      "work_item": "work_item text from budget",
       "wip_amount": 12500.00,
-      "confidence": "high",
-      "matched_text": "the exact text from the document that contained this amount"
+      "confidence": "high|medium|low",
+      "matched_text": "exact excerpt from document"
     }
   ],
   "unmatched_items": [
     {
-      "description": "description of the item from the document",
+      "description": "what was found in the document",
       "amount": 5000.00,
-      "reason": "No matching budget line item found - appears to be [explanation]"
+      "reason": "explanation"
     }
   ],
-  "summary": "Found X amounts in the document. Matched Y to budget items. Z items could not be matched because..."
-}
+  "summary": "Found N total amounts. Matched M. Unmatched K."
+}`;
 
-CONFIDENCE LEVELS:
-- "high": Exact or nearly exact description match
-- "medium": Good semantic match, same category, or clear intent
-- "low": Best guess - the amount exists and this is the most likely match`;
+    const userPrompt = `Extract EVERY monetary amount from this document. Be aggressive - the user will review all matches.
 
-    const userPrompt = `THOROUGHLY analyze this WIP/fee document and extract EVERY monetary amount you can find:
-
-=== DOCUMENT START ===
+=== DOCUMENT ===
 ${content}
-=== DOCUMENT END ===
+=== END ===
 
-Remember: Extract ALL amounts. Match as many as possible to the budget items. Report anything you cannot match in unmatched_items. Be comprehensive!`;
+Extract ALL amounts. Match as many as possible. Put anything you can't match in unmatched_items. DO NOT SKIP ANYTHING.`;
+
 
 
     // Call the Lovable AI gateway

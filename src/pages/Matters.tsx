@@ -633,6 +633,7 @@ export default function Matters() {
           m.matter_name.toLowerCase().includes(searchLower) ||
           m.matter_number.toLowerCase().includes(searchLower) ||
           m.clients?.name.toLowerCase().includes(searchLower) ||
+          m.clients?.display_name?.toLowerCase().includes(searchLower) ||
           m.lead_partner?.toLowerCase().includes(searchLower) ||
           m.originator?.toLowerCase().includes(searchLower) ||
           m.practice_area?.toLowerCase().includes(searchLower)

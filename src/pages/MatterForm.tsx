@@ -736,7 +736,7 @@ export default function MatterForm() {
 
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="exchange_rate">Exchange Rate (to USD)</Label>
+                    <Label htmlFor="exchange_rate">Exchange Rate (to GBP)</Label>
                     <Button 
                       type="button" 
                       variant="ghost" 

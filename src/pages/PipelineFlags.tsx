@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useRef } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { getClientDisplayName } from '@/lib/clientUtils';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -31,6 +32,7 @@ interface FlaggedMatter {
   matter_name: string;
   matter_number: string;
   client_name: string;
+  client_display_name: string | null;
   flags: PipelineFlagType[];
   rfpDaysInfo?: string;
 }
@@ -101,6 +103,7 @@ export default function PipelineFlags() {
           ? matter.cm_number 
           : '[CM number required]',
         client_name: matter.clients?.name || '',
+        client_display_name: matter.clients?.display_name || null,
         flags,
         rfpDaysInfo,
       };
@@ -237,7 +240,7 @@ export default function PipelineFlags() {
                     {flaggedMatters.map((matter) => (
                       <TableRow key={matter.id} className="group">
                         <TableCell>
-                          <p className="text-sm text-muted-foreground">{matter.client_name}</p>
+                          <p className="text-sm text-muted-foreground">{getClientDisplayName({ name: matter.client_name, display_name: matter.client_display_name })}</p>
                           <p className="font-medium text-foreground">{matter.matter_name}</p>
                           <p className="text-xs text-muted-foreground">{matter.matter_number}</p>
                         </TableCell>

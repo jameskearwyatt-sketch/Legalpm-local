@@ -14,6 +14,7 @@ import { Plus, FileText, Trash2, Calendar, Building, DollarSign } from "lucide-r
 import { usePricingProposals } from "@/lib/hooks/usePricingProposals";
 import { useClients } from "@/lib/hooks/useClients";
 import { format } from "date-fns";
+import { getClientDisplayName } from "@/lib/clientUtils";
 
 export default function MatterPricing() {
   const navigate = useNavigate();
@@ -88,7 +89,7 @@ export default function MatterPricing() {
                     <SelectContent>
                       {clients.map(client => (
                         <SelectItem key={client.id} value={client.id}>
-                          {client.name}
+                          {getClientDisplayName(client)}
                         </SelectItem>
                       ))}
                     </SelectContent>

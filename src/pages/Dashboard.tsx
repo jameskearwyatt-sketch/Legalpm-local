@@ -270,15 +270,6 @@ export default function Dashboard() {
     );
   }
 
-  // Pipeline KPI card - separate at the top
-  const pipelineCard = {
-    title: 'Total Potential Pipeline',
-    value: formatCurrency(stats?.totalPipelineValueUsd || 0, 'USD'),
-    subtitle: `${stats?.pipelineMattersCount || 0} pipeline matters`,
-    icon: <Rocket className="h-5 w-5" />,
-    variant: 'default' as const,
-  };
-
   const kpiCards = [
     {
       title: 'Live Matters: Total BM Budget',
@@ -344,22 +335,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Pipeline KPI Card - Full Width at Top */}
-        <Card className="shadow-card bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
-          <CardContent className="py-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-full bg-primary/10 text-primary">
-                {pipelineCard.icon}
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">{pipelineCard.title}</p>
-                <p className="text-2xl font-bold text-foreground">{pipelineCard.value}</p>
-                <p className="text-xs text-muted-foreground">{pipelineCard.subtitle}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {kpiCards.map((card) => (
@@ -371,6 +346,57 @@ export default function Dashboard() {
               variant={card.variant}
             />
           ))}
+        </div>
+
+        {/* Pipeline & Grand Total Summary */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Live Matters Total */}
+          <Card className="shadow-card">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-primary/10 text-primary">
+                  <Briefcase className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Live Matters BM Budget</p>
+                  <p className="text-2xl font-bold text-foreground">{formatCurrency(stats?.totalBudget || 0, 'USD')}</p>
+                  <p className="text-xs text-muted-foreground">{stats?.openMattersCount || 0} live matters</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Pipeline Total (Potential) */}
+          <Card className="shadow-card border-dashed border-muted-foreground/30">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-muted text-muted-foreground">
+                  <Rocket className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Pipeline (Potential)</p>
+                  <p className="text-2xl font-bold text-muted-foreground">{formatCurrency(stats?.totalPipelineValueUsd || 0, 'USD')}</p>
+                  <p className="text-xs text-muted-foreground">{stats?.pipelineMattersCount || 0} pipeline matters</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Grand Total (Theoretical) */}
+          <Card className="shadow-card bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+            <CardContent className="py-4">
+              <div className="flex items-center gap-4">
+                <div className="p-3 rounded-full bg-primary/10 text-primary">
+                  <TrendingUp className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Grand Total (Theoretical)</p>
+                  <p className="text-2xl font-bold text-foreground">{formatCurrency((stats?.totalBudget || 0) + (stats?.totalPipelineValueUsd || 0), 'USD')}</p>
+                  <p className="text-xs text-muted-foreground">Live + Pipeline if all won</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Live Matters Filter Section */}

@@ -24,28 +24,40 @@ export function formatCurrency(value: number, currency: string = 'GBP'): string 
 /**
  * Convert an amount from its native currency to USD.
  * 
- * The exchange_rate stored on matters is the rate to convert that currency TO USD directly.
- * For example: if fee_currency is GBP and exchange_rate is 1.35, it means 1 GBP = 1.35 USD.
+ * Exchange rate interpretation depends on the source currency:
+ * - For GBP: exchange_rate is the direct GBP→USD rate (e.g., 1.35 means 1 GBP = 1.35 USD)
+ * - For other currencies: exchange_rate is the rate TO GBP (e.g., 0.109 for SEK means 1 SEK = 0.109 GBP)
  * 
  * @param amount - The amount in the source currency
  * @param feeCurrency - The source currency (e.g., 'GBP', 'EUR', 'USD')
- * @param exchangeRateToUsd - The stored exchange rate that converts the source currency TO USD
- *                            (e.g., 1.35 for GBP means 1 GBP = 1.35 USD)
- * @param _gbpToUsdRate - Deprecated/unused, kept for API compatibility
+ * @param exchangeRate - The stored exchange rate (interpretation depends on currency)
+ * @param gbpToUsdRate - The live GBP to USD rate (e.g., 1.35 means 1 GBP = 1.35 USD)
  * @returns The amount converted to USD
  */
 export function convertToUsd(
   amount: number, 
   feeCurrency: string, 
-  exchangeRateToUsd: number,
-  _gbpToUsdRate?: number
+  exchangeRate: number,
+  gbpToUsdRate?: number
 ): number {
   // If already USD, no conversion needed
   if (feeCurrency === 'USD') {
     return amount;
   }
   
-  // The stored exchange_rate is the direct conversion to USD
-  // e.g., for GBP with rate 1.35: £1 = $1.35
-  return amount * exchangeRateToUsd;
+  // Default GBP to USD rate if not provided
+  const liveGbpUsdRate = gbpToUsdRate || 1.27;
+  
+  // For GBP: the stored exchange_rate IS the GBP→USD rate
+  if (feeCurrency === 'GBP') {
+    // Use the stored rate if it looks like a valid GBP→USD rate (typically 1.2-1.5)
+    // Otherwise fall back to the live rate
+    const rateToUse = (exchangeRate > 1 && exchangeRate < 2) ? exchangeRate : liveGbpUsdRate;
+    return amount * rateToUse;
+  }
+  
+  // For all other currencies: exchange_rate is the rate TO GBP
+  // First convert to GBP, then convert GBP to USD
+  const amountInGbp = amount * exchangeRate;
+  return amountInGbp * liveGbpUsdRate;
 }

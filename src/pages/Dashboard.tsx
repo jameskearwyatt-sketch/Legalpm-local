@@ -349,18 +349,18 @@ export default function Dashboard() {
         </div>
 
         {/* Budget Summary - Live, Pipeline & Grand Total */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/10">
           {/* Live Matters Total */}
           <Card className="shadow-card">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-full bg-primary/10 text-primary">
-                  <Briefcase className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Live Matters BM Budget</p>
-                  <p className="text-2xl font-bold text-foreground">{formatCurrency(stats?.totalBudget || 0, 'USD')}</p>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Live Matters BM Budget</p>
+                  <p className="text-2xl font-heading font-bold text-foreground">{formatCurrency(stats?.totalBudget || 0, 'USD')}</p>
                   <p className="text-xs text-muted-foreground">{stats?.openMattersCount || 0} live matters</p>
+                </div>
+                <div className="p-3 rounded-lg bg-primary/10 text-primary">
+                  <Briefcase className="h-5 w-5" />
                 </div>
               </div>
             </CardContent>
@@ -368,15 +368,15 @@ export default function Dashboard() {
 
           {/* Pipeline Total (Potential) */}
           <Card className="shadow-card">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-full bg-primary/10 text-primary">
-                  <Rocket className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Pipeline (Potential)</p>
-                  <p className="text-2xl font-bold text-foreground">{formatCurrency(stats?.totalPipelineValueUsd || 0, 'USD')}</p>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Pipeline (Potential)</p>
+                  <p className="text-2xl font-heading font-bold text-foreground">{formatCurrency(stats?.totalPipelineValueUsd || 0, 'USD')}</p>
                   <p className="text-xs text-muted-foreground">{stats?.pipelineMattersCount || 0} pipeline matters</p>
+                </div>
+                <div className="p-3 rounded-lg bg-primary/10 text-primary">
+                  <Rocket className="h-5 w-5" />
                 </div>
               </div>
             </CardContent>
@@ -384,15 +384,15 @@ export default function Dashboard() {
 
           {/* Grand Total (Theoretical) */}
           <Card className="shadow-card">
-            <CardContent className="py-4">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-full bg-primary/10 text-primary">
-                  <TrendingUp className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Grand Total (Theoretical)</p>
-                  <p className="text-2xl font-bold text-foreground">{formatCurrency((stats?.totalBudget || 0) + (stats?.totalPipelineValueUsd || 0), 'USD')}</p>
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Grand Total (Theoretical)</p>
+                  <p className="text-2xl font-heading font-bold text-foreground">{formatCurrency((stats?.totalBudget || 0) + (stats?.totalPipelineValueUsd || 0), 'USD')}</p>
                   <p className="text-xs text-muted-foreground">Live + Pipeline if all won</p>
+                </div>
+                <div className="p-3 rounded-lg bg-primary/10 text-primary">
+                  <TrendingUp className="h-5 w-5" />
                 </div>
               </div>
             </CardContent>

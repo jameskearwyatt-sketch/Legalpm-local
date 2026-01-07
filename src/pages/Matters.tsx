@@ -955,23 +955,8 @@ export default function Matters() {
                       <TableHead className="min-w-[140px] sticky left-0 z-20 bg-background">
                         <SortableHeader field="matter_name">Client / Matter</SortableHeader>
                       </TableHead>
-                      {!isPipelineOrLost && (
-                        <TableHead className="w-16">Status</TableHead>
-                      )}
-                      <TableHead className="text-right min-w-[90px]">
-                        <SortableHeader field="fee_amount">Budget</SortableHeader>
-                      </TableHead>
-                      {isPipelineOrLost && (
-                        <TableHead className="text-right min-w-[80px]">USD</TableHead>
-                      )}
                       {isLive && (
                         <>
-                          <TableHead className="text-right min-w-[85px]">
-                            <SortableHeader field="bm_fee">BM Budget</SortableHeader>
-                          </TableHead>
-                          <TableHead className="text-right min-w-[95px]">
-                            <SortableHeader field="local_counsel">Local Budget</SortableHeader>
-                          </TableHead>
                           <TableHead className="text-right min-w-[110px]">
                             Financials
                           </TableHead>
@@ -986,6 +971,22 @@ export default function Matters() {
                           </TableHead>
                           <TableHead className="text-right min-w-[45px]">
                             <SortableHeader field="headroom_pct">%</SortableHeader>
+                          </TableHead>
+                        </>
+                      )}
+                      <TableHead className="text-right min-w-[90px]">
+                        <SortableHeader field="fee_amount">Budget</SortableHeader>
+                      </TableHead>
+                      {isPipelineOrLost && (
+                        <TableHead className="text-right min-w-[80px]">USD</TableHead>
+                      )}
+                      {isLive && (
+                        <>
+                          <TableHead className="text-right min-w-[85px]">
+                            <SortableHeader field="bm_fee">BM Budget</SortableHeader>
+                          </TableHead>
+                          <TableHead className="text-right min-w-[95px]">
+                            <SortableHeader field="local_counsel">Local Budget</SortableHeader>
                           </TableHead>
                         </>
                       )}
@@ -1007,6 +1008,9 @@ export default function Matters() {
                         </TableHead>
                       )}
                       <TableHead className="min-w-[70px]">Practice</TableHead>
+                      {!isPipelineOrLost && (
+                        <TableHead className="w-16">Status</TableHead>
+                      )}
                       <TableHead className="w-12 min-w-[48px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -1043,10 +1047,79 @@ export default function Matters() {
                               </p>
                             </Link>
                           </TableCell>
-                          {!isPipelineOrLost && (
-                            <TableCell>
-                              <StatusBadge status={displayStatus} />
-                            </TableCell>
+                          {isLive && (
+                            <>
+                              <TableCell className="p-1">
+                                <div className="flex flex-col gap-0.5 text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span className="text-[10px] text-muted-foreground leading-tight">WIP:</span>
+                                    <EditableFinancialCell
+                                      value={matter.latest_snapshot?.wip_amount || 0}
+                                      currency={matter.fee_currency}
+                                      compact
+                                      onSave={async (value) => {
+                                        await upsertTodaySnapshot.mutateAsync({
+                                          matterId: matter.id,
+                                          field: 'wip_amount',
+                                          value,
+                                        });
+                                      }}
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span className="text-[10px] text-muted-foreground leading-tight">Billed:</span>
+                                    <BilledAmountCell
+                                      matterId={matter.id}
+                                      currentBilledAmount={matter.latest_snapshot?.billed_amount || 0}
+                                      currency={matter.fee_currency}
+                                      compact
+                                    />
+                                  </div>
+                                  <div className="flex items-center justify-end gap-1">
+                                    <span className="text-[10px] text-muted-foreground leading-tight">Paid:</span>
+                                    <EditableFinancialCell
+                                      value={matter.latest_snapshot?.paid_amount || 0}
+                                      currency={matter.fee_currency}
+                                      compact
+                                      onSave={async (value) => {
+                                        await upsertTodaySnapshot.mutateAsync({
+                                          matterId: matter.id,
+                                          field: 'paid_amount',
+                                          value,
+                                        });
+                                      }}
+                                      className="text-success"
+                                    />
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {formatCurrency(budgetBurn, (matter as any).effective_currency ?? matter.fee_currency)}
+                              </TableCell>
+                              <TableCell className="text-right text-muted-foreground">
+                                {matter.local_counsel_billing === 'Disb' && matter.local_counsel_fee > 0 ? (
+                                  formatCurrency(((matter as any).lc_wip || 0) + ((matter as any).lc_billed || 0), (matter as any).effective_currency ?? matter.fee_currency)
+                                ) : (
+                                  <span className="text-muted-foreground/50">-</span>
+                                )}
+                              </TableCell>
+                              <TableCell className={cn(
+                                "text-right font-medium",
+                                matter.headroom < 0 ? "text-danger" : "text-foreground"
+                              )}>
+                                {formatCurrency(matter.headroom, (matter as any).effective_currency ?? matter.fee_currency)}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <span className={cn(
+                                  "font-medium",
+                                  headroomStatus === 'danger' && 'text-danger',
+                                  headroomStatus === 'warning' && 'text-warning',
+                                  headroomStatus === 'success' && 'text-success'
+                                )}>
+                                  {matter.headroom_percent.toFixed(0)}%
+                                </span>
+                              </TableCell>
+                            </>
                           )}
                           <TableCell className="text-right">
                             <div className="flex flex-col items-end gap-0.5">
@@ -1145,76 +1218,6 @@ export default function Matters() {
                                     );
                                   })()}
                                 </div>
-                              </TableCell>
-                              <TableCell className="p-1">
-                                <div className="flex flex-col gap-0.5 text-right">
-                                  <div className="flex items-center justify-end gap-1">
-                                    <span className="text-[10px] text-muted-foreground leading-tight">WIP:</span>
-                                    <EditableFinancialCell
-                                      value={matter.latest_snapshot?.wip_amount || 0}
-                                      currency={matter.fee_currency}
-                                      compact
-                                      onSave={async (value) => {
-                                        await upsertTodaySnapshot.mutateAsync({
-                                          matterId: matter.id,
-                                          field: 'wip_amount',
-                                          value,
-                                        });
-                                      }}
-                                    />
-                                  </div>
-                                  <div className="flex items-center justify-end gap-1">
-                                    <span className="text-[10px] text-muted-foreground leading-tight">Billed:</span>
-                                    <BilledAmountCell
-                                      matterId={matter.id}
-                                      currentBilledAmount={matter.latest_snapshot?.billed_amount || 0}
-                                      currency={matter.fee_currency}
-                                      compact
-                                    />
-                                  </div>
-                                  <div className="flex items-center justify-end gap-1">
-                                    <span className="text-[10px] text-muted-foreground leading-tight">Paid:</span>
-                                    <EditableFinancialCell
-                                      value={matter.latest_snapshot?.paid_amount || 0}
-                                      currency={matter.fee_currency}
-                                      compact
-                                      onSave={async (value) => {
-                                        await upsertTodaySnapshot.mutateAsync({
-                                          matterId: matter.id,
-                                          field: 'paid_amount',
-                                          value,
-                                        });
-                                      }}
-                                      className="text-success"
-                                    />
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-right text-muted-foreground">
-                                {formatCurrency(budgetBurn, (matter as any).effective_currency ?? matter.fee_currency)}
-                              </TableCell>
-                              <TableCell className="text-right text-muted-foreground">
-                                {matter.local_counsel_billing === 'Disb' && matter.local_counsel_fee > 0 ? (
-                                  formatCurrency(((matter as any).lc_wip || 0) + ((matter as any).lc_billed || 0), (matter as any).effective_currency ?? matter.fee_currency)
-                                ) : (
-                                  <span className="text-muted-foreground/50">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell className={cn(
-                                "text-right font-medium",
-                                matter.headroom < 0 ? "text-danger" : "text-foreground"
-                              )}>
-                                {formatCurrency(matter.headroom, (matter as any).effective_currency ?? matter.fee_currency)}
-                              </TableCell>
-                              <TableCell className="text-right">
-                                <span className={cn(
-                                  "font-medium",
-                                  headroomStatus === 'danger' && 'text-danger',
-                                  headroomStatus === 'warning' && 'text-warning',
-                                  headroomStatus === 'success' && 'text-success'
-                                )}>
-                                  {matter.headroom_percent.toFixed(0)}%
-                                </span>
                               </TableCell>
                             </>
                           )}
@@ -1329,6 +1332,11 @@ export default function Matters() {
                           <TableCell className="text-muted-foreground text-sm">
                             {matter.practice_area || '-'}
                           </TableCell>
+                          {!isPipelineOrLost && (
+                            <TableCell>
+                              <StatusBadge status={displayStatus} />
+                            </TableCell>
+                          )}
                           <TableCell>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>

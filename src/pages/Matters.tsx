@@ -37,7 +37,7 @@ import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
-import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2 } from 'lucide-react';
 import { format, differenceInDays, parseISO, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -235,22 +235,156 @@ function MmaBpTableRow({ matter, userProfile, updateMatter }: MmaBpTableRowProps
   );
 }
 
-// Clients Tab inline editing row component
-interface ClientRowProps {
+// Clients Tab Content
+interface ClientsTabContentProps {
+  clients: { id: string; name: string; display_name: string | null }[];
+  clientsInUse: Set<string>;
+  isLoading: boolean;
+  updateClient: {
+    mutateAsync: (input: { id: string; name?: string; display_name?: string | null }) => Promise<unknown>;
+    isPending?: boolean;
+  };
+  deleteClient: {
+    mutateAsync: (id: string) => Promise<void>;
+    isPending?: boolean;
+  };
+}
+
+function ClientsTabContent({ clients, clientsInUse, isLoading, updateClient, deleteClient }: ClientsTabContentProps) {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const { activeClients, unusedClients } = useMemo(() => {
+    let filtered = clients;
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      filtered = clients.filter(
+        (c) =>
+          c.name.toLowerCase().includes(term) ||
+          (c.display_name && c.display_name.toLowerCase().includes(term))
+      );
+    }
+    
+    const active = filtered.filter(c => clientsInUse.has(c.id)).sort((a, b) => a.name.localeCompare(b.name));
+    const unused = filtered.filter(c => !clientsInUse.has(c.id)).sort((a, b) => a.name.localeCompare(b.name));
+    
+    return { activeClients: active, unusedClients: unused };
+  }, [clients, clientsInUse, searchTerm]);
+
+  const handleDelete = async (clientId: string) => {
+    setDeletingId(clientId);
+    try {
+      await deleteClient.mutateAsync(clientId);
+      toast.success('Client deleted');
+    } catch (error) {
+      toast.error('Failed to delete client');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const renderClientTable = (clientList: typeof clients, showDelete: boolean, title: string) => (
+    <Card className="shadow-card">
+      <CardContent className="p-0">
+        <div className="px-4 py-3 border-b bg-muted/30">
+          <h3 className="font-medium text-sm text-foreground">{title}</h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {clientList.length} client{clientList.length !== 1 ? 's' : ''}
+          </p>
+        </div>
+        {clientList.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <p className="text-sm text-muted-foreground">No clients in this category</p>
+          </div>
+        ) : (
+          <StickyTableHeader>
+            <TableScrollControls>
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead className="min-w-[250px]">Full Client Name</TableHead>
+                    <TableHead className="min-w-[200px]">Commonly Referred To</TableHead>
+                    <TableHead className="min-w-[150px]">Display Preview</TableHead>
+                    <TableHead className="w-16">Save</TableHead>
+                    {showDelete && <TableHead className="w-16">Delete</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clientList.map((client) => (
+                    <ClientRowWithDelete
+                      key={client.id}
+                      client={client}
+                      updateClient={updateClient}
+                      showDelete={showDelete}
+                      onDelete={() => handleDelete(client.id)}
+                      isDeleting={deletingId === client.id}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </TableScrollControls>
+          </StickyTableHeader>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <>
+      {/* Search */}
+      <Card className="shadow-card">
+        <CardContent className="pt-6">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search clients..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {isLoading ? (
+        <Card className="shadow-card">
+          <CardContent className="p-0">
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {/* Active Clients */}
+          {renderClientTable(activeClients, false, 'Clients In Use')}
+          
+          {/* Unused Clients */}
+          {unusedClients.length > 0 && renderClientTable(unusedClients, true, 'Unused Clients (can be deleted)')}
+        </>
+      )}
+    </>
+  );
+}
+
+// Extended ClientRow with delete option
+interface ClientRowWithDeleteProps {
   client: { id: string; name: string; display_name: string | null };
   updateClient: {
     mutateAsync: (input: { id: string; name?: string; display_name?: string | null }) => Promise<unknown>;
     isPending?: boolean;
   };
+  showDelete: boolean;
+  onDelete: () => void;
+  isDeleting: boolean;
 }
 
-function ClientRow({ client, updateClient }: ClientRowProps) {
+function ClientRowWithDelete({ client, updateClient, showDelete, onDelete, isDeleting }: ClientRowWithDeleteProps) {
   const [nameValue, setNameValue] = useState(client.name);
   const [displayNameValue, setDisplayNameValue] = useState(client.display_name || '');
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  // Update local state when client changes
   useMemo(() => {
     setNameValue(client.name);
     setDisplayNameValue(client.display_name || '');
@@ -291,7 +425,7 @@ function ClientRow({ client, updateClient }: ClientRowProps) {
         <Input
           value={nameValue}
           onChange={(e) => handleNameChange(e.target.value)}
-          disabled={isSaving}
+          disabled={isSaving || isDeleting}
           placeholder="Client name..."
           className="h-8 text-sm"
         />
@@ -300,7 +434,7 @@ function ClientRow({ client, updateClient }: ClientRowProps) {
         <Input
           value={displayNameValue}
           onChange={(e) => handleDisplayNameChange(e.target.value)}
-          disabled={isSaving}
+          disabled={isSaving || isDeleting}
           placeholder="Short name (optional)..."
           className="h-8 text-sm"
         />
@@ -315,7 +449,7 @@ function ClientRow({ client, updateClient }: ClientRowProps) {
           size="sm"
           variant={hasChanges ? 'default' : 'ghost'}
           onClick={handleSave}
-          disabled={isSaving || !hasChanges}
+          disabled={isSaving || !hasChanges || isDeleting}
           className="h-8"
         >
           {isSaving ? (
@@ -325,95 +459,24 @@ function ClientRow({ client, updateClient }: ClientRowProps) {
           )}
         </Button>
       </TableCell>
+      {showDelete && (
+        <TableCell>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onDelete}
+            disabled={isDeleting || isSaving}
+            className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            {isDeleting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4" />
+            )}
+          </Button>
+        </TableCell>
+      )}
     </TableRow>
-  );
-}
-
-// Clients Tab Content
-interface ClientsTabContentProps {
-  clients: { id: string; name: string; display_name: string | null }[];
-  isLoading: boolean;
-  updateClient: {
-    mutateAsync: (input: { id: string; name?: string; display_name?: string | null }) => Promise<unknown>;
-    isPending?: boolean;
-  };
-}
-
-function ClientsTabContent({ clients, isLoading, updateClient }: ClientsTabContentProps) {
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const filteredClients = useMemo(() => {
-    if (!searchTerm.trim()) return clients;
-    const term = searchTerm.toLowerCase();
-    return clients.filter(
-      (c) =>
-        c.name.toLowerCase().includes(term) ||
-        (c.display_name && c.display_name.toLowerCase().includes(term))
-    );
-  }, [clients, searchTerm]);
-
-  return (
-    <>
-      {/* Search */}
-      <Card className="shadow-card">
-        <CardContent className="pt-6">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search clients..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Client Table */}
-      <Card className="shadow-card">
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredClients.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <Building2 className="h-12 w-12 text-muted-foreground/50 mb-4" />
-              <h3 className="text-lg font-medium text-foreground">No clients found</h3>
-              <p className="text-sm text-muted-foreground mt-1">
-                {searchTerm ? 'Try adjusting your search' : 'Clients are created when you add a matter'}
-              </p>
-            </div>
-          ) : (
-            <StickyTableHeader>
-              <TableScrollControls>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="min-w-[250px]">Full Client Name</TableHead>
-                      <TableHead className="min-w-[200px]">Commonly Referred To</TableHead>
-                      <TableHead className="min-w-[150px]">Display Preview</TableHead>
-                      <TableHead className="w-16">Save</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredClients
-                      .sort((a, b) => a.name.localeCompare(b.name))
-                      .map((client) => (
-                        <ClientRow
-                          key={client.id}
-                          client={client}
-                          updateClient={updateClient}
-                        />
-                      ))}
-                  </TableBody>
-                </Table>
-              </TableScrollControls>
-            </StickyTableHeader>
-          )}
-        </CardContent>
-      </Card>
-    </>
   );
 }
 
@@ -421,7 +484,7 @@ export default function Matters() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { matters, isLoading, updateMatter } = useMatters();
-  const { clients, updateClient, isLoading: clientsLoading } = useClients();
+  const { clients, updateClient, deleteClient, isLoading: clientsLoading } = useClients();
   const { upsertTodaySnapshot } = useSnapshots();
   const { data: exchangeRatesData } = useExchangeRates();
   const [search, setSearch] = useState('');
@@ -473,6 +536,19 @@ export default function Matters() {
     });
     return map;
   }, [allMatterClients]);
+
+  // Build a set of client IDs that are in use (have at least one matter)
+  const clientsInUse = useMemo(() => {
+    const usedIds = new Set<string>();
+    matters.forEach((m) => {
+      if (m.client_id) usedIds.add(m.client_id);
+    });
+    // Also add clients from multi-client relationships
+    allMatterClients.forEach((mc) => {
+      usedIds.add(mc.client_id);
+    });
+    return usedIds;
+  }, [matters, allMatterClients]);
 
   // Silent update for local counsel billing (no toast)
   const updateLocalCounselBilling = async (matterId: string, value: 'Direct' | 'Disb' | null) => {
@@ -740,14 +816,14 @@ export default function Matters() {
                 </span>
               </TabsTrigger>
             ))}
-            <TabsTrigger value="MMA/BP" className="gap-2 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-900 dark:data-[state=active]:bg-amber-900/30 dark:data-[state=active]:text-amber-200">
+            <TabsTrigger value="MMA/BP" className="gap-2 bg-stone-100 dark:bg-stone-800/50 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-900 dark:data-[state=active]:bg-amber-900/30 dark:data-[state=active]:text-amber-200">
               <Users className="h-4 w-4" />
               <span>MMA/BP</span>
               <span className="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded-full">
                 {mmaBpCount}
               </span>
             </TabsTrigger>
-            <TabsTrigger value="Clients" className="gap-2 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-900 dark:data-[state=active]:bg-emerald-900/30 dark:data-[state=active]:text-emerald-200">
+            <TabsTrigger value="Clients" className="gap-2 bg-stone-100 dark:bg-stone-800/50 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-900 dark:data-[state=active]:bg-emerald-900/30 dark:data-[state=active]:text-emerald-200">
               <Building2 className="h-4 w-4" />
               <span>Clients</span>
               <span className="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded-full">
@@ -795,8 +871,10 @@ export default function Matters() {
         {isClientsTab && (
           <ClientsTabContent 
             clients={clients} 
+            clientsInUse={clientsInUse}
             isLoading={clientsLoading} 
-            updateClient={updateClient} 
+            updateClient={updateClient}
+            deleteClient={deleteClient}
           />
         )}
 

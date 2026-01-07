@@ -58,6 +58,8 @@ export interface Matter {
   quote_currency: string | null;
   billing_currency: string | null;
   is_multi_client: boolean;
+  // Full time costs mode (no estimate/headroom tracking)
+  pay_full_time_costs: boolean;
   created_at: string;
   updated_at: string;
   clients?: {

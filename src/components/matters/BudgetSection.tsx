@@ -156,6 +156,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const billingCurrency = (matter as any)?.billing_currency || currency;
   const agreedBillingAmount = (matter as any)?.agreed_billing_amount || 0;
   const originalFeeUpperEnd = matter?.fee_amount_upper_end || 0;
+  const payFullTimeCosts = (matter as any)?.pay_full_time_costs ?? false;
   
   // Calculate mandated exchange rate (billing currency per quote currency)
   const mandatedRate = (differentBillingCurrency && originalFeeUpperEnd > 0 && agreedBillingAmount > 0)
@@ -1110,7 +1111,26 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           )}
         </div>
 
-        {/* Notes - shown for both initial and updates */}
+        {/* Full Time Costs Option */}
+        <div className="border-t pt-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={payFullTimeCosts}
+              onChange={async (e) => {
+                await updateBillingCurrencyField('pay_full_time_costs', e.target.checked);
+              }}
+              className="h-4 w-4 rounded border cursor-pointer"
+            />
+            <span className="text-sm">Client pays full time costs (no estimate/budget tracking)</span>
+          </label>
+          {payFullTimeCosts && (
+            <p className="text-xs text-muted-foreground mt-2 pl-6">
+              Budget and headroom will show as N/A in the matters table since the client will pay whatever time costs are incurred.
+            </p>
+          )}
+        </div>
+
         {(isEditing || !hasExistingBudget) && (
           <div className="space-y-3">
             <Label>{hasExistingBudget ? 'Update Notes' : 'Budget Notes'}</Label>

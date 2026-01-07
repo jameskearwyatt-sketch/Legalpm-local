@@ -605,6 +605,7 @@ export type Database = {
           matter_open: boolean
           opportunity_receipt_date: string | null
           originator: string | null
+          pay_full_time_costs: boolean
           pipeline_outcome:
             | Database["public"]["Enums"]["pipeline_outcome"]
             | null
@@ -660,6 +661,7 @@ export type Database = {
           matter_open?: boolean
           opportunity_receipt_date?: string | null
           originator?: string | null
+          pay_full_time_costs?: boolean
           pipeline_outcome?:
             | Database["public"]["Enums"]["pipeline_outcome"]
             | null
@@ -715,6 +717,7 @@ export type Database = {
           matter_open?: boolean
           opportunity_receipt_date?: string | null
           originator?: string | null
+          pay_full_time_costs?: boolean
           pipeline_outcome?:
             | Database["public"]["Enums"]["pipeline_outcome"]
             | null

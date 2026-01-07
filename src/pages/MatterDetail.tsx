@@ -679,41 +679,47 @@ export default function MatterDetail() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center py-3 border-b">
                   <span className="text-muted-foreground">Work in Progress</span>
-                  <EditableFinancialCell
-                    value={wipAmount}
-                    currency={currency}
-                    onSave={async (value) => {
-                      await upsertTodaySnapshot.mutateAsync({
-                        matterId: id!,
-                        field: 'wip_amount',
-                        value,
-                      });
-                    }}
-                  />
+                  <div className="w-28">
+                    <EditableFinancialCell
+                      value={wipAmount}
+                      currency={currency}
+                      onSave={async (value) => {
+                        await upsertTodaySnapshot.mutateAsync({
+                          matterId: id!,
+                          field: 'wip_amount',
+                          value,
+                        });
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="flex justify-between items-center py-3 border-b">
                   <span className="text-muted-foreground">AR (Billed)</span>
-                  <BilledAmountCell
-                    matterId={id!}
-                    currentBilledAmount={billedAmount}
-                    currency={currency}
-                    compact={false}
-                  />
+                  <div className="w-28">
+                    <BilledAmountCell
+                      matterId={id!}
+                      currentBilledAmount={billedAmount}
+                      currency={currency}
+                      compact={false}
+                    />
+                  </div>
                 </div>
                 <div className="flex justify-between items-center py-3 border-b">
                   <span className="text-muted-foreground">Paid</span>
-                  <EditableFinancialCell
-                    value={paidAmount}
-                    currency={currency}
-                    className="text-success"
-                    onSave={async (value) => {
-                      await upsertTodaySnapshot.mutateAsync({
-                        matterId: id!,
-                        field: 'paid_amount',
-                        value,
-                      });
-                    }}
-                  />
+                  <div className="w-28">
+                    <EditableFinancialCell
+                      value={paidAmount}
+                      currency={currency}
+                      className="text-success"
+                      onSave={async (value) => {
+                        await upsertTodaySnapshot.mutateAsync({
+                          matterId: id!,
+                          field: 'paid_amount',
+                          value,
+                        });
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="flex justify-between items-center py-3">
                   <span className="text-muted-foreground">Collection Rate</span>

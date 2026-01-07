@@ -348,31 +348,28 @@ export function AskAIButton() {
   const getChatPanelStyle = (): React.CSSProperties => {
     const panelWidth = Math.min(384, window.innerWidth - 24); // w-96 = 384px, but cap at viewport
     const panelHeight = 440; // Approximate height
-    const buttonSize = 56;
     const margin = 12;
     
     if (position) {
-      // Calculate available space in each direction
-      const spaceAbove = position.y - margin;
-      const spaceBelow = window.innerHeight - position.y - buttonSize - margin;
-      const spaceLeft = position.x;
-      const spaceRight = window.innerWidth - position.x - buttonSize;
-      
-      let top: number;
       let left: number;
+      let top: number;
       
-      // Determine vertical position - prefer above, but use below if not enough space
-      if (spaceAbove >= panelHeight) {
-        top = position.y - panelHeight - 8;
-      } else if (spaceBelow >= panelHeight) {
-        top = position.y + buttonSize + 8;
+      // Calculate available space
+      const spaceAbove = position.y - margin;
+      const spaceBelow = window.innerHeight - position.y - margin;
+      
+      // If button is in bottom half, show panel above
+      // If button is in top half, show panel below
+      if (position.y > window.innerHeight / 2) {
+        // Button is in bottom half - position panel above
+        top = Math.max(margin, position.y - panelHeight - 8);
       } else {
-        // Not enough space either way - position at top of viewport with margin
-        top = margin;
+        // Button is in top half - position panel below (button will be at top)
+        top = position.y + 8;
       }
       
       // Center horizontally on button, but keep within viewport
-      left = position.x - panelWidth / 2 + buttonSize / 2;
+      left = position.x - panelWidth / 2 + 28; // 28 = half button width
       left = Math.max(margin, Math.min(left, window.innerWidth - panelWidth - margin));
       
       // Final safety check - ensure panel stays fully within viewport
@@ -387,7 +384,7 @@ export function AskAIButton() {
       };
     }
     
-    // Default position - ensure it fits within viewport
+    // Default position - bottom right, panel above
     const defaultTop = Math.max(margin, window.innerHeight - panelHeight - 96);
     const defaultRight = Math.max(margin, 24);
     
@@ -395,6 +392,26 @@ export function AskAIButton() {
       position: 'fixed',
       right: defaultRight,
       top: defaultTop,
+      bottom: 'auto',
+    };
+  };
+
+  // Calculate where to position the button when panel is open
+  const getOpenButtonStyle = (): React.CSSProperties => {
+    const panelStyle = getChatPanelStyle();
+    const panelWidth = Math.min(384, window.innerWidth - 24);
+    const panelHeight = 440;
+    const buttonSize = 56;
+    
+    // Position button at bottom center of panel
+    const panelLeft = panelStyle.left as number ?? (window.innerWidth - panelWidth - (panelStyle.right as number ?? 24));
+    const panelTop = panelStyle.top as number ?? 0;
+    
+    return {
+      position: 'fixed',
+      left: panelLeft + panelWidth / 2 - buttonSize / 2,
+      top: panelTop + panelHeight + 8,
+      right: 'auto',
       bottom: 'auto',
     };
   };
@@ -442,7 +459,7 @@ export function AskAIButton() {
       <div 
         ref={buttonRef}
         className="z-50"
-        style={getButtonStyle()}
+        style={isOpen ? getOpenButtonStyle() : getButtonStyle()}
       >
         <button
           onPointerDown={handlePointerDown}

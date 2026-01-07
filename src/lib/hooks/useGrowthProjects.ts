@@ -80,10 +80,16 @@ export function useGrowthProjects(projectType?: GrowthProjectType) {
   });
 
   const createProject = useMutation({
-    mutationFn: async (project: Partial<GrowthProject>) => {
+    mutationFn: async (project: { name: string; project_type: GrowthProjectType; description?: string | null; mentee_name?: string | null }) => {
       const { data, error } = await supabase
         .from('growth_projects')
-        .insert([{ ...project, user_id: user!.id }])
+        .insert([{ 
+          name: project.name,
+          project_type: project.project_type,
+          description: project.description,
+          mentee_name: project.mentee_name,
+          user_id: user!.id 
+        }])
         .select()
         .single();
       if (error) throw error;
@@ -224,11 +230,14 @@ export function useGrowthProject(projectId?: string) {
   });
 
   const addTask = useMutation({
-    mutationFn: async (task: Partial<GrowthTask>) => {
+    mutationFn: async (task: { title: string; description?: string; assignee?: string; deadline_type: TaskDeadlineType }) => {
       const { data, error } = await supabase
         .from('growth_tasks')
         .insert([{ 
-          ...task, 
+          title: task.title,
+          description: task.description,
+          assignee: task.assignee,
+          deadline_type: task.deadline_type,
           project_id: projectId!, 
           user_id: user!.id,
           deadline_set_at: task.deadline_type !== 'no_deadline' ? new Date().toISOString() : null,

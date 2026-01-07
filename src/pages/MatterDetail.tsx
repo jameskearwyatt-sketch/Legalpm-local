@@ -481,13 +481,29 @@ export default function MatterDetail() {
                 <div className="flex items-center gap-2">
                   {/* Show all clients for multi-client matters */}
                   {matterClients && matterClients.length > 1 ? (
-                    <span className="text-2xl lg:text-3xl font-heading font-bold text-foreground">
-                      {matterClients.map(mc => getClientDisplayName(mc.clients)).join(' / ')}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-2xl lg:text-3xl font-heading font-bold text-foreground">
+                        {matterClients.map(mc => getClientDisplayName(mc.clients)).join(' / ')}
+                      </span>
+                      {/* Show full names if any differ from display names */}
+                      {matterClients.some(mc => mc.clients?.display_name && mc.clients.display_name.trim() && mc.clients.display_name !== mc.clients.name) && (
+                        <span className="text-xs text-muted-foreground">
+                          {matterClients.map(mc => mc.clients?.name).join(' / ')}
+                        </span>
+                      )}
+                    </div>
                   ) : (
-                    <span className="text-2xl lg:text-3xl font-heading font-bold text-foreground">
-                      {getMatterClientDisplayName(matter)}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-2xl lg:text-3xl font-heading font-bold text-foreground">
+                        {getMatterClientDisplayName(matter)}
+                      </span>
+                      {/* Show full name if different from display name */}
+                      {matter.clients?.display_name && matter.clients.display_name.trim() && matter.clients.display_name !== matter.clients.name && (
+                        <span className="text-xs text-muted-foreground">
+                          {matter.clients.name}
+                        </span>
+                      )}
+                    </div>
                   )}
                   <span className="text-2xl lg:text-3xl font-heading text-muted-foreground">–</span>
                   <Input

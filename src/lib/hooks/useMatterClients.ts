@@ -17,6 +17,7 @@ export interface MatterClient {
   clients?: {
     id: string;
     name: string;
+    display_name?: string | null;
   };
 }
 
@@ -48,7 +49,7 @@ export function useMatterClients(matterId?: string) {
         .from('matter_clients')
         .select(`
           *,
-          clients (id, name)
+          clients (id, name, display_name)
         `)
         .eq('matter_id', matterId)
         .order('is_master', { ascending: false })

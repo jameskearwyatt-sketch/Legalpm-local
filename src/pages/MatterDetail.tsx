@@ -315,13 +315,21 @@ export default function MatterDetail() {
   // Auto-populate exchange rate when fee currency changes
   useEffect(() => {
     if (exchangeRatesData?.rates && formData.fee_currency && matter) {
+      // Always force rate to 1 for same-currency (e.g., GBP to GBP)
+      if (formData.fee_currency === 'GBP' && formData.exchange_rate !== 1) {
+        setFormData(prev => ({ ...prev, exchange_rate: 1 }));
+        setHasChanges(true);
+        return;
+      }
+      
+      // Only auto-update rate when currency changes
       const rate = getExchangeRate(exchangeRatesData.rates, formData.fee_currency);
       if (rate !== formData.exchange_rate && formData.fee_currency !== matter.fee_currency) {
         setFormData(prev => ({ ...prev, exchange_rate: rate }));
         setHasChanges(true);
       }
     }
-  }, [formData.fee_currency, exchangeRatesData?.rates]);
+  }, [formData.fee_currency, formData.exchange_rate, exchangeRatesData?.rates]);
 
   const updateField = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import AppLayout from '@/components/layout/AppLayout';
@@ -160,14 +160,14 @@ function MmaBpTableRow({ matter, userProfile, updateMatter }: MmaBpTableRowProps
 
   return (
     <TableRow className="group">
-      <TableCell className="sticky left-0 z-10 bg-background">
+      <TableCell className="sticky left-0 z-10 bg-background max-w-[200px]">
         <Link 
           to={`/matters/${matter.id}`}
           className="block hover:text-primary transition-colors"
         >
-          <p className="text-sm text-muted-foreground">{getClientDisplayName(matter.clients)}</p>
-          <p className="font-medium text-foreground group-hover:text-primary transition-colors">
-            {matter.matter_name}
+          <p className="font-medium text-foreground">{getClientDisplayName(matter.clients)}</p>
+          <p className="text-sm text-muted-foreground group-hover:text-primary transition-colors line-clamp-2" title={matter.matter_name}>
+            {(matter as any).matter_display_name || matter.matter_name}
           </p>
         </Link>
       </TableCell>
@@ -556,6 +556,35 @@ export default function Matters() {
     await supabase.from('matters').update({ local_counsel_billing: value }).eq('id', matterId);
     queryClient.invalidateQueries({ queryKey: ['matters'] });
   };
+
+  // Auto-summarize long matter names that don't have a display name yet
+  useEffect(() => {
+    const summarizeLongNames = async () => {
+      const mattersNeedingSummary = matters.filter(
+        (m) => m.matter_name.length > 60 && !(m as any).matter_display_name
+      );
+      
+      // Process one at a time to avoid overwhelming the API
+      for (const matter of mattersNeedingSummary.slice(0, 3)) {
+        try {
+          const response = await supabase.functions.invoke('summarize-matter-name', {
+            body: { matterId: matter.id, matterName: matter.matter_name },
+          });
+          
+          if (response.data?.saved) {
+            // Refresh matters to get the updated display name
+            queryClient.invalidateQueries({ queryKey: ['matters'] });
+          }
+        } catch (error) {
+          console.error('Failed to summarize matter name:', error);
+        }
+      }
+    };
+    
+    if (matters.length > 0) {
+      summarizeLongNames();
+    }
+  }, [matters.length]); // Only re-run when matters count changes
 
   const handleCategoryChange = async (matterId: string, newCategory: MatterCategory, pipelineOutcome?: 'Won' | 'Lost') => {
     try {
@@ -1036,14 +1065,14 @@ export default function Matters() {
                       
                       return (
                         <TableRow key={matter.id} className="group">
-                          <TableCell className="sticky left-0 z-10 bg-background">
+                          <TableCell className="sticky left-0 z-10 bg-background max-w-[200px]">
                             <Link 
                               to={`/matters/${matter.id}`}
                               className="block hover:text-primary transition-colors"
                             >
-                              <p className="text-sm text-muted-foreground">{getClientDisplayName(matter.clients)}</p>
-                              <p className="font-medium text-foreground group-hover:text-primary transition-colors">
-                                {matter.matter_name}
+                              <p className="font-medium text-foreground">{getClientDisplayName(matter.clients)}</p>
+                              <p className="text-sm text-muted-foreground group-hover:text-primary transition-colors line-clamp-2" title={matter.matter_name}>
+                                {(matter as any).matter_display_name || matter.matter_name}
                               </p>
                             </Link>
                           </TableCell>

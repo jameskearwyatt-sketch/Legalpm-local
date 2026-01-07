@@ -70,7 +70,17 @@ export function TableScrollControls({ children, className }: TableScrollControls
     
     const rect = container.getBoundingClientRect();
     const viewportHeight = window.innerHeight;
-    const isVisible = rect.top < viewportHeight && rect.bottom > 60;
+    const isInView = rect.top < viewportHeight && rect.bottom > 60;
+    
+    // Check if user has scrolled to the bottom of the table
+    // The native horizontal scrollbar becomes visible when the bottom of the container is in view
+    // We hide the floating scrollbar when the bottom of the table (with some buffer for the scrollbar) is visible
+    const scrollbarHeight = 20; // Approximate height of native scrollbar area
+    const bottomBuffer = 100; // Buffer zone - hide floating bar when bottom is within this distance of viewport bottom
+    const isAtBottom = rect.bottom <= viewportHeight + bottomBuffer;
+    
+    // Only show floating scrollbar if table is in view, has overflow, AND user hasn't scrolled to bottom
+    const shouldShow = isInView && overflow && !isAtBottom;
     
     // Calculate thumb size and position relative to track
     const trackWidth = Math.min(rect.width * 0.6, 300); // Track width
@@ -84,7 +94,7 @@ export function TableScrollControls({ children, className }: TableScrollControls
     setPosition({
       left: rect.left,
       width: rect.width,
-      visible: isVisible && overflow,
+      visible: shouldShow,
     });
   }, [scrollableEl]);
 

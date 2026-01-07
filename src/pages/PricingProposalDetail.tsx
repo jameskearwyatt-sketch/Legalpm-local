@@ -387,7 +387,7 @@ export default function PricingProposalDetail() {
     };
   }, [draftItems, rateCard, assumptions]);
 
-  const currencySymbol = proposal?.currency === "GBP" ? "£" : proposal?.currency === "USD" ? "$" : "€";
+  const currencySymbol = getCurrencySymbol(proposal?.currency || 'GBP');
 
   const formatCurrency = (value: number) => {
     return `${currencySymbol}${new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)}`;

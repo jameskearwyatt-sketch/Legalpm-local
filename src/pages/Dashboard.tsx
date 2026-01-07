@@ -273,25 +273,25 @@ export default function Dashboard() {
   const kpiCards = [
     {
       title: 'Live Matters: Total BM Budget',
-      value: formatCurrency(stats?.totalBudget || 0),
+      value: formatCurrency(stats?.totalBudget || 0, 'USD'),
       icon: <DollarSign className="h-5 w-5" />,
       variant: 'default' as const,
     },
     {
       title: 'Work in Progress',
-      value: formatCurrency(stats?.totalWip || 0),
+      value: formatCurrency(stats?.totalWip || 0, 'USD'),
       icon: <Clock className="h-5 w-5" />,
       variant: 'default' as const,
     },
     {
       title: 'AR (Total Billed)',
-      value: formatCurrency(stats?.totalBilled || 0),
+      value: formatCurrency(stats?.totalBilled || 0, 'USD'),
       icon: <FileText className="h-5 w-5" />,
       variant: 'default' as const,
     },
     {
       title: 'Cash Received',
-      value: formatCurrency(stats?.totalPaid || 0),
+      value: formatCurrency(stats?.totalPaid || 0, 'USD'),
       icon: <CheckCircle className="h-5 w-5" />,
       variant: 'success' as const,
     },
@@ -432,7 +432,7 @@ export default function Dashboard() {
                             style={{ backgroundColor: entry.color }}
                           />
                           <span className="text-muted-foreground">{entry.name}:</span>
-                          <span className="font-medium">{formatCurrency(entry.value)}</span>
+                          <span className="font-medium">{formatCurrency(entry.value, 'USD')}</span>
                         </div>
                       ))}
                     </div>

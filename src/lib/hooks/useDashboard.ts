@@ -26,6 +26,8 @@ export interface DashboardStats {
   totalPaid: number;
   avgCollectionRate: number;
   openMattersCount: number;
+  pipelineMattersCount: number;
+  totalPipelineValueUsd: number;
   alerts: Alert[];
   pipelineAlerts: PipelineAlert[];
   trendData: TrendDataPoint[];
@@ -106,6 +108,8 @@ export function useDashboard(excludedMatterIds: string[] = []) {
           totalPaid: 0,
           avgCollectionRate: 0,
           openMattersCount: 0,
+          pipelineMattersCount: 0,
+          totalPipelineValueUsd: 0,
           alerts: [],
           pipelineAlerts: [],
           trendData: [],
@@ -135,8 +139,17 @@ export function useDashboard(excludedMatterIds: string[] = []) {
       let totalWipUsd = 0;
       let totalBilledUsd = 0;
       let totalPaidUsd = 0;
+      let totalPipelineValueUsd = 0;
       const alerts: Alert[] = [];
       const pipelineAlerts: PipelineAlert[] = [];
+
+      // Calculate total pipeline value
+      pipelineMatters?.forEach(matter => {
+        const bmFee = Number(matter.bm_fee_component) || 0;
+        const exchangeRate = Number(matter.exchange_rate) || 1;
+        const feeCurrency = matter.fee_currency || 'GBP';
+        totalPipelineValueUsd += convertToUsd(bmFee, feeCurrency, exchangeRate, gbpToUsdRate);
+      });
       const today = new Date();
 
       liveMatters?.forEach(matter => {
@@ -423,7 +436,9 @@ export function useDashboard(excludedMatterIds: string[] = []) {
         totalPaid: totalPaidUsd,
         avgCollectionRate,
         openMattersCount: liveMatters?.length || 0,
-      alerts: alerts.sort((a, b) => {
+        pipelineMattersCount: pipelineMatters?.length || 0,
+        totalPipelineValueUsd,
+        alerts: alerts.sort((a, b) => {
         const priority: Record<string, number> = { 'Over Budget': 1, 'Near Budget': 2, 'Poor Collection': 3, 'High WIP': 4, 'Stale Financials': 5, 'Stale LC Financials': 6 };
         return (priority[a.type] || 99) - (priority[b.type] || 99);
         }),

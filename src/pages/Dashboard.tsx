@@ -270,15 +270,16 @@ export default function Dashboard() {
     );
   }
 
-  // Calculate outstanding AR (billed but not yet paid)
+  // Calculate total lock-up (WIP + Outstanding AR) - all capital tied up
   const outstandingAR = (stats?.totalBilled || 0) - (stats?.totalPaid || 0);
+  const totalLockup = (stats?.totalWip || 0) + outstandingAR;
 
   const kpiCards = [
     {
-      title: 'Outstanding AR',
-      value: formatCurrency(outstandingAR, 'USD'),
-      icon: <AlertTriangle className="h-5 w-5" />,
-      variant: outstandingAR > 100000 ? 'warning' as const : 'default' as const,
+      title: 'Total Lock-up',
+      value: formatCurrency(totalLockup, 'USD'),
+      icon: <DollarSign className="h-5 w-5" />,
+      variant: 'default' as const,
     },
     {
       title: 'Work in Progress',

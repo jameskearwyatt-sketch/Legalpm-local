@@ -82,6 +82,47 @@ export function WipImportDialog({
       return await file.text();
     }
     
+    // For Excel files, use exceljs to parse
+    if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || 
+        file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+        file.type === 'application/vnd.ms-excel') {
+      const ExcelJS = await import('exceljs');
+      const workbook = new ExcelJS.Workbook();
+      const arrayBuffer = await file.arrayBuffer();
+      await workbook.xlsx.load(arrayBuffer);
+      
+      let textContent = '';
+      workbook.eachSheet((sheet) => {
+        textContent += `\n--- Sheet: ${sheet.name} ---\n`;
+        sheet.eachRow((row) => {
+          const rowValues = row.values;
+          if (!Array.isArray(rowValues)) return;
+          
+          // Process each cell, skipping the first (exceljs uses 1-based indexing)
+          const cellStrings: string[] = [];
+          for (let i = 1; i < rowValues.length; i++) {
+            const cell = rowValues[i];
+            if (cell == null) {
+              cellStrings.push('');
+            } else if (typeof cell === 'object' && cell !== null && 'result' in cell) {
+              cellStrings.push(String((cell as { result: unknown }).result));
+            } else if (typeof cell === 'object') {
+              cellStrings.push('');
+            } else {
+              cellStrings.push(String(cell));
+            }
+          }
+          
+          const rowText = cellStrings.join('\t');
+          if (rowText.trim()) {
+            textContent += rowText + '\n';
+          }
+        });
+      });
+      
+      return textContent;
+    }
+    
     // For other document types, use the parse-document-text edge function
     const formData = new FormData();
     formData.append('file', file);
@@ -263,7 +304,7 @@ export function WipImportDialog({
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept=".txt,.pdf,.doc,.docx"
+                    accept=".txt,.pdf,.doc,.docx,.xlsx,.xls"
                     onChange={handleFileSelect}
                     className="hidden"
                   />
@@ -290,7 +331,7 @@ export function WipImportDialog({
                       <Upload className="h-10 w-10 text-muted-foreground" />
                       <p className="font-medium">Click to upload or drag and drop</p>
                       <p className="text-sm text-muted-foreground">
-                        Supports PDF, DOC, DOCX, TXT files
+                        Supports PDF, DOC, DOCX, XLS, XLSX, TXT files
                       </p>
                     </div>
                   )}

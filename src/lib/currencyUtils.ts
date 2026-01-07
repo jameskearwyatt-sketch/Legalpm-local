@@ -24,33 +24,28 @@ export function formatCurrency(value: number, currency: string = 'GBP'): string 
 /**
  * Convert an amount from its native currency to USD.
  * 
+ * The exchange_rate stored on matters is the rate to convert that currency TO USD directly.
+ * For example: if fee_currency is GBP and exchange_rate is 1.35, it means 1 GBP = 1.35 USD.
+ * 
  * @param amount - The amount in the source currency
  * @param feeCurrency - The source currency (e.g., 'GBP', 'EUR', 'USD')
- * @param exchangeRateToGbp - The stored exchange rate that converts the source currency TO GBP
- *                            (e.g., 0.79 for USD means 1 USD = 0.79 GBP)
- * @param gbpToUsdRate - The rate to convert GBP to USD (optional, default ~1.27 if not provided)
- *                       This is: 1 GBP = X USD, so typically > 1
+ * @param exchangeRateToUsd - The stored exchange rate that converts the source currency TO USD
+ *                            (e.g., 1.35 for GBP means 1 GBP = 1.35 USD)
+ * @param _gbpToUsdRate - Deprecated/unused, kept for API compatibility
  * @returns The amount converted to USD
  */
 export function convertToUsd(
   amount: number, 
   feeCurrency: string, 
-  exchangeRateToGbp: number,
-  gbpToUsdRate?: number
+  exchangeRateToUsd: number,
+  _gbpToUsdRate?: number
 ): number {
   // If already USD, no conversion needed
   if (feeCurrency === 'USD') {
     return amount;
   }
   
-  // Default GBP to USD rate if not provided (approximate)
-  const gbpUsdRate = gbpToUsdRate || 1.27;
-  
-  // First convert to GBP using the stored exchange rate
-  // exchangeRateToGbp means: 1 unit of feeCurrency = exchangeRateToGbp GBP
-  const amountInGbp = amount * exchangeRateToGbp;
-  
-  // Then convert GBP to USD
-  // gbpUsdRate means: 1 GBP = gbpUsdRate USD
-  return amountInGbp * gbpUsdRate;
+  // The stored exchange_rate is the direct conversion to USD
+  // e.g., for GBP with rate 1.35: £1 = $1.35
+  return amount * exchangeRateToUsd;
 }

@@ -121,7 +121,7 @@ Be concise and actionable. Focus on what matters most for a busy professional.`;
       });
     }
 
-    const aiResponse = await fetch('https://api.lovable.dev/v1/chat/completions', {
+    const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${lovableApiKey}`,
@@ -132,7 +132,6 @@ Be concise and actionable. Focus on what matters most for a busy professional.`;
         messages: [
           { role: 'user', content: prompt }
         ],
-        max_tokens: 200,
       }),
     });
 

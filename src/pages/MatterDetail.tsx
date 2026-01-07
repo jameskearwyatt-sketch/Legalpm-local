@@ -486,40 +486,40 @@ export default function MatterDetail() {
                 <ArrowLeft className="h-5 w-5" />
               </Link>
             </Button>
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1 flex-wrap">
-                <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   {/* Show all clients for multi-client matters */}
                   {matterClients && matterClients.length > 1 ? (
-                    <div className="flex flex-col">
-                      <span className="text-2xl lg:text-3xl font-heading font-bold text-foreground">
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-lg lg:text-xl font-heading font-bold text-foreground truncate">
                         {matterClients.map(mc => getClientDisplayName(mc.clients)).join(' / ')}
                       </span>
                       {/* Show full names if any differ from display names */}
                       {matterClients.some(mc => mc.clients?.display_name && mc.clients.display_name.trim() && mc.clients.display_name !== mc.clients.name) && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-muted-foreground truncate">
                           {matterClients.map(mc => mc.clients?.name).join(' / ')}
                         </span>
                       )}
                     </div>
                   ) : (
-                    <div className="flex flex-col">
-                      <span className="text-2xl lg:text-3xl font-heading font-bold text-foreground">
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-lg lg:text-xl font-heading font-bold text-foreground truncate">
                         {getMatterClientDisplayName(matter)}
                       </span>
                       {/* Show full name if different from display name */}
                       {matter.clients?.display_name && matter.clients.display_name.trim() && matter.clients.display_name !== matter.clients.name && (
-                        <span className="text-xs text-muted-foreground">
+                        <span className="text-xs text-muted-foreground truncate">
                           {matter.clients.name}
                         </span>
                       )}
                     </div>
                   )}
-                  <span className="text-2xl lg:text-3xl font-heading text-muted-foreground">–</span>
+                  <span className="text-lg lg:text-xl font-heading text-muted-foreground flex-shrink-0">–</span>
                   <Input
                     value={formData.matter_name || ''}
                     onChange={(e) => updateField('matter_name', e.target.value)}
-                    className="text-2xl lg:text-3xl font-heading font-bold border-0 p-0 h-auto focus-visible:ring-0 bg-transparent"
+                    className="text-lg lg:text-xl font-heading font-bold border-0 p-0 h-auto focus-visible:ring-0 bg-transparent min-w-0 flex-1"
                   />
                 </div>
                 <StatusBadge status={displayStatus} />

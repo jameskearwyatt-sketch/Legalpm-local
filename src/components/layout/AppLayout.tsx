@@ -42,7 +42,7 @@ const navigation = [
   { name: 'Red Flags', href: '/red-flags', icon: AlertTriangle },
   { name: 'Pipeline Flags', href: '/pipeline-flags', icon: Rocket },
   { name: 'Admin Flags', href: '/flags', icon: Flag },
-  { name: 'Reports', href: '/reports', icon: FileText },
+  { name: 'Report Export', href: '/reports', icon: FileText },
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Help', href: '/help', icon: HelpCircle },
 ];

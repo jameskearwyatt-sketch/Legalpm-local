@@ -21,6 +21,7 @@ export interface Matter {
   assignment_letter_signed: boolean;
   matter_open: boolean;
   lead_partner: string | null;
+  matter_managing_attorney: string | null;
   start_date: string | null;
   target_close_date: string | null;
   currency: string;
@@ -90,6 +91,7 @@ export interface CreateMatterInput {
   assignment_letter_signed?: boolean;
   matter_open?: boolean;
   lead_partner?: string;
+  matter_managing_attorney?: string;
   start_date?: string;
   target_close_date?: string;
   currency?: string;

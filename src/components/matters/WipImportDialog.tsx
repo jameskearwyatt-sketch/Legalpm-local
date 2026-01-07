@@ -9,9 +9,11 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Upload, FileText, CheckCircle, AlertTriangle, Info } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Upload, FileText, CheckCircle, AlertTriangle, Info, X, Check, Edit2, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -33,10 +35,22 @@ interface ParsedWipMatch {
   matched_text?: string;
 }
 
+interface EditableMatch extends ParsedWipMatch {
+  status: 'pending' | 'accepted' | 'rejected' | 'editing';
+  edited_amount?: number;
+  edited_budget_line_item_id?: string;
+}
+
 interface UnmatchedItem {
   description: string;
   amount: number;
   reason: string;
+}
+
+interface EditableUnmatched extends UnmatchedItem {
+  status: 'pending' | 'assigned' | 'rejected';
+  assigned_budget_line_item_id?: string;
+  edited_amount?: number;
 }
 
 interface WipImportDialogProps {
@@ -60,8 +74,8 @@ export function WipImportDialog({
   const [pastedContent, setPastedContent] = useState('');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [parsedMatches, setParsedMatches] = useState<ParsedWipMatch[] | null>(null);
-  const [unmatchedItems, setUnmatchedItems] = useState<UnmatchedItem[]>([]);
+  const [editableMatches, setEditableMatches] = useState<EditableMatch[] | null>(null);
+  const [editableUnmatched, setEditableUnmatched] = useState<EditableUnmatched[]>([]);
   const [summary, setSummary] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,20 +83,17 @@ export function WipImportDialog({
     const file = e.target.files?.[0];
     if (file) {
       setUploadedFile(file);
-      // Reset any previous results
-      setParsedMatches(null);
-      setUnmatchedItems([]);
+      setEditableMatches(null);
+      setEditableUnmatched([]);
       setSummary('');
     }
   };
 
   const extractTextFromFile = async (file: File): Promise<string> => {
-    // For text files, read directly
     if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
       return await file.text();
     }
     
-    // For Excel files, use exceljs to parse
     if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || 
         file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
         file.type === 'application/vnd.ms-excel') {
@@ -98,7 +109,6 @@ export function WipImportDialog({
           const rowValues = row.values;
           if (!Array.isArray(rowValues)) return;
           
-          // Process each cell, skipping the first (exceljs uses 1-based indexing)
           const cellStrings: string[] = [];
           for (let i = 1; i < rowValues.length; i++) {
             const cell = rowValues[i];
@@ -123,7 +133,6 @@ export function WipImportDialog({
       return textContent;
     }
     
-    // For other document types, use the parse-document-text edge function
     const formData = new FormData();
     formData.append('file', file);
     
@@ -137,8 +146,8 @@ export function WipImportDialog({
 
   const handleProcess = async () => {
     setIsProcessing(true);
-    setParsedMatches(null);
-    setUnmatchedItems([]);
+    setEditableMatches(null);
+    setEditableUnmatched([]);
     setSummary('');
 
     try {
@@ -199,14 +208,25 @@ export function WipImportDialog({
         throw new Error(data.error || 'Failed to parse WIP document');
       }
 
-      setParsedMatches(data.matches || []);
-      setUnmatchedItems(data.unmatched_items || []);
+      // Convert to editable matches with pending status
+      const matches: EditableMatch[] = (data.matches || []).map((m: ParsedWipMatch) => ({
+        ...m,
+        status: 'pending' as const,
+      }));
+      
+      const unmatched: EditableUnmatched[] = (data.unmatched_items || []).map((u: UnmatchedItem) => ({
+        ...u,
+        status: 'pending' as const,
+      }));
+
+      setEditableMatches(matches);
+      setEditableUnmatched(unmatched);
       setSummary(data.summary || '');
 
-      if (data.matches?.length > 0) {
-        toast.success(`Found ${data.matches.length} WIP matches`);
+      if (matches.length > 0 || unmatched.length > 0) {
+        toast.success(`Found ${matches.length} matches and ${unmatched.length} unmatched items - review below`);
       } else {
-        toast.warning('No matching WIP items found');
+        toast.warning('No WIP items found in the document');
       }
 
     } catch (error) {
@@ -217,58 +237,110 @@ export function WipImportDialog({
     }
   };
 
+  const updateMatch = (index: number, updates: Partial<EditableMatch>) => {
+    setEditableMatches(prev => 
+      prev?.map((m, i) => i === index ? { ...m, ...updates } : m) || null
+    );
+  };
+
+  const updateUnmatched = (index: number, updates: Partial<EditableUnmatched>) => {
+    setEditableUnmatched(prev => 
+      prev.map((u, i) => i === index ? { ...u, ...updates } : u)
+    );
+  };
+
+  const acceptAll = () => {
+    setEditableMatches(prev => 
+      prev?.map(m => ({ ...m, status: 'accepted' as const })) || null
+    );
+  };
+
+  const rejectAll = () => {
+    setEditableMatches(prev => 
+      prev?.map(m => ({ ...m, status: 'rejected' as const })) || null
+    );
+  };
+
   const handleApply = () => {
-    if (parsedMatches && parsedMatches.length > 0) {
-      onApplyMatches(parsedMatches);
-      handleClose();
+    if (!editableMatches) return;
+
+    // Build final matches from accepted items
+    const acceptedMatches: ParsedWipMatch[] = editableMatches
+      .filter(m => m.status === 'accepted')
+      .map(m => ({
+        budget_line_item_id: m.edited_budget_line_item_id || m.budget_line_item_id,
+        work_item: budgetLineItems.find(b => b.id === (m.edited_budget_line_item_id || m.budget_line_item_id))?.work_item || m.work_item,
+        wip_amount: m.edited_amount ?? m.wip_amount,
+        confidence: m.confidence,
+        matched_text: m.matched_text,
+      }));
+
+    // Add assigned unmatched items
+    const assignedUnmatched: ParsedWipMatch[] = editableUnmatched
+      .filter(u => u.status === 'assigned' && u.assigned_budget_line_item_id)
+      .map(u => ({
+        budget_line_item_id: u.assigned_budget_line_item_id!,
+        work_item: budgetLineItems.find(b => b.id === u.assigned_budget_line_item_id)?.work_item || u.description,
+        wip_amount: u.edited_amount ?? u.amount,
+        confidence: 'low' as const,
+        matched_text: u.description,
+      }));
+
+    const allMatches = [...acceptedMatches, ...assignedUnmatched];
+
+    if (allMatches.length === 0) {
+      toast.error('No items accepted - please accept at least one item');
+      return;
     }
+
+    onApplyMatches(allMatches);
+    handleClose();
+    toast.success(`Applied ${allMatches.length} WIP updates`);
   };
 
   const handleClose = () => {
     setPastedContent('');
     setUploadedFile(null);
-    setParsedMatches(null);
-    setUnmatchedItems([]);
+    setEditableMatches(null);
+    setEditableUnmatched([]);
     setSummary('');
     onClose();
   };
 
   const getConfidenceColor = (confidence: 'high' | 'medium' | 'low') => {
     switch (confidence) {
-      case 'high':
-        return 'text-green-600 dark:text-green-400';
-      case 'medium':
-        return 'text-amber-600 dark:text-amber-400';
-      case 'low':
-        return 'text-red-600 dark:text-red-400';
+      case 'high': return 'text-green-600 dark:text-green-400';
+      case 'medium': return 'text-amber-600 dark:text-amber-400';
+      case 'low': return 'text-red-600 dark:text-red-400';
     }
   };
 
   const getConfidenceIcon = (confidence: 'high' | 'medium' | 'low') => {
     switch (confidence) {
-      case 'high':
-        return <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />;
-      case 'medium':
-        return <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />;
-      case 'low':
-        return <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />;
+      case 'high': return <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />;
+      case 'medium': return <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />;
+      case 'low': return <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />;
     }
   };
 
+  const acceptedCount = editableMatches?.filter(m => m.status === 'accepted').length || 0;
+  const assignedCount = editableUnmatched.filter(u => u.status === 'assigned').length;
+  const totalApplyCount = acceptedCount + assignedCount;
+
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && handleClose()}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
             Import WIP Information
           </DialogTitle>
           <DialogDescription>
-            Upload a document or paste WIP information to automatically populate the WIP amounts
+            Upload a document or paste WIP information. Review and accept/reject each extracted item.
           </DialogDescription>
         </DialogHeader>
 
-        {!parsedMatches ? (
+        {!editableMatches ? (
           <>
             <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'paste' | 'upload')}>
               <TabsList className="grid w-full grid-cols-2">
@@ -342,9 +414,7 @@ export function WipImportDialog({
             <Alert className="bg-muted/50">
               <Info className="h-4 w-4" />
               <AlertDescription className="text-sm">
-                The AI will analyze your content and match WIP amounts to the existing budget line items.
-                It works best with clear, structured information but can handle various formats including
-                tables, lists, emails, and summaries.
+                The AI will aggressively extract ALL monetary values and propose matches. You can then accept, reject, or edit each item individually.
               </AlertDescription>
             </Alert>
           </>
@@ -359,31 +429,159 @@ export function WipImportDialog({
             )}
 
             {/* Matched Items */}
-            {parsedMatches.length > 0 && (
+            {editableMatches.length > 0 && (
               <div className="border rounded-lg overflow-hidden">
-                <div className="bg-muted/50 px-4 py-2 font-medium text-sm flex items-center justify-between">
-                  <span>Matched WIP Items ({parsedMatches.length})</span>
-                  <span className="text-xs text-muted-foreground">
-                    Total: {formatCurrency(parsedMatches.reduce((sum, m) => sum + m.wip_amount, 0), currency)}
+                <div className="bg-muted/50 px-4 py-2 flex items-center justify-between">
+                  <span className="font-medium text-sm">
+                    Matched Items ({editableMatches.length})
                   </span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={acceptAll} className="h-7 text-xs">
+                      <Check className="h-3 w-3 mr-1" /> Accept All
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={rejectAll} className="h-7 text-xs">
+                      <X className="h-3 w-3 mr-1" /> Reject All
+                    </Button>
+                  </div>
                 </div>
                 <div className="divide-y max-h-[300px] overflow-y-auto">
-                  {parsedMatches.map((match, index) => (
-                    <div key={index} className="px-4 py-3 flex items-start gap-3">
-                      {getConfidenceIcon(match.confidence)}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{match.work_item}</p>
-                        {match.matched_text && (
-                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                            "{match.matched_text}"
-                          </p>
+                  {editableMatches.map((match, index) => (
+                    <div 
+                      key={index} 
+                      className={cn(
+                        'px-4 py-3 transition-colors',
+                        match.status === 'accepted' && 'bg-green-50 dark:bg-green-950/20',
+                        match.status === 'rejected' && 'bg-red-50 dark:bg-red-950/20 opacity-50'
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        {/* Status/Confidence indicator */}
+                        <div className="flex-shrink-0 pt-0.5">
+                          {match.status === 'accepted' ? (
+                            <CheckCircle className="h-4 w-4 text-green-600" />
+                          ) : match.status === 'rejected' ? (
+                            <X className="h-4 w-4 text-red-500" />
+                          ) : (
+                            getConfidenceIcon(match.confidence)
+                          )}
+                        </div>
+
+                        {/* Main content */}
+                        <div className="flex-1 min-w-0 space-y-2">
+                          {match.status === 'editing' ? (
+                            <>
+                              {/* Editing mode */}
+                              <Select
+                                value={match.edited_budget_line_item_id || match.budget_line_item_id}
+                                onValueChange={(value) => updateMatch(index, { edited_budget_line_item_id: value })}
+                              >
+                                <SelectTrigger className="h-8 text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {budgetLineItems.map(item => (
+                                    <SelectItem key={item.id} value={item.id}>
+                                      {item.work_item}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Amount:</span>
+                                <Input
+                                  type="number"
+                                  value={match.edited_amount ?? match.wip_amount}
+                                  onChange={(e) => updateMatch(index, { edited_amount: parseFloat(e.target.value) || 0 })}
+                                  className="h-8 w-32 text-sm"
+                                />
+                                <Button 
+                                  size="sm" 
+                                  variant="default"
+                                  className="h-8"
+                                  onClick={() => updateMatch(index, { status: 'accepted' })}
+                                >
+                                  <Check className="h-3 w-3 mr-1" /> Confirm
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="ghost"
+                                  className="h-8"
+                                  onClick={() => updateMatch(index, { status: 'pending', edited_amount: undefined, edited_budget_line_item_id: undefined })}
+                                >
+                                  <RotateCcw className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              {/* Display mode */}
+                              <p className="text-sm font-medium">{match.work_item}</p>
+                              {match.matched_text && (
+                                <p className="text-xs text-muted-foreground line-clamp-2">
+                                  Matched: "{match.matched_text}"
+                                </p>
+                              )}
+                            </>
+                          )}
+                        </div>
+
+                        {/* Amount and actions */}
+                        {match.status !== 'editing' && (
+                          <div className="flex items-center gap-2 flex-shrink-0">
+                            <div className="text-right">
+                              <p className="text-sm font-bold">
+                                {formatCurrency(match.edited_amount ?? match.wip_amount, currency)}
+                              </p>
+                              <p className={cn('text-xs capitalize', getConfidenceColor(match.confidence))}>
+                                {match.confidence}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {match.status === 'pending' && (
+                                <>
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-7 w-7"
+                                    onClick={() => updateMatch(index, { status: 'accepted' })}
+                                    title="Accept"
+                                  >
+                                    <Check className="h-4 w-4 text-green-600" />
+                                  </Button>
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-7 w-7"
+                                    onClick={() => updateMatch(index, { status: 'editing' })}
+                                    title="Edit"
+                                  >
+                                    <Edit2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button 
+                                    size="icon" 
+                                    variant="ghost" 
+                                    className="h-7 w-7"
+                                    onClick={() => updateMatch(index, { status: 'rejected' })}
+                                    title="Reject"
+                                  >
+                                    <X className="h-4 w-4 text-red-500" />
+                                  </Button>
+                                </>
+                              )}
+                              {(match.status === 'accepted' || match.status === 'rejected') && (
+                                <Button 
+                                  size="icon" 
+                                  variant="ghost" 
+                                  className="h-7 w-7"
+                                  onClick={() => updateMatch(index, { status: 'pending' })}
+                                  title="Undo"
+                                >
+                                  <RotateCcw className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
                         )}
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="text-sm font-bold">{formatCurrency(match.wip_amount, currency)}</p>
-                        <p className={cn('text-xs capitalize', getConfidenceColor(match.confidence))}>
-                          {match.confidence} confidence
-                        </p>
                       </div>
                     </div>
                   ))}
@@ -392,34 +590,93 @@ export function WipImportDialog({
             )}
 
             {/* Unmatched Items */}
-            {unmatchedItems.length > 0 && (
+            {editableUnmatched.length > 0 && (
               <div className="border border-amber-200 dark:border-amber-800 rounded-lg overflow-hidden">
                 <div className="bg-amber-50 dark:bg-amber-950/30 px-4 py-2 font-medium text-sm text-amber-800 dark:text-amber-300">
-                  Unmatched Items ({unmatchedItems.length})
+                  Unmatched Items ({editableUnmatched.length}) - Assign to budget items or reject
                 </div>
-                <div className="divide-y max-h-[150px] overflow-y-auto">
-                  {unmatchedItems.map((item, index) => (
-                    <div key={index} className="px-4 py-2 flex items-center gap-3">
-                      <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm truncate">{item.description}</p>
-                        <p className="text-xs text-muted-foreground">{item.reason}</p>
+                <div className="divide-y max-h-[200px] overflow-y-auto">
+                  {editableUnmatched.map((item, index) => (
+                    <div 
+                      key={index} 
+                      className={cn(
+                        'px-4 py-3 transition-colors',
+                        item.status === 'assigned' && 'bg-green-50 dark:bg-green-950/20',
+                        item.status === 'rejected' && 'bg-red-50 dark:bg-red-950/20 opacity-50'
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0 space-y-2">
+                          <p className="text-sm">{item.description}</p>
+                          <p className="text-xs text-muted-foreground">{item.reason}</p>
+                          
+                          {item.status === 'pending' && (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Select
+                                value={item.assigned_budget_line_item_id || ''}
+                                onValueChange={(value) => updateUnmatched(index, { 
+                                  assigned_budget_line_item_id: value,
+                                  status: 'assigned' 
+                                })}
+                              >
+                                <SelectTrigger className="h-8 text-sm w-[200px]">
+                                  <SelectValue placeholder="Assign to budget item..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {budgetLineItems.map(b => (
+                                    <SelectItem key={b.id} value={b.id}>
+                                      {b.work_item}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Input
+                                type="number"
+                                value={item.edited_amount ?? item.amount}
+                                onChange={(e) => updateUnmatched(index, { edited_amount: parseFloat(e.target.value) || 0 })}
+                                className="h-8 w-24 text-sm"
+                              />
+                              <Button 
+                                size="sm" 
+                                variant="ghost" 
+                                className="h-8"
+                                onClick={() => updateUnmatched(index, { status: 'rejected' })}
+                              >
+                                <X className="h-3 w-3 mr-1" /> Reject
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <p className="text-sm font-medium">
+                            {formatCurrency(item.edited_amount ?? item.amount, currency)}
+                          </p>
+                          {(item.status === 'assigned' || item.status === 'rejected') && (
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              className="h-7 w-7"
+                              onClick={() => updateUnmatched(index, { status: 'pending', assigned_budget_line_item_id: undefined })}
+                            >
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-sm font-medium flex-shrink-0">
-                        {formatCurrency(item.amount, currency)}
-                      </p>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {parsedMatches.length === 0 && (
+            {editableMatches.length === 0 && editableUnmatched.length === 0 && (
               <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription>
-                  No matching WIP items could be found in the provided content.
-                  Try providing more detailed information or manually entering the values.
+                  No WIP items could be extracted from the provided content.
+                  Try providing more detailed information.
                 </AlertDescription>
               </Alert>
             )}
@@ -427,8 +684,8 @@ export function WipImportDialog({
             <Button
               variant="outline"
               onClick={() => {
-                setParsedMatches(null);
-                setUnmatchedItems([]);
+                setEditableMatches(null);
+                setEditableUnmatched([]);
                 setSummary('');
               }}
               className="w-full"
@@ -442,7 +699,7 @@ export function WipImportDialog({
           <Button variant="outline" onClick={handleClose} disabled={isProcessing}>
             Cancel
           </Button>
-          {!parsedMatches ? (
+          {!editableMatches ? (
             <Button
               onClick={handleProcess}
               disabled={isProcessing || (activeTab === 'paste' ? !pastedContent.trim() : !uploadedFile)}
@@ -459,9 +716,9 @@ export function WipImportDialog({
           ) : (
             <Button
               onClick={handleApply}
-              disabled={parsedMatches.length === 0}
+              disabled={totalApplyCount === 0}
             >
-              Apply {parsedMatches.length} Matches
+              Apply {totalApplyCount} Item{totalApplyCount !== 1 ? 's' : ''}
             </Button>
           )}
         </DialogFooter>

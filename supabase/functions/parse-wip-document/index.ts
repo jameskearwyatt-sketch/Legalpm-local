@@ -140,10 +140,22 @@ Extract all WIP amounts and match them to the appropriate budget line items. Ret
 
     console.log('AI response received');
 
-    // Parse the AI response
+    // Parse the AI response - strip markdown code blocks if present
     let parsedResult;
     try {
-      parsedResult = JSON.parse(content_response);
+      let jsonContent = content_response.trim();
+      // Remove markdown code blocks if present
+      if (jsonContent.startsWith('```json')) {
+        jsonContent = jsonContent.slice(7);
+      } else if (jsonContent.startsWith('```')) {
+        jsonContent = jsonContent.slice(3);
+      }
+      if (jsonContent.endsWith('```')) {
+        jsonContent = jsonContent.slice(0, -3);
+      }
+      jsonContent = jsonContent.trim();
+      
+      parsedResult = JSON.parse(jsonContent);
     } catch (e) {
       console.error('Failed to parse AI response:', content_response);
       throw new Error('Failed to parse AI response as JSON');

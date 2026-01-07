@@ -94,24 +94,23 @@ Pending Tasks (${pendingTasks.length}):
 ${pendingTasks.map(t => `- ${t.title}${t.assignee ? ` (${t.assignee})` : ''} - ${t.deadline_type.replace('_', ' ')}`).join('\n') || 'None'}
 `;
 
-    const prompt = `You are a professional development assistant for a busy legal practitioner. Analyze the following ${projectTypeLabels[project.project_type]} project and provide a concise status summary.
+    const prompt = `You are a senior legal practice manager providing a crisp status update on a ${projectTypeLabels[project.project_type]} initiative.
 
-Project: ${project.name}
-${project.mentee_name ? `Mentee: ${project.mentee_name}` : ''}
-${project.description ? `Description: ${project.description}` : ''}
+PROJECT: ${project.name}
+${project.mentee_name ? `MENTEE: ${project.mentee_name}` : ''}
+${project.description ? `CONTEXT: ${project.description}` : ''}
 
-Recent Activity and Notes:
-${entriesContext || 'No entries yet'}
+ACTIVITY LOG:
+${entriesContext || 'No documented activity yet.'}
 
-Task Status:
+TASK STATUS:
 ${tasksContext}
 
-Provide a brief, professional summary (2-3 sentences max) that captures:
-1. The current status of the project
-2. Key progress or achievements
-3. Any immediate priorities or concerns
+Provide a 2-sentence executive summary:
+- Sentence 1: Current status and momentum (on track / stalled / accelerating / blocked)
+- Sentence 2: Critical next action or key risk
 
-Be concise and actionable. Focus on what matters most for a busy professional.`;
+Write in direct, businesslike tone. No pleasantries. No bullet points. Facts only.`;
 
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     if (!lovableApiKey) {

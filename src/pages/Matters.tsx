@@ -164,7 +164,7 @@ function MmaBpTableRow({ matter, userProfile, updateMatter }: MmaBpTableRowProps
           to={`/matters/${matter.id}`}
           className="block hover:text-primary transition-colors"
         >
-          <p className="text-sm text-muted-foreground">{matter.clients?.name}</p>
+          <p className="text-sm text-muted-foreground">{getClientDisplayName(matter.clients)}</p>
           <p className="font-medium text-foreground group-hover:text-primary transition-colors">
             {matter.matter_name}
           </p>
@@ -1035,7 +1035,7 @@ export default function Matters() {
                               to={`/matters/${matter.id}`}
                               className="block hover:text-primary transition-colors"
                             >
-                              <p className="text-sm text-muted-foreground">{matter.clients?.name}</p>
+                              <p className="text-sm text-muted-foreground">{getClientDisplayName(matter.clients)}</p>
                               <p className="font-medium text-foreground group-hover:text-primary transition-colors">
                                 {matter.matter_name}
                               </p>

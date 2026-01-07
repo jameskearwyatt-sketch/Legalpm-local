@@ -346,27 +346,37 @@ export function AskAIButton() {
 
   // Calculate chat panel position based on button position
   const getChatPanelStyle = (): React.CSSProperties => {
+    const panelWidth = Math.min(384, window.innerWidth - 24); // w-96 = 384px, but cap at viewport
+    const panelHeight = 440; // Approximate height
+    const buttonSize = 56;
+    const margin = 12;
+    
     if (position) {
-      const panelWidth = 384; // w-96 = 24rem = 384px
-      const panelHeight = 440; // Approximate height
-      const buttonSize = 56;
+      // Calculate available space in each direction
+      const spaceAbove = position.y - margin;
+      const spaceBelow = window.innerHeight - position.y - buttonSize - margin;
+      const spaceLeft = position.x;
+      const spaceRight = window.innerWidth - position.x - buttonSize;
       
-      // Try to position above the button
-      let top = position.y - panelHeight - 8;
-      let left = position.x - panelWidth / 2 + buttonSize / 2;
+      let top: number;
+      let left: number;
       
-      // If panel would go off top, position below
-      if (top < 8) {
-        top = position.y + buttonSize + 8;
-      }
-      
-      // Keep within horizontal bounds
-      left = Math.max(8, Math.min(left, window.innerWidth - panelWidth - 8));
-      
-      // If panel would go off bottom, position above regardless
-      if (top + panelHeight > window.innerHeight - 8) {
+      // Determine vertical position - prefer above, but use below if not enough space
+      if (spaceAbove >= panelHeight) {
         top = position.y - panelHeight - 8;
+      } else if (spaceBelow >= panelHeight) {
+        top = position.y + buttonSize + 8;
+      } else {
+        // Not enough space either way - position at top of viewport with margin
+        top = margin;
       }
+      
+      // Center horizontally on button, but keep within viewport
+      left = position.x - panelWidth / 2 + buttonSize / 2;
+      left = Math.max(margin, Math.min(left, window.innerWidth - panelWidth - margin));
+      
+      // Final safety check - ensure panel stays fully within viewport
+      top = Math.max(margin, Math.min(top, window.innerHeight - panelHeight - margin));
       
       return {
         position: 'fixed',
@@ -376,11 +386,16 @@ export function AskAIButton() {
         bottom: 'auto',
       };
     }
-    // Default position
+    
+    // Default position - ensure it fits within viewport
+    const defaultTop = Math.max(margin, window.innerHeight - panelHeight - 96);
+    const defaultRight = Math.max(margin, 24);
+    
     return {
       position: 'fixed',
-      right: 24,
-      bottom: 96,
+      right: defaultRight,
+      top: defaultTop,
+      bottom: 'auto',
     };
   };
 

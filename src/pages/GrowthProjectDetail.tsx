@@ -1,12 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { 
@@ -14,15 +11,13 @@ import {
   Plus, 
   FileText, 
   CheckCircle2, 
-  Clock, 
-  Upload,
   Sparkles,
   Loader2,
-  Trash2,
   MoreVertical,
   ChevronDown,
   AlertCircle,
-  Archive
+  Archive,
+  Trash2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -47,26 +42,32 @@ import {
   useGrowthProjects,
   useKnownAssignees,
   type TaskDeadlineType,
-  getDeadlineLabel,
+  type GrowthProjectEntry,
   calculateDueDate
 } from '@/lib/hooks/useGrowthProjects';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
-import { formatDistanceToNow, format, isPast } from 'date-fns';
+import { isPast, format } from 'date-fns';
 import { TaskItem } from '@/components/growth/TaskItem';
 import { AddEntryForm } from '@/components/growth/AddEntryForm';
+import { EntryCard } from '@/components/growth/EntryCard';
+import { TaskExtractionDialog, type ExtractedTask } from '@/components/growth/TaskExtractionDialog';
 
 const GrowthProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
   const { project, entries, tasks, isLoading, isSynthesizing, addEntry, deleteEntry, addTask, updateTask, deleteTask, synthesizeProject } = useGrowthProject(projectId);
   const { updateProject, deleteProject } = useGrowthProjects();
+  const { addAssignee } = useKnownAssignees();
   const [showAddEntry, setShowAddEntry] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  
+  // Task extraction state
+  const [extractedTasks, setExtractedTasks] = useState<ExtractedTask[]>([]);
+  const [showTaskExtraction, setShowTaskExtraction] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
 
   const pendingTasks = tasks.filter(t => !t.is_completed);
   const completedTasks = tasks.filter(t => t.is_completed);
@@ -88,6 +89,65 @@ const GrowthProjectDetail = () => {
   const handleArchiveProject = async () => {
     if (!projectId) return;
     await updateProject.mutateAsync({ id: projectId, status: 'archived' });
+  };
+
+  // Handle new entry with task extraction
+  const handleAddEntry = async (entry: Partial<GrowthProjectEntry>) => {
+    // Add the entry first
+    await addEntry.mutateAsync(entry);
+    setShowAddEntry(false);
+
+    // If there's text content, extract tasks
+    if (entry.content && entry.content.trim().length > 20 && project) {
+      setIsExtracting(true);
+      setShowTaskExtraction(true);
+
+      try {
+        const { data, error } = await supabase.functions.invoke('extract-tasks', {
+          body: {
+            content: entry.content,
+            projectName: project.name,
+            projectType: project.project_type,
+          },
+        });
+
+        if (error) throw error;
+
+        const tasks = (data?.tasks || []).map((t: { title: string; assignee?: string; deadline_type: string }) => ({
+          ...t,
+          deadline_type: t.deadline_type as TaskDeadlineType,
+          selected: true,
+        }));
+
+        setExtractedTasks(tasks);
+      } catch (err) {
+        console.error('Task extraction error:', err);
+        toast.error('Could not extract tasks from content');
+        setShowTaskExtraction(false);
+      } finally {
+        setIsExtracting(false);
+      }
+    }
+  };
+
+  // Handle confirming extracted tasks
+  const handleConfirmExtractedTasks = async (tasks: ExtractedTask[]) => {
+    for (const task of tasks) {
+      // Save assignee for future use
+      if (task.assignee && task.assignee !== 'Me') {
+        addAssignee.mutate(task.assignee);
+      }
+
+      await addTask.mutateAsync({
+        title: task.title,
+        assignee: task.assignee === 'Me' ? undefined : task.assignee,
+        deadline_type: task.deadline_type,
+      });
+    }
+
+    setShowTaskExtraction(false);
+    setExtractedTasks([]);
+    toast.success(`Added ${tasks.length} tasks`);
   };
 
   if (isLoading) {
@@ -317,46 +377,19 @@ const GrowthProjectDetail = () => {
               {showAddEntry && (
                 <AddEntryForm
                   projectId={projectId!}
-                  onAdd={(entry) => {
-                    addEntry.mutate(entry);
-                    setShowAddEntry(false);
-                  }}
+                  onAdd={handleAddEntry}
                   onCancel={() => setShowAddEntry(false)}
                 />
               )}
 
               <ScrollArea className="h-[400px] pr-4">
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {entries.map((entry) => (
-                    <div key={entry.id} className="border rounded-lg p-4 space-y-2">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium">{entry.title || 'Untitled Entry'}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {format(new Date(entry.created_at), 'PPp')}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => deleteEntry.mutate(entry.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {entry.content && (
-                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                          {entry.content}
-                        </p>
-                      )}
-                      {entry.file_name && (
-                        <Badge variant="outline" className="text-xs">
-                          <FileText className="h-3 w-3 mr-1" />
-                          {entry.file_name}
-                        </Badge>
-                      )}
-                    </div>
+                    <EntryCard
+                      key={entry.id}
+                      entry={entry}
+                      onDelete={() => deleteEntry.mutate(entry.id)}
+                    />
                   ))}
                   {entries.length === 0 && !showAddEntry && (
                     <p className="text-center text-muted-foreground py-8">
@@ -369,6 +402,16 @@ const GrowthProjectDetail = () => {
           </Card>
         </div>
       </div>
+
+      {/* Task Extraction Dialog */}
+      <TaskExtractionDialog
+        open={showTaskExtraction}
+        onOpenChange={setShowTaskExtraction}
+        tasks={extractedTasks}
+        onTasksChange={setExtractedTasks}
+        onConfirm={handleConfirmExtractedTasks}
+        isLoading={isExtracting}
+      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

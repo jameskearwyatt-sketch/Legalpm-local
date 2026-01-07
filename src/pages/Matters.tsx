@@ -1,12 +1,13 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useQuery } from '@tanstack/react-query';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -34,10 +35,9 @@ import { useMatters, MatterWithFinancials, MatterCategory, MatterStage } from '@
 import { useClients } from '@/lib/hooks/useClients';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useAuth } from '@/lib/auth';
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
-import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users } from 'lucide-react';
 import { format, differenceInDays, parseISO, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -46,6 +46,7 @@ import { useExchangeRates } from '@/lib/hooks/useExchangeRates';
 
 type SortField = 'matter_name' | 'fee_amount' | 'bm_fee' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'local_counsel' | 'stage';
 type SortDirection = 'asc' | 'desc';
+type TabFilter = MatterCategory | 'MMA/BP';
 
 // Stage options based on category
 const liveStages: MatterStage[] = ['Pre-Start', 'Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Closing Process', 'Closed', 'Paused'];
@@ -58,6 +59,181 @@ const categoryIcons: Record<MatterCategory, React.ReactNode> = {
   Lost: <XCircle className="h-4 w-4" />,
 };
 
+// MMA/BP inline editing row component
+interface MmaBpTableRowProps {
+  matter: MatterWithFinancials;
+  userProfile: { full_name: string | null } | null | undefined;
+  updateMatter: {
+    mutateAsync: (input: { id: string; lead_partner?: string; matter_managing_attorney?: string }) => Promise<unknown>;
+    isPending?: boolean;
+  };
+}
+
+function MmaBpTableRow({ matter, userProfile, updateMatter }: MmaBpTableRowProps) {
+  const [bpValue, setBpValue] = useState(matter.lead_partner || '');
+  const [mmaValue, setMmaValue] = useState(matter.matter_managing_attorney || '');
+  const [isBpMe, setIsBpMe] = useState(
+    !!userProfile?.full_name && matter.lead_partner === userProfile.full_name
+  );
+  const [isMmaMe, setIsMmaMe] = useState(
+    !!userProfile?.full_name && matter.matter_managing_attorney === userProfile.full_name
+  );
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Update local state when matter changes
+  useMemo(() => {
+    setBpValue(matter.lead_partner || '');
+    setMmaValue(matter.matter_managing_attorney || '');
+    setIsBpMe(!!userProfile?.full_name && matter.lead_partner === userProfile.full_name);
+    setIsMmaMe(!!userProfile?.full_name && matter.matter_managing_attorney === userProfile.full_name);
+  }, [matter.lead_partner, matter.matter_managing_attorney, userProfile?.full_name]);
+
+  const handleBpMeChange = async (checked: boolean) => {
+    setIsSaving(true);
+    try {
+      if (checked && userProfile?.full_name) {
+        await updateMatter.mutateAsync({ id: matter.id, lead_partner: userProfile.full_name });
+        setBpValue(userProfile.full_name);
+        setIsBpMe(true);
+      } else {
+        await updateMatter.mutateAsync({ id: matter.id, lead_partner: '' });
+        setBpValue('');
+        setIsBpMe(false);
+      }
+    } catch (error) {
+      toast.error('Failed to update Billing Partner');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleMmaMeChange = async (checked: boolean) => {
+    setIsSaving(true);
+    try {
+      if (checked && userProfile?.full_name) {
+        await updateMatter.mutateAsync({ id: matter.id, matter_managing_attorney: userProfile.full_name });
+        setMmaValue(userProfile.full_name);
+        setIsMmaMe(true);
+      } else {
+        await updateMatter.mutateAsync({ id: matter.id, matter_managing_attorney: '' });
+        setMmaValue('');
+        setIsMmaMe(false);
+      }
+    } catch (error) {
+      toast.error('Failed to update MMA');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleBpBlur = async () => {
+    if (bpValue !== matter.lead_partner) {
+      setIsSaving(true);
+      try {
+        await updateMatter.mutateAsync({ id: matter.id, lead_partner: bpValue });
+        setIsBpMe(!!userProfile?.full_name && bpValue === userProfile.full_name);
+      } catch (error) {
+        toast.error('Failed to update Billing Partner');
+        setBpValue(matter.lead_partner || '');
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  const handleMmaBlur = async () => {
+    if (mmaValue !== matter.matter_managing_attorney) {
+      setIsSaving(true);
+      try {
+        await updateMatter.mutateAsync({ id: matter.id, matter_managing_attorney: mmaValue });
+        setIsMmaMe(!!userProfile?.full_name && mmaValue === userProfile.full_name);
+      } catch (error) {
+        toast.error('Failed to update MMA');
+        setMmaValue(matter.matter_managing_attorney || '');
+      } finally {
+        setIsSaving(false);
+      }
+    }
+  };
+
+  return (
+    <TableRow className="group">
+      <TableCell className="sticky left-0 z-10 bg-background">
+        <Link 
+          to={`/matters/${matter.id}`}
+          className="block hover:text-primary transition-colors"
+        >
+          <p className="text-sm text-muted-foreground">{matter.clients?.name}</p>
+          <p className="font-medium text-foreground group-hover:text-primary transition-colors">
+            {matter.matter_name}
+          </p>
+        </Link>
+      </TableCell>
+      <TableCell>
+        <span className={cn(
+          "text-xs font-medium px-2 py-1 rounded",
+          matter.category === 'Live' && 'bg-green-100 text-green-700',
+          matter.category === 'Pipeline' && 'bg-blue-100 text-blue-700'
+        )}>
+          {matter.category}
+        </span>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          {userProfile?.full_name && (
+            <div className="flex items-center gap-1.5">
+              <Checkbox
+                id={`bp-me-${matter.id}`}
+                checked={isBpMe}
+                onCheckedChange={handleBpMeChange}
+                disabled={isSaving}
+                className="h-4 w-4"
+              />
+              <label htmlFor={`bp-me-${matter.id}`} className="text-sm text-muted-foreground cursor-pointer">
+                Me
+              </label>
+            </div>
+          )}
+          <Input
+            value={bpValue}
+            onChange={(e) => setBpValue(e.target.value)}
+            onBlur={handleBpBlur}
+            disabled={isSaving || isBpMe}
+            placeholder="Enter name..."
+            className="h-8 text-sm flex-1"
+          />
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          {userProfile?.full_name && (
+            <div className="flex items-center gap-1.5">
+              <Checkbox
+                id={`mma-me-${matter.id}`}
+                checked={isMmaMe}
+                onCheckedChange={handleMmaMeChange}
+                disabled={isSaving}
+                className="h-4 w-4"
+              />
+              <label htmlFor={`mma-me-${matter.id}`} className="text-sm text-muted-foreground cursor-pointer">
+                Me
+              </label>
+            </div>
+          )}
+          <Input
+            value={mmaValue}
+            onChange={(e) => setMmaValue(e.target.value)}
+            onBlur={handleMmaBlur}
+            disabled={isSaving || isMmaMe}
+            placeholder="Enter name..."
+            className="h-8 text-sm flex-1"
+          />
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 export default function Matters() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -66,10 +242,29 @@ export default function Matters() {
   const { upsertTodaySnapshot } = useSnapshots();
   const { data: exchangeRatesData } = useExchangeRates();
   const [search, setSearch] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<MatterCategory>('Live');
+  const [tabFilter, setTabFilter] = useState<TabFilter>('Live');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [sortField, setSortField] = useState<SortField>('matter_name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  // Fetch user profile for "Me" checkbox
+  const { data: userProfile } = useQuery({
+    queryKey: ['user-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
+
+  // Derive categoryFilter from tabFilter for non-MMA/BP tabs
+  const categoryFilter = tabFilter === 'MMA/BP' ? null : tabFilter;
 
   // Fetch all matter_clients to support filtering by secondary clients on multi-client matters
   const { data: allMatterClients = [] } = useQuery({
@@ -163,8 +358,12 @@ export default function Matters() {
   const filteredMatters = useMemo(() => {
     let result = [...matters];
 
-    // Category filter
-    result = result.filter((m) => m.category === categoryFilter);
+    // Category filter - for MMA/BP tab, show Live and Pipeline only
+    if (tabFilter === 'MMA/BP') {
+      result = result.filter((m) => m.category === 'Live' || m.category === 'Pipeline');
+    } else {
+      result = result.filter((m) => m.category === categoryFilter);
+    }
 
     // Search filter
     if (search) {
@@ -250,7 +449,7 @@ export default function Matters() {
     });
 
     return result;
-  }, [matters, search, categoryFilter, clientFilter, sortField, sortDirection, matterToClientsMap]);
+  }, [matters, search, tabFilter, categoryFilter, clientFilter, sortField, sortDirection, matterToClientsMap]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<MatterCategory, number> = { Live: 0, Pipeline: 0, Closed: 0, Lost: 0 };
@@ -260,6 +459,11 @@ export default function Matters() {
       }
     });
     return counts;
+  }, [matters]);
+
+  // Count for MMA/BP tab (Live + Pipeline)
+  const mmaBpCount = useMemo(() => {
+    return matters.filter(m => m.category === 'Live' || m.category === 'Pipeline').length;
   }, [matters]);
 
   // Calculate GBP to USD rate from exchange rates data
@@ -313,6 +517,7 @@ export default function Matters() {
     return 'success';
   };
 
+  const isMmaBpTab = tabFilter === 'MMA/BP';
   const isPipeline = categoryFilter === 'Pipeline';
   const isLive = categoryFilter === 'Live';
   const isLost = categoryFilter === 'Lost';
@@ -328,7 +533,7 @@ export default function Matters() {
             <h1 className="text-2xl lg:text-3xl font-heading font-bold text-foreground">Matters</h1>
             <p className="text-muted-foreground mt-1">Track live transactions, pipeline, and closed matters</p>
           </div>
-          {!isClosed && (
+          {!isClosed && !isMmaBpTab && (
             <Button asChild>
               <Link to="/matters/new">
                 <Plus className="mr-2 h-4 w-4" />
@@ -339,8 +544,8 @@ export default function Matters() {
         </div>
 
         {/* Category Tabs */}
-        <Tabs value={categoryFilter} onValueChange={(v) => setCategoryFilter(v as MatterCategory)}>
-          <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
+        <Tabs value={tabFilter} onValueChange={(v) => setTabFilter(v as TabFilter)}>
+          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
             {(['Live', 'Pipeline', 'Closed', 'Lost'] as MatterCategory[]).map((cat) => (
               <TabsTrigger key={cat} value={cat} className="gap-2">
                 {categoryIcons[cat]}
@@ -350,6 +555,13 @@ export default function Matters() {
                 </span>
               </TabsTrigger>
             ))}
+            <TabsTrigger value="MMA/BP" className="gap-2">
+              <Users className="h-4 w-4" />
+              <span>MMA/BP</span>
+              <span className="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded-full">
+                {mmaBpCount}
+              </span>
+            </TabsTrigger>
           </TabsList>
         </Tabs>
 
@@ -395,13 +607,15 @@ export default function Matters() {
             ) : filteredMatters.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <Briefcase className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-medium text-foreground">No {categoryFilter.toLowerCase()} matters found</h3>
+                <h3 className="text-lg font-medium text-foreground">
+                  No {isMmaBpTab ? 'live or pipeline' : categoryFilter?.toLowerCase()} matters found
+                </h3>
                 <p className="text-sm text-muted-foreground mt-1">
                   {search || clientFilter !== 'all'
                     ? 'Try adjusting your filters'
-                    : `Get started by creating a new ${categoryFilter.toLowerCase()} matter`}
+                    : isMmaBpTab ? 'No live or pipeline matters to assign' : `Get started by creating a new ${categoryFilter?.toLowerCase()} matter`}
                 </p>
-                {!search && clientFilter === 'all' && !isClosed && (
+                {!search && clientFilter === 'all' && !isClosed && !isMmaBpTab && (
                   <Button asChild className="mt-4">
                     <Link to="/matters/new">
                       <Plus className="mr-2 h-4 w-4" />
@@ -410,6 +624,44 @@ export default function Matters() {
                   </Button>
                 )}
               </div>
+            ) : isMmaBpTab ? (
+              /* MMA/BP Tab Table */
+              <StickyTableHeader>
+                <TableScrollControls>
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="min-w-[200px] sticky left-0 z-20 bg-background">
+                          <SortableHeader field="matter_name">Client / Matter</SortableHeader>
+                        </TableHead>
+                        <TableHead className="min-w-[80px]">Category</TableHead>
+                        <TableHead className="min-w-[200px]">Billing Partner</TableHead>
+                        <TableHead className="min-w-[200px]">MMA</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredMatters
+                        .sort((a, b) => {
+                          // Sort by category (Live first), then by client name, then by matter name
+                          if (a.category !== b.category) {
+                            return a.category === 'Live' ? -1 : 1;
+                          }
+                          const clientCompare = (a.clients?.name || '').localeCompare(b.clients?.name || '');
+                          if (clientCompare !== 0) return clientCompare;
+                          return a.matter_name.localeCompare(b.matter_name);
+                        })
+                        .map((matter) => (
+                          <MmaBpTableRow
+                            key={matter.id}
+                            matter={matter}
+                            userProfile={userProfile}
+                            updateMatter={updateMatter}
+                          />
+                        ))}
+                    </TableBody>
+                  </Table>
+                </TableScrollControls>
+              </StickyTableHeader>
             ) : (
               <StickyTableHeader>
                 <TableScrollControls>

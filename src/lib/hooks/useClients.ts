@@ -7,6 +7,7 @@ export interface Client {
   id: string;
   user_id: string;
   name: string;
+  display_name: string | null;
   group_sector: string | null;
   billing_contact: string | null;
   created_at: string;
@@ -15,6 +16,7 @@ export interface Client {
 
 export interface CreateClientInput {
   name: string;
+  display_name?: string | null;
   group_sector?: string;
   billing_contact?: string;
 }

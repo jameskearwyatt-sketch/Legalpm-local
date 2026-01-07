@@ -24,40 +24,70 @@ export function formatCurrency(value: number, currency: string = 'GBP'): string 
 /**
  * Convert an amount from its native currency to USD.
  * 
- * Exchange rate interpretation depends on the source currency:
- * - For GBP: exchange_rate is the direct GBP→USD rate (e.g., 1.35 means 1 GBP = 1.35 USD)
- * - For other currencies: exchange_rate is the rate TO GBP (e.g., 0.109 for SEK means 1 SEK = 0.109 GBP)
+ * This function uses a simple direct conversion approach:
+ * - The exchangeRate parameter should be the rate TO USD (e.g., 1.35 for GBP means 1 GBP = 1.35 USD)
+ * - If the stored rate appears to be a TO-GBP rate, we use the live rates to convert properly
  * 
  * @param amount - The amount in the source currency
  * @param feeCurrency - The source currency (e.g., 'GBP', 'EUR', 'USD')
- * @param exchangeRate - The stored exchange rate (interpretation depends on currency)
+ * @param storedExchangeRate - The stored exchange rate (may be TO-GBP or TO-USD depending on when it was saved)
  * @param gbpToUsdRate - The live GBP to USD rate (e.g., 1.35 means 1 GBP = 1.35 USD)
+ * @param liveRates - Optional live rates object from the exchange rate API (base USD)
  * @returns The amount converted to USD
  */
 export function convertToUsd(
   amount: number, 
   feeCurrency: string, 
-  exchangeRate: number,
-  gbpToUsdRate?: number
+  storedExchangeRate: number,
+  gbpToUsdRate?: number,
+  liveRates?: Record<string, number>
 ): number {
   // If already USD, no conversion needed
   if (feeCurrency === 'USD') {
     return amount;
   }
   
-  // Default GBP to USD rate if not provided
-  const liveGbpUsdRate = gbpToUsdRate || 1.27;
+  // Default GBP to USD rate if not provided (1 GBP = ~1.35 USD)
+  const liveGbpUsdRate = gbpToUsdRate || 1.35;
   
-  // For GBP: the stored exchange_rate IS the GBP→USD rate
+  // For GBP: use the stored rate directly if it looks valid, otherwise use live rate
   if (feeCurrency === 'GBP') {
-    // Use the stored rate if it looks like a valid GBP→USD rate (typically 1.2-1.5)
-    // Otherwise fall back to the live rate
-    const rateToUse = (exchangeRate > 1 && exchangeRate < 2) ? exchangeRate : liveGbpUsdRate;
+    const rateToUse = (storedExchangeRate > 1 && storedExchangeRate < 2) ? storedExchangeRate : liveGbpUsdRate;
     return amount * rateToUse;
   }
   
-  // For all other currencies: exchange_rate is the rate TO GBP
-  // First convert to GBP, then convert GBP to USD
-  const amountInGbp = amount * exchangeRate;
-  return amountInGbp * liveGbpUsdRate;
+  // For other currencies, we need to calculate the direct rate to USD
+  // If live rates are provided, use them for accurate conversion
+  if (liveRates && liveRates[feeCurrency]) {
+    // API rates are "1 USD = X units of currency"
+    // So to convert currency to USD: amount / rate
+    const currencyPerUsd = liveRates[feeCurrency];
+    return amount / currencyPerUsd;
+  }
+  
+  // Fallback: use the stored exchange rate
+  // The stored rate SHOULD be "1 unit of currency = X USD"
+  // But historically it might be "1 unit of currency = X GBP"
+  // We detect this by checking if the rate makes sense as a direct USD rate
+  
+  // For EUR: 1 EUR ≈ 1.05-1.20 USD typically
+  // For SEK: 1 SEK ≈ 0.09-0.12 USD typically
+  // For MYR: 1 MYR ≈ 0.21-0.25 USD typically
+  
+  // If the stored rate looks like a TO-GBP rate (small number for SEK, or ~0.85 for EUR),
+  // we convert via GBP. Otherwise use it directly.
+  const isLikelyToGbpRate = (
+    (feeCurrency === 'EUR' && storedExchangeRate < 1) ||
+    (feeCurrency === 'SEK' && storedExchangeRate < 0.2) ||
+    (feeCurrency === 'MYR' && storedExchangeRate < 0.3) ||
+    (feeCurrency === 'Ringgit' && storedExchangeRate < 0.3)
+  );
+  
+  if (isLikelyToGbpRate) {
+    // Convert via GBP: amount * (currency→GBP) * (GBP→USD)
+    return amount * storedExchangeRate * liveGbpUsdRate;
+  }
+  
+  // The stored rate is likely already a direct TO-USD rate
+  return amount * storedExchangeRate;
 }

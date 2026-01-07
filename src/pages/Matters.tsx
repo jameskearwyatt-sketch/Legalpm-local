@@ -37,16 +37,17 @@ import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
-import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save } from 'lucide-react';
 import { format, differenceInDays, parseISO, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { formatCurrency, convertToUsd } from '@/lib/currencyUtils';
 import { useExchangeRates } from '@/lib/hooks/useExchangeRates';
+import { getClientDisplayName } from '@/lib/clientUtils';
 
 type SortField = 'matter_name' | 'fee_amount' | 'bm_fee' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'local_counsel' | 'stage';
 type SortDirection = 'asc' | 'desc';
-type TabFilter = MatterCategory | 'MMA/BP';
+type TabFilter = MatterCategory | 'MMA/BP' | 'Clients';
 
 // Stage options based on category
 const liveStages: MatterStage[] = ['Pre-Start', 'Term Sheet', 'Documentation - Start', 'Documentation - Close', 'Closing Process', 'Closed', 'Paused'];
@@ -234,11 +235,193 @@ function MmaBpTableRow({ matter, userProfile, updateMatter }: MmaBpTableRowProps
   );
 }
 
+// Clients Tab inline editing row component
+interface ClientRowProps {
+  client: { id: string; name: string; display_name: string | null };
+  updateClient: {
+    mutateAsync: (input: { id: string; name?: string; display_name?: string | null }) => Promise<unknown>;
+    isPending?: boolean;
+  };
+}
+
+function ClientRow({ client, updateClient }: ClientRowProps) {
+  const [nameValue, setNameValue] = useState(client.name);
+  const [displayNameValue, setDisplayNameValue] = useState(client.display_name || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+
+  // Update local state when client changes
+  useMemo(() => {
+    setNameValue(client.name);
+    setDisplayNameValue(client.display_name || '');
+    setHasChanges(false);
+  }, [client.name, client.display_name]);
+
+  const handleNameChange = (value: string) => {
+    setNameValue(value);
+    setHasChanges(value !== client.name || displayNameValue !== (client.display_name || ''));
+  };
+
+  const handleDisplayNameChange = (value: string) => {
+    setDisplayNameValue(value);
+    setHasChanges(nameValue !== client.name || value !== (client.display_name || ''));
+  };
+
+  const handleSave = async () => {
+    if (!hasChanges) return;
+    setIsSaving(true);
+    try {
+      await updateClient.mutateAsync({
+        id: client.id,
+        name: nameValue.trim() || client.name,
+        display_name: displayNameValue.trim() || null,
+      });
+      setHasChanges(false);
+      toast.success('Client updated');
+    } catch (error) {
+      toast.error('Failed to update client');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <TableRow className="group">
+      <TableCell>
+        <Input
+          value={nameValue}
+          onChange={(e) => handleNameChange(e.target.value)}
+          disabled={isSaving}
+          placeholder="Client name..."
+          className="h-8 text-sm"
+        />
+      </TableCell>
+      <TableCell>
+        <Input
+          value={displayNameValue}
+          onChange={(e) => handleDisplayNameChange(e.target.value)}
+          disabled={isSaving}
+          placeholder="Short name (optional)..."
+          className="h-8 text-sm"
+        />
+      </TableCell>
+      <TableCell>
+        <span className="text-sm text-muted-foreground">
+          {displayNameValue.trim() || nameValue}
+        </span>
+      </TableCell>
+      <TableCell>
+        <Button
+          size="sm"
+          variant={hasChanges ? 'default' : 'ghost'}
+          onClick={handleSave}
+          disabled={isSaving || !hasChanges}
+          className="h-8"
+        >
+          {isSaving ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4" />
+          )}
+        </Button>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+// Clients Tab Content
+interface ClientsTabContentProps {
+  clients: { id: string; name: string; display_name: string | null }[];
+  isLoading: boolean;
+  updateClient: {
+    mutateAsync: (input: { id: string; name?: string; display_name?: string | null }) => Promise<unknown>;
+    isPending?: boolean;
+  };
+}
+
+function ClientsTabContent({ clients, isLoading, updateClient }: ClientsTabContentProps) {
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredClients = useMemo(() => {
+    if (!searchTerm.trim()) return clients;
+    const term = searchTerm.toLowerCase();
+    return clients.filter(
+      (c) =>
+        c.name.toLowerCase().includes(term) ||
+        (c.display_name && c.display_name.toLowerCase().includes(term))
+    );
+  }, [clients, searchTerm]);
+
+  return (
+    <>
+      {/* Search */}
+      <Card className="shadow-card">
+        <CardContent className="pt-6">
+          <div className="relative max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search clients..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Client Table */}
+      <Card className="shadow-card">
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : filteredClients.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Building2 className="h-12 w-12 text-muted-foreground/50 mb-4" />
+              <h3 className="text-lg font-medium text-foreground">No clients found</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                {searchTerm ? 'Try adjusting your search' : 'Clients are created when you add a matter'}
+              </p>
+            </div>
+          ) : (
+            <StickyTableHeader>
+              <TableScrollControls>
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="min-w-[250px]">Full Client Name</TableHead>
+                      <TableHead className="min-w-[200px]">Commonly Referred To</TableHead>
+                      <TableHead className="min-w-[150px]">Display Preview</TableHead>
+                      <TableHead className="w-16">Save</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredClients
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map((client) => (
+                        <ClientRow
+                          key={client.id}
+                          client={client}
+                          updateClient={updateClient}
+                        />
+                      ))}
+                  </TableBody>
+                </Table>
+              </TableScrollControls>
+            </StickyTableHeader>
+          )}
+        </CardContent>
+      </Card>
+    </>
+  );
+}
+
 export default function Matters() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { matters, isLoading, updateMatter } = useMatters();
-  const { clients } = useClients();
+  const { clients, updateClient, isLoading: clientsLoading } = useClients();
   const { upsertTodaySnapshot } = useSnapshots();
   const { data: exchangeRatesData } = useExchangeRates();
   const [search, setSearch] = useState('');
@@ -263,8 +446,8 @@ export default function Matters() {
     enabled: !!user?.id,
   });
 
-  // Derive categoryFilter from tabFilter for non-MMA/BP tabs
-  const categoryFilter = tabFilter === 'MMA/BP' ? null : tabFilter;
+  // Derive categoryFilter from tabFilter for non-special tabs
+  const categoryFilter = (tabFilter === 'MMA/BP' || tabFilter === 'Clients') ? null : tabFilter;
 
   // Fetch all matter_clients to support filtering by secondary clients on multi-client matters
   const { data: allMatterClients = [] } = useQuery({
@@ -518,6 +701,8 @@ export default function Matters() {
   };
 
   const isMmaBpTab = tabFilter === 'MMA/BP';
+  const isClientsTab = tabFilter === 'Clients';
+  const isSpecialTab = isMmaBpTab || isClientsTab;
   const isPipeline = categoryFilter === 'Pipeline';
   const isLive = categoryFilter === 'Live';
   const isLost = categoryFilter === 'Lost';
@@ -533,7 +718,7 @@ export default function Matters() {
             <h1 className="text-2xl lg:text-3xl font-heading font-bold text-foreground">Matters</h1>
             <p className="text-muted-foreground mt-1">Track live transactions, pipeline, and closed matters</p>
           </div>
-          {!isClosed && !isMmaBpTab && (
+          {!isClosed && !isSpecialTab && (
             <Button asChild>
               <Link to="/matters/new">
                 <Plus className="mr-2 h-4 w-4" />
@@ -545,7 +730,7 @@ export default function Matters() {
 
         {/* Category Tabs */}
         <Tabs value={tabFilter} onValueChange={(v) => setTabFilter(v as TabFilter)}>
-          <TabsList className="grid w-full grid-cols-5 lg:w-auto lg:inline-grid">
+          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
             {(['Live', 'Pipeline', 'Closed', 'Lost'] as MatterCategory[]).map((cat) => (
               <TabsTrigger key={cat} value={cat} className="gap-2">
                 {categoryIcons[cat]}
@@ -555,76 +740,95 @@ export default function Matters() {
                 </span>
               </TabsTrigger>
             ))}
-            <TabsTrigger value="MMA/BP" className="gap-2">
+            <TabsTrigger value="MMA/BP" className="gap-2 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-900 dark:data-[state=active]:bg-amber-900/30 dark:data-[state=active]:text-amber-200">
               <Users className="h-4 w-4" />
               <span>MMA/BP</span>
               <span className="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded-full">
                 {mmaBpCount}
               </span>
             </TabsTrigger>
+            <TabsTrigger value="Clients" className="gap-2 data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-900 dark:data-[state=active]:bg-emerald-900/30 dark:data-[state=active]:text-emerald-200">
+              <Building2 className="h-4 w-4" />
+              <span>Clients</span>
+              <span className="ml-1 text-xs bg-muted px-1.5 py-0.5 rounded-full">
+                {clients.length}
+              </span>
+            </TabsTrigger>
           </TabsList>
         </Tabs>
 
-        {/* Summary & Filters */}
-        <Card className="shadow-card">
-          <CardContent className="pt-6">
-            <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
-              <div className="flex flex-col sm:flex-row gap-4 flex-1">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search matters, clients, partners..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9"
-                  />
+        {/* Summary & Filters - Hide for Clients tab */}
+        {!isClientsTab && (
+          <Card className="shadow-card">
+            <CardContent className="pt-6">
+              <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
+                <div className="flex flex-col sm:flex-row gap-4 flex-1">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search matters, clients, partners..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  <Select value={clientFilter} onValueChange={setClientFilter}>
+                    <SelectTrigger className="w-full sm:w-48">
+                      <SelectValue placeholder="Client" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Clients</SelectItem>
+                      {clients.map((client) => (
+                        <SelectItem key={client.id} value={client.id}>
+                          {getClientDisplayName(client)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Select value={clientFilter} onValueChange={setClientFilter}>
-                  <SelectTrigger className="w-full sm:w-48">
-                    <SelectValue placeholder="Client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Clients</SelectItem>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Table */}
-        <Card className="shadow-card">
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="flex items-center justify-center py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : filteredMatters.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <Briefcase className="h-12 w-12 text-muted-foreground/50 mb-4" />
-                <h3 className="text-lg font-medium text-foreground">
-                  No {isMmaBpTab ? 'live or pipeline' : categoryFilter?.toLowerCase()} matters found
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {search || clientFilter !== 'all'
-                    ? 'Try adjusting your filters'
-                    : isMmaBpTab ? 'No live or pipeline matters to assign' : `Get started by creating a new ${categoryFilter?.toLowerCase()} matter`}
-                </p>
-                {!search && clientFilter === 'all' && !isClosed && !isMmaBpTab && (
-                  <Button asChild className="mt-4">
-                    <Link to="/matters/new">
-                      <Plus className="mr-2 h-4 w-4" />
-                      New Matter
-                    </Link>
-                  </Button>
-                )}
-              </div>
-            ) : isMmaBpTab ? (
+        {/* Clients Tab Content */}
+        {isClientsTab && (
+          <ClientsTabContent 
+            clients={clients} 
+            isLoading={clientsLoading} 
+            updateClient={updateClient} 
+          />
+        )}
+
+        {/* Table - Hide for Clients tab */}
+        {!isClientsTab && (
+          <Card className="shadow-card">
+            <CardContent className="p-0">
+              {isLoading ? (
+                <div className="flex items-center justify-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : filteredMatters.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center">
+                  <Briefcase className="h-12 w-12 text-muted-foreground/50 mb-4" />
+                  <h3 className="text-lg font-medium text-foreground">
+                    No {isMmaBpTab ? 'live or pipeline' : categoryFilter?.toLowerCase()} matters found
+                  </h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {search || clientFilter !== 'all'
+                      ? 'Try adjusting your filters'
+                      : isMmaBpTab ? 'No live or pipeline matters to assign' : `Get started by creating a new ${categoryFilter?.toLowerCase()} matter`}
+                  </p>
+                  {!search && clientFilter === 'all' && !isClosed && !isMmaBpTab && (
+                    <Button asChild className="mt-4">
+                      <Link to="/matters/new">
+                        <Plus className="mr-2 h-4 w-4" />
+                        New Matter
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              ) : isMmaBpTab ? (
               /* MMA/BP Tab Table */
               <StickyTableHeader>
                 <TableScrollControls>
@@ -1082,6 +1286,7 @@ export default function Matters() {
             )}
           </CardContent>
         </Card>
+        )}
       </div>
     </AppLayout>
   );

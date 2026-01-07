@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth';
 import { differenceInDays, parseISO, isAfter, format } from 'date-fns';
 import { convertToUsd } from '@/lib/currencyUtils';
 import { useExchangeRates } from './useExchangeRates';
+import { getMatterClientDisplayName } from '@/lib/clientUtils';
 
 export interface TrendDataPoint {
   date: string;
@@ -105,14 +106,14 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       const liveMattersForUI: LiveMatter[] = (liveMatters || []).map(matter => ({
         id: matter.id,
         matterName: matter.matter_name,
-        clientName: matter.clients?.name || 'Unknown Client',
+        clientName: getMatterClientDisplayName(matter),
       }));
 
       // Build pipeline matters list for the UI (always includes all matters)
       const pipelineMattersForUI: PipelineMatter[] = (pipelineMatters || []).map(matter => ({
         id: matter.id,
         matterName: matter.matter_name,
-        clientName: matter.clients?.name || 'Unknown Client',
+        clientName: getMatterClientDisplayName(matter),
       }));
 
       if (matterIds.length === 0 && (!pipelineMatters || pipelineMatters.length === 0)) {

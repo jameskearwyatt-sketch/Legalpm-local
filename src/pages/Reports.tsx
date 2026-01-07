@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import ExcelJS from 'exceljs';
 import { convertToUsd } from '@/lib/currencyUtils';
+import { getMatterClientDisplayName } from '@/lib/clientUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 
@@ -110,7 +111,7 @@ export default function Reports() {
   const addDataRows = (worksheet: ExcelJS.Worksheet, data: MatterWithFinancials[], startRowIndex: number) => {
     data.forEach((matter, index) => {
       const row = worksheet.getRow(startRowIndex + index);
-      const clientName = matter.clients?.name || 'Unknown';
+      const clientName = getMatterClientDisplayName(matter);
       const feeCurrency = matter.fee_currency || 'GBP';
       const exchangeRate = matter.exchange_rate || 1;
 

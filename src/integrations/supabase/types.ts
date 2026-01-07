@@ -175,6 +175,7 @@ export type Database = {
         Row: {
           billing_contact: string | null
           created_at: string
+          display_name: string | null
           group_sector: string | null
           id: string
           name: string
@@ -184,6 +185,7 @@ export type Database = {
         Insert: {
           billing_contact?: string | null
           created_at?: string
+          display_name?: string | null
           group_sector?: string | null
           id?: string
           name: string
@@ -193,6 +195,7 @@ export type Database = {
         Update: {
           billing_contact?: string | null
           created_at?: string
+          display_name?: string | null
           group_sector?: string | null
           id?: string
           name?: string

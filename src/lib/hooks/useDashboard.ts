@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { differenceInDays, parseISO, isAfter, format } from 'date-fns';
+import { convertToUsd } from '@/lib/currencyUtils';
+import { useExchangeRates } from './useExchangeRates';
 
 export interface TrendDataPoint {
   date: string;
@@ -59,6 +61,11 @@ export function useDashboard(excludedMatterIds: string[] = []) {
   return useQuery({
     queryKey: ['dashboard', user?.id, excludedMatterIds.sort().join(',')],
     queryFn: async () => {
+      // Fetch exchange rates for GBP to USD conversion
+      const { data: ratesData } = await supabase.functions.invoke('fetch-exchange-rates');
+      // Calculate GBP to USD rate: if 1 USD = 0.79 GBP, then 1 GBP = 1/0.79 USD = 1.27 USD
+      const gbpToUsdRate = ratesData?.rates?.GBP ? (1 / ratesData.rates.GBP) : 1.27;
+      
       // Get all Live matters with their clients
       const { data: liveMatters, error: mattersError } = await supabase
         .from('matters')
@@ -136,9 +143,10 @@ export function useDashboard(excludedMatterIds: string[] = []) {
         const snapshot = snapshotMap.get(matter.id);
         const isExcluded = excludedSet.has(matter.id);
         
-        // Use bm_fee_component as the BM fee and convert to USD using exchange_rate
+        // Use bm_fee_component as the BM fee and convert to USD using proper conversion
         const bmFee = Number(matter.bm_fee_component) || 0;
         const exchangeRate = Number(matter.exchange_rate) || 1;
+        const feeCurrency = matter.fee_currency || 'GBP';
         const budget = Number(matter.fee_amount_upper_end) || 0;
         const wipAmount = Number(snapshot?.wip_amount) || 0;
         const billedAmount = Number(snapshot?.billed_amount) || 0;
@@ -158,11 +166,11 @@ export function useDashboard(excludedMatterIds: string[] = []) {
 
         // Only include in financial totals if not excluded
         if (!isExcluded) {
-          // Convert to USD using exchange rate
-          totalBmFeesUsd += effectiveBmFee * exchangeRate;
-          totalWipUsd += wipAmount * exchangeRate;
-          totalBilledUsd += billedAmount * exchangeRate;
-          totalPaidUsd += paidAmount * exchangeRate;
+          // Convert to USD using proper conversion (via GBP)
+          totalBmFeesUsd += convertToUsd(effectiveBmFee, feeCurrency, exchangeRate, gbpToUsdRate);
+          totalWipUsd += convertToUsd(wipAmount, feeCurrency, exchangeRate, gbpToUsdRate);
+          totalBilledUsd += convertToUsd(billedAmount, feeCurrency, exchangeRate, gbpToUsdRate);
+          totalPaidUsd += convertToUsd(paidAmount, feeCurrency, exchangeRate, gbpToUsdRate);
         }
 
         const totalUsed = billedAmount + wipAmount;
@@ -176,7 +184,6 @@ export function useDashboard(excludedMatterIds: string[] = []) {
           : '[CM number required]';
         
         // Get the correct currency symbol for display
-        const feeCurrency = matter.fee_currency || 'GBP';
         const currencySymbols: Record<string, string> = {
           'GBP': '£', 'USD': '$', 'EUR': '€', 'MYR': 'RM ', 'CHF': 'CHF ', 'AUD': 'A$', 'CAD': 'C$', 'SGD': 'S$'
         };

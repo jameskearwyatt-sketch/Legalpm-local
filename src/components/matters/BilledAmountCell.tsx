@@ -268,17 +268,15 @@ export function BilledAmountCell({
           {/* View mode with action buttons */}
           {mode === 'view' && (
             <div className="flex gap-2">
-              {bills.length > 0 && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setMode('adjust')}
-                >
-                  <Pencil className="h-3 w-3 mr-1" />
-                  Adjust
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={() => setMode('adjust')}
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                Adjust
+              </Button>
               <Button
                 size="sm"
                 className="flex-1"

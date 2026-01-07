@@ -270,12 +270,15 @@ export default function Dashboard() {
     );
   }
 
+  // Calculate outstanding AR (billed but not yet paid)
+  const outstandingAR = (stats?.totalBilled || 0) - (stats?.totalPaid || 0);
+
   const kpiCards = [
     {
-      title: 'Live Matters: Total BM Budget',
-      value: formatCurrency(stats?.totalBudget || 0, 'USD'),
-      icon: <DollarSign className="h-5 w-5" />,
-      variant: 'default' as const,
+      title: 'Outstanding AR',
+      value: formatCurrency(outstandingAR, 'USD'),
+      icon: <AlertTriangle className="h-5 w-5" />,
+      variant: outstandingAR > 100000 ? 'warning' as const : 'default' as const,
     },
     {
       title: 'Work in Progress',

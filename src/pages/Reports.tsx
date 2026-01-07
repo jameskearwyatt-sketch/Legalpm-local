@@ -2,23 +2,26 @@ import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Download, Briefcase, Rocket, Loader2 } from 'lucide-react';
 import { useMatters, MatterWithFinancials } from '@/lib/hooks/useMatters';
+import { useExchangeRates } from '@/lib/hooks/useExchangeRates';
 import { useToast } from '@/hooks/use-toast';
 import { useState } from 'react';
 import ExcelJS from 'exceljs';
+import { convertToUsd } from '@/lib/currencyUtils';
 
 export default function Reports() {
   const { matters, isLoading } = useMatters();
+  const { data: exchangeData } = useExchangeRates();
   const { toast } = useToast();
   const [exportingMatters, setExportingMatters] = useState(false);
   const [exportingPipeline, setExportingPipeline] = useState(false);
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+  // Get live rates for currency conversion
+  const gbpToUsdRate = exchangeData?.rates?.GBP ? 1 / exchangeData.rates.GBP : 1.35;
+  const liveRates = exchangeData?.rates;
+
+  // Helper to convert amount to USD
+  const toUsd = (amount: number, feeCurrency: string, exchangeRate: number) => {
+    return convertToUsd(amount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
   };
 
   const exportToExcel = async (data: MatterWithFinancials[], filename: string, title: string) => {
@@ -31,7 +34,7 @@ export default function Reports() {
     });
 
     // Title row
-    worksheet.mergeCells('A1:J1');
+    worksheet.mergeCells('A1:H1');
     const titleCell = worksheet.getCell('A1');
     titleCell.value = title;
     titleCell.font = { size: 18, bold: true, color: { argb: 'FF1F2937' } };
@@ -39,7 +42,7 @@ export default function Reports() {
     worksheet.getRow(1).height = 35;
 
     // Subtitle with date
-    worksheet.mergeCells('A2:J2');
+    worksheet.mergeCells('A2:H2');
     const subtitleCell = worksheet.getCell('A2');
     subtitleCell.value = `Generated on ${new Date().toLocaleDateString('en-US', { 
       weekday: 'long', 
@@ -51,18 +54,16 @@ export default function Reports() {
     subtitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
     worksheet.getRow(2).height = 22;
 
-    // Headers
+    // Headers (removed Status and Category)
     const headers = [
       'Client',
       'Matter Name',
       'Matter Number',
       'Practice Area',
-      'Status',
-      'Category',
-      'Total Budget',
-      'WIP',
-      'Billed',
-      'Paid',
+      'Total Budget (USD)',
+      'WIP (USD)',
+      'Billed (USD)',
+      'Paid (USD)',
     ];
 
     const headerRow = worksheet.getRow(3);
@@ -89,29 +90,32 @@ export default function Reports() {
     data.forEach((matter, index) => {
       const row = worksheet.getRow(index + 4);
       const clientName = matter.clients?.name || 'Unknown';
-      const wip = matter.latest_snapshot?.wip_amount || 0;
-      const billed = matter.latest_snapshot?.billed_amount || 0;
-      const paid = matter.latest_snapshot?.paid_amount || 0;
+      const feeCurrency = matter.fee_currency || 'GBP';
+      const exchangeRate = matter.exchange_rate || 1;
+      
+      // Convert all financial values to USD
+      const budgetUsd = toUsd(matter.fee_amount_upper_end || 0, feeCurrency, exchangeRate);
+      const wipUsd = toUsd(matter.latest_snapshot?.wip_amount || 0, feeCurrency, exchangeRate);
+      const billedUsd = toUsd(matter.latest_snapshot?.billed_amount || 0, feeCurrency, exchangeRate);
+      const paidUsd = toUsd(matter.latest_snapshot?.paid_amount || 0, feeCurrency, exchangeRate);
 
       row.getCell(1).value = clientName;
       row.getCell(2).value = matter.matter_name;
-      row.getCell(3).value = matter.matter_number;
+      row.getCell(3).value = matter.cm_number || '-'; // Use cm_number (Baker McKenzie number)
       row.getCell(4).value = matter.practice_area || '-';
-      row.getCell(5).value = matter.status;
-      row.getCell(6).value = matter.category;
-      row.getCell(7).value = matter.fee_amount_upper_end || 0;
-      row.getCell(8).value = wip;
-      row.getCell(9).value = billed;
-      row.getCell(10).value = paid;
+      row.getCell(5).value = budgetUsd;
+      row.getCell(6).value = wipUsd;
+      row.getCell(7).value = billedUsd;
+      row.getCell(8).value = paidUsd;
 
       // Format currency columns
-      [7, 8, 9, 10].forEach(col => {
+      [5, 6, 7, 8].forEach(col => {
         row.getCell(col).numFmt = '"$"#,##0';
       });
 
       // Alternate row colors
       const fillColor = index % 2 === 0 ? 'FFF9FAFB' : 'FFFFFFFF';
-      for (let col = 1; col <= 10; col++) {
+      for (let col = 1; col <= 8; col++) {
         const cell = row.getCell(col);
         cell.fill = {
           type: 'pattern',
@@ -131,12 +135,10 @@ export default function Reports() {
     worksheet.getColumn(2).width = 30;
     worksheet.getColumn(3).width = 18;
     worksheet.getColumn(4).width = 18;
-    worksheet.getColumn(5).width = 12;
-    worksheet.getColumn(6).width = 12;
+    worksheet.getColumn(5).width = 18;
+    worksheet.getColumn(6).width = 15;
     worksheet.getColumn(7).width = 15;
     worksheet.getColumn(8).width = 15;
-    worksheet.getColumn(9).width = 15;
-    worksheet.getColumn(10).width = 15;
 
     // Summary row
     const summaryRowIndex = data.length + 5;
@@ -144,22 +146,39 @@ export default function Reports() {
     summaryRow.getCell(1).value = 'TOTALS';
     summaryRow.getCell(1).font = { bold: true };
     
-    const totalBudget = data.reduce((sum, m) => sum + (m.fee_amount_upper_end || 0), 0);
-    const totalWip = data.reduce((sum, m) => sum + (m.latest_snapshot?.wip_amount || 0), 0);
-    const totalBilled = data.reduce((sum, m) => sum + (m.latest_snapshot?.billed_amount || 0), 0);
-    const totalPaid = data.reduce((sum, m) => sum + (m.latest_snapshot?.paid_amount || 0), 0);
+    // Calculate totals with proper currency conversion
+    const totalBudget = data.reduce((sum, m) => {
+      const feeCurrency = m.fee_currency || 'GBP';
+      const exchangeRate = m.exchange_rate || 1;
+      return sum + toUsd(m.fee_amount_upper_end || 0, feeCurrency, exchangeRate);
+    }, 0);
+    const totalWip = data.reduce((sum, m) => {
+      const feeCurrency = m.fee_currency || 'GBP';
+      const exchangeRate = m.exchange_rate || 1;
+      return sum + toUsd(m.latest_snapshot?.wip_amount || 0, feeCurrency, exchangeRate);
+    }, 0);
+    const totalBilled = data.reduce((sum, m) => {
+      const feeCurrency = m.fee_currency || 'GBP';
+      const exchangeRate = m.exchange_rate || 1;
+      return sum + toUsd(m.latest_snapshot?.billed_amount || 0, feeCurrency, exchangeRate);
+    }, 0);
+    const totalPaid = data.reduce((sum, m) => {
+      const feeCurrency = m.fee_currency || 'GBP';
+      const exchangeRate = m.exchange_rate || 1;
+      return sum + toUsd(m.latest_snapshot?.paid_amount || 0, feeCurrency, exchangeRate);
+    }, 0);
 
-    summaryRow.getCell(7).value = totalBudget;
-    summaryRow.getCell(8).value = totalWip;
-    summaryRow.getCell(9).value = totalBilled;
-    summaryRow.getCell(10).value = totalPaid;
+    summaryRow.getCell(5).value = totalBudget;
+    summaryRow.getCell(6).value = totalWip;
+    summaryRow.getCell(7).value = totalBilled;
+    summaryRow.getCell(8).value = totalPaid;
 
-    [7, 8, 9, 10].forEach(col => {
+    [5, 6, 7, 8].forEach(col => {
       summaryRow.getCell(col).numFmt = '"$"#,##0';
       summaryRow.getCell(col).font = { bold: true };
     });
 
-    for (let col = 1; col <= 10; col++) {
+    for (let col = 1; col <= 8; col++) {
       summaryRow.getCell(col).fill = {
         type: 'pattern',
         pattern: 'solid',
@@ -175,30 +194,33 @@ export default function Reports() {
     // Add chart sheet
     const chartSheet = workbook.addWorksheet('Summary Chart');
     
-    // Chart data - aggregate by category or status
-    const categoryData: Record<string, { budget: number; wip: number; billed: number; paid: number; count: number }> = {};
+    // Chart data - aggregate by practice area (more useful than category since we're already filtering by category)
+    const practiceAreaData: Record<string, { budget: number; wip: number; billed: number; paid: number; count: number }> = {};
     data.forEach(matter => {
-      const cat = matter.category || 'Unknown';
-      if (!categoryData[cat]) {
-        categoryData[cat] = { budget: 0, wip: 0, billed: 0, paid: 0, count: 0 };
+      const practiceArea = matter.practice_area || 'Unknown';
+      const feeCurrency = matter.fee_currency || 'GBP';
+      const exchangeRate = matter.exchange_rate || 1;
+      
+      if (!practiceAreaData[practiceArea]) {
+        practiceAreaData[practiceArea] = { budget: 0, wip: 0, billed: 0, paid: 0, count: 0 };
       }
-      categoryData[cat].budget += matter.fee_amount_upper_end || 0;
-      categoryData[cat].wip += matter.latest_snapshot?.wip_amount || 0;
-      categoryData[cat].billed += matter.latest_snapshot?.billed_amount || 0;
-      categoryData[cat].paid += matter.latest_snapshot?.paid_amount || 0;
-      categoryData[cat].count += 1;
+      practiceAreaData[practiceArea].budget += toUsd(matter.fee_amount_upper_end || 0, feeCurrency, exchangeRate);
+      practiceAreaData[practiceArea].wip += toUsd(matter.latest_snapshot?.wip_amount || 0, feeCurrency, exchangeRate);
+      practiceAreaData[practiceArea].billed += toUsd(matter.latest_snapshot?.billed_amount || 0, feeCurrency, exchangeRate);
+      practiceAreaData[practiceArea].paid += toUsd(matter.latest_snapshot?.paid_amount || 0, feeCurrency, exchangeRate);
+      practiceAreaData[practiceArea].count += 1;
     });
 
     // Chart title
     chartSheet.mergeCells('A1:F1');
     const chartTitle = chartSheet.getCell('A1');
-    chartTitle.value = `${title} - Summary by Category`;
+    chartTitle.value = `${title} - Summary by Practice Area`;
     chartTitle.font = { size: 16, bold: true, color: { argb: 'FF1F2937' } };
     chartTitle.alignment = { horizontal: 'center', vertical: 'middle' };
     chartSheet.getRow(1).height = 30;
 
     // Chart headers
-    const chartHeaders = ['Category', 'Count', 'Total Budget', 'WIP', 'Billed', 'Paid'];
+    const chartHeaders = ['Practice Area', 'Count', 'Total Budget (USD)', 'WIP (USD)', 'Billed (USD)', 'Paid (USD)'];
     const chartHeaderRow = chartSheet.getRow(3);
     chartHeaders.forEach((header, index) => {
       const cell = chartHeaderRow.getCell(index + 1);
@@ -215,9 +237,9 @@ export default function Reports() {
 
     // Chart data rows
     let chartRowIndex = 4;
-    Object.entries(categoryData).forEach(([category, stats], index) => {
+    Object.entries(practiceAreaData).forEach(([practiceArea, stats], index) => {
       const row = chartSheet.getRow(chartRowIndex);
-      row.getCell(1).value = category;
+      row.getCell(1).value = practiceArea;
       row.getCell(2).value = stats.count;
       row.getCell(3).value = stats.budget;
       row.getCell(4).value = stats.wip;

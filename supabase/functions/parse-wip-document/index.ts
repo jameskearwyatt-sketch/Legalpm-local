@@ -143,24 +143,26 @@ Extract ALL amounts. Match as many as possible. Put anything you can't match in 
 
     console.log('AI response received');
 
-    // Parse the AI response - strip markdown code blocks if present
+    // Parse the AI response - extract JSON from anywhere in the response
     let parsedResult;
     try {
       let jsonContent = content_response.trim();
-      // Remove markdown code blocks if present
-      if (jsonContent.startsWith('```json')) {
-        jsonContent = jsonContent.slice(7);
-      } else if (jsonContent.startsWith('```')) {
-        jsonContent = jsonContent.slice(3);
+      
+      // Try to find JSON block in markdown code fence
+      const jsonBlockMatch = jsonContent.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (jsonBlockMatch) {
+        jsonContent = jsonBlockMatch[1].trim();
+      } else {
+        // Try to find raw JSON object
+        const jsonObjectMatch = jsonContent.match(/\{[\s\S]*\}/);
+        if (jsonObjectMatch) {
+          jsonContent = jsonObjectMatch[0];
+        }
       }
-      if (jsonContent.endsWith('```')) {
-        jsonContent = jsonContent.slice(0, -3);
-      }
-      jsonContent = jsonContent.trim();
       
       parsedResult = JSON.parse(jsonContent);
     } catch (e) {
-      console.error('Failed to parse AI response:', content_response);
+      console.error('Failed to parse AI response:', content_response.substring(0, 500));
       throw new Error('Failed to parse AI response as JSON');
     }
 

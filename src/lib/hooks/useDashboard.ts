@@ -82,7 +82,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         .from('matters')
         .select(`
           *,
-          clients (id, name),
+          clients (id, name, display_name),
           matter_local_counsels (id, last_updated)
         `)
         .eq('category', 'Live');
@@ -94,7 +94,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         .from('matters')
         .select(`
           *,
-          clients (id, name)
+          clients (id, name, display_name)
         `)
         .eq('category', 'Pipeline');
 

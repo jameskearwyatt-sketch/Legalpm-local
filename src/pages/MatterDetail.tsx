@@ -47,7 +47,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { InvoiceHistorySection } from '@/components/matters/InvoiceHistorySection';
+import { BilledAmountCell } from '@/components/matters/BilledAmountCell';
 import { 
   ArrowLeft, 
   Trash2, 
@@ -682,7 +682,12 @@ export default function MatterDetail() {
                 </div>
                 <div className="flex justify-between items-center py-3 border-b">
                   <span className="text-muted-foreground">AR (Billed)</span>
-                  <span className="text-lg font-semibold">{formatCurrency(billedAmount, currency)}</span>
+                  <BilledAmountCell
+                    matterId={id!}
+                    currentBilledAmount={billedAmount}
+                    currency={currency}
+                    compact={false}
+                  />
                 </div>
                 <div className="flex justify-between items-center py-3 border-b">
                   <span className="text-muted-foreground">Paid</span>
@@ -698,11 +703,6 @@ export default function MatterDetail() {
                   )}>
                     {collectionRate.toFixed(1)}%
                   </span>
-                </div>
-                
-                {/* Invoice History */}
-                <div className="border-t pt-4 mt-4">
-                  <InvoiceHistorySection matterId={id!} currency={currency} />
                 </div>
               </CardContent>
             </Card>

@@ -433,6 +433,38 @@ export type Database = {
           },
         ]
       }
+      matter_bills: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          matter_id: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          matter_id: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          matter_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "matter_bills_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matter_clients: {
         Row: {
           client_id: string

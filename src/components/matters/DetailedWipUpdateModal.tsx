@@ -11,10 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertTriangle, TrendingUp } from 'lucide-react';
+import { Loader2, AlertTriangle, TrendingUp, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BudgetLineItem } from '@/lib/hooks/useBudgetVersions';
 import { useDetailedWipUpdates } from '@/lib/hooks/useDetailedWipUpdates';
+import { WipImportDialog } from './WipImportDialog';
 
 interface WipLineItem {
   id: string;
@@ -78,6 +79,20 @@ export function DetailedWipUpdateModal({
   const [wipItems, setWipItems] = useState<WipLineItem[]>([]);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [hasAcknowledged, setHasAcknowledged] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+
+  // Handle imported WIP matches
+  const handleApplyMatches = (matches: Array<{ budget_line_item_id: string; wip_amount: number }>) => {
+    setWipItems(prev =>
+      prev.map(item => {
+        const match = matches.find(m => m.budget_line_item_id === item.id);
+        if (match) {
+          return { ...item, wip_amount: match.wip_amount };
+        }
+        return item;
+      })
+    );
+  };
 
   // Initialize WIP items from line items
   useEffect(() => {
@@ -179,6 +194,18 @@ export function DetailedWipUpdateModal({
 
         {hasAcknowledged && (
           <>
+            {/* Import Button */}
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowImportDialog(true)}
+                className="flex items-center gap-2"
+              >
+                <Upload className="h-4 w-4" />
+                Upload or Paste Information
+              </Button>
+            </div>
+
             {/* Overall Summary */}
             <div className={cn('rounded-lg p-4 border', overallHealth.bg)}>
               <div className="flex items-center justify-between">
@@ -281,6 +308,16 @@ export function DetailedWipUpdateModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Import Dialog */}
+      <WipImportDialog
+        isOpen={showImportDialog}
+        onClose={() => setShowImportDialog(false)}
+        onApplyMatches={handleApplyMatches}
+        budgetLineItems={wipItems}
+        currency={currency}
+        formatCurrency={formatCurrency}
+      />
     </Dialog>
   );
 }

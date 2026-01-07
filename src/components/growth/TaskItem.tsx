@@ -1,25 +1,21 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator
-} from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Clock, Trash2, User, CalendarClock } from 'lucide-react';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Clock, Trash2, User } from 'lucide-react';
 import { 
   type GrowthTask, 
   type TaskDeadlineType, 
-  getDeadlineLabel, 
-  calculateDueDate 
+  getDeadlineLabel,
+  useKnownAssignees
 } from '@/lib/hooks/useGrowthProjects';
-import { formatDistanceToNow, isPast } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface TaskItemProps {
@@ -30,16 +26,28 @@ interface TaskItemProps {
   isOverdue?: boolean;
 }
 
+const deadlineOptions: TaskDeadlineType[] = [
+  'this_week',
+  'next_week',
+  'this_month',
+  'next_month',
+  'in_3_months',
+  'in_6_months',
+  'no_deadline',
+];
+
 export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: TaskItemProps) => {
-  const deadlineOptions: TaskDeadlineType[] = [
-    'this_week',
-    'next_week',
-    'this_month',
-    'next_month',
-    'in_3_months',
-    'in_6_months',
-    'no_deadline',
-  ];
+  const { assignees, addAssignee } = useKnownAssignees();
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
+  const [deadlineOpen, setDeadlineOpen] = useState(false);
+  const [editingAssignee, setEditingAssignee] = useState(task.assignee || '');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (assigneeOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [assigneeOpen]);
 
   const getDeadlineColor = () => {
     if (task.is_completed) return 'bg-muted text-muted-foreground';
@@ -57,6 +65,20 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
     }
   };
 
+  const handleAssigneeSelect = (name: string) => {
+    onUpdate({ assignee: name || null });
+    setAssigneeOpen(false);
+    // Save new assignee if not already known
+    if (name && !assignees.some(a => a.name.toLowerCase() === name.toLowerCase())) {
+      addAssignee.mutate(name);
+    }
+  };
+
+  const handleDeadlineSelect = (deadline: TaskDeadlineType) => {
+    onUpdate({ deadline_type: deadline });
+    setDeadlineOpen(false);
+  };
+
   return (
     <div className={cn(
       "flex items-start gap-3 p-3 rounded-lg border transition-colors",
@@ -72,25 +94,111 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
       <div className="flex-1 min-w-0">
         <p className={cn(
           "text-sm font-medium",
-          task.is_completed && 'line-through text-muted-foreground'
+          task.is_completed && 'text-muted-foreground'
         )}>
           {task.title}
         </p>
         
-        <div className="flex flex-wrap items-center gap-2 mt-1">
-          {task.assignee && (
-            <Badge variant="outline" className="text-xs">
-              <User className="h-3 w-3 mr-1" />
-              {task.assignee}
-            </Badge>
-          )}
-          
-          {task.deadline_type !== 'no_deadline' && (
-            <Badge variant="outline" className={cn("text-xs", getDeadlineColor())}>
-              <Clock className="h-3 w-3 mr-1" />
-              {getDeadlineLabel(task.deadline_type)}
-            </Badge>
-          )}
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          {/* Clickable Assignee */}
+          <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>
+            <PopoverTrigger asChild>
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "text-xs cursor-pointer hover:bg-accent transition-colors",
+                  task.is_completed && "opacity-60"
+                )}
+              >
+                <User className="h-3 w-3 mr-1" />
+                {task.assignee || 'Unassigned'}
+              </Badge>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="start">
+              <div className="space-y-2">
+                <Input
+                  ref={inputRef}
+                  value={editingAssignee}
+                  onChange={(e) => setEditingAssignee(e.target.value)}
+                  placeholder="Type or select..."
+                  className="h-8 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAssigneeSelect(editingAssignee);
+                    }
+                  }}
+                />
+                {assignees.length > 0 && (
+                  <div className="max-h-32 overflow-y-auto space-y-1">
+                    {assignees
+                      .filter(a => a.name.toLowerCase().includes(editingAssignee.toLowerCase()))
+                      .map((assignee) => (
+                        <button
+                          key={assignee.id}
+                          className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors"
+                          onClick={() => {
+                            setEditingAssignee(assignee.name);
+                            handleAssigneeSelect(assignee.name);
+                          }}
+                        >
+                          {assignee.name}
+                        </button>
+                      ))}
+                  </div>
+                )}
+                <div className="flex gap-1 pt-1 border-t">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="flex-1 h-7 text-xs"
+                    onClick={() => handleAssigneeSelect('')}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 h-7 text-xs"
+                    onClick={() => handleAssigneeSelect(editingAssignee)}
+                  >
+                    Save
+                  </Button>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Clickable Deadline - Always shown */}
+          <Popover open={deadlineOpen} onOpenChange={setDeadlineOpen}>
+            <PopoverTrigger asChild>
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "text-xs cursor-pointer hover:bg-accent transition-colors",
+                  getDeadlineColor()
+                )}
+              >
+                <Clock className="h-3 w-3 mr-1" />
+                {getDeadlineLabel(task.deadline_type)}
+              </Badge>
+            </PopoverTrigger>
+            <PopoverContent className="w-40 p-1" align="start">
+              <div className="space-y-0.5">
+                {deadlineOptions.map((opt) => (
+                  <button
+                    key={opt}
+                    className={cn(
+                      "w-full text-left px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors flex items-center justify-between",
+                      task.deadline_type === opt && "bg-accent"
+                    )}
+                    onClick={() => handleDeadlineSelect(opt)}
+                  >
+                    {getDeadlineLabel(opt)}
+                    {task.deadline_type === opt && <span>✓</span>}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
           
           {task.completed_at && (
             <span className="text-xs text-muted-foreground">
@@ -100,37 +208,15 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
         </div>
       </div>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <CalendarClock className="h-4 w-4 mr-2" />
-              Change Deadline
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent>
-              {deadlineOptions.map((opt) => (
-                <DropdownMenuItem
-                  key={opt}
-                  onClick={() => onUpdate({ deadline_type: opt })}
-                >
-                  {getDeadlineLabel(opt)}
-                  {task.deadline_type === opt && ' ✓'}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={onDelete} className="text-destructive">
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* Delete button directly on task */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+        onClick={onDelete}
+      >
+        <Trash2 className="h-4 w-4" />
+      </Button>
     </div>
   );
 };

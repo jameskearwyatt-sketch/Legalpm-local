@@ -130,24 +130,34 @@ const GrowthProjectDetail = () => {
     }
   };
 
-  // Handle confirming extracted tasks
+  // Handle confirming extracted tasks - dialog closes immediately to prevent double-clicks
   const handleConfirmExtractedTasks = async (tasks: ExtractedTask[]) => {
-    for (const task of tasks) {
-      // Save assignee for future use
-      if (task.assignee && task.assignee !== 'Me') {
-        addAssignee.mutate(task.assignee);
-      }
-
-      await addTask.mutateAsync({
-        title: task.title,
-        assignee: task.assignee === 'Me' ? undefined : task.assignee,
-        deadline_type: task.deadline_type,
-      });
-    }
-
-    setShowTaskExtraction(false);
+    // Dialog is already closed by the dialog component
     setExtractedTasks([]);
-    toast.success(`Added ${tasks.length} tasks`);
+    
+    // Process tasks in background
+    let addedCount = 0;
+    for (const task of tasks) {
+      try {
+        // Save assignee for future use
+        if (task.assignee && task.assignee !== 'Me') {
+          addAssignee.mutate(task.assignee);
+        }
+
+        await addTask.mutateAsync({
+          title: task.title,
+          assignee: task.assignee === 'Me' ? undefined : task.assignee,
+          deadline_type: task.deadline_type,
+        });
+        addedCount++;
+      } catch (err) {
+        console.error('Failed to add task:', err);
+      }
+    }
+    
+    if (addedCount > 0) {
+      toast.success(`Added ${addedCount} task${addedCount === 1 ? '' : 's'}`);
+    }
   };
 
   if (isLoading) {

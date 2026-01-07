@@ -43,11 +43,14 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
   const [editingAssignee, setEditingAssignee] = useState(task.assignee || '');
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Sync editingAssignee when popover opens
   useEffect(() => {
-    if (assigneeOpen && inputRef.current) {
-      inputRef.current.focus();
+    if (assigneeOpen) {
+      setEditingAssignee(task.assignee || '');
+      // Focus after state update
+      setTimeout(() => inputRef.current?.focus(), 0);
     }
-  }, [assigneeOpen]);
+  }, [assigneeOpen, task.assignee]);
 
   const getDeadlineColor = () => {
     if (task.is_completed) return 'bg-muted text-muted-foreground';

@@ -3,8 +3,9 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Loader2, Sparkles, Trash2, User, Clock } from 'lucide-react';
-import { type TaskDeadlineType, getDeadlineLabel } from '@/lib/hooks/useGrowthProjects';
+import { type TaskDeadlineType, getDeadlineLabel, useKnownAssignees } from '@/lib/hooks/useGrowthProjects';
 import { cn } from '@/lib/utils';
 
 export interface ExtractedTask {
@@ -43,6 +44,9 @@ export const TaskExtractionDialog = ({
   isLoading,
   isAdding,
 }: TaskExtractionDialogProps) => {
+  const { assignees } = useKnownAssignees();
+  const [openAssigneeIndex, setOpenAssigneeIndex] = useState<number | null>(null);
+  const [assigneeInputs, setAssigneeInputs] = useState<Record<number, string>>({});
   const selectedCount = tasks.filter(t => t.selected).length;
 
   const toggleTask = (index: number) => {
@@ -130,15 +134,87 @@ export const TaskExtractionDialog = ({
                 </div>
 
                 <div className="flex items-center gap-2 pl-7">
-                  <div className="flex items-center gap-1">
-                    <User className="h-3 w-3 text-muted-foreground" />
-                    <Input
-                      value={task.assignee || ''}
-                      onChange={(e) => updateTask(index, { assignee: e.target.value })}
-                      placeholder="Assignee"
-                      className="h-7 w-32 text-xs"
-                    />
-                  </div>
+                  <Popover 
+                    open={openAssigneeIndex === index} 
+                    onOpenChange={(isOpen) => {
+                      if (isOpen) {
+                        setOpenAssigneeIndex(index);
+                        setAssigneeInputs(prev => ({ ...prev, [index]: task.assignee || '' }));
+                      } else {
+                        setOpenAssigneeIndex(null);
+                      }
+                    }}
+                  >
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center gap-1 h-7 px-2 text-xs border rounded hover:bg-accent transition-colors">
+                        <User className="h-3 w-3 text-muted-foreground" />
+                        <span className={task.assignee ? '' : 'text-muted-foreground'}>
+                          {task.assignee || 'Unassigned'}
+                        </span>
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-48 p-2" align="start">
+                      <div className="space-y-2">
+                        <Input
+                          value={assigneeInputs[index] || ''}
+                          onChange={(e) => setAssigneeInputs(prev => ({ ...prev, [index]: e.target.value }))}
+                          placeholder="Type or select..."
+                          className="h-8 text-sm"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              updateTask(index, { assignee: assigneeInputs[index] || '' });
+                              setOpenAssigneeIndex(null);
+                            }
+                          }}
+                        />
+                        {assignees.length > 0 && (
+                          <div className="max-h-32 overflow-y-auto space-y-1">
+                            {assignees
+                              .filter(a => a.name.toLowerCase().includes((assigneeInputs[index] || '').toLowerCase()))
+                              .map((assignee) => (
+                                <button
+                                  key={assignee.id}
+                                  type="button"
+                                  className="w-full text-left px-2 py-1.5 text-sm rounded hover:bg-accent transition-colors"
+                                  onClick={() => {
+                                    updateTask(index, { assignee: assignee.name });
+                                    setOpenAssigneeIndex(null);
+                                  }}
+                                >
+                                  {assignee.name}
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                        <div className="flex gap-1 pt-1 border-t">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="flex-1 h-7 text-xs"
+                            type="button"
+                            onClick={() => {
+                              updateTask(index, { assignee: '' });
+                              setOpenAssigneeIndex(null);
+                            }}
+                          >
+                            Clear
+                          </Button>
+                          <Button
+                            size="sm"
+                            className="flex-1 h-7 text-xs"
+                            type="button"
+                            onClick={() => {
+                              updateTask(index, { assignee: assigneeInputs[index] || '' });
+                              setOpenAssigneeIndex(null);
+                            }}
+                          >
+                            Save
+                          </Button>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
 
                   <div className="flex items-center gap-1">
                     <Clock className="h-3 w-3 text-muted-foreground" />

@@ -20,6 +20,9 @@ import { useClients } from '@/lib/hooks/useClients';
 import { useExchangeRates, getExchangeRate } from '@/lib/hooks/useExchangeRates';
 import { useMatterClients } from '@/lib/hooks/useMatterClients';
 import { MultiClientSection, ClientAllocation } from '@/components/matters/MultiClientSection';
+import { useAuth } from '@/lib/auth';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 import { z } from 'zod';
 import { cn } from '@/lib/utils';
@@ -97,6 +100,7 @@ const allStages: MatterStage[] = ['Pre-Start', 'Term Sheet', 'Documentation - St
 export default function MatterForm() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const isEditing = !!id;
   
   const { data: existingMatter, isLoading: matterLoading } = useMatter(id || '');
@@ -104,6 +108,22 @@ export default function MatterForm() {
   const { clients, isLoading: clientsLoading } = useClients();
   const { data: exchangeRatesData, isLoading: ratesLoading, refetch: refetchRates } = useExchangeRates();
   const { matterClients, saveMatterClients } = useMatterClients(id);
+
+  // Fetch current user's profile for "Me" checkbox functionality
+  const { data: userProfile } = useQuery({
+    queryKey: ['user-profile', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return null;
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user?.id,
+  });
 
   // Multi-client state
   const [isMultiClient, setIsMultiClient] = useState(false);
@@ -605,22 +625,66 @@ export default function MatterForm() {
 
                 <div className="space-y-2">
                   <Label htmlFor="lead_partner">Billing Partner</Label>
-                  <Input
-                    id="lead_partner"
-                    value={formData.lead_partner}
-                    onChange={(e) => updateField('lead_partner', e.target.value)}
-                    placeholder="Partner name"
-                  />
+                  <div className="flex items-center gap-2">
+                    {userProfile?.full_name && (
+                      <div className="flex items-center gap-1.5">
+                        <Checkbox
+                          id="bp-me"
+                          checked={formData.lead_partner === userProfile.full_name}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              updateField('lead_partner', userProfile.full_name);
+                            } else {
+                              updateField('lead_partner', '');
+                            }
+                          }}
+                        />
+                        <label htmlFor="bp-me" className="text-sm text-muted-foreground cursor-pointer">
+                          Me
+                        </label>
+                      </div>
+                    )}
+                    <Input
+                      id="lead_partner"
+                      value={formData.lead_partner}
+                      onChange={(e) => updateField('lead_partner', e.target.value)}
+                      placeholder="Partner name"
+                      disabled={userProfile?.full_name && formData.lead_partner === userProfile.full_name}
+                      className="flex-1"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="originator">MMA</Label>
-                  <Input
-                    id="originator"
-                    value={formData.originator}
-                    onChange={(e) => updateField('originator', e.target.value)}
-                    placeholder="Partner name"
-                  />
+                  <div className="flex items-center gap-2">
+                    {userProfile?.full_name && (
+                      <div className="flex items-center gap-1.5">
+                        <Checkbox
+                          id="mma-me"
+                          checked={formData.originator === userProfile.full_name}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              updateField('originator', userProfile.full_name);
+                            } else {
+                              updateField('originator', '');
+                            }
+                          }}
+                        />
+                        <label htmlFor="mma-me" className="text-sm text-muted-foreground cursor-pointer">
+                          Me
+                        </label>
+                      </div>
+                    )}
+                    <Input
+                      id="originator"
+                      value={formData.originator}
+                      onChange={(e) => updateField('originator', e.target.value)}
+                      placeholder="Partner name"
+                      disabled={userProfile?.full_name && formData.originator === userProfile.full_name}
+                      className="flex-1"
+                    />
+                  </div>
                 </div>
               </div>
 

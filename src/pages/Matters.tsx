@@ -37,6 +37,7 @@ import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
+import { BilledAmountCell } from '@/components/matters/BilledAmountCell';
 import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2 } from 'lucide-react';
 import { format, differenceInDays, parseISO, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -1163,17 +1164,11 @@ export default function Matters() {
                                   </div>
                                   <div className="flex items-center justify-end gap-1">
                                     <span className="text-[10px] text-muted-foreground leading-tight">Billed:</span>
-                                    <EditableFinancialCell
-                                      value={matter.latest_snapshot?.billed_amount || 0}
+                                    <BilledAmountCell
+                                      matterId={matter.id}
+                                      currentBilledAmount={matter.latest_snapshot?.billed_amount || 0}
                                       currency={matter.fee_currency}
                                       compact
-                                      onSave={async (value) => {
-                                        await upsertTodaySnapshot.mutateAsync({
-                                          matterId: matter.id,
-                                          field: 'billed_amount',
-                                          value,
-                                        });
-                                      }}
                                     />
                                   </div>
                                   <div className="flex items-center justify-end gap-1">

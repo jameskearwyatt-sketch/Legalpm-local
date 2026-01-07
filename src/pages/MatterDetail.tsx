@@ -47,6 +47,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { InvoiceHistorySection } from '@/components/matters/InvoiceHistorySection';
 import { 
   ArrowLeft, 
   Trash2, 
@@ -697,6 +698,11 @@ export default function MatterDetail() {
                   )}>
                     {collectionRate.toFixed(1)}%
                   </span>
+                </div>
+                
+                {/* Invoice History */}
+                <div className="border-t pt-4 mt-4">
+                  <InvoiceHistorySection matterId={id!} currency={currency} />
                 </div>
               </CardContent>
             </Card>

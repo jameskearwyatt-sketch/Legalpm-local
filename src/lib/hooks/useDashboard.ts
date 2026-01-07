@@ -19,6 +19,12 @@ export interface LiveMatter {
   clientName: string;
 }
 
+export interface PipelineMatter {
+  id: string;
+  matterName: string;
+  clientName: string;
+}
+
 export interface DashboardStats {
   totalBudget: number;
   totalWip: number;
@@ -32,6 +38,7 @@ export interface DashboardStats {
   pipelineAlerts: PipelineAlert[];
   trendData: TrendDataPoint[];
   liveMatters: LiveMatter[];
+  pipelineMatters: PipelineMatter[];
 }
 
 export interface Alert {
@@ -57,11 +64,11 @@ export interface PipelineAlert {
   message: string;
 }
 
-export function useDashboard(excludedMatterIds: string[] = []) {
+export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineMatterIds: string[] = []) {
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['dashboard', user?.id, excludedMatterIds.sort().join(',')],
+    queryKey: ['dashboard', user?.id, excludedMatterIds.sort().join(','), excludedPipelineMatterIds.sort().join(',')],
     queryFn: async () => {
       // Fetch exchange rates for GBP to USD conversion
       const { data: ratesData } = await supabase.functions.invoke('fetch-exchange-rates');
@@ -101,6 +108,13 @@ export function useDashboard(excludedMatterIds: string[] = []) {
         clientName: matter.clients?.name || 'Unknown Client',
       }));
 
+      // Build pipeline matters list for the UI (always includes all matters)
+      const pipelineMattersForUI: PipelineMatter[] = (pipelineMatters || []).map(matter => ({
+        id: matter.id,
+        matterName: matter.matter_name,
+        clientName: matter.clients?.name || 'Unknown Client',
+      }));
+
       if (matterIds.length === 0 && (!pipelineMatters || pipelineMatters.length === 0)) {
         return {
           totalBudget: 0,
@@ -115,11 +129,13 @@ export function useDashboard(excludedMatterIds: string[] = []) {
           pipelineAlerts: [],
           trendData: [],
           liveMatters: liveMattersForUI,
+          pipelineMatters: pipelineMattersForUI,
         } as DashboardStats;
       }
 
       // Create set of excluded matter IDs for quick lookup
       const excludedSet = new Set(excludedMatterIds);
+      const excludedPipelineSet = new Set(excludedPipelineMatterIds);
 
       // Get latest snapshots for each matter
       const { data: snapshots } = matterIds.length > 0 ? await supabase
@@ -144,12 +160,17 @@ export function useDashboard(excludedMatterIds: string[] = []) {
       const alerts: Alert[] = [];
       const pipelineAlerts: PipelineAlert[] = [];
 
-      // Calculate total pipeline value
+      // Calculate total pipeline value (respecting excluded pipeline matters)
+      let includedPipelineCount = 0;
       pipelineMatters?.forEach(matter => {
+        // Skip excluded pipeline matters
+        if (excludedPipelineSet.has(matter.id)) return;
+        
         const bmFee = Number(matter.bm_fee_component) || 0;
         const exchangeRate = Number(matter.exchange_rate) || 1;
         const feeCurrency = matter.fee_currency || 'GBP';
         totalPipelineValueUsd += convertToUsd(bmFee, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+        includedPipelineCount++;
       });
       const today = new Date();
 
@@ -442,7 +463,7 @@ export function useDashboard(excludedMatterIds: string[] = []) {
         totalPaid: totalPaidUsd,
         avgCollectionRate,
         openMattersCount: liveMatters?.length || 0,
-        pipelineMattersCount: pipelineMatters?.length || 0,
+        pipelineMattersCount: includedPipelineCount,
         totalPipelineValueUsd,
         alerts: alerts.sort((a, b) => {
         const priority: Record<string, number> = { 'Over Budget': 1, 'Near Budget': 2, 'Poor Collection': 3, 'High WIP': 4, 'Stale Financials': 5, 'Stale LC Financials': 6 };
@@ -456,6 +477,7 @@ export function useDashboard(excludedMatterIds: string[] = []) {
         }),
         trendData: sortedTrendData,
         liveMatters: liveMattersForUI,
+        pipelineMatters: pipelineMattersForUI,
       } as DashboardStats;
     },
     enabled: !!user,

@@ -42,6 +42,7 @@ import { toast } from '@/hooks/use-toast';
 
 export default function Dashboard() {
   const [excludedMatterIds, setExcludedMatterIds] = useState<string[]>([]);
+  const [excludedPipelineMatterIds, setExcludedPipelineMatterIds] = useState<string[]>([]);
   const [deleteConfirmDate, setDeleteConfirmDate] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeTooltipData, setActiveTooltipData] = useState<{ dataPoint: TrendDataPoint; payload: any[] } | null>(null);
@@ -49,7 +50,7 @@ export default function Dashboard() {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const isHoveringTooltipRef = useRef(false);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const { data: stats, isLoading } = useDashboard(excludedMatterIds);
+  const { data: stats, isLoading } = useDashboard(excludedMatterIds, excludedPipelineMatterIds);
   const { matters } = useMatters();
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -72,7 +73,7 @@ export default function Dashboard() {
 
   const userName = userProfile?.full_name || '';
 
-  // Categorize matters into "my matters" and "not my matters"
+  // Categorize LIVE matters into "my matters" and "not my matters"
   const { myMatterIds, notMyMatterIds } = useMemo(() => {
     if (!stats?.liveMatters || !userName) {
       return { myMatterIds: new Set<string>(), notMyMatterIds: new Set<string>() };
@@ -108,7 +109,45 @@ export default function Dashboard() {
     return { myMatterIds: myIds, notMyMatterIds: notMyIds };
   }, [stats?.liveMatters, matters, userName]);
 
-  // Calculate master checkbox states
+  // Categorize PIPELINE matters into "my matters" and "not my matters"
+  // If MMA/BP fields are blank, the matter goes to "not my matters" (assumption: if I were MMA/BP, I'd have set it)
+  const { myPipelineMatterIds, notMyPipelineMatterIds } = useMemo(() => {
+    if (!stats?.pipelineMatters || !userName) {
+      return { myPipelineMatterIds: new Set<string>(), notMyPipelineMatterIds: new Set<string>() };
+    }
+
+    const myIds = new Set<string>();
+    const notMyIds = new Set<string>();
+
+    // Get the full matter data to check MMA and lead_partner
+    const pipelineMattersMap = new Map(matters.filter(m => m.category === 'Pipeline').map(m => [m.id, m]));
+
+    stats.pipelineMatters.forEach(pipelineMatter => {
+      const fullMatter = pipelineMattersMap.get(pipelineMatter.id);
+      if (!fullMatter) {
+        notMyIds.add(pipelineMatter.id);
+        return;
+      }
+
+      const mma = (fullMatter as any).matter_managing_attorney || '';
+      const billingPartner = fullMatter.lead_partner || '';
+
+      // Check if user is MMA or Billing Partner (case-insensitive comparison)
+      // If fields are blank, user is NOT considered MMA/BP
+      const isMMA = mma.trim() !== '' && mma.toLowerCase().trim() === userName.toLowerCase().trim();
+      const isBillingPartner = billingPartner.trim() !== '' && billingPartner.toLowerCase().trim() === userName.toLowerCase().trim();
+
+      if (isMMA || isBillingPartner) {
+        myIds.add(pipelineMatter.id);
+      } else {
+        notMyIds.add(pipelineMatter.id);
+      }
+    });
+
+    return { myPipelineMatterIds: myIds, notMyPipelineMatterIds: notMyIds };
+  }, [stats?.pipelineMatters, matters, userName]);
+
+  // Calculate master checkbox states for Live matters
   const myMattersAllIncluded = useMemo(() => {
     if (myMatterIds.size === 0) return false;
     return Array.from(myMatterIds).every(id => !excludedMatterIds.includes(id));
@@ -136,13 +175,19 @@ export default function Dashboard() {
 
   const handleMyMattersToggle = (checked: boolean) => {
     if (checked) {
-      // Include all my matters (remove from excluded)
+      // Include all my matters (remove from excluded) - both Live and Pipeline
       setExcludedMatterIds(prev => prev.filter(id => !myMatterIds.has(id)));
+      setExcludedPipelineMatterIds(prev => prev.filter(id => !myPipelineMatterIds.has(id)));
     } else {
-      // Exclude all my matters
+      // Exclude all my matters - both Live and Pipeline
       setExcludedMatterIds(prev => {
         const newExcluded = new Set(prev);
         myMatterIds.forEach(id => newExcluded.add(id));
+        return Array.from(newExcluded);
+      });
+      setExcludedPipelineMatterIds(prev => {
+        const newExcluded = new Set(prev);
+        myPipelineMatterIds.forEach(id => newExcluded.add(id));
         return Array.from(newExcluded);
       });
     }
@@ -150,13 +195,19 @@ export default function Dashboard() {
 
   const handleNotMyMattersToggle = (checked: boolean) => {
     if (checked) {
-      // Include all not-my matters (remove from excluded)
+      // Include all not-my matters (remove from excluded) - both Live and Pipeline
       setExcludedMatterIds(prev => prev.filter(id => !notMyMatterIds.has(id)));
+      setExcludedPipelineMatterIds(prev => prev.filter(id => !notMyPipelineMatterIds.has(id)));
     } else {
-      // Exclude all not-my matters
+      // Exclude all not-my matters - both Live and Pipeline
       setExcludedMatterIds(prev => {
         const newExcluded = new Set(prev);
         notMyMatterIds.forEach(id => newExcluded.add(id));
+        return Array.from(newExcluded);
+      });
+      setExcludedPipelineMatterIds(prev => {
+        const newExcluded = new Set(prev);
+        notMyPipelineMatterIds.forEach(id => newExcluded.add(id));
         return Array.from(newExcluded);
       });
     }

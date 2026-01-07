@@ -197,6 +197,23 @@ function PersonInlineEditor({
       }
     } else {
       setIsMe(false);
+      setCustomName('');
+      setIsSaving(true);
+      try {
+        await onUpdate(matterId, { [fieldName]: '' });
+        toast({
+          title: "Updated",
+          description: `${fieldName === 'matter_managing_attorney' ? 'MMA' : 'Billing Partner'} cleared for ${matterName}`,
+        });
+      } catch (error) {
+        toast({
+          title: "Error",
+          description: "Failed to update. Please try again.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsSaving(false);
+      }
     }
   };
 

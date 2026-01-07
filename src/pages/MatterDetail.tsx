@@ -1023,6 +1023,8 @@ export default function MatterDetail() {
                         onCheckedChange={(checked) => {
                           if (checked) {
                             updateField('lead_partner', userProfile.full_name);
+                          } else {
+                            updateField('lead_partner', '');
                           }
                         }}
                         className="h-4 w-4"
@@ -1049,6 +1051,8 @@ export default function MatterDetail() {
                         onCheckedChange={(checked) => {
                           if (checked) {
                             updateField('matter_managing_attorney', userProfile.full_name);
+                          } else {
+                            updateField('matter_managing_attorney', '');
                           }
                         }}
                         className="h-4 w-4"

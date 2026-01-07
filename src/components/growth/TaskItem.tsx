@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { 
@@ -106,16 +105,16 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
           {/* Clickable Assignee */}
           <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>
             <PopoverTrigger asChild>
-              <Badge 
-                variant="outline" 
+              <button 
+                type="button"
                 className={cn(
-                  "text-xs cursor-pointer hover:bg-accent transition-colors",
+                  "inline-flex items-center text-xs px-2 py-1 border rounded-full cursor-pointer hover:bg-accent transition-colors",
                   task.is_completed && "opacity-60"
                 )}
               >
                 <User className="h-3 w-3 mr-1" />
                 {task.assignee || 'Unassigned'}
-              </Badge>
+              </button>
             </PopoverTrigger>
             <PopoverContent className="w-56 p-2" align="start">
               <div className="space-y-2">
@@ -173,16 +172,16 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
           {/* Clickable Deadline - Always shown */}
           <Popover open={deadlineOpen} onOpenChange={setDeadlineOpen}>
             <PopoverTrigger asChild>
-              <Badge 
-                variant="outline" 
+              <button 
+                type="button"
                 className={cn(
-                  "text-xs cursor-pointer hover:bg-accent transition-colors",
+                  "inline-flex items-center text-xs px-2 py-1 border rounded-full cursor-pointer hover:bg-accent transition-colors",
                   getDeadlineColor()
                 )}
               >
                 <Clock className="h-3 w-3 mr-1" />
                 {getDeadlineLabel(task.deadline_type)}
-              </Badge>
+              </button>
             </PopoverTrigger>
             <PopoverContent className="w-40 p-1" align="start">
               <div className="space-y-0.5">

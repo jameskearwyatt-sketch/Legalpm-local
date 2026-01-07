@@ -105,11 +105,16 @@ ${content}
 Extract all WIP amounts and match them to the appropriate budget line items. Return the results as JSON.`;
 
     // Call the Lovable AI gateway
-    const response = await fetch('https://ai-gateway.lovable.dev/v1/chat/completions', {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
+      throw new Error("LOVABLE_API_KEY is not configured");
+    }
+
+    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
@@ -117,9 +122,6 @@ Extract all WIP amounts and match them to the appropriate budget line items. Ret
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        response_format: { type: 'json_object' },
-        temperature: 0.2,
-        max_tokens: 4096,
       }),
     });
 

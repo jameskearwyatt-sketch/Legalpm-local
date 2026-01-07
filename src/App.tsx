@@ -9,7 +9,8 @@ import Dashboard from "./pages/Dashboard";
 import Matters from "./pages/Matters";
 import MatterDetail from "./pages/MatterDetail";
 import MatterForm from "./pages/MatterForm";
-
+import Growth from "./pages/Growth";
+import GrowthProjectDetail from "./pages/GrowthProjectDetail";
 import Settings from "./pages/Settings";
 import Reports from "./pages/Reports";
 import Help from "./pages/Help";
@@ -55,6 +56,8 @@ function AppRoutes() {
       <Route path="/time-recording" element={<ProtectedRoute><TimeRecording /></ProtectedRoute>} />
       <Route path="/pricing" element={<ProtectedRoute><MatterPricing /></ProtectedRoute>} />
       <Route path="/pricing/proposal/:proposalId" element={<ProtectedRoute><PricingProposalDetail /></ProtectedRoute>} />
+      <Route path="/growth" element={<ProtectedRoute><Growth /></ProtectedRoute>} />
+      <Route path="/growth/:projectId" element={<ProtectedRoute><GrowthProjectDetail /></ProtectedRoute>} />
       <Route path="/flags" element={<ProtectedRoute><Flags /></ProtectedRoute>} />
       <Route path="/red-flags" element={<ProtectedRoute><RedFlags /></ProtectedRoute>} />
       <Route path="/pipeline-flags" element={<ProtectedRoute><PipelineFlags /></ProtectedRoute>} />

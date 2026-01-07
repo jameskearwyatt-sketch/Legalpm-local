@@ -348,8 +348,8 @@ export default function Dashboard() {
           ))}
         </div>
 
-        {/* Pipeline & Grand Total Summary */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Budget Summary - Live, Pipeline & Grand Total */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-muted/30 rounded-lg">
           {/* Live Matters Total */}
           <Card className="shadow-card">
             <CardContent className="py-4">
@@ -367,15 +367,15 @@ export default function Dashboard() {
           </Card>
 
           {/* Pipeline Total (Potential) */}
-          <Card className="shadow-card border-dashed border-muted-foreground/30">
+          <Card className="shadow-card">
             <CardContent className="py-4">
               <div className="flex items-center gap-4">
-                <div className="p-3 rounded-full bg-muted text-muted-foreground">
+                <div className="p-3 rounded-full bg-primary/10 text-primary">
                   <Rocket className="h-5 w-5" />
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Pipeline (Potential)</p>
-                  <p className="text-2xl font-bold text-muted-foreground">{formatCurrency(stats?.totalPipelineValueUsd || 0, 'USD')}</p>
+                  <p className="text-2xl font-bold text-foreground">{formatCurrency(stats?.totalPipelineValueUsd || 0, 'USD')}</p>
                   <p className="text-xs text-muted-foreground">{stats?.pipelineMattersCount || 0} pipeline matters</p>
                 </div>
               </div>
@@ -383,7 +383,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Grand Total (Theoretical) */}
-          <Card className="shadow-card bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+          <Card className="shadow-card">
             <CardContent className="py-4">
               <div className="flex items-center gap-4">
                 <div className="p-3 rounded-full bg-primary/10 text-primary">
@@ -422,7 +422,7 @@ export default function Dashboard() {
                         onCheckedChange={(checked) => handleMyMattersToggle(!!checked)}
                         className="h-4 w-4"
                       />
-                      <span className="text-sm font-medium text-foreground">
+                      <span className="text-sm font-medium text-emerald-600 dark:text-emerald-500">
                         Matters Where I Am MMA and/or Billing Partner
                       </span>
                       <span className="text-xs text-muted-foreground">
@@ -435,7 +435,7 @@ export default function Dashboard() {
                         onCheckedChange={(checked) => handleNotMyMattersToggle(!!checked)}
                         className="h-4 w-4"
                       />
-                      <span className="text-sm font-medium text-foreground">
+                      <span className="text-sm font-medium text-rose-600 dark:text-rose-500">
                         Matters Where I Am Not MMA or Billing Partner
                       </span>
                       <span className="text-xs text-muted-foreground">

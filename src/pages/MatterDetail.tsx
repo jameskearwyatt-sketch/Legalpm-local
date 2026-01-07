@@ -26,6 +26,7 @@ import {
 import { useMatter, useMatters, MatterCategory, MatterStage, FeeType, MatterSource, PipelineOutcome } from '@/lib/hooks/useMatters';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { BudgetSection } from '@/components/matters/BudgetSection';
+import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { AssumptionsSection } from '@/components/matters/AssumptionsSection';
 import { useClients } from '@/lib/hooks/useClients';
 import { useExchangeRates, getExchangeRate } from '@/lib/hooks/useExchangeRates';
@@ -209,7 +210,7 @@ export default function MatterDetail() {
   const { user } = useAuth();
   const { data: matter, isLoading: matterLoading } = useMatter(id!);
   const { deleteMatter, updateMatter } = useMatters();
-  const { snapshots } = useSnapshots(id);
+  const { snapshots, upsertTodaySnapshot } = useSnapshots(id);
   const { clients, isLoading: clientsLoading } = useClients();
   const { data: exchangeRatesData, refetch: refetchRates } = useExchangeRates();
   const { matterClients, updateMatterClient } = useMatterClients(id);
@@ -678,7 +679,17 @@ export default function MatterDetail() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center py-3 border-b">
                   <span className="text-muted-foreground">Work in Progress</span>
-                  <span className="text-lg font-semibold">{formatCurrency(wipAmount, currency)}</span>
+                  <EditableFinancialCell
+                    value={wipAmount}
+                    currency={currency}
+                    onSave={async (value) => {
+                      await upsertTodaySnapshot.mutateAsync({
+                        matterId: id!,
+                        field: 'wip_amount',
+                        value,
+                      });
+                    }}
+                  />
                 </div>
                 <div className="flex justify-between items-center py-3 border-b">
                   <span className="text-muted-foreground">AR (Billed)</span>
@@ -691,7 +702,18 @@ export default function MatterDetail() {
                 </div>
                 <div className="flex justify-between items-center py-3 border-b">
                   <span className="text-muted-foreground">Paid</span>
-                  <span className="text-lg font-semibold text-success">{formatCurrency(paidAmount, currency)}</span>
+                  <EditableFinancialCell
+                    value={paidAmount}
+                    currency={currency}
+                    className="text-success"
+                    onSave={async (value) => {
+                      await upsertTodaySnapshot.mutateAsync({
+                        matterId: id!,
+                        field: 'paid_amount',
+                        value,
+                      });
+                    }}
+                  />
                 </div>
                 <div className="flex justify-between items-center py-3">
                   <span className="text-muted-foreground">Collection Rate</span>

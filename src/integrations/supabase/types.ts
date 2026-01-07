@@ -333,6 +333,148 @@ export type Database = {
           },
         ]
       }
+      growth_project_entries: {
+        Row: {
+          content: string | null
+          created_at: string
+          entry_type: string
+          file_name: string | null
+          file_url: string | null
+          id: string
+          project_id: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          entry_type?: string
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          project_id: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          entry_type?: string
+          file_name?: string | null
+          file_url?: string | null
+          id?: string
+          project_id?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "growth_project_entries_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "growth_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      growth_projects: {
+        Row: {
+          ai_summary: string | null
+          created_at: string
+          description: string | null
+          id: string
+          mentee_name: string | null
+          name: string
+          project_type: Database["public"]["Enums"]["growth_project_type"]
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          ai_summary?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          mentee_name?: string | null
+          name: string
+          project_type: Database["public"]["Enums"]["growth_project_type"]
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          ai_summary?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          mentee_name?: string | null
+          name?: string
+          project_type?: Database["public"]["Enums"]["growth_project_type"]
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      growth_tasks: {
+        Row: {
+          assignee: string | null
+          completed_at: string | null
+          created_at: string
+          deadline_set_at: string | null
+          deadline_type: Database["public"]["Enums"]["task_deadline_type"]
+          description: string | null
+          id: string
+          is_completed: boolean
+          project_id: string
+          sort_order: number
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assignee?: string | null
+          completed_at?: string | null
+          created_at?: string
+          deadline_set_at?: string | null
+          deadline_type?: Database["public"]["Enums"]["task_deadline_type"]
+          description?: string | null
+          id?: string
+          is_completed?: boolean
+          project_id: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assignee?: string | null
+          completed_at?: string | null
+          created_at?: string
+          deadline_set_at?: string | null
+          deadline_type?: Database["public"]["Enums"]["task_deadline_type"]
+          description?: string | null
+          id?: string
+          is_completed?: boolean
+          project_id?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "growth_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "growth_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           billed_amount: number
@@ -388,6 +530,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      known_assignees: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       matter_assumptions: {
         Row: {
@@ -1131,6 +1294,10 @@ export type Database = {
         | "Discounted Rates with Partial Cap"
         | "Rack Rates with Cap"
         | "Rack Rates with Estimate"
+      growth_project_type:
+        | "business_development"
+        | "professional_development"
+        | "learning_development"
       invoice_status: "Draft" | "Sent" | "Part Paid" | "Paid" | "Overdue"
       matter_category: "Live" | "Pipeline" | "Closed" | "Lost"
       matter_source: "RfP" | "Direct from Client" | "Internal Referral"
@@ -1147,6 +1314,14 @@ export type Database = {
         | "Lost"
       matter_status: "Open" | "On Hold" | "Closed"
       pipeline_outcome: "Won" | "Lost" | "Pending"
+      task_deadline_type:
+        | "this_week"
+        | "next_week"
+        | "this_month"
+        | "next_month"
+        | "in_3_months"
+        | "in_6_months"
+        | "no_deadline"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1283,6 +1458,11 @@ export const Constants = {
         "Rack Rates with Cap",
         "Rack Rates with Estimate",
       ],
+      growth_project_type: [
+        "business_development",
+        "professional_development",
+        "learning_development",
+      ],
       invoice_status: ["Draft", "Sent", "Part Paid", "Paid", "Overdue"],
       matter_category: ["Live", "Pipeline", "Closed", "Lost"],
       matter_source: ["RfP", "Direct from Client", "Internal Referral"],
@@ -1300,6 +1480,15 @@ export const Constants = {
       ],
       matter_status: ["Open", "On Hold", "Closed"],
       pipeline_outcome: ["Won", "Lost", "Pending"],
+      task_deadline_type: [
+        "this_week",
+        "next_week",
+        "this_month",
+        "next_month",
+        "in_3_months",
+        "in_6_months",
+        "no_deadline",
+      ],
     },
   },
 } as const

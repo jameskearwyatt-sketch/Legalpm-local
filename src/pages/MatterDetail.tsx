@@ -594,89 +594,105 @@ export default function MatterDetail() {
             <Card className="shadow-card">
               <CardHeader>
                 <CardTitle className="text-lg font-heading">Budget Overview</CardTitle>
-                {formData.fee_type && (
+                {(formData as any).pay_full_time_costs ? (
+                  <CardDescription className="text-xs text-muted-foreground">
+                    Client pays full time costs
+                  </CardDescription>
+                ) : formData.fee_type && (
                   <CardDescription className="text-xs text-muted-foreground">
                     {formData.fee_type}
                   </CardDescription>
                 )}
               </CardHeader>
               <CardContent className="space-y-6">
-                {/* BM Budget Progress */}
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">BM Budget Used</span>
-                    <span className={cn(
-                      "font-medium",
-                      bmBudgetUsedPercent > 100 && "text-danger",
-                      bmBudgetUsedPercent >= 80 && bmBudgetUsedPercent <= 100 && "text-warning",
-                      bmBudgetUsedPercent < 80 && "text-success"
-                    )}>
-                      {bmBudgetUsedPercent.toFixed(1)}%
-                    </span>
-                  </div>
-                  <Progress 
-                    value={Math.min(bmBudgetUsedPercent, 100)} 
-                    className={cn(
-                      "h-3",
-                      bmBudgetUsedPercent > 100 && "[&>div]:bg-danger",
-                      bmBudgetUsedPercent >= 80 && bmBudgetUsedPercent <= 100 && "[&>div]:bg-warning",
-                      bmBudgetUsedPercent < 80 && "[&>div]:bg-success"
-                    )}
-                  />
-                </div>
-
-                {/* Headroom Grid */}
-                <div className={cn("grid gap-4", localCounsel > 0 ? "grid-cols-3" : "grid-cols-2")}>
-                  <div className={cn(
-                    "p-4 rounded-lg",
-                    bmHeadroom < 0 ? "bg-danger/10" : "bg-success/10"
-                  )}>
-                    <p className="text-sm text-muted-foreground">BM Headroom</p>
-                    <p className={cn(
-                      "text-xl font-heading font-bold",
-                      bmHeadroom < 0 ? "text-danger" : "text-success"
-                    )}>
-                      {formatCurrency(bmHeadroom, currency)}
+                {(formData as any).pay_full_time_costs ? (
+                  <div className="p-4 rounded-lg bg-muted/50 text-center">
+                    <p className="text-muted-foreground">
+                      Budget tracking is disabled for this matter.
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      of {formatCurrency(bmFee, currency)}
+                    <p className="text-xs text-muted-foreground mt-2">
+                      The client has agreed to pay full time costs, so estimates and headroom are not applicable.
                     </p>
                   </div>
-                  {localCounsel > 0 && (
-                    <div className={cn(
-                      "p-4 rounded-lg",
-                      lcHeadroom < 0 ? "bg-danger/10" : isLcDisbursement ? "bg-success/10" : "bg-muted/50"
-                    )}>
-                      <p className="text-sm text-muted-foreground">LC Headroom</p>
-                      <p className={cn(
-                        "text-xl font-heading font-bold",
-                        lcHeadroom < 0 ? "text-danger" : isLcDisbursement ? "text-success" : "text-muted-foreground"
-                      )}>
-                        {formatCurrency(lcHeadroom, currency)}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        of {formatCurrency(localCounsel, currency)}
-                        {!isLcDisbursement && lcBillingMode === 'Direct' && " (Direct)"}
-                      </p>
+                ) : (
+                  <>
+                    {/* BM Budget Progress */}
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">BM Budget Used</span>
+                        <span className={cn(
+                          "font-medium",
+                          bmBudgetUsedPercent > 100 && "text-danger",
+                          bmBudgetUsedPercent >= 80 && bmBudgetUsedPercent <= 100 && "text-warning",
+                          bmBudgetUsedPercent < 80 && "text-success"
+                        )}>
+                          {bmBudgetUsedPercent.toFixed(1)}%
+                        </span>
+                      </div>
+                      <Progress 
+                        value={Math.min(bmBudgetUsedPercent, 100)} 
+                        className={cn(
+                          "h-3",
+                          bmBudgetUsedPercent > 100 && "[&>div]:bg-danger",
+                          bmBudgetUsedPercent >= 80 && bmBudgetUsedPercent <= 100 && "[&>div]:bg-warning",
+                          bmBudgetUsedPercent < 80 && "[&>div]:bg-success"
+                        )}
+                      />
                     </div>
-                  )}
-                  <div className={cn(
-                    "p-4 rounded-lg",
-                    totalHeadroom < 0 ? "bg-danger/10" : "bg-primary/10"
-                  )}>
-                    <p className="text-sm text-muted-foreground">Total Headroom</p>
-                    <p className={cn(
-                      "text-xl font-heading font-bold",
-                      totalHeadroom < 0 ? "text-danger" : "text-primary"
-                    )}>
-                      {formatCurrency(totalHeadroom, currency)}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      of {formatCurrency(totalBudget, currency)}
-                    </p>
-                  </div>
-                </div>
 
+                    {/* Headroom Grid */}
+                    <div className={cn("grid gap-4", localCounsel > 0 ? "grid-cols-3" : "grid-cols-2")}>
+                      <div className={cn(
+                        "p-4 rounded-lg",
+                        bmHeadroom < 0 ? "bg-danger/10" : "bg-success/10"
+                      )}>
+                        <p className="text-sm text-muted-foreground">BM Headroom</p>
+                        <p className={cn(
+                          "text-xl font-heading font-bold",
+                          bmHeadroom < 0 ? "text-danger" : "text-success"
+                        )}>
+                          {formatCurrency(bmHeadroom, currency)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          of {formatCurrency(bmFee, currency)}
+                        </p>
+                      </div>
+                      {localCounsel > 0 && (
+                        <div className={cn(
+                          "p-4 rounded-lg",
+                          lcHeadroom < 0 ? "bg-danger/10" : isLcDisbursement ? "bg-success/10" : "bg-muted/50"
+                        )}>
+                          <p className="text-sm text-muted-foreground">LC Headroom</p>
+                          <p className={cn(
+                            "text-xl font-heading font-bold",
+                            lcHeadroom < 0 ? "text-danger" : isLcDisbursement ? "text-success" : "text-muted-foreground"
+                          )}>
+                            {formatCurrency(lcHeadroom, currency)}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            of {formatCurrency(localCounsel, currency)}
+                            {!isLcDisbursement && lcBillingMode === 'Direct' && " (Direct)"}
+                          </p>
+                        </div>
+                      )}
+                      <div className={cn(
+                        "p-4 rounded-lg",
+                        totalHeadroom < 0 ? "bg-danger/10" : "bg-primary/10"
+                      )}>
+                        <p className="text-sm text-muted-foreground">Total Headroom</p>
+                        <p className={cn(
+                          "text-xl font-heading font-bold",
+                          totalHeadroom < 0 ? "text-danger" : "text-primary"
+                        )}>
+                          {formatCurrency(totalHeadroom, currency)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          of {formatCurrency(totalBudget, currency)}
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
 

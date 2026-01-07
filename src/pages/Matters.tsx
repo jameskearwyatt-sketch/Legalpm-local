@@ -1105,38 +1105,50 @@ export default function Matters() {
                               </TableCell>
                               <TableCell className={cn(
                                 "text-right font-medium",
-                                matter.headroom < 0 ? "text-danger" : "text-foreground"
+                                !(matter as any).pay_full_time_costs && matter.headroom < 0 ? "text-danger" : "text-foreground"
                               )}>
-                                {formatCurrency(matter.headroom, (matter as any).effective_currency ?? matter.fee_currency)}
+                                {(matter as any).pay_full_time_costs ? (
+                                  <span className="text-muted-foreground">N/A</span>
+                                ) : (
+                                  formatCurrency(matter.headroom, (matter as any).effective_currency ?? matter.fee_currency)
+                                )}
                               </TableCell>
                               <TableCell className="text-right">
-                                <span className={cn(
-                                  "font-medium",
-                                  headroomStatus === 'danger' && 'text-danger',
-                                  headroomStatus === 'warning' && 'text-warning',
-                                  headroomStatus === 'success' && 'text-success'
-                                )}>
-                                  {matter.headroom_percent.toFixed(0)}%
-                                </span>
+                                {(matter as any).pay_full_time_costs ? (
+                                  <span className="text-muted-foreground">N/A</span>
+                                ) : (
+                                  <span className={cn(
+                                    "font-medium",
+                                    headroomStatus === 'danger' && 'text-danger',
+                                    headroomStatus === 'warning' && 'text-warning',
+                                    headroomStatus === 'success' && 'text-success'
+                                  )}>
+                                    {matter.headroom_percent.toFixed(0)}%
+                                  </span>
+                                )}
                               </TableCell>
                             </>
                           )}
                           <TableCell className="text-right">
-                            <div className="flex flex-col items-end gap-0.5">
-                              {matter.fee_type && (
-                                <span className="text-[10px] text-muted-foreground">
-                                  {getFeeTypeLabel(matter.fee_type)}
+                            {(matter as any).pay_full_time_costs ? (
+                              <span className="text-muted-foreground">N/A</span>
+                            ) : (
+                              <div className="flex flex-col items-end gap-0.5">
+                                {matter.fee_type && (
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {getFeeTypeLabel(matter.fee_type)}
+                                  </span>
+                                )}
+                                <span className="font-medium">
+                                  {formatCurrency((matter as any).effective_fee_upper_end ?? matter.fee_amount_upper_end, (matter as any).effective_currency ?? matter.fee_currency)}
                                 </span>
-                              )}
-                              <span className="font-medium">
-                                {formatCurrency((matter as any).effective_fee_upper_end ?? matter.fee_amount_upper_end, (matter as any).effective_currency ?? matter.fee_currency)}
-                              </span>
-                              {(matter as any).different_billing_currency && (matter as any).agreed_billing_amount > 0 && (
-                                <span className="text-[10px] text-muted-foreground/70">
-                                  (quoted: {formatCurrency(matter.fee_amount_upper_end, (matter as any).quote_currency)})
-                                </span>
-                              )}
-                            </div>
+                                {(matter as any).different_billing_currency && (matter as any).agreed_billing_amount > 0 && (
+                                  <span className="text-[10px] text-muted-foreground/70">
+                                    (quoted: {formatCurrency(matter.fee_amount_upper_end, (matter as any).quote_currency)})
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </TableCell>
                           {isPipelineOrLost && (
                             <TableCell className="text-right">
@@ -1155,69 +1167,77 @@ export default function Matters() {
                           {isLive && (
                             <>
                               <TableCell className="text-right font-medium">
-                                <div className="flex flex-col items-end">
-                                  <span>{formatCurrency((matter as any).effective_bm_fee ?? matter.bm_fee_component, (matter as any).effective_currency ?? matter.fee_currency)}</span>
-                                  {/* Always show USD equivalent for non-USD currencies */}
-                                  {((matter as any).effective_currency ?? matter.fee_currency) !== 'USD' && (
-                                    <span className="text-[10px] text-muted-foreground/70 font-normal">
-                                      ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(convertToUsd((matter as any).effective_bm_fee ?? matter.bm_fee_component, (matter as any).effective_currency ?? matter.fee_currency ?? 'GBP', matter.exchange_rate || 1, gbpToUsdRate, liveRates))}
-                                    </span>
-                                  )}
-                                </div>
+                                {(matter as any).pay_full_time_costs ? (
+                                  <span className="text-muted-foreground font-normal">N/A</span>
+                                ) : (
+                                  <div className="flex flex-col items-end">
+                                    <span>{formatCurrency((matter as any).effective_bm_fee ?? matter.bm_fee_component, (matter as any).effective_currency ?? matter.fee_currency)}</span>
+                                    {/* Always show USD equivalent for non-USD currencies */}
+                                    {((matter as any).effective_currency ?? matter.fee_currency) !== 'USD' && (
+                                      <span className="text-[10px] text-muted-foreground/70 font-normal">
+                                        ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(convertToUsd((matter as any).effective_bm_fee ?? matter.bm_fee_component, (matter as any).effective_currency ?? matter.fee_currency ?? 'GBP', matter.exchange_rate || 1, gbpToUsdRate, liveRates))}
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell className="text-right">
-                                <div className="flex flex-col items-end gap-0.5">
-                                  <span className="text-muted-foreground">
-                                    {formatCurrency((matter as any).effective_local_counsel_fee ?? matter.local_counsel_fee, (matter as any).effective_currency ?? matter.fee_currency)}
-                                  </span>
-                                  {(matter.local_counsel_fee || 0) > 0 && (() => {
-                                    const hasSelection = matter.local_counsel_billing === 'Disb' || matter.local_counsel_billing === 'Direct';
-                                    return (
-                                      <div className="flex items-center gap-1.5">
-                                        <label 
-                                          className={cn(
-                                            "flex items-center gap-0.5 cursor-pointer text-[9px] leading-none",
-                                            hasSelection ? "text-success" : "text-destructive"
-                                          )}
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={matter.local_counsel_billing === 'Disb'}
-                                            onChange={async () => {
-                                              const newValue = matter.local_counsel_billing === 'Disb' ? null : 'Disb';
-                                              await updateLocalCounselBilling(matter.id, newValue);
-                                            }}
+                                {(matter as any).pay_full_time_costs ? (
+                                  <span className="text-muted-foreground">N/A</span>
+                                ) : (
+                                  <div className="flex flex-col items-end gap-0.5">
+                                    <span className="text-muted-foreground">
+                                      {formatCurrency((matter as any).effective_local_counsel_fee ?? matter.local_counsel_fee, (matter as any).effective_currency ?? matter.fee_currency)}
+                                    </span>
+                                    {(matter.local_counsel_fee || 0) > 0 && (() => {
+                                      const hasSelection = matter.local_counsel_billing === 'Disb' || matter.local_counsel_billing === 'Direct';
+                                      return (
+                                        <div className="flex items-center gap-1.5">
+                                          <label 
                                             className={cn(
-                                              "h-2.5 w-2.5 rounded-sm border cursor-pointer accent-current",
-                                              matter.local_counsel_billing === 'Disb' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                                              "flex items-center gap-0.5 cursor-pointer text-[9px] leading-none",
+                                              hasSelection ? "text-success" : "text-destructive"
                                             )}
-                                          />
-                                          Disb
-                                        </label>
-                                        <label 
-                                          className={cn(
-                                            "flex items-center gap-0.5 cursor-pointer text-[9px] leading-none",
-                                            hasSelection ? "text-success" : "text-destructive"
-                                          )}
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={matter.local_counsel_billing === 'Direct'}
-                                            onChange={async () => {
-                                              const newValue = matter.local_counsel_billing === 'Direct' ? null : 'Direct';
-                                              await updateLocalCounselBilling(matter.id, newValue);
-                                            }}
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={matter.local_counsel_billing === 'Disb'}
+                                              onChange={async () => {
+                                                const newValue = matter.local_counsel_billing === 'Disb' ? null : 'Disb';
+                                                await updateLocalCounselBilling(matter.id, newValue);
+                                              }}
+                                              className={cn(
+                                                "h-2.5 w-2.5 rounded-sm border cursor-pointer accent-current",
+                                                matter.local_counsel_billing === 'Disb' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                                              )}
+                                            />
+                                            Disb
+                                          </label>
+                                          <label 
                                             className={cn(
-                                              "h-2.5 w-2.5 rounded-sm border cursor-pointer accent-current",
-                                              matter.local_counsel_billing === 'Direct' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                                              "flex items-center gap-0.5 cursor-pointer text-[9px] leading-none",
+                                              hasSelection ? "text-success" : "text-destructive"
                                             )}
-                                          />
-                                          Direct
-                                        </label>
-                                      </div>
-                                    );
-                                  })()}
-                                </div>
+                                          >
+                                            <input
+                                              type="checkbox"
+                                              checked={matter.local_counsel_billing === 'Direct'}
+                                              onChange={async () => {
+                                                const newValue = matter.local_counsel_billing === 'Direct' ? null : 'Direct';
+                                                await updateLocalCounselBilling(matter.id, newValue);
+                                              }}
+                                              className={cn(
+                                                "h-2.5 w-2.5 rounded-sm border cursor-pointer accent-current",
+                                                matter.local_counsel_billing === 'Direct' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                                              )}
+                                            />
+                                            Direct
+                                          </label>
+                                        </div>
+                                      );
+                                    })()}
+                                  </div>
+                                )}
                               </TableCell>
                             </>
                           )}

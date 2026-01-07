@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { getClientDisplayName } from '@/lib/clientUtils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -61,6 +62,7 @@ interface FlaggedMatter {
   matter_name: string;
   matter_number: string;
   client_name: string;
+  client_display_name: string | null;
   category: string;
   flags: FlagType[];
 }
@@ -528,6 +530,7 @@ export default function Flags() {
           ? matter.cm_number 
           : '[CM number required]',
         client_name: matter.clients?.name || '',
+        client_display_name: matter.clients?.display_name || null,
         category: matter.category,
         flags,
       };
@@ -690,7 +693,7 @@ export default function Flags() {
                                 {matter.matter_name}
                               </p>
                               <p className="text-xs text-muted-foreground">
-                                {matter.client_name} • {matter.matter_number}
+                                {getClientDisplayName({ name: matter.client_name, display_name: matter.client_display_name })} • {matter.matter_number}
                               </p>
                             </div>
                             <ArrowRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />

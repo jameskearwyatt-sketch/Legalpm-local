@@ -21,6 +21,7 @@ import { Plus, Trash2, Star, Users, UserPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Client } from '@/lib/hooks/useClients';
 import { ClientForm } from '@/components/forms/ClientForm';
+import { getClientDisplayName } from '@/lib/clientUtils';
 
 export interface ClientAllocation {
   client_id: string;
@@ -168,7 +169,7 @@ export function MultiClientSection({
                 </SelectItem>
                 {clients.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
-                    {client.name}
+                    {getClientDisplayName(client)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -278,7 +279,7 @@ export function MultiClientSection({
                       </SelectItem>
                       {getAvailableClients(allocation.client_id).map((client) => (
                         <SelectItem key={client.id} value={client.id}>
-                          {client.name}
+                          {getClientDisplayName(client)}
                         </SelectItem>
                       ))}
                     </SelectContent>

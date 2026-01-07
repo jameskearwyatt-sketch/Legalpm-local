@@ -63,6 +63,7 @@ export interface Matter {
   clients?: {
     id: string;
     name: string;
+    display_name?: string | null;
   };
 }
 
@@ -136,7 +137,7 @@ export function useMatters() {
         .from('matters')
         .select(`
           *,
-          clients (id, name)
+          clients (id, name, display_name)
         `)
         .order('updated_at', { ascending: false });
 
@@ -362,7 +363,7 @@ export function useMatter(id: string) {
         .from('matters')
         .select(`
           *,
-          clients (id, name)
+          clients (id, name, display_name)
         `)
         .eq('id', id)
         .maybeSingle();

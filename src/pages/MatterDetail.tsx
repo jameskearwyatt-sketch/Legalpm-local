@@ -35,6 +35,7 @@ import { useLocalCounsels } from '@/lib/hooks/useLocalCounsels';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
+import { getClientDisplayName, getMatterClientDisplayName } from '@/lib/clientUtils';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -140,7 +141,7 @@ function EditableMatterClients({ matterClients, updateMatterClient }: EditableMa
     <div className="flex flex-wrap gap-x-6 gap-y-2">
       {matterClients.map(mc => (
         <div key={mc.id} className="flex items-center gap-1 group">
-          <span className="font-medium">{mc.clients?.name}:</span>
+          <span className="font-medium">{getClientDisplayName(mc.clients)}:</span>
           
           {editingId === mc.id ? (
             <>
@@ -481,11 +482,11 @@ export default function MatterDetail() {
                   {/* Show all clients for multi-client matters */}
                   {matterClients && matterClients.length > 1 ? (
                     <span className="text-2xl lg:text-3xl font-heading font-bold text-foreground">
-                      {matterClients.map(mc => mc.clients?.name).join(' / ')}
+                      {matterClients.map(mc => getClientDisplayName(mc.clients)).join(' / ')}
                     </span>
                   ) : (
                     <span className="text-2xl lg:text-3xl font-heading font-bold text-foreground">
-                      {matter.clients?.name}
+                      {getMatterClientDisplayName(matter)}
                     </span>
                   )}
                   <span className="text-2xl lg:text-3xl font-heading text-muted-foreground">–</span>
@@ -987,7 +988,7 @@ export default function MatterDetail() {
                     <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
                     <SelectContent>
                       {clients.map((client) => (
-                        <SelectItem key={client.id} value={client.id}>{client.name}</SelectItem>
+                        <SelectItem key={client.id} value={client.id}>{getClientDisplayName(client)}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

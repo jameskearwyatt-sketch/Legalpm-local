@@ -522,24 +522,26 @@ export default function MatterDetail() {
                     className="text-lg lg:text-xl font-heading font-bold border-0 p-0 h-auto focus-visible:ring-0 bg-transparent min-w-0 flex-1"
                   />
                 </div>
-                <StatusBadge status={displayStatus} />
               </div>
               {/* Show C/M number - for multi-client show editable fields */}
-              {matterClients && matterClients.length > 1 ? (
-                <div className="text-sm text-muted-foreground">
-                  <EditableMatterClients 
-                    matterClients={matterClients} 
-                    updateMatterClient={updateMatterClient}
+              <div className="flex items-center gap-3">
+                {matterClients && matterClients.length > 1 ? (
+                  <div className="text-sm text-muted-foreground">
+                    <EditableMatterClients 
+                      matterClients={matterClients} 
+                      updateMatterClient={updateMatterClient}
+                    />
+                  </div>
+                ) : (
+                  <Input
+                    value={formData.cm_number || ''}
+                    onChange={(e) => updateField('cm_number', e.target.value)}
+                    className="text-muted-foreground border-0 p-0 h-auto focus-visible:ring-0 bg-transparent w-48"
+                    placeholder="C/M Number"
                   />
-                </div>
-              ) : (
-                <Input
-                  value={formData.cm_number || ''}
-                  onChange={(e) => updateField('cm_number', e.target.value)}
-                  className="text-muted-foreground border-0 p-0 h-auto focus-visible:ring-0 bg-transparent w-48"
-                  placeholder="C/M Number"
-                />
-              )}
+                )}
+                <StatusBadge status={displayStatus} />
+              </div>
             </div>
           </div>
           <div className="flex gap-2 ml-10 sm:ml-0">

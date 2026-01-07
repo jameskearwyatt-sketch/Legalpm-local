@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
 import { Loader2, Sparkles, Trash2, User, Clock } from 'lucide-react';
 import { type TaskDeadlineType, getDeadlineLabel } from '@/lib/hooks/useGrowthProjects';
 import { cn } from '@/lib/utils';
@@ -22,6 +21,7 @@ interface TaskExtractionDialogProps {
   onTasksChange: (tasks: ExtractedTask[]) => void;
   onConfirm: (tasks: ExtractedTask[]) => void;
   isLoading?: boolean;
+  isAdding?: boolean;
 }
 
 const deadlineOptions: TaskDeadlineType[] = [
@@ -41,6 +41,7 @@ export const TaskExtractionDialog = ({
   onTasksChange,
   onConfirm,
   isLoading,
+  isAdding,
 }: TaskExtractionDialogProps) => {
   const selectedCount = tasks.filter(t => t.selected).length;
 
@@ -61,7 +62,11 @@ export const TaskExtractionDialog = ({
   };
 
   const handleConfirm = () => {
-    onConfirm(tasks.filter(t => t.selected));
+    const selectedTasks = tasks.filter(t => t.selected);
+    // Immediately close dialog to prevent double-clicks
+    onOpenChange(false);
+    // Then trigger the confirm with selected tasks
+    onConfirm(selectedTasks);
   };
 
   return (
@@ -154,14 +159,21 @@ export const TaskExtractionDialog = ({
         </div>
 
         <DialogFooter className="border-t pt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isAdding}>
             Skip
           </Button>
           <Button 
             onClick={handleConfirm} 
-            disabled={selectedCount === 0 || isLoading}
+            disabled={selectedCount === 0 || isLoading || isAdding}
           >
-            Add {selectedCount} {selectedCount === 1 ? 'Task' : 'Tasks'}
+            {isAdding ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Adding...
+              </>
+            ) : (
+              `Add ${selectedCount} ${selectedCount === 1 ? 'Task' : 'Tasks'}`
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>

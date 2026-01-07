@@ -516,12 +516,24 @@ export default function MatterDetail() {
                     </div>
                   )}
                   <span className="text-lg lg:text-xl font-heading text-muted-foreground flex-shrink-0">–</span>
-                  <Input
-                    value={formData.matter_name || ''}
-                    onChange={(e) => updateField('matter_name', e.target.value)}
-                    className="text-lg lg:text-xl font-heading font-bold border-0 p-0 h-auto focus-visible:ring-0 bg-transparent min-w-0 flex-1"
-                  />
                 </div>
+                <Textarea
+                  value={formData.matter_name || ''}
+                  onChange={(e) => updateField('matter_name', e.target.value)}
+                  className="text-lg lg:text-xl font-heading font-bold border-0 p-0 focus-visible:ring-0 bg-transparent w-full resize-none overflow-hidden"
+                  rows={1}
+                  onInput={(e) => {
+                    const target = e.target as HTMLTextAreaElement;
+                    target.style.height = 'auto';
+                    target.style.height = target.scrollHeight + 'px';
+                  }}
+                  ref={(el) => {
+                    if (el) {
+                      el.style.height = 'auto';
+                      el.style.height = el.scrollHeight + 'px';
+                    }
+                  }}
+                />
               </div>
               {/* Show C/M number - for multi-client show editable fields */}
               <div className="flex items-center gap-3">

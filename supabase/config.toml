@@ -35,3 +35,12 @@ verify_jwt = false
 
 [functions.parse-wip-document]
 verify_jwt = false
+
+[functions.synthesize-growth-project]
+verify_jwt = false
+
+[functions.extract-tasks]
+verify_jwt = false
+
+[functions.summarize-matter-name]
+verify_jwt = false

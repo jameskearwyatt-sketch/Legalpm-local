@@ -1,18 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { Check, X, Loader2, Pencil, Plus, Receipt } from 'lucide-react';
+import { Check, X, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/currencyUtils';
-import { useInvoices, CreateInvoiceInput } from '@/lib/hooks/useInvoices';
+import { useMatterBills } from '@/lib/hooks/useMatterBills';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
-import { format } from 'date-fns';
 
 interface BilledAmountCellProps {
   matterId: string;
@@ -29,95 +27,91 @@ export function BilledAmountCell({
 }: BilledAmountCellProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<'view' | 'adjust' | 'add'>('view');
-  const [adjustValue, setAdjustValue] = useState(currentBilledAmount.toString());
-  const [newInvoiceNumber, setNewInvoiceNumber] = useState('');
-  const [newInvoiceAmount, setNewInvoiceAmount] = useState('');
-  const [newInvoiceDate, setNewInvoiceDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [newAmount, setNewAmount] = useState('');
+  const [editingBillId, setEditingBillId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const { invoices, createInvoice, isLoading: invoicesLoading } = useInvoices(matterId);
+  const { bills, totalBilled, isLoading, addBill, updateBill, deleteBill } = useMatterBills(matterId);
   const { upsertTodaySnapshot } = useSnapshots();
 
-  // Calculate aggregate billed from invoices
-  const aggregateBilled = invoices.reduce((sum, inv) => sum + inv.billed_amount, 0);
-  const displayAmount = invoices.length > 0 ? aggregateBilled : currentBilledAmount;
+  // Use bills total if we have bills, otherwise fall back to snapshot
+  const displayAmount = bills.length > 0 ? totalBilled : currentBilledAmount;
 
   useEffect(() => {
-    if (mode === 'adjust' && inputRef.current) {
+    if ((mode === 'add' || editingBillId) && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.select();
     }
-  }, [mode]);
+  }, [mode, editingBillId]);
 
-  useEffect(() => {
-    setAdjustValue(displayAmount.toString());
-  }, [displayAmount]);
+  const syncSnapshot = async (newTotal: number) => {
+    await upsertTodaySnapshot.mutateAsync({
+      matterId,
+      field: 'billed_amount',
+      value: newTotal,
+    });
+  };
 
-  const handleAdjust = async () => {
-    const numValue = parseFloat(adjustValue.replace(/,/g, '')) || 0;
-    if (numValue === displayAmount) {
+  const handleAddBill = async () => {
+    const amount = parseFloat(newAmount.replace(/,/g, '')) || 0;
+    if (amount <= 0) return;
+
+    setIsSaving(true);
+    try {
+      await addBill.mutateAsync(amount);
+      await syncSnapshot(totalBilled + amount);
+      setNewAmount('');
       setMode('view');
+    } catch (error) {
+      console.error('Failed to add bill:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdateBill = async (billId: string, oldAmount: number) => {
+    const newAmt = parseFloat(editValue.replace(/,/g, '')) || 0;
+    if (newAmt === oldAmount) {
+      setEditingBillId(null);
       return;
     }
-    
+
     setIsSaving(true);
     try {
-      await upsertTodaySnapshot.mutateAsync({
-        matterId,
-        field: 'billed_amount',
-        value: numValue,
-      });
-      setMode('view');
+      await updateBill.mutateAsync({ id: billId, amount: newAmt });
+      await syncSnapshot(totalBilled - oldAmount + newAmt);
+      setEditingBillId(null);
     } catch (error) {
-      console.error('Failed to adjust billed amount:', error);
+      console.error('Failed to update bill:', error);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleAddInvoice = async () => {
-    const amount = parseFloat(newInvoiceAmount.replace(/,/g, '')) || 0;
-    if (!newInvoiceNumber.trim() || amount <= 0) return;
-
+  const handleDeleteBill = async (billId: string, amount: number) => {
     setIsSaving(true);
     try {
-      const invoiceInput: CreateInvoiceInput = {
-        matter_id: matterId,
-        invoice_number: newInvoiceNumber.trim(),
-        invoice_date: newInvoiceDate,
-        billed_amount: amount,
-        status: 'Sent',
-      };
-      
-      await createInvoice.mutateAsync(invoiceInput);
-      
-      // Update the snapshot with the new aggregate
-      const newAggregate = aggregateBilled + amount;
-      await upsertTodaySnapshot.mutateAsync({
-        matterId,
-        field: 'billed_amount',
-        value: newAggregate,
-      });
-      
-      // Reset form
-      setNewInvoiceNumber('');
-      setNewInvoiceAmount('');
-      setNewInvoiceDate(format(new Date(), 'yyyy-MM-dd'));
-      setMode('view');
+      await deleteBill.mutateAsync(billId);
+      await syncSnapshot(totalBilled - amount);
     } catch (error) {
-      console.error('Failed to add invoice:', error);
+      console.error('Failed to delete bill:', error);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      if (mode === 'adjust') handleAdjust();
-      else if (mode === 'add') handleAddInvoice();
-    } else if (e.key === 'Escape') {
+  const startEditingBill = (billId: string, amount: number) => {
+    setEditingBillId(billId);
+    setEditValue(amount.toString());
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent, action: () => void) => {
+    if (e.key === 'Enter') action();
+    else if (e.key === 'Escape') {
       setMode('view');
+      setEditingBillId(null);
     }
   };
 
@@ -125,8 +119,8 @@ export function BilledAmountCell({
     setIsOpen(open);
     if (!open) {
       setMode('view');
-      setNewInvoiceNumber('');
-      setNewInvoiceAmount('');
+      setEditingBillId(null);
+      setNewAmount('');
     }
   };
 
@@ -143,12 +137,6 @@ export function BilledAmountCell({
         >
           <span className={cn("flex items-center justify-end", compact ? "gap-0.5" : "gap-1")}>
             {formatCurrency(displayAmount, currency)}
-            {invoices.length > 0 && (
-              <Receipt className={cn(
-                "text-primary/50",
-                compact ? "h-2 w-2" : "h-3 w-3"
-              )} />
-            )}
             <Pencil className={cn(
               "text-primary/50 opacity-0 group-hover:opacity-100 transition-opacity",
               compact ? "h-2 w-2" : "h-3 w-3"
@@ -156,152 +144,152 @@ export function BilledAmountCell({
           </span>
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72" align="end">
-        {mode === 'view' && (
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Total Billed</span>
-              <span className="text-lg font-semibold">{formatCurrency(displayAmount, currency)}</span>
-            </div>
-            
-            {invoicesLoading ? (
-              <div className="flex justify-center py-2">
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              </div>
-            ) : invoices.length > 0 ? (
-              <div className="border-t pt-2 space-y-1 max-h-32 overflow-y-auto">
-                <p className="text-xs text-muted-foreground mb-1">{invoices.length} invoice(s)</p>
-                {invoices.slice(0, 5).map((inv) => (
-                  <div key={inv.id} className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">{inv.invoice_number}</span>
-                    <span>{formatCurrency(inv.billed_amount, currency)}</span>
-                  </div>
-                ))}
-                {invoices.length > 5 && (
-                  <p className="text-xs text-muted-foreground text-center">
-                    +{invoices.length - 5} more
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="text-xs text-muted-foreground text-center py-2">No invoices recorded</p>
-            )}
+      <PopoverContent className="w-64" align="end">
+        <div className="space-y-3">
+          {/* Header with total */}
+          <div className="flex justify-between items-center pb-2 border-b">
+            <span className="text-sm font-medium">Total Billed</span>
+            <span className="text-lg font-semibold">{formatCurrency(displayAmount, currency)}</span>
+          </div>
 
-            <div className="flex gap-2 pt-2 border-t">
+          {/* Bills list in adjust mode */}
+          {mode === 'adjust' && (
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {isLoading ? (
+                <div className="flex justify-center py-2">
+                  <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : bills.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-2">No bills to adjust</p>
+              ) : (
+                bills.map((bill, index) => (
+                  <div key={bill.id} className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground w-12">Bill {index + 1}:</span>
+                    {editingBillId === bill.id ? (
+                      <>
+                        <Input
+                          ref={inputRef}
+                          type="text"
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => handleKeyDown(e, () => handleUpdateBill(bill.id, bill.amount))}
+                          className="h-7 flex-1 text-sm"
+                          disabled={isSaving}
+                        />
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => handleUpdateBill(bill.id, bill.amount)}
+                          disabled={isSaving}
+                        >
+                          {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3 text-success" />}
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => setEditingBillId(null)}
+                        >
+                          <X className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="flex-1 text-sm">{formatCurrency(bill.amount, currency)}</span>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => startEditingBill(bill.id, bill.amount)}
+                        >
+                          <Pencil className="h-3 w-3 text-muted-foreground" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7"
+                          onClick={() => handleDeleteBill(bill.id, bill.amount)}
+                          disabled={isSaving}
+                        >
+                          <Trash2 className="h-3 w-3 text-destructive" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="flex-1"
-                onClick={() => setMode('adjust')}
+                className="w-full text-xs"
+                onClick={() => setMode('view')}
               >
-                <Pencil className="h-3 w-3 mr-1" />
-                Adjust
+                Done
               </Button>
+            </div>
+          )}
+
+          {/* Add bill mode */}
+          {mode === 'add' && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Input
+                  ref={inputRef}
+                  type="text"
+                  value={newAmount}
+                  onChange={(e) => setNewAmount(e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, handleAddBill)}
+                  className="h-8 flex-1"
+                  placeholder="Enter amount..."
+                  disabled={isSaving}
+                />
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  onClick={handleAddBill}
+                  disabled={isSaving || !newAmount}
+                >
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4 text-success" />}
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  onClick={() => setMode('view')}
+                >
+                  <X className="h-4 w-4 text-destructive" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* View mode with action buttons */}
+          {mode === 'view' && (
+            <div className="flex gap-2">
+              {bills.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setMode('adjust')}
+                >
+                  <Pencil className="h-3 w-3 mr-1" />
+                  Adjust
+                </Button>
+              )}
               <Button
                 size="sm"
                 className="flex-1"
                 onClick={() => setMode('add')}
               >
                 <Plus className="h-3 w-3 mr-1" />
-                Add Invoice
+                Add Bill
               </Button>
             </div>
-          </div>
-        )}
-
-        {mode === 'adjust' && (
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Adjust Total Billed</Label>
-            <div className="flex items-center gap-2">
-              <Input
-                ref={inputRef}
-                type="text"
-                value={adjustValue}
-                onChange={(e) => setAdjustValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="h-8"
-                disabled={isSaving}
-              />
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              ) : (
-                <>
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={handleAdjust}>
-                    <Check className="h-4 w-4 text-success" />
-                  </Button>
-                  <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => setMode('view')}>
-                    <X className="h-4 w-4 text-destructive" />
-                  </Button>
-                </>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              This adjusts the snapshot total directly without creating an invoice record.
-            </p>
-          </div>
-        )}
-
-        {mode === 'add' && (
-          <div className="space-y-3">
-            <Label className="text-sm font-medium">Add New Invoice</Label>
-            <div className="space-y-2">
-              <div>
-                <Label className="text-xs text-muted-foreground">Invoice Number</Label>
-                <Input
-                  ref={inputRef}
-                  type="text"
-                  value={newInvoiceNumber}
-                  onChange={(e) => setNewInvoiceNumber(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="h-8"
-                  placeholder="e.g. INV-001"
-                  disabled={isSaving}
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Amount</Label>
-                <Input
-                  type="text"
-                  value={newInvoiceAmount}
-                  onChange={(e) => setNewInvoiceAmount(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="h-8"
-                  placeholder="0.00"
-                  disabled={isSaving}
-                />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Date</Label>
-                <Input
-                  type="date"
-                  value={newInvoiceDate}
-                  onChange={(e) => setNewInvoiceDate(e.target.value)}
-                  className="h-8"
-                  disabled={isSaving}
-                />
-              </div>
-            </div>
-            <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex-1"
-                onClick={() => setMode('view')}
-                disabled={isSaving}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                className="flex-1"
-                onClick={handleAddInvoice}
-                disabled={isSaving || !newInvoiceNumber.trim() || !newInvoiceAmount}
-              >
-                {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Add'}
-              </Button>
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </PopoverContent>
     </Popover>
   );

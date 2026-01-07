@@ -266,19 +266,22 @@ export default function Matters() {
   // The API returns rates as "1 USD = X currency", so GBP rate tells us how many GBP per USD
   // To get USD per GBP: 1 / gbpRate
   const gbpToUsdRate = useMemo(() => {
-    if (!exchangeRatesData?.rates?.GBP) return 1.27; // Default fallback
-    // If 1 USD = 0.79 GBP, then 1 GBP = 1/0.79 USD = 1.27 USD
+    if (!exchangeRatesData?.rates?.GBP) return 1.35; // Default fallback
+    // If 1 USD = 0.74 GBP, then 1 GBP = 1/0.74 USD = 1.35 USD
     return 1 / exchangeRatesData.rates.GBP;
   }, [exchangeRatesData]);
+
+  // Get live rates for direct currency conversion
+  const liveRates = exchangeRatesData?.rates as Record<string, number> | undefined;
 
   const categoryTotals = useMemo(() => {
     return filteredMatters.reduce((sum, m) => {
       const feeCurrency = m.fee_currency || 'GBP';
       const exchangeRate = m.exchange_rate || 1;
       const bmFee = m.bm_fee_component || 0;
-      return sum + convertToUsd(bmFee, feeCurrency, exchangeRate, gbpToUsdRate);
+      return sum + convertToUsd(bmFee, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
     }, 0);
-  }, [filteredMatters, gbpToUsdRate]);
+  }, [filteredMatters, gbpToUsdRate, liveRates]);
 
   const closedFeesPaid = useMemo(() => {
     if (categoryFilter !== 'Closed') return 0;
@@ -286,9 +289,9 @@ export default function Matters() {
       const feeCurrency = m.fee_currency || 'GBP';
       const exchangeRate = m.exchange_rate || 1;
       const paidAmount = m.latest_snapshot?.paid_amount || 0;
-      return sum + convertToUsd(paidAmount, feeCurrency, exchangeRate, gbpToUsdRate);
+      return sum + convertToUsd(paidAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
     }, 0);
-  }, [filteredMatters, categoryFilter, gbpToUsdRate]);
+  }, [filteredMatters, categoryFilter, gbpToUsdRate, liveRates]);
 
   const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <button
@@ -534,7 +537,7 @@ export default function Matters() {
                                 </span>
                                 {!(matter as any).different_billing_currency && matter.fee_currency !== 'USD' && (
                                   <span className="text-[10px] text-muted-foreground/70">
-                                    ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(convertToUsd(matter.bm_fee_component, matter.fee_currency || 'GBP', matter.exchange_rate || 1, gbpToUsdRate))}
+                                    ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(convertToUsd(matter.bm_fee_component, matter.fee_currency || 'GBP', matter.exchange_rate || 1, gbpToUsdRate, liveRates))}
                                   </span>
                                 )}
                               </div>
@@ -548,7 +551,7 @@ export default function Matters() {
                                   {/* Always show USD equivalent for non-USD currencies */}
                                   {((matter as any).effective_currency ?? matter.fee_currency) !== 'USD' && (
                                     <span className="text-[10px] text-muted-foreground/70 font-normal">
-                                      ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(convertToUsd((matter as any).effective_bm_fee ?? matter.bm_fee_component, (matter as any).effective_currency ?? matter.fee_currency ?? 'GBP', matter.exchange_rate || 1, gbpToUsdRate))}
+                                      ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(convertToUsd((matter as any).effective_bm_fee ?? matter.bm_fee_component, (matter as any).effective_currency ?? matter.fee_currency ?? 'GBP', matter.exchange_rate || 1, gbpToUsdRate, liveRates))}
                                     </span>
                                   )}
                                 </div>

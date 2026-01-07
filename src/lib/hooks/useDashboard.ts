@@ -65,8 +65,9 @@ export function useDashboard(excludedMatterIds: string[] = []) {
     queryFn: async () => {
       // Fetch exchange rates for GBP to USD conversion
       const { data: ratesData } = await supabase.functions.invoke('fetch-exchange-rates');
-      // Calculate GBP to USD rate: if 1 USD = 0.79 GBP, then 1 GBP = 1/0.79 USD = 1.27 USD
-      const gbpToUsdRate = ratesData?.rates?.GBP ? (1 / ratesData.rates.GBP) : 1.27;
+      // Calculate GBP to USD rate: if 1 USD = 0.74 GBP, then 1 GBP = 1/0.74 USD = 1.35 USD
+      const gbpToUsdRate = ratesData?.rates?.GBP ? (1 / ratesData.rates.GBP) : 1.35;
+      const liveRates = ratesData?.rates as Record<string, number> | undefined;
       
       // Get all Live matters with their clients
       const { data: liveMatters, error: mattersError } = await supabase
@@ -148,7 +149,7 @@ export function useDashboard(excludedMatterIds: string[] = []) {
         const bmFee = Number(matter.bm_fee_component) || 0;
         const exchangeRate = Number(matter.exchange_rate) || 1;
         const feeCurrency = matter.fee_currency || 'GBP';
-        totalPipelineValueUsd += convertToUsd(bmFee, feeCurrency, exchangeRate, gbpToUsdRate);
+        totalPipelineValueUsd += convertToUsd(bmFee, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
       });
       const today = new Date();
 
@@ -179,11 +180,11 @@ export function useDashboard(excludedMatterIds: string[] = []) {
 
         // Only include in financial totals if not excluded
         if (!isExcluded) {
-          // Convert to USD using proper conversion (via GBP)
-          totalBmFeesUsd += convertToUsd(effectiveBmFee, feeCurrency, exchangeRate, gbpToUsdRate);
-          totalWipUsd += convertToUsd(wipAmount, feeCurrency, exchangeRate, gbpToUsdRate);
-          totalBilledUsd += convertToUsd(billedAmount, feeCurrency, exchangeRate, gbpToUsdRate);
-          totalPaidUsd += convertToUsd(paidAmount, feeCurrency, exchangeRate, gbpToUsdRate);
+          // Convert to USD using live rates for accuracy
+          totalBmFeesUsd += convertToUsd(effectiveBmFee, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          totalWipUsd += convertToUsd(wipAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          totalBilledUsd += convertToUsd(billedAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          totalPaidUsd += convertToUsd(paidAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
         }
 
         const totalUsed = billedAmount + wipAmount;
@@ -394,10 +395,13 @@ export function useDashboard(excludedMatterIds: string[] = []) {
       const avgCollectionRate = totalBilledUsd > 0 ? (totalPaidUsd / totalBilledUsd) * 100 : 100;
 
       // Build historical trend data from all snapshots
-      // Create a map of matter_id to exchange_rate for currency conversion
-      const matterExchangeRates = new Map<string, number>();
+      // Create a map of matter_id to matter data for currency conversion
+      const matterDataMap = new Map<string, { exchangeRate: number; feeCurrency: string }>();
       liveMatters?.forEach(matter => {
-        matterExchangeRates.set(matter.id, Number(matter.exchange_rate) || 1);
+        matterDataMap.set(matter.id, {
+          exchangeRate: Number(matter.exchange_rate) || 1,
+          feeCurrency: matter.fee_currency || 'GBP'
+        });
       });
 
       // Group all snapshots by date and aggregate (excluding excluded matters)
@@ -407,12 +411,14 @@ export function useDashboard(excludedMatterIds: string[] = []) {
         if (excludedSet.has(snap.matter_id)) return;
         
         const dateKey = snap.as_of_date;
-        const exchangeRate = matterExchangeRates.get(snap.matter_id) || 1;
+        const matterData = matterDataMap.get(snap.matter_id);
+        const exchangeRate = matterData?.exchangeRate || 1;
+        const feeCurrency = matterData?.feeCurrency || 'GBP';
         
         const existing = trendByDate.get(dateKey) || { wip: 0, billed: 0, paid: 0 };
-        existing.wip += (Number(snap.wip_amount) || 0) * exchangeRate;
-        existing.billed += (Number(snap.billed_amount) || 0) * exchangeRate;
-        existing.paid += (Number(snap.paid_amount) || 0) * exchangeRate;
+        existing.wip += convertToUsd(Number(snap.wip_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+        existing.billed += convertToUsd(Number(snap.billed_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+        existing.paid += convertToUsd(Number(snap.paid_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
         trendByDate.set(dateKey, existing);
       });
 

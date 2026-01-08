@@ -827,9 +827,9 @@ export function QuickToDoButton() {
           selectedTasks.has(task.id) && "bg-primary/10"
         )}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-start gap-2">
           {/* Dual checkbox: complete with notes + quick complete */}
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-1 shrink-0 mt-0.5">
             <button
               type="button"
               onClick={() => openCompleteDialog(task)}
@@ -853,14 +853,13 @@ export function QuickToDoButton() {
               onChange={(e) => setEditedTitle(e.target.value)}
               onBlur={handleSave}
               onKeyDown={handleKeyDownRow}
-              className="flex-1 h-7 text-sm"
+              className="flex-1 min-w-0 h-7 text-sm"
             />
           ) : (
             <span 
-              className="flex-1 text-sm cursor-pointer hover:bg-background/50 rounded px-1 -mx-1"
+              className="flex-1 min-w-0 text-sm cursor-pointer hover:bg-background/50 rounded px-1 -mx-1 break-words"
               onClick={() => setIsEditing(true)}
               title="Click to edit"
-              style={{ wordBreak: 'break-word' }}
             >
               {task.title}
             </span>

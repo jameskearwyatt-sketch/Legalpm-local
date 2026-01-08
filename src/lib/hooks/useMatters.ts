@@ -69,6 +69,15 @@ export interface Matter {
   };
 }
 
+export interface LocalCounselBrief {
+  id: string;
+  firm_name: string;
+  billing_mode: 'Direct' | 'Disb' | null;
+  allocated_budget: number;
+  wip_amount: number;
+  billed_amount: number;
+}
+
 export interface MatterWithFinancials extends Matter {
   latest_snapshot?: {
     wip_amount: number;
@@ -82,6 +91,7 @@ export interface MatterWithFinancials extends Matter {
   headroom: number;
   headroom_percent: number;
   total_paid_ar_wip: number;
+  local_counsels?: LocalCounselBrief[];
 }
 
 export interface CreateMatterInput {
@@ -171,8 +181,9 @@ export function useMatters() {
         }
       });
       
-      // Create a map of matter_id to aggregated LC financials
+      // Create a map of matter_id to aggregated LC financials and full LC list
       const lcAggregateMap = new Map<string, { totalWip: number; totalBilled: number; totalAllocated: number }>();
+      const lcListMap = new Map<string, LocalCounselBrief[]>();
       localCounsels?.forEach(lc => {
         const existing = lcAggregateMap.get(lc.matter_id) || { totalWip: 0, totalBilled: 0, totalAllocated: 0 };
         lcAggregateMap.set(lc.matter_id, {
@@ -180,6 +191,17 @@ export function useMatters() {
           totalBilled: existing.totalBilled + (lc.billed_amount || 0),
           totalAllocated: existing.totalAllocated + (lc.allocated_budget || 0),
         });
+        // Also store the full LC list per matter
+        const existingList = lcListMap.get(lc.matter_id) || [];
+        existingList.push({
+          id: lc.id,
+          firm_name: lc.firm_name,
+          billing_mode: lc.billing_mode as 'Direct' | 'Disb' | null,
+          allocated_budget: lc.allocated_budget || 0,
+          wip_amount: lc.wip_amount || 0,
+          billed_amount: lc.billed_amount || 0,
+        });
+        lcListMap.set(lc.matter_id, existingList);
       });
 
       // Combine matters with their financial data
@@ -194,6 +216,7 @@ export function useMatters() {
         // Local counsel financials - prefer aggregated from matter_local_counsels table
         const matterAny = matter as any;
         const lcAggregate = lcAggregateMap.get(matter.id);
+        const localCounsels = lcListMap.get(matter.id) || [];
         const localCounselBilling = matterAny.local_counsel_billing;
         
         // Use aggregated LC data from the new table if available, otherwise fall back to old fields
@@ -277,6 +300,8 @@ export function useMatters() {
           // Override legacy lc_wip/lc_billed with aggregated values from matter_local_counsels
           lc_wip: lcWip,
           lc_billed: lcBilled,
+          // Include full local counsels list for per-LC billing mode display
+          local_counsels: localCounsels,
         } as MatterWithFinancials;
       }) || [];
     },

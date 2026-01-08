@@ -4,8 +4,25 @@ import {
   Briefcase, GraduationCap, Lightbulb, Maximize2, Minimize2,
   ListTodo, LayoutGrid, Filter, Check, ChevronDown, ChevronRight,
   Zap, Target, CalendarClock, Feather, Flame, MessageSquare, Pin, PinOff,
-  Clipboard, ClipboardCheck, GripHorizontal
+  Clipboard, ClipboardCheck, GripHorizontal, GripVertical
 } from "lucide-react";
+import { 
+  DndContext, 
+  closestCenter, 
+  KeyboardSensor, 
+  PointerSensor, 
+  useSensor, 
+  useSensors,
+  DragEndEvent 
+} from "@dnd-kit/core";
+import { 
+  arrayMove, 
+  SortableContext, 
+  sortableKeyboardCoordinates, 
+  useSortable, 
+  verticalListSortingStrategy 
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { formatDistanceToNow, format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -259,6 +276,90 @@ const TriagePills = ({ task, onUpdate, compact = false, disabled = false }: Tria
   );
 };
 
+// Sortable Slate Item Component
+interface SortableSlateItemProps {
+  task: UnifiedTask;
+  index: number;
+  onCompleteWithNotes: () => void;
+  onQuickComplete: () => void;
+  onRemoveFromSlate: () => void;
+}
+
+const SortableSlateItem = ({ 
+  task, 
+  index, 
+  onCompleteWithNotes, 
+  onQuickComplete, 
+  onRemoveFromSlate 
+}: SortableSlateItemProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1 : 0,
+  };
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style}
+      className={cn(
+        "flex items-center gap-2 p-2 rounded-lg bg-muted/50 group",
+        isDragging && "shadow-lg ring-2 ring-primary/20"
+      )}
+    >
+      {/* Drag handle with number */}
+      <div 
+        {...attributes} 
+        {...listeners}
+        className="flex items-center gap-1 shrink-0 cursor-grab active:cursor-grabbing touch-none"
+      >
+        <div className="flex items-center justify-center w-5 h-5 rounded bg-primary/10 text-primary text-xs font-bold">
+          {index + 1}
+        </div>
+        <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
+      </div>
+      
+      {/* Dual checkbox */}
+      <div className="flex items-center gap-1 shrink-0">
+        <button
+          type="button"
+          onClick={onCompleteWithNotes}
+          className="h-4 w-4 rounded border border-input flex items-center justify-center hover:bg-accent hover:border-primary transition-colors"
+          title="Complete with notes"
+        >
+          <MessageSquare className="h-2.5 w-2.5 text-muted-foreground" />
+        </button>
+        <Checkbox
+          checked={task.is_completed}
+          onCheckedChange={onQuickComplete}
+          className="h-4 w-4"
+          title="Quick complete"
+        />
+      </div>
+      <span className="flex-1 text-sm truncate">{task.title}</span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 opacity-0 group-hover:opacity-100"
+        onClick={onRemoveFromSlate}
+        title="Remove from Slate"
+      >
+        <ClipboardCheck className="h-3.5 w-3.5 text-blue-500" />
+      </Button>
+    </div>
+  );
+};
+
 export function QuickToDoButton() {
   const { user } = useAuth();
   const { projects } = useGrowthProjects();
@@ -295,7 +396,8 @@ export function QuickToDoButton() {
   const [isDraggingSlate, setIsDraggingSlate] = useState(false);
   const slateDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
   const slateRef = useRef<HTMLDivElement>(null);
-
+  const [slateTaskOrder, setSlateTaskOrder] = useState<string[]>([]);
+  const SLATE_ORDER_KEY = 'slate-task-order';
   // Triage debouncing - track tasks being actively triaged
   // Key: taskId, Value: { lastTriageTime, previousQuadrant }
   const [tasksBeingTriaged, setTasksBeingTriaged] = useState<Map<string, { lastTriageTime: number; previousQuadrant: EisenhowerQuadrant }>>(new Map());
@@ -352,6 +454,28 @@ export function QuickToDoButton() {
       localStorage.setItem(SLATE_POSITION_KEY, JSON.stringify(slatePosition));
     }
   }, [slatePosition]);
+
+  // Load saved slate task order on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(SLATE_ORDER_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setSlateTaskOrder(parsed);
+        }
+      } catch {
+        // Invalid saved order
+      }
+    }
+  }, []);
+
+  // Save slate task order when it changes
+  useEffect(() => {
+    if (slateTaskOrder.length > 0) {
+      localStorage.setItem(SLATE_ORDER_KEY, JSON.stringify(slateTaskOrder));
+    }
+  }, [slateTaskOrder]);
 
   // Slate drag handlers
   const handleSlateMouseDown = useCallback((e: React.MouseEvent) => {
@@ -803,8 +927,50 @@ export function QuickToDoButton() {
   // Untriaged count for blue badge
   const untriagedCount = useMemo(() => pendingTasks.filter(t => !isFullyTriaged(t)).length, [pendingTasks]);
   
-  // Slate tasks (both quick and growth tasks can be on slate)
-  const slateTasks = useMemo(() => allUnifiedTasks.filter(t => t.on_slate && !t.is_completed), [allUnifiedTasks]);
+  // Slate tasks (both quick and growth tasks can be on slate) - ordered by user preference
+  const rawSlateTasks = useMemo(() => allUnifiedTasks.filter(t => t.on_slate && !t.is_completed), [allUnifiedTasks]);
+  
+  // Order slate tasks based on saved order, with new tasks at the end
+  const orderedSlateTasks = useMemo(() => {
+    if (slateTaskOrder.length === 0) return rawSlateTasks;
+    
+    const orderedTasks: UnifiedTask[] = [];
+    const taskMap = new Map(rawSlateTasks.map(t => [t.id, t]));
+    
+    // Add tasks in saved order
+    slateTaskOrder.forEach(id => {
+      const task = taskMap.get(id);
+      if (task) {
+        orderedTasks.push(task);
+        taskMap.delete(id);
+      }
+    });
+    
+    // Add any new tasks that weren't in the saved order
+    taskMap.forEach(task => orderedTasks.push(task));
+    
+    return orderedTasks;
+  }, [rawSlateTasks, slateTaskOrder]);
+
+  // Sensors for dnd-kit (for slate reordering)
+  const slateSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  // Handle slate task reorder
+  const handleSlateDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = orderedSlateTasks.findIndex(t => t.id === active.id);
+    const newIndex = orderedSlateTasks.findIndex(t => t.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newOrder = arrayMove(orderedSlateTasks.map(t => t.id), oldIndex, newIndex);
+      setSlateTaskOrder(newOrder);
+    }
+  }, [orderedSlateTasks]);
 
   const groupedTasks = useMemo(() => {
     let filtered = pendingTasks;
@@ -997,9 +1163,7 @@ export function QuickToDoButton() {
       width: panelWidth,
       height: 'calc(100vh - 100px)',
     };
-  };
-
-
+};
   const activeProjects = projects?.filter(p => p.status === 'active') || [];
 
   // Task Row Component
@@ -1480,16 +1644,16 @@ export function QuickToDoButton() {
                 "group-hover:scale-110",
                 "flex items-center justify-center text-white",
                 "shadow-md",
-                slateTasks.length === 0 && "opacity-60 group-hover:opacity-80"
+                orderedSlateTasks.length === 0 && "opacity-60 group-hover:opacity-80"
               )}
-              title={`Slate (${slateTasks.length} tasks)`}
+              title={`Slate (${orderedSlateTasks.length} tasks)`}
             >
               <Clipboard className="h-3.5 w-3.5" />
             </button>
             {/* Slate count badge */}
-            {slateTasks.length > 0 && (
+            {orderedSlateTasks.length > 0 && (
               <span className="absolute -top-1 -right-1 flex min-w-4 h-4 px-0.5 items-center justify-center rounded-full bg-blue-400 text-[10px] font-bold text-white">
-                {slateTasks.length}
+                {orderedSlateTasks.length}
               </span>
             )}
           </div>
@@ -1567,7 +1731,7 @@ export function QuickToDoButton() {
                 <div>
                   <h3 className="font-bold text-white text-sm">Slate</h3>
                   <p className="text-[10px] text-white/80">
-                    {slateTasks.length} {slateTasks.length === 1 ? 'task' : 'tasks'} to do now
+                    {orderedSlateTasks.length} {orderedSlateTasks.length === 1 ? 'task' : 'tasks'} to do now
                   </p>
                 </div>
               </div>
@@ -1586,63 +1750,69 @@ export function QuickToDoButton() {
 
           {/* Slate Tasks */}
           <ScrollArea className="flex-1 p-3">
-            {slateTasks.length === 0 ? (
+            {orderedSlateTasks.length === 0 ? (
               <p className="text-center text-muted-foreground text-sm py-8">
                 No tasks on your Slate yet.<br />
                 Add tasks from your triaged list.
               </p>
             ) : (
-              <div className="space-y-2">
-                {slateTasks.map(task => (
-                  <div key={task.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 group">
-                    {/* Dual checkbox */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const unified: UnifiedTask = { ...task, source: 'quick' as const };
+              <DndContext
+                sensors={slateSensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleSlateDragEnd}
+              >
+                <SortableContext 
+                  items={orderedSlateTasks.map(t => t.id)} 
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {orderedSlateTasks.map((task, index) => (
+                      <SortableSlateItem
+                        key={task.id}
+                        task={task}
+                        index={index}
+                        onCompleteWithNotes={() => {
+                          const unified: UnifiedTask = { ...task, source: task.source };
                           setTaskToComplete(unified);
                           setCompletionNotes("");
                           setCompleteDialogOpen(true);
                         }}
-                        className="h-4 w-4 rounded border border-input flex items-center justify-center hover:bg-accent hover:border-primary transition-colors"
-                        title="Complete with notes"
-                      >
-                        <MessageSquare className="h-2.5 w-2.5 text-muted-foreground" />
-                      </button>
-                      <Checkbox
-                        checked={task.is_completed}
-                        onCheckedChange={async () => {
-                          const { error } = await supabase
-                            .from('quick_tasks')
-                            .update({
-                              is_completed: true,
-                              completed_at: new Date().toISOString(),
-                            })
-                            .eq('id', task.id);
-                          if (error) {
-                            toast.error('Failed to complete task');
+                        onQuickComplete={async () => {
+                          if (task.source === 'growth') {
+                            const realId = task.id.replace('growth-', '');
+                            const { error } = await supabase
+                              .from('growth_tasks')
+                              .update({
+                                is_completed: true,
+                                completed_at: new Date().toISOString(),
+                              })
+                              .eq('id', realId);
+                            if (error) {
+                              toast.error('Failed to complete task');
+                            } else {
+                              refetchGrowthTasks();
+                            }
                           } else {
-                            fetchTasks();
+                            const { error } = await supabase
+                              .from('quick_tasks')
+                              .update({
+                                is_completed: true,
+                                completed_at: new Date().toISOString(),
+                              })
+                              .eq('id', task.id);
+                            if (error) {
+                              toast.error('Failed to complete task');
+                            } else {
+                              fetchTasks();
+                            }
                           }
                         }}
-                        className="h-4 w-4"
-                        title="Quick complete"
+                        onRemoveFromSlate={() => toggleSlate(task.id, true, task.source)}
                       />
-                    </div>
-                    <span className="flex-1 text-sm truncate">{task.title}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                      onClick={() => toggleSlate(task.id, true, task.source)}
-                      title="Remove from Slate"
-                    >
-                      <ClipboardCheck className="h-3.5 w-3.5 text-blue-500" />
-                    </Button>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             )}
           </ScrollArea>
           
@@ -1705,11 +1875,11 @@ export function QuickToDoButton() {
                   }}
                   className={cn(
                     "h-7 w-7 flex items-center justify-center rounded-full transition-colors text-white",
-                    slateTasks.length > 0 
+                    orderedSlateTasks.length > 0 
                       ? "bg-blue-500/50 hover:bg-blue-500/70" 
                       : "bg-white/20 hover:bg-white/30"
                   )}
-                  title={`Open Slate (${slateTasks.length} tasks)`}
+                  title={`Open Slate (${orderedSlateTasks.length} tasks)`}
                 >
                   <Clipboard className="h-3.5 w-3.5" />
                 </button>

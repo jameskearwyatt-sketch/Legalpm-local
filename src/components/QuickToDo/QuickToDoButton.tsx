@@ -316,9 +316,26 @@ export function QuickToDoButton() {
   };
 
   const getPanelStyle = (): React.CSSProperties => {
-    const panelWidth = isExpanded ? Math.min(480, window.innerWidth - 48) : Math.min(320, window.innerWidth - 24);
-    const panelHeight = isExpanded ? Math.min(600, window.innerHeight - 120) : 440;
-    const margin = 12;
+    const margin = isExpanded ? 24 : 12;
+    const panelWidth = isExpanded 
+      ? Math.min(window.innerWidth - margin * 2, window.innerWidth - 48) 
+      : Math.min(320, window.innerWidth - 24);
+    const panelHeight = isExpanded 
+      ? window.innerHeight - margin * 2 - 80 // Leave room for the floating button
+      : 440;
+
+    if (isExpanded) {
+      // Centered full-screen style
+      return {
+        position: 'fixed',
+        left: margin,
+        top: margin,
+        right: 'auto',
+        bottom: 'auto',
+        width: panelWidth,
+        height: panelHeight,
+      };
+    }
 
     if (position) {
       let left: number;
@@ -354,8 +371,13 @@ export function QuickToDoButton() {
 
   const getOpenButtonStyle = (): React.CSSProperties => {
     const panelStyle = getPanelStyle();
-    const panelWidth = isExpanded ? Math.min(480, window.innerWidth - 48) : Math.min(320, window.innerWidth - 24);
-    const panelHeight = isExpanded ? Math.min(600, window.innerHeight - 120) : 440;
+    const margin = isExpanded ? 24 : 12;
+    const panelWidth = isExpanded 
+      ? Math.min(window.innerWidth - margin * 2, window.innerWidth - 48) 
+      : Math.min(320, window.innerWidth - 24);
+    const panelHeight = isExpanded 
+      ? window.innerHeight - margin * 2 - 80
+      : 440;
     const buttonSize = 56;
 
     const panelLeft = panelStyle.left as number ?? 24;
@@ -641,7 +663,7 @@ export function QuickToDoButton() {
       {isOpen && (
         <div
           className={cn(
-            "z-50 rounded-xl border-0 shadow-2xl shadow-teal-500/20 overflow-hidden animate-scale-in bg-background transition-all duration-300",
+            "z-50 rounded-xl border-0 shadow-2xl shadow-teal-500/20 overflow-hidden animate-scale-in bg-background transition-all duration-300 flex flex-col",
             isExpanded ? "max-w-[calc(100vw-3rem)]" : "max-w-[calc(100vw-3rem)]"
           )}
           style={getPanelStyle()}
@@ -694,7 +716,7 @@ export function QuickToDoButton() {
           </div>
 
           {/* Task List */}
-          <ScrollArea className={isExpanded ? "h-[calc(100%-140px)]" : "h-[320px]"} style={{ height: isExpanded ? Math.min(600, window.innerHeight - 120) - 140 : 320 }}>
+          <ScrollArea className="flex-1" style={{ height: isExpanded ? 'calc(100% - 140px)' : 320 }}>
             <div className="p-3 space-y-2">
               {incompleteTasks.length === 0 && completedTasks.length === 0 && (
                 <p className="text-center text-muted-foreground text-sm py-8">

@@ -713,7 +713,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 onClick={() => setIsDetailedWipOpen(true)}
               >
                 <TrendingUp className="h-4 w-4 mr-2" />
-                Detailed WIP Update
+                Detailed Budget Utilisation Update
               </Button>
               <Button
                 variant="ghost"
@@ -721,7 +721,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 onClick={() => setIsWipHistoryOpen(true)}
               >
                 <History className="h-4 w-4 mr-2" />
-                WIP History
+                Budget Utilisation History
               </Button>
             </>
           )}

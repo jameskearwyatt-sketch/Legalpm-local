@@ -163,10 +163,10 @@ export function DetailedWipUpdateModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TrendingUp className="h-5 w-5" />
-            Detailed WIP Update
+            Detailed Budget Utilisation Update
           </DialogTitle>
           <DialogDescription>
-            Update the work in progress for each budget line item
+            Update the budget utilisation for each budget line item
           </DialogDescription>
         </DialogHeader>
 

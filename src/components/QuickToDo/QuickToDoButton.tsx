@@ -703,7 +703,8 @@ export function QuickToDoButton() {
       right: 'auto',
       bottom: 'auto',
       width: panelWidth,
-      maxHeight: `calc(100vh - 100px)`,
+      maxHeight: `calc(100vh - 120px)`,
+      height: 700,
     };
   };
 

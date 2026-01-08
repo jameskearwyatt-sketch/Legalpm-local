@@ -71,62 +71,88 @@ export const DocumentRepository = ({
 }: DocumentRepositoryProps) => {
   const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [title, setTitle] = useState('');
   const [askSummarize, setAskSummarize] = useState(false);
-  const [pendingDocument, setPendingDocument] = useState<{ id: string; url: string; name: string } | null>(null);
+  const [pendingDocuments, setPendingDocuments] = useState<{ id: string; url: string; name: string }[]>([]);
   const [summarizingId, setSummarizingId] = useState<string | null>(null);
   const [viewingSummary, setViewingSummary] = useState<GrowthDocument | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
+    const files = e.target.files;
+    if (!files || files.length === 0 || !user) return;
 
     setIsUploading(true);
+    setUploadProgress({ current: 0, total: files.length });
+    
+    const uploadedDocs: { id: string; url: string; name: string }[] = [];
+    
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `${user.id}/${projectId}/documents/${fileName}`;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        setUploadProgress({ current: i + 1, total: files.length });
+        
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${i}.${fileExt}`;
+        const filePath = `${user.id}/${projectId}/documents/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from('growth-files')
-        .upload(filePath, file);
+        const { error: uploadError } = await supabase.storage
+          .from('growth-files')
+          .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+        if (uploadError) {
+          toast.error(`Failed to upload ${file.name}: ${uploadError.message}`);
+          continue;
+        }
 
-      const { data: urlData } = supabase.storage
-        .from('growth-files')
-        .getPublicUrl(filePath);
+        const { data: urlData } = supabase.storage
+          .from('growth-files')
+          .getPublicUrl(filePath);
 
-      // Insert document record
-      const { data: docData, error: insertError } = await supabase
-        .from('growth_project_documents')
-        .insert({
-          project_id: projectId,
-          user_id: user.id,
-          title: title.trim() || file.name,
-          file_url: urlData.publicUrl,
-          file_name: file.name,
-          file_type: file.type,
-        })
-        .select()
-        .single();
+        // For multiple files, use individual file names as titles
+        const docTitle = files.length === 1 && title.trim() ? title.trim() : file.name;
 
-      if (insertError) throw insertError;
+        // Insert document record
+        const { data: docData, error: insertError } = await supabase
+          .from('growth_project_documents')
+          .insert({
+            project_id: projectId,
+            user_id: user.id,
+            title: docTitle,
+            file_url: urlData.publicUrl,
+            file_name: file.name,
+            file_type: file.type,
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          toast.error(`Failed to save ${file.name}: ${insertError.message}`);
+          continue;
+        }
+
+        uploadedDocs.push({ id: docData.id, url: urlData.publicUrl, name: file.name });
+      }
 
       onDocumentAdded();
       setShowUpload(false);
       setTitle('');
       
-      // Ask if user wants AI summary
-      setPendingDocument({ id: docData.id, url: urlData.publicUrl, name: file.name });
-      setAskSummarize(true);
+      // Ask if user wants AI summaries for uploaded docs
+      if (uploadedDocs.length > 0) {
+        setPendingDocuments(uploadedDocs);
+        setAskSummarize(true);
+      }
+      
+      toast.success(`Uploaded ${uploadedDocs.length} document${uploadedDocs.length > 1 ? 's' : ''}`);
       
     } catch (error: any) {
-      toast.error('Failed to upload document: ' + error.message);
+      toast.error('Failed to upload documents: ' + error.message);
     } finally {
       setIsUploading(false);
+      setUploadProgress(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -169,9 +195,15 @@ export const DocumentRepository = ({
       toast.error('Failed to generate summary');
     } finally {
       setSummarizingId(null);
-      setAskSummarize(false);
-      setPendingDocument(null);
     }
+  };
+
+  const handleSummarizeAll = async () => {
+    for (const doc of pendingDocuments) {
+      await handleGenerateSummary(doc.id, doc.url, doc.name);
+    }
+    setAskSummarize(false);
+    setPendingDocuments([]);
   };
 
   const handleDelete = async (docId: string) => {
@@ -209,7 +241,7 @@ export const DocumentRepository = ({
         {showUpload && (
           <div className="border rounded-lg p-4 space-y-3 bg-muted/30 mb-4">
             <Input
-              placeholder="Document title (optional)"
+              placeholder="Document title (optional, for single file)"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
@@ -220,12 +252,15 @@ export const DocumentRepository = ({
               {isUploading ? (
                 <div className="flex flex-col items-center gap-2">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Uploading...</p>
+                  <p className="text-sm text-muted-foreground">
+                    Uploading{uploadProgress ? ` ${uploadProgress.current} of ${uploadProgress.total}` : ''}...
+                  </p>
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-2">
                   <Upload className="h-6 w-6 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground">Click to upload a document</p>
+                  <p className="text-sm text-muted-foreground">Click to upload documents</p>
+                  <p className="text-xs text-muted-foreground">You can select multiple files</p>
                 </div>
               )}
               <input
@@ -234,6 +269,7 @@ export const DocumentRepository = ({
                 className="hidden"
                 onChange={handleFileUpload}
                 accept=".pdf,.doc,.docx,.txt,.md,.xls,.xlsx,.ppt,.pptx"
+                multiple
               />
             </div>
             <div className="flex justify-end">
@@ -350,25 +386,31 @@ export const DocumentRepository = ({
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-yellow-500" />
-              Generate AI Summary?
+              Generate AI {pendingDocuments.length > 1 ? 'Summaries' : 'Summary'}?
             </DialogTitle>
             <DialogDescription>
-              Would you like me to generate an AI summary of this document? This can help you quickly understand the key points.
+              {pendingDocuments.length > 1 
+                ? `Would you like me to generate AI summaries for ${pendingDocuments.length} documents? This can help you quickly understand the key points.`
+                : 'Would you like me to generate an AI summary of this document? This can help you quickly understand the key points.'
+              }
             </DialogDescription>
           </DialogHeader>
+          {pendingDocuments.length > 1 && (
+            <div className="text-sm text-muted-foreground max-h-32 overflow-auto">
+              {pendingDocuments.map((doc, i) => (
+                <div key={doc.id} className="truncate">• {doc.name}</div>
+              ))}
+            </div>
+          )}
           <div className="flex justify-end gap-2 mt-4">
             <Button 
               variant="outline" 
-              onClick={() => { setAskSummarize(false); setPendingDocument(null); }}
+              onClick={() => { setAskSummarize(false); setPendingDocuments([]); }}
             >
               No, thanks
             </Button>
             <Button 
-              onClick={() => {
-                if (pendingDocument) {
-                  handleGenerateSummary(pendingDocument.id, pendingDocument.url, pendingDocument.name);
-                }
-              }}
+              onClick={handleSummarizeAll}
               disabled={summarizingId !== null}
             >
               {summarizingId ? (
@@ -379,7 +421,7 @@ export const DocumentRepository = ({
               ) : (
                 <>
                   <Sparkles className="h-4 w-4 mr-2" />
-                  Yes, summarize
+                  Yes, summarize{pendingDocuments.length > 1 ? ' all' : ''}
                 </>
               )}
             </Button>

@@ -42,16 +42,47 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [deadlineOpen, setDeadlineOpen] = useState(false);
   const [editingAssignee, setEditingAssignee] = useState(task.assignee || '');
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(task.title);
   const inputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Sync editingAssignee when popover opens
   useEffect(() => {
     if (assigneeOpen) {
       setEditingAssignee(task.assignee || '');
-      // Focus after state update
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [assigneeOpen, task.assignee]);
+
+  // Focus title input when editing starts
+  useEffect(() => {
+    if (isEditingTitle) {
+      setEditedTitle(task.title);
+      setTimeout(() => {
+        titleInputRef.current?.focus();
+        titleInputRef.current?.select();
+      }, 0);
+    }
+  }, [isEditingTitle, task.title]);
+
+  const handleTitleSave = () => {
+    const trimmed = editedTitle.trim();
+    if (trimmed && trimmed !== task.title) {
+      onUpdate({ title: trimmed });
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTitleSave();
+    } else if (e.key === 'Escape') {
+      setEditedTitle(task.title);
+      setIsEditingTitle(false);
+    }
+  };
 
   // Calculate the due date for coloring
   const dueDate = task.deadline_set_at && task.deadline_type !== 'no_deadline'
@@ -92,13 +123,28 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
       />
       
       <div className="flex-1 min-w-0">
-        <p className={cn(
-          "text-sm font-medium",
-          titleColor,
-          task.is_completed && 'line-through'
-        )}>
-          {task.title}
-        </p>
+        {isEditingTitle ? (
+          <Input
+            ref={titleInputRef}
+            value={editedTitle}
+            onChange={(e) => setEditedTitle(e.target.value)}
+            onBlur={handleTitleSave}
+            onKeyDown={handleTitleKeyDown}
+            className="h-7 text-sm font-medium"
+          />
+        ) : (
+          <p 
+            className={cn(
+              "text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1",
+              titleColor,
+              task.is_completed && 'line-through'
+            )}
+            onClick={() => setIsEditingTitle(true)}
+            title="Click to edit"
+          >
+            {task.title}
+          </p>
+        )}
         
         <div className="flex flex-wrap items-center gap-2 mt-2">
           {/* Clickable Assignee */}

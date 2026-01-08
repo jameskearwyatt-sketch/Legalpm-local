@@ -24,7 +24,7 @@ import {
   useKnownAssignees,
   calculateDueDate
 } from '@/lib/hooks/useGrowthProjects';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { getDeadlineTextColor, getDeadlineBadgeColor } from '@/lib/deadlineColors';
 

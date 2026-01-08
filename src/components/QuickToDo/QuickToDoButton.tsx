@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { CheckSquare, X, Plus, Trash2, Flame, ArrowRight, Clock, User, Pencil, Briefcase, GraduationCap, Lightbulb } from "lucide-react";
+import { CheckSquare, X, Plus, Trash2, Flame, ArrowRight, Clock, User, Pencil, Briefcase, GraduationCap, Lightbulb, Maximize2, Minimize2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -49,6 +49,7 @@ export function QuickToDoButton() {
   const { projects } = useGrowthProjects();
   const { assignees } = useKnownAssignees();
   const [isOpen, setIsOpen] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
   const [tasks, setTasks] = useState<QuickTask[]>([]);
   const [newTask, setNewTask] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -315,8 +316,8 @@ export function QuickToDoButton() {
   };
 
   const getPanelStyle = (): React.CSSProperties => {
-    const panelWidth = Math.min(320, window.innerWidth - 24);
-    const panelHeight = 440;
+    const panelWidth = isExpanded ? Math.min(480, window.innerWidth - 48) : Math.min(320, window.innerWidth - 24);
+    const panelHeight = isExpanded ? Math.min(600, window.innerHeight - 120) : 440;
     const margin = 12;
 
     if (position) {
@@ -339,6 +340,7 @@ export function QuickToDoButton() {
         top,
         right: 'auto',
         bottom: 'auto',
+        width: panelWidth,
       };
     }
 
@@ -346,13 +348,14 @@ export function QuickToDoButton() {
       position: 'fixed',
       left: 24,
       bottom: 96,
+      width: panelWidth,
     };
   };
 
   const getOpenButtonStyle = (): React.CSSProperties => {
     const panelStyle = getPanelStyle();
-    const panelWidth = Math.min(320, window.innerWidth - 24);
-    const panelHeight = 440;
+    const panelWidth = isExpanded ? Math.min(480, window.innerWidth - 48) : Math.min(320, window.innerWidth - 24);
+    const panelHeight = isExpanded ? Math.min(600, window.innerHeight - 120) : 440;
     const buttonSize = 56;
 
     const panelLeft = panelStyle.left as number ?? 24;
@@ -637,22 +640,34 @@ export function QuickToDoButton() {
       {/* Task Panel */}
       {isOpen && (
         <div
-          className="z-50 w-80 max-w-[calc(100vw-3rem)] rounded-xl border-0 shadow-2xl shadow-teal-500/20 overflow-hidden animate-scale-in bg-background"
+          className={cn(
+            "z-50 rounded-xl border-0 shadow-2xl shadow-teal-500/20 overflow-hidden animate-scale-in bg-background transition-all duration-300",
+            isExpanded ? "max-w-[calc(100vw-3rem)]" : "max-w-[calc(100vw-3rem)]"
+          )}
           style={getPanelStyle()}
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 px-4 py-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
-                <CheckSquare className="h-5 w-5 text-white" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+                  <CheckSquare className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white">Quick To-Do</h3>
+                  <p className="text-xs text-white/80">
+                    {incompleteTasks.length} task{incompleteTasks.length !== 1 ? 's' : ''} pending
+                    {urgentTasks.length > 0 && ` (${urgentTasks.length} urgent)`}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-white">Quick To-Do</h3>
-                <p className="text-xs text-white/80">
-                  {incompleteTasks.length} task{incompleteTasks.length !== 1 ? 's' : ''} pending
-                  {urgentTasks.length > 0 && ` (${urgentTasks.length} urgent)`}
-                </p>
-              </div>
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="h-8 w-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+                title={isExpanded ? "Collapse" : "Expand"}
+              >
+                {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </button>
             </div>
           </div>
 
@@ -679,7 +694,7 @@ export function QuickToDoButton() {
           </div>
 
           {/* Task List */}
-          <ScrollArea className="h-[320px]">
+          <ScrollArea className={isExpanded ? "h-[calc(100%-140px)]" : "h-[320px]"} style={{ height: isExpanded ? Math.min(600, window.innerHeight - 120) - 140 : 320 }}>
             <div className="p-3 space-y-2">
               {incompleteTasks.length === 0 && completedTasks.length === 0 && (
                 <p className="text-center text-muted-foreground text-sm py-8">

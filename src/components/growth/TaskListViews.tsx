@@ -338,28 +338,31 @@ const TaskRow = ({
               </div>
             </PopoverContent>
           </Popover>
-          
-          {/* Pin to Task List button */}
-          {!task.is_completed && (
-            <button 
-              type="button"
-              onClick={() => onUpdate({ pinned_to_tasklist: !task.pinned_to_tasklist })}
-              className={cn(
-                "inline-flex items-center text-[10px] px-1.5 py-0.5 border rounded-full cursor-pointer hover:bg-accent transition-colors",
-                task.pinned_to_tasklist 
-                  ? "bg-primary/10 text-primary border-primary/30" 
-                  : "border-dashed text-muted-foreground"
-              )}
-              title={task.pinned_to_tasklist ? "Remove from Task List" : "Add to Task List"}
-            >
-              <ListTodo className="h-2.5 w-2.5 mr-1" />
-              {task.pinned_to_tasklist ? 'On Tasks' : 'Add'}
-            </button>
-          )}
         </div>
       </div>
       
-      <div className="flex items-center gap-0.5 shrink-0">
+      {/* Action buttons - separate from triage */}
+      <div className="flex items-center gap-1 shrink-0">
+        {/* Pin to Task List button */}
+        {!task.is_completed && (
+          <Button
+            variant={task.pinned_to_tasklist ? "default" : "outline"}
+            size="sm"
+            className={cn(
+              "h-6 px-2 text-[10px]",
+              task.pinned_to_tasklist 
+                ? "bg-primary text-primary-foreground" 
+                : "border-dashed"
+            )}
+            onClick={() => onUpdate({ pinned_to_tasklist: !task.pinned_to_tasklist })}
+            title={task.pinned_to_tasklist ? "Remove from Task List" : "Add to Task List"}
+          >
+            <ListTodo className="h-3 w-3 mr-1" />
+            {task.pinned_to_tasklist ? 'On Tasks' : 'Add'}
+          </Button>
+        )}
+        
+        {/* Delete button */}
         <Button
           variant="ghost"
           size="icon"

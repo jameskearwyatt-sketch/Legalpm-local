@@ -145,7 +145,7 @@ serve(async (req) => {
     // Get clients
     const { data: clients, error: clientsError } = await supabase
       .from("clients")
-      .select("id, name, group_sector")
+      .select("id, name, group_sector, display_name, billing_contact")
       .eq("user_id", userId);
 
     if (clientsError) {
@@ -197,6 +197,142 @@ serve(async (req) => {
 
     if (docsError) {
       console.error("Error fetching growth documents:", docsError);
+    }
+
+    // Get financial snapshots
+    const { data: snapshots, error: snapshotsError } = await supabase
+      .from("financial_snapshots")
+      .select("id, matter_id, as_of_date, wip_amount, billed_amount, paid_amount, notes")
+      .eq("user_id", userId)
+      .order("as_of_date", { ascending: false })
+      .limit(200);
+
+    if (snapshotsError) {
+      console.error("Error fetching snapshots:", snapshotsError);
+    }
+
+    // Get budget amendments
+    const { data: amendments, error: amendmentsError } = await supabase
+      .from("budget_amendments")
+      .select("id, matter_id, amendment_date, previous_budget, new_budget, previous_bm_fee, new_bm_fee, previous_local_counsel, new_local_counsel, notes")
+      .eq("user_id", userId)
+      .order("amendment_date", { ascending: false })
+      .limit(100);
+
+    if (amendmentsError) {
+      console.error("Error fetching amendments:", amendmentsError);
+    }
+
+    // Get matter local counsels
+    const { data: localCounsels, error: lcError } = await supabase
+      .from("matter_local_counsels")
+      .select("id, matter_id, firm_name, allocated_budget, wip_amount, billed_amount, billing_mode, last_updated")
+      .eq("user_id", userId);
+
+    if (lcError) {
+      console.error("Error fetching local counsels:", lcError);
+    }
+
+    // Get matter assumptions
+    const { data: assumptions, error: assumptionsError } = await supabase
+      .from("matter_assumptions")
+      .select("id, matter_id, label, assumption_text, is_standard, source_document")
+      .eq("user_id", userId);
+
+    if (assumptionsError) {
+      console.error("Error fetching assumptions:", assumptionsError);
+    }
+
+    // Get payments
+    const { data: payments, error: paymentsError } = await supabase
+      .from("payments")
+      .select("id, matter_id, payment_date, amount, reference")
+      .eq("user_id", userId)
+      .order("payment_date", { ascending: false })
+      .limit(200);
+
+    if (paymentsError) {
+      console.error("Error fetching payments:", paymentsError);
+    }
+
+    // Get pricing proposals
+    const { data: proposals, error: proposalsError } = await supabase
+      .from("pricing_proposals")
+      .select("id, client_id, name, description, currency, status, current_version, assumptions, rate_card, work_phases")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false });
+
+    if (proposalsError) {
+      console.error("Error fetching proposals:", proposalsError);
+    }
+
+    // Get pricing proposal versions
+    const { data: proposalVersions, error: versionsError } = await supabase
+      .from("pricing_proposal_versions")
+      .select("id, proposal_id, version_number, total_amount, bm_total, local_counsel_total, notes")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (versionsError) {
+      console.error("Error fetching proposal versions:", versionsError);
+    }
+
+    // Get pricing proposal items
+    const { data: proposalItems, error: itemsError } = await supabase
+      .from("pricing_proposal_items")
+      .select("id, proposal_id, version_id, work_item, provider, category, fee_amount, fee_lower, fee_upper, is_included, is_optional, partner_hours, associate_hours, pricing_method, ai_rationale")
+      .eq("user_id", userId)
+      .limit(500);
+
+    if (itemsError) {
+      console.error("Error fetching proposal items:", itemsError);
+    }
+
+    // Get time recording drafts
+    const { data: timeDrafts, error: timeDraftsError } = await supabase
+      .from("time_recording_drafts")
+      .select("id, name, mode, single_date, date_range_from, date_range_to, grid_entries, is_polished, processed_output")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false })
+      .limit(50);
+
+    if (timeDraftsError) {
+      console.error("Error fetching time drafts:", timeDraftsError);
+    }
+
+    // Get matter clients (for multi-client matters)
+    const { data: matterClients, error: matterClientsError } = await supabase
+      .from("matter_clients")
+      .select("id, matter_id, client_id, fee_percentage, is_master, cm_number")
+      .eq("user_id", userId);
+
+    if (matterClientsError) {
+      console.error("Error fetching matter clients:", matterClientsError);
+    }
+
+    // Get detailed WIP updates
+    const { data: wipUpdates, error: wipUpdatesError } = await supabase
+      .from("detailed_wip_updates")
+      .select("id, matter_id, total_wip_amount, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (wipUpdatesError) {
+      console.error("Error fetching WIP updates:", wipUpdatesError);
+    }
+
+    // Get matter bills
+    const { data: matterBills, error: billsError } = await supabase
+      .from("matter_bills")
+      .select("id, matter_id, amount, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (billsError) {
+      console.error("Error fetching matter bills:", billsError);
     }
 
     // Approximate exchange rates for currency conversion (to GBP as base)
@@ -387,49 +523,213 @@ serve(async (req) => {
       };
     });
 
-    const systemPrompt = `You are an intelligent assistant for a legal professional. You have access to:
-1. Legal MATTERS (cases, budgets, financials)
-2. GROWTH PROJECTS (business development, professional development, learning initiatives)
+    // Build snapshots context
+    const snapshotsContext = (snapshots || []).map((s: any) => {
+      const matter = (matters || []).find((m: any) => m.id === s.matter_id);
+      const currency = matter?.currency || 'GBP';
+      return {
+        matterName: matter?.matter_name,
+        asOfDate: s.as_of_date,
+        wipAmount: { original: s.wip_amount, currency, inGBP: convertToGBP(s.wip_amount, currency) },
+        billedAmount: { original: s.billed_amount, currency, inGBP: convertToGBP(s.billed_amount, currency) },
+        paidAmount: { original: s.paid_amount, currency, inGBP: convertToGBP(s.paid_amount, currency) },
+        notes: s.notes,
+      };
+    });
 
-Your role is to provide helpful, accurate answers based on ALL available data.
+    // Build amendments context
+    const amendmentsContext = (amendments || []).map((a: any) => {
+      const matter = (matters || []).find((m: any) => m.id === a.matter_id);
+      const currency = matter?.fee_currency || matter?.currency || 'GBP';
+      return {
+        matterName: matter?.matter_name,
+        date: a.amendment_date,
+        previousBudget: a.previous_budget,
+        newBudget: a.new_budget,
+        previousBmFee: a.previous_bm_fee,
+        newBmFee: a.new_bm_fee,
+        previousLocalCounsel: a.previous_local_counsel,
+        newLocalCounsel: a.new_local_counsel,
+        currency,
+        notes: a.notes,
+      };
+    });
 
-=== MATTERS & FINANCIAL DATA ===
+    // Build local counsels context
+    const localCounselsContext = (localCounsels || []).map((lc: any) => {
+      const matter = (matters || []).find((m: any) => m.id === lc.matter_id);
+      const currency = matter?.fee_currency || matter?.currency || 'GBP';
+      return {
+        matterName: matter?.matter_name,
+        firmName: lc.firm_name,
+        allocatedBudget: lc.allocated_budget,
+        wipAmount: lc.wip_amount,
+        billedAmount: lc.billed_amount,
+        billingMode: lc.billing_mode,
+        lastUpdated: lc.last_updated,
+        currency,
+      };
+    });
 
-CRITICAL CURRENCY RULES:
-1. Each matter and budget has its OWN CURRENCY - pay close attention to the "originalCurrency" field
-2. NEVER mix currencies - a budget of 219,000 EUR is NOT the same as 219,000 GBP
-3. When comparing matters or calculating averages, ALWAYS use the converted values (inGBP or inUSD)
-4. When reporting final recommendations, ALWAYS report in GBP (pounds sterling) or USD (US dollars)
-5. Default to reporting in GBP unless the user specifically asks for USD
+    // Build assumptions context
+    const assumptionsContext = (assumptions || []).map((a: any) => {
+      const matter = (matters || []).find((m: any) => m.id === a.matter_id);
+      return {
+        matterName: matter?.matter_name,
+        label: a.label,
+        text: a.assumption_text,
+        isStandard: a.is_standard,
+        sourceDocument: a.source_document,
+      };
+    });
 
-When answering questions about pricing or quotes:
-1. Look for similar matters by practice area, deal type, or client sector
-2. Analyze the budget amounts using the CONVERTED values for fair comparison
-3. Reference specific matters by their NAME only (never use internal system IDs)
+    // Build payments context
+    const paymentsContext = (payments || []).map((p: any) => {
+      const matter = (matters || []).find((m: any) => m.id === p.matter_id);
+      const currency = matter?.currency || 'GBP';
+      return {
+        matterName: matter?.matter_name,
+        date: p.payment_date,
+        amount: { original: p.amount, currency, inGBP: convertToGBP(p.amount, currency) },
+        reference: p.reference,
+      };
+    });
+
+    // Build pricing proposals context
+    const proposalsContext = (proposals || []).map((p: any) => {
+      const client = (clients || []).find((c: any) => c.id === p.client_id);
+      const versions = (proposalVersions || []).filter((v: any) => v.proposal_id === p.id);
+      const items = (proposalItems || []).filter((i: any) => i.proposal_id === p.id);
+      return {
+        name: p.name,
+        clientName: client?.name,
+        description: p.description,
+        currency: p.currency,
+        status: p.status,
+        currentVersion: p.current_version,
+        assumptions: p.assumptions,
+        rateCard: p.rate_card,
+        workPhases: p.work_phases,
+        versions: versions.map((v: any) => ({
+          versionNumber: v.version_number,
+          totalAmount: v.total_amount,
+          bmTotal: v.bm_total,
+          localCounselTotal: v.local_counsel_total,
+          notes: v.notes,
+        })),
+        items: items.map((i: any) => ({
+          workItem: i.work_item,
+          provider: i.provider,
+          category: i.category,
+          feeAmount: i.fee_amount,
+          feeLower: i.fee_lower,
+          feeUpper: i.fee_upper,
+          included: i.is_included,
+          optional: i.is_optional,
+          partnerHours: i.partner_hours,
+          associateHours: i.associate_hours,
+          pricingMethod: i.pricing_method,
+          aiRationale: i.ai_rationale,
+        })),
+      };
+    });
+
+    // Build time recording context
+    const timeRecordingContext = (timeDrafts || []).map((t: any) => ({
+      name: t.name,
+      mode: t.mode,
+      singleDate: t.single_date,
+      dateRangeFrom: t.date_range_from,
+      dateRangeTo: t.date_range_to,
+      isPolished: t.is_polished,
+      gridEntries: t.grid_entries,
+      processedOutput: t.processed_output,
+    }));
+
+    // Build matter bills context
+    const matterBillsContext = (matterBills || []).map((b: any) => {
+      const matter = (matters || []).find((m: any) => m.id === b.matter_id);
+      const currency = matter?.currency || 'GBP';
+      return {
+        matterName: matter?.matter_name,
+        amount: b.amount,
+        currency,
+        date: b.created_at,
+      };
+    });
+
+    // Build WIP updates context
+    const wipUpdatesContext = (wipUpdates || []).map((w: any) => {
+      const matter = (matters || []).find((m: any) => m.id === w.matter_id);
+      const currency = matter?.currency || 'GBP';
+      return {
+        matterName: matter?.matter_name,
+        totalWipAmount: w.total_wip_amount,
+        currency,
+        date: w.created_at,
+      };
+    });
+
+    // Build multi-client matters context
+    const multiClientContext = (matterClients || []).map((mc: any) => {
+      const matter = (matters || []).find((m: any) => m.id === mc.matter_id);
+      const client = (clients || []).find((c: any) => c.id === mc.client_id);
+      return {
+        matterName: matter?.matter_name,
+        clientName: client?.name,
+        feePercentage: mc.fee_percentage,
+        isMaster: mc.is_master,
+        cmNumber: mc.cm_number,
+      };
+    });
+
+    const systemPrompt = `You are an intelligent assistant for a legal professional. You have COMPLETE ACCESS to ALL data in the application including:
+
+1. MATTERS - Legal cases, budgets, financials, status
+2. CLIENTS - Client information, sectors, billing contacts
+3. GROWTH PROJECTS - Business development, professional development, learning initiatives
+4. PRICING PROPOSALS - Fee quotes, rate cards, work phase breakdowns
+5. TIME RECORDING - Time entry drafts, narratives
+6. INVOICES & PAYMENTS - Billing history, payment tracking
+7. FINANCIAL SNAPSHOTS - Historical WIP, billed, paid amounts
+8. BUDGET AMENDMENTS - Budget change history
+9. LOCAL COUNSELS - Third-party counsel tracking
+10. MATTER ASSUMPTIONS - Pricing assumptions and exclusions
+
+Your role is to provide helpful, accurate answers based on ALL available data. You can answer questions about ANY aspect of the user's practice.
+
+=== CURRENCY RULES ===
+1. Each matter and budget has its OWN CURRENCY - check the currency field
+2. NEVER mix currencies - convert using provided GBP values for comparisons
+3. Default to reporting in GBP unless the user asks for another currency
 
 === GROWTH PROJECTS ===
-
-For Growth-related questions (BD initiatives, professional development, learning):
-1. Review ALL scrapbook entries (notes, meeting summaries, emails) for the relevant project
-2. Check document summaries for key insights
-3. Review tasks and their status
-4. Use the AI summary for quick context, but dig into entries for details
-5. Reference specific projects by name
-
-When asked about a specific BD initiative or growth project:
-- Summarize the key activities and progress from the scrapbook entries
-- Highlight pending tasks and who is responsible
-- Reference any documents and their summaries
+For BD, professional development, or learning questions:
+- Review ALL scrapbook entries (notes, meeting summaries, emails)
+- Check document summaries for key insights
+- Review tasks and their status
 - Provide actionable insights
 
-IMPORTANT: Never reference internal system IDs. Always refer to matters and projects by their descriptive name only.
+=== PRICING & PROPOSALS ===
+For pricing questions:
+- Reference similar matters and proposals
+- Use rate cards and work phase breakdowns
+- Consider assumptions and exclusions
 
-Keep your answers concise but informative. Always justify your recommendations with specific data points.
+=== TIME RECORDING ===
+For time-related questions:
+- Review time entry drafts and narratives
+- Check polished vs unpolished entries
 
-=== USER'S DATA ===
+IMPORTANT: Never reference internal system IDs. Always refer to matters, clients, and projects by their descriptive name.
+
+=== USER'S COMPLETE DATA ===
 
 MATTERS (${mattersContext.length} total):
 ${JSON.stringify(mattersContext, null, 2)}
+
+CLIENTS (${(clients || []).length} total):
+${JSON.stringify(clients, null, 2)}
 
 BUDGETS (${budgetContext.length} versions):
 ${JSON.stringify(budgetContext, null, 2)}
@@ -437,8 +737,35 @@ ${JSON.stringify(budgetContext, null, 2)}
 INVOICES (${invoiceContext.length} total):
 ${JSON.stringify(invoiceContext, null, 2)}
 
-CLIENTS (${(clients || []).length} total):
-${JSON.stringify(clients, null, 2)}
+PAYMENTS (${paymentsContext.length} total):
+${JSON.stringify(paymentsContext, null, 2)}
+
+FINANCIAL SNAPSHOTS (${snapshotsContext.length} total):
+${JSON.stringify(snapshotsContext, null, 2)}
+
+BUDGET AMENDMENTS (${amendmentsContext.length} total):
+${JSON.stringify(amendmentsContext, null, 2)}
+
+LOCAL COUNSELS (${localCounselsContext.length} total):
+${JSON.stringify(localCounselsContext, null, 2)}
+
+MATTER ASSUMPTIONS (${assumptionsContext.length} total):
+${JSON.stringify(assumptionsContext, null, 2)}
+
+MATTER BILLS (${matterBillsContext.length} total):
+${JSON.stringify(matterBillsContext, null, 2)}
+
+WIP UPDATES (${wipUpdatesContext.length} total):
+${JSON.stringify(wipUpdatesContext, null, 2)}
+
+MULTI-CLIENT MATTERS (${multiClientContext.length} entries):
+${JSON.stringify(multiClientContext, null, 2)}
+
+PRICING PROPOSALS (${proposalsContext.length} total):
+${JSON.stringify(proposalsContext, null, 2)}
+
+TIME RECORDING DRAFTS (${timeRecordingContext.length} total):
+${JSON.stringify(timeRecordingContext, null, 2)}
 
 GROWTH PROJECTS (${growthContext.length} total):
 ${JSON.stringify(growthContext, null, 2)}`;

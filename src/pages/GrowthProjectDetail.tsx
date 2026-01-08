@@ -263,6 +263,7 @@ const GrowthProjectDetail = () => {
           id: completedTask.original_task_id, 
           is_completed: true,
           completed_at: new Date().toISOString(),
+          completion_notes: completedTask.completion_notes || null,
         });
         completedCount++;
       } catch (err) {
@@ -405,7 +406,7 @@ const GrowthProjectDetail = () => {
                 <TaskItem
                   key={task.id}
                   task={task}
-                  onToggle={() => updateTask.mutate({ id: task.id, is_completed: true })}
+                  onToggle={(notes) => updateTask.mutate({ id: task.id, is_completed: true, completion_notes: notes || null })}
                   onUpdate={(updates) => updateTask.mutate({ id: task.id, ...updates })}
                   onDelete={() => deleteTask.mutate(task.id)}
                   isOverdue
@@ -469,7 +470,7 @@ const GrowthProjectDetail = () => {
                   <TaskItem
                     key={task.id}
                     task={task}
-                    onToggle={() => updateTask.mutate({ id: task.id, is_completed: true })}
+                    onToggle={(notes) => updateTask.mutate({ id: task.id, is_completed: true, completion_notes: notes || null })}
                     onUpdate={(updates) => updateTask.mutate({ id: task.id, ...updates })}
                     onDelete={() => deleteTask.mutate(task.id)}
                   />
@@ -498,7 +499,7 @@ const GrowthProjectDetail = () => {
                         <TaskItem
                           key={task.id}
                           task={task}
-                          onToggle={() => updateTask.mutate({ id: task.id, is_completed: false, completed_at: null })}
+                          onToggle={() => updateTask.mutate({ id: task.id, is_completed: false, completed_at: null, completion_notes: null })}
                           onUpdate={(updates) => updateTask.mutate({ id: task.id, ...updates })}
                           onDelete={() => deleteTask.mutate(task.id)}
                         />

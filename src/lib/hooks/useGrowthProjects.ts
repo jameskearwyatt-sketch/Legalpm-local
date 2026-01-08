@@ -44,6 +44,7 @@ export interface GrowthTask {
   deadline_set_at: string | null;
   is_completed: boolean;
   completed_at: string | null;
+  completion_notes: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;

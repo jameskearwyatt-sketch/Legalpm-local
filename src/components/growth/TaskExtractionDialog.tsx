@@ -31,6 +31,7 @@ export interface CompletedTaskSuggestion {
   original_task_title: string;
   original_task_id?: string;
   evidence: string;
+  completion_notes?: string;
   selected: boolean;
 }
 
@@ -105,6 +106,12 @@ export const TaskExtractionDialog = ({
   const toggleCompleted = (index: number) => {
     const updated = [...completedTasks];
     updated[index].selected = !updated[index].selected;
+    onCompletedTasksChange(updated);
+  };
+
+  const updateCompletedNotes = (index: number, notes: string) => {
+    const updated = [...completedTasks];
+    updated[index].completion_notes = notes;
     onCompletedTasksChange(updated);
   };
 
@@ -372,12 +379,22 @@ export const TaskExtractionDialog = ({
                           onCheckedChange={() => toggleCompleted(index)}
                           className="mt-1"
                         />
-                        <div className="flex-1 space-y-1">
+                        <div className="flex-1 space-y-2">
                           <div className="font-medium flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-green-600" />
                             {completed.original_task_title}
                           </div>
                           <p className="text-xs text-muted-foreground italic">{completed.evidence}</p>
+                          {completed.selected && (
+                            <div className="pt-1">
+                              <Input
+                                value={completed.completion_notes || ''}
+                                onChange={(e) => updateCompletedNotes(index, e.target.value)}
+                                placeholder="How was this completed? (optional notes)"
+                                className="h-8 text-sm bg-background"
+                              />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

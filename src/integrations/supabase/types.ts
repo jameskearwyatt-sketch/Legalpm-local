@@ -473,6 +473,7 @@ export type Database = {
         Row: {
           assignee: string | null
           completed_at: string | null
+          completion_notes: string | null
           created_at: string
           deadline_set_at: string | null
           deadline_type: Database["public"]["Enums"]["task_deadline_type"]
@@ -488,6 +489,7 @@ export type Database = {
         Insert: {
           assignee?: string | null
           completed_at?: string | null
+          completion_notes?: string | null
           created_at?: string
           deadline_set_at?: string | null
           deadline_type?: Database["public"]["Enums"]["task_deadline_type"]
@@ -503,6 +505,7 @@ export type Database = {
         Update: {
           assignee?: string | null
           completed_at?: string | null
+          completion_notes?: string | null
           created_at?: string
           deadline_set_at?: string | null
           deadline_type?: Database["public"]["Enums"]["task_deadline_type"]

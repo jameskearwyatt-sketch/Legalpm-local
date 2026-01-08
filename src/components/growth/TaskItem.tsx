@@ -2,12 +2,21 @@ import { useState, useRef, useEffect } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { Clock, Trash2, User } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Clock, Trash2, User, MessageSquare } from 'lucide-react';
 import { 
   type GrowthTask, 
   type TaskDeadlineType, 
@@ -21,7 +30,7 @@ import { getDeadlineTextColor, getDeadlineBadgeColor } from '@/lib/deadlineColor
 
 interface TaskItemProps {
   task: GrowthTask;
-  onToggle: () => void;
+  onToggle: (completionNotes?: string) => void;
   onUpdate: (updates: Partial<GrowthTask>) => void;
   onDelete: () => void;
   isOverdue?: boolean;
@@ -44,8 +53,52 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
   const [editingAssignee, setEditingAssignee] = useState(task.assignee || '');
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [editedTitle, setEditedTitle] = useState(task.title);
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [completionNotes, setCompletionNotes] = useState('');
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [editedNotes, setEditedNotes] = useState(task.completion_notes || '');
   const inputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const notesInputRef = useRef<HTMLTextAreaElement>(null);
+
+  const handleCheckboxChange = () => {
+    if (!task.is_completed) {
+      // Completing a task - show dialog for notes
+      setCompletionNotes('');
+      setShowCompleteDialog(true);
+    } else {
+      // Uncompleting - just toggle
+      onToggle();
+    }
+  };
+
+  const handleConfirmComplete = () => {
+    onToggle(completionNotes || undefined);
+    setShowCompleteDialog(false);
+    setCompletionNotes('');
+  };
+
+  const handleSkipNotes = () => {
+    onToggle();
+    setShowCompleteDialog(false);
+    setCompletionNotes('');
+  };
+
+  // Handle editing completion notes inline
+  const handleNotesSave = () => {
+    const trimmed = editedNotes.trim();
+    if (trimmed !== (task.completion_notes || '')) {
+      onUpdate({ completion_notes: trimmed || null });
+    }
+    setIsEditingNotes(false);
+  };
+
+  useEffect(() => {
+    if (isEditingNotes) {
+      setEditedNotes(task.completion_notes || '');
+      setTimeout(() => notesInputRef.current?.focus(), 0);
+    }
+  }, [isEditingNotes, task.completion_notes]);
 
   // Sync editingAssignee when popover opens
   useEffect(() => {
@@ -118,7 +171,7 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
     )}>
       <Checkbox
         checked={task.is_completed}
-        onCheckedChange={onToggle}
+        onCheckedChange={handleCheckboxChange}
         className="mt-1"
       />
       
@@ -253,6 +306,40 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
             </span>
           )}
         </div>
+
+        {/* Completion notes for completed tasks */}
+        {task.is_completed && (
+          <div className="mt-2">
+            {isEditingNotes ? (
+              <Textarea
+                ref={notesInputRef}
+                value={editedNotes}
+                onChange={(e) => setEditedNotes(e.target.value)}
+                onBlur={handleNotesSave}
+                onKeyDown={(e) => {
+                  if (e.key === 'Escape') {
+                    setEditedNotes(task.completion_notes || '');
+                    setIsEditingNotes(false);
+                  }
+                }}
+                placeholder="Add completion notes..."
+                className="min-h-[60px] text-xs"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsEditingNotes(true)}
+                className={cn(
+                  "text-xs w-full text-left px-2 py-1.5 rounded hover:bg-accent/50 transition-colors flex items-start gap-1.5",
+                  task.completion_notes ? "text-muted-foreground" : "text-muted-foreground/50 italic"
+                )}
+              >
+                <MessageSquare className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                {task.completion_notes || 'Add completion notes...'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Delete button directly on task */}
@@ -264,6 +351,35 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
       >
         <Trash2 className="h-4 w-4" />
       </Button>
+
+      {/* Complete task dialog */}
+      <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Mark task complete</DialogTitle>
+            <DialogDescription>
+              Optionally add notes about how this task was completed.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <p className="text-sm font-medium mb-3">{task.title}</p>
+            <Textarea
+              value={completionNotes}
+              onChange={(e) => setCompletionNotes(e.target.value)}
+              placeholder="e.g., Discussed in 1:1 meeting, sent report to client..."
+              className="min-h-[80px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleSkipNotes}>
+              Skip
+            </Button>
+            <Button onClick={handleConfirmComplete}>
+              Complete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

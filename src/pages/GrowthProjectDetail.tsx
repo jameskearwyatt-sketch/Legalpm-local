@@ -67,7 +67,7 @@ const GrowthProjectDetail = () => {
   const [showAddTask, setShowAddTask] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [taskSort, setTaskSort] = useState<'default' | 'assignee' | 'created'>('default');
+  const [taskSort, setTaskSort] = useState<'default' | 'assignee' | 'deadline'>('default');
   
   // Task extraction state
   const [extractedTasks, setExtractedTasks] = useState<ExtractedTask[]>([]);
@@ -85,10 +85,12 @@ const GrowthProjectDetail = () => {
         return aAssignee.localeCompare(bAssignee);
       });
     }
-    if (taskSort === 'created') {
-      return [...taskList].sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
+    if (taskSort === 'deadline') {
+      return [...taskList].sort((a, b) => {
+        const aDate = a.deadline_set_at ? calculateDueDate(new Date(a.deadline_set_at), a.deadline_type) : new Date(9999, 11, 31);
+        const bDate = b.deadline_set_at ? calculateDueDate(new Date(b.deadline_set_at), b.deadline_type) : new Date(9999, 11, 31);
+        return aDate.getTime() - bDate.getTime();
+      });
     }
     return taskList; // default order from DB
   };
@@ -434,11 +436,11 @@ const GrowthProjectDetail = () => {
                       <User className="h-3.5 w-3.5" />
                     </Button>
                     <Button 
-                      variant={taskSort === 'created' ? 'secondary' : 'ghost'} 
+                      variant={taskSort === 'deadline' ? 'secondary' : 'ghost'} 
                       size="sm" 
                       className="h-8 px-2 rounded-l-none border-l"
-                      onClick={() => setTaskSort(taskSort === 'created' ? 'default' : 'created')}
-                      title="Sort by date created"
+                      onClick={() => setTaskSort(taskSort === 'deadline' ? 'default' : 'deadline')}
+                      title="Sort by deadline"
                     >
                       <Calendar className="h-3.5 w-3.5" />
                     </Button>

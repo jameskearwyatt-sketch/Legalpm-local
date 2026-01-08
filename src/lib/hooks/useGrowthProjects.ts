@@ -329,6 +329,9 @@ export function useGrowthProject(projectId?: string) {
       queryClient.invalidateQueries({ queryKey: ['all-growth-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['overdue-tasks'] });
     },
+    onError: (error: Error) => {
+      toast.error('Failed to update task: ' + error.message);
+    },
   });
 
   const deleteTask = useMutation({

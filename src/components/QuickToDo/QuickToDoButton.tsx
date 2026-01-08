@@ -683,13 +683,22 @@ export function QuickToDoButton() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="h-8 w-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
-                title={isExpanded ? "Collapse" : "Expand"}
-              >
-                {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setIsExpanded(!isExpanded)}
+                  className="h-8 w-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+                  title={isExpanded ? "Collapse" : "Expand"}
+                >
+                  {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                </button>
+                <button
+                  onClick={() => setIsOpen(false)}
+                  className="h-8 w-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+                  title="Close"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { CheckSquare, X, Plus, Trash2, Flame, ArrowRight, Clock, User, Pencil } from "lucide-react";
+import { CheckSquare, X, Plus, Trash2, Flame, ArrowRight, Clock, User, Pencil, Briefcase, GraduationCap, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -495,9 +495,51 @@ export function QuickToDoButton() {
                   <SelectValue placeholder="Select a project..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {activeProjects.map((project) => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
+                  {/* Business Development */}
+                  {activeProjects.filter(p => p.project_type === 'business_development').length > 0 && (
+                    <div className="px-2 py-1.5 text-xs font-semibold text-orange-600 dark:text-orange-400 flex items-center gap-1.5 border-b mb-1">
+                      <Briefcase className="h-3 w-3" />
+                      Business Development
+                    </div>
+                  )}
+                  {activeProjects.filter(p => p.project_type === 'business_development').map((project) => (
+                    <SelectItem key={project.id} value={project.id} className="pl-6">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-orange-500" />
+                        {project.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                  
+                  {/* Professional Development */}
+                  {activeProjects.filter(p => p.project_type === 'professional_development').length > 0 && (
+                    <div className="px-2 py-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 flex items-center gap-1.5 border-b mb-1 mt-2">
+                      <GraduationCap className="h-3 w-3" />
+                      Career Development
+                    </div>
+                  )}
+                  {activeProjects.filter(p => p.project_type === 'professional_development').map((project) => (
+                    <SelectItem key={project.id} value={project.id} className="pl-6">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-blue-500" />
+                        {project.name}
+                      </span>
+                    </SelectItem>
+                  ))}
+                  
+                  {/* Learning & Development */}
+                  {activeProjects.filter(p => p.project_type === 'learning_development').length > 0 && (
+                    <div className="px-2 py-1.5 text-xs font-semibold text-purple-600 dark:text-purple-400 flex items-center gap-1.5 border-b mb-1 mt-2">
+                      <Lightbulb className="h-3 w-3" />
+                      Learning & Development
+                    </div>
+                  )}
+                  {activeProjects.filter(p => p.project_type === 'learning_development').map((project) => (
+                    <SelectItem key={project.id} value={project.id} className="pl-6">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-purple-500" />
+                        {project.name}
+                      </span>
                     </SelectItem>
                   ))}
                 </SelectContent>

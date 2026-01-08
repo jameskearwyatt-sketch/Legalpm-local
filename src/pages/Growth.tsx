@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Briefcase, 
   GraduationCap, 
@@ -12,20 +13,39 @@ import {
   Rocket,
   Target,
   Users,
-  Lightbulb,
   ArrowRight,
-  Clock
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
-import { useGrowthProjects, useOverdueTasks, type GrowthProjectType } from '@/lib/hooks/useGrowthProjects';
+import { useGrowthProjects, useOverdueTasks, useAllTasksByCategory, calculateDueDate, getDeadlineLabel, type GrowthProjectType, type TaskWithProject } from '@/lib/hooks/useGrowthProjects';
 import AppLayout from '@/components/layout/AppLayout';
 import { GrowthProjectList } from '@/components/growth/GrowthProjectList';
 import { NewProjectDialog } from '@/components/growth/NewProjectDialog';
+import { cn } from '@/lib/utils';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 
 const Growth = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<string>('overview');
   const [newProjectType, setNewProjectType] = useState<GrowthProjectType | null>(null);
   const { overdueCount } = useOverdueTasks();
+  const { bdTasks, pdTasks, ldTasks, isLoading: tasksLoading } = useAllTasksByCategory();
+  const queryClient = useQueryClient();
+
+  const toggleTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase
+        .from('growth_tasks')
+        .update({ is_completed: true, completed_at: new Date().toISOString() })
+        .eq('id', taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-growth-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['overdue-tasks'] });
+    },
+  });
 
   const handleNewProject = (type: GrowthProjectType) => {
     setNewProjectType(type);
@@ -85,6 +105,10 @@ const Growth = () => {
                 color="bg-blue-500/10 text-blue-600"
                 onExplore={() => setActiveTab('business')}
                 onNew={() => handleNewProject('business_development')}
+                myTasks={bdTasks.myTasks}
+                othersTasks={bdTasks.othersTasks}
+                onToggleTask={(id) => toggleTaskMutation.mutate(id)}
+                onTaskClick={(projectId) => navigate(`/growth/${projectId}`)}
               />
               <OverviewCard
                 title="Professional Development"
@@ -93,6 +117,10 @@ const Growth = () => {
                 color="bg-purple-500/10 text-purple-600"
                 onExplore={() => setActiveTab('professional')}
                 onNew={() => handleNewProject('professional_development')}
+                myTasks={pdTasks.myTasks}
+                othersTasks={pdTasks.othersTasks}
+                onToggleTask={(id) => toggleTaskMutation.mutate(id)}
+                onTaskClick={(projectId) => navigate(`/growth/${projectId}`)}
               />
               <OverviewCard
                 title="Learning & Development"
@@ -101,26 +129,12 @@ const Growth = () => {
                 color="bg-emerald-500/10 text-emerald-600"
                 onExplore={() => setActiveTab('learning')}
                 onNew={() => handleNewProject('learning_development')}
+                myTasks={ldTasks.myTasks}
+                othersTasks={ldTasks.othersTasks}
+                onToggleTask={(id) => toggleTaskMutation.mutate(id)}
+                onTaskClick={(projectId) => navigate(`/growth/${projectId}`)}
               />
             </div>
-
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5 text-yellow-500" />
-                  Quick Tips
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="prose prose-sm dark:prose-invert max-w-none">
-                <ul className="space-y-2 text-muted-foreground">
-                  <li>Create projects to track BD initiatives, coaching relationships, or training programs</li>
-                  <li>Paste meeting notes, emails, or upload documents to keep everything in one place</li>
-                  <li>Set quick deadlines (this week, next month, etc.) without fiddling with calendars</li>
-                  <li>AI automatically summarizes your progress as you add content</li>
-                  <li>Never lose track of tasks - they'll surface when they're due</li>
-                </ul>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           <TabsContent value="business" className="mt-6">
@@ -216,26 +230,134 @@ interface OverviewCardProps {
   color: string;
   onExplore: () => void;
   onNew: () => void;
+  myTasks: TaskWithProject[];
+  othersTasks: TaskWithProject[];
+  onToggleTask: (taskId: string) => void;
+  onTaskClick: (projectId: string) => void;
 }
 
-const OverviewCard = ({ title, description, icon, color, onExplore, onNew }: OverviewCardProps) => {
+const TaskRow = ({ 
+  task, 
+  onToggle, 
+  onClick 
+}: { 
+  task: TaskWithProject; 
+  onToggle: () => void; 
+  onClick: () => void;
+}) => {
+  const now = new Date();
+  const dueDate = task.deadline_set_at 
+    ? calculateDueDate(new Date(task.deadline_set_at), task.deadline_type) 
+    : null;
+  const isOverdue = dueDate && dueDate < now;
+
   return (
-    <Card className="group hover:shadow-lg transition-shadow">
-      <CardHeader>
+    <div 
+      className={cn(
+        "flex items-start gap-2 py-1.5 group",
+        isOverdue && "text-destructive"
+      )}
+    >
+      <Checkbox
+        checked={false}
+        onCheckedChange={() => onToggle()}
+        className="mt-0.5 shrink-0"
+      />
+      <div className="flex-1 min-w-0">
+        <button
+          onClick={onClick}
+          className="text-left text-sm hover:underline truncate block w-full"
+        >
+          {task.title}
+        </button>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span className="truncate">{task.growth_projects.name}</span>
+          {task.deadline_type !== 'no_deadline' && (
+            <>
+              <span>•</span>
+              <span className={cn(isOverdue && "text-destructive font-medium flex items-center gap-1")}>
+                {isOverdue && <AlertTriangle className="h-3 w-3" />}
+                {getDeadlineLabel(task.deadline_type)}
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const OverviewCard = ({ 
+  title, 
+  description, 
+  icon, 
+  color, 
+  onExplore, 
+  onNew,
+  myTasks,
+  othersTasks,
+  onToggleTask,
+  onTaskClick
+}: OverviewCardProps) => {
+  const totalTasks = myTasks.length + othersTasks.length;
+
+  return (
+    <Card className="group hover:shadow-lg transition-shadow flex flex-col">
+      <CardHeader className="pb-3">
         <div className={`w-16 h-16 rounded-xl ${color} flex items-center justify-center mb-3`}>
           {icon}
         </div>
         <CardTitle className="text-xl">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
-      <CardContent className="flex gap-2">
-        <Button variant="outline" onClick={onExplore} className="flex-1">
-          Explore
-          <ArrowRight className="h-4 w-4 ml-2" />
-        </Button>
-        <Button onClick={onNew} size="icon">
-          <Plus className="h-4 w-4" />
-        </Button>
+      <CardContent className="flex-1 flex flex-col">
+        {totalTasks > 0 ? (
+          <div className="flex-1 space-y-3 mb-4 max-h-[280px] overflow-y-auto">
+            {myTasks.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">My Tasks</p>
+                <div className="space-y-0.5">
+                  {myTasks.map(task => (
+                    <TaskRow 
+                      key={task.id} 
+                      task={task} 
+                      onToggle={() => onToggleTask(task.id)}
+                      onClick={() => onTaskClick(task.project_id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+            {othersTasks.length > 0 && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">Others' Tasks</p>
+                <div className="space-y-0.5">
+                  {othersTasks.map(task => (
+                    <TaskRow 
+                      key={task.id} 
+                      task={task} 
+                      onToggle={() => onToggleTask(task.id)}
+                      onClick={() => onTaskClick(task.project_id)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm py-4">
+            No pending tasks
+          </div>
+        )}
+        <div className="flex gap-2 mt-auto pt-2 border-t">
+          <Button variant="outline" onClick={onExplore} className="flex-1">
+            Explore
+            <ArrowRight className="h-4 w-4 ml-2" />
+          </Button>
+          <Button onClick={onNew} size="icon">
+            <Plus className="h-4 w-4" />
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );

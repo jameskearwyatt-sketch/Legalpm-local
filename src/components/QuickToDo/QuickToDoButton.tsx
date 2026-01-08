@@ -110,126 +110,140 @@ const quadrantInfo: Record<EisenhowerQuadrant, { label: string; guidance: string
 interface TriagePillsProps {
   task: UnifiedTask | QuickTask;
   onUpdate: (updates: Partial<QuickTask>) => void;
-  triageMode?: boolean;
   compact?: boolean;
   disabled?: boolean;
 }
 
-const TriagePills = ({ task, onUpdate, triageMode = false, compact = false, disabled = false }: TriagePillsProps) => {
-  const iconSize = compact ? "h-2.5 w-2.5" : "h-3 w-3";
+const TriagePills = ({ task, onUpdate, compact = false, disabled = false }: TriagePillsProps) => {
+  const iconSize = compact ? "h-3 w-3" : "h-3.5 w-3.5";
   
   const handleUrgencyClick = (value: 'urgent' | 'not_urgent') => {
+    if (disabled) return;
     onUpdate({ urgency: task.urgency === value ? 'unset' : value });
   };
 
   const handleImportanceClick = (value: 'important' | 'not_important') => {
+    if (disabled) return;
     onUpdate({ importance: task.importance === value ? 'unset' : value });
   };
 
   const handleEffortClick = (value: 'quick_win' | 'deep_work') => {
+    if (disabled) return;
     onUpdate({ effort: task.effort === value ? 'unset' : value });
   };
 
   const pillBase = cn(
-    "inline-flex items-center gap-0.5 rounded-full border transition-all duration-150 cursor-pointer active:scale-95",
-    compact ? "text-[9px] px-1 py-0.5" : "text-[10px] px-1.5 py-0.5",
-    triageMode && !compact && "px-2 py-1 text-xs"
+    "inline-flex items-center gap-1 rounded-full border transition-all duration-150 cursor-pointer active:scale-95 font-medium whitespace-nowrap",
+    compact ? "text-[11px] px-2 py-1" : "text-xs px-2.5 py-1",
+    disabled && "opacity-50 cursor-not-allowed"
   );
 
   return (
-    <div className={cn("flex flex-wrap gap-0.5", triageMode && "gap-1")}>
+    <div className="flex flex-wrap gap-1">
       {/* Urgency */}
-      <div className="flex gap-px">
+      <div className="flex gap-0.5">
         <button
           type="button"
           onClick={() => handleUrgencyClick('urgent')}
+          disabled={disabled}
           className={cn(
             pillBase,
             task.urgency === 'urgent' 
-              ? 'bg-red-500 text-white border-red-500' 
-              : 'border-red-200 text-red-400 hover:bg-red-50 dark:hover:bg-red-950/50',
-            task.urgency === 'unset' && 'opacity-50'
+              ? 'bg-red-500 text-white border-red-500 shadow-sm' 
+              : 'border-red-300 text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400 dark:hover:bg-red-950/50',
+            task.urgency === 'unset' && 'opacity-60'
           )}
+          title="Urgent"
         >
           <Zap className={iconSize} />
-          {!compact && "Urgent"}
+          <span>Urgent</span>
         </button>
         <button
           type="button"
           onClick={() => handleUrgencyClick('not_urgent')}
+          disabled={disabled}
           className={cn(
             pillBase,
             task.urgency === 'not_urgent'
-              ? 'bg-emerald-500 text-white border-emerald-500'
-              : 'border-emerald-200 text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/50',
-            task.urgency === 'unset' && 'opacity-50'
+              ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm'
+              : 'border-emerald-300 text-emerald-600 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-950/50',
+            task.urgency === 'unset' && 'opacity-60'
           )}
+          title="Not Urgent"
         >
           <Clock className={iconSize} />
-          {!compact && "Not urgent"}
+          <span>Not Urgent</span>
         </button>
       </div>
 
       {/* Importance */}
-      <div className="flex gap-px">
+      <div className="flex gap-0.5">
         <button
           type="button"
           onClick={() => handleImportanceClick('important')}
+          disabled={disabled}
           className={cn(
             pillBase,
             task.importance === 'important'
-              ? 'bg-amber-500 text-white border-amber-500'
-              : 'border-amber-200 text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/50',
-            task.importance === 'unset' && 'opacity-50'
+              ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+              : 'border-amber-300 text-amber-600 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400 dark:hover:bg-amber-950/50',
+            task.importance === 'unset' && 'opacity-60'
           )}
+          title="Important"
         >
           <Target className={iconSize} />
-          {!compact && "Important"}
+          <span>Important</span>
         </button>
         <button
           type="button"
           onClick={() => handleImportanceClick('not_important')}
+          disabled={disabled}
           className={cn(
             pillBase,
             task.importance === 'not_important'
-              ? 'bg-slate-400 text-white border-slate-400'
-              : 'border-slate-200 text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50',
-            task.importance === 'unset' && 'opacity-50'
+              ? 'bg-slate-500 text-white border-slate-500 shadow-sm'
+              : 'border-slate-300 text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800/50',
+            task.importance === 'unset' && 'opacity-60'
           )}
+          title="Not Important"
         >
-          {!compact && "Not important"}
+          <span>Not Imp.</span>
         </button>
       </div>
 
       {/* Effort */}
-      <div className="flex gap-px">
+      <div className="flex gap-0.5">
         <button
           type="button"
           onClick={() => handleEffortClick('quick_win')}
+          disabled={disabled}
           className={cn(
             pillBase,
             task.effort === 'quick_win'
-              ? 'bg-sky-500 text-white border-sky-500'
-              : 'border-sky-200 text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-950/50',
-            task.effort === 'unset' && 'opacity-50'
+              ? 'bg-sky-500 text-white border-sky-500 shadow-sm'
+              : 'border-sky-300 text-sky-600 hover:bg-sky-50 dark:border-sky-700 dark:text-sky-400 dark:hover:bg-sky-950/50',
+            task.effort === 'unset' && 'opacity-60'
           )}
+          title="Quick Win - Small task"
         >
           <Feather className={iconSize} />
-          {!compact && "Quick"}
+          <span>Quick</span>
         </button>
         <button
           type="button"
           onClick={() => handleEffortClick('deep_work')}
+          disabled={disabled}
           className={cn(
             pillBase,
             task.effort === 'deep_work'
-              ? 'bg-purple-500 text-white border-purple-500'
-              : 'border-purple-200 text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/50',
-            task.effort === 'unset' && 'opacity-50'
+              ? 'bg-purple-500 text-white border-purple-500 shadow-sm'
+              : 'border-purple-300 text-purple-600 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-950/50',
+            task.effort === 'unset' && 'opacity-60'
           )}
+          title="Deep Work - Requires focus"
         >
           <Flame className={iconSize} />
-          {!compact && "Deep"}
+          <span>Deep</span>
         </button>
       </div>
     </div>
@@ -660,17 +674,19 @@ export function QuickToDoButton() {
 
   const getPanelStyle = (): React.CSSProperties => {
     const margin = isExpanded ? 24 : 12;
+    // Get sidebar width (typically 256px when expanded, ~56px when collapsed)
+    const sidebarWidth = 256;
     const panelWidth = isExpanded 
-      ? Math.min(window.innerWidth - margin * 2, window.innerWidth - 48) 
-      : Math.min(400, window.innerWidth - 24);
+      ? Math.min(window.innerWidth - sidebarWidth - margin * 2, window.innerWidth - 48) 
+      : Math.min(420, window.innerWidth - sidebarWidth - 24);
     const panelHeight = isExpanded 
       ? window.innerHeight - margin * 2 - 80
-      : 520;
+      : 560;
 
     if (isExpanded) {
       return {
         position: 'fixed',
-        left: margin,
+        left: sidebarWidth + margin,
         top: margin,
         right: 'auto',
         bottom: 'auto',
@@ -679,35 +695,15 @@ export function QuickToDoButton() {
       };
     }
 
-    if (position) {
-      let left: number;
-      let top: number;
-
-      if (position.y > window.innerHeight / 2) {
-        top = Math.max(margin, position.y - panelHeight - 8);
-      } else {
-        top = position.y + 64;
-      }
-
-      left = position.x - panelWidth / 2 + 28;
-      left = Math.max(margin, Math.min(left, window.innerWidth - panelWidth - margin));
-      top = Math.max(margin, Math.min(top, window.innerHeight - panelHeight - margin));
-
-      return {
-        position: 'fixed',
-        left,
-        top,
-        right: 'auto',
-        bottom: 'auto',
-        width: panelWidth,
-      };
-    }
-
+    // Position panel adjacent to sidebar, in top third of screen
     return {
       position: 'fixed',
-      left: 24,
-      bottom: 96,
+      left: sidebarWidth,
+      top: 80, // Top third positioning
+      right: 'auto',
+      bottom: 'auto',
       width: panelWidth,
+      maxHeight: `calc(100vh - 100px)`,
     };
   };
 
@@ -750,8 +746,8 @@ export function QuickToDoButton() {
 
     return (
       <div
-      className={cn(
-          "flex flex-col gap-1.5 p-2 rounded-lg group transition-all",
+        className={cn(
+          "flex flex-col gap-2 p-3 rounded-lg group transition-all",
           "bg-muted/50 hover:bg-muted/80",
           selectedTasks.has(task.id) && "bg-primary/10"
         )}
@@ -760,6 +756,7 @@ export function QuickToDoButton() {
           <Checkbox
             checked={task.is_completed}
             onCheckedChange={() => toggleTask(task)}
+            className="h-4 w-4"
           />
           
           {isEditing ? (
@@ -769,63 +766,66 @@ export function QuickToDoButton() {
               onChange={(e) => setEditedTitle(e.target.value)}
               onBlur={handleSave}
               onKeyDown={handleKeyDownRow}
-              className="flex-1 h-6 text-sm"
+              className="flex-1 h-7 text-sm"
             />
           ) : (
             <span 
-              className="flex-1 text-sm cursor-pointer hover:bg-background/50 rounded px-1 -mx-1 truncate"
+              className="flex-1 text-sm cursor-pointer hover:bg-background/50 rounded px-1 -mx-1"
               onClick={() => setIsEditing(true)}
               title="Click to edit"
+              style={{ wordBreak: 'break-word' }}
             >
               {task.title}
             </span>
           )}
           
           {isTriaged && (
-            <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-green-50 text-green-600 border-green-200 dark:bg-green-950/30">
-              <Check className="h-2 w-2" />
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-green-50 text-green-600 border-green-200 dark:bg-green-950/30 shrink-0">
+              <Check className="h-2.5 w-2.5 mr-0.5" />
+              Done
             </Badge>
           )}
           
           {/* Only show move/delete buttons for quick tasks */}
           {task.source === 'quick' && (
-            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-1 shrink-0">
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-5 w-5"
+                className="h-6 w-6"
                 onClick={() => openMoveDialog(task)}
                 title="Move to Growth"
               >
-                <ArrowRight className="h-3 w-3 text-muted-foreground" />
+                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-5 w-5"
+                className="h-6 w-6"
                 onClick={() => deleteTask(task.id)}
+                title="Delete task"
               >
-                <Trash2 className="h-3 w-3 text-muted-foreground" />
+                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
             </div>
           )}
           
           {/* Show project badge and due date for growth tasks */}
           {task.source === 'growth' && (
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-1.5 shrink-0">
               {task.dueDate && (
                 <Badge variant="outline" className={cn(
-                  "text-[9px] px-1 py-0 h-4",
+                  "text-[10px] px-1.5 py-0.5 h-5",
                   task.dueDate < new Date() 
                     ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30" 
                     : "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30"
                 )}>
-                  <CalendarClock className="h-2 w-2 mr-0.5" />
+                  <CalendarClock className="h-2.5 w-2.5 mr-0.5" />
                   {formatDistanceToNow(task.dueDate, { addSuffix: true })}
                 </Badge>
               )}
               {task.projectName && (
-                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30">
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30">
                   {task.projectName}
                 </Badge>
               )}

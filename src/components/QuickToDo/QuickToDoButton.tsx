@@ -827,6 +827,7 @@ export function QuickToDoButton() {
           selectedTasks.has(task.id) && "bg-primary/10"
         )}
       >
+        {/* Title row */}
         <div className="flex items-start gap-2">
           {/* Dual checkbox: complete with notes + quick complete */}
           <div className="flex items-center gap-1 shrink-0 mt-0.5">
@@ -846,24 +847,26 @@ export function QuickToDoButton() {
             />
           </div>
           
-          {isEditing ? (
-            <Input
-              ref={editInputRef}
-              value={editedTitle}
-              onChange={(e) => setEditedTitle(e.target.value)}
-              onBlur={handleSave}
-              onKeyDown={handleKeyDownRow}
-              className="flex-1 min-w-0 h-7 text-sm"
-            />
-          ) : (
-            <span 
-              className="flex-1 min-w-0 text-sm cursor-pointer hover:bg-background/50 rounded px-1 -mx-1 break-words"
-              onClick={() => setIsEditing(true)}
-              title="Click to edit"
-            >
-              {task.title}
-            </span>
-          )}
+          <div className="flex-1 min-w-0">
+            {isEditing ? (
+              <Input
+                ref={editInputRef}
+                value={editedTitle}
+                onChange={(e) => setEditedTitle(e.target.value)}
+                onBlur={handleSave}
+                onKeyDown={handleKeyDownRow}
+                className="w-full h-7 text-sm"
+              />
+            ) : (
+              <span 
+                className="block text-sm cursor-pointer hover:bg-background/50 rounded px-1 -mx-1"
+                onClick={() => setIsEditing(true)}
+                title="Click to edit"
+              >
+                {task.title}
+              </span>
+            )}
+          </div>
           
           {isTriaged && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-green-50 text-green-600 border-green-200 dark:bg-green-950/30 shrink-0">
@@ -895,47 +898,47 @@ export function QuickToDoButton() {
               </Button>
             </div>
           )}
-          
-          {/* Show project badge, assignee, due date, and unpin for growth tasks */}
-          {task.source === 'growth' && (
-            <div className="flex items-center gap-1.5 shrink-0">
-              {task.assignee && task.assignee !== 'Me' && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/30">
-                  <User className="h-2.5 w-2.5 mr-0.5" />
-                  {task.assignee}
-                </Badge>
-              )}
-              {task.dueDate && (
-                <Badge variant="outline" className={cn(
-                  "text-[10px] px-1.5 py-0.5 h-5",
-                  task.dueDate < new Date() 
-                    ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30" 
-                    : "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30"
-                )}>
-                  <CalendarClock className="h-2.5 w-2.5 mr-0.5" />
-                  {formatDistanceToNow(task.dueDate, { addSuffix: true })}
-                </Badge>
-              )}
-              {task.projectName && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30">
-                  {task.projectName}
-                </Badge>
-              )}
-              {/* Unpin button for pinned growth tasks */}
-              {task.pinned_to_tasklist && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6"
-                  onClick={() => toggleGrowthTaskPin(task.id, true)}
-                  title="Remove from Task List"
-                >
-                  <PinOff className="h-3.5 w-3.5 text-muted-foreground" />
-                </Button>
-              )}
-            </div>
-          )}
         </div>
+        
+        {/* Growth task metadata row - separate line for badges */}
+        {task.source === 'growth' && (
+          <div className="flex items-center gap-1.5 flex-wrap ml-9">
+            {task.assignee && task.assignee !== 'Me' && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/30">
+                <User className="h-2.5 w-2.5 mr-0.5" />
+                {task.assignee}
+              </Badge>
+            )}
+            {task.dueDate && (
+              <Badge variant="outline" className={cn(
+                "text-[10px] px-1.5 py-0.5 h-5",
+                task.dueDate < new Date() 
+                  ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30" 
+                  : "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30"
+              )}>
+                <CalendarClock className="h-2.5 w-2.5 mr-0.5" />
+                {formatDistanceToNow(task.dueDate, { addSuffix: true })}
+              </Badge>
+            )}
+            {task.projectName && (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30">
+                {task.projectName}
+              </Badge>
+            )}
+            {/* Unpin button for pinned growth tasks */}
+            {task.pinned_to_tasklist && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5"
+                onClick={() => toggleGrowthTaskPin(task.id, true)}
+                title="Remove from Task List"
+              >
+                <PinOff className="h-3 w-3 text-muted-foreground" />
+              </Button>
+            )}
+          </div>
+        )}
         
         <TriagePills 
           task={task} 

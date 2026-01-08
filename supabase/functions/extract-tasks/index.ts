@@ -71,6 +71,20 @@ serve(async (req) => {
       ? completedTasksList.slice(0, 10).map((t, i) => `${i + 1}. "${t.title}"`).join('\n')
       : 'No completed tasks yet.';
 
+    // Build assignee guidance based on project type
+    let assigneeGuidance = `- If "I" or "me" is mentioned, the assignee is "Me"
+- If no specific person is mentioned, leave assignee empty`;
+
+    if (projectType === 'professional_development') {
+      // For professional development, we need the mentee name from project context
+      assigneeGuidance = `- IMPORTANT: This is a Professional Development project
+- If a mentee name is mentioned in entries or tasks, tasks for the mentee should be assigned to them by name
+- If tasks are clearly for the user themselves (self-development, their own goals), assign to "Me"
+- If "I" or "me" is mentioned for user's own actions, the assignee is "Me"
+- Default to "Me" if the task appears to be for the user's own professional development
+- Only leave assignee empty if truly ambiguous`;
+    }
+
     const prompt = `You are analyzing a ${projectTypeLabels[projectType] || 'professional'} project called "${projectName}".
 
 ## PROJECT CONTEXT
@@ -103,12 +117,10 @@ Based on the NEW ENTRY above (using the project context to inform your analysis)
 
 2. **TASK AMENDMENTS**: If the new entry suggests changes to existing pending tasks (e.g., scope change, new deadline, reassignment), suggest amendments.
 
-3. **COMPLETED TASKS**: If the new entry provides evidence that any pending tasks have been delivered or satisfied, identify them with the specific evidence.
+3. **COMPLETED TASKS**: If the new entry provides evidence that any pending tasks have been delivered or satisfied, identify them with the specific evidence. Include a brief "completion_notes" summarizing how the task was completed based on evidence in the entry.
 
-Rules:
-- Focus your analysis on the NEW ENTRY - the previous entries are just for context
-- If "I" or "me" is mentioned, the assignee is "Me"
-- If no specific person is mentioned, leave assignee empty
+ASSIGNEE RULES:
+${assigneeGuidance}
 - Be thorough but don't invent tasks not implied by the content
 - Only mark tasks complete if there's clear evidence in the new entry
 
@@ -187,9 +199,10 @@ Return your analysis using the analyze_tasks function.`;
                       type: 'object',
                       properties: {
                         original_task_title: { type: 'string', description: 'The existing task title that appears complete' },
-                        evidence: { type: 'string', description: 'Brief explanation of why this task appears complete' }
+                        evidence: { type: 'string', description: 'Brief explanation of why this task appears complete' },
+                        completion_notes: { type: 'string', description: 'A brief summary of how the task was completed, suitable for record-keeping (e.g., "Discussed in 1:1 meeting on Jan 8", "Submitted proposal to client")' }
                       },
-                      required: ['original_task_title', 'evidence']
+                      required: ['original_task_title', 'evidence', 'completion_notes']
                     }
                   }
                 },
@@ -231,7 +244,7 @@ Return your analysis using the analyze_tasks function.`;
     // Extract from tool call response
     let newTasks: Array<{ title: string; assignee?: string; deadline_type: string }> = [];
     let amendments: Array<{ original_task_title: string; suggested_title?: string; suggested_assignee?: string; suggested_deadline_type?: string; reason: string }> = [];
-    let completedTasks: Array<{ original_task_title: string; evidence: string }> = [];
+    let completedTasks: Array<{ original_task_title: string; evidence: string; completion_notes?: string }> = [];
     
     const toolCalls = aiData.choices?.[0]?.message?.tool_calls;
     if (toolCalls && toolCalls.length > 0) {

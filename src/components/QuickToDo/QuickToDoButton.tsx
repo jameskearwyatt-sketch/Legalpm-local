@@ -199,7 +199,7 @@ export function QuickToDoButton() {
   const openMoveDialog = (task: QuickTask) => {
     setTaskToMove(task);
     setSelectedProject("");
-    setSelectedAssignee("");
+    setSelectedAssignee("__unassigned__");
     setSelectedDeadline("no_deadline");
     setMoveDialogOpen(true);
   };
@@ -216,7 +216,7 @@ export function QuickToDoButton() {
           title: taskToMove.title,
           project_id: selectedProject,
           user_id: user.id,
-          assignee: selectedAssignee || null,
+          assignee: selectedAssignee === '__unassigned__' ? null : selectedAssignee,
           deadline_type: selectedDeadline,
           deadline_set_at: selectedDeadline !== 'no_deadline' ? new Date().toISOString() : null,
         });
@@ -514,7 +514,7 @@ export function QuickToDoButton() {
                   <SelectValue placeholder="Select assignee (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Unassigned</SelectItem>
+                  <SelectItem value="__unassigned__">Unassigned</SelectItem>
                   <SelectItem value="Me">Me</SelectItem>
                   {assignees.map((a) => (
                     <SelectItem key={a.id} value={a.name}>

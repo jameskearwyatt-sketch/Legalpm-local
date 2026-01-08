@@ -11,6 +11,7 @@ export interface LocalCounsel {
   allocated_budget: number;
   wip_amount: number;
   billed_amount: number;
+  billing_mode: 'Direct' | 'Disb' | null;
   last_updated: string | null;
   created_at: string;
   updated_at: string;
@@ -26,6 +27,7 @@ export interface UpdateLocalCounselInput {
   id: string;
   wip_amount?: number;
   billed_amount?: number;
+  billing_mode?: 'Direct' | 'Disb' | null;
   last_updated?: string | null;
   allocated_budget?: number;
 }
@@ -87,6 +89,7 @@ export function useLocalCounsels(matterId?: string) {
       const updateData: Partial<LocalCounsel> = {};
       if (input.wip_amount !== undefined) updateData.wip_amount = input.wip_amount;
       if (input.billed_amount !== undefined) updateData.billed_amount = input.billed_amount;
+      if (input.billing_mode !== undefined) updateData.billing_mode = input.billing_mode;
       if (input.last_updated !== undefined) updateData.last_updated = input.last_updated;
       if (input.allocated_budget !== undefined) updateData.allocated_budget = input.allocated_budget;
 

@@ -551,10 +551,17 @@ export default function Matters() {
     return usedIds;
   }, [matters, allMatterClients]);
 
-  // Silent update for local counsel billing (no toast)
+  // Silent update for local counsel billing (no toast) - legacy matter-level
   const updateLocalCounselBilling = async (matterId: string, value: 'Direct' | 'Disb' | null) => {
     await supabase.from('matters').update({ local_counsel_billing: value }).eq('id', matterId);
     queryClient.invalidateQueries({ queryKey: ['matters'] });
+  };
+
+  // Update per-LC billing mode
+  const updateLcBillingMode = async (lcId: string, value: 'Direct' | 'Disb' | null) => {
+    await supabase.from('matter_local_counsels').update({ billing_mode: value }).eq('id', lcId);
+    queryClient.invalidateQueries({ queryKey: ['matters'] });
+    queryClient.invalidateQueries({ queryKey: ['local-counsels'] });
   };
 
   // Auto-summarize long matter names that don't have a display name yet
@@ -1214,57 +1221,117 @@ export default function Matters() {
                                 {(matter as any).pay_full_time_costs ? (
                                   <span className="text-muted-foreground">N/A</span>
                                 ) : (
-                                  <div className="flex flex-col items-end gap-0.5">
+                                  <div className="flex flex-col items-end gap-1">
                                     <span className="text-muted-foreground">
                                       {formatCurrency((matter as any).effective_local_counsel_fee ?? matter.local_counsel_fee, (matter as any).effective_currency ?? matter.fee_currency)}
                                     </span>
-                                    {(matter.local_counsel_fee || 0) > 0 && (() => {
-                                      const hasSelection = matter.local_counsel_billing === 'Disb' || matter.local_counsel_billing === 'Direct';
-                                      return (
-                                        <div className="flex items-center gap-1.5">
-                                          <label 
-                                            className={cn(
-                                              "flex items-center gap-0.5 cursor-pointer text-[9px] leading-none",
-                                              hasSelection ? "text-success" : "text-destructive"
-                                            )}
-                                          >
-                                            <input
-                                              type="checkbox"
-                                              checked={matter.local_counsel_billing === 'Disb'}
-                                              onChange={async () => {
-                                                const newValue = matter.local_counsel_billing === 'Disb' ? null : 'Disb';
-                                                await updateLocalCounselBilling(matter.id, newValue);
-                                              }}
+                                    {/* Per-LC billing mode checkboxes */}
+                                    {((matter as any).local_counsels && (matter as any).local_counsels.length > 0) ? (
+                                      <div className="flex flex-col gap-1 items-end">
+                                        {(matter as any).local_counsels.map((lc: any) => {
+                                          const hasSelection = lc.billing_mode === 'Disb' || lc.billing_mode === 'Direct';
+                                          return (
+                                            <div key={lc.id} className="flex items-center gap-1">
+                                              <span className={cn(
+                                                "text-[8px] leading-none truncate max-w-[60px]",
+                                                hasSelection ? "text-muted-foreground" : "text-destructive"
+                                              )} title={lc.firm_name}>
+                                                {lc.firm_name.length > 10 ? lc.firm_name.slice(0, 10) + '…' : lc.firm_name}
+                                              </span>
+                                              <label 
+                                                className={cn(
+                                                  "flex items-center gap-0.5 cursor-pointer text-[9px] leading-none",
+                                                  hasSelection ? "text-success" : "text-destructive"
+                                                )}
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={lc.billing_mode === 'Disb'}
+                                                  onChange={async () => {
+                                                    const newValue = lc.billing_mode === 'Disb' ? null : 'Disb';
+                                                    await updateLcBillingMode(lc.id, newValue);
+                                                  }}
+                                                  className={cn(
+                                                    "h-2.5 w-2.5 rounded-sm border cursor-pointer accent-current",
+                                                    lc.billing_mode === 'Disb' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                                                  )}
+                                                />
+                                                D
+                                              </label>
+                                              <label 
+                                                className={cn(
+                                                  "flex items-center gap-0.5 cursor-pointer text-[9px] leading-none",
+                                                  hasSelection ? "text-success" : "text-destructive"
+                                                )}
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={lc.billing_mode === 'Direct'}
+                                                  onChange={async () => {
+                                                    const newValue = lc.billing_mode === 'Direct' ? null : 'Direct';
+                                                    await updateLcBillingMode(lc.id, newValue);
+                                                  }}
+                                                  className={cn(
+                                                    "h-2.5 w-2.5 rounded-sm border cursor-pointer accent-current",
+                                                    lc.billing_mode === 'Direct' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                                                  )}
+                                                />
+                                                Dir
+                                              </label>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    ) : (matter.local_counsel_fee || 0) > 0 && (
+                                      /* Fallback to matter-level checkboxes if no LC records exist */
+                                      (() => {
+                                        const hasSelection = matter.local_counsel_billing === 'Disb' || matter.local_counsel_billing === 'Direct';
+                                        return (
+                                          <div className="flex items-center gap-1.5">
+                                            <label 
                                               className={cn(
-                                                "h-2.5 w-2.5 rounded-sm border cursor-pointer accent-current",
-                                                matter.local_counsel_billing === 'Disb' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                                                "flex items-center gap-0.5 cursor-pointer text-[9px] leading-none",
+                                                hasSelection ? "text-success" : "text-destructive"
                                               )}
-                                            />
-                                            Disb
-                                          </label>
-                                          <label 
-                                            className={cn(
-                                              "flex items-center gap-0.5 cursor-pointer text-[9px] leading-none",
-                                              hasSelection ? "text-success" : "text-destructive"
-                                            )}
-                                          >
-                                            <input
-                                              type="checkbox"
-                                              checked={matter.local_counsel_billing === 'Direct'}
-                                              onChange={async () => {
-                                                const newValue = matter.local_counsel_billing === 'Direct' ? null : 'Direct';
-                                                await updateLocalCounselBilling(matter.id, newValue);
-                                              }}
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={matter.local_counsel_billing === 'Disb'}
+                                                onChange={async () => {
+                                                  const newValue = matter.local_counsel_billing === 'Disb' ? null : 'Disb';
+                                                  await updateLocalCounselBilling(matter.id, newValue);
+                                                }}
+                                                className={cn(
+                                                  "h-2.5 w-2.5 rounded-sm border cursor-pointer accent-current",
+                                                  matter.local_counsel_billing === 'Disb' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                                                )}
+                                              />
+                                              Disb
+                                            </label>
+                                            <label 
                                               className={cn(
-                                                "h-2.5 w-2.5 rounded-sm border cursor-pointer accent-current",
-                                                matter.local_counsel_billing === 'Direct' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                                                "flex items-center gap-0.5 cursor-pointer text-[9px] leading-none",
+                                                hasSelection ? "text-success" : "text-destructive"
                                               )}
-                                            />
-                                            Direct
-                                          </label>
-                                        </div>
-                                      );
-                                    })()}
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={matter.local_counsel_billing === 'Direct'}
+                                                onChange={async () => {
+                                                  const newValue = matter.local_counsel_billing === 'Direct' ? null : 'Direct';
+                                                  await updateLocalCounselBilling(matter.id, newValue);
+                                                }}
+                                                className={cn(
+                                                  "h-2.5 w-2.5 rounded-sm border cursor-pointer accent-current",
+                                                  matter.local_counsel_billing === 'Direct' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                                                )}
+                                              />
+                                              Direct
+                                            </label>
+                                          </div>
+                                        );
+                                      })()
+                                    )}
                                   </div>
                                 )}
                               </TableCell>

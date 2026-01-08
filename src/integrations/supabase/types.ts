@@ -683,6 +683,7 @@ export type Database = {
         Row: {
           allocated_budget: number
           billed_amount: number
+          billing_mode: string | null
           created_at: string
           firm_name: string
           id: string
@@ -695,6 +696,7 @@ export type Database = {
         Insert: {
           allocated_budget?: number
           billed_amount?: number
+          billing_mode?: string | null
           created_at?: string
           firm_name: string
           id?: string
@@ -707,6 +709,7 @@ export type Database = {
         Update: {
           allocated_budget?: number
           billed_amount?: number
+          billing_mode?: string | null
           created_at?: string
           firm_name?: string
           id?: string

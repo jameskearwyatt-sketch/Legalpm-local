@@ -767,8 +767,8 @@ export default function MatterDetail() {
           </div>
         )}
 
-        {/* Local Counsel Financials - only show when LC fee exists and billing mode is Disbursement */}
-        {!isPipeline && localCounsel > 0 && isLcDisbursement && (
+        {/* Local Counsel Financials - show when LC fee exists */}
+        {!isPipeline && localCounsel > 0 && (
           <Card className="shadow-card border-l-4 border-l-primary">
             <CardHeader>
               <CardTitle className="text-lg font-heading">Local Counsel Financials</CardTitle>
@@ -794,95 +794,160 @@ export default function MatterDetail() {
                     {localCounsels.map((lc) => {
                       const firmBurn = (lc.wip_amount || 0) + (lc.billed_amount || 0);
                       const firmBudgetPercent = lc.allocated_budget > 0 ? (firmBurn / lc.allocated_budget) * 100 : 0;
+                      const hasSelection = lc.billing_mode === 'Disb' || lc.billing_mode === 'Direct';
+                      const isLcDisbursementMode = lc.billing_mode === 'Disb';
                       
                       return (
                         <div key={lc.id} className="border rounded-lg p-4 space-y-3">
                           <div className="flex justify-between items-center">
-                            <h4 className="font-medium text-sm">{lc.firm_name}</h4>
+                            <div className="flex items-center gap-3">
+                              <h4 className="font-medium text-sm">{lc.firm_name}</h4>
+                              {/* Per-LC billing mode checkboxes */}
+                              <div className="flex items-center gap-2">
+                                <label 
+                                  className={cn(
+                                    "flex items-center gap-1 cursor-pointer text-xs",
+                                    hasSelection ? "text-success" : "text-destructive"
+                                  )}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={lc.billing_mode === 'Disb'}
+                                    onChange={() => {
+                                      const newValue = lc.billing_mode === 'Disb' ? null : 'Disb';
+                                      updateLocalCounsel.mutate({
+                                        id: lc.id,
+                                        billing_mode: newValue,
+                                      });
+                                    }}
+                                    className={cn(
+                                      "h-3 w-3 rounded-sm border cursor-pointer accent-current",
+                                      lc.billing_mode === 'Disb' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                                    )}
+                                  />
+                                  Disb
+                                </label>
+                                <label 
+                                  className={cn(
+                                    "flex items-center gap-1 cursor-pointer text-xs",
+                                    hasSelection ? "text-success" : "text-destructive"
+                                  )}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={lc.billing_mode === 'Direct'}
+                                    onChange={() => {
+                                      const newValue = lc.billing_mode === 'Direct' ? null : 'Direct';
+                                      updateLocalCounsel.mutate({
+                                        id: lc.id,
+                                        billing_mode: newValue,
+                                      });
+                                    }}
+                                    className={cn(
+                                      "h-3 w-3 rounded-sm border cursor-pointer accent-current",
+                                      lc.billing_mode === 'Direct' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
+                                    )}
+                                  />
+                                  Direct
+                                </label>
+                              </div>
+                            </div>
                             <span className="text-xs text-muted-foreground">
                               Budget: {formatCurrency(lc.allocated_budget, currency)}
                             </span>
                           </div>
-                          <div className="grid sm:grid-cols-3 gap-3">
-                            <div className="space-y-1">
-                              <Label className="text-xs">WIP</Label>
-                              <Input
-                                type="number"
-                                value={lc.wip_amount || ''}
-                                onChange={(e) => {
-                                  updateLocalCounsel.mutate({
-                                    id: lc.id,
-                                    wip_amount: parseFloat(e.target.value) || 0,
-                                    last_updated: new Date().toISOString().split('T')[0],
-                                  });
-                                }}
-                                placeholder="0"
-                                className="h-8 text-sm"
-                              />
+                          {/* Only show WIP/Billed inputs if billing mode is Disbursement */}
+                          {isLcDisbursementMode && (
+                            <div className="grid sm:grid-cols-3 gap-3">
+                              <div className="space-y-1">
+                                <Label className="text-xs">WIP</Label>
+                                <Input
+                                  type="number"
+                                  value={lc.wip_amount || ''}
+                                  onChange={(e) => {
+                                    updateLocalCounsel.mutate({
+                                      id: lc.id,
+                                      wip_amount: parseFloat(e.target.value) || 0,
+                                      last_updated: new Date().toISOString().split('T')[0],
+                                    });
+                                  }}
+                                  placeholder="0"
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Billed</Label>
+                                <Input
+                                  type="number"
+                                  value={lc.billed_amount || ''}
+                                  onChange={(e) => {
+                                    updateLocalCounsel.mutate({
+                                      id: lc.id,
+                                      billed_amount: parseFloat(e.target.value) || 0,
+                                      last_updated: new Date().toISOString().split('T')[0],
+                                    });
+                                  }}
+                                  placeholder="0"
+                                  className="h-8 text-sm"
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <Label className="text-xs">Last Updated</Label>
+                                <ClearableDateInput 
+                                  value={lc.last_updated || ''} 
+                                  onChange={(value) => {
+                                    updateLocalCounsel.mutate({
+                                      id: lc.id,
+                                      last_updated: value || null,
+                                    });
+                                  }}
+                                  className="h-8 text-sm"
+                                />
+                              </div>
                             </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs">Billed</Label>
-                              <Input
-                                type="number"
-                                value={lc.billed_amount || ''}
-                                onChange={(e) => {
-                                  updateLocalCounsel.mutate({
-                                    id: lc.id,
-                                    billed_amount: parseFloat(e.target.value) || 0,
-                                    last_updated: new Date().toISOString().split('T')[0],
-                                  });
-                                }}
-                                placeholder="0"
-                                className="h-8 text-sm"
-                              />
+                          )}
+                          {isLcDisbursementMode && (
+                            <div className="flex justify-between items-center text-sm">
+                              <span className="text-muted-foreground">Burn</span>
+                              <span className={cn(
+                                "font-medium",
+                                firmBudgetPercent > 100 && "text-danger",
+                                firmBudgetPercent >= 80 && firmBudgetPercent <= 100 && "text-warning",
+                                firmBudgetPercent < 80 && "text-success"
+                              )}>
+                                {formatCurrency(firmBurn, currency)} ({firmBudgetPercent.toFixed(0)}%)
+                              </span>
                             </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs">Last Updated</Label>
-                              <ClearableDateInput 
-                                value={lc.last_updated || ''} 
-                                onChange={(value) => {
-                                  updateLocalCounsel.mutate({
-                                    id: lc.id,
-                                    last_updated: value || null,
-                                  });
-                                }}
-                                className="h-8 text-sm"
-                              />
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-center text-sm">
-                            <span className="text-muted-foreground">Burn</span>
-                            <span className={cn(
-                              "font-medium",
-                              firmBudgetPercent > 100 && "text-danger",
-                              firmBudgetPercent >= 80 && firmBudgetPercent <= 100 && "text-warning",
-                              firmBudgetPercent < 80 && "text-success"
-                            )}>
-                              {formatCurrency(firmBurn, currency)} ({firmBudgetPercent.toFixed(0)}%)
-                            </span>
-                          </div>
+                          )}
+                          {!hasSelection && (
+                            <p className="text-xs text-destructive">
+                              Please select billing method (Disb or Direct)
+                            </p>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                   
-                  {/* Total LC summary */}
-                  <div className="flex justify-between items-center py-3 bg-muted/50 rounded-lg px-4">
-                    <span className="text-muted-foreground font-medium">Total LC Budget Burn</span>
-                    <div className="text-right">
-                      <span className={cn(
-                        "text-lg font-semibold",
-                        lcBudgetUsedPercent > 100 && "text-danger",
-                        lcBudgetUsedPercent >= 80 && lcBudgetUsedPercent <= 100 && "text-warning",
-                        lcBudgetUsedPercent < 80 && "text-success"
-                      )}>
-                        {lcBudgetUsedPercent.toFixed(1)}%
-                      </span>
-                      <p className="text-xs text-muted-foreground">
-                        {formatCurrency(lcTotalUsed, currency)} of {formatCurrency(localCounsel, currency)}
-                      </p>
+                  {/* Total LC summary - only for disbursement LCs */}
+                  {localCounsels.some(lc => lc.billing_mode === 'Disb') && (
+                    <div className="flex justify-between items-center py-3 bg-muted/50 rounded-lg px-4">
+                      <span className="text-muted-foreground font-medium">Total LC Budget Burn (Disb only)</span>
+                      <div className="text-right">
+                        <span className={cn(
+                          "text-lg font-semibold",
+                          lcBudgetUsedPercent > 100 && "text-danger",
+                          lcBudgetUsedPercent >= 80 && lcBudgetUsedPercent <= 100 && "text-warning",
+                          lcBudgetUsedPercent < 80 && "text-success"
+                        )}>
+                          {lcBudgetUsedPercent.toFixed(1)}%
+                        </span>
+                        <p className="text-xs text-muted-foreground">
+                          {formatCurrency(lcTotalUsed, currency)} of {formatCurrency(localCounsel, currency)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </>
               )}
             </CardContent>

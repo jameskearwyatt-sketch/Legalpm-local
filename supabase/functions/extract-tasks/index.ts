@@ -13,16 +13,23 @@ interface ExistingTask {
   is_completed: boolean;
 }
 
+interface ExistingEntry {
+  title?: string;
+  content?: string;
+  entry_type: string;
+  created_at: string;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { content, projectName, projectType, existingTasks } = await req.json();
+    const { newEntryContent, projectName, projectType, existingTasks, existingEntries } = await req.json();
 
-    if (!content) {
-      return new Response(JSON.stringify({ error: 'content is required', tasks: [], amendments: [], completedTasks: [] }), {
+    if (!newEntryContent) {
+      return new Response(JSON.stringify({ error: 'newEntryContent is required', tasks: [], amendments: [], completedTasks: [] }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -42,45 +49,69 @@ serve(async (req) => {
       'learning_development': 'Learning & Development',
     };
 
+    // Format existing entries for context (limit to recent ones to avoid token limits)
+    const recentEntries = (existingEntries as ExistingEntry[] || []).slice(0, 10);
+    const entriesContext = recentEntries.length > 0 
+      ? recentEntries.map((e, i) => {
+          const title = e.title ? `"${e.title}"` : `Entry ${i + 1}`;
+          const content = e.content || '[No text content - file attachment]';
+          return `--- ${title} (${e.entry_type}, ${new Date(e.created_at).toLocaleDateString()}) ---\n${content}`;
+        }).join('\n\n')
+      : 'No previous entries.';
+
     // Format existing tasks for context
-    const existingTasksList = (existingTasks as ExistingTask[] || [])
-      .filter(t => !t.is_completed)
-      .map((t, i) => `${i + 1}. "${t.title}" (assigned to: ${t.assignee || 'unassigned'})`)
-      .join('\n');
+    const pendingTasks = (existingTasks as ExistingTask[] || []).filter(t => !t.is_completed);
+    const completedTasksList = (existingTasks as ExistingTask[] || []).filter(t => t.is_completed);
+    
+    const pendingTasksContext = pendingTasks.length > 0
+      ? pendingTasks.map((t, i) => `${i + 1}. "${t.title}" (assigned to: ${t.assignee || 'unassigned'})`).join('\n')
+      : 'No pending tasks.';
 
-    const prompt = `You are analyzing the LATEST entry/note from a ${projectTypeLabels[projectType] || 'professional'} project called "${projectName}".
+    const completedTasksContext = completedTasksList.length > 0
+      ? completedTasksList.slice(0, 10).map((t, i) => `${i + 1}. "${t.title}"`).join('\n')
+      : 'No completed tasks yet.';
 
-IMPORTANT: Only analyze the new content below - do NOT consider any previous entries.
+    const prompt = `You are analyzing a ${projectTypeLabels[projectType] || 'professional'} project called "${projectName}".
 
-New content to analyze:
+## PROJECT CONTEXT
+
+### Previous Scrapbook Entries (for context):
+${entriesContext}
+
+### Current Pending Tasks:
+${pendingTasksContext}
+
+### Recently Completed Tasks:
+${completedTasksContext}
+
+---
+
+## NEW ENTRY TO ANALYZE
+
+The user has just added this new entry:
 """
-${content}
+${newEntryContent}
 """
 
-${existingTasksList ? `
-EXISTING PENDING TASKS in this project:
-${existingTasksList}
+---
 
-Based on the new content above, identify:
-1. NEW tasks that should be added (not duplicates of existing ones)
-2. AMENDMENTS to existing tasks (if the new content suggests changes to scope, assignee, or deadline)
-3. COMPLETED tasks (if the new content indicates existing tasks have been satisfied or delivered)
-` : ''}
+## YOUR TASK
 
-Rules for NEW tasks:
-- Extract EVERY new action item, commitment, or follow-up mentioned
+Based on the NEW ENTRY above (using the project context to inform your analysis), identify:
+
+1. **NEW TASKS**: Action items mentioned in the new entry that aren't already in the pending tasks list. Be specific and actionable. Don't duplicate existing tasks.
+
+2. **TASK AMENDMENTS**: If the new entry suggests changes to existing pending tasks (e.g., scope change, new deadline, reassignment), suggest amendments.
+
+3. **COMPLETED TASKS**: If the new entry provides evidence that any pending tasks have been delivered or satisfied, identify them with the specific evidence.
+
+Rules:
+- Focus your analysis on the NEW ENTRY - the previous entries are just for context
 - If "I" or "me" is mentioned, the assignee is "Me"
 - If no specific person is mentioned, leave assignee empty
-- Do NOT suggest tasks that duplicate existing ones
+- Be thorough but don't invent tasks not implied by the content
 - Deadline types: this_week, next_week, this_month, next_month, in_3_months, in_6_months, no_deadline
-
-Rules for AMENDMENTS:
-- Only suggest amendments if the new content clearly indicates a change
-- Include the original task title and what should change
-
-Rules for COMPLETED tasks:
-- Only mark as completed if there's clear evidence in the new content
-- Include why you believe the task is complete
+- Only mark tasks complete if there's clear evidence in the new entry
 
 Return your analysis using the analyze_tasks function.`;
 

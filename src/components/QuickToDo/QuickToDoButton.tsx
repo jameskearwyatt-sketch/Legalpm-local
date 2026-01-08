@@ -1,17 +1,15 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { 
-  CheckSquare, X, Plus, Trash2, Flame, ArrowRight, Clock, User, Pencil, 
-  Briefcase, GraduationCap, Lightbulb, Maximize2, Minimize2, Keyboard,
+  CheckSquare, X, Plus, Trash2, ArrowRight, Clock, User,
+  Briefcase, GraduationCap, Lightbulb, Maximize2, Minimize2,
   ListTodo, LayoutGrid, Filter, Check, ChevronDown, ChevronRight,
-  Zap, Target, Feather, CalendarClock
+  Zap, Target, CalendarClock, Feather, Flame
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -251,10 +249,7 @@ export function QuickToDoButton() {
 
   // View state
   const [viewMode, setViewMode] = useState<'focus' | 'matrix'>('focus');
-  const [triageMode, setTriageMode] = useState(false);
-  const [autoAdvance, setAutoAdvance] = useState(true);
   const [showUntriagedOnly, setShowUntriagedOnly] = useState(false);
-  const [focusedIndex, setFocusedIndex] = useState(-1);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
   const [collapsedQuadrants, setCollapsedQuadrants] = useState<Set<EisenhowerQuadrant>>(new Set(['eliminate']));
 
@@ -571,75 +566,6 @@ export function QuickToDoButton() {
     return groups;
   }, [pendingTasks, showUntriagedOnly]);
 
-  // Flat list for keyboard navigation
-  const flatTaskList = useMemo(() => {
-    const order: EisenhowerQuadrant[] = ['do_first', 'schedule', 'delegate', 'eliminate', 'untriaged'];
-    return order.flatMap(q => collapsedQuadrants.has(q) ? [] : groupedTasks[q]);
-  }, [groupedTasks, collapsedQuadrants]);
-
-  // Keyboard shortcuts for triage mode
-  useEffect(() => {
-    if (!triageMode || !isOpen) return;
-
-    const handleKeyDownGlobal = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-
-      const focusedTask = flatTaskList[focusedIndex];
-      if (!focusedTask && !['ArrowDown', 'ArrowUp'].includes(e.key)) return;
-
-      switch (e.key.toLowerCase()) {
-        case 'u':
-          e.preventDefault();
-          updateTask(focusedTask.id, { urgency: focusedTask.urgency === 'urgent' ? 'unset' : 'urgent' });
-          if (autoAdvance) setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'n':
-          e.preventDefault();
-          updateTask(focusedTask.id, { urgency: focusedTask.urgency === 'not_urgent' ? 'unset' : 'not_urgent' });
-          if (autoAdvance) setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'i':
-          e.preventDefault();
-          updateTask(focusedTask.id, { importance: focusedTask.importance === 'important' ? 'unset' : 'important' });
-          if (autoAdvance) setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'o':
-          e.preventDefault();
-          updateTask(focusedTask.id, { importance: focusedTask.importance === 'not_important' ? 'unset' : 'not_important' });
-          if (autoAdvance) setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'q':
-          e.preventDefault();
-          updateTask(focusedTask.id, { effort: focusedTask.effort === 'quick_win' ? 'unset' : 'quick_win' });
-          if (autoAdvance) setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'd':
-          e.preventDefault();
-          updateTask(focusedTask.id, { effort: focusedTask.effort === 'deep_work' ? 'unset' : 'deep_work' });
-          if (autoAdvance) setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case ' ':
-          e.preventDefault();
-          toggleTask(focusedTask);
-          break;
-        case 'enter':
-          e.preventDefault();
-          setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'arrowdown':
-          e.preventDefault();
-          setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'arrowup':
-          e.preventDefault();
-          setFocusedIndex(i => Math.max(i - 1, 0));
-          break;
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDownGlobal);
-    return () => window.removeEventListener('keydown', handleKeyDownGlobal);
-  }, [triageMode, isOpen, focusedIndex, flatTaskList, autoAdvance]);
 
   // Bulk actions
   const handleBulkUpdate = (updates: Partial<QuickTask>) => {
@@ -789,7 +715,7 @@ export function QuickToDoButton() {
   const activeProjects = projects?.filter(p => p.status === 'active') || [];
 
   // Task Row Component
-  const TaskRow = ({ task, isFocused }: { task: UnifiedTask; isFocused?: boolean }) => {
+  const TaskRow = ({ task }: { task: UnifiedTask }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editedTitle, setEditedTitle] = useState(task.title);
     const editInputRef = useRef<HTMLInputElement>(null);
@@ -824,30 +750,13 @@ export function QuickToDoButton() {
 
     return (
       <div
-        className={cn(
+      className={cn(
           "flex flex-col gap-1.5 p-2 rounded-lg group transition-all",
           "bg-muted/50 hover:bg-muted/80",
-          isFocused && "ring-2 ring-primary ring-offset-1",
           selectedTasks.has(task.id) && "bg-primary/10"
         )}
       >
         <div className="flex items-center gap-2">
-          {/* Multi-select checkbox (visible in triage mode) */}
-          {triageMode && (
-            <Checkbox
-              checked={selectedTasks.has(task.id)}
-              onCheckedChange={(checked) => {
-                setSelectedTasks(prev => {
-                  const next = new Set(prev);
-                  if (checked) next.add(task.id);
-                  else next.delete(task.id);
-                  return next;
-                });
-              }}
-              className="h-3.5 w-3.5"
-            />
-          )}
-          
           <Checkbox
             checked={task.is_completed}
             onCheckedChange={() => toggleTask(task)}
@@ -927,8 +836,7 @@ export function QuickToDoButton() {
         <TriagePills 
           task={task} 
           onUpdate={(updates) => updateTask(task.id, updates)}
-          triageMode={triageMode}
-          compact={!triageMode}
+          compact
         />
       </div>
     );
@@ -964,16 +872,12 @@ export function QuickToDoButton() {
 
         {!isCollapsed && (
           <div className="space-y-1">
-            {tasksInQuadrant.map((task) => {
-              const idx = flatTaskList.findIndex(t => t.id === task.id);
-              return (
-                <TaskRow 
-                  key={task.id} 
-                  task={task} 
-                  isFocused={triageMode && idx === focusedIndex}
-                />
-              );
-            })}
+            {tasksInQuadrant.map((task) => (
+              <TaskRow 
+                key={task.id} 
+                task={task} 
+              />
+            ))}
           </div>
         )}
       </div>
@@ -1284,34 +1188,6 @@ export function QuickToDoButton() {
             
             {viewMode === 'focus' && (
               <div className="flex flex-wrap items-center gap-2 text-[10px]">
-                <div className="flex items-center gap-1.5">
-                  <Switch
-                    id="triage-mode"
-                    checked={triageMode}
-                    onCheckedChange={(checked) => {
-                      setTriageMode(checked);
-                      if (checked && flatTaskList.length > 0) setFocusedIndex(0);
-                    }}
-                    className="h-4 w-7"
-                  />
-                  <Label htmlFor="triage-mode" className="flex items-center gap-1 cursor-pointer text-[10px]">
-                    <Keyboard className="h-3 w-3" />
-                    Triage
-                  </Label>
-                </div>
-                
-                {triageMode && (
-                  <div className="flex items-center gap-1.5">
-                    <Switch
-                      id="auto-advance"
-                      checked={autoAdvance}
-                      onCheckedChange={setAutoAdvance}
-                      className="h-4 w-7"
-                    />
-                    <Label htmlFor="auto-advance" className="text-[10px] cursor-pointer">Auto</Label>
-                  </div>
-                )}
-                
                 <button
                   type="button"
                   onClick={() => setShowUntriagedOnly(!showUntriagedOnly)}
@@ -1323,12 +1199,6 @@ export function QuickToDoButton() {
                   <Filter className="h-2.5 w-2.5" />
                   Untriaged
                 </button>
-                
-                {triageMode && (
-                  <span className="text-muted-foreground ml-auto hidden sm:inline">
-                    U/N • I/O • Q/D • Space
-                  </span>
-                )}
               </div>
             )}
           </div>

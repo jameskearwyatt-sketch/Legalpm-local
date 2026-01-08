@@ -55,6 +55,7 @@ interface QuickTask {
   urgency: TaskUrgency;
   effort: TaskEffort;
   created_at: string;
+  completed_at: string | null;
 }
 
 // Unified task type for display - can be a QuickTask or a Growth Task
@@ -66,6 +67,7 @@ interface UnifiedTask {
   urgency: TaskUrgency;
   effort: TaskEffort;
   created_at: string;
+  completed_at?: string | null;
   // Growth task specific
   source: 'quick' | 'growth';
   projectName?: string;
@@ -516,6 +518,7 @@ export function QuickToDoButton() {
       urgency: gt.urgency,
       effort: gt.effort,
       created_at: gt.created_at,
+      completed_at: gt.completed_at,
       source: 'growth' as const,
       projectName: gt.growth_projects.name,
       projectId: gt.project_id,

@@ -278,13 +278,16 @@ const TaskRow = ({
         </div>
       </div>
       
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+      <div className="flex items-center gap-0.5">
         {onCompleteWithNotes && !task.is_completed && (
           <Button
             variant="ghost"
             size="icon"
             className="h-6 w-6 text-muted-foreground hover:text-primary"
-            onClick={onCompleteWithNotes}
+            onClick={(e) => {
+              e.stopPropagation();
+              onCompleteWithNotes();
+            }}
             title="Complete with notes"
           >
             <MessageSquare className="h-3 w-3" />

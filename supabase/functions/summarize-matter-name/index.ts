@@ -13,6 +13,30 @@ serve(async (req) => {
   }
 
   try {
+    // Verify authentication
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return new Response(
+        JSON.stringify({ error: 'Authorization required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_ANON_KEY')!,
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabase.auth.getUser(token);
+    if (claimsError || !claimsData?.user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid or expired token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { matterId, matterName } = await req.json();
 
     if (!matterId || !matterName) {
@@ -67,10 +91,10 @@ serve(async (req) => {
     const aiData = await aiResponse.json();
     const summary = aiData.choices?.[0]?.message?.content?.trim() || matterName.substring(0, 50) + '...';
 
-    // Store the summary in the database
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Store the summary in the database using service role for update
+    const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
     
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('matters')
       .update({ matter_display_name: summary })
       .eq('id', matterId);
@@ -85,10 +109,9 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error in summarize-matter-name function:', error);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: 'An error occurred processing your request. Please try again.' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

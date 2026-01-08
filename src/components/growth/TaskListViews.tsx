@@ -208,7 +208,7 @@ const TaskRow = ({
         <div className="flex items-center gap-2">
           <span className={cn(
             "text-sm font-medium truncate",
-            task.is_completed && 'line-through text-muted-foreground'
+            task.is_completed && 'text-muted-foreground'
           )}>
             {task.title}
           </span>
@@ -636,7 +636,7 @@ export const TodaysFocusView = ({
                     className="mt-1"
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm line-through text-muted-foreground">
+                    <p className="text-sm text-muted-foreground">
                       {task.title}
                     </p>
                     {task.completion_notes && (

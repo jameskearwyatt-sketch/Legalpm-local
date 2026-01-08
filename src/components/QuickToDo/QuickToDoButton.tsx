@@ -1266,7 +1266,12 @@ export function QuickToDoButton() {
                             onCheckedChange={() => toggleTask(task)}
                             className="h-3.5 w-3.5"
                           />
-                          <span className="flex-1 text-muted-foreground line-through truncate">{task.title}</span>
+                          <span className="flex-1 text-muted-foreground truncate">{task.title}</span>
+                          {task.completed_at && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              {format(new Date(task.completed_at), 'MMM d')}
+                            </span>
+                          )}
                           <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => deleteTask(task.id)}>
                             <Trash2 className="h-3 w-3" />
                           </Button>

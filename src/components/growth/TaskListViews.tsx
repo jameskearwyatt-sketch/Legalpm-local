@@ -118,27 +118,31 @@ const TaskRow = ({
   }, [task.urgency, task.importance, task.effort]);
 
   const handleTriageChange = (field: 'urgency' | 'importance' | 'effort', value: TaskUrgency | TaskImportance | TaskEffort) => {
-    setPendingTriage(prev => ({
-      urgency: prev?.urgency ?? task.urgency,
-      importance: prev?.importance ?? task.importance,
-      effort: prev?.effort ?? task.effort,
+    const newPending = {
+      urgency: pendingTriage?.urgency ?? task.urgency,
+      importance: pendingTriage?.importance ?? task.importance,
+      effort: pendingTriage?.effort ?? task.effort,
       [field]: value,
-    }));
-  };
-
-  const handleConfirmTriage = () => {
-    if (pendingTriage) {
+    };
+    
+    // Check if all three are now set (non-unset)
+    const allSet = 
+      newPending.urgency !== 'unset' && 
+      newPending.importance !== 'unset' && 
+      newPending.effort !== 'unset';
+    
+    if (allSet) {
+      // Auto-save when all three are set
       onUpdate({
-        urgency: pendingTriage.urgency ?? task.urgency,
-        importance: pendingTriage.importance ?? task.importance,
-        effort: pendingTriage.effort ?? task.effort,
+        urgency: newPending.urgency,
+        importance: newPending.importance,
+        effort: newPending.effort,
       });
       setPendingTriage(null);
+    } else {
+      // Keep pending until all are set
+      setPendingTriage(newPending);
     }
-  };
-
-  const handleCancelTriage = () => {
-    setPendingTriage(null);
   };
 
   const handleAssigneeSelect = (name: string) => {
@@ -229,28 +233,11 @@ const TaskRow = ({
             compact={compact}
           />
           
-          {/* Confirm/Cancel triage buttons */}
+          {/* Show indicator when triage is in progress */}
           {hasPendingChanges && (
-            <div className="flex items-center gap-1">
-              <Button
-                variant="default"
-                size="icon"
-                className="h-6 w-6 bg-green-500 hover:bg-green-600"
-                onClick={handleConfirmTriage}
-                title="Confirm triage"
-              >
-                <Check className="h-3.5 w-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                onClick={handleCancelTriage}
-                title="Cancel changes"
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-amber-50 text-amber-600 border-amber-200 animate-pulse">
+              Triaging...
+            </Badge>
           )}
           
           {/* Clickable Assignee */}

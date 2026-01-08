@@ -20,9 +20,7 @@ import {
   Archive,
   Trash2,
   User,
-  Calendar,
-  LayoutGrid,
-  ListTodo
+  Calendar
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -58,7 +56,7 @@ import { AddEntryForm } from '@/components/growth/AddEntryForm';
 import { EntryCard } from '@/components/growth/EntryCard';
 import { TaskExtractionDialog, type ExtractedTask, type TaskAmendment, type CompletedTaskSuggestion } from '@/components/growth/TaskExtractionDialog';
 import { DocumentRepository } from '@/components/growth/DocumentRepository';
-import { TodaysFocusView, MatrixView } from '@/components/growth/TaskListViews';
+import { TodaysFocusView } from '@/components/growth/TaskListViews';
 
 const GrowthProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -70,7 +68,7 @@ const GrowthProjectDetail = () => {
   const [showAddTask, setShowAddTask] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [taskView, setTaskView] = useState<'focus' | 'matrix'>('focus');
+  
   
   // Task extraction state
   const [extractedTasks, setExtractedTasks] = useState<ExtractedTask[]>([]);
@@ -410,18 +408,6 @@ const GrowthProjectDetail = () => {
                   Tasks
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  <Tabs value={taskView} onValueChange={(v) => setTaskView(v as typeof taskView)} className="h-8">
-                    <TabsList className="h-8">
-                      <TabsTrigger value="focus" className="h-7 px-2 text-xs gap-1">
-                        <ListTodo className="h-3.5 w-3.5" />
-                        Focus
-                      </TabsTrigger>
-                      <TabsTrigger value="matrix" className="h-7 px-2 text-xs gap-1">
-                        <LayoutGrid className="h-3.5 w-3.5" />
-                        Matrix
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
                   <Button size="sm" onClick={() => setShowAddTask(!showAddTask)}>
                     <Plus className="h-4 w-4 mr-1" />
                     Add
@@ -441,43 +427,22 @@ const GrowthProjectDetail = () => {
                 />
               )}
 
-              {taskView === 'focus' && (
-                <TodaysFocusView
-                  tasks={tasks}
-                  onUpdateTask={(id, updates) => updateTask.mutate({ id, ...updates })}
-                  onDeleteTask={(id) => deleteTask.mutate(id)}
-                  onToggleComplete={(id, notes) => {
-                    const task = tasks.find(t => t.id === id);
-                    if (task) {
-                      updateTask.mutate({ 
-                        id, 
-                        is_completed: !task.is_completed, 
-                        completed_at: !task.is_completed ? new Date().toISOString() : null,
-                        completion_notes: notes || null 
-                      });
-                    }
-                  }}
-                />
-              )}
-
-              {taskView === 'matrix' && (
-                <MatrixView
-                  tasks={tasks}
-                  onUpdateTask={(id, updates) => updateTask.mutate({ id, ...updates })}
-                  onDeleteTask={(id) => deleteTask.mutate(id)}
-                  onToggleComplete={(id, notes) => {
-                    const task = tasks.find(t => t.id === id);
-                    if (task) {
-                      updateTask.mutate({ 
-                        id, 
-                        is_completed: !task.is_completed, 
-                        completed_at: !task.is_completed ? new Date().toISOString() : null,
-                        completion_notes: notes || null 
-                      });
-                    }
-                  }}
-                />
-              )}
+              <TodaysFocusView
+                tasks={tasks}
+                onUpdateTask={(id, updates) => updateTask.mutate({ id, ...updates })}
+                onDeleteTask={(id) => deleteTask.mutate(id)}
+                onToggleComplete={(id, notes) => {
+                  const task = tasks.find(t => t.id === id);
+                  if (task) {
+                    updateTask.mutate({ 
+                      id, 
+                      is_completed: !task.is_completed, 
+                      completed_at: !task.is_completed ? new Date().toISOString() : null,
+                      completion_notes: notes || null 
+                    });
+                  }
+                }}
+              />
 
             </CardContent>
           </Card>

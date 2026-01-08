@@ -13,6 +13,7 @@ interface TriagePillsProps {
   disabled?: boolean;
   compact?: boolean;
   expandOnHover?: boolean;
+  forceExpanded?: boolean; // Controlled expansion from parent
 }
 
 type PillVariant = 'urgent' | 'not_urgent' | 'important' | 'not_important' | 'quick_win' | 'deep_work';
@@ -94,6 +95,7 @@ export const TriagePills = ({
   disabled = false,
   compact = false,
   expandOnHover = false,
+  forceExpanded = false,
 }: TriagePillsProps) => {
   const handleUrgencyClick = (value: 'urgent' | 'not_urgent') => {
     if (disabled) return;
@@ -113,13 +115,19 @@ export const TriagePills = ({
 
   const iconSize = expandOnHover ? "h-3 w-3" : (compact ? "h-2.5 w-2.5" : "h-3 w-3");
 
+  // Use forceExpanded when provided (controlled by parent)
+  const isExpanded = forceExpanded;
+
   // When expandOnHover is true, wrap in a container that shows icons only, 
-  // and on hover expands to show full labels
+  // and on hover expands to show full labels (controlled by forceExpanded)
   if (expandOnHover) {
     return (
-      <div className="group/triage relative">
+      <div className="relative">
         {/* Collapsed state - icons only */}
-        <div className="flex gap-1 group-hover/triage:hidden">
+        <div className={cn(
+          "flex gap-1 transition-all duration-200",
+          isExpanded ? "opacity-0 absolute pointer-events-none scale-95" : "opacity-100"
+        )}>
           <div className="flex gap-0.5">
             <SinglePill
               label="Urgent"
@@ -188,8 +196,11 @@ export const TriagePills = ({
           </div>
         </div>
         
-        {/* Expanded state - full labels on hover */}
-        <div className="hidden group-hover/triage:flex flex-wrap gap-1">
+        {/* Expanded state - full labels */}
+        <div className={cn(
+          "flex flex-wrap gap-1 transition-all duration-200",
+          isExpanded ? "opacity-100" : "opacity-0 absolute pointer-events-none scale-95"
+        )}>
           <div className="flex gap-0.5">
             <SinglePill
               label="Urgent"

@@ -134,12 +134,21 @@ const GrowthProjectDetail = () => {
           is_completed: t.is_completed,
         }));
 
+        // Pass existing entries for context (excluding the one just added)
+        const existingEntriesForAI = entries.map(e => ({
+          title: e.title,
+          content: e.content,
+          entry_type: e.entry_type,
+          created_at: e.created_at,
+        }));
+
         const { data, error } = await supabase.functions.invoke('extract-tasks', {
           body: {
-            content: entry.content,
+            newEntryContent: entry.content,
             projectName: project.name,
             projectType: project.project_type,
             existingTasks: existingTasksForAI,
+            existingEntries: existingEntriesForAI,
           },
         });
 

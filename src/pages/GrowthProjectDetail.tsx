@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +17,10 @@ import {
   ChevronDown,
   AlertCircle,
   Archive,
-  Trash2
+  Trash2,
+  ArrowUpDown,
+  User,
+  Calendar
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -63,14 +66,32 @@ const GrowthProjectDetail = () => {
   const [showAddTask, setShowAddTask] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [taskSort, setTaskSort] = useState<'default' | 'assignee' | 'created'>('default');
   
   // Task extraction state
   const [extractedTasks, setExtractedTasks] = useState<ExtractedTask[]>([]);
   const [showTaskExtraction, setShowTaskExtraction] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
 
-  const pendingTasks = tasks.filter(t => !t.is_completed);
-  const completedTasks = tasks.filter(t => t.is_completed);
+  // Sort function for tasks
+  const sortTasks = (taskList: typeof tasks) => {
+    if (taskSort === 'assignee') {
+      return [...taskList].sort((a, b) => {
+        const aAssignee = a.assignee || 'zzz'; // Put unassigned at the end
+        const bAssignee = b.assignee || 'zzz';
+        return aAssignee.localeCompare(bAssignee);
+      });
+    }
+    if (taskSort === 'created') {
+      return [...taskList].sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    }
+    return taskList; // default order from DB
+  };
+
+  const pendingTasks = useMemo(() => sortTasks(tasks.filter(t => !t.is_completed)), [tasks, taskSort]);
+  const completedTasks = useMemo(() => sortTasks(tasks.filter(t => t.is_completed)), [tasks, taskSort]);
   
   // Find overdue tasks
   const now = new Date();
@@ -304,10 +325,32 @@ const GrowthProjectDetail = () => {
                   <CheckCircle2 className="h-5 w-5" />
                   Tasks
                 </CardTitle>
-                <Button size="sm" onClick={() => setShowAddTask(!showAddTask)}>
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Task
-                </Button>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center border rounded-md">
+                    <Button 
+                      variant={taskSort === 'assignee' ? 'secondary' : 'ghost'} 
+                      size="sm" 
+                      className="h-8 px-2 rounded-r-none"
+                      onClick={() => setTaskSort(taskSort === 'assignee' ? 'default' : 'assignee')}
+                      title="Sort by assignee"
+                    >
+                      <User className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button 
+                      variant={taskSort === 'created' ? 'secondary' : 'ghost'} 
+                      size="sm" 
+                      className="h-8 px-2 rounded-l-none border-l"
+                      onClick={() => setTaskSort(taskSort === 'created' ? 'default' : 'created')}
+                      title="Sort by date created"
+                    >
+                      <Calendar className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                  <Button size="sm" onClick={() => setShowAddTask(!showAddTask)}>
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Task
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">

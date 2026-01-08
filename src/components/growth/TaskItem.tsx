@@ -319,24 +319,6 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
             </PopoverContent>
           </Popover>
           
-          {/* Pin to Task List button */}
-          {!task.is_completed && (
-            <button 
-              type="button"
-              onClick={() => onUpdate({ pinned_to_tasklist: !task.pinned_to_tasklist })}
-              className={cn(
-                "inline-flex items-center text-xs px-2 py-1 border rounded-full cursor-pointer hover:bg-accent transition-colors",
-                task.pinned_to_tasklist 
-                  ? "bg-primary/10 text-primary border-primary/30" 
-                  : "border-dashed text-muted-foreground"
-              )}
-              title={task.pinned_to_tasklist ? "Remove from Task List" : "Add to Task List"}
-            >
-              <ListTodo className="h-3 w-3 mr-1" />
-              {task.pinned_to_tasklist ? 'On Task List' : 'Add to Tasks'}
-            </button>
-          )}
-          
           {task.completed_at && (
             <span className="text-xs text-muted-foreground">
               Completed {formatDistanceToNow(new Date(task.completed_at), { addSuffix: true })}
@@ -379,15 +361,37 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
         )}
       </div>
 
-      {/* Delete button directly on task */}
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-        onClick={onDelete}
-      >
-        <Trash2 className="h-4 w-4" />
-      </Button>
+      {/* Action buttons - separate from triage */}
+      <div className="flex flex-col gap-1 shrink-0">
+        {/* Pin to Task List button */}
+        {!task.is_completed && (
+          <Button
+            variant={task.pinned_to_tasklist ? "default" : "outline"}
+            size="sm"
+            className={cn(
+              "h-8 px-2 text-xs",
+              task.pinned_to_tasklist 
+                ? "bg-primary text-primary-foreground" 
+                : "border-dashed"
+            )}
+            onClick={() => onUpdate({ pinned_to_tasklist: !task.pinned_to_tasklist })}
+            title={task.pinned_to_tasklist ? "Remove from Task List" : "Add to Task List"}
+          >
+            <ListTodo className="h-3.5 w-3.5 mr-1" />
+            {task.pinned_to_tasklist ? 'On Tasks' : 'Add to Tasks'}
+          </Button>
+        )}
+        
+        {/* Delete button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground hover:text-destructive"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </div>
 
       {/* Complete task dialog */}
       <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>

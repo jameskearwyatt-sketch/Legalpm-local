@@ -511,12 +511,12 @@ export function useMyUpcomingGrowthTasks() {
       
       // Filter: (assigned to "Me" or unassigned AND due within next week) OR pinned to tasklist
       return (data || []).filter((task: TaskWithProject) => {
-        // If pinned to tasklist, always include (if assigned to Me or unassigned)
+        // If pinned to tasklist, always include regardless of assignee
         if (task.pinned_to_tasklist) {
-          return !task.assignee || task.assignee === 'Me';
+          return true;
         }
         
-        // Must be assigned to "Me" or unassigned
+        // For non-pinned tasks: Must be assigned to "Me" or unassigned
         if (task.assignee && task.assignee !== 'Me') return false;
         
         // Must have a deadline

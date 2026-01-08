@@ -19,24 +19,77 @@ async function extractTextFromDocx(arrayBuffer: ArrayBuffer): Promise<string> {
       throw new Error("Could not find document.xml in DOCX file");
     }
     
-    let result = '';
-    const paragraphs = documentXml.split(/<\/w:p>/);
+    // Remove XML tags and extract text content
+    // First, replace paragraph endings with newlines
+    let text = documentXml.replace(/<\/w:p>/g, '\n');
+    // Extract text between w:t tags (including those with attributes like xml:space)
+    const textMatches = text.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
+    const extractedTexts = textMatches.map(match => {
+      const content = match.replace(/<w:t[^>]*>([^<]*)<\/w:t>/, '$1');
+      return content;
+    });
     
-    for (const para of paragraphs) {
-      const texts = para.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
-      const paraText = texts
-        .map(t => t.replace(/<w:t[^>]*>([^<]*)<\/w:t>/, '$1'))
-        .join('');
-      
-      if (paraText.trim()) {
-        result += paraText + '\n';
-      }
+    // Join and clean up
+    let result = extractedTexts.join('').replace(/\n+/g, '\n').trim();
+    
+    // If we got very little text, try a more aggressive approach
+    if (result.length < 50) {
+      // Strip all XML tags and get raw text
+      result = documentXml
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
     }
     
-    return result.trim();
+    console.log("DOCX extracted text preview:", result.substring(0, 200));
+    return result;
   } catch (error) {
     console.error("Error parsing DOCX:", error);
     throw new Error("Failed to parse Word document");
+  }
+}
+
+// Extract text from PPTX file (PowerPoint)
+async function extractTextFromPptx(arrayBuffer: ArrayBuffer): Promise<string> {
+  try {
+    const zip = new JSZip();
+    const contents = await zip.loadAsync(arrayBuffer);
+    
+    const allText: string[] = [];
+    
+    // PPTX stores slides in ppt/slides/slide1.xml, slide2.xml, etc.
+    const slideFiles = Object.keys(contents.files)
+      .filter(name => name.match(/ppt\/slides\/slide\d+\.xml$/))
+      .sort((a, b) => {
+        const numA = parseInt(a.match(/slide(\d+)\.xml/)?.[1] || '0');
+        const numB = parseInt(b.match(/slide(\d+)\.xml/)?.[1] || '0');
+        return numA - numB;
+      });
+    
+    console.log("Found slides:", slideFiles.length);
+    
+    for (const slideFile of slideFiles) {
+      const slideXml = await contents.file(slideFile)?.async("string");
+      if (slideXml) {
+        // Extract text from a:t tags (text elements in PPTX)
+        const textMatches = slideXml.match(/<a:t>([^<]*)<\/a:t>/g) || [];
+        const slideTexts = textMatches.map(match => 
+          match.replace(/<a:t>([^<]*)<\/a:t>/, '$1')
+        ).filter(t => t.trim());
+        
+        if (slideTexts.length > 0) {
+          const slideNum = slideFile.match(/slide(\d+)\.xml/)?.[1] || '?';
+          allText.push(`[Slide ${slideNum}]\n${slideTexts.join(' ')}`);
+        }
+      }
+    }
+    
+    const result = allText.join('\n\n').trim();
+    console.log("PPTX extracted text preview:", result.substring(0, 200));
+    return result;
+  } catch (error) {
+    console.error("Error parsing PPTX:", error);
+    throw new Error("Failed to parse PowerPoint document");
   }
 }
 
@@ -82,6 +135,16 @@ serve(async (req) => {
         console.log("Parsing DOCX file...");
         const arrayBuffer = await docResponse.arrayBuffer();
         documentContent = await extractTextFromDocx(arrayBuffer);
+        console.log("Extracted text length:", documentContent.length);
+      }
+      // Handle PPTX files (PowerPoint)
+      else if (
+        contentType.includes("application/vnd.openxmlformats-officedocument.presentationml.presentation") ||
+        lowerFileName.endsWith(".pptx")
+      ) {
+        console.log("Parsing PPTX file...");
+        const arrayBuffer = await docResponse.arrayBuffer();
+        documentContent = await extractTextFromPptx(arrayBuffer);
         console.log("Extracted text length:", documentContent.length);
       }
       // Handle PDF files - send to AI with file data

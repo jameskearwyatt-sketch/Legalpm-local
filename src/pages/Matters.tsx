@@ -1038,7 +1038,7 @@ export default function Matters() {
                           <TableHead className="min-w-[65px]">Outcome</TableHead>
                         </>
                       )}
-                      {!isLost && (
+                      {isLive && (
                         <TableHead className="min-w-[90px]">
                           <SortableHeader field="stage">Stage</SortableHeader>
                         </TableHead>
@@ -1416,7 +1416,7 @@ export default function Matters() {
                               </TableCell>
                             </>
                           )}
-                          {!isLost && (
+                          {isLive && (
                             <TableCell>
                               <Select
                                 value={matter.current_stage || ''}
@@ -1436,7 +1436,7 @@ export default function Matters() {
                                   <SelectValue placeholder="Select stage" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {(matter.category === 'Pipeline' ? pipelineStages : liveStages).map((stage) => (
+                                  {liveStages.map((stage) => (
                                     <SelectItem key={stage} value={stage}>
                                       {stage}
                                     </SelectItem>

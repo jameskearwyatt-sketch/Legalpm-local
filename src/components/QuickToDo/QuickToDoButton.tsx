@@ -294,7 +294,12 @@ export function QuickToDoButton() {
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
 
     if (!wasDragging) {
-      setIsOpen(!isOpen);
+      if (isOpen) {
+        setIsOpen(false);
+        setIsExpanded(false); // Reset to small format when closing
+      } else {
+        setIsOpen(true);
+      }
     }
   };
 
@@ -692,7 +697,10 @@ export function QuickToDoButton() {
                   {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </button>
                 <button
-                  onClick={() => setIsOpen(false)}
+                  onClick={() => {
+                    setIsOpen(false);
+                    setIsExpanded(false); // Reset to small format when closing
+                  }}
                   className="h-8 w-8 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
                   title="Close"
                 >

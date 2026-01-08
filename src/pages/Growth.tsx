@@ -23,6 +23,8 @@ import { GrowthProjectList } from '@/components/growth/GrowthProjectList';
 import { NewProjectDialog } from '@/components/growth/NewProjectDialog';
 import { cn } from '@/lib/utils';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { isPast } from 'date-fns';
+import { getDeadlineTextColor } from '@/lib/deadlineColors';
 import { supabase } from '@/integrations/supabase/client';
 
 const Growth = () => {
@@ -249,13 +251,15 @@ const TaskRow = ({
   const dueDate = task.deadline_set_at 
     ? calculateDueDate(new Date(task.deadline_set_at), task.deadline_type) 
     : null;
-  const isOverdue = dueDate && dueDate < now;
+  const isOverdue = dueDate && isPast(dueDate);
+  
+  // Get text color based on deadline
+  const titleColor = getDeadlineTextColor(dueDate, false);
 
   return (
     <div 
       className={cn(
-        "flex items-start gap-2 py-1.5 group",
-        isOverdue && "text-destructive"
+        "flex items-start gap-2 py-1.5 group"
       )}
     >
       <Checkbox
@@ -266,7 +270,10 @@ const TaskRow = ({
       <div className="flex-1 min-w-0">
         <button
           onClick={onClick}
-          className="text-left text-sm hover:underline truncate block w-full"
+          className={cn(
+            "text-left text-sm hover:underline truncate block w-full",
+            titleColor
+          )}
         >
           {task.title}
         </button>

@@ -1457,7 +1457,7 @@ export function QuickToDoButton() {
       {/* Slate Panel */}
       {isSlateOpen && (
         <div
-          className="fixed z-50 bottom-4 left-4 w-[28rem] max-h-[60vh] rounded-xl border-0 shadow-2xl shadow-blue-500/20 overflow-hidden bg-background flex flex-col"
+          className="fixed z-50 top-1/2 -translate-y-1/2 left-[17rem] w-[28rem] max-h-[70vh] rounded-xl border-0 shadow-2xl shadow-blue-500/20 overflow-hidden bg-background flex flex-col"
         >
           {/* Slate Header */}
           <div className="bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 px-4 py-3">

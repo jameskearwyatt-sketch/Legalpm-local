@@ -128,7 +128,7 @@ const TaskRow = ({
   return (
     <div 
       className={cn(
-        "flex items-start gap-2 p-2 rounded-lg border transition-all",
+        "flex items-start gap-2 p-2 rounded-lg border transition-all group",
         task.is_completed ? 'bg-muted/30 opacity-60' : 'bg-background',
         isFocused && 'ring-2 ring-primary ring-offset-1',
         isSelected && 'bg-primary/5'
@@ -141,11 +141,28 @@ const TaskRow = ({
         className="mt-1"
       />
       
-      {/* Complete checkbox */}
+      {/* Complete with notes button - more visible */}
+      {onCompleteWithNotes && !task.is_completed && (
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-6 w-6 shrink-0 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground"
+          onClick={(e) => {
+            e.stopPropagation();
+            onCompleteWithNotes();
+          }}
+          title="Complete with notes"
+        >
+          <MessageSquare className="h-3 w-3" />
+        </Button>
+      )}
+      
+      {/* Complete checkbox (without notes) */}
       <Checkbox
         checked={task.is_completed}
         onCheckedChange={() => onToggleComplete()}
         className="mt-1"
+        title="Mark complete"
       />
       
       <div className="flex-1 min-w-0 space-y-1">
@@ -278,25 +295,11 @@ const TaskRow = ({
         </div>
       </div>
       
-      <div className="flex items-center gap-0.5">
-        {onCompleteWithNotes && !task.is_completed && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6 text-muted-foreground hover:text-primary"
-            onClick={(e) => {
-              e.stopPropagation();
-              onCompleteWithNotes();
-            }}
-            title="Complete with notes"
-          >
-            <MessageSquare className="h-3 w-3" />
-          </Button>
-        )}
+      <div className="flex items-center gap-0.5 shrink-0">
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+          className="h-6 w-6 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={onDelete}
         >
           <Trash2 className="h-3 w-3" />

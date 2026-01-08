@@ -49,14 +49,12 @@ export const AddEntryForm = ({ projectId, onAdd, onCancel }: AddEntryFormProps) 
 
       if (error) throw error;
 
-      const { data: urlData } = supabase.storage
-        .from('growth-files')
-        .getPublicUrl(filePath);
-
+      // Store the file path (not public URL) since bucket is private
+      // The file path will be used to generate signed URLs when needed
       onAdd({
         entry_type: 'file',
         title: title.trim() || file.name,
-        file_url: urlData.publicUrl,
+        file_url: filePath, // Store path, not public URL
         file_name: file.name,
       });
     } catch (error: any) {

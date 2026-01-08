@@ -482,6 +482,7 @@ export type Database = {
           id: string
           importance: Database["public"]["Enums"]["task_importance"]
           is_completed: boolean
+          on_slate: boolean
           pinned_to_tasklist: boolean
           project_id: string
           sort_order: number
@@ -502,6 +503,7 @@ export type Database = {
           id?: string
           importance?: Database["public"]["Enums"]["task_importance"]
           is_completed?: boolean
+          on_slate?: boolean
           pinned_to_tasklist?: boolean
           project_id: string
           sort_order?: number
@@ -522,6 +524,7 @@ export type Database = {
           id?: string
           importance?: Database["public"]["Enums"]["task_importance"]
           is_completed?: boolean
+          on_slate?: boolean
           pinned_to_tasklist?: boolean
           project_id?: string
           sort_order?: number

@@ -110,6 +110,14 @@ export default {
           from: { opacity: "0", transform: "scale(0.95)" },
           to: { opacity: "1", transform: "scale(1)" },
         },
+        "slate-glow": {
+          "0%, 100%": { 
+            boxShadow: "0 0 20px rgba(59, 130, 246, 0.3), 0 0 40px rgba(99, 102, 241, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.25)" 
+          },
+          "50%": { 
+            boxShadow: "0 0 30px rgba(59, 130, 246, 0.5), 0 0 60px rgba(99, 102, 241, 0.25), 0 25px 50px -12px rgba(0, 0, 0, 0.25)" 
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -117,6 +125,7 @@ export default {
         "fade-in": "fade-in 0.3s ease-out forwards",
         "slide-up": "slide-up 0.3s ease-out forwards",
         "scale-in": "scale-in 0.2s ease-out forwards",
+        "slate-glow": "slate-glow 3s ease-in-out infinite",
       },
     },
   },

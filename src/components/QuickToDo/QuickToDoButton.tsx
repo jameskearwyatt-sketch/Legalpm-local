@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { 
   CheckSquare, X, Plus, Trash2, ArrowRight, Clock, User,
   Briefcase, GraduationCap, Lightbulb, Maximize2, Minimize2,
   ListTodo, LayoutGrid, Filter, Check, ChevronDown, ChevronRight,
   Zap, Target, CalendarClock, Feather, Flame, MessageSquare, Pin, PinOff,
-  Clipboard, ClipboardCheck
+  Clipboard, ClipboardCheck, GripHorizontal
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -82,6 +82,7 @@ interface UnifiedTask {
 }
 
 const STORAGE_KEY = 'todo-button-position';
+const SLATE_POSITION_KEY = 'slate-panel-position';
 
 const deadlineOptions: TaskDeadlineType[] = [
   'this_week',
@@ -290,6 +291,10 @@ export function QuickToDoButton() {
   
   // Slate panel state
   const [isSlateOpen, setIsSlateOpen] = useState(false);
+  const [slatePosition, setSlatePosition] = useState<{ x: number; y: number } | null>(null);
+  const [isDraggingSlate, setIsDraggingSlate] = useState(false);
+  const slateDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
+  const slateRef = useRef<HTMLDivElement>(null);
 
   // Triage debouncing - track tasks being actively triaged
   // Key: taskId, Value: { lastTriageTime, previousQuadrant }
@@ -327,6 +332,78 @@ export function QuickToDoButton() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(position));
     }
   }, [position]);
+
+  // Load saved slate position on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(SLATE_POSITION_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setSlatePosition(parsed);
+      } catch {
+        // Invalid saved position
+      }
+    }
+  }, []);
+
+  // Save slate position when it changes
+  useEffect(() => {
+    if (slatePosition) {
+      localStorage.setItem(SLATE_POSITION_KEY, JSON.stringify(slatePosition));
+    }
+  }, [slatePosition]);
+
+  // Slate drag handlers
+  const handleSlateMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    const slate = slateRef.current;
+    if (!slate) return;
+
+    const rect = slate.getBoundingClientRect();
+    slateDragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startPosX: rect.left,
+      startPosY: rect.top,
+    };
+    setIsDraggingSlate(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isDraggingSlate) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!slateDragRef.current) return;
+
+      const deltaX = e.clientX - slateDragRef.current.startX;
+      const deltaY = e.clientY - slateDragRef.current.startY;
+
+      const newX = slateDragRef.current.startPosX + deltaX;
+      const newY = slateDragRef.current.startPosY + deltaY;
+
+      // Constrain to viewport
+      const maxX = window.innerWidth - 448; // 28rem = 448px
+      const maxY = window.innerHeight - 100;
+      
+      setSlatePosition({
+        x: Math.min(Math.max(0, newX), maxX),
+        y: Math.min(Math.max(0, newY), maxY),
+      });
+    };
+
+    const handleMouseUp = () => {
+      setIsDraggingSlate(false);
+      slateDragRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDraggingSlate]);
 
   // Cleanup triage timeouts on unmount
   useEffect(() => {
@@ -1457,17 +1534,35 @@ export function QuickToDoButton() {
       {/* Slate Panel */}
       {isSlateOpen && (
         <div
-          className="fixed z-50 top-1/2 -translate-y-1/2 left-[17rem] w-[28rem] max-h-[70vh] rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]"
+          ref={slateRef}
+          className={cn(
+            "fixed z-50 w-[28rem] max-h-[70vh] rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
+            isDraggingSlate && "select-none"
+          )}
           style={{
+            ...(slatePosition ? {
+              left: slatePosition.x,
+              top: slatePosition.y,
+            } : {
+              left: '17rem',
+              top: '50%',
+              transform: 'translateY(-50%)',
+            }),
             boxShadow: '0 0 20px rgba(59, 130, 246, 0.3), 0 0 40px rgba(99, 102, 241, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           }}
         >
-          {/* Slate Header */}
-          <div className="bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 px-4 py-3">
+          {/* Slate Header - Draggable */}
+          <div 
+            className={cn(
+              "bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 px-4 py-3",
+              isDraggingSlate ? "cursor-grabbing" : "cursor-grab"
+            )}
+            onMouseDown={handleSlateMouseDown}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
-                  <Clipboard className="h-4 w-4 text-white" />
+                  <GripHorizontal className="h-4 w-4 text-white/70" />
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-sm">Slate</h3>
@@ -1477,7 +1572,10 @@ export function QuickToDoButton() {
                 </div>
               </div>
               <button
-                onClick={() => setIsSlateOpen(false)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsSlateOpen(false);
+                }}
                 className="h-7 w-7 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
                 title="Close"
               >

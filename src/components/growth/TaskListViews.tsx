@@ -154,12 +154,11 @@ const TaskRow = ({
   };
 
   const handleDeadlineSelect = (deadline: TaskDeadlineType) => {
-    // When selecting a deadline, also update deadline_set_at to now if changing from no_deadline
-    const updates: Partial<GrowthTask> = { deadline_type: deadline };
-    if (deadline !== 'no_deadline' && !task.deadline_set_at) {
-      updates.deadline_set_at = new Date().toISOString();
-    }
-    onUpdate(updates);
+    // Pass current deadline_set_at so the hook knows whether to reset it
+    onUpdate({ 
+      deadline_type: deadline,
+      ...(task.deadline_set_at ? { currentDeadlineSetAt: task.deadline_set_at } : {})
+    } as Partial<GrowthTask>);
     setDeadlineOpen(false);
   };
 

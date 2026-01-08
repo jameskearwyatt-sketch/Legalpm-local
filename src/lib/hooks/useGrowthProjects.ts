@@ -324,10 +324,11 @@ export function useGrowthProject(projectId?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['growth-tasks', projectId] });
-      queryClient.invalidateQueries({ queryKey: ['my-upcoming-growth-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['all-growth-tasks'] });
-      queryClient.invalidateQueries({ queryKey: ['overdue-tasks'] });
+      // Force immediate refetch of all related queries
+      queryClient.invalidateQueries({ queryKey: ['growth-tasks', projectId], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['my-upcoming-growth-tasks'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['all-growth-tasks'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['overdue-tasks'], refetchType: 'all' });
     },
     onError: (error: Error) => {
       toast.error('Failed to update task: ' + error.message);

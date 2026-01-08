@@ -55,11 +55,12 @@ import { TaskItem } from '@/components/growth/TaskItem';
 import { AddEntryForm } from '@/components/growth/AddEntryForm';
 import { EntryCard } from '@/components/growth/EntryCard';
 import { TaskExtractionDialog, type ExtractedTask, type TaskAmendment, type CompletedTaskSuggestion } from '@/components/growth/TaskExtractionDialog';
+import { DocumentRepository } from '@/components/growth/DocumentRepository';
 
 const GrowthProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { project, entries, tasks, isLoading, isSynthesizing, addEntry, deleteEntry, addTask, updateTask, deleteTask, synthesizeProject } = useGrowthProject(projectId);
+  const { project, entries, tasks, documents, isLoading, isSynthesizing, addEntry, deleteEntry, addTask, updateTask, deleteTask, synthesizeProject, refreshDocuments, updateDocumentSummary } = useGrowthProject(projectId);
   const { updateProject, deleteProject } = useGrowthProjects();
   const { addAssignee } = useKnownAssignees();
   const [showAddEntry, setShowAddEntry] = useState(false);
@@ -549,6 +550,17 @@ const GrowthProjectDetail = () => {
               </ScrollArea>
             </CardContent>
           </Card>
+
+          {/* Document Repository Section */}
+          <DocumentRepository
+            projectId={projectId!}
+            projectName={project.name}
+            projectType={project.project_type}
+            documents={documents}
+            onDocumentAdded={refreshDocuments}
+            onDocumentDeleted={() => refreshDocuments()}
+            onSummaryGenerated={updateDocumentSummary}
+          />
         </div>
       </div>
 

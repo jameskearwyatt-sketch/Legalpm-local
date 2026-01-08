@@ -785,28 +785,6 @@ export function QuickToDoButton() {
     };
   };
 
-  const getOpenButtonStyle = (): React.CSSProperties => {
-    const panelStyle = getPanelStyle();
-    const margin = isExpanded ? 24 : 12;
-    const panelWidth = isExpanded 
-      ? Math.min(window.innerWidth - margin * 2, window.innerWidth - 48) 
-      : Math.min(400, window.innerWidth - 24);
-    const panelHeight = isExpanded 
-      ? window.innerHeight - margin * 2 - 80
-      : 520;
-    const buttonSize = 56;
-
-    const panelLeft = panelStyle.left as number ?? 24;
-    const panelTop = panelStyle.top as number ?? 0;
-
-    return {
-      position: 'fixed',
-      left: panelLeft + panelWidth / 2 - buttonSize / 2,
-      top: panelTop + panelHeight + 8,
-      right: 'auto',
-      bottom: 'auto',
-    };
-  };
 
   const activeProjects = projects?.filter(p => p.status === 'active') || [];
 
@@ -1200,37 +1178,38 @@ export function QuickToDoButton() {
         </DialogContent>
       </Dialog>
 
-      {/* Floating Draggable Button */}
-      <div
-        ref={buttonRef}
-        className="z-50"
-        style={isOpen ? getOpenButtonStyle() : getButtonStyle()}
-      >
-        <button
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          className={cn(
-            "relative h-14 w-14 rounded-full shadow-xl transition-all duration-300 touch-none select-none",
-            "bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600",
-            "hover:from-emerald-400 hover:via-teal-400 hover:to-cyan-500",
-            "hover:shadow-2xl hover:shadow-teal-500/30",
-            !isDragging && "hover:scale-110",
-            "flex items-center justify-center text-white",
-            "ring-2 ring-white/20 ring-offset-2 ring-offset-background",
-            isOpen && "rotate-90",
-            isDragging && "cursor-grabbing scale-110 shadow-2xl shadow-teal-500/40",
-            !isDragging && !isOpen && "cursor-grab"
-          )}
+      {/* Floating Draggable Button - Hidden when panel is open */}
+      {!isOpen && (
+        <div
+          ref={buttonRef}
+          className="z-50"
+          style={getButtonStyle()}
         >
-          {isOpen ? <X className="h-6 w-6" /> : <CheckSquare className="h-6 w-6" />}
-          {!isOpen && incompleteTasks.length > 0 && (
-            <span className="absolute -top-1 -right-1 flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-              {incompleteTasks.length}
-            </span>
-          )}
-        </button>
-      </div>
+          <button
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            className={cn(
+              "relative h-14 w-14 rounded-full shadow-xl transition-all duration-300 touch-none select-none",
+              "bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600",
+              "hover:from-emerald-400 hover:via-teal-400 hover:to-cyan-500",
+              "hover:shadow-2xl hover:shadow-teal-500/30",
+              !isDragging && "hover:scale-110",
+              "flex items-center justify-center text-white",
+              "ring-2 ring-white/20 ring-offset-2 ring-offset-background",
+              isDragging && "cursor-grabbing scale-110 shadow-2xl shadow-teal-500/40",
+              !isDragging && "cursor-grab"
+            )}
+          >
+            <CheckSquare className="h-6 w-6" />
+            {incompleteTasks.length > 0 && (
+              <span className="absolute -top-1 -right-1 flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                {incompleteTasks.length}
+              </span>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Task Panel */}
       {isOpen && (

@@ -4,15 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Trash2, User, Check, ChevronDown, ChevronRight, Keyboard, Filter } from 'lucide-react';
+import { Trash2, User, Check, ChevronDown, ChevronRight, Keyboard, Filter, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { 
+import {
   type GrowthTask, 
   type TaskImportance, 
   type TaskUrgency, 
   type TaskEffort,
-  calculateDueDate 
+  type TaskDeadlineType,
+  calculateDueDate,
+  getDeadlineLabel
 } from '@/lib/hooks/useGrowthProjects';
+import { getDeadlineBadgeColor } from '@/lib/deadlineColors';
 import { 
   TriagePills, 
   getQuadrant, 
@@ -49,6 +52,16 @@ interface TaskRowProps {
   compact?: boolean;
 }
 
+const deadlineOptions: TaskDeadlineType[] = [
+  'this_week',
+  'next_week',
+  'this_month',
+  'next_month',
+  'in_3_months',
+  'in_6_months',
+  'no_deadline',
+];
+
 const TaskRow = ({ 
   task, 
   onUpdate, 
@@ -63,6 +76,7 @@ const TaskRow = ({
 }: TaskRowProps) => {
   const { assignees, addAssignee } = useKnownAssignees();
   const [assigneeOpen, setAssigneeOpen] = useState(false);
+  const [deadlineOpen, setDeadlineOpen] = useState(false);
   const [editingAssignee, setEditingAssignee] = useState(task.assignee || '');
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -81,6 +95,24 @@ const TaskRow = ({
     if (name && !assignees.some(a => a.name.toLowerCase() === name.toLowerCase())) {
       addAssignee.mutate(name);
     }
+  };
+
+  const handleDeadlineSelect = (deadline: TaskDeadlineType) => {
+    // When selecting a deadline, also update deadline_set_at to now if changing from no_deadline
+    const updates: Partial<GrowthTask> = { deadline_type: deadline };
+    if (deadline !== 'no_deadline' && !task.deadline_set_at) {
+      updates.deadline_set_at = new Date().toISOString();
+    }
+    onUpdate(updates);
+    setDeadlineOpen(false);
+  };
+
+  const getDeadlineColor = () => {
+    if (!task.deadline_set_at || task.deadline_type === 'no_deadline') {
+      return 'text-muted-foreground';
+    }
+    const dueDate = calculateDueDate(new Date(task.deadline_set_at), task.deadline_type);
+    return getDeadlineBadgeColor(dueDate, task.is_completed);
   };
 
   return (
@@ -135,58 +167,104 @@ const TaskRow = ({
             compact={compact}
           />
           
-          {/* Delegate hint */}
-          {showDelegateHint && task.urgency === 'urgent' && task.importance === 'not_important' && !task.assignee && (
-            <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>
-              <PopoverTrigger asChild>
-                <button 
-                  type="button"
-                  className="inline-flex items-center text-[10px] px-1.5 py-0.5 border border-dashed border-sky-300 rounded-full text-sky-500 hover:bg-sky-50 transition-colors"
-                >
-                  <User className="h-2.5 w-2.5 mr-1" />
-                  Delegate?
-                </button>
-              </PopoverTrigger>
-              <PopoverContent className="w-48 p-2" align="start">
-                <div className="space-y-2">
-                  <Input
-                    ref={inputRef}
-                    value={editingAssignee}
-                    onChange={(e) => setEditingAssignee(e.target.value)}
-                    placeholder="Assign to..."
-                    className="h-8 text-sm"
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleAssigneeSelect(editingAssignee);
-                      }
-                    }}
-                  />
-                  {assignees.length > 0 && (
-                    <div className="max-h-24 overflow-y-auto space-y-0.5">
-                      {assignees
-                        .filter(a => a.name.toLowerCase().includes(editingAssignee.toLowerCase()))
-                        .map((assignee) => (
-                          <button
-                            key={assignee.id}
-                            className="w-full text-left px-2 py-1 text-xs rounded hover:bg-accent"
-                            onClick={() => handleAssigneeSelect(assignee.name)}
-                          >
-                            {assignee.name}
-                          </button>
-                        ))}
-                    </div>
-                  )}
+          {/* Clickable Assignee */}
+          <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>
+            <PopoverTrigger asChild>
+              <button 
+                type="button"
+                className={cn(
+                  "inline-flex items-center text-[10px] px-1.5 py-0.5 border rounded-full cursor-pointer hover:bg-accent transition-colors",
+                  task.is_completed && "opacity-60",
+                  !task.assignee && "border-dashed text-muted-foreground"
+                )}
+              >
+                <User className="h-2.5 w-2.5 mr-1" />
+                {task.assignee || 'Assign'}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-2" align="start">
+              <div className="space-y-2">
+                <Input
+                  ref={inputRef}
+                  value={editingAssignee}
+                  onChange={(e) => setEditingAssignee(e.target.value)}
+                  placeholder="Type or select..."
+                  className="h-7 text-xs"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleAssigneeSelect(editingAssignee);
+                    }
+                  }}
+                />
+                {assignees.length > 0 && (
+                  <div className="max-h-24 overflow-y-auto space-y-0.5">
+                    {assignees
+                      .filter(a => a.name.toLowerCase().includes(editingAssignee.toLowerCase()))
+                      .map((assignee) => (
+                        <button
+                          key={assignee.id}
+                          className="w-full text-left px-2 py-1 text-xs rounded hover:bg-accent"
+                          onClick={() => handleAssigneeSelect(assignee.name)}
+                        >
+                          {assignee.name}
+                        </button>
+                      ))}
+                  </div>
+                )}
+                <div className="flex gap-1 pt-1 border-t">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="flex-1 h-6 text-[10px]"
+                    onClick={() => handleAssigneeSelect('')}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="flex-1 h-6 text-[10px]"
+                    onClick={() => handleAssigneeSelect(editingAssignee)}
+                  >
+                    Save
+                  </Button>
                 </div>
-              </PopoverContent>
-            </Popover>
-          )}
+              </div>
+            </PopoverContent>
+          </Popover>
           
-          {task.assignee && (
-            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
-              <User className="h-2.5 w-2.5" />
-              {task.assignee}
-            </span>
-          )}
+          {/* Clickable Deadline */}
+          <Popover open={deadlineOpen} onOpenChange={setDeadlineOpen}>
+            <PopoverTrigger asChild>
+              <button 
+                type="button"
+                className={cn(
+                  "inline-flex items-center text-[10px] px-1.5 py-0.5 border rounded-full cursor-pointer hover:bg-accent transition-colors",
+                  getDeadlineColor(),
+                  task.deadline_type === 'no_deadline' && "border-dashed"
+                )}
+              >
+                <Clock className="h-2.5 w-2.5 mr-1" />
+                {getDeadlineLabel(task.deadline_type)}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-36 p-1" align="start">
+              <div className="space-y-0.5">
+                {deadlineOptions.map((opt) => (
+                  <button
+                    key={opt}
+                    className={cn(
+                      "w-full text-left px-2 py-1 text-xs rounded hover:bg-accent transition-colors flex items-center justify-between",
+                      task.deadline_type === opt && "bg-accent"
+                    )}
+                    onClick={() => handleDeadlineSelect(opt)}
+                  >
+                    {getDeadlineLabel(opt)}
+                    {task.deadline_type === opt && <span>✓</span>}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
       

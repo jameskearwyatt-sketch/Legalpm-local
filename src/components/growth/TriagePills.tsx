@@ -12,6 +12,7 @@ interface TriagePillsProps {
   triageMode?: boolean;
   disabled?: boolean;
   compact?: boolean;
+  expandOnHover?: boolean;
 }
 
 type PillVariant = 'urgent' | 'not_urgent' | 'important' | 'not_important' | 'quick_win' | 'deep_work';
@@ -53,9 +54,10 @@ interface SinglePillProps {
   triageMode?: boolean;
   disabled?: boolean;
   compact?: boolean;
+  iconOnly?: boolean;
 }
 
-const SinglePill = ({ label, icon, variant, isActive, isUnset, onClick, triageMode, disabled, compact }: SinglePillProps) => {
+const SinglePill = ({ label, icon, variant, isActive, isUnset, onClick, triageMode, disabled, compact, iconOnly }: SinglePillProps) => {
   const styles = pillStyles[variant];
   
   return (
@@ -63,10 +65,12 @@ const SinglePill = ({ label, icon, variant, isActive, isUnset, onClick, triageMo
       type="button"
       onClick={onClick}
       disabled={disabled}
+      title={iconOnly ? label : undefined}
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border transition-all duration-150",
-        compact ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-1",
-        triageMode && !compact && "px-3 py-1.5 text-sm",
+        "inline-flex items-center rounded-full border transition-all duration-150",
+        iconOnly ? "p-1" : "gap-1",
+        !iconOnly && (compact ? "text-[10px] px-1.5 py-0.5" : "text-xs px-2 py-1"),
+        !iconOnly && triageMode && !compact && "px-3 py-1.5 text-sm",
         isActive ? styles.active : styles.inactive,
         isUnset && "opacity-50",
         disabled && "opacity-30 cursor-not-allowed",
@@ -74,7 +78,7 @@ const SinglePill = ({ label, icon, variant, isActive, isUnset, onClick, triageMo
       )}
     >
       {icon}
-      {label}
+      {!iconOnly && label}
     </button>
   );
 };
@@ -89,6 +93,7 @@ export const TriagePills = ({
   triageMode = false,
   disabled = false,
   compact = false,
+  expandOnHover = false,
 }: TriagePillsProps) => {
   const handleUrgencyClick = (value: 'urgent' | 'not_urgent') => {
     if (disabled) return;
@@ -106,7 +111,154 @@ export const TriagePills = ({
     onEffortChange(effort === value ? 'unset' : value);
   };
 
-  const iconSize = compact ? "h-2.5 w-2.5" : "h-3 w-3";
+  const iconSize = expandOnHover ? "h-3 w-3" : (compact ? "h-2.5 w-2.5" : "h-3 w-3");
+
+  // When expandOnHover is true, wrap in a container that shows icons only, 
+  // and on hover expands to show full labels
+  if (expandOnHover) {
+    return (
+      <div className="group/triage relative">
+        {/* Collapsed state - icons only */}
+        <div className="flex gap-1 group-hover/triage:hidden">
+          <div className="flex gap-0.5">
+            <SinglePill
+              label="Urgent"
+              icon={<Zap className={iconSize} />}
+              variant="urgent"
+              isActive={urgency === 'urgent'}
+              isUnset={urgency === 'unset'}
+              onClick={() => handleUrgencyClick('urgent')}
+              disabled={disabled}
+              iconOnly
+            />
+            <SinglePill
+              label="Not urgent"
+              icon={<Clock className={iconSize} />}
+              variant="not_urgent"
+              isActive={urgency === 'not_urgent'}
+              isUnset={urgency === 'unset'}
+              onClick={() => handleUrgencyClick('not_urgent')}
+              disabled={disabled}
+              iconOnly
+            />
+          </div>
+          <div className="flex gap-0.5">
+            <SinglePill
+              label="Important"
+              icon={<Target className={iconSize} />}
+              variant="important"
+              isActive={importance === 'important'}
+              isUnset={importance === 'unset'}
+              onClick={() => handleImportanceClick('important')}
+              disabled={disabled}
+              iconOnly
+            />
+            <SinglePill
+              label="Not important"
+              icon={<Target className={cn(iconSize, "opacity-50")} />}
+              variant="not_important"
+              isActive={importance === 'not_important'}
+              isUnset={importance === 'unset'}
+              onClick={() => handleImportanceClick('not_important')}
+              disabled={disabled}
+              iconOnly
+            />
+          </div>
+          <div className="flex gap-0.5">
+            <SinglePill
+              label="Quick win"
+              icon={<Feather className={iconSize} />}
+              variant="quick_win"
+              isActive={effort === 'quick_win'}
+              isUnset={effort === 'unset'}
+              onClick={() => handleEffortClick('quick_win')}
+              disabled={disabled}
+              iconOnly
+            />
+            <SinglePill
+              label="Deep work"
+              icon={<Flame className={iconSize} />}
+              variant="deep_work"
+              isActive={effort === 'deep_work'}
+              isUnset={effort === 'unset'}
+              onClick={() => handleEffortClick('deep_work')}
+              disabled={disabled}
+              iconOnly
+            />
+          </div>
+        </div>
+        
+        {/* Expanded state - full labels on hover */}
+        <div className="hidden group-hover/triage:flex flex-wrap gap-1">
+          <div className="flex gap-0.5">
+            <SinglePill
+              label="Urgent"
+              icon={<Zap className={iconSize} />}
+              variant="urgent"
+              isActive={urgency === 'urgent'}
+              isUnset={urgency === 'unset'}
+              onClick={() => handleUrgencyClick('urgent')}
+              disabled={disabled}
+              compact
+            />
+            <SinglePill
+              label="Not urgent"
+              icon={<Clock className={iconSize} />}
+              variant="not_urgent"
+              isActive={urgency === 'not_urgent'}
+              isUnset={urgency === 'unset'}
+              onClick={() => handleUrgencyClick('not_urgent')}
+              disabled={disabled}
+              compact
+            />
+          </div>
+          <div className="flex gap-0.5">
+            <SinglePill
+              label="Important"
+              icon={<Target className={iconSize} />}
+              variant="important"
+              isActive={importance === 'important'}
+              isUnset={importance === 'unset'}
+              onClick={() => handleImportanceClick('important')}
+              disabled={disabled}
+              compact
+            />
+            <SinglePill
+              label="Not important"
+              variant="not_important"
+              isActive={importance === 'not_important'}
+              isUnset={importance === 'unset'}
+              onClick={() => handleImportanceClick('not_important')}
+              disabled={disabled}
+              compact
+            />
+          </div>
+          <div className="flex gap-0.5">
+            <SinglePill
+              label="Quick win"
+              icon={<Feather className={iconSize} />}
+              variant="quick_win"
+              isActive={effort === 'quick_win'}
+              isUnset={effort === 'unset'}
+              onClick={() => handleEffortClick('quick_win')}
+              disabled={disabled}
+              compact
+            />
+            <SinglePill
+              label="Deep work"
+              icon={<Flame className={iconSize} />}
+              variant="deep_work"
+              isActive={effort === 'deep_work'}
+              isUnset={effort === 'unset'}
+              onClick={() => handleEffortClick('deep_work')}
+              disabled={disabled}
+              compact
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("flex flex-wrap gap-1", triageMode && "gap-2")}>

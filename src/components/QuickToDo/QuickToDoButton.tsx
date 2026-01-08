@@ -337,6 +337,7 @@ export function QuickToDoButton() {
       urgency: t.urgency || 'unset',
       effort: t.effort || 'unset',
       created_at: t.created_at,
+      completed_at: t.completed_at || null,
     }));
 
     setTasks(mappedTasks);
@@ -453,6 +454,7 @@ export function QuickToDoButton() {
       urgency: task.urgency,
       effort: task.effort,
       created_at: task.created_at,
+      completed_at: task.completed_at || null,
     };
     setTaskToMove(quickTask);
     setSelectedProject("");

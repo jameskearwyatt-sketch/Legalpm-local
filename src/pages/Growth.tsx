@@ -272,6 +272,12 @@ const TaskRow = ({
         </button>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <span className="truncate">{task.growth_projects.name}</span>
+          {task.assignee && task.assignee !== 'Me' && (
+            <>
+              <span>•</span>
+              <span className="font-medium text-foreground/70">{task.assignee}</span>
+            </>
+          )}
           {task.deadline_type !== 'no_deadline' && (
             <>
               <span>•</span>

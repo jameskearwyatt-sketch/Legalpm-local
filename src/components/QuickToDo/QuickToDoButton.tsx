@@ -3,11 +3,12 @@ import {
   CheckSquare, X, Plus, Trash2, ArrowRight, Clock, User,
   Briefcase, GraduationCap, Lightbulb, Maximize2, Minimize2,
   ListTodo, LayoutGrid, Filter, Check, ChevronDown, ChevronRight,
-  Zap, Target, CalendarClock, Feather, Flame
+  Zap, Target, CalendarClock, Feather, Flame, MessageSquare, Pin, PinOff
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -73,6 +74,8 @@ interface UnifiedTask {
   projectName?: string;
   projectId?: string;
   dueDate?: Date;
+  pinned_to_tasklist?: boolean;
+  assignee?: string | null;
 }
 
 const STORAGE_KEY = 'todo-button-position';
@@ -276,6 +279,11 @@ export function QuickToDoButton() {
   const [selectedAssignee, setSelectedAssignee] = useState<string>("");
   const [selectedDeadline, setSelectedDeadline] = useState<TaskDeadlineType>("no_deadline");
   const [isMoving, setIsMoving] = useState(false);
+  
+  // Complete with notes dialog state
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  const [taskToComplete, setTaskToComplete] = useState<UnifiedTask | null>(null);
+  const [completionNotes, setCompletionNotes] = useState("");
 
   // Dragging state
   const [isDragging, setIsDragging] = useState(false);
@@ -463,6 +471,66 @@ export function QuickToDoButton() {
     setMoveDialogOpen(true);
   };
 
+  const openCompleteDialog = (task: UnifiedTask) => {
+    setTaskToComplete(task);
+    setCompletionNotes("");
+    setCompleteDialogOpen(true);
+  };
+
+  const handleCompleteWithNotes = async () => {
+    if (!taskToComplete) return;
+    
+    if (taskToComplete.source === 'growth') {
+      const realId = taskToComplete.id.replace('growth-', '');
+      const { error } = await supabase
+        .from('growth_tasks')
+        .update({
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+          completion_notes: completionNotes || null,
+        })
+        .eq('id', realId);
+      
+      if (error) {
+        toast.error('Failed to complete task');
+      } else {
+        refetchGrowthTasks();
+      }
+    } else {
+      const { error } = await supabase
+        .from('quick_tasks')
+        .update({
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', taskToComplete.id);
+      
+      if (error) {
+        toast.error('Failed to complete task');
+      } else {
+        fetchTasks();
+      }
+    }
+    
+    setCompleteDialogOpen(false);
+    setTaskToComplete(null);
+    setCompletionNotes("");
+  };
+
+  const toggleGrowthTaskPin = async (taskId: string, currentlyPinned: boolean) => {
+    const realId = taskId.replace('growth-', '');
+    const { error } = await supabase
+      .from('growth_tasks')
+      .update({ pinned_to_tasklist: !currentlyPinned })
+      .eq('id', realId);
+    
+    if (error) {
+      toast.error('Failed to update task');
+    } else {
+      refetchGrowthTasks();
+    }
+  };
+
   const handleMoveToGrowth = async () => {
     if (!taskToMove || !selectedProject || !user) return;
 
@@ -527,6 +595,8 @@ export function QuickToDoButton() {
       dueDate: gt.deadline_set_at 
         ? calculateDueDate(new Date(gt.deadline_set_at), gt.deadline_type)
         : undefined,
+      pinned_to_tasklist: gt.pinned_to_tasklist,
+      assignee: gt.assignee,
     }));
   }, [upcomingGrowthTasks]);
 
@@ -758,11 +828,23 @@ export function QuickToDoButton() {
         )}
       >
         <div className="flex items-center gap-2">
-          <Checkbox
-            checked={task.is_completed}
-            onCheckedChange={() => toggleTask(task)}
-            className="h-4 w-4"
-          />
+          {/* Dual checkbox: complete with notes + quick complete */}
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => openCompleteDialog(task)}
+              className="h-4 w-4 rounded border border-input flex items-center justify-center hover:bg-accent hover:border-primary transition-colors"
+              title="Complete with notes"
+            >
+              <MessageSquare className="h-2.5 w-2.5 text-muted-foreground" />
+            </button>
+            <Checkbox
+              checked={task.is_completed}
+              onCheckedChange={() => toggleTask(task)}
+              className="h-4 w-4"
+              title="Quick complete"
+            />
+          </div>
           
           {isEditing ? (
             <Input
@@ -815,9 +897,15 @@ export function QuickToDoButton() {
             </div>
           )}
           
-          {/* Show project badge and due date for growth tasks */}
+          {/* Show project badge, assignee, due date, and unpin for growth tasks */}
           {task.source === 'growth' && (
             <div className="flex items-center gap-1.5 shrink-0">
+              {task.assignee && task.assignee !== 'Me' && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/30">
+                  <User className="h-2.5 w-2.5 mr-0.5" />
+                  {task.assignee}
+                </Badge>
+              )}
               {task.dueDate && (
                 <Badge variant="outline" className={cn(
                   "text-[10px] px-1.5 py-0.5 h-5",
@@ -833,6 +921,18 @@ export function QuickToDoButton() {
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30">
                   {task.projectName}
                 </Badge>
+              )}
+              {/* Unpin button for pinned growth tasks */}
+              {task.pinned_to_tasklist && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => toggleGrowthTaskPin(task.id, true)}
+                  title="Remove from Task List"
+                >
+                  <PinOff className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
               )}
             </div>
           )}
@@ -1082,6 +1182,41 @@ export function QuickToDoButton() {
               className="bg-teal-500 hover:bg-teal-600"
             >
               {isMoving ? "Moving..." : "Move Task"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Complete with Notes Dialog */}
+      <Dialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Complete Task</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Task</label>
+              <p className="text-sm text-muted-foreground bg-muted p-2 rounded">
+                {taskToComplete?.title}
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Completion Notes (optional)</label>
+              <Textarea
+                value={completionNotes}
+                onChange={(e) => setCompletionNotes(e.target.value)}
+                placeholder="Add notes about what was done, outcomes, or follow-ups..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCompleteWithNotes}>
+              Complete Task
             </Button>
           </DialogFooter>
         </DialogContent>

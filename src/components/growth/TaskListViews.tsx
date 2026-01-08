@@ -134,19 +134,12 @@ const TaskRow = ({
         isSelected && 'bg-primary/5'
       )}
     >
-      {/* Multi-select checkbox */}
-      <Checkbox
-        checked={isSelected}
-        onCheckedChange={(checked) => onSelect(!!checked)}
-        className="mt-1"
-      />
-      
-      {/* Complete with notes button - more visible */}
+      {/* Complete with notes button - visible for incomplete tasks */}
       {onCompleteWithNotes && !task.is_completed && (
         <Button
           variant="outline"
           size="icon"
-          className="h-6 w-6 shrink-0 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground"
+          className="h-6 w-6 shrink-0 mt-0.5 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground"
           onClick={(e) => {
             e.stopPropagation();
             onCompleteWithNotes();
@@ -157,12 +150,12 @@ const TaskRow = ({
         </Button>
       )}
       
-      {/* Complete checkbox (without notes) */}
+      {/* Complete checkbox (quick complete without notes) */}
       <Checkbox
         checked={task.is_completed}
         onCheckedChange={() => onToggleComplete()}
         className="mt-1"
-        title="Mark complete"
+        title="Quick complete"
       />
       
       <div className="flex-1 min-w-0 space-y-1">

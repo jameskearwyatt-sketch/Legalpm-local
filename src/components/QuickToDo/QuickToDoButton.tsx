@@ -605,18 +605,32 @@ export function QuickToDoButton() {
     }
   };
 
-  const toggleSlate = async (taskId: string, currentlyOnSlate: boolean) => {
-    // Optimistic update
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, on_slate: !currentlyOnSlate } : t));
-    
-    const { error } = await supabase
-      .from('quick_tasks')
-      .update({ on_slate: !currentlyOnSlate })
-      .eq('id', taskId);
-    
-    if (error) {
-      toast.error('Failed to update slate status');
-      fetchTasks(); // Revert on error
+  const toggleSlate = async (taskId: string, currentlyOnSlate: boolean, source: 'quick' | 'growth') => {
+    if (source === 'growth') {
+      const realId = taskId.replace('growth-', '');
+      const { error } = await supabase
+        .from('growth_tasks')
+        .update({ on_slate: !currentlyOnSlate })
+        .eq('id', realId);
+      
+      if (error) {
+        toast.error('Failed to update slate status');
+      } else {
+        refetchGrowthTasks();
+      }
+    } else {
+      // Optimistic update for quick tasks
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, on_slate: !currentlyOnSlate } : t));
+      
+      const { error } = await supabase
+        .from('quick_tasks')
+        .update({ on_slate: !currentlyOnSlate })
+        .eq('id', taskId);
+      
+      if (error) {
+        toast.error('Failed to update slate status');
+        fetchTasks(); // Revert on error
+      }
     }
   };
 
@@ -686,6 +700,7 @@ export function QuickToDoButton() {
         : undefined,
       pinned_to_tasklist: gt.pinned_to_tasklist,
       assignee: gt.assignee,
+      on_slate: (gt as any).on_slate || false,
     }));
   }, [upcomingGrowthTasks]);
 
@@ -711,8 +726,8 @@ export function QuickToDoButton() {
   // Untriaged count for blue badge
   const untriagedCount = useMemo(() => pendingTasks.filter(t => !isFullyTriaged(t)).length, [pendingTasks]);
   
-  // Slate tasks (only quick tasks can be on slate)
-  const slateTasks = useMemo(() => tasks.filter(t => t.on_slate && !t.is_completed), [tasks]);
+  // Slate tasks (both quick and growth tasks can be on slate)
+  const slateTasks = useMemo(() => allUnifiedTasks.filter(t => t.on_slate && !t.is_completed), [allUnifiedTasks]);
 
   const groupedTasks = useMemo(() => {
     let filtered = pendingTasks;
@@ -1000,45 +1015,49 @@ export function QuickToDoButton() {
             </Badge>
           )}
           
-          {/* Only show move/delete/slate buttons for quick tasks */}
-          {task.source === 'quick' && (
-            <div className="flex items-center gap-1 shrink-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn(
-                  "h-6 w-6",
-                  task.on_slate && "bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-400"
-                )}
-                onClick={() => toggleSlate(task.id, task.on_slate || false)}
-                title={task.on_slate ? "Remove from Slate" : "Add to Slate"}
-              >
-                {task.on_slate ? (
-                  <ClipboardCheck className="h-3.5 w-3.5" />
-                ) : (
-                  <Clipboard className="h-3.5 w-3.5 text-blue-500" />
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => openMoveDialog(task)}
-                title="Move to Growth"
-              >
-                <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => deleteTask(task.id)}
-                title="Delete task"
-              >
-                <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-              </Button>
-            </div>
-          )}
+          {/* Slate button - for all tasks */}
+          <div className="flex items-center gap-1 shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              className={cn(
+                "h-6 w-6",
+                task.on_slate && "bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-400"
+              )}
+              onClick={() => toggleSlate(task.id, task.on_slate || false, task.source)}
+              title={task.on_slate ? "Remove from Slate" : "Add to Slate"}
+            >
+              {task.on_slate ? (
+                <ClipboardCheck className="h-3.5 w-3.5" />
+              ) : (
+                <Clipboard className="h-3.5 w-3.5 text-blue-500" />
+              )}
+            </Button>
+            
+            {/* Only show move/delete buttons for quick tasks */}
+            {task.source === 'quick' && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => openMoveDialog(task)}
+                  title="Move to Growth"
+                >
+                  <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => deleteTask(task.id)}
+                  title="Delete task"
+                >
+                  <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                </Button>
+              </>
+            )}
+          </div>
         </div>
         
         {/* Growth task metadata row - separate line for badges */}
@@ -1369,24 +1388,29 @@ export function QuickToDoButton() {
       {!isOpen && !isSlateOpen && (
         <div
           ref={buttonRef}
-          className="z-50 flex items-center"
+          className="z-50 flex items-center group"
           style={getButtonStyle()}
         >
-          {/* Slate Moon - on the left */}
+          {/* Slate Moon - crescent shape on the left, scales with hover */}
           <button
             onClick={() => setIsSlateOpen(true)}
             className={cn(
-              "relative h-10 w-8 -mr-2 z-10 transition-all duration-300 touch-none select-none",
+              "relative transition-all duration-300 touch-none select-none",
               "bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600",
               "hover:from-blue-400 hover:via-blue-500 hover:to-indigo-500",
-              "hover:shadow-lg hover:shadow-blue-500/30",
               "flex items-center justify-center text-white",
-              "rounded-l-full",
-              slateTasks.length === 0 && "opacity-60"
+              "h-10 w-6 -mr-3",
+              "group-hover:h-[46px] group-hover:w-7 group-hover:-mr-3.5",
+              "group-hover:shadow-lg group-hover:shadow-blue-500/30",
+              slateTasks.length === 0 && "opacity-60 group-hover:opacity-80"
             )}
+            style={{
+              borderRadius: '50% 0 0 50%',
+              clipPath: 'ellipse(100% 50% at 100% 50%)',
+            }}
             title={`Slate (${slateTasks.length} tasks)`}
           >
-            <Clipboard className="h-4 w-4 -ml-1" />
+            <Clipboard className="h-3.5 w-3.5 -ml-0.5 transition-all duration-300 group-hover:h-4 group-hover:w-4" />
           </button>
           
           {/* Main Quick Task Button */}
@@ -1399,7 +1423,7 @@ export function QuickToDoButton() {
               "bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-600",
               "hover:from-emerald-400 hover:via-teal-400 hover:to-cyan-500",
               "hover:shadow-2xl hover:shadow-teal-500/30",
-              !isDragging && "hover:scale-110",
+              "group-hover:scale-110",
               "flex items-center justify-center text-white",
               "ring-2 ring-white/20 ring-offset-2 ring-offset-background",
               isDragging && "cursor-grabbing scale-110 shadow-2xl shadow-teal-500/40",
@@ -1503,7 +1527,7 @@ export function QuickToDoButton() {
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                      onClick={() => toggleSlate(task.id, true)}
+                      onClick={() => toggleSlate(task.id, true, task.source)}
                       title="Remove from Slate"
                     >
                       <ClipboardCheck className="h-3.5 w-3.5 text-blue-500" />
@@ -1565,6 +1589,22 @@ export function QuickToDoButton() {
                 </div>
               </div>
               <div className="flex items-center gap-1" onPointerDown={(e) => e.stopPropagation()}>
+                {/* Open Slate button */}
+                <button
+                  onClick={() => {
+                    setIsOpen(false);
+                    setIsSlateOpen(true);
+                  }}
+                  className={cn(
+                    "h-7 w-7 flex items-center justify-center rounded-full transition-colors text-white",
+                    slateTasks.length > 0 
+                      ? "bg-blue-500/50 hover:bg-blue-500/70" 
+                      : "bg-white/20 hover:bg-white/30"
+                  )}
+                  title={`Open Slate (${slateTasks.length} tasks)`}
+                >
+                  <Clipboard className="h-3.5 w-3.5" />
+                </button>
                 {/* Hide expand button on mobile - already full screen */}
                 <button
                   onClick={() => setIsExpanded(!isExpanded)}

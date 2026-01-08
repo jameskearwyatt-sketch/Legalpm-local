@@ -1223,6 +1223,33 @@ export type Database = {
         }
         Relationships: []
       }
+      quick_tasks: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          is_completed: boolean
+          title: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          title: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       time_recording_drafts: {
         Row: {
           created_at: string

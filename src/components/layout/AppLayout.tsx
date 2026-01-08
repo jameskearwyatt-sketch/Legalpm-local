@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { AskAIButton } from '@/components/AskAI/AskAIButton';
+import { QuickToDoButton } from '@/components/QuickToDo/QuickToDoButton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -198,6 +199,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       {/* Floating AI Assistant */}
       <AskAIButton />
+      
+      {/* Floating Quick To-Do */}
+      <QuickToDoButton />
     </div>
   );
 }

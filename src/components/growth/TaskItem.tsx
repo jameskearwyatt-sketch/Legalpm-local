@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Clock, Trash2, User, MessageSquare, Pencil } from 'lucide-react';
+import { Clock, Trash2, User, MessageSquare, Pencil, ListTodo } from 'lucide-react';
 import { 
   type GrowthTask, 
   type TaskDeadlineType, 
@@ -318,6 +318,24 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
               </div>
             </PopoverContent>
           </Popover>
+          
+          {/* Pin to Task List button */}
+          {!task.is_completed && (
+            <button 
+              type="button"
+              onClick={() => onUpdate({ pinned_to_tasklist: !task.pinned_to_tasklist })}
+              className={cn(
+                "inline-flex items-center text-xs px-2 py-1 border rounded-full cursor-pointer hover:bg-accent transition-colors",
+                task.pinned_to_tasklist 
+                  ? "bg-primary/10 text-primary border-primary/30" 
+                  : "border-dashed text-muted-foreground"
+              )}
+              title={task.pinned_to_tasklist ? "Remove from Task List" : "Add to Task List"}
+            >
+              <ListTodo className="h-3 w-3 mr-1" />
+              {task.pinned_to_tasklist ? 'On Task List' : 'Add to Tasks'}
+            </button>
+          )}
           
           {task.completed_at && (
             <span className="text-xs text-muted-foreground">

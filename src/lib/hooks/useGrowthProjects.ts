@@ -53,6 +53,7 @@ export interface GrowthTask {
   importance: TaskImportance;
   urgency: TaskUrgency;
   effort: TaskEffort;
+  pinned_to_tasklist: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -500,8 +501,7 @@ export function useMyUpcomingGrowthTasks() {
       const { data, error } = await supabase
         .from('growth_tasks')
         .select('*, growth_projects!inner(name, project_type)')
-        .eq('is_completed', false)
-        .neq('deadline_type', 'no_deadline');
+        .eq('is_completed', false);
       
       if (error) throw error;
       
@@ -509,12 +509,19 @@ export function useMyUpcomingGrowthTasks() {
       const oneWeekFromNow = new Date(now);
       oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
       
-      // Filter: assigned to "Me" (or unassigned) AND due within next week
+      // Filter: (assigned to "Me" or unassigned AND due within next week) OR pinned to tasklist
       return (data || []).filter((task: TaskWithProject) => {
+        // If pinned to tasklist, always include (if assigned to Me or unassigned)
+        if (task.pinned_to_tasklist) {
+          return !task.assignee || task.assignee === 'Me';
+        }
+        
         // Must be assigned to "Me" or unassigned
         if (task.assignee && task.assignee !== 'Me') return false;
         
-        if (!task.deadline_set_at) return false;
+        // Must have a deadline
+        if (task.deadline_type === 'no_deadline' || !task.deadline_set_at) return false;
+        
         const setAt = new Date(task.deadline_set_at);
         const dueDate = calculateDueDate(setAt, task.deadline_type);
         

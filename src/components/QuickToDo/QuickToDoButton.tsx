@@ -49,6 +49,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { 
   useGrowthProjects, 
   type TaskDeadlineType, 
@@ -625,6 +626,7 @@ const SortableSlateItem = ({
 
 export function QuickToDoButton() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const { projects } = useGrowthProjects();
   const { assignees } = useKnownAssignees();
   const { upcomingTasks: upcomingGrowthTasks, refetch: refetchGrowthTasks } = useMyUpcomingGrowthTasks();
@@ -1088,7 +1090,11 @@ export function QuickToDoButton() {
     if (error) {
       toast.error('Failed to update task');
     } else {
+      // Invalidate all growth task queries to sync with Growth section
       refetchGrowthTasks();
+      queryClient.invalidateQueries({ queryKey: ['growth-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['all-growth-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['overdue-tasks'] });
     }
   };
 

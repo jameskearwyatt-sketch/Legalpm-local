@@ -146,27 +146,14 @@ interface TriagePillsProps {
   compact?: boolean;
   disabled?: boolean;
   expandOnHover?: boolean;
+  forceExpanded?: boolean; // Controlled expansion from parent
 }
 
-const TriagePills = ({ task, onUpdate, compact = false, disabled = false, expandOnHover = false }: TriagePillsProps) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+const TriagePills = ({ task, onUpdate, compact = false, disabled = false, expandOnHover = false, forceExpanded = false }: TriagePillsProps) => {
   const iconSize = "h-3 w-3";
   
-  const handleMouseEnter = () => {
-    if (!expandOnHover) return;
-    hoverTimeoutRef.current = setTimeout(() => {
-      setIsExpanded(true);
-    }, 1000); // 1 second delay
-  };
-  
-  const handleMouseLeave = () => {
-    if (hoverTimeoutRef.current) {
-      clearTimeout(hoverTimeoutRef.current);
-      hoverTimeoutRef.current = null;
-    }
-    setIsExpanded(false);
-  };
+  // Use forceExpanded when provided (controlled by parent), otherwise always collapsed for expandOnHover mode
+  const isExpanded = forceExpanded;
   
   const handleUrgencyClick = (value: 'urgent' | 'not_urgent') => {
     if (disabled) return;
@@ -191,14 +178,10 @@ const TriagePills = ({ task, onUpdate, compact = false, disabled = false, expand
   const iconOnlyPill = cn(pillBase, "p-1 transition-all duration-200");
   const expandedPill = cn(pillBase, "gap-1 text-[11px] px-2 py-1 transition-all duration-200");
 
-  // When expandOnHover is true, show icons only by default, expand on row hover with delay
+  // When expandOnHover is true, show icons only by default, expand when forceExpanded is true
   if (expandOnHover) {
     return (
-      <div 
-        className="relative"
-        onMouseEnter={handleMouseEnter}
-        onMouseLeave={handleMouseLeave}
-      >
+      <div className="relative">
         {/* Collapsed state - icons only */}
         <div className={cn(
           "flex gap-1 transition-all duration-200",
@@ -1544,8 +1527,38 @@ export function QuickToDoButton() {
   const TaskRow = ({ task }: { task: UnifiedTask }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editedTitle, setEditedTitle] = useState(task.title);
+    const [triageExpanded, setTriageExpanded] = useState(false);
     const editInputRef = useRef<HTMLInputElement>(null);
+    const triageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const rowRef = useRef<HTMLDivElement>(null);
     const isTriaged = isFullyTriaged(task);
+
+    const handleRowMouseMove = (e: React.MouseEvent) => {
+      if (!rowRef.current) return;
+      const rect = rowRef.current.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const isLeftHalf = mouseX < rect.width / 2;
+      
+      if (isLeftHalf && !triageExpanded && !triageTimeoutRef.current) {
+        triageTimeoutRef.current = setTimeout(() => {
+          setTriageExpanded(true);
+        }, 500); // 0.5 second delay
+      } else if (!isLeftHalf) {
+        if (triageTimeoutRef.current) {
+          clearTimeout(triageTimeoutRef.current);
+          triageTimeoutRef.current = null;
+        }
+        setTriageExpanded(false);
+      }
+    };
+
+    const handleRowMouseLeave = () => {
+      if (triageTimeoutRef.current) {
+        clearTimeout(triageTimeoutRef.current);
+        triageTimeoutRef.current = null;
+      }
+      setTriageExpanded(false);
+    };
 
     useEffect(() => {
       if (isEditing) {
@@ -1576,6 +1589,9 @@ export function QuickToDoButton() {
 
     return (
       <div
+        ref={rowRef}
+        onMouseMove={handleRowMouseMove}
+        onMouseLeave={handleRowMouseLeave}
         className={cn(
           "flex flex-col gap-2 p-3 rounded-lg group transition-all",
           "bg-muted/50 hover:bg-muted/80",
@@ -1719,6 +1735,7 @@ export function QuickToDoButton() {
           task={task} 
           onUpdate={(updates) => updateTask(task.id, updates)}
           expandOnHover
+          forceExpanded={triageExpanded}
         />
       </div>
     );

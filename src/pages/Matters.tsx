@@ -1353,7 +1353,7 @@ export default function Matters() {
                                       ? "text-warning font-medium"
                                       : "text-muted-foreground"
                                   )}>
-                                    {format(parseISO(matter.clarifications_date), 'dd MMM')}
+                                    {format(parseISO(matter.clarifications_date), 'dd MMM yy')}
                                   </span>
                                 ) : '-'}
                               </TableCell>
@@ -1378,14 +1378,14 @@ export default function Matters() {
                                         needsAttention && isUrgent && !isOverdue && "text-warning font-medium",
                                         !needsAttention && "text-muted-foreground"
                                       )}>
-                                        {format(deadlineDate, 'dd MMM')}
+                                        {format(deadlineDate, 'dd MMM yy')}
                                       </span>
                                     </div>
                                   );
                                 })() : '-'}
                               </TableCell>
                               <TableCell className="text-muted-foreground text-sm">
-                                {matter.decision_date ? format(parseISO(matter.decision_date), 'dd MMM') : '-'}
+                                {matter.decision_date ? format(parseISO(matter.decision_date), 'dd MMM yy') : '-'}
                               </TableCell>
                               <TableCell>
                                 {matter.submitted ? (

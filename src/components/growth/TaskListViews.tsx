@@ -353,7 +353,10 @@ const TaskRow = ({
                 ? "bg-primary text-primary-foreground" 
                 : "border-dashed"
             )}
-            onClick={() => onUpdate({ pinned_to_tasklist: !task.pinned_to_tasklist })}
+            onClick={(e) => {
+              e.stopPropagation();
+              onUpdate({ pinned_to_tasklist: !task.pinned_to_tasklist });
+            }}
             title={task.pinned_to_tasklist ? "Remove from Task List" : "Add to Task List"}
           >
             <ListTodo className="h-3 w-3 mr-1" />

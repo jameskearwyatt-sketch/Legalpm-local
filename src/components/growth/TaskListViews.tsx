@@ -3,7 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, User, Check, ChevronDown, ChevronRight, Filter, Clock, MessageSquare, X } from 'lucide-react';
+import { Trash2, User, Check, ChevronDown, ChevronRight, Filter, Clock, MessageSquare, X, ListTodo } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -338,6 +338,24 @@ const TaskRow = ({
               </div>
             </PopoverContent>
           </Popover>
+          
+          {/* Pin to Task List button */}
+          {!task.is_completed && (
+            <button 
+              type="button"
+              onClick={() => onUpdate({ pinned_to_tasklist: !task.pinned_to_tasklist })}
+              className={cn(
+                "inline-flex items-center text-[10px] px-1.5 py-0.5 border rounded-full cursor-pointer hover:bg-accent transition-colors",
+                task.pinned_to_tasklist 
+                  ? "bg-primary/10 text-primary border-primary/30" 
+                  : "border-dashed text-muted-foreground"
+              )}
+              title={task.pinned_to_tasklist ? "Remove from Task List" : "Add to Task List"}
+            >
+              <ListTodo className="h-2.5 w-2.5 mr-1" />
+              {task.pinned_to_tasklist ? 'On Tasks' : 'Add'}
+            </button>
+          )}
         </div>
       </div>
       

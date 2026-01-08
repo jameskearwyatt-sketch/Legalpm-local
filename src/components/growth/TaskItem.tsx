@@ -12,10 +12,12 @@ import {
   type GrowthTask, 
   type TaskDeadlineType, 
   getDeadlineLabel,
-  useKnownAssignees
+  useKnownAssignees,
+  calculateDueDate
 } from '@/lib/hooks/useGrowthProjects';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { getDeadlineTextColor, getDeadlineBadgeColor } from '@/lib/deadlineColors';
 
 interface TaskItemProps {
   task: GrowthTask;
@@ -51,21 +53,17 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
     }
   }, [assigneeOpen, task.assignee]);
 
+  // Calculate the due date for coloring
+  const dueDate = task.deadline_set_at && task.deadline_type !== 'no_deadline'
+    ? calculateDueDate(new Date(task.deadline_set_at), task.deadline_type)
+    : null;
+
   const getDeadlineColor = () => {
-    if (task.is_completed) return 'bg-muted text-muted-foreground';
-    if (isOverdue) return 'bg-destructive/10 text-destructive border-destructive/30';
-    
-    switch (task.deadline_type) {
-      case 'this_week':
-        return 'bg-orange-500/10 text-orange-600 border-orange-500/30';
-      case 'next_week':
-        return 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30';
-      case 'this_month':
-        return 'bg-blue-500/10 text-blue-600 border-blue-500/30';
-      default:
-        return 'bg-muted text-muted-foreground';
-    }
+    return getDeadlineBadgeColor(dueDate, task.is_completed);
   };
+
+  // Get the text color for the task title
+  const titleColor = getDeadlineTextColor(dueDate, task.is_completed);
 
   const handleAssigneeSelect = (name: string) => {
     onUpdate({ assignee: name || null });
@@ -96,7 +94,8 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
       <div className="flex-1 min-w-0">
         <p className={cn(
           "text-sm font-medium",
-          task.is_completed && 'text-muted-foreground'
+          titleColor,
+          task.is_completed && 'line-through'
         )}>
           {task.title}
         </p>

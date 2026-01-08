@@ -188,6 +188,27 @@ export function CategorizedBudgetView({
     return totals;
   }, [items]);
 
+  // Calculate totals per provider (Baker McKenzie + each LC firm)
+  const providerTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    
+    items.forEach(item => {
+      const providerName = item.provider === 'Local Counsel' && item.lc_firm_name 
+        ? item.lc_firm_name 
+        : 'Baker McKenzie';
+      const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
+      
+      if (isIncluded) {
+        if (!totals[providerName]) {
+          totals[providerName] = 0;
+        }
+        totals[providerName] += item.fee_amount || 0;
+      }
+    });
+    
+    return totals;
+  }, [items]);
+
   // Save category change to database
   const saveCategoryToDb = async (itemId: string, category: string) => {
     try {
@@ -407,6 +428,62 @@ export function CategorizedBudgetView({
           );
         })()}
       </div>
+
+      {/* Provider Subtotals (Baker McKenzie + each Local Counsel) */}
+      {Object.keys(providerTotals).length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {/* Baker McKenzie first */}
+          {providerTotals['Baker McKenzie'] > 0 && (() => {
+            const total = providerTotals['Baker McKenzie'];
+            const displayTotal = differentBillingCurrency && agreedBillingAmount > 0
+              ? total * mandatedRate
+              : total;
+            const displayCurrency = differentBillingCurrency && agreedBillingAmount > 0 
+              ? billingCurrency 
+              : currency;
+            
+            return (
+              <div className="rounded-md px-3 py-2 border bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600">
+                <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                  Baker McKenzie
+                </div>
+                <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                  {formatCurrency(displayTotal, displayCurrency)}
+                </div>
+              </div>
+            );
+          })()}
+          
+          {/* Local Counsel firms sorted alphabetically */}
+          {Object.entries(providerTotals)
+            .filter(([name]) => name !== 'Baker McKenzie')
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([lcName, total]) => {
+              if (total === 0) return null;
+              
+              const displayTotal = differentBillingCurrency && agreedBillingAmount > 0
+                ? total * mandatedRate
+                : total;
+              const displayCurrency = differentBillingCurrency && agreedBillingAmount > 0 
+                ? billingCurrency 
+                : currency;
+              
+              return (
+                <div
+                  key={lcName}
+                  className="rounded-md px-3 py-2 border bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-700"
+                >
+                  <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                    {lcName}
+                  </div>
+                  <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                    {formatCurrency(displayTotal, displayCurrency)}
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      )}
 
       <DndContext
         sensors={sensors}

@@ -110,7 +110,11 @@ serve(async (req) => {
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+      console.error("LOVABLE_API_KEY is not configured");
+      return new Response(
+        JSON.stringify({ error: "Service temporarily unavailable. Please try again later.", summary: null }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     let documentContent = "";
@@ -207,7 +211,11 @@ Keep your summary to 2-4 sentences, focused and actionable.`
               { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
-          throw new Error(`AI gateway error: ${response.status}`);
+          console.error("AI gateway error:", response.status);
+          return new Response(
+            JSON.stringify({ error: "An error occurred processing your document. Please try again.", summary: null }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
         }
 
         const data = await response.json();
@@ -241,7 +249,7 @@ Keep your summary to 2-4 sentences, focused and actionable.`
     } catch (fetchError) {
       console.error("Error fetching/parsing document:", fetchError);
       return new Response(
-        JSON.stringify({ error: `Failed to access document: ${fetchError instanceof Error ? fetchError.message : 'Unknown error'}`, summary: null }),
+        JSON.stringify({ error: "Failed to access document. Please ensure it exists and try again.", summary: null }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -303,7 +311,10 @@ Please provide a helpful summary of this document.`;
       }
       const errorText = await response.text();
       console.error("AI gateway error:", response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+      return new Response(
+        JSON.stringify({ error: "An error occurred processing your document. Please try again.", summary: null }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     const data = await response.json();
@@ -316,7 +327,7 @@ Please provide a helpful summary of this document.`;
   } catch (error) {
     console.error("Error in summarize-document:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error", summary: null }),
+      JSON.stringify({ error: "An error occurred processing your document. Please try again.", summary: null }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

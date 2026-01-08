@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import DOMPurify from 'dompurify';
 import { cn } from '@/lib/utils';
 
 interface StickyTableHeaderProps {
@@ -173,7 +174,10 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
               className="w-full caption-bottom text-sm border-collapse" 
               style={{ minWidth: scrollableEl?.scrollWidth }}
               dangerouslySetInnerHTML={{ 
-                __html: colStyles + `<thead class="bg-background [&_tr]:border-b">${theadClone.innerHTML}</thead>` 
+                __html: DOMPurify.sanitize(
+                  colStyles + `<thead class="bg-background [&_tr]:border-b">${theadClone.innerHTML}</thead>`,
+                  { ADD_TAGS: ['colgroup', 'col', 'thead', 'tr', 'th'], ADD_ATTR: ['style', 'class', 'colspan', 'rowspan'] }
+                )
               }}
             />
           </div>

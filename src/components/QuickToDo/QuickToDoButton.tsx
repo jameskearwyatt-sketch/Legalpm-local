@@ -3,7 +3,8 @@ import {
   CheckSquare, X, Plus, Trash2, ArrowRight, Clock, User,
   Briefcase, GraduationCap, Lightbulb, Maximize2, Minimize2,
   ListTodo, LayoutGrid, Filter, Check, ChevronDown, ChevronRight,
-  Zap, Target, CalendarClock, Feather, Flame, MessageSquare, Pin, PinOff
+  Zap, Target, CalendarClock, Feather, Flame, MessageSquare, Pin, PinOff,
+  Clipboard, ClipboardCheck
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ interface QuickTask {
   effort: TaskEffort;
   created_at: string;
   completed_at: string | null;
+  on_slate: boolean;
 }
 
 // Unified task type for display - can be a QuickTask or a Growth Task
@@ -76,6 +78,7 @@ interface UnifiedTask {
   dueDate?: Date;
   pinned_to_tasklist?: boolean;
   assignee?: string | null;
+  on_slate?: boolean;
 }
 
 const STORAGE_KEY = 'todo-button-position';
@@ -284,6 +287,9 @@ export function QuickToDoButton() {
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
   const [taskToComplete, setTaskToComplete] = useState<UnifiedTask | null>(null);
   const [completionNotes, setCompletionNotes] = useState("");
+  
+  // Slate panel state
+  const [isSlateOpen, setIsSlateOpen] = useState(false);
 
   // Triage debouncing - track tasks being actively triaged
   // Key: taskId, Value: { lastTriageTime, previousQuadrant }
@@ -358,6 +364,7 @@ export function QuickToDoButton() {
       effort: t.effort || 'unset',
       created_at: t.created_at,
       completed_at: t.completed_at || null,
+      on_slate: t.on_slate || false,
     }));
 
     setTasks(mappedTasks);
@@ -529,6 +536,7 @@ export function QuickToDoButton() {
       effort: task.effort,
       created_at: task.created_at,
       completed_at: task.completed_at || null,
+      on_slate: task.on_slate || false,
     };
     setTaskToMove(quickTask);
     setSelectedProject("");
@@ -594,6 +602,21 @@ export function QuickToDoButton() {
       toast.error('Failed to update task');
     } else {
       refetchGrowthTasks();
+    }
+  };
+
+  const toggleSlate = async (taskId: string, currentlyOnSlate: boolean) => {
+    // Optimistic update
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, on_slate: !currentlyOnSlate } : t));
+    
+    const { error } = await supabase
+      .from('quick_tasks')
+      .update({ on_slate: !currentlyOnSlate })
+      .eq('id', taskId);
+    
+    if (error) {
+      toast.error('Failed to update slate status');
+      fetchTasks(); // Revert on error
     }
   };
 
@@ -684,6 +707,12 @@ export function QuickToDoButton() {
   const completedTasks = useMemo(() => tasks.filter(t => t.is_completed), [tasks]);
   const incompleteTasks = pendingTasks; // alias for badge count
   const completedUnifiedTasks: UnifiedTask[] = useMemo(() => completedTasks.map(t => ({ ...t, source: 'quick' as const })), [completedTasks]);
+  
+  // Untriaged count for blue badge
+  const untriagedCount = useMemo(() => pendingTasks.filter(t => !isFullyTriaged(t)).length, [pendingTasks]);
+  
+  // Slate tasks (only quick tasks can be on slate)
+  const slateTasks = useMemo(() => tasks.filter(t => t.on_slate && !t.is_completed), [tasks]);
 
   const groupedTasks = useMemo(() => {
     let filtered = pendingTasks;
@@ -971,9 +1000,25 @@ export function QuickToDoButton() {
             </Badge>
           )}
           
-          {/* Only show move/delete buttons for quick tasks */}
+          {/* Only show move/delete/slate buttons for quick tasks */}
           {task.source === 'quick' && (
             <div className="flex items-center gap-1 shrink-0">
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-6 w-6",
+                  task.on_slate && "bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-950 dark:text-blue-400"
+                )}
+                onClick={() => toggleSlate(task.id, task.on_slate || false)}
+                title={task.on_slate ? "Remove from Slate" : "Add to Slate"}
+              >
+                {task.on_slate ? (
+                  <ClipboardCheck className="h-3.5 w-3.5" />
+                ) : (
+                  <Clipboard className="h-3.5 w-3.5 text-blue-500" />
+                )}
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -1320,13 +1365,31 @@ export function QuickToDoButton() {
         </DialogContent>
       </Dialog>
 
-      {/* Floating Draggable Button - Hidden when panel is open */}
-      {!isOpen && (
+      {/* Floating Draggable Button with Slate Moon - Hidden when panel is open */}
+      {!isOpen && !isSlateOpen && (
         <div
           ref={buttonRef}
-          className="z-50"
+          className="z-50 flex items-center"
           style={getButtonStyle()}
         >
+          {/* Slate Moon - on the left */}
+          <button
+            onClick={() => setIsSlateOpen(true)}
+            className={cn(
+              "relative h-10 w-8 -mr-2 z-10 transition-all duration-300 touch-none select-none",
+              "bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600",
+              "hover:from-blue-400 hover:via-blue-500 hover:to-indigo-500",
+              "hover:shadow-lg hover:shadow-blue-500/30",
+              "flex items-center justify-center text-white",
+              "rounded-l-full",
+              slateTasks.length === 0 && "opacity-60"
+            )}
+            title={`Slate (${slateTasks.length} tasks)`}
+          >
+            <Clipboard className="h-4 w-4 -ml-1" />
+          </button>
+          
+          {/* Main Quick Task Button */}
           <button
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
@@ -1344,12 +1407,128 @@ export function QuickToDoButton() {
             )}
           >
             <CheckSquare className="h-6 w-6" />
+            {/* Red badge - total incomplete tasks */}
             {incompleteTasks.length > 0 && (
               <span className="absolute -top-1 -right-1 flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
                 {incompleteTasks.length}
               </span>
             )}
+            {/* Blue badge - untriaged tasks */}
+            {untriagedCount > 0 && (
+              <span className="absolute -bottom-1 -right-1 flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
+                {untriagedCount}
+              </span>
+            )}
           </button>
+        </div>
+      )}
+
+      {/* Slate Panel */}
+      {isSlateOpen && (
+        <div
+          className="fixed z-50 bottom-4 right-4 w-80 max-h-[60vh] rounded-xl border-0 shadow-2xl shadow-blue-500/20 overflow-hidden bg-background flex flex-col"
+        >
+          {/* Slate Header */}
+          <div className="bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 px-4 py-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+                  <Clipboard className="h-4 w-4 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">Slate</h3>
+                  <p className="text-[10px] text-white/80">
+                    {slateTasks.length} {slateTasks.length === 1 ? 'task' : 'tasks'} to do now
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsSlateOpen(false)}
+                className="h-7 w-7 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+                title="Close"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Slate Tasks */}
+          <ScrollArea className="flex-1 p-3">
+            {slateTasks.length === 0 ? (
+              <p className="text-center text-muted-foreground text-sm py-8">
+                No tasks on your Slate yet.<br />
+                Add tasks from your triaged list.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {slateTasks.map(task => (
+                  <div key={task.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 group">
+                    {/* Dual checkbox */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const unified: UnifiedTask = { ...task, source: 'quick' as const };
+                          setTaskToComplete(unified);
+                          setCompletionNotes("");
+                          setCompleteDialogOpen(true);
+                        }}
+                        className="h-4 w-4 rounded border border-input flex items-center justify-center hover:bg-accent hover:border-primary transition-colors"
+                        title="Complete with notes"
+                      >
+                        <MessageSquare className="h-2.5 w-2.5 text-muted-foreground" />
+                      </button>
+                      <Checkbox
+                        checked={task.is_completed}
+                        onCheckedChange={async () => {
+                          const { error } = await supabase
+                            .from('quick_tasks')
+                            .update({
+                              is_completed: true,
+                              completed_at: new Date().toISOString(),
+                            })
+                            .eq('id', task.id);
+                          if (error) {
+                            toast.error('Failed to complete task');
+                          } else {
+                            fetchTasks();
+                          }
+                        }}
+                        className="h-4 w-4"
+                        title="Quick complete"
+                      />
+                    </div>
+                    <span className="flex-1 text-sm truncate">{task.title}</span>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                      onClick={() => toggleSlate(task.id, true)}
+                      title="Remove from Slate"
+                    >
+                      <ClipboardCheck className="h-3.5 w-3.5 text-blue-500" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+          
+          {/* Open full task list button */}
+          <div className="p-2 border-t">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-xs"
+              onClick={() => {
+                setIsSlateOpen(false);
+                setIsOpen(true);
+              }}
+            >
+              <CheckSquare className="h-3.5 w-3.5 mr-1.5" />
+              Open Full Task List
+            </Button>
+          </div>
         </div>
       )}
 

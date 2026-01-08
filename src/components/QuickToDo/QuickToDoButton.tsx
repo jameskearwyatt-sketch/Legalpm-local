@@ -285,6 +285,11 @@ export function QuickToDoButton() {
   const [taskToComplete, setTaskToComplete] = useState<UnifiedTask | null>(null);
   const [completionNotes, setCompletionNotes] = useState("");
 
+  // Triage debouncing - track tasks being actively triaged
+  // Key: taskId, Value: { lastTriageTime, previousQuadrant }
+  const [tasksBeingTriaged, setTasksBeingTriaged] = useState<Map<string, { lastTriageTime: number; previousQuadrant: EisenhowerQuadrant }>>(new Map());
+  const triageTimeoutRefs = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
   // Dragging state
   const [isDragging, setIsDragging] = useState(false);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
@@ -316,6 +321,13 @@ export function QuickToDoButton() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(position));
     }
   }, [position]);
+
+  // Cleanup triage timeouts on unmount
+  useEffect(() => {
+    return () => {
+      triageTimeoutRefs.current.forEach(timeout => clearTimeout(timeout));
+    };
+  }, []);
 
   // Load tasks
   useEffect(() => {
@@ -408,6 +420,60 @@ export function QuickToDoButton() {
   };
 
   const updateTask = async (taskId: string, updates: Partial<QuickTask>) => {
+    // Check if this is a triage update (urgency, importance, or effort)
+    const isTriageUpdate = 'urgency' in updates || 'importance' in updates || 'effort' in updates;
+    
+    if (isTriageUpdate) {
+      // Get current task state to determine its current quadrant
+      const currentTask = allUnifiedTasks.find(t => t.id === taskId);
+      if (currentTask) {
+        const currentQuadrant = getQuadrant(currentTask.urgency, currentTask.importance);
+        
+        // Start or extend the triage debounce timer
+        setTasksBeingTriaged(prev => {
+          const next = new Map(prev);
+          const existing = next.get(taskId);
+          next.set(taskId, {
+            lastTriageTime: Date.now(),
+            // Keep original quadrant from when triage started
+            previousQuadrant: existing?.previousQuadrant ?? currentQuadrant,
+          });
+          return next;
+        });
+        
+        // Clear existing timeout for this task
+        const existingTimeout = triageTimeoutRefs.current.get(taskId);
+        if (existingTimeout) clearTimeout(existingTimeout);
+        
+        // Set new timeout to release the task after 5 seconds
+        const timeout = setTimeout(() => {
+          setTasksBeingTriaged(prev => {
+            const next = new Map(prev);
+            next.delete(taskId);
+            return next;
+          });
+          triageTimeoutRefs.current.delete(taskId);
+        }, 5000);
+        triageTimeoutRefs.current.set(taskId, timeout);
+        
+        // Check if task will be fully triaged after this update
+        const updatedTask = { ...currentTask, ...updates };
+        if (isFullyTriaged(updatedTask)) {
+          // Immediately release the task since all three are set
+          setTimeout(() => {
+            setTasksBeingTriaged(prev => {
+              const next = new Map(prev);
+              next.delete(taskId);
+              return next;
+            });
+            const t = triageTimeoutRefs.current.get(taskId);
+            if (t) clearTimeout(t);
+            triageTimeoutRefs.current.delete(taskId);
+          }, 100); // Small delay so user sees the final state briefly
+        }
+      }
+    }
+    
     if (taskId.startsWith('growth-')) {
       // Update growth task
       const realId = taskId.replace('growth-', '');
@@ -634,14 +700,29 @@ export function QuickToDoButton() {
     };
 
     filtered.forEach(task => {
-      const quadrant = getQuadrant(task.urgency, task.importance);
+      // Check if this task is being actively triaged
+      const triageState = tasksBeingTriaged.get(task.id);
+      
+      // If task is being triaged, keep it in its original quadrant
+      const quadrant = triageState 
+        ? triageState.previousQuadrant 
+        : getQuadrant(task.urgency, task.importance);
+      
       groups[quadrant].push(task);
     });
 
     // Sort: quick wins first, then by due date (for growth tasks), then by created_at
     Object.keys(groups).forEach(key => {
       groups[key as EisenhowerQuadrant].sort((a, b) => {
-        // Quick wins first
+        // Tasks being triaged stay at their original position (sort by when triage started)
+        const aTriaging = tasksBeingTriaged.has(a.id);
+        const bTriaging = tasksBeingTriaged.has(b.id);
+        
+        // Keep triaging tasks in place relative to each other
+        if (aTriaging && !bTriaging) return 0; // Keep in place
+        if (!aTriaging && bTriaging) return 0; // Keep in place
+        
+        // Quick wins first (only for non-triaging tasks)
         if (a.effort === 'quick_win' && b.effort !== 'quick_win') return -1;
         if (a.effort !== 'quick_win' && b.effort === 'quick_win') return 1;
         // Growth tasks with due dates sort by due date
@@ -653,7 +734,7 @@ export function QuickToDoButton() {
     });
 
     return groups;
-  }, [pendingTasks, showUntriagedOnly]);
+  }, [pendingTasks, showUntriagedOnly, tasksBeingTriaged]);
 
 
   // Bulk actions

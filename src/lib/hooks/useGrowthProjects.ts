@@ -286,6 +286,9 @@ export function useGrowthProject(projectId?: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['growth-tasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['my-upcoming-growth-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['all-growth-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['overdue-tasks'] });
       synthesizeProject();
     },
     onError: (error: Error) => {
@@ -329,6 +332,9 @@ export function useGrowthProject(projectId?: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['growth-tasks', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['my-upcoming-growth-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['all-growth-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['overdue-tasks'] });
     },
   });
 
@@ -509,10 +515,10 @@ export function useMyUpcomingGrowthTasks() {
       if (error) throw error;
       
       const now = new Date();
-      const oneWeekFromNow = new Date(now);
-      oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+      const twoWeeksFromNow = new Date(now);
+      twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
       
-      // Filter: (assigned to "Me" or unassigned AND due within next week) OR pinned to tasklist
+      // Filter: (assigned to "Me" or unassigned AND due within 2 weeks) OR pinned to tasklist
       return (data || []).filter((task: TaskWithProject) => {
         // If pinned to tasklist, always include regardless of assignee
         if (task.pinned_to_tasklist) {
@@ -528,8 +534,8 @@ export function useMyUpcomingGrowthTasks() {
         const setAt = new Date(task.deadline_set_at);
         const dueDate = calculateDueDate(setAt, task.deadline_type);
         
-        // Due within the next 7 days (or already overdue)
-        return dueDate <= oneWeekFromNow;
+        // Due within the next 14 days (2 weeks) or already overdue
+        return dueDate <= twoWeeksFromNow;
       }) as TaskWithProject[];
     },
     enabled: !!user,

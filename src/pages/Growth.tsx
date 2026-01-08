@@ -113,26 +113,7 @@ const Growth = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview" className="flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="business" className="flex items-center gap-2">
-              <Briefcase className="h-4 w-4" />
-              Business
-            </TabsTrigger>
-            <TabsTrigger value="professional" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Professional
-            </TabsTrigger>
-            <TabsTrigger value="learning" className="flex items-center gap-2">
-              <GraduationCap className="h-4 w-4" />
-              Learning
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="mt-6">
+          <TabsContent value="overview" className="mt-0">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <OverviewCard
                 title="Business Development"

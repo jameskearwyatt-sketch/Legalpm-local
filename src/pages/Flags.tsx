@@ -517,9 +517,14 @@ export default function Flags() {
       const mma = (matter as any).matter_managing_attorney;
       if (!mma || mma.trim() === '') flags.push('no_mma');
       if (!matter.lead_partner || matter.lead_partner.trim() === '') flags.push('no_billing_partner');
-      // Local counsel billing missing check
+      // Local counsel billing missing check - check per-LC billing_mode
+      const localCounsels = (matter as any).local_counsels || [];
       const localCounselFee = Number(matter.local_counsel_fee) || 0;
-      if (localCounselFee > 0 && (!matter.local_counsel_billing || matter.local_counsel_billing.trim() === '')) {
+      // Flag if there's LC fee but no LC records, or if any LC is missing billing_mode
+      const hasLcWithMissingBilling = localCounsels.length > 0 
+        ? localCounsels.some((lc: any) => !lc.billing_mode)
+        : localCounselFee > 0; // Flag if fee exists but no LC records
+      if (hasLcWithMissingBilling) {
         flags.push('no_lc_billing');
       }
       

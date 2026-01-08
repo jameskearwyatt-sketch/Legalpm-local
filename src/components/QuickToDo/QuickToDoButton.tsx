@@ -1238,7 +1238,7 @@ export function QuickToDoButton() {
           </div>
 
           {/* Task List */}
-          <ScrollArea className="flex-1" style={{ height: isExpanded ? 'calc(100% - 180px)' : 340 }}>
+          <div className="flex-1 overflow-y-auto" style={{ maxHeight: isExpanded ? 'calc(100vh - 280px)' : '400px' }}>
             <div className="p-2 space-y-1.5">
               {incompleteTasks.length === 0 && completedTasks.length === 0 && (
                 <p className="text-center text-muted-foreground text-sm py-8">
@@ -1279,7 +1279,7 @@ export function QuickToDoButton() {
 
               {viewMode === 'matrix' && renderMatrixView()}
             </div>
-          </ScrollArea>
+          </div>
         </div>
       )}
     </>

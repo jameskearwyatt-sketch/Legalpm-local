@@ -478,12 +478,15 @@ export type Database = {
           deadline_set_at: string | null
           deadline_type: Database["public"]["Enums"]["task_deadline_type"]
           description: string | null
+          effort: Database["public"]["Enums"]["task_effort"]
           id: string
+          importance: Database["public"]["Enums"]["task_importance"]
           is_completed: boolean
           project_id: string
           sort_order: number
           title: string
           updated_at: string
+          urgency: Database["public"]["Enums"]["task_urgency"]
           user_id: string
         }
         Insert: {
@@ -494,12 +497,15 @@ export type Database = {
           deadline_set_at?: string | null
           deadline_type?: Database["public"]["Enums"]["task_deadline_type"]
           description?: string | null
+          effort?: Database["public"]["Enums"]["task_effort"]
           id?: string
+          importance?: Database["public"]["Enums"]["task_importance"]
           is_completed?: boolean
           project_id: string
           sort_order?: number
           title: string
           updated_at?: string
+          urgency?: Database["public"]["Enums"]["task_urgency"]
           user_id: string
         }
         Update: {
@@ -510,12 +516,15 @@ export type Database = {
           deadline_set_at?: string | null
           deadline_type?: Database["public"]["Enums"]["task_deadline_type"]
           description?: string | null
+          effort?: Database["public"]["Enums"]["task_effort"]
           id?: string
+          importance?: Database["public"]["Enums"]["task_importance"]
           is_completed?: boolean
           project_id?: string
           sort_order?: number
           title?: string
           updated_at?: string
+          urgency?: Database["public"]["Enums"]["task_urgency"]
           user_id?: string
         }
         Relationships: [
@@ -1408,6 +1417,9 @@ export type Database = {
         | "in_3_months"
         | "in_6_months"
         | "no_deadline"
+      task_effort: "quick_win" | "deep_work" | "unset"
+      task_importance: "important" | "not_important" | "unset"
+      task_urgency: "urgent" | "not_urgent" | "unset"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1575,6 +1587,9 @@ export const Constants = {
         "in_6_months",
         "no_deadline",
       ],
+      task_effort: ["quick_win", "deep_work", "unset"],
+      task_importance: ["important", "not_important", "unset"],
+      task_urgency: ["urgent", "not_urgent", "unset"],
     },
   },
 } as const

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   ArrowLeft, 
   Plus, 
@@ -18,9 +19,10 @@ import {
   AlertCircle,
   Archive,
   Trash2,
-  ArrowUpDown,
   User,
-  Calendar
+  Calendar,
+  LayoutGrid,
+  ListTodo
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -56,6 +58,7 @@ import { AddEntryForm } from '@/components/growth/AddEntryForm';
 import { EntryCard } from '@/components/growth/EntryCard';
 import { TaskExtractionDialog, type ExtractedTask, type TaskAmendment, type CompletedTaskSuggestion } from '@/components/growth/TaskExtractionDialog';
 import { DocumentRepository } from '@/components/growth/DocumentRepository';
+import { TodaysFocusView, MatrixView } from '@/components/growth/TaskListViews';
 
 const GrowthProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -67,7 +70,7 @@ const GrowthProjectDetail = () => {
   const [showAddTask, setShowAddTask] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [taskSort, setTaskSort] = useState<'default' | 'assignee' | 'deadline'>('default');
+  const [taskView, setTaskView] = useState<'focus' | 'matrix' | 'simple'>('focus');
   
   // Task extraction state
   const [extractedTasks, setExtractedTasks] = useState<ExtractedTask[]>([]);
@@ -76,27 +79,8 @@ const GrowthProjectDetail = () => {
   const [showTaskExtraction, setShowTaskExtraction] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
 
-  // Sort function for tasks
-  const sortTasks = (taskList: typeof tasks) => {
-    if (taskSort === 'assignee') {
-      return [...taskList].sort((a, b) => {
-        const aAssignee = a.assignee || 'zzz'; // Put unassigned at the end
-        const bAssignee = b.assignee || 'zzz';
-        return aAssignee.localeCompare(bAssignee);
-      });
-    }
-    if (taskSort === 'deadline') {
-      return [...taskList].sort((a, b) => {
-        const aDate = a.deadline_set_at ? calculateDueDate(new Date(a.deadline_set_at), a.deadline_type) : new Date(9999, 11, 31);
-        const bDate = b.deadline_set_at ? calculateDueDate(new Date(b.deadline_set_at), b.deadline_type) : new Date(9999, 11, 31);
-        return aDate.getTime() - bDate.getTime();
-      });
-    }
-    return taskList; // default order from DB
-  };
-
-  const pendingTasks = useMemo(() => sortTasks(tasks.filter(t => !t.is_completed)), [tasks, taskSort]);
-  const completedTasks = useMemo(() => sortTasks(tasks.filter(t => t.is_completed)), [tasks, taskSort]);
+  const pendingTasks = useMemo(() => tasks.filter(t => !t.is_completed), [tasks]);
+  const completedTasks = useMemo(() => tasks.filter(t => t.is_completed), [tasks]);
   
   // Find overdue tasks
   const now = new Date();
@@ -426,29 +410,24 @@ const GrowthProjectDetail = () => {
                   Tasks
                 </CardTitle>
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center border rounded-md">
-                    <Button 
-                      variant={taskSort === 'assignee' ? 'secondary' : 'ghost'} 
-                      size="sm" 
-                      className="h-8 px-2 rounded-r-none"
-                      onClick={() => setTaskSort(taskSort === 'assignee' ? 'default' : 'assignee')}
-                      title="Sort by assignee"
-                    >
-                      <User className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button 
-                      variant={taskSort === 'deadline' ? 'secondary' : 'ghost'} 
-                      size="sm" 
-                      className="h-8 px-2 rounded-l-none border-l"
-                      onClick={() => setTaskSort(taskSort === 'deadline' ? 'default' : 'deadline')}
-                      title="Sort by deadline"
-                    >
-                      <Calendar className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                  <Tabs value={taskView} onValueChange={(v) => setTaskView(v as typeof taskView)} className="h-8">
+                    <TabsList className="h-8">
+                      <TabsTrigger value="focus" className="h-7 px-2 text-xs gap-1">
+                        <ListTodo className="h-3.5 w-3.5" />
+                        Focus
+                      </TabsTrigger>
+                      <TabsTrigger value="matrix" className="h-7 px-2 text-xs gap-1">
+                        <LayoutGrid className="h-3.5 w-3.5" />
+                        Matrix
+                      </TabsTrigger>
+                      <TabsTrigger value="simple" className="h-7 px-2 text-xs">
+                        Simple
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                   <Button size="sm" onClick={() => setShowAddTask(!showAddTask)}>
                     <Plus className="h-4 w-4 mr-1" />
-                    Add Task
+                    Add
                   </Button>
                 </div>
               </div>
@@ -465,46 +444,68 @@ const GrowthProjectDetail = () => {
                 />
               )}
 
-              <div className="space-y-2">
-                {pendingTasks.filter(t => !overdueTasks.find(o => o.id === t.id)).map((task) => (
-                  <TaskItem
-                    key={task.id}
-                    task={task}
-                    onToggle={(notes) => updateTask.mutate({ id: task.id, is_completed: true, completion_notes: notes || null })}
-                    onUpdate={(updates) => updateTask.mutate({ id: task.id, ...updates })}
-                    onDelete={() => deleteTask.mutate(task.id)}
-                  />
-                ))}
-              </div>
-
-              {pendingTasks.length === 0 && !showAddTask && (
-                <p className="text-center text-muted-foreground py-4">No pending tasks</p>
+              {taskView === 'focus' && (
+                <TodaysFocusView
+                  tasks={tasks}
+                  onUpdateTask={(id, updates) => updateTask.mutate({ id, ...updates })}
+                  onDeleteTask={(id) => deleteTask.mutate(id)}
+                  onToggleComplete={(id, notes) => updateTask.mutate({ id, is_completed: true, completion_notes: notes || null })}
+                />
               )}
 
-              {completedTasks.length > 0 && (
+              {taskView === 'matrix' && (
+                <MatrixView
+                  tasks={tasks}
+                  onUpdateTask={(id, updates) => updateTask.mutate({ id, ...updates })}
+                  onDeleteTask={(id) => deleteTask.mutate(id)}
+                  onToggleComplete={(id, notes) => updateTask.mutate({ id, is_completed: true, completion_notes: notes || null })}
+                />
+              )}
+
+              {taskView === 'simple' && (
                 <>
-                  <Separator />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowCompleted(!showCompleted)}
-                    className="w-full justify-between"
-                  >
-                    <span>Completed ({completedTasks.length})</span>
-                    <ChevronDown className={`h-4 w-4 transition-transform ${showCompleted ? 'rotate-180' : ''}`} />
-                  </Button>
-                  {showCompleted && (
-                    <div className="space-y-2 opacity-60">
-                      {completedTasks.map((task) => (
-                        <TaskItem
-                          key={task.id}
-                          task={task}
-                          onToggle={() => updateTask.mutate({ id: task.id, is_completed: false, completed_at: null, completion_notes: null })}
-                          onUpdate={(updates) => updateTask.mutate({ id: task.id, ...updates })}
-                          onDelete={() => deleteTask.mutate(task.id)}
-                        />
-                      ))}
-                    </div>
+                  <div className="space-y-2">
+                    {pendingTasks.filter(t => !overdueTasks.find(o => o.id === t.id)).map((task) => (
+                      <TaskItem
+                        key={task.id}
+                        task={task}
+                        onToggle={(notes) => updateTask.mutate({ id: task.id, is_completed: true, completion_notes: notes || null })}
+                        onUpdate={(updates) => updateTask.mutate({ id: task.id, ...updates })}
+                        onDelete={() => deleteTask.mutate(task.id)}
+                      />
+                    ))}
+                  </div>
+
+                  {pendingTasks.length === 0 && !showAddTask && (
+                    <p className="text-center text-muted-foreground py-4">No pending tasks</p>
+                  )}
+
+                  {completedTasks.length > 0 && (
+                    <>
+                      <Separator />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowCompleted(!showCompleted)}
+                        className="w-full justify-between"
+                      >
+                        <span>Completed ({completedTasks.length})</span>
+                        <ChevronDown className={`h-4 w-4 transition-transform ${showCompleted ? 'rotate-180' : ''}`} />
+                      </Button>
+                      {showCompleted && (
+                        <div className="space-y-2 opacity-60">
+                          {completedTasks.map((task) => (
+                            <TaskItem
+                              key={task.id}
+                              task={task}
+                              onToggle={() => updateTask.mutate({ id: task.id, is_completed: false, completed_at: null, completion_notes: null })}
+                              onUpdate={(updates) => updateTask.mutate({ id: task.id, ...updates })}
+                              onDelete={() => deleteTask.mutate(task.id)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}

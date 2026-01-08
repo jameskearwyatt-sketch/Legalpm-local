@@ -33,6 +33,10 @@ export interface GrowthProjectEntry {
   updated_at: string;
 }
 
+export type TaskImportance = 'important' | 'not_important' | 'unset';
+export type TaskUrgency = 'urgent' | 'not_urgent' | 'unset';
+export type TaskEffort = 'quick_win' | 'deep_work' | 'unset';
+
 export interface GrowthTask {
   id: string;
   project_id: string;
@@ -46,6 +50,9 @@ export interface GrowthTask {
   completed_at: string | null;
   completion_notes: string | null;
   sort_order: number;
+  importance: TaskImportance;
+  urgency: TaskUrgency;
+  effort: TaskEffort;
   created_at: string;
   updated_at: string;
 }

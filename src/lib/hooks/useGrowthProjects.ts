@@ -406,6 +406,10 @@ export function useKnownAssignees() {
   return { assignees, addAssignee };
 }
 
+export interface TaskWithProject extends GrowthTask {
+  growth_projects: Pick<GrowthProject, 'name' | 'project_type'>;
+}
+
 export function useOverdueTasks() {
   const { user } = useAuth();
 
@@ -420,18 +424,59 @@ export function useOverdueTasks() {
       if (error) throw error;
       
       const now = new Date();
-      return (data || []).filter((task: GrowthTask & { growth_projects: GrowthProject }) => {
+      return (data || []).filter((task: TaskWithProject) => {
         if (!task.deadline_set_at) return false;
         const setAt = new Date(task.deadline_set_at);
         const dueDate = calculateDueDate(setAt, task.deadline_type);
         return dueDate < now;
-      });
+      }) as TaskWithProject[];
     },
     enabled: !!user,
     refetchInterval: 60000, // Refresh every minute
   });
 
   return { overdueTasks, overdueCount: overdueTasks.length };
+}
+
+export function useAllTasksByCategory() {
+  const { user } = useAuth();
+
+  const { data: allTasks = [], isLoading } = useQuery({
+    queryKey: ['all-growth-tasks'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('growth_tasks')
+        .select('*, growth_projects!inner(name, project_type)')
+        .eq('is_completed', false);
+      if (error) throw error;
+      return data as TaskWithProject[];
+    },
+    enabled: !!user,
+  });
+
+  const sortByUrgency = (tasks: TaskWithProject[]) => {
+    const now = new Date();
+    return [...tasks].sort((a, b) => {
+      const aDate = a.deadline_set_at ? calculateDueDate(new Date(a.deadline_set_at), a.deadline_type) : new Date(9999, 11, 31);
+      const bDate = b.deadline_set_at ? calculateDueDate(new Date(b.deadline_set_at), b.deadline_type) : new Date(9999, 11, 31);
+      return aDate.getTime() - bDate.getTime();
+    });
+  };
+
+  const getTasksForCategory = (projectType: GrowthProjectType) => {
+    const categoryTasks = allTasks.filter(t => t.growth_projects.project_type === projectType);
+    const myTasks = sortByUrgency(categoryTasks.filter(t => !t.assignee || t.assignee === 'Me'));
+    const othersTasks = sortByUrgency(categoryTasks.filter(t => t.assignee && t.assignee !== 'Me'));
+    return { myTasks, othersTasks };
+  };
+
+  return {
+    isLoading,
+    getTasksForCategory,
+    bdTasks: getTasksForCategory('business_development'),
+    pdTasks: getTasksForCategory('professional_development'),
+    ldTasks: getTasksForCategory('learning_development'),
+  };
 }
 
 export function calculateDueDate(setAt: Date, deadlineType: TaskDeadlineType): Date {

@@ -1534,21 +1534,19 @@ export function QuickToDoButton() {
     const isTriaged = isFullyTriaged(task);
 
     const handleRowMouseMove = (e: React.MouseEvent) => {
-      if (!rowRef.current) return;
+      if (!rowRef.current || triageExpanded) return; // Don't start new timer if already expanded
       const rect = rowRef.current.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const isLeftHalf = mouseX < rect.width / 2;
       
-      if (isLeftHalf && !triageExpanded && !triageTimeoutRef.current) {
+      if (isLeftHalf && !triageTimeoutRef.current) {
         triageTimeoutRef.current = setTimeout(() => {
           setTriageExpanded(true);
         }, 500); // 0.5 second delay
-      } else if (!isLeftHalf) {
-        if (triageTimeoutRef.current) {
-          clearTimeout(triageTimeoutRef.current);
-          triageTimeoutRef.current = null;
-        }
-        setTriageExpanded(false);
+      } else if (!isLeftHalf && triageTimeoutRef.current) {
+        // Only cancel pending timer if moving to right half before expansion
+        clearTimeout(triageTimeoutRef.current);
+        triageTimeoutRef.current = null;
       }
     };
 

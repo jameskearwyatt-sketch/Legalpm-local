@@ -110,8 +110,19 @@ Rules:
 - If "I" or "me" is mentioned, the assignee is "Me"
 - If no specific person is mentioned, leave assignee empty
 - Be thorough but don't invent tasks not implied by the content
-- Deadline types: this_week, next_week, this_month, next_month, in_3_months, in_6_months, no_deadline
 - Only mark tasks complete if there's clear evidence in the new entry
+
+DEADLINE GUIDANCE - Make intelligent guesses based on context:
+- If urgency words like "ASAP", "urgent", "immediately", "today" → this_week
+- If "soon", "this week" → this_week
+- If "next week" or implies ~7 days → next_week
+- If "end of month", "this month" → this_month
+- If "next month" or implies ~4-6 weeks → next_month
+- If "quarter", "Q1/Q2/etc", "few months" → in_3_months
+- If "later", "long term", "eventually" → in_6_months
+- If no time context but task seems routine/ongoing → this_month (default for actionable items)
+- If truly no deadline implied and low priority → no_deadline
+- Prefer to suggest a reasonable deadline rather than no_deadline - users can adjust
 
 Return your analysis using the analyze_tasks function.`;
 

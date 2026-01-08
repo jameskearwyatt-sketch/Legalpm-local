@@ -70,7 +70,7 @@ const GrowthProjectDetail = () => {
   const [showAddTask, setShowAddTask] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [taskView, setTaskView] = useState<'focus' | 'matrix' | 'simple'>('focus');
+  const [taskView, setTaskView] = useState<'focus' | 'matrix'>('focus');
   
   // Task extraction state
   const [extractedTasks, setExtractedTasks] = useState<ExtractedTask[]>([]);
@@ -420,9 +420,6 @@ const GrowthProjectDetail = () => {
                         <LayoutGrid className="h-3.5 w-3.5" />
                         Matrix
                       </TabsTrigger>
-                      <TabsTrigger value="simple" className="h-7 px-2 text-xs">
-                        Simple
-                      </TabsTrigger>
                     </TabsList>
                   </Tabs>
                   <Button size="sm" onClick={() => setShowAddTask(!showAddTask)}>
@@ -449,7 +446,17 @@ const GrowthProjectDetail = () => {
                   tasks={tasks}
                   onUpdateTask={(id, updates) => updateTask.mutate({ id, ...updates })}
                   onDeleteTask={(id) => deleteTask.mutate(id)}
-                  onToggleComplete={(id, notes) => updateTask.mutate({ id, is_completed: true, completion_notes: notes || null })}
+                  onToggleComplete={(id, notes) => {
+                    const task = tasks.find(t => t.id === id);
+                    if (task) {
+                      updateTask.mutate({ 
+                        id, 
+                        is_completed: !task.is_completed, 
+                        completed_at: !task.is_completed ? new Date().toISOString() : null,
+                        completion_notes: notes || null 
+                      });
+                    }
+                  }}
                 />
               )}
 
@@ -458,57 +465,20 @@ const GrowthProjectDetail = () => {
                   tasks={tasks}
                   onUpdateTask={(id, updates) => updateTask.mutate({ id, ...updates })}
                   onDeleteTask={(id) => deleteTask.mutate(id)}
-                  onToggleComplete={(id, notes) => updateTask.mutate({ id, is_completed: true, completion_notes: notes || null })}
+                  onToggleComplete={(id, notes) => {
+                    const task = tasks.find(t => t.id === id);
+                    if (task) {
+                      updateTask.mutate({ 
+                        id, 
+                        is_completed: !task.is_completed, 
+                        completed_at: !task.is_completed ? new Date().toISOString() : null,
+                        completion_notes: notes || null 
+                      });
+                    }
+                  }}
                 />
               )}
 
-              {taskView === 'simple' && (
-                <>
-                  <div className="space-y-2">
-                    {pendingTasks.filter(t => !overdueTasks.find(o => o.id === t.id)).map((task) => (
-                      <TaskItem
-                        key={task.id}
-                        task={task}
-                        onToggle={(notes) => updateTask.mutate({ id: task.id, is_completed: true, completion_notes: notes || null })}
-                        onUpdate={(updates) => updateTask.mutate({ id: task.id, ...updates })}
-                        onDelete={() => deleteTask.mutate(task.id)}
-                      />
-                    ))}
-                  </div>
-
-                  {pendingTasks.length === 0 && !showAddTask && (
-                    <p className="text-center text-muted-foreground py-4">No pending tasks</p>
-                  )}
-
-                  {completedTasks.length > 0 && (
-                    <>
-                      <Separator />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowCompleted(!showCompleted)}
-                        className="w-full justify-between"
-                      >
-                        <span>Completed ({completedTasks.length})</span>
-                        <ChevronDown className={`h-4 w-4 transition-transform ${showCompleted ? 'rotate-180' : ''}`} />
-                      </Button>
-                      {showCompleted && (
-                        <div className="space-y-2 opacity-60">
-                          {completedTasks.map((task) => (
-                            <TaskItem
-                              key={task.id}
-                              task={task}
-                              onToggle={() => updateTask.mutate({ id: task.id, is_completed: false, completed_at: null, completion_notes: null })}
-                              onUpdate={(updates) => updateTask.mutate({ id: task.id, ...updates })}
-                              onDelete={() => deleteTask.mutate(task.id)}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
             </CardContent>
           </Card>
 

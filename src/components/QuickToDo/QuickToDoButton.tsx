@@ -1090,10 +1090,9 @@ export function QuickToDoButton() {
     if (error) {
       toast.error('Failed to update task');
     } else {
-      // Invalidate all growth task queries to sync with Growth section
-      // Use predicate to match all growth-tasks queries regardless of projectId
+      // Force immediate refetch of all growth task queries to sync with Growth section
       await refetchGrowthTasks();
-      await queryClient.invalidateQueries({ 
+      await queryClient.refetchQueries({ 
         predicate: (query) => {
           const key = query.queryKey;
           return Array.isArray(key) && (
@@ -1102,8 +1101,7 @@ export function QuickToDoButton() {
             key[0] === 'overdue-tasks' ||
             key[0] === 'my-upcoming-growth-tasks'
           );
-        },
-        refetchType: 'all'
+        }
       });
     }
   };

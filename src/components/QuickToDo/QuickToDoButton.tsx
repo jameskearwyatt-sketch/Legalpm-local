@@ -699,12 +699,11 @@ export function QuickToDoButton() {
     return {
       position: 'fixed',
       left: sidebarWidth,
-      top: 80, // Top third positioning
+      top: 60,
       right: 'auto',
       bottom: 'auto',
       width: panelWidth,
-      maxHeight: `calc(100vh - 120px)`,
-      height: 700,
+      height: 'calc(100vh - 100px)',
     };
   };
 

@@ -149,7 +149,24 @@ interface TriagePillsProps {
 }
 
 const TriagePills = ({ task, onUpdate, compact = false, disabled = false, expandOnHover = false }: TriagePillsProps) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const iconSize = "h-3 w-3";
+  
+  const handleMouseEnter = () => {
+    if (!expandOnHover) return;
+    hoverTimeoutRef.current = setTimeout(() => {
+      setIsExpanded(true);
+    }, 1000); // 1 second delay
+  };
+  
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setIsExpanded(false);
+  };
   
   const handleUrgencyClick = (value: 'urgent' | 'not_urgent') => {
     if (disabled) return;
@@ -167,19 +184,26 @@ const TriagePills = ({ task, onUpdate, compact = false, disabled = false, expand
   };
 
   const pillBase = cn(
-    "inline-flex items-center rounded-full border transition-all duration-150 cursor-pointer active:scale-95 font-medium whitespace-nowrap",
+    "inline-flex items-center rounded-full border cursor-pointer active:scale-95 font-medium whitespace-nowrap",
     disabled && "opacity-50 cursor-not-allowed"
   );
 
-  const iconOnlyPill = cn(pillBase, "p-1");
-  const expandedPill = cn(pillBase, "gap-1 text-[11px] px-2 py-1");
+  const iconOnlyPill = cn(pillBase, "p-1 transition-all duration-200");
+  const expandedPill = cn(pillBase, "gap-1 text-[11px] px-2 py-1 transition-all duration-200");
 
-  // When expandOnHover is true, show icons only by default, expand on row hover
+  // When expandOnHover is true, show icons only by default, expand on row hover with delay
   if (expandOnHover) {
     return (
-      <div className="group/triage relative">
+      <div 
+        className="relative"
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
         {/* Collapsed state - icons only */}
-        <div className="flex gap-1 group-hover/triage:hidden">
+        <div className={cn(
+          "flex gap-1 transition-all duration-200",
+          isExpanded ? "opacity-0 absolute pointer-events-none scale-95" : "opacity-100"
+        )}>
           <div className="flex gap-0.5">
             <button
               type="button"
@@ -278,8 +302,11 @@ const TriagePills = ({ task, onUpdate, compact = false, disabled = false, expand
           </div>
         </div>
         
-        {/* Expanded state - full labels on hover */}
-        <div className="hidden group-hover/triage:flex flex-wrap gap-1">
+        {/* Expanded state - full labels after delay */}
+        <div className={cn(
+          "flex flex-wrap gap-1 transition-all duration-200",
+          isExpanded ? "opacity-100" : "opacity-0 absolute pointer-events-none scale-95"
+        )}>
           <div className="flex gap-0.5">
             <button
               type="button"
@@ -782,7 +809,7 @@ export function QuickToDoButton() {
       const newY = slateDragRef.current.startPosY + deltaY;
 
       // Constrain to viewport
-      const maxX = window.innerWidth - 448; // 28rem = 448px
+      const maxX = window.innerWidth - 512; // 32rem = 512px
       const maxY = window.innerHeight - 100;
       
       setSlatePosition({
@@ -2047,7 +2074,7 @@ export function QuickToDoButton() {
         <div
           ref={slateRef}
           className={cn(
-            "fixed z-50 w-[28rem] max-h-[70vh] rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
+            "fixed z-50 w-[32rem] max-h-[70vh] rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
             isDraggingSlate && "select-none"
           )}
           style={{

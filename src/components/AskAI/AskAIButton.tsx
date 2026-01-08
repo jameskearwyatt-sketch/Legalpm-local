@@ -455,10 +455,13 @@ export function AskAIButton() {
         </DialogContent>
       </Dialog>
 
-      {/* Floating Draggable Button */}
+      {/* Floating Draggable Button - Hidden on mobile when panel is open */}
       <div 
         ref={buttonRef}
-        className="z-50"
+        className={cn(
+          "z-50",
+          isOpen && "hidden sm:block" // Hide on mobile when panel is open (close button is in header)
+        )}
         style={isOpen ? getOpenButtonStyle() : getButtonStyle()}
       >
         <button
@@ -483,29 +486,44 @@ export function AskAIButton() {
         </button>
       </div>
 
-      {/* Chat Panel */}
+      {/* Chat Panel - Full screen on mobile */}
       {isOpen && (
         <div 
-          className="z-50 w-96 max-w-[calc(100vw-3rem)] rounded-xl border-0 shadow-2xl shadow-pink-500/20 overflow-hidden animate-scale-in"
-          style={getChatPanelStyle()}
+          className={cn(
+            "z-50 rounded-xl border-0 shadow-2xl shadow-pink-500/20 overflow-hidden animate-scale-in",
+            // Mobile: full screen
+            "fixed inset-2 sm:inset-auto",
+            // Desktop: fixed width and position
+            "sm:w-96 sm:max-w-[calc(100vw-3rem)]"
+          )}
+          style={window.innerWidth >= 640 ? getChatPanelStyle() : undefined}
         >
           {/* Header with gradient */}
           <div className="bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 px-4 py-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
-                <Sparkles className="h-5 w-5 text-white" />
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
+                  <Sparkles className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white">Ask AI</h3>
+                  <p className="text-xs text-white/80">
+                    Your intelligent legal assistant
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-bold text-white">Ask AI</h3>
-                <p className="text-xs text-white/80">
-                  Your intelligent legal assistant
-                </p>
-              </div>
+              {/* Close button visible on mobile */}
+              <button
+                onClick={() => setIsOpen(false)}
+                className="sm:hidden h-10 w-10 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
             </div>
           </div>
 
-          {/* Messages */}
-          <ScrollArea className="h-80 bg-card p-4">
+          {/* Messages - taller on mobile for better usability */}
+          <ScrollArea className="h-[calc(100vh-220px)] sm:h-80 bg-card p-4">
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center text-center text-muted-foreground">
                 <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-orange-500/10 via-pink-500/10 to-purple-600/10">
@@ -524,15 +542,15 @@ export function AskAIButton() {
                     className={cn(
                       "rounded-xl px-4 py-3 text-sm",
                       message.role === "user"
-                        ? "ml-8 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 text-white shadow-md"
-                        : "mr-8 bg-muted text-foreground border border-border"
+                        ? "ml-4 sm:ml-8 bg-gradient-to-r from-orange-500 via-pink-500 to-purple-600 text-white shadow-md"
+                        : "mr-4 sm:mr-8 bg-muted text-foreground border border-border"
                     )}
                   >
                     <p className="whitespace-pre-wrap">{message.content}</p>
                   </div>
                 ))}
                 {isLoading && (
-                  <div className="mr-8 flex items-center gap-2 rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground border border-border">
+                  <div className="mr-4 sm:mr-8 flex items-center gap-2 rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground border border-border">
                     <Loader2 className="h-4 w-4 animate-spin text-pink-500" />
                     <span className="bg-gradient-to-r from-orange-500 to-pink-500 bg-clip-text text-transparent font-medium">
                       Thinking...

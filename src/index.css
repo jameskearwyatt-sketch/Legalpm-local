@@ -256,3 +256,91 @@
     @apply bg-muted text-muted-foreground border-border;
   }
 }
+
+/* ==========================================
+   MOBILE RESPONSIVE GLOBAL FIXES
+   ========================================== */
+
+/* Make all tables scroll horizontally on mobile */
+@media (max-width: 767px) {
+  /* Tables should scroll, not overflow */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Reduce padding on mobile */
+  .p-6 {
+    padding: 1rem !important;
+  }
+  
+  .p-8 {
+    padding: 1rem !important;
+  }
+  
+  .lg\:p-8 {
+    padding: 1rem !important;
+  }
+  
+  /* Make cards stack better */
+  .grid {
+    gap: 0.75rem;
+  }
+  
+  /* Hide less important columns on mobile */
+  .hide-on-mobile {
+    display: none !important;
+  }
+  
+  /* Force single column on very small screens */
+  .grid-cols-2,
+  .grid-cols-3,
+  .grid-cols-4,
+  .grid-cols-5,
+  .grid-cols-6 {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+  }
+  
+  @media (min-width: 400px) {
+    .grid-cols-2,
+    .sm\:grid-cols-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+  }
+  
+  /* Make buttons more touch-friendly */
+  button, .btn {
+    min-height: 44px;
+  }
+  
+  /* Reduce font sizes slightly */
+  h1 {
+    font-size: 1.5rem !important;
+  }
+  
+  h2 {
+    font-size: 1.25rem !important;
+  }
+  
+  /* Fix sticky headers for mobile */
+  .sticky {
+    position: relative !important;
+  }
+  
+  /* Make inputs full width */
+  input, select, textarea {
+    max-width: 100%;
+  }
+}
+
+/* Tablet improvements (768px - 1023px) */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .lg\:grid-cols-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+  
+  .xl\:grid-cols-6 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}

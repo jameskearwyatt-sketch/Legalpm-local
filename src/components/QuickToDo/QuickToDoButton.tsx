@@ -829,6 +829,21 @@ export function QuickToDoButton() {
   };
 
   const getPanelStyle = (): React.CSSProperties => {
+    const isMobile = window.innerWidth < 768;
+    
+    // Mobile: full screen with small margins
+    if (isMobile) {
+      return {
+        position: 'fixed',
+        left: 8,
+        right: 8,
+        top: 8,
+        bottom: 8,
+        width: 'auto',
+        height: 'auto',
+      };
+    }
+    
     const margin = isExpanded ? 24 : 12;
     // Get sidebar width (typically 256px when expanded, ~56px when collapsed)
     const sidebarWidth = 256;
@@ -1371,9 +1386,10 @@ export function QuickToDoButton() {
                 </div>
               </div>
               <div className="flex items-center gap-1" onPointerDown={(e) => e.stopPropagation()}>
+                {/* Hide expand button on mobile - already full screen */}
                 <button
                   onClick={() => setIsExpanded(!isExpanded)}
-                  className="h-7 w-7 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+                  className="hidden sm:flex h-7 w-7 items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
                   title={isExpanded ? "Collapse" : "Expand"}
                 >
                   {isExpanded ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}

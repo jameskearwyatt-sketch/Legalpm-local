@@ -192,7 +192,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       {/* Main content */}
       <main className="lg:pl-64">
-        <div className="min-h-[calc(100vh-4rem)] lg:min-h-screen">
+        <div className="min-h-[calc(100vh-4rem)] lg:min-h-screen px-2 sm:px-4 lg:px-0">
           {children}
         </div>
       </main>

@@ -219,7 +219,7 @@ const GrowthProjectDetail = () => {
         }
         await addTask.mutateAsync({
           title: task.title,
-          assignee: task.assignee === 'Me' ? undefined : task.assignee,
+          assignee: task.assignee || undefined,
           deadline_type: task.deadline_type,
         });
         addedCount++;
@@ -235,7 +235,7 @@ const GrowthProjectDetail = () => {
         const updates: Record<string, unknown> = {};
         if (amendment.suggested_title) updates.title = amendment.suggested_title;
         if (amendment.suggested_assignee) {
-          updates.assignee = amendment.suggested_assignee === 'Me' ? undefined : amendment.suggested_assignee;
+          updates.assignee = amendment.suggested_assignee || undefined;
           if (amendment.suggested_assignee !== 'Me') {
             addAssignee.mutate(amendment.suggested_assignee);
           }

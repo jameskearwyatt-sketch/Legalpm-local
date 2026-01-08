@@ -108,21 +108,17 @@ export const DocumentRepository = ({
           continue;
         }
 
-        const { data: urlData } = supabase.storage
-          .from('growth-files')
-          .getPublicUrl(filePath);
-
         // For multiple files, use individual file names as titles
         const docTitle = files.length === 1 && title.trim() ? title.trim() : file.name;
 
-        // Insert document record
+        // Insert document record with the file path (not public URL since bucket is private)
         const { data: docData, error: insertError } = await supabase
           .from('growth_project_documents')
           .insert({
             project_id: projectId,
             user_id: user.id,
             title: docTitle,
-            file_url: urlData.publicUrl,
+            file_url: filePath, // Store the path, not public URL
             file_name: file.name,
             file_type: file.type,
           })
@@ -134,7 +130,12 @@ export const DocumentRepository = ({
           continue;
         }
 
-        uploadedDocs.push({ id: docData.id, url: urlData.publicUrl, name: file.name });
+        // Generate a signed URL for immediate use
+        const { data: signedData } = await supabase.storage
+          .from('growth-files')
+          .createSignedUrl(filePath, 3600); // 1 hour expiry
+
+        uploadedDocs.push({ id: docData.id, url: signedData?.signedUrl || filePath, name: file.name });
       }
 
       onDocumentAdded();
@@ -160,12 +161,32 @@ export const DocumentRepository = ({
     }
   };
 
+  // Helper to get a signed URL for a file path
+  const getSignedUrl = async (filePath: string): Promise<string | null> => {
+    // If it's already a full URL (legacy), return as-is
+    if (filePath.startsWith('http')) {
+      return filePath;
+    }
+    const { data } = await supabase.storage
+      .from('growth-files')
+      .createSignedUrl(filePath, 3600); // 1 hour expiry
+    return data?.signedUrl || null;
+  };
+
   const handleGenerateSummary = async (docId: string, docUrl: string, docName: string) => {
     setSummarizingId(docId);
     try {
+      // Get a signed URL if needed
+      const signedUrl = await getSignedUrl(docUrl);
+      if (!signedUrl) {
+        toast.error('Failed to access document');
+        setSummarizingId(null);
+        return;
+      }
+
       const { data, error } = await supabase.functions.invoke('summarize-document', {
         body: {
-          documentUrl: docUrl,
+          documentUrl: signedUrl,
           fileName: docName,
           projectName,
           projectType,
@@ -315,7 +336,14 @@ export const DocumentRepository = ({
                       variant="ghost"
                       size="icon"
                       className="h-8 w-8"
-                      onClick={() => handleGenerateSummary(doc.id, doc.file_url, doc.file_name)}
+                      onClick={async () => {
+                        const signedUrl = await getSignedUrl(doc.file_url);
+                        if (signedUrl) {
+                          handleGenerateSummary(doc.id, signedUrl, doc.file_name);
+                        } else {
+                          toast.error('Failed to access document');
+                        }
+                      }}
                       disabled={summarizingId === doc.id}
                       title="Generate AI Summary"
                     >
@@ -332,7 +360,14 @@ export const DocumentRepository = ({
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    onClick={() => window.open(doc.file_url, '_blank')}
+                    onClick={async () => {
+                      const signedUrl = await getSignedUrl(doc.file_url);
+                      if (signedUrl) {
+                        window.open(signedUrl, '_blank');
+                      } else {
+                        toast.error('Failed to access document');
+                      }
+                    }}
                     title="Open Document"
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -454,9 +489,14 @@ export const DocumentRepository = ({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
+              onClick={async () => {
                 if (viewingSummary) {
-                  handleGenerateSummary(viewingSummary.id, viewingSummary.file_url, viewingSummary.file_name);
+                  const signedUrl = await getSignedUrl(viewingSummary.file_url);
+                  if (signedUrl) {
+                    handleGenerateSummary(viewingSummary.id, signedUrl, viewingSummary.file_name);
+                  } else {
+                    toast.error('Failed to access document');
+                  }
                   setViewingSummary(null);
                 }
               }}

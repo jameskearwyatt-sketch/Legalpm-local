@@ -1637,13 +1637,6 @@ export function QuickToDoButton() {
             )}
           </div>
           
-          {isTriaged && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 h-5 bg-green-50 text-green-600 border-green-200 dark:bg-green-950/30 shrink-0">
-              <Check className="h-2.5 w-2.5 mr-0.5" />
-              Done
-            </Badge>
-          )}
-          
           {/* Slate button - for all tasks */}
           <div className="flex items-center gap-1 shrink-0">
             <Button
@@ -2365,6 +2358,11 @@ export function QuickToDoButton() {
                 >
                   <Filter className="h-2.5 w-2.5" />
                   Untriaged
+                  {untriagedCount > 0 && (
+                    <span className="flex min-w-4 h-4 px-0.5 items-center justify-center rounded-full bg-purple-500 text-[10px] font-bold text-white">
+                      {untriagedCount}
+                    </span>
+                  )}
                 </button>
               </div>
             )}

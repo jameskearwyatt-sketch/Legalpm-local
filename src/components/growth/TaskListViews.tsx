@@ -90,6 +90,11 @@ const TaskRow = ({
   const [editingAssignee, setEditingAssignee] = useState(task.assignee || '');
   const inputRef = useRef<HTMLInputElement>(null);
   
+  // Hover-controlled triage expansion
+  const [triageExpanded, setTriageExpanded] = useState(false);
+  const triageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
+  
   // Pending triage state - track changes before confirmation
   const [pendingTriage, setPendingTriage] = useState<{
     urgency?: TaskUrgency;
@@ -104,6 +109,31 @@ const TaskRow = ({
   
   const isTriaged = isFullyTriaged(displayUrgency, displayImportance, displayEffort);
   const hasPendingChanges = pendingTriage !== null;
+
+  const handleRowMouseMove = (e: React.MouseEvent) => {
+    if (!rowRef.current || triageExpanded) return; // Don't start new timer if already expanded
+    const rect = rowRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const isLeftHalf = mouseX < rect.width / 2;
+    
+    if (isLeftHalf && !triageTimeoutRef.current) {
+      triageTimeoutRef.current = setTimeout(() => {
+        setTriageExpanded(true);
+      }, 500); // 0.5 second delay
+    } else if (!isLeftHalf && triageTimeoutRef.current) {
+      // Only cancel pending timer if moving to right half before expansion
+      clearTimeout(triageTimeoutRef.current);
+      triageTimeoutRef.current = null;
+    }
+  };
+
+  const handleRowMouseLeave = () => {
+    if (triageTimeoutRef.current) {
+      clearTimeout(triageTimeoutRef.current);
+      triageTimeoutRef.current = null;
+    }
+    setTriageExpanded(false);
+  };
 
   useEffect(() => {
     if (assigneeOpen) {
@@ -172,6 +202,9 @@ const TaskRow = ({
 
   return (
     <div 
+      ref={rowRef}
+      onMouseMove={handleRowMouseMove}
+      onMouseLeave={handleRowMouseLeave}
       className={cn(
         "flex items-start gap-2 p-2 rounded-lg border transition-all group",
         task.is_completed ? 'bg-muted/30 opacity-60' : 'bg-background',
@@ -211,12 +244,6 @@ const TaskRow = ({
           )}>
             {task.title}
           </span>
-          {isTriaged && !task.is_completed && (
-            <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 bg-green-50 text-green-600 border-green-200">
-              <Check className="h-2.5 w-2.5 mr-0.5" />
-              Triaged
-            </Badge>
-          )}
         </div>
         
         <div className="flex items-center gap-2 flex-wrap">
@@ -230,6 +257,8 @@ const TaskRow = ({
             triageMode={triageMode}
             disabled={task.is_completed}
             compact={compact}
+            expandOnHover
+            forceExpanded={triageExpanded}
           />
           
           {/* Show indicator when triage is in progress */}

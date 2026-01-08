@@ -290,10 +290,10 @@ export function WipHistoryModal({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <History className="h-5 w-5" />
-            WIP Update History
+            Budget Utilisation History
           </DialogTitle>
           <DialogDescription>
-            View and manage detailed WIP updates for this matter
+            View and manage budget utilisation updates for this matter
           </DialogDescription>
         </DialogHeader>
 
@@ -304,9 +304,9 @@ export function WipHistoryModal({
         ) : wipUpdates.length === 0 ? (
           <div className="text-center py-12">
             <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">No WIP updates recorded yet</p>
+            <p className="text-muted-foreground">No budget utilisation updates recorded yet</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Use the "Detailed WIP Update" button to create your first update
+              Use the "Detailed Budget Utilisation Update" button to create your first update
             </p>
           </div>
         ) : (

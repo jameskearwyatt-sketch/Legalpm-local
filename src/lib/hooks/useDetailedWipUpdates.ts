@@ -183,7 +183,7 @@ export function useDetailedWipUpdates(matterId?: string) {
       queryClient.invalidateQueries({ queryKey: ['matters'] });
       queryClient.invalidateQueries({ queryKey: ['matter', variables.matterId] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast({ title: 'Detailed WIP update saved successfully' });
+      toast({ title: 'Budget utilisation update saved successfully' });
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to save WIP update', description: error.message, variant: 'destructive' });

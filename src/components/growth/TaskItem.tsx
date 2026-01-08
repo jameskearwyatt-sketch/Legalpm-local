@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Clock, Trash2, User, MessageSquare } from 'lucide-react';
+import { Clock, Trash2, User, MessageSquare, Pencil } from 'lucide-react';
 import { 
   type GrowthTask, 
   type TaskDeadlineType, 
@@ -61,25 +61,25 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
   const titleInputRef = useRef<HTMLInputElement>(null);
   const notesInputRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleCheckboxChange = () => {
-    if (!task.is_completed) {
-      // Completing a task - show dialog for notes
-      setCompletionNotes('');
-      setShowCompleteDialog(true);
-    } else {
+  // Quick complete (no notes)
+  const handleQuickComplete = () => {
+    if (task.is_completed) {
       // Uncompleting - just toggle
+      onToggle();
+    } else {
+      // Complete without notes
       onToggle();
     }
   };
 
-  const handleConfirmComplete = () => {
-    onToggle(completionNotes || undefined);
-    setShowCompleteDialog(false);
+  // Complete with notes
+  const handleCompleteWithNotes = () => {
     setCompletionNotes('');
+    setShowCompleteDialog(true);
   };
 
-  const handleSkipNotes = () => {
-    onToggle();
+  const handleConfirmComplete = () => {
+    onToggle(completionNotes || undefined);
     setShowCompleteDialog(false);
     setCompletionNotes('');
   };
@@ -169,11 +169,24 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
       task.is_completed ? 'bg-muted/30' : 'bg-background',
       isOverdue && !task.is_completed && 'border-destructive/50'
     )}>
-      <Checkbox
-        checked={task.is_completed}
-        onCheckedChange={handleCheckboxChange}
-        className="mt-1"
-      />
+      {/* Two completion options for pending tasks, single checkbox for completed */}
+      <div className="flex items-center gap-1 mt-1">
+        <Checkbox
+          checked={task.is_completed}
+          onCheckedChange={handleQuickComplete}
+          title={task.is_completed ? "Mark incomplete" : "Quick complete"}
+        />
+        {!task.is_completed && (
+          <button
+            type="button"
+            onClick={handleCompleteWithNotes}
+            className="h-4 w-4 rounded border border-input flex items-center justify-center hover:bg-accent hover:border-primary transition-colors"
+            title="Complete with notes"
+          >
+            <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+          </button>
+        )}
+      </div>
       
       <div className="flex-1 min-w-0">
         {isEditingTitle ? (
@@ -371,11 +384,11 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={handleSkipNotes}>
-              Skip
+            <Button variant="outline" onClick={() => setShowCompleteDialog(false)}>
+              Cancel
             </Button>
             <Button onClick={handleConfirmComplete}>
-              Complete
+              Complete with Notes
             </Button>
           </DialogFooter>
         </DialogContent>

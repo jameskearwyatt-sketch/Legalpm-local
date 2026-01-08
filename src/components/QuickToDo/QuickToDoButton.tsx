@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { CheckSquare, X, Plus, Trash2, Flame, ArrowRight, Clock, User } from "lucide-react";
+import { CheckSquare, X, Plus, Trash2, Flame, ArrowRight, Clock, User, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -156,6 +156,23 @@ export function QuickToDoButton() {
       .from('quick_tasks')
       .update({ is_urgent: !task.is_urgent })
       .eq('id', task.id);
+
+    if (error) {
+      toast.error('Failed to update task');
+      console.error('Error updating task:', error);
+    } else {
+      fetchTasks();
+    }
+  };
+
+  const updateTaskTitle = async (taskId: string, newTitle: string) => {
+    const trimmed = newTitle.trim();
+    if (!trimmed) return;
+
+    const { error } = await supabase
+      .from('quick_tasks')
+      .update({ title: trimmed })
+      .eq('id', taskId);
 
     if (error) {
       toast.error('Failed to update task');
@@ -359,50 +376,101 @@ export function QuickToDoButton() {
   // Active growth projects for the move dialog
   const activeProjects = projects?.filter(p => p.status === 'active') || [];
 
-  const TaskRow = ({ task, isUrgentSection }: { task: QuickTask; isUrgentSection?: boolean }) => (
-    <div
-      className={cn(
-        "flex items-center gap-2 p-2 rounded-lg group",
-        isUrgentSection ? "bg-red-500/10 border border-red-500/20" : "bg-muted/50"
-      )}
-    >
-      <Checkbox
-        checked={task.is_completed}
-        onCheckedChange={() => toggleTask(task)}
-      />
-      <span className={cn("flex-1 text-sm", isUrgentSection && "text-red-600 dark:text-red-400 font-medium")}>
-        {task.title}
-      </span>
-      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={() => toggleUrgent(task)}
-          title={task.is_urgent ? "Remove from urgent" : "Mark as urgent"}
-        >
-          <Flame className={cn("h-3 w-3", task.is_urgent ? "text-red-500" : "text-muted-foreground")} />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={() => openMoveDialog(task)}
-          title="Move to Growth project"
-        >
-          <ArrowRight className="h-3 w-3 text-muted-foreground" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6"
-          onClick={() => deleteTask(task.id)}
-        >
-          <Trash2 className="h-3 w-3 text-muted-foreground" />
-        </Button>
+  const TaskRow = ({ task, isUrgentSection }: { task: QuickTask; isUrgentSection?: boolean }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [editedTitle, setEditedTitle] = useState(task.title);
+    const editInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+      if (isEditing) {
+        setEditedTitle(task.title);
+        setTimeout(() => {
+          editInputRef.current?.focus();
+          editInputRef.current?.select();
+        }, 0);
+      }
+    }, [isEditing, task.title]);
+
+    const handleSave = () => {
+      if (editedTitle.trim() && editedTitle.trim() !== task.title) {
+        updateTaskTitle(task.id, editedTitle);
+      }
+      setIsEditing(false);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleSave();
+      } else if (e.key === 'Escape') {
+        setEditedTitle(task.title);
+        setIsEditing(false);
+      }
+    };
+
+    return (
+      <div
+        className={cn(
+          "flex items-center gap-2 p-2 rounded-lg group",
+          isUrgentSection ? "bg-red-500/10 border border-red-500/20" : "bg-muted/50"
+        )}
+      >
+        <Checkbox
+          checked={task.is_completed}
+          onCheckedChange={() => toggleTask(task)}
+        />
+        {isEditing ? (
+          <Input
+            ref={editInputRef}
+            value={editedTitle}
+            onChange={(e) => setEditedTitle(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={handleKeyDown}
+            className="flex-1 h-7 text-sm"
+          />
+        ) : (
+          <span 
+            className={cn(
+              "flex-1 text-sm cursor-pointer hover:bg-background/50 rounded px-1 -mx-1",
+              isUrgentSection && "text-red-600 dark:text-red-400 font-medium"
+            )}
+            onClick={() => setIsEditing(true)}
+            title="Click to edit"
+          >
+            {task.title}
+          </span>
+        )}
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => toggleUrgent(task)}
+            title={task.is_urgent ? "Remove from urgent" : "Mark as urgent"}
+          >
+            <Flame className={cn("h-3 w-3", task.is_urgent ? "text-red-500" : "text-muted-foreground")} />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => openMoveDialog(task)}
+            title="Move to Growth project"
+          >
+            <ArrowRight className="h-3 w-3 text-muted-foreground" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6"
+            onClick={() => deleteTask(task.id)}
+          >
+            <Trash2 className="h-3 w-3 text-muted-foreground" />
+          </Button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <>

@@ -250,7 +250,7 @@ export function QuickToDoButton() {
   const [isLoading, setIsLoading] = useState(false);
 
   // View state
-  const [viewMode, setViewMode] = useState<'focus' | 'matrix' | 'simple'>('focus');
+  const [viewMode, setViewMode] = useState<'focus' | 'matrix'>('focus');
   const [triageMode, setTriageMode] = useState(false);
   const [autoAdvance, setAutoAdvance] = useState(true);
   const [showUntriagedOnly, setShowUntriagedOnly] = useState(false);
@@ -271,6 +271,7 @@ export function QuickToDoButton() {
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   // Load saved position on mount
   useEffect(() => {
@@ -646,11 +647,9 @@ export function QuickToDoButton() {
     setSelectedTasks(new Set());
   };
 
-  // Handle pointer events for dragging
+  // Handle pointer events for dragging (works for both button and panel header)
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (isOpen) return;
-
-    const rect = buttonRef.current?.getBoundingClientRect();
+    const rect = isOpen ? panelRef.current?.getBoundingClientRect() : buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
 
     dragRef.current = {
@@ -675,9 +674,9 @@ export function QuickToDoButton() {
     }
 
     if (isDragging || Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
-      const buttonSize = 56;
-      const newX = Math.min(Math.max(0, dragRef.current.startPosX + deltaX), window.innerWidth - buttonSize);
-      const newY = Math.min(Math.max(0, dragRef.current.startPosY + deltaY), window.innerHeight - buttonSize);
+      const elementSize = isOpen ? 400 : 56; // Panel width or button size
+      const newX = Math.min(Math.max(0, dragRef.current.startPosX + deltaX), window.innerWidth - elementSize);
+      const newY = Math.min(Math.max(0, dragRef.current.startPosY + deltaY), window.innerHeight - 100);
       setPosition({ x: newX, y: newY });
     }
   };
@@ -688,14 +687,32 @@ export function QuickToDoButton() {
     setIsDragging(false);
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
 
-    if (!wasDragging) {
-      if (isOpen) {
-        setIsOpen(false);
-        setIsExpanded(false);
-      } else {
-        setIsOpen(true);
-      }
+    // Only toggle open/close if not dragging AND clicking the button (not panel header)
+    if (!wasDragging && !isOpen) {
+      setIsOpen(true);
     }
+  };
+
+  // Panel header drag - only drags, doesn't toggle
+  const handlePanelHeaderPointerDown = (e: React.PointerEvent) => {
+    const rect = panelRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startPosX: position?.x ?? rect.left,
+      startPosY: position?.y ?? rect.top,
+    };
+
+    setIsDragging(false);
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  const handlePanelHeaderPointerUp = (e: React.PointerEvent) => {
+    dragRef.current = null;
+    setIsDragging(false);
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
   };
 
   const getButtonStyle = (): React.CSSProperties => {
@@ -1056,41 +1073,6 @@ export function QuickToDoButton() {
     );
   };
 
-  // Render Simple View (original style)
-  const renderSimpleView = () => (
-    <div className="space-y-1">
-      {pendingTasks.map(task => (
-        <TaskRow key={task.id} task={task} />
-      ))}
-      
-      {completedTasks.length > 0 && (
-        <>
-          <div className="text-xs text-muted-foreground pt-2 pb-1 font-medium">
-            Completed ({completedTasks.length})
-          </div>
-          {completedUnifiedTasks.map(task => (
-            <div key={task.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 group">
-              <Checkbox
-                checked={task.is_completed}
-                onCheckedChange={() => toggleTask(task)}
-              />
-              <span className="flex-1 text-sm text-muted-foreground line-through truncate">
-                {task.title}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-5 w-5 opacity-0 group-hover:opacity-100"
-                onClick={() => deleteTask(task.id)}
-              >
-                <Trash2 className="h-3 w-3 text-muted-foreground" />
-              </Button>
-            </div>
-          ))}
-        </>
-      )}
-    </div>
-  );
 
   return (
     <>
@@ -1253,13 +1235,22 @@ export function QuickToDoButton() {
       {/* Task Panel */}
       {isOpen && (
         <div
+          ref={panelRef}
           className={cn(
             "z-50 rounded-xl border-0 shadow-2xl shadow-teal-500/20 overflow-hidden animate-scale-in bg-background transition-all duration-300 flex flex-col"
           )}
           style={getPanelStyle()}
         >
-          {/* Header */}
-          <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 px-4 py-3">
+          {/* Header - Draggable */}
+          <div 
+            className={cn(
+              "bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-600 px-4 py-3 touch-none select-none",
+              isDragging ? "cursor-grabbing" : "cursor-grab"
+            )}
+            onPointerDown={handlePanelHeaderPointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePanelHeaderPointerUp}
+          >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 backdrop-blur-sm">
@@ -1273,7 +1264,7 @@ export function QuickToDoButton() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1" onPointerDown={(e) => e.stopPropagation()}>
                 <button
                   onClick={() => setIsExpanded(!isExpanded)}
                   className="h-7 w-7 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
@@ -1307,9 +1298,6 @@ export function QuickToDoButton() {
                   <TabsTrigger value="matrix" className="h-6 text-[10px] flex-1 gap-1">
                     <LayoutGrid className="h-3 w-3" />
                     Matrix
-                  </TabsTrigger>
-                  <TabsTrigger value="simple" className="h-6 text-[10px] flex-1">
-                    Simple
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -1441,7 +1429,6 @@ export function QuickToDoButton() {
               )}
 
               {viewMode === 'matrix' && renderMatrixView()}
-              {viewMode === 'simple' && renderSimpleView()}
             </div>
           </ScrollArea>
         </div>

@@ -533,23 +533,27 @@ export function calculateDueDate(setAt: Date, deadlineType: TaskDeadlineType): D
   const date = new Date(setAt);
   switch (deadlineType) {
     case 'this_week':
-      // End of current week (Sunday)
-      const dayOfWeek = date.getDay();
-      date.setDate(date.getDate() + (7 - dayOfWeek));
+      // 7 days from set date
+      date.setDate(date.getDate() + 7);
       break;
     case 'next_week':
-      date.setDate(date.getDate() + 14 - date.getDay());
+      // 14 days from set date (2 weeks)
+      date.setDate(date.getDate() + 14);
       break;
     case 'this_month':
-      date.setMonth(date.getMonth() + 1, 0); // Last day of current month
+      // 1 month from set date
+      date.setMonth(date.getMonth() + 1);
       break;
     case 'next_month':
-      date.setMonth(date.getMonth() + 2, 0);
+      // 2 months from set date
+      date.setMonth(date.getMonth() + 2);
       break;
     case 'in_3_months':
+      // 3 months from set date
       date.setMonth(date.getMonth() + 3);
       break;
     case 'in_6_months':
+      // 6 months from set date
       date.setMonth(date.getMonth() + 6);
       break;
     default:

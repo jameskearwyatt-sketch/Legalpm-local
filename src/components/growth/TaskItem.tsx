@@ -24,7 +24,7 @@ import {
   useKnownAssignees,
   calculateDueDate
 } from '@/lib/hooks/useGrowthProjects';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { getDeadlineTextColor, getDeadlineBadgeColor } from '@/lib/deadlineColors';
 
@@ -199,17 +199,23 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
             className="h-7 text-sm font-medium"
           />
         ) : (
-          <p 
-            className={cn(
-              "text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1",
-              titleColor,
-              task.is_completed && 'line-through'
+          <div className="flex items-center gap-2">
+            <p 
+              className={cn(
+                "text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1",
+                titleColor
+              )}
+              onClick={() => setIsEditingTitle(true)}
+              title="Click to edit"
+            >
+              {task.title}
+            </p>
+            {task.is_completed && task.completed_at && (
+              <span className="text-[10px] text-muted-foreground">
+                {format(new Date(task.completed_at), 'MMM d')}
+              </span>
             )}
-            onClick={() => setIsEditingTitle(true)}
-            title="Click to edit"
-          >
-            {task.title}
-          </p>
+          </div>
         )}
         
         <div className="flex flex-wrap items-center gap-2 mt-2">

@@ -5,7 +5,7 @@ import {
   ListTodo, LayoutGrid, Filter, Check, ChevronDown, ChevronRight,
   Zap, Target, CalendarClock, Feather, Flame
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, format } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -55,6 +55,7 @@ interface QuickTask {
   urgency: TaskUrgency;
   effort: TaskEffort;
   created_at: string;
+  completed_at: string | null;
 }
 
 // Unified task type for display - can be a QuickTask or a Growth Task
@@ -66,6 +67,7 @@ interface UnifiedTask {
   urgency: TaskUrgency;
   effort: TaskEffort;
   created_at: string;
+  completed_at?: string | null;
   // Growth task specific
   source: 'quick' | 'growth';
   projectName?: string;
@@ -335,6 +337,7 @@ export function QuickToDoButton() {
       urgency: t.urgency || 'unset',
       effort: t.effort || 'unset',
       created_at: t.created_at,
+      completed_at: t.completed_at || null,
     }));
 
     setTasks(mappedTasks);
@@ -451,6 +454,7 @@ export function QuickToDoButton() {
       urgency: task.urgency,
       effort: task.effort,
       created_at: task.created_at,
+      completed_at: task.completed_at || null,
     };
     setTaskToMove(quickTask);
     setSelectedProject("");
@@ -516,6 +520,7 @@ export function QuickToDoButton() {
       urgency: gt.urgency,
       effort: gt.effort,
       created_at: gt.created_at,
+      completed_at: gt.completed_at,
       source: 'growth' as const,
       projectName: gt.growth_projects.name,
       projectId: gt.project_id,
@@ -1266,7 +1271,12 @@ export function QuickToDoButton() {
                             onCheckedChange={() => toggleTask(task)}
                             className="h-3.5 w-3.5"
                           />
-                          <span className="flex-1 text-muted-foreground line-through truncate">{task.title}</span>
+                          <span className="flex-1 text-muted-foreground truncate">{task.title}</span>
+                          {task.completed_at && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              {format(new Date(task.completed_at), 'MMM d')}
+                            </span>
+                          )}
                           <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => deleteTask(task.id)}>
                             <Trash2 className="h-3 w-3" />
                           </Button>

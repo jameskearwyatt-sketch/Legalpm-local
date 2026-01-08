@@ -657,8 +657,8 @@ export function QuickToDoButton() {
           {isOpen ? <X className="h-6 w-6" /> : <CheckSquare className="h-6 w-6" />}
           {/* Badge for incomplete tasks */}
           {!isOpen && incompleteTasks.length > 0 && (
-            <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-              {incompleteTasks.length > 9 ? '9+' : incompleteTasks.length}
+            <span className="absolute -top-1 -right-1 flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+              {incompleteTasks.length}
             </span>
           )}
         </button>

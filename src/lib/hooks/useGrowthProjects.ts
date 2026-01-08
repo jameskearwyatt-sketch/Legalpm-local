@@ -297,13 +297,22 @@ export function useGrowthProject(projectId?: string) {
   });
 
   const updateTask = useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<GrowthTask> & { id: string }) => {
+    mutationFn: async ({ id, currentDeadlineSetAt, ...updates }: Partial<GrowthTask> & { id: string; currentDeadlineSetAt?: string | null }) => {
       const updateData: Record<string, unknown> = { ...updates };
       if (updates.is_completed === true) {
         updateData.completed_at = new Date().toISOString();
       }
-      if (updates.deadline_type && updates.deadline_type !== 'no_deadline') {
-        updateData.deadline_set_at = new Date().toISOString();
+      // Only reset deadline_set_at if:
+      // 1. Changing TO a deadline from no_deadline (no existing deadline_set_at)
+      // 2. Or explicitly clearing the deadline
+      if (updates.deadline_type !== undefined) {
+        if (updates.deadline_type === 'no_deadline') {
+          updateData.deadline_set_at = null;
+        } else if (!currentDeadlineSetAt) {
+          // Setting a deadline for the first time
+          updateData.deadline_set_at = new Date().toISOString();
+        }
+        // If changing between deadline types and already has deadline_set_at, keep it
       }
       const { data, error } = await supabase
         .from('growth_tasks')

@@ -159,7 +159,11 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
   };
 
   const handleDeadlineSelect = (deadline: TaskDeadlineType) => {
-    onUpdate({ deadline_type: deadline });
+    onUpdate({ 
+      deadline_type: deadline,
+      // Pass current deadline_set_at so the hook knows whether to reset it
+      ...(task.deadline_set_at ? { currentDeadlineSetAt: task.deadline_set_at } : {})
+    } as Partial<GrowthTask>);
     setDeadlineOpen(false);
   };
 

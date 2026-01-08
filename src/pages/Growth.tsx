@@ -5,6 +5,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { 
   Briefcase, 
   GraduationCap, 
@@ -15,7 +24,8 @@ import {
   Users,
   ArrowRight,
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  MessageSquare
 } from 'lucide-react';
 import { useGrowthProjects, useOverdueTasks, useAllTasksByCategory, calculateDueDate, getDeadlineLabel, type GrowthProjectType, type TaskWithProject } from '@/lib/hooks/useGrowthProjects';
 import AppLayout from '@/components/layout/AppLayout';
@@ -35,11 +45,20 @@ const Growth = () => {
   const { bdTasks, pdTasks, ldTasks, isLoading: tasksLoading } = useAllTasksByCategory();
   const queryClient = useQueryClient();
 
+  // Complete with notes dialog state
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false);
+  const [taskToComplete, setTaskToComplete] = useState<TaskWithProject | null>(null);
+  const [completionNotes, setCompletionNotes] = useState('');
+
   const toggleTaskMutation = useMutation({
-    mutationFn: async (taskId: string) => {
+    mutationFn: async ({ taskId, notes }: { taskId: string; notes?: string }) => {
       const { error } = await supabase
         .from('growth_tasks')
-        .update({ is_completed: true, completed_at: new Date().toISOString() })
+        .update({ 
+          is_completed: true, 
+          completed_at: new Date().toISOString(),
+          completion_notes: notes || null
+        })
         .eq('id', taskId);
       if (error) throw error;
     },
@@ -48,6 +67,21 @@ const Growth = () => {
       queryClient.invalidateQueries({ queryKey: ['overdue-tasks'] });
     },
   });
+
+  const handleCompleteWithNotes = (task: TaskWithProject) => {
+    setTaskToComplete(task);
+    setCompletionNotes('');
+    setCompleteDialogOpen(true);
+  };
+
+  const handleConfirmComplete = () => {
+    if (taskToComplete) {
+      toggleTaskMutation.mutate({ taskId: taskToComplete.id, notes: completionNotes || undefined });
+    }
+    setCompleteDialogOpen(false);
+    setTaskToComplete(null);
+    setCompletionNotes('');
+  };
 
   const handleNewProject = (type: GrowthProjectType) => {
     setNewProjectType(type);
@@ -109,7 +143,8 @@ const Growth = () => {
                 onNew={() => handleNewProject('business_development')}
                 myTasks={bdTasks.myTasks}
                 othersTasks={bdTasks.othersTasks}
-                onToggleTask={(id) => toggleTaskMutation.mutate(id)}
+                onToggleTask={(id) => toggleTaskMutation.mutate({ taskId: id })}
+                onCompleteWithNotes={handleCompleteWithNotes}
                 onTaskClick={(projectId) => navigate(`/growth/${projectId}`)}
               />
               <OverviewCard
@@ -121,7 +156,8 @@ const Growth = () => {
                 onNew={() => handleNewProject('professional_development')}
                 myTasks={pdTasks.myTasks}
                 othersTasks={pdTasks.othersTasks}
-                onToggleTask={(id) => toggleTaskMutation.mutate(id)}
+                onToggleTask={(id) => toggleTaskMutation.mutate({ taskId: id })}
+                onCompleteWithNotes={handleCompleteWithNotes}
                 onTaskClick={(projectId) => navigate(`/growth/${projectId}`)}
               />
               <OverviewCard
@@ -133,7 +169,8 @@ const Growth = () => {
                 onNew={() => handleNewProject('learning_development')}
                 myTasks={ldTasks.myTasks}
                 othersTasks={ldTasks.othersTasks}
-                onToggleTask={(id) => toggleTaskMutation.mutate(id)}
+                onToggleTask={(id) => toggleTaskMutation.mutate({ taskId: id })}
+                onCompleteWithNotes={handleCompleteWithNotes}
                 onTaskClick={(projectId) => navigate(`/growth/${projectId}`)}
               />
             </div>
@@ -212,6 +249,37 @@ const Growth = () => {
         </Tabs>
       </div>
 
+      {/* Complete with notes dialog */}
+      <Dialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Complete Task</DialogTitle>
+            <DialogDescription>
+              {taskToComplete?.title}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Completion Notes (optional)</label>
+              <Textarea
+                value={completionNotes}
+                onChange={(e) => setCompletionNotes(e.target.value)}
+                placeholder="Add notes about what was done, outcomes, or follow-ups..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCompleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmComplete}>
+              Complete Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <NewProjectDialog
         open={newProjectType !== null}
         onOpenChange={(open) => !open && setNewProjectType(null)}
@@ -235,19 +303,21 @@ interface OverviewCardProps {
   myTasks: TaskWithProject[];
   othersTasks: TaskWithProject[];
   onToggleTask: (taskId: string) => void;
+  onCompleteWithNotes: (task: TaskWithProject) => void;
   onTaskClick: (projectId: string) => void;
 }
 
 const TaskRow = ({ 
   task, 
-  onToggle, 
+  onToggle,
+  onCompleteWithNotes,
   onClick 
 }: { 
   task: TaskWithProject; 
-  onToggle: () => void; 
+  onToggle: () => void;
+  onCompleteWithNotes: () => void;
   onClick: () => void;
 }) => {
-  const now = new Date();
   const dueDate = task.deadline_set_at 
     ? calculateDueDate(new Date(task.deadline_set_at), task.deadline_type) 
     : null;
@@ -262,10 +332,26 @@ const TaskRow = ({
         "flex items-start gap-2 py-1.5 group"
       )}
     >
+      {/* Complete with notes button */}
+      <Button
+        variant="outline"
+        size="icon"
+        className="h-5 w-5 shrink-0 mt-0.5 border-primary/30 text-primary hover:bg-primary hover:text-primary-foreground"
+        onClick={(e) => {
+          e.stopPropagation();
+          onCompleteWithNotes();
+        }}
+        title="Complete with notes"
+      >
+        <MessageSquare className="h-2.5 w-2.5" />
+      </Button>
+      
+      {/* Quick complete checkbox */}
       <Checkbox
         checked={false}
         onCheckedChange={() => onToggle()}
         className="mt-0.5 shrink-0"
+        title="Quick complete"
       />
       <div className="flex-1 min-w-0">
         <button
@@ -310,6 +396,7 @@ const OverviewCard = ({
   myTasks,
   othersTasks,
   onToggleTask,
+  onCompleteWithNotes,
   onTaskClick
 }: OverviewCardProps) => {
   const totalTasks = myTasks.length + othersTasks.length;
@@ -335,6 +422,7 @@ const OverviewCard = ({
                       key={task.id} 
                       task={task} 
                       onToggle={() => onToggleTask(task.id)}
+                      onCompleteWithNotes={() => onCompleteWithNotes(task)}
                       onClick={() => onTaskClick(task.project_id)}
                     />
                   ))}
@@ -350,6 +438,7 @@ const OverviewCard = ({
                       key={task.id} 
                       task={task} 
                       onToggle={() => onToggleTask(task.id)}
+                      onCompleteWithNotes={() => onCompleteWithNotes(task)}
                       onClick={() => onTaskClick(task.project_id)}
                     />
                   ))}

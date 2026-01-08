@@ -3,7 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, User, Check, ChevronDown, ChevronRight, Filter, Clock, MessageSquare } from 'lucide-react';
+import { Trash2, User, Check, ChevronDown, ChevronRight, Filter, Clock, MessageSquare, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -90,7 +90,20 @@ const TaskRow = ({
   const [editingAssignee, setEditingAssignee] = useState(task.assignee || '');
   const inputRef = useRef<HTMLInputElement>(null);
   
-  const isTriaged = isFullyTriaged(task.urgency, task.importance, task.effort);
+  // Pending triage state - track changes before confirmation
+  const [pendingTriage, setPendingTriage] = useState<{
+    urgency?: TaskUrgency;
+    importance?: TaskImportance;
+    effort?: TaskEffort;
+  } | null>(null);
+  
+  // Use pending values if they exist, otherwise use task values
+  const displayUrgency = pendingTriage?.urgency ?? task.urgency;
+  const displayImportance = pendingTriage?.importance ?? task.importance;
+  const displayEffort = pendingTriage?.effort ?? task.effort;
+  
+  const isTriaged = isFullyTriaged(displayUrgency, displayImportance, displayEffort);
+  const hasPendingChanges = pendingTriage !== null;
 
   useEffect(() => {
     if (assigneeOpen) {
@@ -98,6 +111,35 @@ const TaskRow = ({
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }, [assigneeOpen, task.assignee]);
+
+  // Reset pending state when task changes externally
+  useEffect(() => {
+    setPendingTriage(null);
+  }, [task.urgency, task.importance, task.effort]);
+
+  const handleTriageChange = (field: 'urgency' | 'importance' | 'effort', value: TaskUrgency | TaskImportance | TaskEffort) => {
+    setPendingTriage(prev => ({
+      urgency: prev?.urgency ?? task.urgency,
+      importance: prev?.importance ?? task.importance,
+      effort: prev?.effort ?? task.effort,
+      [field]: value,
+    }));
+  };
+
+  const handleConfirmTriage = () => {
+    if (pendingTriage) {
+      onUpdate({
+        urgency: pendingTriage.urgency ?? task.urgency,
+        importance: pendingTriage.importance ?? task.importance,
+        effort: pendingTriage.effort ?? task.effort,
+      });
+      setPendingTriage(null);
+    }
+  };
+
+  const handleCancelTriage = () => {
+    setPendingTriage(null);
+  };
 
   const handleAssigneeSelect = (name: string) => {
     onUpdate({ assignee: name || null });
@@ -176,16 +218,40 @@ const TaskRow = ({
         
         <div className="flex items-center gap-2 flex-wrap">
           <TriagePills
-            urgency={task.urgency}
-            importance={task.importance}
-            effort={task.effort}
-            onUrgencyChange={(v) => onUpdate({ urgency: v })}
-            onImportanceChange={(v) => onUpdate({ importance: v })}
-            onEffortChange={(v) => onUpdate({ effort: v })}
+            urgency={displayUrgency}
+            importance={displayImportance}
+            effort={displayEffort}
+            onUrgencyChange={(v) => handleTriageChange('urgency', v)}
+            onImportanceChange={(v) => handleTriageChange('importance', v)}
+            onEffortChange={(v) => handleTriageChange('effort', v)}
             triageMode={triageMode}
             disabled={task.is_completed}
             compact={compact}
           />
+          
+          {/* Confirm/Cancel triage buttons */}
+          {hasPendingChanges && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="default"
+                size="icon"
+                className="h-6 w-6 bg-green-500 hover:bg-green-600"
+                onClick={handleConfirmTriage}
+                title="Confirm triage"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                onClick={handleCancelTriage}
+                title="Cancel changes"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
           
           {/* Clickable Assignee */}
           <Popover open={assigneeOpen} onOpenChange={setAssigneeOpen}>

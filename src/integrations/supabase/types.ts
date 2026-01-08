@@ -1239,28 +1239,37 @@ export type Database = {
         Row: {
           completed_at: string | null
           created_at: string
+          effort: Database["public"]["Enums"]["task_effort"]
           id: string
+          importance: Database["public"]["Enums"]["task_importance"]
           is_completed: boolean
           is_urgent: boolean
           title: string
+          urgency: Database["public"]["Enums"]["task_urgency"]
           user_id: string
         }
         Insert: {
           completed_at?: string | null
           created_at?: string
+          effort?: Database["public"]["Enums"]["task_effort"]
           id?: string
+          importance?: Database["public"]["Enums"]["task_importance"]
           is_completed?: boolean
           is_urgent?: boolean
           title: string
+          urgency?: Database["public"]["Enums"]["task_urgency"]
           user_id: string
         }
         Update: {
           completed_at?: string | null
           created_at?: string
+          effort?: Database["public"]["Enums"]["task_effort"]
           id?: string
+          importance?: Database["public"]["Enums"]["task_importance"]
           is_completed?: boolean
           is_urgent?: boolean
           title?: string
+          urgency?: Database["public"]["Enums"]["task_urgency"]
           user_id?: string
         }
         Relationships: []

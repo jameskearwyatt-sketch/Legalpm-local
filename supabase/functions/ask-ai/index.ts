@@ -152,6 +152,53 @@ serve(async (req) => {
       console.error("Error fetching clients:", clientsError);
     }
 
+    // Get growth projects
+    const { data: growthProjects, error: growthError } = await supabase
+      .from("growth_projects")
+      .select("id, name, description, project_type, status, ai_summary, mentee_name")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false });
+
+    if (growthError) {
+      console.error("Error fetching growth projects:", growthError);
+    }
+
+    // Get growth project entries (scrapbook notes)
+    const { data: growthEntries, error: entriesError } = await supabase
+      .from("growth_project_entries")
+      .select("id, project_id, title, content, entry_type, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (entriesError) {
+      console.error("Error fetching growth entries:", entriesError);
+    }
+
+    // Get growth tasks
+    const { data: growthTasks, error: tasksError } = await supabase
+      .from("growth_tasks")
+      .select("id, project_id, title, description, assignee, deadline_type, is_completed, completed_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+
+    if (tasksError) {
+      console.error("Error fetching growth tasks:", tasksError);
+    }
+
+    // Get growth documents with summaries
+    const { data: growthDocuments, error: docsError } = await supabase
+      .from("growth_project_documents")
+      .select("id, project_id, title, file_name, ai_summary")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (docsError) {
+      console.error("Error fetching growth documents:", docsError);
+    }
+
     // Approximate exchange rates for currency conversion (to GBP as base)
     // These are rough rates for AI estimation - not for actual billing
     const exchangeRatesToGBP: Record<string, number> = {
@@ -306,7 +353,47 @@ serve(async (req) => {
       };
     });
 
-    const systemPrompt = `You are an intelligent legal matter and budget assistant. You have access to the user's matters, budgets, and financial data. Your role is to provide helpful, accurate answers based on this data.
+    // Build growth projects context
+    const growthContext = (growthProjects || []).map((gp: any) => {
+      const projectEntries = (growthEntries || []).filter((e: any) => e.project_id === gp.id);
+      const projectTasks = (growthTasks || []).filter((t: any) => t.project_id === gp.id);
+      const projectDocs = (growthDocuments || []).filter((d: any) => d.project_id === gp.id);
+      
+      return {
+        name: gp.name,
+        type: gp.project_type?.replace(/_/g, ' '),
+        description: gp.description,
+        status: gp.status,
+        menteeName: gp.mentee_name,
+        aiSummary: gp.ai_summary,
+        entries: projectEntries.map((e: any) => ({
+          title: e.title,
+          content: e.content,
+          type: e.entry_type,
+          date: e.created_at,
+        })),
+        tasks: projectTasks.map((t: any) => ({
+          title: t.title,
+          description: t.description,
+          assignee: t.assignee,
+          deadline: t.deadline_type,
+          completed: t.is_completed,
+        })),
+        documents: projectDocs.map((d: any) => ({
+          title: d.title,
+          fileName: d.file_name,
+          summary: d.ai_summary,
+        })),
+      };
+    });
+
+    const systemPrompt = `You are an intelligent assistant for a legal professional. You have access to:
+1. Legal MATTERS (cases, budgets, financials)
+2. GROWTH PROJECTS (business development, professional development, learning initiatives)
+
+Your role is to provide helpful, accurate answers based on ALL available data.
+
+=== MATTERS & FINANCIAL DATA ===
 
 CRITICAL CURRENCY RULES:
 1. Each matter and budget has its OWN CURRENCY - pay close attention to the "originalCurrency" field
@@ -314,31 +401,32 @@ CRITICAL CURRENCY RULES:
 3. When comparing matters or calculating averages, ALWAYS use the converted values (inGBP or inUSD)
 4. When reporting final recommendations, ALWAYS report in GBP (pounds sterling) or USD (US dollars)
 5. Default to reporting in GBP unless the user specifically asks for USD
-6. When you reference a specific matter's budget, mention its original currency (e.g., "Matter X had a budget of €219,000, which is approximately £188,000")
-
-FORMAT FOR ANSWERS:
-- Give your main recommendation in GBP (e.g., "I recommend quoting approximately £150,000")
-- If helpful, also provide the USD equivalent in parentheses
-- When referencing source data, always clarify the original currency
 
 When answering questions about pricing or quotes:
 1. Look for similar matters by practice area, deal type, or client sector
 2. Analyze the budget amounts using the CONVERTED values for fair comparison
-3. Consider the range of fees quoted (budget amounts, BM fees, local counsel fees)
-4. Provide a clear recommendation with specific justification
-5. Reference specific matters by their NAME only (never use internal system IDs or codes)
+3. Reference specific matters by their NAME only (never use internal system IDs)
 
-When giving price recommendations:
-- Provide a specific figure or range IN GBP (or USD if requested)
-- Explain what similar matters you based this on (by name, not by ID)
-- Clarify the original currencies of your source data
-- Note any relevant factors that might affect the price
+=== GROWTH PROJECTS ===
 
-IMPORTANT: Never reference internal system matter numbers or IDs. Always refer to matters by their descriptive name only.
+For Growth-related questions (BD initiatives, professional development, learning):
+1. Review ALL scrapbook entries (notes, meeting summaries, emails) for the relevant project
+2. Check document summaries for key insights
+3. Review tasks and their status
+4. Use the AI summary for quick context, but dig into entries for details
+5. Reference specific projects by name
+
+When asked about a specific BD initiative or growth project:
+- Summarize the key activities and progress from the scrapbook entries
+- Highlight pending tasks and who is responsible
+- Reference any documents and their summaries
+- Provide actionable insights
+
+IMPORTANT: Never reference internal system IDs. Always refer to matters and projects by their descriptive name only.
 
 Keep your answers concise but informative. Always justify your recommendations with specific data points.
 
-Here is the user's data:
+=== USER'S DATA ===
 
 MATTERS (${mattersContext.length} total):
 ${JSON.stringify(mattersContext, null, 2)}
@@ -350,7 +438,10 @@ INVOICES (${invoiceContext.length} total):
 ${JSON.stringify(invoiceContext, null, 2)}
 
 CLIENTS (${(clients || []).length} total):
-${JSON.stringify(clients, null, 2)}`;
+${JSON.stringify(clients, null, 2)}
+
+GROWTH PROJECTS (${growthContext.length} total):
+${JSON.stringify(growthContext, null, 2)}`;
 
     console.log("Calling Lovable AI...");
 

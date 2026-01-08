@@ -49,6 +49,20 @@ export interface GrowthTask {
   updated_at: string;
 }
 
+export interface GrowthDocument {
+  id: string;
+  project_id: string;
+  user_id: string;
+  title: string;
+  file_url: string;
+  file_name: string;
+  file_type: string | null;
+  ai_summary: string | null;
+  summary_generated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface KnownAssignee {
   id: string;
   user_id: string;
@@ -196,6 +210,20 @@ export function useGrowthProject(projectId?: string) {
     enabled: !!projectId && !!user,
   });
 
+  const { data: documents = [], isLoading: documentsLoading } = useQuery({
+    queryKey: ['growth-project-documents', projectId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('growth_project_documents')
+        .select('*')
+        .eq('project_id', projectId!)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as GrowthDocument[];
+    },
+    enabled: !!projectId && !!user,
+  });
+
   const addEntry = useMutation({
     mutationFn: async (entry: Partial<GrowthProjectEntry>) => {
       const { data, error } = await supabase
@@ -310,11 +338,27 @@ export function useGrowthProject(projectId?: string) {
     }
   };
 
+  const refreshDocuments = () => {
+    queryClient.invalidateQueries({ queryKey: ['growth-project-documents', projectId] });
+  };
+
+  const updateDocumentSummary = (docId: string, summary: string) => {
+    queryClient.setQueryData(['growth-project-documents', projectId], (old: GrowthDocument[] | undefined) => {
+      if (!old) return old;
+      return old.map(doc => 
+        doc.id === docId 
+          ? { ...doc, ai_summary: summary, summary_generated_at: new Date().toISOString() }
+          : doc
+      );
+    });
+  };
+
   return {
     project,
     entries,
     tasks,
-    isLoading: projectLoading || entriesLoading || tasksLoading,
+    documents,
+    isLoading: projectLoading || entriesLoading || tasksLoading || documentsLoading,
     isSynthesizing,
     addEntry,
     deleteEntry,
@@ -322,6 +366,8 @@ export function useGrowthProject(projectId?: string) {
     updateTask,
     deleteTask,
     synthesizeProject,
+    refreshDocuments,
+    updateDocumentSummary,
   };
 }
 

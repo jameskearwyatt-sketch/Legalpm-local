@@ -1229,6 +1229,7 @@ export type Database = {
           created_at: string
           id: string
           is_completed: boolean
+          is_urgent: boolean
           title: string
           user_id: string
         }
@@ -1237,6 +1238,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_completed?: boolean
+          is_urgent?: boolean
           title: string
           user_id: string
         }
@@ -1245,6 +1247,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_completed?: boolean
+          is_urgent?: boolean
           title?: string
           user_id?: string
         }

@@ -1384,34 +1384,38 @@ export function QuickToDoButton() {
         </DialogContent>
       </Dialog>
 
-      {/* Floating Draggable Button with Slate Moon - Hidden when panel is open */}
+      {/* Floating Draggable Button with Slate Circle - Hidden when panel is open */}
       {!isOpen && !isSlateOpen && (
         <div
           ref={buttonRef}
-          className="z-50 flex items-center group"
+          className="z-50 flex items-center gap-1.5 group"
           style={getButtonStyle()}
         >
-          {/* Slate Moon - crescent shape on the left, scales with hover */}
-          <button
-            onClick={() => setIsSlateOpen(true)}
-            className={cn(
-              "relative transition-all duration-300 touch-none select-none",
-              "bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600",
-              "hover:from-blue-400 hover:via-blue-500 hover:to-indigo-500",
-              "flex items-center justify-center text-white",
-              "h-10 w-6 -mr-3",
-              "group-hover:h-[46px] group-hover:w-7 group-hover:-mr-3.5",
-              "group-hover:shadow-lg group-hover:shadow-blue-500/30",
-              slateTasks.length === 0 && "opacity-60 group-hover:opacity-80"
+          {/* Slate Circle - 1/4 surface area of main button */}
+          <div className="relative">
+            <button
+              onClick={() => setIsSlateOpen(true)}
+              className={cn(
+                "relative h-7 w-7 rounded-full transition-all duration-300 touch-none select-none",
+                "bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-600",
+                "hover:from-blue-400 hover:via-blue-500 hover:to-indigo-500",
+                "hover:shadow-lg hover:shadow-blue-500/30",
+                "group-hover:scale-110",
+                "flex items-center justify-center text-white",
+                "shadow-md",
+                slateTasks.length === 0 && "opacity-60 group-hover:opacity-80"
+              )}
+              title={`Slate (${slateTasks.length} tasks)`}
+            >
+              <Clipboard className="h-3.5 w-3.5" />
+            </button>
+            {/* Slate count badge */}
+            {slateTasks.length > 0 && (
+              <span className="absolute -top-1 -right-1 flex min-w-4 h-4 px-0.5 items-center justify-center rounded-full bg-blue-400 text-[10px] font-bold text-white">
+                {slateTasks.length}
+              </span>
             )}
-            style={{
-              borderRadius: '50% 0 0 50%',
-              clipPath: 'ellipse(100% 50% at 100% 50%)',
-            }}
-            title={`Slate (${slateTasks.length} tasks)`}
-          >
-            <Clipboard className="h-3.5 w-3.5 -ml-0.5 transition-all duration-300 group-hover:h-4 group-hover:w-4" />
-          </button>
+          </div>
           
           {/* Main Quick Task Button */}
           <button
@@ -1431,18 +1435,21 @@ export function QuickToDoButton() {
             )}
           >
             <CheckSquare className="h-6 w-6" />
-            {/* Red badge - total incomplete tasks */}
-            {incompleteTasks.length > 0 && (
-              <span className="absolute -top-1 -right-1 flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-                {incompleteTasks.length}
-              </span>
-            )}
-            {/* Blue badge - untriaged tasks */}
-            {untriagedCount > 0 && (
-              <span className="absolute -bottom-1 -right-1 flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-blue-500 text-xs font-bold text-white">
-                {untriagedCount}
-              </span>
-            )}
+            {/* Badges container - top right corner */}
+            <div className="absolute -top-1 -right-1 flex items-center gap-0.5">
+              {/* Purple badge - untriaged tasks */}
+              {untriagedCount > 0 && (
+                <span className="flex min-w-4 h-4 px-0.5 items-center justify-center rounded-full bg-purple-500 text-[10px] font-bold text-white">
+                  {untriagedCount}
+                </span>
+              )}
+              {/* Red badge - total incomplete tasks */}
+              {incompleteTasks.length > 0 && (
+                <span className="flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                  {incompleteTasks.length}
+                </span>
+              )}
+            </div>
           </button>
         </div>
       )}

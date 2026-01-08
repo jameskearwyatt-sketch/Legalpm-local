@@ -1,11 +1,19 @@
-import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
-import { Trash2, User, Check, ChevronDown, ChevronRight, Keyboard, Filter, Clock } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Trash2, User, Check, ChevronDown, ChevronRight, Filter, Clock, MessageSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { formatDistanceToNow } from 'date-fns';
 import {
   type GrowthTask, 
   type TaskImportance, 
@@ -50,6 +58,7 @@ interface TaskRowProps {
   triageMode: boolean;
   showDelegateHint?: boolean;
   compact?: boolean;
+  onCompleteWithNotes?: () => void;
 }
 
 const deadlineOptions: TaskDeadlineType[] = [
@@ -73,6 +82,7 @@ const TaskRow = ({
   triageMode,
   showDelegateHint = false,
   compact = false,
+  onCompleteWithNotes,
 }: TaskRowProps) => {
   const { assignees, addAssignee } = useKnownAssignees();
   const [assigneeOpen, setAssigneeOpen] = useState(false);
@@ -268,14 +278,27 @@ const TaskRow = ({
         </div>
       </div>
       
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-6 w-6 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
-        onClick={onDelete}
-      >
-        <Trash2 className="h-3 w-3" />
-      </Button>
+      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+        {onCompleteWithNotes && !task.is_completed && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-primary"
+            onClick={onCompleteWithNotes}
+            title="Complete with notes"
+          >
+            <MessageSquare className="h-3 w-3" />
+          </Button>
+        )}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+          onClick={onDelete}
+        >
+          <Trash2 className="h-3 w-3" />
+        </Button>
+      </div>
     </div>
   );
 };
@@ -304,14 +327,20 @@ export const TodaysFocusView = ({
   onDeleteTask, 
   onToggleComplete 
 }: Omit<TaskListViewsProps, 'view'>) => {
-  const [triageMode, setTriageMode] = useState(false);
-  const [autoAdvance, setAutoAdvance] = useState(true);
   const [showUntriagedOnly, setShowUntriagedOnly] = useState(false);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
-  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const [collapsedQuadrants, setCollapsedQuadrants] = useState<Set<EisenhowerQuadrant>>(new Set(['eliminate']));
+  const [showCompletedTasks, setShowCompletedTasks] = useState(false);
+  
+  // Completion notes dialog state
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [taskToComplete, setTaskToComplete] = useState<GrowthTask | null>(null);
+  const [completionNotes, setCompletionNotes] = useState('');
   
   const pendingTasks = tasks.filter(t => !t.is_completed);
+  const completedTasks = tasks.filter(t => t.is_completed).sort((a, b) => 
+    new Date(b.completed_at || b.updated_at).getTime() - new Date(a.completed_at || a.updated_at).getTime()
+  );
   
   // Group tasks by quadrant
   const groupedTasks = useMemo(() => {
@@ -341,76 +370,6 @@ export const TodaysFocusView = ({
     return groups;
   }, [pendingTasks, showUntriagedOnly]);
   
-  // Flat list for keyboard navigation
-  const flatTaskList = useMemo(() => {
-    const order: EisenhowerQuadrant[] = ['do_first', 'schedule', 'delegate', 'eliminate', 'untriaged'];
-    return order.flatMap(q => collapsedQuadrants.has(q) ? [] : groupedTasks[q]);
-  }, [groupedTasks, collapsedQuadrants]);
-  
-  // Keyboard shortcuts
-  useEffect(() => {
-    if (!triageMode) return;
-    
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      
-      const focusedTask = flatTaskList[focusedIndex];
-      if (!focusedTask && !['ArrowDown', 'ArrowUp'].includes(e.key)) return;
-      
-      switch (e.key.toLowerCase()) {
-        case 'u':
-          e.preventDefault();
-          onUpdateTask(focusedTask.id, { urgency: focusedTask.urgency === 'urgent' ? 'unset' : 'urgent' });
-          if (autoAdvance) setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'n':
-          e.preventDefault();
-          onUpdateTask(focusedTask.id, { urgency: focusedTask.urgency === 'not_urgent' ? 'unset' : 'not_urgent' });
-          if (autoAdvance) setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'i':
-          e.preventDefault();
-          onUpdateTask(focusedTask.id, { importance: focusedTask.importance === 'important' ? 'unset' : 'important' });
-          if (autoAdvance) setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'o':
-          e.preventDefault();
-          onUpdateTask(focusedTask.id, { importance: focusedTask.importance === 'not_important' ? 'unset' : 'not_important' });
-          if (autoAdvance) setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'q':
-          e.preventDefault();
-          onUpdateTask(focusedTask.id, { effort: focusedTask.effort === 'quick_win' ? 'unset' : 'quick_win' });
-          if (autoAdvance) setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'd':
-          e.preventDefault();
-          onUpdateTask(focusedTask.id, { effort: focusedTask.effort === 'deep_work' ? 'unset' : 'deep_work' });
-          if (autoAdvance) setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case ' ':
-          e.preventDefault();
-          onToggleComplete(focusedTask.id);
-          break;
-        case 'enter':
-          e.preventDefault();
-          setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'arrowdown':
-          e.preventDefault();
-          setFocusedIndex(i => Math.min(i + 1, flatTaskList.length - 1));
-          break;
-        case 'arrowup':
-          e.preventDefault();
-          setFocusedIndex(i => Math.max(i - 1, 0));
-          break;
-      }
-    };
-    
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [triageMode, focusedIndex, flatTaskList, onUpdateTask, onToggleComplete, autoAdvance]);
-  
   const toggleQuadrant = (quadrant: EisenhowerQuadrant) => {
     setCollapsedQuadrants(prev => {
       const next = new Set(prev);
@@ -439,6 +398,22 @@ export const TodaysFocusView = ({
     setSelectedTasks(new Set());
   };
   
+  // Handle completion with notes
+  const handleCompleteWithNotes = (task: GrowthTask) => {
+    setTaskToComplete(task);
+    setCompletionNotes('');
+    setShowCompleteDialog(true);
+  };
+
+  const handleConfirmComplete = () => {
+    if (taskToComplete) {
+      onToggleComplete(taskToComplete.id, completionNotes || undefined);
+    }
+    setShowCompleteDialog(false);
+    setTaskToComplete(null);
+    setCompletionNotes('');
+  };
+  
   const renderQuadrant = (quadrant: EisenhowerQuadrant) => {
     const tasksInQuadrant = groupedTasks[quadrant];
     if (tasksInQuadrant.length === 0) return null;
@@ -461,24 +436,22 @@ export const TodaysFocusView = ({
         
         {!isCollapsed && (
           <div className="space-y-1.5">
-            {tasksInQuadrant.map((task) => {
-              const idx = flatTaskList.findIndex(t => t.id === task.id);
-              return (
-                <div key={task.id} className="group">
-                  <TaskRow
-                    task={task}
-                    onUpdate={(updates) => onUpdateTask(task.id, updates)}
-                    onDelete={() => onDeleteTask(task.id)}
-                    onToggleComplete={(notes) => onToggleComplete(task.id, notes)}
-                    isSelected={selectedTasks.has(task.id)}
-                    onSelect={(s) => handleSelectTask(task.id, s)}
-                    isFocused={triageMode && idx === focusedIndex}
-                    triageMode={triageMode}
-                    showDelegateHint={quadrant === 'delegate'}
-                  />
-                </div>
-              );
-            })}
+            {tasksInQuadrant.map((task) => (
+              <div key={task.id} className="group">
+                <TaskRow
+                  task={task}
+                  onUpdate={(updates) => onUpdateTask(task.id, updates)}
+                  onDelete={() => onDeleteTask(task.id)}
+                  onToggleComplete={() => onToggleComplete(task.id)}
+                  isSelected={selectedTasks.has(task.id)}
+                  onSelect={(s) => handleSelectTask(task.id, s)}
+                  isFocused={false}
+                  triageMode={false}
+                  showDelegateHint={quadrant === 'delegate'}
+                  onCompleteWithNotes={() => handleCompleteWithNotes(task)}
+                />
+              </div>
+            ))}
           </div>
         )}
       </div>
@@ -487,43 +460,39 @@ export const TodaysFocusView = ({
   
   return (
     <div className="space-y-4">
+      {/* Completion Notes Dialog */}
+      <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Complete Task</DialogTitle>
+            <DialogDescription>
+              {taskToComplete?.title}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Completion Notes (optional)</label>
+              <Textarea
+                value={completionNotes}
+                onChange={(e) => setCompletionNotes(e.target.value)}
+                placeholder="Add notes about what was done, outcomes, or follow-ups..."
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCompleteDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmComplete}>
+              Complete Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/50 rounded-lg">
-        <div className="flex items-center gap-2">
-          <Switch
-            id="triage-mode"
-            checked={triageMode}
-            onCheckedChange={(checked) => {
-              setTriageMode(checked);
-              if (checked && flatTaskList.length > 0) setFocusedIndex(0);
-            }}
-          />
-          <Label htmlFor="triage-mode" className="flex items-center gap-1.5 cursor-pointer">
-            <Keyboard className="h-4 w-4" />
-            Triage Mode
-          </Label>
-        </div>
-        
-        {triageMode && (
-          <>
-            <div className="flex items-center gap-2">
-              <Switch
-                id="auto-advance"
-                checked={autoAdvance}
-                onCheckedChange={setAutoAdvance}
-              />
-              <Label htmlFor="auto-advance" className="text-sm cursor-pointer">Auto-advance</Label>
-            </div>
-            <div className="text-xs text-muted-foreground border-l pl-4">
-              <span className="font-mono">U</span>/N urgency • 
-              <span className="font-mono ml-1">I</span>/O importance • 
-              <span className="font-mono ml-1">Q</span>/D effort • 
-              <span className="font-mono ml-1">Space</span> complete • 
-              <span className="font-mono ml-1">↑↓</span> navigate
-            </div>
-          </>
-        )}
-        
         <div className="flex items-center gap-2 ml-auto">
           <button
             type="button"
@@ -586,6 +555,67 @@ export const TodaysFocusView = ({
       {pendingTasks.length === 0 && (
         <div className="text-center py-8 text-muted-foreground">
           No pending tasks
+        </div>
+      )}
+      
+      {/* Completed Tasks Section */}
+      {completedTasks.length > 0 && (
+        <div className="border-t pt-4 mt-4">
+          <button
+            type="button"
+            className="flex items-center gap-2 w-full text-left mb-3"
+            onClick={() => setShowCompletedTasks(!showCompletedTasks)}
+          >
+            {showCompletedTasks ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <span className="font-medium text-sm text-muted-foreground">Completed Tasks</span>
+            <Badge variant="secondary" className="text-xs">{completedTasks.length}</Badge>
+          </button>
+          
+          {showCompletedTasks && (
+            <div className="space-y-2">
+              {completedTasks.slice(0, 10).map(task => (
+                <div 
+                  key={task.id} 
+                  className="flex items-start gap-2 p-2 rounded-lg bg-muted/30 group"
+                >
+                  <Checkbox
+                    checked={task.is_completed}
+                    onCheckedChange={() => onToggleComplete(task.id)}
+                    className="mt-1"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm line-through text-muted-foreground">
+                      {task.title}
+                    </p>
+                    {task.completion_notes && (
+                      <p className="text-xs text-muted-foreground mt-1 flex items-start gap-1">
+                        <MessageSquare className="h-3 w-3 mt-0.5 shrink-0" />
+                        {task.completion_notes}
+                      </p>
+                    )}
+                    {task.completed_at && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Completed {formatDistanceToNow(new Date(task.completed_at), { addSuffix: true })}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                    onClick={() => onDeleteTask(task.id)}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              {completedTasks.length > 10 && (
+                <p className="text-xs text-muted-foreground text-center py-2">
+                  + {completedTasks.length - 10} more completed tasks
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

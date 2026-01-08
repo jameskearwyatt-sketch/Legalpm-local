@@ -1247,6 +1247,7 @@ export type Database = {
           importance: Database["public"]["Enums"]["task_importance"]
           is_completed: boolean
           is_urgent: boolean
+          on_slate: boolean
           title: string
           urgency: Database["public"]["Enums"]["task_urgency"]
           user_id: string
@@ -1259,6 +1260,7 @@ export type Database = {
           importance?: Database["public"]["Enums"]["task_importance"]
           is_completed?: boolean
           is_urgent?: boolean
+          on_slate?: boolean
           title: string
           urgency?: Database["public"]["Enums"]["task_urgency"]
           user_id: string
@@ -1271,6 +1273,7 @@ export type Database = {
           importance?: Database["public"]["Enums"]["task_importance"]
           is_completed?: boolean
           is_urgent?: boolean
+          on_slate?: boolean
           title?: string
           urgency?: Database["public"]["Enums"]["task_urgency"]
           user_id?: string

@@ -54,7 +54,7 @@ import { isPast, format } from 'date-fns';
 import { TaskItem } from '@/components/growth/TaskItem';
 import { AddEntryForm } from '@/components/growth/AddEntryForm';
 import { EntryCard } from '@/components/growth/EntryCard';
-import { TaskExtractionDialog, type ExtractedTask } from '@/components/growth/TaskExtractionDialog';
+import { TaskExtractionDialog, type ExtractedTask, type TaskAmendment, type CompletedTaskSuggestion } from '@/components/growth/TaskExtractionDialog';
 
 const GrowthProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
@@ -70,6 +70,8 @@ const GrowthProjectDetail = () => {
   
   // Task extraction state
   const [extractedTasks, setExtractedTasks] = useState<ExtractedTask[]>([]);
+  const [taskAmendments, setTaskAmendments] = useState<TaskAmendment[]>([]);
+  const [completedTaskSuggestions, setCompletedTaskSuggestions] = useState<CompletedTaskSuggestion[]>([]);
   const [showTaskExtraction, setShowTaskExtraction] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
 
@@ -124,23 +126,56 @@ const GrowthProjectDetail = () => {
       setShowTaskExtraction(true);
 
       try {
+        // Pass existing tasks for context
+        const existingTasksForAI = tasks.map(t => ({
+          id: t.id,
+          title: t.title,
+          assignee: t.assignee,
+          is_completed: t.is_completed,
+        }));
+
         const { data, error } = await supabase.functions.invoke('extract-tasks', {
           body: {
             content: entry.content,
             projectName: project.name,
             projectType: project.project_type,
+            existingTasks: existingTasksForAI,
           },
         });
 
         if (error) throw error;
 
-        const tasks = (data?.tasks || []).map((t: { title: string; assignee?: string; deadline_type: string }) => ({
+        // Process new tasks
+        const newTasks = (data?.tasks || []).map((t: { title: string; assignee?: string; deadline_type: string }) => ({
           ...t,
           deadline_type: t.deadline_type as TaskDeadlineType,
           selected: true,
         }));
+        setExtractedTasks(newTasks);
 
-        setExtractedTasks(tasks);
+        // Process amendments - match with existing task IDs
+        const amendments = (data?.amendments || []).map((a: { original_task_title: string; suggested_title?: string; suggested_assignee?: string; suggested_deadline_type?: string; reason: string }) => {
+          const matchingTask = tasks.find(t => t.title.toLowerCase() === a.original_task_title.toLowerCase());
+          return {
+            ...a,
+            original_task_id: matchingTask?.id,
+            suggested_deadline_type: a.suggested_deadline_type as TaskDeadlineType | undefined,
+            selected: true,
+          };
+        });
+        setTaskAmendments(amendments);
+
+        // Process completed tasks - match with existing task IDs
+        const completed = (data?.completedTasks || []).map((c: { original_task_title: string; evidence: string }) => {
+          const matchingTask = tasks.find(t => t.title.toLowerCase() === c.original_task_title.toLowerCase());
+          return {
+            ...c,
+            original_task_id: matchingTask?.id,
+            selected: true,
+          };
+        });
+        setCompletedTaskSuggestions(completed);
+
       } catch (err) {
         console.error('Task extraction error:', err);
         toast.error('Could not extract tasks from content');
@@ -152,19 +187,26 @@ const GrowthProjectDetail = () => {
   };
 
   // Handle confirming extracted tasks - dialog closes immediately to prevent double-clicks
-  const handleConfirmExtractedTasks = async (tasks: ExtractedTask[]) => {
+  const handleConfirmExtractedTasks = async (
+    newTasks: ExtractedTask[], 
+    amendments: TaskAmendment[], 
+    completed: CompletedTaskSuggestion[]
+  ) => {
     // Dialog is already closed by the dialog component
     setExtractedTasks([]);
+    setTaskAmendments([]);
+    setCompletedTaskSuggestions([]);
     
-    // Process tasks in background
     let addedCount = 0;
-    for (const task of tasks) {
+    let amendedCount = 0;
+    let completedCount = 0;
+
+    // Process new tasks
+    for (const task of newTasks) {
       try {
-        // Save assignee for future use
         if (task.assignee && task.assignee !== 'Me') {
           addAssignee.mutate(task.assignee);
         }
-
         await addTask.mutateAsync({
           title: task.title,
           assignee: task.assignee === 'Me' ? undefined : task.assignee,
@@ -175,9 +217,54 @@ const GrowthProjectDetail = () => {
         console.error('Failed to add task:', err);
       }
     }
+
+    // Process amendments
+    for (const amendment of amendments) {
+      if (!amendment.original_task_id) continue;
+      try {
+        const updates: Record<string, unknown> = {};
+        if (amendment.suggested_title) updates.title = amendment.suggested_title;
+        if (amendment.suggested_assignee) {
+          updates.assignee = amendment.suggested_assignee === 'Me' ? undefined : amendment.suggested_assignee;
+          if (amendment.suggested_assignee !== 'Me') {
+            addAssignee.mutate(amendment.suggested_assignee);
+          }
+        }
+        if (amendment.suggested_deadline_type) {
+          updates.deadline_type = amendment.suggested_deadline_type;
+          updates.deadline_set_at = new Date().toISOString();
+        }
+        if (Object.keys(updates).length > 0) {
+          await updateTask.mutateAsync({ id: amendment.original_task_id, ...updates });
+          amendedCount++;
+        }
+      } catch (err) {
+        console.error('Failed to amend task:', err);
+      }
+    }
+
+    // Process completed tasks
+    for (const completedTask of completed) {
+      if (!completedTask.original_task_id) continue;
+      try {
+        await updateTask.mutateAsync({ 
+          id: completedTask.original_task_id, 
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+        });
+        completedCount++;
+      } catch (err) {
+        console.error('Failed to mark task complete:', err);
+      }
+    }
     
-    if (addedCount > 0) {
-      toast.success(`Added ${addedCount} task${addedCount === 1 ? '' : 's'}`);
+    // Show summary toast
+    const parts = [];
+    if (addedCount > 0) parts.push(`${addedCount} added`);
+    if (amendedCount > 0) parts.push(`${amendedCount} amended`);
+    if (completedCount > 0) parts.push(`${completedCount} completed`);
+    if (parts.length > 0) {
+      toast.success(`Tasks: ${parts.join(', ')}`);
     }
   };
 
@@ -461,7 +548,11 @@ const GrowthProjectDetail = () => {
         open={showTaskExtraction}
         onOpenChange={setShowTaskExtraction}
         tasks={extractedTasks}
+        amendments={taskAmendments}
+        completedTasks={completedTaskSuggestions}
         onTasksChange={setExtractedTasks}
+        onAmendmentsChange={setTaskAmendments}
+        onCompletedTasksChange={setCompletedTaskSuggestions}
         onConfirm={handleConfirmExtractedTasks}
         isLoading={isExtracting}
       />

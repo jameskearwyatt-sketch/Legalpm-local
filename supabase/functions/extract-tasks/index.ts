@@ -6,16 +6,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface ExistingTask {
+  id: string;
+  title: string;
+  assignee?: string;
+  is_completed: boolean;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { content, projectName, projectType } = await req.json();
+    const { content, projectName, projectType, existingTasks } = await req.json();
 
     if (!content) {
-      return new Response(JSON.stringify({ error: 'content is required', tasks: [] }), {
+      return new Response(JSON.stringify({ error: 'content is required', tasks: [], amendments: [], completedTasks: [] }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -23,7 +30,7 @@ serve(async (req) => {
 
     const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
     if (!lovableApiKey) {
-      return new Response(JSON.stringify({ error: 'AI service not configured', tasks: [] }), {
+      return new Response(JSON.stringify({ error: 'AI service not configured', tasks: [], amendments: [], completedTasks: [] }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -35,26 +42,47 @@ serve(async (req) => {
       'learning_development': 'Learning & Development',
     };
 
-    const prompt = `You are analyzing notes from a ${projectTypeLabels[projectType] || 'professional'} project called "${projectName}".
+    // Format existing tasks for context
+    const existingTasksList = (existingTasks as ExistingTask[] || [])
+      .filter(t => !t.is_completed)
+      .map((t, i) => `${i + 1}. "${t.title}" (assigned to: ${t.assignee || 'unassigned'})`)
+      .join('\n');
 
-Extract ALL actionable tasks from the following content. For each task:
-1. Create a clear, specific action item title (verb + object)
-2. Identify who should do it (look for names, roles, or pronouns like "I", "we", "they")
-3. Suggest a deadline type based on context clues
+    const prompt = `You are analyzing the LATEST entry/note from a ${projectTypeLabels[projectType] || 'professional'} project called "${projectName}".
 
-Content to analyze:
+IMPORTANT: Only analyze the new content below - do NOT consider any previous entries.
+
+New content to analyze:
 """
 ${content}
 """
 
-Rules:
-- Extract EVERY action item, commitment, or follow-up mentioned
+${existingTasksList ? `
+EXISTING PENDING TASKS in this project:
+${existingTasksList}
+
+Based on the new content above, identify:
+1. NEW tasks that should be added (not duplicates of existing ones)
+2. AMENDMENTS to existing tasks (if the new content suggests changes to scope, assignee, or deadline)
+3. COMPLETED tasks (if the new content indicates existing tasks have been satisfied or delivered)
+` : ''}
+
+Rules for NEW tasks:
+- Extract EVERY new action item, commitment, or follow-up mentioned
 - If "I" or "me" is mentioned, the assignee is "Me"
 - If no specific person is mentioned, leave assignee empty
-- Be thorough - extract 3-10 tasks if present
+- Do NOT suggest tasks that duplicate existing ones
 - Deadline types: this_week, next_week, this_month, next_month, in_3_months, in_6_months, no_deadline
 
-Return tasks using the suggest_tasks function.`;
+Rules for AMENDMENTS:
+- Only suggest amendments if the new content clearly indicates a change
+- Include the original task title and what should change
+
+Rules for COMPLETED tasks:
+- Only mark as completed if there's clear evidence in the new content
+- Include why you believe the task is complete
+
+Return your analysis using the analyze_tasks function.`;
 
     const aiResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -69,13 +97,14 @@ Return tasks using the suggest_tasks function.`;
           {
             type: 'function',
             function: {
-              name: 'suggest_tasks',
-              description: 'Return extracted tasks from the content',
+              name: 'analyze_tasks',
+              description: 'Return new tasks, amendments to existing tasks, and tasks that appear completed',
               parameters: {
                 type: 'object',
                 properties: {
-                  tasks: {
+                  new_tasks: {
                     type: 'array',
+                    description: 'New tasks to add to the project',
                     items: {
                       type: 'object',
                       properties: {
@@ -89,14 +118,45 @@ Return tasks using the suggest_tasks function.`;
                       },
                       required: ['title', 'deadline_type']
                     }
+                  },
+                  amendments: {
+                    type: 'array',
+                    description: 'Suggested changes to existing tasks',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        original_task_title: { type: 'string', description: 'The existing task title to amend' },
+                        suggested_title: { type: 'string', description: 'New suggested title (if changing)' },
+                        suggested_assignee: { type: 'string', description: 'New suggested assignee (if changing)' },
+                        suggested_deadline_type: { 
+                          type: 'string', 
+                          enum: ['this_week', 'next_week', 'this_month', 'next_month', 'in_3_months', 'in_6_months', 'no_deadline'],
+                          description: 'New suggested deadline (if changing)'
+                        },
+                        reason: { type: 'string', description: 'Brief explanation for the amendment' }
+                      },
+                      required: ['original_task_title', 'reason']
+                    }
+                  },
+                  completed_tasks: {
+                    type: 'array',
+                    description: 'Existing tasks that appear to be completed based on the new content',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        original_task_title: { type: 'string', description: 'The existing task title that appears complete' },
+                        evidence: { type: 'string', description: 'Brief explanation of why this task appears complete' }
+                      },
+                      required: ['original_task_title', 'evidence']
+                    }
                   }
                 },
-                required: ['tasks']
+                required: ['new_tasks', 'amendments', 'completed_tasks']
               }
             }
           }
         ],
-        tool_choice: { type: 'function', function: { name: 'suggest_tasks' } }
+        tool_choice: { type: 'function', function: { name: 'analyze_tasks' } }
       }),
     });
 
@@ -105,19 +165,19 @@ Return tasks using the suggest_tasks function.`;
       console.error('AI API error:', errorText);
       
       if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.', tasks: [] }), {
+        return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please try again in a moment.', tasks: [], amendments: [], completedTasks: [] }), {
           status: 429,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: 'AI credits exhausted. Please add credits.', tasks: [] }), {
+        return new Response(JSON.stringify({ error: 'AI credits exhausted. Please add credits.', tasks: [], amendments: [], completedTasks: [] }), {
           status: 402,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
       
-      return new Response(JSON.stringify({ error: 'AI service error', tasks: [] }), {
+      return new Response(JSON.stringify({ error: 'AI service error', tasks: [], amendments: [], completedTasks: [] }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -126,8 +186,10 @@ Return tasks using the suggest_tasks function.`;
     const aiData = await aiResponse.json();
     console.log('AI response:', JSON.stringify(aiData));
     
-    // Extract tasks from tool call response
-    let tasks: Array<{ title: string; assignee?: string; deadline_type: string }> = [];
+    // Extract from tool call response
+    let newTasks: Array<{ title: string; assignee?: string; deadline_type: string }> = [];
+    let amendments: Array<{ original_task_title: string; suggested_title?: string; suggested_assignee?: string; suggested_deadline_type?: string; reason: string }> = [];
+    let completedTasks: Array<{ original_task_title: string; evidence: string }> = [];
     
     const toolCalls = aiData.choices?.[0]?.message?.tool_calls;
     if (toolCalls && toolCalls.length > 0) {
@@ -135,21 +197,27 @@ Return tasks using the suggest_tasks function.`;
       if (args) {
         try {
           const parsed = typeof args === 'string' ? JSON.parse(args) : args;
-          tasks = parsed.tasks || [];
+          newTasks = parsed.new_tasks || [];
+          amendments = parsed.amendments || [];
+          completedTasks = parsed.completed_tasks || [];
         } catch (e) {
           console.error('Failed to parse tool call arguments:', e);
         }
       }
     }
 
-    return new Response(JSON.stringify({ tasks }), {
+    return new Response(JSON.stringify({ 
+      tasks: newTasks, 
+      amendments, 
+      completedTasks 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: unknown) {
     console.error('Error in extract-tasks:', error);
     const message = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({ error: message, tasks: [] }), {
+    return new Response(JSON.stringify({ error: message, tasks: [], amendments: [], completedTasks: [] }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

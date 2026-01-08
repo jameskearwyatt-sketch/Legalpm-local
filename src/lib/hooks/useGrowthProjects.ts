@@ -487,6 +487,48 @@ export function useAllTasksByCategory() {
   };
 }
 
+/**
+ * Hook to fetch Growth tasks assigned to "Me" that are due within the next week.
+ * These tasks are shown in the Quick Tasks panel alongside regular quick tasks.
+ */
+export function useMyUpcomingGrowthTasks() {
+  const { user } = useAuth();
+
+  const { data: upcomingTasks = [], isLoading, refetch } = useQuery({
+    queryKey: ['my-upcoming-growth-tasks'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('growth_tasks')
+        .select('*, growth_projects!inner(name, project_type)')
+        .eq('is_completed', false)
+        .neq('deadline_type', 'no_deadline');
+      
+      if (error) throw error;
+      
+      const now = new Date();
+      const oneWeekFromNow = new Date(now);
+      oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+      
+      // Filter: assigned to "Me" (or unassigned) AND due within next week
+      return (data || []).filter((task: TaskWithProject) => {
+        // Must be assigned to "Me" or unassigned
+        if (task.assignee && task.assignee !== 'Me') return false;
+        
+        if (!task.deadline_set_at) return false;
+        const setAt = new Date(task.deadline_set_at);
+        const dueDate = calculateDueDate(setAt, task.deadline_type);
+        
+        // Due within the next 7 days (or already overdue)
+        return dueDate <= oneWeekFromNow;
+      }) as TaskWithProject[];
+    },
+    enabled: !!user,
+    refetchInterval: 60000, // Refresh every minute
+  });
+
+  return { upcomingTasks, isLoading, refetch };
+}
+
 export function calculateDueDate(setAt: Date, deadlineType: TaskDeadlineType): Date {
   const date = new Date(setAt);
   switch (deadlineType) {

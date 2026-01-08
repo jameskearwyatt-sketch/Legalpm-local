@@ -3,8 +3,9 @@ import {
   CheckSquare, X, Plus, Trash2, Flame, ArrowRight, Clock, User, Pencil, 
   Briefcase, GraduationCap, Lightbulb, Maximize2, Minimize2, Keyboard,
   ListTodo, LayoutGrid, Filter, Check, ChevronDown, ChevronRight,
-  Zap, Target, Feather
+  Zap, Target, Feather, CalendarClock
 } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,7 +32,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import { useGrowthProjects, type TaskDeadlineType, getDeadlineLabel, useKnownAssignees } from "@/lib/hooks/useGrowthProjects";
+import { 
+  useGrowthProjects, 
+  type TaskDeadlineType, 
+  getDeadlineLabel, 
+  useKnownAssignees,
+  useMyUpcomingGrowthTasks,
+  calculateDueDate,
+  type TaskWithProject,
+} from "@/lib/hooks/useGrowthProjects";
 
 // Types
 type TaskImportance = 'important' | 'not_important' | 'unset';
@@ -50,6 +59,22 @@ interface QuickTask {
   created_at: string;
 }
 
+// Unified task type for display - can be a QuickTask or a Growth Task
+interface UnifiedTask {
+  id: string;
+  title: string;
+  is_completed: boolean;
+  importance: TaskImportance;
+  urgency: TaskUrgency;
+  effort: TaskEffort;
+  created_at: string;
+  // Growth task specific
+  source: 'quick' | 'growth';
+  projectName?: string;
+  projectId?: string;
+  dueDate?: Date;
+}
+
 const STORAGE_KEY = 'todo-button-position';
 
 const deadlineOptions: TaskDeadlineType[] = [
@@ -63,7 +88,7 @@ const deadlineOptions: TaskDeadlineType[] = [
 ];
 
 // Helpers
-const isFullyTriaged = (task: QuickTask): boolean => {
+const isFullyTriaged = (task: UnifiedTask | QuickTask): boolean => {
   return task.urgency !== 'unset' && task.importance !== 'unset' && task.effort !== 'unset';
 };
 
@@ -85,13 +110,14 @@ const quadrantInfo: Record<EisenhowerQuadrant, { label: string; guidance: string
 
 // Triage Pills Component
 interface TriagePillsProps {
-  task: QuickTask;
+  task: UnifiedTask | QuickTask;
   onUpdate: (updates: Partial<QuickTask>) => void;
   triageMode?: boolean;
   compact?: boolean;
+  disabled?: boolean;
 }
 
-const TriagePills = ({ task, onUpdate, triageMode = false, compact = false }: TriagePillsProps) => {
+const TriagePills = ({ task, onUpdate, triageMode = false, compact = false, disabled = false }: TriagePillsProps) => {
   const iconSize = compact ? "h-2.5 w-2.5" : "h-3 w-3";
   
   const handleUrgencyClick = (value: 'urgent' | 'not_urgent') => {
@@ -216,6 +242,7 @@ export function QuickToDoButton() {
   const { user } = useAuth();
   const { projects } = useGrowthProjects();
   const { assignees } = useKnownAssignees();
+  const { upcomingTasks: upcomingGrowthTasks, refetch: refetchGrowthTasks } = useMyUpcomingGrowthTasks();
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [tasks, setTasks] = useState<QuickTask[]>([]);
@@ -324,34 +351,68 @@ export function QuickToDoButton() {
     setIsLoading(false);
   };
 
-  const toggleTask = async (task: QuickTask) => {
-    const { error } = await supabase
-      .from('quick_tasks')
-      .update({
-        is_completed: !task.is_completed,
-        completed_at: !task.is_completed ? new Date().toISOString() : null,
-      })
-      .eq('id', task.id);
+  const toggleTask = async (task: UnifiedTask) => {
+    if (task.source === 'growth') {
+      // Toggle growth task
+      const realId = task.id.replace('growth-', '');
+      const { error } = await supabase
+        .from('growth_tasks')
+        .update({
+          is_completed: !task.is_completed,
+          completed_at: !task.is_completed ? new Date().toISOString() : null,
+        })
+        .eq('id', realId);
 
-    if (error) {
-      toast.error('Failed to update task');
+      if (error) {
+        toast.error('Failed to update task');
+      } else {
+        refetchGrowthTasks();
+      }
     } else {
-      fetchTasks();
+      // Toggle quick task
+      const { error } = await supabase
+        .from('quick_tasks')
+        .update({
+          is_completed: !task.is_completed,
+          completed_at: !task.is_completed ? new Date().toISOString() : null,
+        })
+        .eq('id', task.id);
+
+      if (error) {
+        toast.error('Failed to update task');
+      } else {
+        fetchTasks();
+      }
     }
   };
 
   const updateTask = async (taskId: string, updates: Partial<QuickTask>) => {
-    // Optimistic update
-    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
-    
-    const { error } = await supabase
-      .from('quick_tasks')
-      .update(updates)
-      .eq('id', taskId);
+    if (taskId.startsWith('growth-')) {
+      // Update growth task
+      const realId = taskId.replace('growth-', '');
+      const { error } = await supabase
+        .from('growth_tasks')
+        .update(updates)
+        .eq('id', realId);
 
-    if (error) {
-      toast.error('Failed to update task');
-      fetchTasks(); // Revert on error
+      if (error) {
+        toast.error('Failed to update task');
+      } else {
+        refetchGrowthTasks();
+      }
+    } else {
+      // Update quick task (optimistic)
+      setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+      
+      const { error } = await supabase
+        .from('quick_tasks')
+        .update(updates)
+        .eq('id', taskId);
+
+      if (error) {
+        toast.error('Failed to update task');
+        fetchTasks(); // Revert on error
+      }
     }
   };
 
@@ -368,8 +429,20 @@ export function QuickToDoButton() {
     }
   };
 
-  const openMoveDialog = (task: QuickTask) => {
-    setTaskToMove(task);
+  const openMoveDialog = (task: UnifiedTask) => {
+    if (task.source !== 'quick') return; // Only allow moving quick tasks
+    // Convert back to QuickTask for the dialog
+    const quickTask: QuickTask = {
+      id: task.id,
+      title: task.title,
+      is_completed: task.is_completed,
+      is_urgent: task.urgency === 'urgent',
+      importance: task.importance,
+      urgency: task.urgency,
+      effort: task.effort,
+      created_at: task.created_at,
+    };
+    setTaskToMove(quickTask);
     setSelectedProject("");
     setSelectedAssignee("__unassigned__");
     setSelectedDeadline("no_deadline");
@@ -423,10 +496,43 @@ export function QuickToDoButton() {
     }
   };
 
+  // Convert Growth tasks to unified format
+  const unifiedGrowthTasks: UnifiedTask[] = useMemo(() => {
+    return upcomingGrowthTasks.map(gt => ({
+      id: `growth-${gt.id}`,
+      title: gt.title,
+      is_completed: gt.is_completed,
+      importance: gt.importance,
+      urgency: gt.urgency,
+      effort: gt.effort,
+      created_at: gt.created_at,
+      source: 'growth' as const,
+      projectName: gt.growth_projects.name,
+      projectId: gt.project_id,
+      dueDate: gt.deadline_set_at 
+        ? calculateDueDate(new Date(gt.deadline_set_at), gt.deadline_type)
+        : undefined,
+    }));
+  }, [upcomingGrowthTasks]);
+
+  // Convert Quick tasks to unified format
+  const unifiedQuickTasks: UnifiedTask[] = useMemo(() => {
+    return tasks.map(t => ({
+      ...t,
+      source: 'quick' as const,
+    }));
+  }, [tasks]);
+
+  // All unified tasks
+  const allUnifiedTasks = useMemo(() => {
+    return [...unifiedQuickTasks, ...unifiedGrowthTasks];
+  }, [unifiedQuickTasks, unifiedGrowthTasks]);
+
   // Grouped tasks for Focus view
-  const pendingTasks = useMemo(() => tasks.filter(t => !t.is_completed), [tasks]);
+  const pendingTasks = useMemo(() => allUnifiedTasks.filter(t => !t.is_completed), [allUnifiedTasks]);
   const completedTasks = useMemo(() => tasks.filter(t => t.is_completed), [tasks]);
-  const incompleteTasks = pendingTasks;
+  const incompleteTasks = pendingTasks; // alias for badge count
+  const completedUnifiedTasks: UnifiedTask[] = useMemo(() => completedTasks.map(t => ({ ...t, source: 'quick' as const })), [completedTasks]);
 
   const groupedTasks = useMemo(() => {
     let filtered = pendingTasks;
@@ -434,7 +540,7 @@ export function QuickToDoButton() {
       filtered = filtered.filter(t => !isFullyTriaged(t));
     }
 
-    const groups: Record<EisenhowerQuadrant, QuickTask[]> = {
+    const groups: Record<EisenhowerQuadrant, UnifiedTask[]> = {
       do_first: [],
       schedule: [],
       delegate: [],
@@ -447,11 +553,16 @@ export function QuickToDoButton() {
       groups[quadrant].push(task);
     });
 
-    // Sort: quick wins first, then by created_at
+    // Sort: quick wins first, then by due date (for growth tasks), then by created_at
     Object.keys(groups).forEach(key => {
       groups[key as EisenhowerQuadrant].sort((a, b) => {
+        // Quick wins first
         if (a.effort === 'quick_win' && b.effort !== 'quick_win') return -1;
         if (a.effort !== 'quick_win' && b.effort === 'quick_win') return 1;
+        // Growth tasks with due dates sort by due date
+        if (a.dueDate && b.dueDate) return a.dueDate.getTime() - b.dueDate.getTime();
+        if (a.dueDate) return -1;
+        if (b.dueDate) return 1;
         return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
       });
     });
@@ -683,7 +794,7 @@ export function QuickToDoButton() {
   const activeProjects = projects?.filter(p => p.status === 'active') || [];
 
   // Task Row Component
-  const TaskRow = ({ task, isFocused }: { task: QuickTask; isFocused?: boolean }) => {
+  const TaskRow = ({ task, isFocused }: { task: UnifiedTask; isFocused?: boolean }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editedTitle, setEditedTitle] = useState(task.title);
     const editInputRef = useRef<HTMLInputElement>(null);
@@ -772,25 +883,50 @@ export function QuickToDoButton() {
             </Badge>
           )}
           
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5"
-              onClick={() => openMoveDialog(task)}
-              title="Move to Growth"
-            >
-              <ArrowRight className="h-3 w-3 text-muted-foreground" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5"
-              onClick={() => deleteTask(task.id)}
-            >
-              <Trash2 className="h-3 w-3 text-muted-foreground" />
-            </Button>
-          </div>
+          {/* Only show move/delete buttons for quick tasks */}
+          {task.source === 'quick' && (
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5"
+                onClick={() => openMoveDialog(task)}
+                title="Move to Growth"
+              >
+                <ArrowRight className="h-3 w-3 text-muted-foreground" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-5 w-5"
+                onClick={() => deleteTask(task.id)}
+              >
+                <Trash2 className="h-3 w-3 text-muted-foreground" />
+              </Button>
+            </div>
+          )}
+          
+          {/* Show project badge and due date for growth tasks */}
+          {task.source === 'growth' && (
+            <div className="flex items-center gap-1 shrink-0">
+              {task.dueDate && (
+                <Badge variant="outline" className={cn(
+                  "text-[9px] px-1 py-0 h-4",
+                  task.dueDate < new Date() 
+                    ? "bg-red-50 text-red-600 border-red-200 dark:bg-red-950/30" 
+                    : "bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-950/30"
+                )}>
+                  <CalendarClock className="h-2 w-2 mr-0.5" />
+                  {formatDistanceToNow(task.dueDate, { addSuffix: true })}
+                </Badge>
+              )}
+              {task.projectName && (
+                <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/30">
+                  {task.projectName}
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
         
         <TriagePills 
@@ -932,7 +1068,7 @@ export function QuickToDoButton() {
           <div className="text-xs text-muted-foreground pt-2 pb-1 font-medium">
             Completed ({completedTasks.length})
           </div>
-          {completedTasks.map(task => (
+          {completedUnifiedTasks.map(task => (
             <div key={task.id} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 group">
               <Checkbox
                 checked={task.is_completed}
@@ -1286,7 +1422,7 @@ export function QuickToDoButton() {
                       <div className="text-xs text-muted-foreground pb-1 font-medium">
                         Completed ({completedTasks.length})
                       </div>
-                      {completedTasks.slice(0, 5).map(task => (
+                      {completedUnifiedTasks.slice(0, 5).map(task => (
                         <div key={task.id} className="flex items-center gap-2 p-1.5 rounded bg-muted/30 group text-xs">
                           <Checkbox
                             checked={task.is_completed}

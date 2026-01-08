@@ -11,7 +11,8 @@ import {
   Sparkles, 
   ExternalLink,
   Trash2,
-  Eye
+  Eye,
+  RefreshCw
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -444,11 +445,27 @@ export const DocumentRepository = ({
           <div className="mt-2 p-4 bg-muted/50 rounded-lg">
             <p className="text-sm leading-relaxed">{viewingSummary?.ai_summary}</p>
           </div>
-          {viewingSummary?.summary_generated_at && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Generated on {format(new Date(viewingSummary.summary_generated_at), 'MMM d, yyyy h:mm a')}
-            </p>
-          )}
+          <div className="flex items-center justify-between mt-2">
+            {viewingSummary?.summary_generated_at && (
+              <p className="text-xs text-muted-foreground">
+                Generated on {format(new Date(viewingSummary.summary_generated_at), 'MMM d, yyyy h:mm a')}
+              </p>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (viewingSummary) {
+                  handleGenerateSummary(viewingSummary.id, viewingSummary.file_url, viewingSummary.file_name);
+                  setViewingSummary(null);
+                }
+              }}
+              disabled={summarizingId !== null}
+            >
+              <RefreshCw className="h-4 w-4 mr-1" />
+              Re-run Analysis
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </Card>

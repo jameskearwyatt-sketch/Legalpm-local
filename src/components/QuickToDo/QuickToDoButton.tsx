@@ -1082,15 +1082,32 @@ export function QuickToDoButton() {
 
   const toggleGrowthTaskPin = async (taskId: string, currentlyPinned: boolean) => {
     const realId = taskId.replace('growth-', '');
+    const newPinnedValue = !currentlyPinned;
+    
+    // Optimistic update - immediately update local state
+    queryClient.setQueryData(['my-upcoming-growth-tasks'], (old: unknown) => {
+      if (!Array.isArray(old)) return old;
+      return old.map((task: { id: string; pinned_to_tasklist?: boolean }) => 
+        task.id === realId ? { ...task, pinned_to_tasklist: newPinnedValue } : task
+      );
+    });
+    
     const { error } = await supabase
       .from('growth_tasks')
-      .update({ pinned_to_tasklist: !currentlyPinned })
+      .update({ pinned_to_tasklist: newPinnedValue })
       .eq('id', realId);
     
     if (error) {
       toast.error('Failed to update task');
+      // Rollback on error
+      queryClient.setQueryData(['my-upcoming-growth-tasks'], (old: unknown) => {
+        if (!Array.isArray(old)) return old;
+        return old.map((task: { id: string; pinned_to_tasklist?: boolean }) => 
+          task.id === realId ? { ...task, pinned_to_tasklist: currentlyPinned } : task
+        );
+      });
     } else {
-      // Force immediate refetch of all growth task queries to sync with Growth section
+      // Refetch all growth task queries to sync with Growth section
       await refetchGrowthTasks();
       await queryClient.refetchQueries({ 
         predicate: (query) => {
@@ -1098,8 +1115,7 @@ export function QuickToDoButton() {
           return Array.isArray(key) && (
             key[0] === 'growth-tasks' ||
             key[0] === 'all-growth-tasks' ||
-            key[0] === 'overdue-tasks' ||
-            key[0] === 'my-upcoming-growth-tasks'
+            key[0] === 'overdue-tasks'
           );
         }
       });

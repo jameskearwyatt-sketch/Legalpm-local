@@ -323,6 +323,23 @@ export function useGrowthProject(projectId?: string) {
       if (error) throw error;
       return data;
     },
+    onMutate: async ({ id, ...updates }) => {
+      // Cancel any outgoing refetches to prevent overwriting optimistic update
+      await queryClient.cancelQueries({ queryKey: ['growth-tasks', projectId] });
+      await queryClient.cancelQueries({ queryKey: ['my-upcoming-growth-tasks'] });
+      
+      // Snapshot the previous value
+      const previousTasks = queryClient.getQueryData<GrowthTask[]>(['growth-tasks', projectId]);
+      
+      // Optimistically update the cache
+      if (previousTasks) {
+        queryClient.setQueryData<GrowthTask[]>(['growth-tasks', projectId], old => 
+          old?.map(task => task.id === id ? { ...task, ...updates } : task)
+        );
+      }
+      
+      return { previousTasks };
+    },
     onSuccess: () => {
       // Force immediate refetch of the current project's tasks
       queryClient.refetchQueries({ queryKey: ['growth-tasks', projectId] });
@@ -330,7 +347,11 @@ export function useGrowthProject(projectId?: string) {
       queryClient.refetchQueries({ queryKey: ['all-growth-tasks'] });
       queryClient.refetchQueries({ queryKey: ['overdue-tasks'] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _variables, context) => {
+      // Rollback on error
+      if (context?.previousTasks) {
+        queryClient.setQueryData(['growth-tasks', projectId], context.previousTasks);
+      }
       toast.error('Failed to update task: ' + error.message);
     },
   });

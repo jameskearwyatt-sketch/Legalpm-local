@@ -177,7 +177,7 @@ export function TableScrollControls({ children, className }: TableScrollControls
   const trackWidth = Math.min(position.width * 0.6, 300);
 
   return (
-    <div ref={containerRef} className={cn("relative w-full overflow-x-auto", className)}>
+    <div ref={containerRef} className={cn("relative", className)}>
       {children}
       
       {showControls && createPortal(

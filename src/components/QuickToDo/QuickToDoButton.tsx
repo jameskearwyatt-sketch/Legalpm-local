@@ -1396,6 +1396,12 @@ export function QuickToDoButton() {
         if (aTriaging && !bTriaging) return 0; // Keep in place
         if (!aTriaging && bTriaging) return 0; // Keep in place
         
+        // Slate items first - snap to top of each category
+        const aOnSlate = a.on_slate === true;
+        const bOnSlate = b.on_slate === true;
+        if (aOnSlate && !bOnSlate) return -1;
+        if (!aOnSlate && bOnSlate) return 1;
+        
         // Quick wins first (only for non-triaging tasks)
         if (a.effort === 'quick_win' && b.effort !== 'quick_win') return -1;
         if (a.effort !== 'quick_win' && b.effort === 'quick_win') return 1;

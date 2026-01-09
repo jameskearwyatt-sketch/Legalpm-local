@@ -2166,130 +2166,137 @@ export function QuickToDoButton() {
             </div>
           </div>
 
-          {/* Slate Tasks */}
-          <ScrollArea className="flex-1 p-3">
-            {orderedSlateTasks.length === 0 ? (
-              <p className="text-center text-muted-foreground text-sm py-8">
-                No tasks on your Slate yet.<br />
-                Add tasks from your triaged list.
-              </p>
-            ) : (
-              <DndContext
-                sensors={slateSensors}
-                collisionDetection={closestCenter}
-                onDragEnd={handleSlateDragEnd}
-              >
-                <SortableContext 
-                  items={orderedSlateTasks.map(t => t.id)} 
-                  strategy={verticalListSortingStrategy}
-                >
-                  <div className="space-y-2">
-                    {orderedSlateTasks.map((task, index) => (
-                      <SortableSlateItem
-                        key={task.id}
-                        task={task}
-                        index={index}
-                        onCompleteWithNotes={() => {
-                          if (task.source === 'slate-only') {
-                            // For slate-only, just remove it
-                            setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
-                            return;
-                          }
-                          const unified: UnifiedTask = { ...task, source: task.source };
-                          setTaskToComplete(unified);
-                          setCompletionNotes("");
-                          setCompleteDialogOpen(true);
-                        }}
-                        onQuickComplete={async () => {
-                          if (task.source === 'slate-only') {
-                            // For slate-only, just remove it
-                            setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
-                            return;
-                          }
-                          if (task.source === 'growth') {
-                            const realId = task.id.replace('growth-', '');
-                            const { error } = await supabase
-                              .from('growth_tasks')
-                              .update({
-                                is_completed: true,
-                                completed_at: new Date().toISOString(),
-                              })
-                              .eq('id', realId);
-                            if (error) {
-                              toast.error('Failed to complete task');
-                            } else {
-                              refetchGrowthTasks();
-                            }
-                          } else {
-                            const { error } = await supabase
-                              .from('quick_tasks')
-                              .update({
-                                is_completed: true,
-                                completed_at: new Date().toISOString(),
-                              })
-                              .eq('id', task.id);
-                            if (error) {
-                              toast.error('Failed to complete task');
-                            } else {
-                              fetchTasks();
-                            }
-                          }
-                        }}
-                        onRemoveFromSlate={() => toggleSlate(task.id, true, task.source)}
-                        onPromoteToTaskList={task.source === 'slate-only' ? () => {
-                          const slateItem = slateOnlyItems.find(i => i.id === task.id);
-                          if (slateItem) promoteSlateOnlyToTaskList(slateItem);
-                        } : undefined}
-                      />
-                    ))}
-                  </div>
-                </SortableContext>
-              </DndContext>
-            )}
-          </ScrollArea>
-          
-          {/* Add new slate item */}
-          <div className="p-2 border-t">
-            <form 
-              onSubmit={(e) => {
-                e.preventDefault();
-                addSlateOnlyItem(newSlateItem);
-              }}
-              className="flex gap-2"
-            >
-              <Input
-                value={newSlateItem}
-                onChange={(e) => setNewSlateItem(e.target.value)}
-                placeholder="Add item to slate..."
-                className="h-8 text-sm flex-1"
-                maxLength={200}
-              />
-              <Button
-                type="submit"
-                size="sm"
-                variant="ghost"
-                className="h-8 w-8 p-0 shrink-0"
-                disabled={!newSlateItem.trim()}
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </form>
+          {/* Slate Tasks - scrollable area with fixed max height */}
+          <div className="flex-1 min-h-0 overflow-hidden">
+            <ScrollArea className="h-full">
+              <div className="p-3">
+                {orderedSlateTasks.length === 0 ? (
+                  <p className="text-center text-muted-foreground text-sm py-8">
+                    No tasks on your Slate yet.<br />
+                    Add tasks from your triaged list.
+                  </p>
+                ) : (
+                  <DndContext
+                    sensors={slateSensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleSlateDragEnd}
+                  >
+                    <SortableContext 
+                      items={orderedSlateTasks.map(t => t.id)} 
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <div className="space-y-2">
+                        {orderedSlateTasks.map((task, index) => (
+                          <SortableSlateItem
+                            key={task.id}
+                            task={task}
+                            index={index}
+                            onCompleteWithNotes={() => {
+                              if (task.source === 'slate-only') {
+                                // For slate-only, just remove it
+                                setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
+                                return;
+                              }
+                              const unified: UnifiedTask = { ...task, source: task.source };
+                              setTaskToComplete(unified);
+                              setCompletionNotes("");
+                              setCompleteDialogOpen(true);
+                            }}
+                            onQuickComplete={async () => {
+                              if (task.source === 'slate-only') {
+                                // For slate-only, just remove it
+                                setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
+                                return;
+                              }
+                              if (task.source === 'growth') {
+                                const realId = task.id.replace('growth-', '');
+                                const { error } = await supabase
+                                  .from('growth_tasks')
+                                  .update({
+                                    is_completed: true,
+                                    completed_at: new Date().toISOString(),
+                                  })
+                                  .eq('id', realId);
+                                if (error) {
+                                  toast.error('Failed to complete task');
+                                } else {
+                                  refetchGrowthTasks();
+                                }
+                              } else {
+                                const { error } = await supabase
+                                  .from('quick_tasks')
+                                  .update({
+                                    is_completed: true,
+                                    completed_at: new Date().toISOString(),
+                                  })
+                                  .eq('id', task.id);
+                                if (error) {
+                                  toast.error('Failed to complete task');
+                                } else {
+                                  fetchTasks();
+                                }
+                              }
+                            }}
+                            onRemoveFromSlate={() => toggleSlate(task.id, true, task.source)}
+                            onPromoteToTaskList={task.source === 'slate-only' ? () => {
+                              const slateItem = slateOnlyItems.find(i => i.id === task.id);
+                              if (slateItem) promoteSlateOnlyToTaskList(slateItem);
+                            } : undefined}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                )}
+              </div>
+            </ScrollArea>
           </div>
           
-          {/* Open full task list button */}
-          <div className="p-2 border-t">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full text-xs"
-              onClick={() => {
-                setIsSlateOpen(false);
-                setIsOpen(true);
-              }}
-            >
-              <CheckSquare className="h-3.5 w-3.5 mr-1.5" />
-              Open Full Task List
-            </Button>
+          {/* Footer - fixed at bottom */}
+          <div className="shrink-0 border-t bg-background">
+            {/* Add new slate item */}
+            <div className="p-2">
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  addSlateOnlyItem(newSlateItem);
+                }}
+                className="flex gap-2"
+              >
+                <Input
+                  value={newSlateItem}
+                  onChange={(e) => setNewSlateItem(e.target.value)}
+                  placeholder="Add item to slate..."
+                  className="h-8 text-sm flex-1"
+                  maxLength={200}
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0 shrink-0"
+                  disabled={!newSlateItem.trim()}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </form>
+            </div>
+            
+            {/* Open full task list button */}
+            <div className="p-2 pt-0">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs"
+                onClick={() => {
+                  setIsSlateOpen(false);
+                  setIsOpen(true);
+                }}
+              >
+                <CheckSquare className="h-3.5 w-3.5 mr-1.5" />
+                Open Full Task List
+              </Button>
+            </div>
           </div>
         </div>
       )}

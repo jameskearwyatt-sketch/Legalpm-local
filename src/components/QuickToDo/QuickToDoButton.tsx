@@ -2118,7 +2118,7 @@ export function QuickToDoButton() {
         <div
           ref={slateRef}
           className={cn(
-            "fixed z-50 w-[34rem] max-h-[70vh] rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
+            "fixed z-50 w-[34rem] h-[80vh] max-h-[80vh] rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
             isDraggingSlate && "select-none"
           )}
           style={{
@@ -2166,10 +2166,10 @@ export function QuickToDoButton() {
             </div>
           </div>
 
-          {/* Slate Tasks - scrollable area with fixed max height */}
+          {/* Slate Tasks - scrollable area */}
           <div className="flex-1 min-h-0 overflow-hidden">
-            <ScrollArea className="h-full">
-              <div className="p-3">
+            <ScrollArea className="h-full [&>[data-radix-scroll-area-viewport]]:max-h-full">
+              <div className="p-3 pb-4">
                 {orderedSlateTasks.length === 0 ? (
                   <p className="text-center text-muted-foreground text-sm py-8">
                     No tasks on your Slate yet.<br />

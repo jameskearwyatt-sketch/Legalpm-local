@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { WorkItemAllocator } from '@/components/time-recording/WorkItemAllocator';
 import { useTimeRecordingDrafts, TimeRecordingDraft } from '@/lib/hooks/useTimeRecordingDrafts';
+import { getMatterClientDisplayName } from '@/lib/clientUtils';
 import { 
   CalendarIcon, 
   Clock, 
@@ -280,7 +281,7 @@ export default function TimeRecording() {
         matterId: matter.id,
         matterNumber: matter.matter_number,
         matterName: matter.matter_name,
-        clientName: matter.clients?.name,
+        clientName: getMatterClientDisplayName(matter),
         cmNumber: matter.cm_number || undefined,
         hours: 0,
         narrative: '',

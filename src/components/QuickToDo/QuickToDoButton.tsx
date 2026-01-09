@@ -550,7 +550,7 @@ const SortableSlateItem = ({
       ref={setNodeRef} 
       style={style}
       className={cn(
-        "flex items-center gap-2 p-2 rounded-lg group",
+        "flex items-center gap-2 p-2 rounded-lg group min-w-0",
         isDragging && "shadow-lg ring-2 ring-primary/20",
         isSlateOnly 
           ? "bg-amber-50/50 dark:bg-amber-950/20 border border-dashed border-amber-300/50 dark:border-amber-700/30" 
@@ -592,7 +592,7 @@ const SortableSlateItem = ({
         />
       </div>
       <span className={cn(
-        "flex-1 text-sm truncate",
+        "flex-1 text-sm truncate min-w-0",
         isSlateOnly && "italic text-muted-foreground"
       )}>
         {task.title}
@@ -603,7 +603,7 @@ const SortableSlateItem = ({
         <Button
           variant="ghost"
           size="icon"
-          className="h-6 w-6 opacity-60 group-hover:opacity-100 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
+          className="h-6 w-6 shrink-0 opacity-60 group-hover:opacity-100 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
           onClick={onPromoteToTaskList}
           title="Add to main task list"
         >
@@ -614,7 +614,7 @@ const SortableSlateItem = ({
       <Button
         variant="ghost"
         size="icon"
-        className="h-6 w-6 opacity-0 group-hover:opacity-100"
+        className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100"
         onClick={onRemoveFromSlate}
         title="Remove from Slate"
       >
@@ -794,7 +794,7 @@ export function QuickToDoButton() {
       const newY = slateDragRef.current.startPosY + deltaY;
 
       // Constrain to viewport
-      const maxX = window.innerWidth - 512; // 32rem = 512px
+      const maxX = window.innerWidth - 544; // 34rem = 544px
       const maxY = window.innerHeight - 100;
       
       setSlatePosition({
@@ -2118,7 +2118,7 @@ export function QuickToDoButton() {
         <div
           ref={slateRef}
           className={cn(
-            "fixed z-50 w-[32rem] max-h-[70vh] rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
+            "fixed z-50 w-[34rem] max-h-[70vh] rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
             isDraggingSlate && "select-none"
           )}
           style={{

@@ -552,24 +552,10 @@ export function useMyUpcomingGrowthTasks() {
       const twoWeeksFromNow = new Date(now);
       twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
       
-      // Filter: (assigned to "Me" or unassigned AND due within 2 weeks) OR pinned to tasklist
+      // Only show tasks that are explicitly pinned to the task list
+      // This gives users full control - add to show, remove to hide
       return (data || []).filter((task: TaskWithProject) => {
-        // If pinned to tasklist, always include regardless of assignee
-        if (task.pinned_to_tasklist) {
-          return true;
-        }
-        
-        // For non-pinned tasks: Must be assigned to "Me" or unassigned
-        if (task.assignee && task.assignee !== 'Me') return false;
-        
-        // Must have a deadline
-        if (task.deadline_type === 'no_deadline' || !task.deadline_set_at) return false;
-        
-        const setAt = new Date(task.deadline_set_at);
-        const dueDate = calculateDueDate(setAt, task.deadline_type);
-        
-        // Due within the next 14 days (2 weeks) or already overdue
-        return dueDate <= twoWeeksFromNow;
+        return task.pinned_to_tasklist === true;
       }) as TaskWithProject[];
     },
     enabled: !!user,

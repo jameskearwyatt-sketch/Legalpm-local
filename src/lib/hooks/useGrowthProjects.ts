@@ -54,6 +54,8 @@ export interface GrowthTask {
   urgency: TaskUrgency;
   effort: TaskEffort;
   pinned_to_tasklist: boolean;
+  on_slate: boolean;
+  slate_sort_order: number;
   created_at: string;
   updated_at: string;
 }

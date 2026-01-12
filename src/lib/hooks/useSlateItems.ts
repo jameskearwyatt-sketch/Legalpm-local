@@ -301,13 +301,14 @@ export function useSlateOrder() {
       }
     },
     onSuccess: () => {
-      // Invalidate all related queries
+      // Invalidate all related queries to refetch with new order
       queryClient.invalidateQueries({ queryKey: ['quick-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['my-upcoming-growth-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['slate-items'] });
     },
     onError: (error) => {
       console.error('Error batch updating slate order:', error);
+      toast.error('Failed to save order');
     },
   });
 

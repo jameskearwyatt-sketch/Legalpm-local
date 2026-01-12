@@ -816,7 +816,7 @@ export function QuickToDoButton() {
     }
   }, [user]);
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     const { data, error } = await supabase
       .from('quick_tasks')
       .select('*')
@@ -844,7 +844,7 @@ export function QuickToDoButton() {
     }));
 
     setTasks(mappedTasks);
-  };
+  }, []);
 
   const addTask = async () => {
     if (!newTask.trim() || !user) return;
@@ -1257,8 +1257,8 @@ export function QuickToDoButton() {
         : undefined,
       pinned_to_tasklist: gt.pinned_to_tasklist,
       assignee: gt.assignee,
-      on_slate: (gt as any).on_slate || false,
-      slate_sort_order: (gt as any).slate_sort_order || 0,
+      on_slate: gt.on_slate || false,
+      slate_sort_order: gt.slate_sort_order || 0,
     }));
   }, [upcomingGrowthTasks]);
 
@@ -1395,9 +1395,14 @@ export function QuickToDoButton() {
         source: task.source === 'slate-only' ? 'slate-item' as const : task.source as 'quick' | 'growth',
         sortOrder: idx,
       }));
-      batchUpdateSlateOrder.mutate(updates);
+      batchUpdateSlateOrder.mutate(updates, {
+        onSuccess: () => {
+          // Refetch quick tasks manually since they don't use react-query
+          fetchTasks();
+        }
+      });
     }
-  }, [orderedSlateTasks, batchUpdateSlateOrder]);
+  }, [orderedSlateTasks, batchUpdateSlateOrder, fetchTasks]);
 
   // Handle personal task reorder - save to database
   const handlePersonalDragEnd = useCallback((event: DragEndEvent) => {

@@ -4,7 +4,7 @@ import {
   Briefcase, GraduationCap, Lightbulb, Maximize2, Minimize2,
   ListTodo, LayoutGrid, Filter, Check, ChevronDown, ChevronRight,
   Zap, Target, CalendarClock, Feather, Flame, MessageSquare, Pin, PinOff,
-  Clipboard, ClipboardCheck, GripHorizontal, GripVertical
+  Clipboard, ClipboardCheck, GripHorizontal, GripVertical, Search
 } from "lucide-react";
 import { 
   DndContext, 
@@ -77,6 +77,7 @@ interface QuickTask {
   created_at: string;
   completed_at: string | null;
   on_slate: boolean;
+  completion_notes?: string | null;
 }
 
 // Unified task type for display - can be a QuickTask or a Growth Task
@@ -97,6 +98,7 @@ interface UnifiedTask {
   pinned_to_tasklist?: boolean;
   assignee?: string | null;
   on_slate?: boolean;
+  completion_notes?: string | null;
 }
 
 // Slate-only item (not on main task list)
@@ -655,6 +657,11 @@ export function QuickToDoButton() {
   const [taskToComplete, setTaskToComplete] = useState<UnifiedTask | null>(null);
   const [completionNotes, setCompletionNotes] = useState("");
   
+  // Completed tasks section state
+  const [showCompletedTasks, setShowCompletedTasks] = useState(false);
+  const [completedSearchQuery, setCompletedSearchQuery] = useState("");
+  const [viewingNotesTask, setViewingNotesTask] = useState<UnifiedTask | null>(null);
+  
   // Slate panel state
   const [isSlateOpen, setIsSlateOpen] = useState(false);
   const [slatePosition, setSlatePosition] = useState<{ x: number; y: number } | null>(null);
@@ -854,6 +861,7 @@ export function QuickToDoButton() {
       created_at: t.created_at,
       completed_at: t.completed_at || null,
       on_slate: t.on_slate || false,
+      completion_notes: t.completion_notes || null,
     }));
 
     setTasks(mappedTasks);
@@ -1065,6 +1073,7 @@ export function QuickToDoButton() {
         .update({
           is_completed: true,
           completed_at: new Date().toISOString(),
+          completion_notes: completionNotes || null,
         })
         .eq('id', taskToComplete.id);
       
@@ -1289,9 +1298,38 @@ export function QuickToDoButton() {
 
   // Grouped tasks for Focus view
   const pendingTasks = useMemo(() => allUnifiedTasks.filter(t => !t.is_completed), [allUnifiedTasks]);
-  const completedTasks = useMemo(() => tasks.filter(t => t.is_completed), [tasks]);
+  
+  // Completed tasks - sorted by completion date (newest first), searchable
+  const completedUnifiedTasks: UnifiedTask[] = useMemo(() => {
+    const quickCompleted: UnifiedTask[] = tasks.filter(t => t.is_completed).map(t => ({ 
+      ...t, 
+      source: 'quick' as const,
+      projectName: undefined,
+    }));
+    const growthCompleted = unifiedGrowthTasks.filter(t => t.is_completed);
+    const allCompleted = [...quickCompleted, ...growthCompleted];
+    
+    // Sort by completion date (newest first)
+    allCompleted.sort((a, b) => {
+      const dateA = a.completed_at ? new Date(a.completed_at).getTime() : 0;
+      const dateB = b.completed_at ? new Date(b.completed_at).getTime() : 0;
+      return dateB - dateA;
+    });
+    
+    // Filter by search query
+    if (completedSearchQuery.trim()) {
+      const query = completedSearchQuery.toLowerCase();
+      return allCompleted.filter(t => 
+        t.title.toLowerCase().includes(query) ||
+        (t.completion_notes && t.completion_notes.toLowerCase().includes(query)) ||
+        (t.projectName && t.projectName.toLowerCase().includes(query))
+      );
+    }
+    
+    return allCompleted;
+  }, [tasks, unifiedGrowthTasks, completedSearchQuery]);
+  
   const incompleteTasks = pendingTasks; // alias for badge count
-  const completedUnifiedTasks: UnifiedTask[] = useMemo(() => completedTasks.map(t => ({ ...t, source: 'quick' as const })), [completedTasks]);
   
   // Untriaged count for blue badge
   const untriagedCount = useMemo(() => pendingTasks.filter(t => !isFullyTriaged(t)).length, [pendingTasks]);
@@ -2043,6 +2081,54 @@ export function QuickToDoButton() {
         </DialogContent>
       </Dialog>
 
+      {/* View Completion Notes Dialog */}
+      <Dialog open={!!viewingNotesTask} onOpenChange={(open) => !open && setViewingNotesTask(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Completion Notes
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Task</label>
+              <p className="text-sm font-medium">
+                {viewingNotesTask?.title}
+              </p>
+            </div>
+            
+            {viewingNotesTask?.projectName && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Project</label>
+                <p className="text-sm text-muted-foreground">{viewingNotesTask.projectName}</p>
+              </div>
+            )}
+            
+            {viewingNotesTask?.completed_at && (
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Completed</label>
+                <p className="text-sm text-muted-foreground">
+                  {format(new Date(viewingNotesTask.completed_at), 'MMMM d, yyyy \'at\' h:mm a')}
+                </p>
+              </div>
+            )}
+            
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Notes</label>
+              <div className="bg-muted p-3 rounded-lg text-sm whitespace-pre-wrap">
+                {viewingNotesTask?.completion_notes || 'No notes added'}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setViewingNotesTask(null)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Floating Draggable Button with Slate Circle - Hidden when panel is open */}
       {!isOpen && !isSlateOpen && (
         <div
@@ -2448,7 +2534,7 @@ export function QuickToDoButton() {
           {/* Task List */}
           <div className="flex-1 overflow-y-auto min-h-0">
             <div className="p-2 space-y-1.5">
-              {incompleteTasks.length === 0 && completedTasks.length === 0 && (
+              {incompleteTasks.length === 0 && completedUnifiedTasks.length === 0 && (
                 <p className="text-center text-muted-foreground text-sm py-8">
                   No tasks yet. Add one above!
                 </p>
@@ -2462,31 +2548,107 @@ export function QuickToDoButton() {
                   {renderQuadrant('eliminate')}
                   {renderQuadrant('untriaged')}
                   
-                  {completedTasks.length > 0 && (
-                    <div className="pt-2">
-                      <div className="text-xs text-muted-foreground pb-1 font-medium">
-                        Completed ({completedTasks.length})
-                      </div>
-                      {completedUnifiedTasks.slice(0, 5).map(task => (
-                        <div key={task.id} className="flex items-center gap-2 p-1.5 rounded bg-muted/30 group text-xs">
-                          <Checkbox
-                            checked={task.is_completed}
-                            onCheckedChange={() => toggleTask(task)}
-                            className="h-3.5 w-3.5"
+                  {/* Completed Tasks Section - Collapsible */}
+                  <div className="border-t pt-3 mt-3">
+                    <button
+                      type="button"
+                      className="flex items-center gap-2 w-full text-left mb-2"
+                      onClick={() => setShowCompletedTasks(!showCompletedTasks)}
+                    >
+                      {showCompletedTasks ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      <span className="text-xs text-muted-foreground font-medium">
+                        Completed Tasks
+                      </span>
+                      <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                        {completedUnifiedTasks.length}
+                      </Badge>
+                    </button>
+                    
+                    {showCompletedTasks && (
+                      <div className="space-y-2">
+                        {/* Search box */}
+                        <div className="relative">
+                          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                          <Input
+                            value={completedSearchQuery}
+                            onChange={(e) => setCompletedSearchQuery(e.target.value)}
+                            placeholder="Search completed tasks..."
+                            className="h-7 text-xs pl-7"
                           />
-                          <span className="flex-1 text-muted-foreground truncate">{task.title}</span>
-                          {task.completed_at && (
-                            <span className="text-[10px] text-muted-foreground shrink-0">
-                              {format(new Date(task.completed_at), 'MMM d')}
-                            </span>
-                          )}
-                          <Button variant="ghost" size="icon" className="h-5 w-5 opacity-0 group-hover:opacity-100" onClick={() => deleteTask(task.id)}>
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
                         </div>
-                      ))}
-                    </div>
-                  )}
+                        
+                        {/* Completed tasks list */}
+                        <ScrollArea className="max-h-48">
+                          <div className="space-y-1">
+                            {completedUnifiedTasks.length === 0 ? (
+                              <p className="text-xs text-muted-foreground text-center py-2">
+                                {completedSearchQuery ? 'No matching completed tasks' : 'No completed tasks yet'}
+                              </p>
+                            ) : (
+                              completedUnifiedTasks.map(task => (
+                                <div 
+                                  key={task.id} 
+                                  className="flex items-start gap-2 p-1.5 rounded bg-muted/30 group text-xs"
+                                >
+                                  <Checkbox
+                                    checked={task.is_completed}
+                                    onCheckedChange={() => toggleTask(task)}
+                                    className="h-3.5 w-3.5 mt-0.5"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <span className="text-muted-foreground block truncate">{task.title}</span>
+                                    {task.projectName && (
+                                      <span className="text-[10px] text-muted-foreground/70 block">
+                                        {task.projectName}
+                                      </span>
+                                    )}
+                                    {task.completion_notes && (
+                                      <button
+                                        type="button"
+                                        onClick={() => setViewingNotesTask(task)}
+                                        className="text-[10px] text-primary/80 hover:text-primary flex items-center gap-0.5 mt-0.5"
+                                      >
+                                        <MessageSquare className="h-2.5 w-2.5" />
+                                        View notes
+                                      </button>
+                                    )}
+                                  </div>
+                                  {task.completed_at && (
+                                    <span className="text-[10px] text-muted-foreground shrink-0">
+                                      {format(new Date(task.completed_at), 'MMM d')}
+                                    </span>
+                                  )}
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0" 
+                                    onClick={() => {
+                                      if (task.source === 'growth') {
+                                        // Delete growth task
+                                        const realId = task.id.replace('growth-', '');
+                                        supabase
+                                          .from('growth_tasks')
+                                          .delete()
+                                          .eq('id', realId)
+                                          .then(({ error }) => {
+                                            if (error) toast.error('Failed to delete task');
+                                            else refetchGrowthTasks();
+                                          });
+                                      } else {
+                                        deleteTask(task.id);
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
 

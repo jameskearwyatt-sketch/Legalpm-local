@@ -3,7 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, User, Check, ChevronDown, ChevronRight, Filter, Clock, MessageSquare, X, ListTodo } from 'lucide-react';
+import { Trash2, User, Check, ChevronDown, ChevronRight, Filter, Clock, MessageSquare, X, ListTodo, Mail, Loader2, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -38,6 +38,9 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/lib/auth';
+import { toast } from 'sonner';
 
 interface TaskListViewsProps {
   tasks: GrowthTask[];
@@ -45,6 +48,8 @@ interface TaskListViewsProps {
   onDeleteTask: (id: string) => void;
   onToggleComplete: (id: string, completionNotes?: string) => void;
   view: 'focus' | 'matrix';
+  projectName?: string;
+  projectType?: string;
 }
 
 interface TaskRowProps {
@@ -59,6 +64,8 @@ interface TaskRowProps {
   showDelegateHint?: boolean;
   compact?: boolean;
   onCompleteWithNotes?: () => void;
+  projectName?: string;
+  projectType?: string;
 }
 
 const deadlineOptions: TaskDeadlineType[] = [
@@ -83,7 +90,10 @@ const TaskRow = ({
   showDelegateHint = false,
   compact = false,
   onCompleteWithNotes,
+  projectName,
+  projectType,
 }: TaskRowProps) => {
+  const { user } = useAuth();
   const { assignees, addAssignee } = useKnownAssignees();
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [deadlineOpen, setDeadlineOpen] = useState(false);
@@ -94,6 +104,12 @@ const TaskRow = ({
   const [triageExpanded, setTriageExpanded] = useState(false);
   const triageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
+  
+  // Email drafting state
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [isDraftingEmail, setIsDraftingEmail] = useState(false);
+  const [draftedEmail, setDraftedEmail] = useState<{ subject: string; body: string } | null>(null);
+  const [copied, setCopied] = useState(false);
   
   // Pending triage state - track changes before confirmation
   const [pendingTriage, setPendingTriage] = useState<{
@@ -109,6 +125,55 @@ const TaskRow = ({
   
   const isTriaged = isFullyTriaged(displayUrgency, displayImportance, displayEffort);
   const hasPendingChanges = pendingTriage !== null;
+
+  // Check if task is delegated (assignee is not "Me" or user's name)
+  const isDelegated = task.assignee && 
+    task.assignee.toLowerCase() !== 'me' && 
+    task.assignee.toLowerCase() !== (user?.user_metadata?.full_name?.toLowerCase() || '');
+
+  // Draft delegation email
+  const handleDraftEmail = async () => {
+    if (!task.assignee) return;
+    
+    setIsDraftingEmail(true);
+    setDraftedEmail(null);
+    setShowEmailDialog(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('draft-delegation-email', {
+        body: {
+          taskTitle: task.title,
+          assigneeName: task.assignee,
+          projectName: projectName,
+          projectType: projectType,
+          senderName: user?.user_metadata?.full_name || undefined,
+        },
+      });
+
+      if (error) throw error;
+
+      setDraftedEmail({
+        subject: data.subject,
+        body: data.body,
+      });
+    } catch (err) {
+      console.error('Error drafting email:', err);
+      toast.error('Failed to draft email');
+      setShowEmailDialog(false);
+    } finally {
+      setIsDraftingEmail(false);
+    }
+  };
+
+  const handleCopyEmail = async () => {
+    if (!draftedEmail) return;
+    
+    const fullEmail = `Subject: ${draftedEmail.subject}\n\n${draftedEmail.body}`;
+    await navigator.clipboard.writeText(fullEmail);
+    setCopied(true);
+    toast.success('Email copied to clipboard');
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const handleRowMouseMove = (e: React.MouseEvent) => {
     if (!rowRef.current || triageExpanded) return; // Don't start new timer if already expanded
@@ -371,6 +436,23 @@ const TaskRow = ({
       
       {/* Action buttons - separate from triage */}
       <div className="flex items-center gap-1 shrink-0">
+        {/* Draft Email button for delegated tasks */}
+        {!task.is_completed && isDelegated && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 px-2 text-[10px] border-dashed"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDraftEmail();
+            }}
+            title={`Draft email to ${task.assignee}`}
+          >
+            <Mail className="h-3 w-3 mr-1" />
+            Email
+          </Button>
+        )}
+
         {/* Pin to Task List button */}
         {!task.is_completed && (() => {
           // Check if task is on the task list
@@ -417,6 +499,62 @@ const TaskRow = ({
           <Trash2 className="h-3 w-3" />
         </Button>
       </div>
+
+      {/* Draft Email dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent className="sm:max-w-[500px]" onClick={(e) => e.stopPropagation()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Draft Email to {task.assignee?.split(' ')[0]}
+            </DialogTitle>
+            <DialogDescription>
+              AI-generated email for delegating this task
+            </DialogDescription>
+          </DialogHeader>
+          
+          {isDraftingEmail ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Drafting email...</p>
+            </div>
+          ) : draftedEmail ? (
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Subject</label>
+                <p className="text-sm font-medium mt-1 p-2 bg-muted rounded">{draftedEmail.subject}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Body</label>
+                <div className="mt-1 p-3 bg-muted rounded whitespace-pre-wrap text-sm">
+                  {draftedEmail.body}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEmailDialog(false)}>
+              Close
+            </Button>
+            {draftedEmail && (
+              <Button onClick={handleCopyEmail}>
+                {copied ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Email
+                  </>
+                )}
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
@@ -443,7 +581,9 @@ export const TodaysFocusView = ({
   tasks, 
   onUpdateTask, 
   onDeleteTask, 
-  onToggleComplete 
+  onToggleComplete,
+  projectName,
+  projectType,
 }: Omit<TaskListViewsProps, 'view'>) => {
   const [showUntriagedOnly, setShowUntriagedOnly] = useState(false);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
@@ -567,6 +707,8 @@ export const TodaysFocusView = ({
                   triageMode={false}
                   showDelegateHint={quadrant === 'delegate'}
                   onCompleteWithNotes={() => handleCompleteWithNotes(task)}
+                  projectName={projectName}
+                  projectType={projectType}
                 />
               </div>
             ))}

@@ -444,6 +444,8 @@ const GrowthProjectDetail = () => {
                     });
                   }
                 }}
+                projectName={project.name}
+                projectType={project.project_type}
               />
 
             </CardContent>

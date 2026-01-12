@@ -79,6 +79,7 @@ interface QuickTask {
   completed_at: string | null;
   on_slate: boolean;
   completion_notes?: string | null;
+  slate_sort_order?: number;
 }
 
 // Unified task type for display - can be a QuickTask or a Growth Task
@@ -100,6 +101,7 @@ interface UnifiedTask {
   assignee?: string | null;
   on_slate?: boolean;
   completion_notes?: string | null;
+  slate_sort_order?: number;
 }
 
 // SlateOnlyItem type is now deprecated - we use SlateItem from useSlateItems hook
@@ -838,6 +840,7 @@ export function QuickToDoButton() {
       completed_at: t.completed_at || null,
       on_slate: t.on_slate || false,
       completion_notes: t.completion_notes || null,
+      slate_sort_order: t.slate_sort_order || 0,
     }));
 
     setTasks(mappedTasks);
@@ -1255,6 +1258,7 @@ export function QuickToDoButton() {
       pinned_to_tasklist: gt.pinned_to_tasklist,
       assignee: gt.assignee,
       on_slate: (gt as any).on_slate || false,
+      slate_sort_order: (gt as any).slate_sort_order || 0,
     }));
   }, [upcomingGrowthTasks]);
 
@@ -2307,7 +2311,8 @@ export function QuickToDoButton() {
                                   index={index}
                                   onCompleteWithNotes={() => {
                                     if (task.source === 'slate-only') {
-                                      setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
+                                      // Complete slate-only item via database
+                                      completeSlateItem.mutate({ id: task.id, isCompleted: true });
                                       return;
                                     }
                                     const unified: UnifiedTask = { ...task, source: task.source };
@@ -2317,7 +2322,8 @@ export function QuickToDoButton() {
                                   }}
                                   onQuickComplete={async () => {
                                     if (task.source === 'slate-only') {
-                                      setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
+                                      // Complete slate-only item via database
+                                      completeSlateItem.mutate({ id: task.id, isCompleted: true });
                                       return;
                                     }
                                     if (task.source === 'growth') {
@@ -2351,7 +2357,7 @@ export function QuickToDoButton() {
                                   }}
                                   onRemoveFromSlate={() => toggleSlate(task.id, true, task.source)}
                                   onPromoteToTaskList={task.source === 'slate-only' ? () => {
-                                    const slateItem = slateOnlyItems.find(i => i.id === task.id);
+                                    const slateItem = workSlateItems.find(i => i.id === task.id);
                                     if (slateItem) promoteSlateOnlyToTaskList(slateItem);
                                   } : undefined}
                                 />
@@ -2394,7 +2400,8 @@ export function QuickToDoButton() {
                                   <Checkbox
                                     checked={false}
                                     onCheckedChange={() => {
-                                      setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
+                                      // Complete personal slate item via database
+                                      completeSlateItem.mutate({ id: task.id, isCompleted: true });
                                     }}
                                     className="h-4 w-4 shrink-0"
                                     title="Complete"
@@ -2409,7 +2416,8 @@ export function QuickToDoButton() {
                                     size="icon"
                                     className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100"
                                     onClick={() => {
-                                      setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
+                                      // Delete personal slate item via database
+                                      deleteSlateItem.mutate(task.id);
                                     }}
                                     title="Remove"
                                   >

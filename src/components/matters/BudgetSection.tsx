@@ -142,6 +142,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         is_included: item.is_included,
         category: item.category || undefined,
         wip_amount: item.wip_amount,
+        wip_write_off: item.wip_write_off,
         wip_updated_at: item.wip_updated_at,
       })));
     } else if (!hasExistingBudget && draftItems.length === 0) {

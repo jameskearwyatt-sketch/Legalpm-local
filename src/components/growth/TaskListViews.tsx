@@ -372,26 +372,35 @@ const TaskRow = ({
       {/* Action buttons - separate from triage */}
       <div className="flex items-center gap-1 shrink-0">
         {/* Pin to Task List button */}
-        {!task.is_completed && (
-          <Button
-            variant={task.pinned_to_tasklist ? "default" : "outline"}
-            size="sm"
-            className={cn(
-              "h-6 px-2 text-[10px]",
-              task.pinned_to_tasklist 
-                ? "bg-primary text-primary-foreground" 
-                : "border-dashed"
-            )}
-            onClick={(e) => {
-              e.stopPropagation();
-              onUpdate({ pinned_to_tasklist: !task.pinned_to_tasklist });
-            }}
-            title={task.pinned_to_tasklist ? "Remove from Task List" : "Add to Task List"}
-          >
-            <ListTodo className="h-3 w-3 mr-1" />
-            {task.pinned_to_tasklist ? 'On Tasks' : 'Add'}
-          </Button>
-        )}
+        {!task.is_completed && (() => {
+          // Check if task is on the task list (pinned OR auto-added via short deadline)
+          const shortDeadlines: TaskDeadlineType[] = ['this_week', 'next_week'];
+          const isAutoAdded = task.pinned_to_tasklist !== false && shortDeadlines.includes(task.deadline_type);
+          const isOnTaskList = task.pinned_to_tasklist === true || isAutoAdded;
+          
+          return (
+            <Button
+              variant={isOnTaskList ? "default" : "outline"}
+              size="sm"
+              className={cn(
+                "h-6 px-2 text-[10px]",
+                isOnTaskList 
+                  ? "bg-primary text-primary-foreground" 
+                  : "border-dashed"
+              )}
+              onClick={(e) => {
+                e.stopPropagation();
+                // If currently on task list, explicitly remove (set to false)
+                // If not on task list, explicitly add (set to true)
+                onUpdate({ pinned_to_tasklist: !isOnTaskList });
+              }}
+              title={isOnTaskList ? "Remove from Task List" : "Add to Task List"}
+            >
+              <ListTodo className="h-3 w-3 mr-1" />
+              {isOnTaskList ? 'On Tasks' : 'Add'}
+            </Button>
+          );
+        })()}
         
         {/* Delete button */}
         <Button

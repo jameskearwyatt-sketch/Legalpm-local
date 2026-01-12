@@ -554,12 +554,15 @@ export function useMyUpcomingGrowthTasks() {
       
       // Auto-include tasks that are:
       // 1. Explicitly pinned to the task list, OR
-      // 2. Have deadlines of this_week or next_week (immediate/short-term tasks)
+      // 2. Have deadlines of this_week or next_week AND not explicitly unpinned
       return (data || []).filter((task: TaskWithProject) => {
         // Always include explicitly pinned tasks
         if (task.pinned_to_tasklist === true) return true;
         
-        // Auto-include tasks with short deadlines (this_week, next_week)
+        // Respect explicit opt-out (user clicked to remove from task list)
+        if (task.pinned_to_tasklist === false) return false;
+        
+        // Auto-include tasks with short deadlines (this_week, next_week) when not explicitly unpinned
         const shortDeadlines: TaskDeadlineType[] = ['this_week', 'next_week'];
         if (shortDeadlines.includes(task.deadline_type)) return true;
         

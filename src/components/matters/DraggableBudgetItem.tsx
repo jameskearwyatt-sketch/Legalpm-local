@@ -360,7 +360,10 @@ export function DraggableBudgetItem({
 
       {/* WIP Amount - only show when budget exists */}
       {hasExistingBudget && (
-        <div className="text-right min-w-[80px]">
+        <div className={cn(
+          "text-right min-w-[100px]",
+          hasWriteOff && "bg-destructive/10 rounded-md px-2 py-1 -my-1"
+        )}>
           <div className="text-xs text-muted-foreground">WIP</div>
           <div className={cn('font-medium text-sm flex items-center justify-end gap-1', hasWipData && wipHealth.text)}>
             {hasWipData && (
@@ -377,10 +380,12 @@ export function DraggableBudgetItem({
               </span>
             )}
           </div>
-          {/* Write-off amount in red */}
+          {/* Write-off amount - prominently displayed in red */}
           {hasWriteOff && (
-            <div className="text-xs text-destructive">
-              W/O: {formatCurrency(isInBillingCurrencyMode ? writeOffAmount * mandatedRate : writeOffAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
+            <div className="flex items-center justify-end gap-1 mt-0.5">
+              <span className="text-xs font-medium text-destructive bg-destructive/20 px-1.5 py-0.5 rounded">
+                ✕ W/O: {formatCurrency(isInBillingCurrencyMode ? writeOffAmount * mandatedRate : writeOffAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
+              </span>
             </div>
           )}
         </div>

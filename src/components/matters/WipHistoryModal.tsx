@@ -29,7 +29,10 @@ interface WipHistoryModalProps {
   onClose: () => void;
   matterId: string;
   formatCurrency: (value: number, currency?: string) => string;
-  currency: string;
+  billingCurrency: string;
+  quoteCurrency: string;
+  mandatedRate: number;
+  differentBillingCurrency: boolean;
 }
 
 // Get health color based on WIP percentage of estimate
@@ -64,7 +67,9 @@ function WipUpdateCard({
   onDelete,
   isDeleting,
   formatCurrency,
-  currency,
+  billingCurrency,
+  mandatedRate,
+  differentBillingCurrency,
   fetchItems,
 }: { 
   update: DetailedWipUpdate;
@@ -72,7 +77,9 @@ function WipUpdateCard({
   onDelete: () => void;
   isDeleting: boolean;
   formatCurrency: (value: number, currency?: string) => string;
-  currency: string;
+  billingCurrency: string;
+  mandatedRate: number;
+  differentBillingCurrency: boolean;
   fetchItems: (id: string) => Promise<DetailedWipUpdateItem[]>;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -94,9 +101,14 @@ function WipUpdateCard({
     setIsExpanded(!isExpanded);
   };
 
-  // Calculate total estimate from items
-  const totalEstimate = items.reduce((sum, item) => sum + item.fee_amount, 0);
-  const overallHealth = getHealthColor(update.total_wip_amount, totalEstimate || update.total_wip_amount);
+  // Calculate total estimate from items - convert to billing currency
+  const totalEstimateQuote = items.reduce((sum, item) => sum + item.fee_amount, 0);
+  const totalWipQuote = update.total_wip_amount;
+  
+  // Convert to billing currency for display
+  const totalEstimate = differentBillingCurrency ? totalEstimateQuote * mandatedRate : totalEstimateQuote;
+  const totalWip = differentBillingCurrency ? totalWipQuote * mandatedRate : totalWipQuote;
+  const overallHealth = getHealthColor(totalWip, totalEstimate || totalWip);
 
   // Group items by category
   const groupedItems = items.reduce((acc, item) => {
@@ -137,7 +149,7 @@ function WipUpdateCard({
               )}
             </div>
             <p className="text-sm text-muted-foreground mt-1">
-              Total WIP: {formatCurrency(update.total_wip_amount, currency)}
+              Total WIP: {formatCurrency(totalWip, billingCurrency)}
             </p>
           </div>
         </div>
@@ -201,7 +213,7 @@ function WipUpdateCard({
                   <div>
                     <p className={cn('text-sm font-medium', overallHealth.text)}>Overall Progress</p>
                     <p className={cn('text-xl font-bold', overallHealth.text)}>
-                      {formatCurrency(update.total_wip_amount, currency)} / {formatCurrency(totalEstimate, currency)}
+                      {formatCurrency(totalWip, billingCurrency)} / {formatCurrency(totalEstimate, billingCurrency)}
                     </p>
                   </div>
                   <div className={cn('text-2xl font-bold', overallHealth.text)}>
@@ -219,7 +231,9 @@ function WipUpdateCard({
                     </div>
                     <div className="divide-y">
                       {categoryItems.map(item => {
-                        const health = getHealthColor(item.wip_amount, item.fee_amount);
+                        const displayWip = differentBillingCurrency ? item.wip_amount * mandatedRate : item.wip_amount;
+                        const displayFee = differentBillingCurrency ? item.fee_amount * mandatedRate : item.fee_amount;
+                        const health = getHealthColor(displayWip, displayFee);
                         return (
                           <div
                             key={item.id}
@@ -236,13 +250,13 @@ function WipUpdateCard({
                             </div>
                             <div className="text-right flex-shrink-0">
                               <span className="text-muted-foreground">
-                                {formatCurrency(item.wip_amount, currency)}
+                                {formatCurrency(displayWip, billingCurrency)}
                               </span>
                               <span className="text-muted-foreground mx-1">/</span>
-                              <span>{formatCurrency(item.fee_amount, currency)}</span>
+                              <span>{formatCurrency(displayFee, billingCurrency)}</span>
                             </div>
                             <div className={cn('w-12 text-right font-medium', health.text)}>
-                              {getPercentage(item.wip_amount, item.fee_amount)}
+                              {getPercentage(displayWip, displayFee)}
                             </div>
                           </div>
                         );
@@ -264,7 +278,10 @@ export function WipHistoryModal({
   onClose,
   matterId,
   formatCurrency,
-  currency,
+  billingCurrency,
+  quoteCurrency,
+  mandatedRate,
+  differentBillingCurrency,
 }: WipHistoryModalProps) {
   const { 
     wipUpdates, 
@@ -319,7 +336,9 @@ export function WipHistoryModal({
                 onDelete={() => handleDelete(update.id)}
                 isDeleting={deletingId === update.id}
                 formatCurrency={formatCurrency}
-                currency={currency}
+                billingCurrency={billingCurrency}
+                mandatedRate={mandatedRate}
+                differentBillingCurrency={differentBillingCurrency}
                 fetchItems={fetchWipUpdateItems}
               />
             ))}

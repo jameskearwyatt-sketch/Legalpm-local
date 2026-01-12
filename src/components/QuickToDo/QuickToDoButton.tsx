@@ -558,7 +558,7 @@ const SortableSlateItem = ({
       ref={setNodeRef} 
       style={style}
       className={cn(
-        "flex items-center gap-2 p-2 rounded-lg group min-w-0",
+        "flex items-start gap-2 p-2 rounded-lg group min-w-0",
         isDragging && "shadow-lg ring-2 ring-primary/20",
         isSlateOnly 
           ? "bg-amber-50/50 dark:bg-amber-950/20 border border-dashed border-amber-300/50 dark:border-amber-700/30" 
@@ -600,7 +600,7 @@ const SortableSlateItem = ({
         />
       </div>
       <span className={cn(
-        "flex-1 text-sm truncate min-w-0",
+        "flex-1 text-sm min-w-0 break-words",
         isSlateOnly && "italic text-muted-foreground"
       )}>
         {task.title}
@@ -2452,7 +2452,7 @@ export function QuickToDoButton() {
                               {orderedPersonalTasks.map((task, index) => (
                                 <div 
                                   key={task.id}
-                                  className="flex items-center gap-2 p-2 rounded-lg group min-w-0 bg-rose-50/50 dark:bg-rose-950/20 border border-dashed border-rose-300/50 dark:border-rose-700/30"
+                                  className="flex items-start gap-2 p-2 rounded-lg group min-w-0 bg-rose-50/50 dark:bg-rose-950/20 border border-dashed border-rose-300/50 dark:border-rose-700/30"
                                 >
                                   {/* Number badge */}
                                   <div className="flex items-center justify-center w-5 h-5 rounded text-xs font-bold bg-rose-200/50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 shrink-0">
@@ -2470,7 +2470,7 @@ export function QuickToDoButton() {
                                     title="Complete"
                                   />
                                   
-                                  <span className="flex-1 text-sm truncate min-w-0 italic text-muted-foreground">
+                                  <span className="flex-1 text-sm min-w-0 break-words italic text-muted-foreground">
                                     {task.title}
                                   </span>
                                   

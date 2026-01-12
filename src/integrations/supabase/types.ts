@@ -485,6 +485,7 @@ export type Database = {
           on_slate: boolean
           pinned_to_tasklist: boolean
           project_id: string
+          slate_sort_order: number
           sort_order: number
           title: string
           updated_at: string
@@ -506,6 +507,7 @@ export type Database = {
           on_slate?: boolean
           pinned_to_tasklist?: boolean
           project_id: string
+          slate_sort_order?: number
           sort_order?: number
           title: string
           updated_at?: string
@@ -527,6 +529,7 @@ export type Database = {
           on_slate?: boolean
           pinned_to_tasklist?: boolean
           project_id?: string
+          slate_sort_order?: number
           sort_order?: number
           title?: string
           updated_at?: string
@@ -1252,6 +1255,7 @@ export type Database = {
           is_completed: boolean
           is_urgent: boolean
           on_slate: boolean
+          slate_sort_order: number
           title: string
           urgency: Database["public"]["Enums"]["task_urgency"]
           user_id: string
@@ -1266,6 +1270,7 @@ export type Database = {
           is_completed?: boolean
           is_urgent?: boolean
           on_slate?: boolean
+          slate_sort_order?: number
           title: string
           urgency?: Database["public"]["Enums"]["task_urgency"]
           user_id: string
@@ -1280,8 +1285,45 @@ export type Database = {
           is_completed?: boolean
           is_urgent?: boolean
           on_slate?: boolean
+          slate_sort_order?: number
           title?: string
           urgency?: Database["public"]["Enums"]["task_urgency"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      slate_items: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          is_completed: boolean
+          is_personal: boolean
+          sort_order: number
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          is_personal?: boolean
+          sort_order?: number
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          is_personal?: boolean
+          sort_order?: number
+          title?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []

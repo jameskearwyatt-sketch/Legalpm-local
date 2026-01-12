@@ -33,7 +33,10 @@ interface DetailedWipUpdateModalProps {
   lineItems: BudgetLineItem[];
   matterId: string;
   formatCurrency: (value: number, currency?: string) => string;
-  currency: string;
+  billingCurrency: string;
+  quoteCurrency: string;
+  mandatedRate: number;
+  differentBillingCurrency: boolean;
 }
 
 // Get health color based on WIP percentage of estimate
@@ -73,7 +76,10 @@ export function DetailedWipUpdateModal({
   lineItems,
   matterId,
   formatCurrency,
-  currency,
+  billingCurrency,
+  quoteCurrency,
+  mandatedRate,
+  differentBillingCurrency,
 }: DetailedWipUpdateModalProps) {
   const { createWipUpdate } = useDetailedWipUpdates(matterId);
   const [wipItems, setWipItems] = useState<WipLineItem[]>([]);
@@ -142,9 +148,13 @@ export function DetailedWipUpdateModal({
     }
   };
 
-  // Calculate totals
-  const totalEstimate = wipItems.reduce((sum, item) => sum + item.fee_amount, 0);
-  const totalWip = wipItems.reduce((sum, item) => sum + item.wip_amount, 0);
+  // Calculate totals - convert to billing currency if needed
+  const totalEstimateQuote = wipItems.reduce((sum, item) => sum + item.fee_amount, 0);
+  const totalWipQuote = wipItems.reduce((sum, item) => sum + item.wip_amount, 0);
+  
+  // Convert to billing currency for display
+  const totalEstimate = differentBillingCurrency ? totalEstimateQuote * mandatedRate : totalEstimateQuote;
+  const totalWip = differentBillingCurrency ? totalWipQuote * mandatedRate : totalWipQuote;
   const overallHealth = getHealthColor(totalWip, totalEstimate);
 
   // Group items by category
@@ -212,8 +222,13 @@ export function DetailedWipUpdateModal({
                 <div>
                   <p className={cn('text-sm font-medium', overallHealth.text)}>Overall Progress</p>
                   <p className={cn('text-2xl font-bold', overallHealth.text)}>
-                    {formatCurrency(totalWip, currency)} / {formatCurrency(totalEstimate, currency)}
+                    {formatCurrency(totalWip, billingCurrency)} / {formatCurrency(totalEstimate, billingCurrency)}
                   </p>
+                  {differentBillingCurrency && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      All values shown in {billingCurrency} (billing currency)
+                    </p>
+                  )}
                 </div>
                 <div className={cn('text-3xl font-bold', overallHealth.text)}>
                   {getPercentage(totalWip, totalEstimate)}
@@ -236,7 +251,10 @@ export function DetailedWipUpdateModal({
                   </div>
                   <div className="divide-y">
                     {items.map(item => {
-                      const health = getHealthColor(item.wip_amount, item.fee_amount);
+                      // Convert amounts to billing currency for display
+                      const displayFeeAmount = differentBillingCurrency ? item.fee_amount * mandatedRate : item.fee_amount;
+                      const displayWipAmount = differentBillingCurrency ? item.wip_amount * mandatedRate : item.wip_amount;
+                      const health = getHealthColor(displayWipAmount, displayFeeAmount);
                       return (
                         <div
                           key={item.id}
@@ -255,21 +273,28 @@ export function DetailedWipUpdateModal({
                             </p>
                           </div>
                           
-                          {/* Estimate */}
+                          {/* Estimate - in billing currency */}
                           <div className="text-right flex-shrink-0 w-24">
                             <Label className="text-xs text-muted-foreground">Estimate</Label>
-                            <p className="text-sm font-medium">{formatCurrency(item.fee_amount, currency)}</p>
+                            <p className="text-sm font-medium">{formatCurrency(displayFeeAmount, billingCurrency)}</p>
                           </div>
                           
-                          {/* WIP Input */}
+                          {/* WIP Input - in billing currency */}
                           <div className="flex-shrink-0 w-32">
-                            <Label className="text-xs text-muted-foreground">WIP</Label>
+                            <Label className="text-xs text-muted-foreground">WIP ({billingCurrency})</Label>
                             <Input
                               type="number"
                               min="0"
                               step="0.01"
-                              value={item.wip_amount || ''}
-                              onChange={e => updateWipAmount(item.id, e.target.value)}
+                              value={displayWipAmount || ''}
+                              onChange={e => {
+                                // Convert input back to quote currency for storage
+                                const billingValue = parseFloat(e.target.value) || 0;
+                                const quoteValue = differentBillingCurrency && mandatedRate > 0 
+                                  ? billingValue / mandatedRate 
+                                  : billingValue;
+                                updateWipAmount(item.id, quoteValue.toString());
+                              }}
                               className="h-8 text-sm"
                               placeholder="0"
                             />
@@ -277,7 +302,7 @@ export function DetailedWipUpdateModal({
                           
                           {/* Percentage */}
                           <div className={cn('w-16 text-right font-bold', health.text)}>
-                            {getPercentage(item.wip_amount, item.fee_amount)}
+                            {getPercentage(displayWipAmount, displayFeeAmount)}
                           </div>
                         </div>
                       );
@@ -315,7 +340,7 @@ export function DetailedWipUpdateModal({
         onClose={() => setShowImportDialog(false)}
         onApplyMatches={handleApplyMatches}
         budgetLineItems={wipItems}
-        currency={currency}
+        currency={billingCurrency}
         formatCurrency={formatCurrency}
       />
     </Dialog>

@@ -253,7 +253,7 @@ export function DraggableBudgetItem({
 
   // Normal viewing mode (no budget yet or just viewing)
   const rawWipAmount = item.wip_amount || 0;
-  const writeOffAmount = (item as any).wip_write_off || 0;
+  const writeOffAmount = item.wip_write_off || 0;
   // Net WIP = raw WIP minus write-offs (write-offs reduce actual WIP)
   const wipAmount = rawWipAmount - writeOffAmount;
   const wipHealth = getHealthColor(wipAmount, item.fee_amount || 0);
@@ -267,7 +267,7 @@ export function DraggableBudgetItem({
       style={style}
       className={cn(
         'grid gap-2 items-center rounded-md py-1 px-1 transition-colors',
-        hasExistingBudget ? 'grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto]' : 'grid-cols-12',
+        hasExistingBudget ? 'grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto_auto]' : 'grid-cols-12',
         isDragging && 'opacity-50',
         isAiSuggested && 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700',
         item.is_optional && !item.is_included && hasExistingBudget && 'opacity-50',
@@ -360,10 +360,7 @@ export function DraggableBudgetItem({
 
       {/* Budget Used (WIP) - only show when budget exists */}
       {hasExistingBudget && (
-        <div className={cn(
-          "text-right min-w-[100px]",
-          hasWriteOff && "bg-destructive/10 rounded-md px-2 py-1 -my-1"
-        )}>
+        <div className="text-right min-w-[100px]">
           <div className="text-xs text-muted-foreground">Budget Used</div>
           <div className={cn('font-medium text-sm flex items-center justify-end gap-1', hasWipData && wipHealth.text)}>
             {hasWipData && (
@@ -380,13 +377,19 @@ export function DraggableBudgetItem({
               </span>
             )}
           </div>
-          {/* Write-off amount - prominently displayed in red */}
-          {hasWriteOff && (
-            <div className="flex items-center justify-end gap-1 mt-0.5">
-              <span className="text-xs font-medium text-destructive bg-destructive/20 px-1.5 py-0.5 rounded">
-                ✕ W/O: {formatCurrency(isInBillingCurrencyMode ? writeOffAmount * mandatedRate : writeOffAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
-              </span>
+        </div>
+      )}
+
+      {/* Write-off column - always show when budget exists */}
+      {hasExistingBudget && (
+        <div className="text-right min-w-[90px]">
+          <div className="text-xs text-muted-foreground">Write-off</div>
+          {hasWriteOff ? (
+            <div className="font-medium text-sm text-destructive bg-destructive/10 rounded px-1.5 py-0.5 inline-block">
+              {formatCurrency(isInBillingCurrencyMode ? writeOffAmount * mandatedRate : writeOffAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
             </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">-</div>
           )}
         </div>
       )}

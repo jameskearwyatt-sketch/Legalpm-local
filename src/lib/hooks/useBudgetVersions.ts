@@ -173,14 +173,33 @@ export function useBudgetVersions(matterId?: string) {
         if (itemsError) throw itemsError;
       }
 
-      // Update the matters table with new budget totals
+      // Fetch current matter to check for different billing currency settings
+      const { data: currentMatter } = await supabase
+        .from('matters')
+        .select('different_billing_currency, agreed_billing_amount, fee_amount_upper_end')
+        .eq('id', input.matter_id)
+        .single();
+
+      // Build update object for matters table
+      const matterUpdate: Record<string, any> = {
+        fee_amount_upper_end: totalAmount,
+        bm_fee_component: bmTotal,
+        local_counsel_fee: localCounselTotal,
+      };
+
+      // If different billing currency is enabled, update agreed_billing_amount proportionally
+      if (currentMatter?.different_billing_currency && 
+          currentMatter.agreed_billing_amount > 0 && 
+          currentMatter.fee_amount_upper_end > 0) {
+        // Calculate the mandated rate from original values
+        const mandatedRate = currentMatter.agreed_billing_amount / currentMatter.fee_amount_upper_end;
+        // Apply the same rate to new total to get new agreed billing amount
+        matterUpdate.agreed_billing_amount = totalAmount * mandatedRate;
+      }
+
       const { error: matterError } = await supabase
         .from('matters')
-        .update({
-          fee_amount_upper_end: totalAmount,
-          bm_fee_component: bmTotal,
-          local_counsel_fee: localCounselTotal,
-        })
+        .update(matterUpdate)
         .eq('id', input.matter_id);
 
       if (matterError) throw matterError;
@@ -305,14 +324,31 @@ export function useBudgetVersions(matterId?: string) {
           })
           .eq('id', latestVersion.id);
 
-        // Update matter totals
+        // Fetch current matter to check for different billing currency
+        const { data: currentMatter } = await supabase
+          .from('matters')
+          .select('different_billing_currency, agreed_billing_amount, fee_amount_upper_end')
+          .eq('id', matterId!)
+          .single();
+
+        // Build update object
+        const matterUpdate: Record<string, number> = {
+          fee_amount_upper_end: totalAmount,
+          bm_fee_component: bmTotal,
+          local_counsel_fee: localCounselTotal,
+        };
+
+        // Update agreed_billing_amount proportionally if different billing currency
+        if (currentMatter?.different_billing_currency && 
+            currentMatter.agreed_billing_amount > 0 && 
+            currentMatter.fee_amount_upper_end > 0) {
+          const mandatedRate = currentMatter.agreed_billing_amount / currentMatter.fee_amount_upper_end;
+          matterUpdate.agreed_billing_amount = totalAmount * mandatedRate;
+        }
+
         await supabase
           .from('matters')
-          .update({
-            fee_amount_upper_end: totalAmount,
-            bm_fee_component: bmTotal,
-            local_counsel_fee: localCounselTotal,
-          })
+          .update(matterUpdate)
           .eq('id', matterId!);
       }
     },
@@ -375,13 +411,31 @@ export function useBudgetVersions(matterId?: string) {
           })
           .eq('id', latestVersion.id);
 
+        // Fetch current matter to check for different billing currency
+        const { data: currentMatter } = await supabase
+          .from('matters')
+          .select('different_billing_currency, agreed_billing_amount, fee_amount_upper_end')
+          .eq('id', matterId!)
+          .single();
+
+        // Build update object
+        const matterUpdate: Record<string, number> = {
+          fee_amount_upper_end: totalAmount,
+          bm_fee_component: bmTotal,
+          local_counsel_fee: localCounselTotal,
+        };
+
+        // Update agreed_billing_amount proportionally if different billing currency
+        if (currentMatter?.different_billing_currency && 
+            currentMatter.agreed_billing_amount > 0 && 
+            currentMatter.fee_amount_upper_end > 0) {
+          const mandatedRate = currentMatter.agreed_billing_amount / currentMatter.fee_amount_upper_end;
+          matterUpdate.agreed_billing_amount = totalAmount * mandatedRate;
+        }
+
         await supabase
           .from('matters')
-          .update({
-            fee_amount_upper_end: totalAmount,
-            bm_fee_component: bmTotal,
-            local_counsel_fee: localCounselTotal,
-          })
+          .update(matterUpdate)
           .eq('id', matterId!);
       }
     },

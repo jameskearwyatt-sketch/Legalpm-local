@@ -552,10 +552,18 @@ export function useMyUpcomingGrowthTasks() {
       const twoWeeksFromNow = new Date(now);
       twoWeeksFromNow.setDate(twoWeeksFromNow.getDate() + 14);
       
-      // Only show tasks that are explicitly pinned to the task list
-      // This gives users full control - add to show, remove to hide
+      // Auto-include tasks that are:
+      // 1. Explicitly pinned to the task list, OR
+      // 2. Have deadlines of this_week or next_week (immediate/short-term tasks)
       return (data || []).filter((task: TaskWithProject) => {
-        return task.pinned_to_tasklist === true;
+        // Always include explicitly pinned tasks
+        if (task.pinned_to_tasklist === true) return true;
+        
+        // Auto-include tasks with short deadlines (this_week, next_week)
+        const shortDeadlines: TaskDeadlineType[] = ['this_week', 'next_week'];
+        if (shortDeadlines.includes(task.deadline_type)) return true;
+        
+        return false;
       }) as TaskWithProject[];
     },
     enabled: !!user,

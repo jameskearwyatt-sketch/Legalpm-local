@@ -16,6 +16,7 @@ export interface GrowthProject {
   status: string;
   ai_summary: string | null;
   mentee_name: string | null;
+  is_starred: boolean;
   created_at: string;
   updated_at: string;
 }

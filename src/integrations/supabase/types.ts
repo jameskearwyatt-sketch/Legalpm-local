@@ -436,6 +436,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_starred: boolean
           mentee_name: string | null
           name: string
           project_type: Database["public"]["Enums"]["growth_project_type"]
@@ -448,6 +449,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_starred?: boolean
           mentee_name?: string | null
           name: string
           project_type: Database["public"]["Enums"]["growth_project_type"]
@@ -460,6 +462,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_starred?: boolean
           mentee_name?: string | null
           name?: string
           project_type?: Database["public"]["Enums"]["growth_project_type"]

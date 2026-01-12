@@ -59,6 +59,7 @@ import {
   calculateDueDate,
   type TaskWithProject,
 } from "@/lib/hooks/useGrowthProjects";
+import { useSlateItems, useSlateOrder, type SlateItem } from "@/lib/hooks/useSlateItems";
 
 // Types
 type TaskImportance = 'important' | 'not_important' | 'unset';
@@ -101,12 +102,14 @@ interface UnifiedTask {
   completion_notes?: string | null;
 }
 
-// Slate-only item (not on main task list)
+// SlateOnlyItem type is now deprecated - we use SlateItem from useSlateItems hook
+// Keeping for backwards compatibility during migration
 interface SlateOnlyItem {
   id: string;
   title: string;
   created_at: string;
-  is_personal?: boolean; // Personal tasks (non-work reminders)
+  is_personal?: boolean;
+  sort_order?: number;
 }
 
 const STORAGE_KEY = 'todo-button-position';
@@ -633,6 +636,19 @@ export function QuickToDoButton() {
   const { projects } = useGrowthProjects();
   const { assignees } = useKnownAssignees();
   const { upcomingTasks: upcomingGrowthTasks, refetch: refetchGrowthTasks } = useMyUpcomingGrowthTasks();
+  
+  // Use database-backed slate items hook
+  const { 
+    workSlateItems, 
+    personalSlateItems, 
+    addSlateItem, 
+    deleteSlateItem, 
+    completeSlateItem,
+    reorderSlateItems,
+    promoteToQuickTask,
+  } = useSlateItems();
+  const { batchUpdateSlateOrder } = useSlateOrder();
+  
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [tasks, setTasks] = useState<QuickTask[]>([]);
@@ -669,43 +685,6 @@ export function QuickToDoButton() {
   const [isDraggingSlate, setIsDraggingSlate] = useState(false);
   const slateDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
   const slateRef = useRef<HTMLDivElement>(null);
-  const SLATE_ORDER_KEY = 'slate-task-order';
-  const SLATE_ONLY_ITEMS_KEY = 'slate-only-items';
-  const PERSONAL_SLATE_ORDER_KEY = 'personal-slate-order';
-  
-  // Use lazy initialization for slate order - load from localStorage immediately
-  const [slateTaskOrder, setSlateTaskOrder] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(SLATE_ORDER_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {}
-    return [];
-  });
-  
-  const [slateOnlyItems, setSlateOnlyItems] = useState<SlateOnlyItem[]>(() => {
-    try {
-      const saved = localStorage.getItem(SLATE_ONLY_ITEMS_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {}
-    return [];
-  });
-  
-  const [personalSlateOrder, setPersonalSlateOrder] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(PERSONAL_SLATE_ORDER_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch {}
-    return [];
-  });
   
   const [newSlateItem, setNewSlateItem] = useState("");
   const [newPersonalItem, setNewPersonalItem] = useState("");
@@ -766,20 +745,8 @@ export function QuickToDoButton() {
     }
   }, [slatePosition]);
 
-  // Save slate task order when it changes - always save immediately
-  useEffect(() => {
-    localStorage.setItem(SLATE_ORDER_KEY, JSON.stringify(slateTaskOrder));
-  }, [slateTaskOrder]);
-
-  // Save slate-only items when they change
-  useEffect(() => {
-    localStorage.setItem(SLATE_ONLY_ITEMS_KEY, JSON.stringify(slateOnlyItems));
-  }, [slateOnlyItems]);
-
-  // Save personal slate order when it changes
-  useEffect(() => {
-    localStorage.setItem(PERSONAL_SLATE_ORDER_KEY, JSON.stringify(personalSlateOrder));
-  }, [personalSlateOrder]);
+  // Note: Slate items and order are now persisted to database via useSlateItems hook
+  // No need for localStorage persistence
 
   // Slate drag handlers
   const handleSlateMouseDown = useCallback((e: React.MouseEvent) => {
@@ -1142,10 +1109,8 @@ export function QuickToDoButton() {
 
   const toggleSlate = async (taskId: string, currentlyOnSlate: boolean, source: 'quick' | 'growth' | 'slate-only') => {
     if (source === 'slate-only') {
-      // Remove slate-only item
-      setSlateOnlyItems(prev => prev.filter(item => item.id !== taskId));
-      // Also remove from order
-      setSlateTaskOrder(prev => prev.filter(id => id !== taskId));
+      // Remove slate-only item from database
+      deleteSlateItem.mutate(taskId);
       return;
     }
     
@@ -1177,18 +1142,12 @@ export function QuickToDoButton() {
     }
   };
 
-  // Add slate-only item (work or personal)
+  // Add slate-only item (work or personal) - now uses database
   const addSlateOnlyItem = (title: string, isPersonal: boolean = false) => {
     const trimmed = title.trim();
     if (!trimmed || trimmed.length > 200) return;
     
-    const newItem: SlateOnlyItem = {
-      id: `slate-only-${Date.now()}`,
-      title: trimmed,
-      created_at: new Date().toISOString(),
-      is_personal: isPersonal,
-    };
-    setSlateOnlyItems(prev => [...prev, newItem]);
+    addSlateItem.mutate({ title: trimmed, isPersonal });
     if (isPersonal) {
       setNewPersonalItem("");
     } else {
@@ -1196,34 +1155,36 @@ export function QuickToDoButton() {
     }
   };
 
-  // Promote slate-only item to main task list
-  const promoteSlateOnlyToTaskList = async (item: SlateOnlyItem) => {
+  // Promote slate-only item to main task list - now uses database
+  const promoteSlateOnlyToTaskList = async (item: SlateItem | SlateOnlyItem) => {
     if (!user) return;
     
-    const { data, error } = await supabase
-      .from('quick_tasks')
-      .insert({
-        title: item.title,
-        user_id: user.id,
-        on_slate: true, // Keep it on slate
-        is_completed: false,
-        is_urgent: false,
-        importance: 'unset',
-        urgency: 'unset',
-        effort: 'unset',
-      })
-      .select()
-      .single();
-    
-    if (error) {
-      toast.error('Failed to add to task list');
+    // Use the database-backed hook if it's a SlateItem
+    if ('user_id' in item) {
+      promoteToQuickTask.mutate(item as SlateItem);
     } else {
-      // Remove from slate-only items
-      setSlateOnlyItems(prev => prev.filter(i => i.id !== item.id));
-      // Update order to use new task id
-      setSlateTaskOrder(prev => prev.map(id => id === item.id ? data.id : id));
-      fetchTasks();
-      toast.success('Added to task list');
+      // Legacy SlateOnlyItem support (shouldn't happen anymore)
+      const { data, error } = await supabase
+        .from('quick_tasks')
+        .insert({
+          title: item.title,
+          user_id: user.id,
+          on_slate: true,
+          is_completed: false,
+          is_urgent: false,
+          importance: 'unset',
+          urgency: 'unset',
+          effort: 'unset',
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        toast.error('Failed to add to task list');
+      } else {
+        fetchTasks();
+        toast.success('Added to task list');
+      }
     }
   };
 
@@ -1348,41 +1309,39 @@ export function QuickToDoButton() {
   // Untriaged count for blue badge
   const untriagedCount = useMemo(() => pendingTasks.filter(t => !isFullyTriaged(t)).length, [pendingTasks]);
   
-  // Slate tasks (both quick and growth tasks can be on slate) - ordered by user preference
-  // Also include slate-only items (split into work and personal)
-  const workSlateOnlyItems = useMemo(() => 
-    slateOnlyItems.filter(item => !item.is_personal), [slateOnlyItems]);
-  
-  const personalSlateOnlyItems = useMemo(() => 
-    slateOnlyItems.filter(item => item.is_personal), [slateOnlyItems]);
+  // Slate tasks (both quick and growth tasks can be on slate) - ordered by slate_sort_order
+  // Work slate items from database (is_personal = false)
+  // Personal slate items from database (is_personal = true)
 
   const slateOnlyAsUnified: UnifiedTask[] = useMemo(() => {
-    return workSlateOnlyItems.map(item => ({
+    return workSlateItems.map(item => ({
       id: item.id,
       title: item.title,
-      is_completed: false,
+      is_completed: item.is_completed,
       importance: 'unset' as TaskImportance,
       urgency: 'unset' as TaskUrgency,
       effort: 'unset' as TaskEffort,
       created_at: item.created_at,
       source: 'slate-only' as const,
       on_slate: true,
+      slate_sort_order: item.sort_order,
     }));
-  }, [workSlateOnlyItems]);
+  }, [workSlateItems]);
 
   const personalSlateAsUnified: UnifiedTask[] = useMemo(() => {
-    return personalSlateOnlyItems.map(item => ({
+    return personalSlateItems.map(item => ({
       id: item.id,
       title: item.title,
-      is_completed: false,
+      is_completed: item.is_completed,
       importance: 'unset' as TaskImportance,
       urgency: 'unset' as TaskUrgency,
       effort: 'unset' as TaskEffort,
       created_at: item.created_at,
       source: 'slate-only' as const,
       on_slate: true,
+      slate_sort_order: item.sort_order,
     }));
-  }, [personalSlateOnlyItems]);
+  }, [personalSlateItems]);
 
   const rawSlateTasks = useMemo(() => {
     const fromTasks = allUnifiedTasks.filter(t => t.on_slate && !t.is_completed);
@@ -1392,46 +1351,23 @@ export function QuickToDoButton() {
   // Personal tasks are separate and ordered separately
   const rawPersonalTasks = useMemo(() => personalSlateAsUnified, [personalSlateAsUnified]);
   
-  // Order slate tasks based on saved order, with new tasks at the end
-  // This memo ALWAYS respects the saved slateTaskOrder - it never resets it
+  // Order slate tasks based on slate_sort_order from database
   const orderedSlateTasks = useMemo(() => {
-    const orderedTasks: UnifiedTask[] = [];
-    const taskMap = new Map(rawSlateTasks.map(t => [t.id, t]));
-    
-    // Add tasks in saved order first
-    slateTaskOrder.forEach(id => {
-      const task = taskMap.get(id);
-      if (task) {
-        orderedTasks.push(task);
-        taskMap.delete(id);
-      }
+    return [...rawSlateTasks].sort((a, b) => {
+      const aOrder = (a as any).slate_sort_order ?? 0;
+      const bOrder = (b as any).slate_sort_order ?? 0;
+      return aOrder - bOrder;
     });
-    
-    // Add any new tasks that weren't in the saved order at the end
-    taskMap.forEach(task => orderedTasks.push(task));
-    
-    return orderedTasks;
-  }, [rawSlateTasks, slateTaskOrder]);
+  }, [rawSlateTasks]);
 
-  // Order personal tasks based on saved order - never auto-resets
+  // Order personal tasks based on sort_order from database
   const orderedPersonalTasks = useMemo(() => {
-    const orderedTasks: UnifiedTask[] = [];
-    const taskMap = new Map(rawPersonalTasks.map(t => [t.id, t]));
-    
-    // Add tasks in saved order first
-    personalSlateOrder.forEach(id => {
-      const task = taskMap.get(id);
-      if (task) {
-        orderedTasks.push(task);
-        taskMap.delete(id);
-      }
+    return [...rawPersonalTasks].sort((a, b) => {
+      const aOrder = (a as any).slate_sort_order ?? 0;
+      const bOrder = (b as any).slate_sort_order ?? 0;
+      return aOrder - bOrder;
     });
-    
-    // Add any new tasks that weren't in the saved order at the end
-    taskMap.forEach(task => orderedTasks.push(task));
-    
-    return orderedTasks;
-  }, [rawPersonalTasks, personalSlateOrder]);
+  }, [rawPersonalTasks]);
 
   // Sensors for dnd-kit (for slate reordering)
   const slateSensors = useSensors(
@@ -1439,7 +1375,7 @@ export function QuickToDoButton() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // Handle slate task reorder
+  // Handle slate task reorder - save to database
   const handleSlateDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -1448,12 +1384,18 @@ export function QuickToDoButton() {
     const newIndex = orderedSlateTasks.findIndex(t => t.id === over.id);
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      const newOrder = arrayMove(orderedSlateTasks.map(t => t.id), oldIndex, newIndex);
-      setSlateTaskOrder(newOrder);
+      const newOrder = arrayMove(orderedSlateTasks, oldIndex, newIndex);
+      // Save new order to database
+      const updates = newOrder.map((task, idx) => ({
+        id: task.id,
+        source: task.source === 'slate-only' ? 'slate-item' as const : task.source as 'quick' | 'growth',
+        sortOrder: idx,
+      }));
+      batchUpdateSlateOrder.mutate(updates);
     }
-  }, [orderedSlateTasks]);
+  }, [orderedSlateTasks, batchUpdateSlateOrder]);
 
-  // Handle personal task reorder
+  // Handle personal task reorder - save to database
   const handlePersonalDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
@@ -1462,10 +1404,16 @@ export function QuickToDoButton() {
     const newIndex = orderedPersonalTasks.findIndex(t => t.id === over.id);
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      const newOrder = arrayMove(orderedPersonalTasks.map(t => t.id), oldIndex, newIndex);
-      setPersonalSlateOrder(newOrder);
+      const newOrder = arrayMove(orderedPersonalTasks, oldIndex, newIndex);
+      // Save order to database (personal items are all slate-items)
+      const updates = newOrder.map((task, idx) => ({
+        id: task.id,
+        source: 'slate-item' as const,
+        sortOrder: idx,
+      }));
+      reorderSlateItems.mutate(updates.map(u => ({ id: u.id, sort_order: u.sortOrder })));
     }
-  }, [orderedPersonalTasks]);
+  }, [orderedPersonalTasks, reorderSlateItems]);
 
   const groupedTasks = useMemo(() => {
     let filtered = pendingTasks;

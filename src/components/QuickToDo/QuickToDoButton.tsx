@@ -669,14 +669,46 @@ export function QuickToDoButton() {
   const [isDraggingSlate, setIsDraggingSlate] = useState(false);
   const slateDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
   const slateRef = useRef<HTMLDivElement>(null);
-  const [slateTaskOrder, setSlateTaskOrder] = useState<string[]>([]);
-  const [slateOnlyItems, setSlateOnlyItems] = useState<SlateOnlyItem[]>([]);
-  const [newSlateItem, setNewSlateItem] = useState("");
-  const [newPersonalItem, setNewPersonalItem] = useState("");
   const SLATE_ORDER_KEY = 'slate-task-order';
   const SLATE_ONLY_ITEMS_KEY = 'slate-only-items';
   const PERSONAL_SLATE_ORDER_KEY = 'personal-slate-order';
-  const [personalSlateOrder, setPersonalSlateOrder] = useState<string[]>([]);
+  
+  // Use lazy initialization for slate order - load from localStorage immediately
+  const [slateTaskOrder, setSlateTaskOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(SLATE_ORDER_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+  
+  const [slateOnlyItems, setSlateOnlyItems] = useState<SlateOnlyItem[]>(() => {
+    try {
+      const saved = localStorage.getItem(SLATE_ONLY_ITEMS_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+  
+  const [personalSlateOrder, setPersonalSlateOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(PERSONAL_SLATE_ORDER_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch {}
+    return [];
+  });
+  
+  const [newSlateItem, setNewSlateItem] = useState("");
+  const [newPersonalItem, setNewPersonalItem] = useState("");
   // Triage debouncing - track tasks being actively triaged
   // Key: taskId, Value: { lastTriageTime, previousQuadrant }
   const [tasksBeingTriaged, setTasksBeingTriaged] = useState<Map<string, { lastTriageTime: number; previousQuadrant: EisenhowerQuadrant }>>(new Map());
@@ -734,60 +766,15 @@ export function QuickToDoButton() {
     }
   }, [slatePosition]);
 
-  // Load saved slate task order on mount
-  useEffect(() => {
-    const saved = localStorage.getItem(SLATE_ORDER_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setSlateTaskOrder(parsed);
-        }
-      } catch {
-        // Invalid saved order
-      }
-    }
-  }, []);
-
-  // Save slate task order when it changes - always save, even empty array
+  // Save slate task order when it changes - always save immediately
   useEffect(() => {
     localStorage.setItem(SLATE_ORDER_KEY, JSON.stringify(slateTaskOrder));
   }, [slateTaskOrder]);
-
-  // Load saved slate-only items on mount
-  useEffect(() => {
-    const saved = localStorage.getItem(SLATE_ONLY_ITEMS_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setSlateOnlyItems(parsed);
-        }
-      } catch {
-        // Invalid saved items
-      }
-    }
-  }, []);
 
   // Save slate-only items when they change
   useEffect(() => {
     localStorage.setItem(SLATE_ONLY_ITEMS_KEY, JSON.stringify(slateOnlyItems));
   }, [slateOnlyItems]);
-
-  // Load saved personal slate order on mount
-  useEffect(() => {
-    const saved = localStorage.getItem(PERSONAL_SLATE_ORDER_KEY);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          setPersonalSlateOrder(parsed);
-        }
-      } catch {
-        // Invalid saved order
-      }
-    }
-  }, []);
 
   // Save personal slate order when it changes
   useEffect(() => {
@@ -1405,52 +1392,13 @@ export function QuickToDoButton() {
   // Personal tasks are separate and ordered separately
   const rawPersonalTasks = useMemo(() => personalSlateAsUnified, [personalSlateAsUnified]);
   
-  // Auto-populate slate order when rawSlateTasks change (e.g., new tasks added)
-  // This ensures all current slate tasks are tracked in the order and order is preserved
-  useEffect(() => {
-    setSlateTaskOrder(prevOrder => {
-      if (rawSlateTasks.length > 0) {
-        const currentIds = new Set(rawSlateTasks.map(t => t.id));
-        const savedOrderIds = new Set(prevOrder);
-        
-        // Check if there are new tasks not in the saved order
-        const hasNewTasks = rawSlateTasks.some(t => !savedOrderIds.has(t.id));
-        // Check if there are removed tasks still in the saved order
-        const hasRemovedTasks = prevOrder.some(id => !currentIds.has(id));
-        
-        if (hasNewTasks || hasRemovedTasks) {
-          // Rebuild the order: keep existing order for known tasks, append new ones
-          const newOrder: string[] = [];
-          prevOrder.forEach(id => {
-            if (currentIds.has(id)) {
-              newOrder.push(id);
-            }
-          });
-          // Add any new tasks at the end
-          rawSlateTasks.forEach(t => {
-            if (!newOrder.includes(t.id)) {
-              newOrder.push(t.id);
-            }
-          });
-          return newOrder;
-        }
-        return prevOrder;
-      } else if (prevOrder.length > 0) {
-        // Clear the order when there are no slate tasks
-        return [];
-      }
-      return prevOrder;
-    });
-  }, [rawSlateTasks]);
-  
   // Order slate tasks based on saved order, with new tasks at the end
+  // This memo ALWAYS respects the saved slateTaskOrder - it never resets it
   const orderedSlateTasks = useMemo(() => {
-    if (slateTaskOrder.length === 0) return rawSlateTasks;
-    
     const orderedTasks: UnifiedTask[] = [];
     const taskMap = new Map(rawSlateTasks.map(t => [t.id, t]));
     
-    // Add tasks in saved order
+    // Add tasks in saved order first
     slateTaskOrder.forEach(id => {
       const task = taskMap.get(id);
       if (task) {
@@ -1459,51 +1407,18 @@ export function QuickToDoButton() {
       }
     });
     
-    // Add any new tasks that weren't in the saved order
+    // Add any new tasks that weren't in the saved order at the end
     taskMap.forEach(task => orderedTasks.push(task));
     
     return orderedTasks;
   }, [rawSlateTasks, slateTaskOrder]);
 
-  // Auto-populate personal slate order when rawPersonalTasks change
-  useEffect(() => {
-    setPersonalSlateOrder(prevOrder => {
-      if (rawPersonalTasks.length > 0) {
-        const currentIds = new Set(rawPersonalTasks.map(t => t.id));
-        const savedOrderIds = new Set(prevOrder);
-        
-        const hasNewTasks = rawPersonalTasks.some(t => !savedOrderIds.has(t.id));
-        const hasRemovedTasks = prevOrder.some(id => !currentIds.has(id));
-        
-        if (hasNewTasks || hasRemovedTasks) {
-          const newOrder: string[] = [];
-          prevOrder.forEach(id => {
-            if (currentIds.has(id)) {
-              newOrder.push(id);
-            }
-          });
-          rawPersonalTasks.forEach(t => {
-            if (!newOrder.includes(t.id)) {
-              newOrder.push(t.id);
-            }
-          });
-          return newOrder;
-        }
-        return prevOrder;
-      } else if (prevOrder.length > 0) {
-        return [];
-      }
-      return prevOrder;
-    });
-  }, [rawPersonalTasks]);
-
-  // Order personal tasks based on saved order
+  // Order personal tasks based on saved order - never auto-resets
   const orderedPersonalTasks = useMemo(() => {
-    if (personalSlateOrder.length === 0) return rawPersonalTasks;
-    
     const orderedTasks: UnifiedTask[] = [];
     const taskMap = new Map(rawPersonalTasks.map(t => [t.id, t]));
     
+    // Add tasks in saved order first
     personalSlateOrder.forEach(id => {
       const task = taskMap.get(id);
       if (task) {
@@ -1512,6 +1427,7 @@ export function QuickToDoButton() {
       }
     });
     
+    // Add any new tasks that weren't in the saved order at the end
     taskMap.forEach(task => orderedTasks.push(task));
     
     return orderedTasks;

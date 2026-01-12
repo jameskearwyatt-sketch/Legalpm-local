@@ -1294,15 +1294,30 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                     >
                       <div>
                         <span className="text-muted-foreground">BM:</span>
-                        <span className="ml-1">{formatCurrency(version.bm_total)}</span>
+                        <span className="ml-1">
+                          {formatCurrency(
+                            differentBillingCurrency ? version.bm_total * mandatedRate : version.bm_total,
+                            differentBillingCurrency ? billingCurrency : quoteCurrency
+                          )}
+                        </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">LC:</span>
-                        <span className="ml-1">{formatCurrency(version.local_counsel_total)}</span>
+                        <span className="ml-1">
+                          {formatCurrency(
+                            differentBillingCurrency ? version.local_counsel_total * mandatedRate : version.local_counsel_total,
+                            differentBillingCurrency ? billingCurrency : quoteCurrency
+                          )}
+                        </span>
                       </div>
                       <div>
                         <span className="text-muted-foreground">Total:</span>
-                        <span className="ml-1 font-medium">{formatCurrency(version.total_amount)}</span>
+                        <span className="ml-1 font-medium">
+                          {formatCurrency(
+                            differentBillingCurrency ? version.total_amount * mandatedRate : version.total_amount,
+                            differentBillingCurrency ? billingCurrency : quoteCurrency
+                          )}
+                        </span>
                       </div>
                     </div>
                     {version.notes && (
@@ -1322,7 +1337,10 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                               <div key={item.id} className="flex justify-between text-xs">
                                 <span>{item.work_item}</span>
                                 <span className="text-muted-foreground">
-                                  {item.provider === 'Baker McKenzie' ? 'BM' : 'LC'}: {formatCurrency(item.fee_amount)}
+                                  {item.provider === 'Baker McKenzie' ? 'BM' : 'LC'}: {formatCurrency(
+                                    differentBillingCurrency ? item.fee_amount * mandatedRate : item.fee_amount,
+                                    differentBillingCurrency ? billingCurrency : quoteCurrency
+                                  )}
                                 </span>
                               </div>
                             ))}

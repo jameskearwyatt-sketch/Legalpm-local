@@ -19,7 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Loader2, Trash2, ChevronDown, ChevronRight, History, Calendar, TrendingUp } from 'lucide-react';
+import { Loader2, Trash2, ChevronDown, ChevronRight, History, Calendar, TrendingUp, MinusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useDetailedWipUpdates, DetailedWipUpdate, DetailedWipUpdateItem } from '@/lib/hooks/useDetailedWipUpdates';
@@ -104,10 +104,12 @@ function WipUpdateCard({
   // Calculate total estimate from items - convert to billing currency
   const totalEstimateQuote = items.reduce((sum, item) => sum + item.fee_amount, 0);
   const totalWipQuote = update.total_wip_amount;
+  const totalWriteOffQuote = update.total_write_off_amount || 0;
   
   // Convert to billing currency for display
   const totalEstimate = differentBillingCurrency ? totalEstimateQuote * mandatedRate : totalEstimateQuote;
   const totalWip = differentBillingCurrency ? totalWipQuote * mandatedRate : totalWipQuote;
+  const totalWriteOff = differentBillingCurrency ? totalWriteOffQuote * mandatedRate : totalWriteOffQuote;
   const overallHealth = getHealthColor(totalWip, totalEstimate || totalWip);
 
   // Group items by category
@@ -145,12 +147,17 @@ function WipUpdateCard({
               {isLatest && (
                 <Badge variant="default" className="text-xs">
                   Current
-                </Badge>
-              )}
-            </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              Total WIP: {formatCurrency(totalWip, billingCurrency)}
-            </p>
+              </Badge>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Total WIP: {formatCurrency(totalWip, billingCurrency)}
+            {totalWriteOff > 0 && (
+              <span className="text-destructive text-xs ml-2">
+                (Write-off: {formatCurrency(totalWriteOff, billingCurrency)})
+              </span>
+            )}
+          </p>
           </div>
         </div>
 
@@ -215,6 +222,12 @@ function WipUpdateCard({
                     <p className={cn('text-xl font-bold', overallHealth.text)}>
                       {formatCurrency(totalWip, billingCurrency)} / {formatCurrency(totalEstimate, billingCurrency)}
                     </p>
+                    {totalWriteOff > 0 && (
+                      <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                        <MinusCircle className="h-3 w-3" />
+                        Write-off: {formatCurrency(totalWriteOff, billingCurrency)}
+                      </p>
+                    )}
                   </div>
                   <div className={cn('text-2xl font-bold', overallHealth.text)}>
                     {getPercentage(update.total_wip_amount, totalEstimate)}

@@ -358,13 +358,13 @@ export function DraggableBudgetItem({
         )}
       </div>
 
-      {/* WIP Amount - only show when budget exists */}
+      {/* Budget Used (WIP) - only show when budget exists */}
       {hasExistingBudget && (
         <div className={cn(
           "text-right min-w-[100px]",
           hasWriteOff && "bg-destructive/10 rounded-md px-2 py-1 -my-1"
         )}>
-          <div className="text-xs text-muted-foreground">WIP</div>
+          <div className="text-xs text-muted-foreground">Budget Used</div>
           <div className={cn('font-medium text-sm flex items-center justify-end gap-1', hasWipData && wipHealth.text)}>
             {hasWipData && (
               <div className={cn('w-2 h-2 rounded-full flex-shrink-0', wipHealth.indicator)} />

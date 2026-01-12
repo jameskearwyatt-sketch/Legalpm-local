@@ -10,6 +10,8 @@ interface CategoryGroupProps {
   providerName?: string;
   groupKey: string;
   subtotal: number;
+  budgetUsed: number;
+  writeOffTotal: number;
   formatCurrency: (value: number, currency?: string) => string;
   currency: string;
   mandatedRate: number;
@@ -41,11 +43,24 @@ const categoryTextColors: Record<BudgetCategory, string> = {
   'Other': 'text-gray-700 dark:text-gray-300',
 };
 
+// Get health color for budget usage
+function getBurnHealth(budgetUsed: number, budget: number): string {
+  if (budget <= 0) return 'text-muted-foreground';
+  const pct = (budgetUsed / budget) * 100;
+  if (pct <= 50) return 'text-green-600 dark:text-green-400';
+  if (pct <= 70) return 'text-lime-600 dark:text-lime-400';
+  if (pct <= 85) return 'text-amber-600 dark:text-amber-400';
+  if (pct <= 100) return 'text-orange-600 dark:text-orange-400';
+  return 'text-red-600 dark:text-red-400';
+}
+
 export function CategoryGroup({
   category,
   providerName,
   groupKey,
   subtotal,
+  budgetUsed,
+  writeOffTotal,
   formatCurrency,
   currency,
   mandatedRate,
@@ -66,6 +81,8 @@ export function CategoryGroup({
 
   // Display name shows category and provider
   const displayName = providerName ? `${category} - ${providerName}` : category;
+  const burnPct = subtotal > 0 ? Math.round((budgetUsed / subtotal) * 100) : 0;
+  const burnHealthColor = getBurnHealth(budgetUsed, subtotal);
 
   return (
     <div
@@ -99,9 +116,37 @@ export function CategoryGroup({
           </span>
         </div>
         {!isEmpty && subtotal > 0 && (
-          <span className={cn('font-medium text-sm', categoryTextColors[category])}>
-            {formatCurrency(subtotal, currency)}
-          </span>
+          <div className="flex items-center gap-3">
+            {/* Budget Used / Budget with percentage */}
+            {budgetUsed > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className={cn('text-xs font-medium', burnHealthColor)}>
+                  {formatCurrency(budgetUsed, currency)}
+                </span>
+                <span className="text-xs text-muted-foreground">/</span>
+                <span className={cn('font-medium text-sm', categoryTextColors[category])}>
+                  {formatCurrency(subtotal, currency)}
+                </span>
+                <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded', burnHealthColor, 
+                  burnPct > 100 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-muted/50'
+                )}>
+                  {burnPct}%
+                </span>
+              </div>
+            )}
+            {/* Just show budget if no usage */}
+            {budgetUsed === 0 && (
+              <span className={cn('font-medium text-sm', categoryTextColors[category])}>
+                {formatCurrency(subtotal, currency)}
+              </span>
+            )}
+            {/* Write-off indicator */}
+            {writeOffTotal > 0 && (
+              <span className="text-xs font-medium text-destructive bg-destructive/10 px-1.5 py-0.5 rounded">
+                W/O: {formatCurrency(writeOffTotal, currency)}
+              </span>
+            )}
+          </div>
         )}
       </div>
 

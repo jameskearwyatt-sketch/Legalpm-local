@@ -100,6 +100,11 @@ export function DetailedWipUpdateModal({
   const [isCombineMode, setIsCombineMode] = useState(false);
   const [selectedForCombine, setSelectedForCombine] = useState<Set<string>>(new Set());
   const [combinedGroups, setCombinedGroups] = useState<CombinedGroup[]>([]);
+  
+  // Write-off mode state
+  const [isWriteOffMode, setIsWriteOffMode] = useState(false);
+  const [selectedForWriteOff, setSelectedForWriteOff] = useState<Set<string>>(new Set());
+  const [writeOffAmount, setWriteOffAmount] = useState<string>('');
 
   // Handle imported WIP matches
   const handleApplyMatches = (matches: Array<{ budget_line_item_id: string; wip_amount: number }>) => {
@@ -133,6 +138,9 @@ export function DetailedWipUpdateModal({
       setIsCombineMode(false);
       setSelectedForCombine(new Set());
       setCombinedGroups([]);
+      setIsWriteOffMode(false);
+      setSelectedForWriteOff(new Set());
+      setWriteOffAmount('');
     }
   }, [isOpen, lineItems]);
 
@@ -162,6 +170,60 @@ export function DetailedWipUpdateModal({
       }
       return newSet;
     });
+  };
+
+  // Toggle item selection for write-off
+  const toggleWriteOffSelection = (id: string) => {
+    setSelectedForWriteOff(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  // Apply write-off to selected items proportionally
+  const applyWriteOffToSelected = () => {
+    if (selectedForWriteOff.size < 1) return;
+    
+    const billingValue = parseFloat(writeOffAmount) || 0;
+    if (billingValue <= 0) return;
+    
+    // Convert to quote currency if needed
+    const quoteValue = differentBillingCurrency && mandatedRate > 0 
+      ? billingValue / mandatedRate 
+      : billingValue;
+    
+    const selectedIds = Array.from(selectedForWriteOff);
+    const selectedItems = wipItems.filter(item => selectedIds.includes(item.id));
+    const totalWip = selectedItems.reduce((sum, item) => sum + item.wip_amount, 0);
+    
+    // Distribute proportionally based on WIP amounts (or equally if no WIP)
+    setWipItems(prev =>
+      prev.map(item => {
+        if (!selectedIds.includes(item.id)) return item;
+        
+        let proportion: number;
+        if (totalWip > 0) {
+          proportion = item.wip_amount / totalWip;
+        } else {
+          proportion = 1 / selectedIds.length;
+        }
+        
+        return {
+          ...item,
+          write_off_amount: roundCurrency(item.write_off_amount + (quoteValue * proportion)),
+        };
+      })
+    );
+    
+    // Reset write-off mode
+    setIsWriteOffMode(false);
+    setSelectedForWriteOff(new Set());
+    setWriteOffAmount('');
   };
 
   // Create a combined group from selected items
@@ -331,19 +393,30 @@ export function DetailedWipUpdateModal({
         {hasAcknowledged && (
           <>
             {/* Action Buttons */}
-            <div className="flex justify-between items-center gap-2">
-              <div className="flex items-center gap-2">
-                {!isCombineMode ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setIsCombineMode(true)}
-                    className="flex items-center gap-2"
-                  >
-                    <Link2 className="h-4 w-4" />
-                    Combine Items for Single WIP Entry
-                  </Button>
-                ) : (
+            <div className="flex justify-between items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                {!isCombineMode && !isWriteOffMode ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsCombineMode(true)}
+                      className="flex items-center gap-2"
+                    >
+                      <Link2 className="h-4 w-4" />
+                      Combine Items
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsWriteOffMode(true)}
+                      className="flex items-center gap-2 border-destructive/50 text-destructive hover:bg-destructive/10"
+                    >
+                      <MinusCircle className="h-4 w-4" />
+                      Write-off Multiple Items
+                    </Button>
+                  </>
+                ) : isCombineMode ? (
                   <>
                     <Button
                       variant="default"
@@ -364,6 +437,40 @@ export function DetailedWipUpdateModal({
                       Cancel
                     </Button>
                   </>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-destructive">Write-off amount ({billingCurrency}):</span>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={writeOffAmount}
+                        onChange={e => setWriteOffAmount(e.target.value)}
+                        className="h-8 w-28 text-sm border-destructive/50"
+                        placeholder="0"
+                      />
+                    </div>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={applyWriteOffToSelected}
+                      disabled={selectedForWriteOff.size < 1 || !writeOffAmount || parseFloat(writeOffAmount) <= 0}
+                    >
+                      Apply to {selectedForWriteOff.size} item{selectedForWriteOff.size !== 1 ? 's' : ''}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsWriteOffMode(false);
+                        setSelectedForWriteOff(new Set());
+                        setWriteOffAmount('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </>
                 )}
               </div>
               <Button
@@ -372,7 +479,7 @@ export function DetailedWipUpdateModal({
                 className="flex items-center gap-2"
               >
                 <Upload className="h-4 w-4" />
-                Upload or Paste Information
+                Upload or Paste
               </Button>
             </div>
 
@@ -383,6 +490,18 @@ export function DetailedWipUpdateModal({
                   <p className="text-sm">
                     Select 2 or more budget items to combine them. WIP will be entered once for the combined items 
                     and distributed proportionally based on each item's budget allocation.
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {isWriteOffMode && (
+              <Alert className="border-destructive/50 bg-red-50 dark:bg-red-950/30">
+                <MinusCircle className="h-4 w-4 text-destructive" />
+                <AlertDescription className="text-red-800 dark:text-red-300">
+                  <p className="text-sm">
+                    Select budget items to write off WIP against. Enter the total write-off amount above, and it will be 
+                    distributed proportionally based on each item's current WIP (or equally if no WIP).
                   </p>
                 </AlertDescription>
               </Alert>
@@ -520,10 +639,12 @@ export function DetailedWipUpdateModal({
                       const combinedGroup = getItemCombinedGroup(item.id);
                       const isInCombinedGroup = !!combinedGroup;
                       const isSelected = selectedForCombine.has(item.id);
+                      const isSelectedForWriteOff = selectedForWriteOff.has(item.id);
                       
                       // Convert amounts to billing currency for display
                       const displayFeeAmount = roundCurrency(differentBillingCurrency ? item.fee_amount * mandatedRate : item.fee_amount);
                       const displayWipAmount = roundCurrency(differentBillingCurrency ? item.wip_amount * mandatedRate : item.wip_amount);
+                      const displayWriteOffAmount = roundCurrency(differentBillingCurrency ? item.write_off_amount * mandatedRate : item.write_off_amount);
                       const health = isInCombinedGroup 
                         ? { bg: 'bg-blue-50/50 dark:bg-blue-950/20', text: 'text-blue-600', indicator: 'bg-blue-400' }
                         : getHealthColor(displayWipAmount, displayFeeAmount);
@@ -534,7 +655,8 @@ export function DetailedWipUpdateModal({
                           className={cn(
                             'px-4 py-3 flex items-center gap-4',
                             health.bg,
-                            isSelected && 'ring-2 ring-inset ring-primary'
+                            isSelected && 'ring-2 ring-inset ring-primary',
+                            isSelectedForWriteOff && 'ring-2 ring-inset ring-destructive'
                           )}
                         >
                           {/* Checkbox for combine mode */}
@@ -543,6 +665,15 @@ export function DetailedWipUpdateModal({
                               checked={isSelected}
                               onCheckedChange={() => toggleItemSelection(item.id)}
                               className="flex-shrink-0"
+                            />
+                          )}
+                          
+                          {/* Checkbox for write-off mode */}
+                          {isWriteOffMode && !isInCombinedGroup && (
+                            <Checkbox
+                              checked={isSelectedForWriteOff}
+                              onCheckedChange={() => toggleWriteOffSelection(item.id)}
+                              className="flex-shrink-0 border-destructive data-[state=checked]:bg-destructive"
                             />
                           )}
                           

@@ -31,6 +31,8 @@ interface BudgetUpdateModalProps {
   currentBmFee: number;
   currentLocalCounsel: number;
   currency: string;
+  differentBillingCurrency?: boolean;
+  agreedBillingAmount?: number;
 }
 
 export function BudgetUpdateModal({
@@ -39,6 +41,8 @@ export function BudgetUpdateModal({
   currentBmFee,
   currentLocalCounsel,
   currency,
+  differentBillingCurrency = false,
+  agreedBillingAmount = 0,
 }: BudgetUpdateModalProps) {
   const [open, setOpen] = useState(false);
   const [newBudget, setNewBudget] = useState(currentBudget.toString());
@@ -141,13 +145,22 @@ export function BudgetUpdateModal({
       notes: notes || undefined,
     });
 
-    // Update matter with new values
-    await updateMatter.mutateAsync({
+    // Build update object for matter
+    const matterUpdate: { id: string; fee_amount_upper_end: number; bm_fee_component: number; local_counsel_fee: number; agreed_billing_amount?: number } = {
       id: matterId,
       fee_amount_upper_end: newBudgetNum,
       bm_fee_component: newBmFeeNum,
       local_counsel_fee: newLocalCounselNum,
-    });
+    };
+
+    // If different billing currency is enabled, update agreed_billing_amount proportionally
+    if (differentBillingCurrency && agreedBillingAmount > 0 && currentBudget > 0) {
+      const mandatedRate = agreedBillingAmount / currentBudget;
+      matterUpdate.agreed_billing_amount = newBudgetNum * mandatedRate;
+    }
+
+    // Update matter with new values
+    await updateMatter.mutateAsync(matterUpdate);
 
     // Also update the latest budget version to keep them in sync
     if (latestVersion) {

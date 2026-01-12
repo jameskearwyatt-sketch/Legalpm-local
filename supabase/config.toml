@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.summarize-matter-name]
 verify_jwt = false
+
+[functions.draft-delegation-email]
+verify_jwt = false

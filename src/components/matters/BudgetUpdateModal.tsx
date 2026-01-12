@@ -18,10 +18,12 @@ import {
 } from '@/components/ui/accordion';
 import { useBudgetAmendments } from '@/lib/hooks/useBudgetAmendments';
 import { useMatters } from '@/lib/hooks/useMatters';
+import { useBudgetVersions } from '@/lib/hooks/useBudgetVersions';
 import { Loader2, History, Sparkles, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface BudgetUpdateModalProps {
   matterId: string;
@@ -48,7 +50,9 @@ export function BudgetUpdateModal({
   
   const { amendments, isLoading, createAmendment } = useBudgetAmendments(matterId);
   const { updateMatter } = useMatters();
+  const { latestVersion } = useBudgetVersions(matterId);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const formatCurrency = (value: number) => {
     const symbols: Record<string, string> = {
@@ -144,6 +148,25 @@ export function BudgetUpdateModal({
       bm_fee_component: newBmFeeNum,
       local_counsel_fee: newLocalCounselNum,
     });
+
+    // Also update the latest budget version to keep them in sync
+    if (latestVersion) {
+      const { error: versionError } = await supabase
+        .from('budget_versions')
+        .update({
+          total_amount: newBudgetNum,
+          bm_total: newBmFeeNum,
+          local_counsel_total: newLocalCounselNum,
+        })
+        .eq('id', latestVersion.id);
+
+      if (versionError) {
+        console.error('Error updating budget version:', versionError);
+      }
+      
+      // Invalidate budget version queries to refresh the UI
+      queryClient.invalidateQueries({ queryKey: ['budget-versions', matterId] });
+    }
 
     setOpen(false);
     setNotes('');

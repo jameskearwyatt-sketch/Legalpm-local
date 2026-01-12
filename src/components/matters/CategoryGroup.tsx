@@ -81,8 +81,12 @@ export function CategoryGroup({
 
   // Display name shows category and provider
   const displayName = providerName ? `${category} - ${providerName}` : category;
-  const burnPct = subtotal > 0 ? Math.round((budgetUsed / subtotal) * 100) : 0;
-  const burnHealthColor = getBurnHealth(budgetUsed, subtotal);
+  // Calculate raw WIP (adjusted + write-offs)
+  const rawWip = budgetUsed + writeOffTotal;
+  // Adjusted budget used is the figure we track against
+  const adjBudgetUsed = budgetUsed;
+  const burnPct = subtotal > 0 ? Math.round((adjBudgetUsed / subtotal) * 100) : 0;
+  const burnHealthColor = getBurnHealth(adjBudgetUsed, subtotal);
 
   return (
     <div
@@ -116,36 +120,47 @@ export function CategoryGroup({
           </span>
         </div>
         {!isEmpty && subtotal > 0 && (
-          <div className="flex items-center gap-3">
-            {/* Budget Used / Budget with percentage */}
-            {budgetUsed > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className={cn('text-xs font-medium', burnHealthColor)}>
-                  {formatCurrency(budgetUsed, currency)}
+          <div className="flex items-center gap-3 text-xs">
+            {/* Raw WIP */}
+            {rawWip > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">Raw:</span>
+                <span className="font-medium text-muted-foreground">
+                  {formatCurrency(rawWip, currency)}
                 </span>
-                <span className="text-xs text-muted-foreground">/</span>
-                <span className={cn('font-medium text-sm', categoryTextColors[category])}>
-                  {formatCurrency(subtotal, currency)}
+              </div>
+            )}
+            {/* Write-off */}
+            {writeOffTotal > 0 && (
+              <div className="flex items-center gap-1">
+                <span className="text-muted-foreground">W/O:</span>
+                <span className="font-medium text-destructive">
+                  -{formatCurrency(writeOffTotal, currency)}
                 </span>
-                <span className={cn('text-xs font-medium px-1.5 py-0.5 rounded', burnHealthColor, 
+              </div>
+            )}
+            {/* Adjusted Budget Used / Budget with percentage */}
+            <div className="flex items-center gap-1.5">
+              {adjBudgetUsed > 0 && (
+                <>
+                  <span className="text-muted-foreground">Adj:</span>
+                  <span className={cn('font-medium', burnHealthColor)}>
+                    {formatCurrency(adjBudgetUsed, currency)}
+                  </span>
+                  <span className="text-muted-foreground">/</span>
+                </>
+              )}
+              <span className={cn('font-medium', categoryTextColors[category])}>
+                {formatCurrency(subtotal, currency)}
+              </span>
+              {adjBudgetUsed > 0 && (
+                <span className={cn('font-medium px-1.5 py-0.5 rounded', burnHealthColor, 
                   burnPct > 100 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-muted/50'
                 )}>
                   {burnPct}%
                 </span>
-              </div>
-            )}
-            {/* Just show budget if no usage */}
-            {budgetUsed === 0 && (
-              <span className={cn('font-medium text-sm', categoryTextColors[category])}>
-                {formatCurrency(subtotal, currency)}
-              </span>
-            )}
-            {/* Write-off indicator */}
-            {writeOffTotal > 0 && (
-              <span className="text-xs font-medium text-destructive bg-destructive/10 px-1.5 py-0.5 rounded">
-                W/O: {formatCurrency(writeOffTotal, currency)}
-              </span>
-            )}
+              )}
+            </div>
           </div>
         )}
       </div>

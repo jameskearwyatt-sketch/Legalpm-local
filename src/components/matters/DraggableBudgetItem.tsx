@@ -267,7 +267,7 @@ export function DraggableBudgetItem({
       style={style}
       className={cn(
         'grid gap-2 items-center rounded-md py-1 px-1 transition-colors',
-        hasExistingBudget ? 'grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto_auto]' : 'grid-cols-12',
+        hasExistingBudget ? 'grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto_auto_auto]' : 'grid-cols-12',
         isDragging && 'opacity-50',
         isAiSuggested && 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700',
         item.is_optional && !item.is_included && hasExistingBudget && 'opacity-50',
@@ -358,10 +358,36 @@ export function DraggableBudgetItem({
         )}
       </div>
 
-      {/* Budget Used (WIP) - only show when budget exists */}
+      {/* Raw WIP - only show when budget exists */}
+      {hasExistingBudget && (
+        <div className="text-right min-w-[80px]">
+          <div className="text-xs text-muted-foreground">Raw WIP</div>
+          <div className="font-medium text-sm text-muted-foreground">
+            {hasWipData 
+              ? formatCurrency(isInBillingCurrencyMode ? rawWipAmount * mandatedRate : rawWipAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)
+              : '-'}
+          </div>
+        </div>
+      )}
+
+      {/* Write-off column - always show when budget exists */}
+      {hasExistingBudget && (
+        <div className="text-right min-w-[80px]">
+          <div className="text-xs text-muted-foreground">Write-off</div>
+          {hasWriteOff ? (
+            <div className="font-medium text-sm text-destructive">
+              -{formatCurrency(isInBillingCurrencyMode ? writeOffAmount * mandatedRate : writeOffAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">-</div>
+          )}
+        </div>
+      )}
+
+      {/* Adjusted Budget Used - the key tracking figure */}
       {hasExistingBudget && (
         <div className="text-right min-w-[100px]">
-          <div className="text-xs text-muted-foreground">Budget Used</div>
+          <div className="text-xs text-muted-foreground">Adj. Used</div>
           <div className={cn('font-medium text-sm flex items-center justify-end gap-1', hasWipData && wipHealth.text)}>
             {hasWipData && (
               <div className={cn('w-2 h-2 rounded-full flex-shrink-0', wipHealth.indicator)} />
@@ -377,20 +403,6 @@ export function DraggableBudgetItem({
               </span>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Write-off column - always show when budget exists */}
-      {hasExistingBudget && (
-        <div className="text-right min-w-[90px]">
-          <div className="text-xs text-muted-foreground">Write-off</div>
-          {hasWriteOff ? (
-            <div className="font-medium text-sm text-destructive bg-destructive/10 rounded px-1.5 py-0.5 inline-block">
-              {formatCurrency(isInBillingCurrencyMode ? writeOffAmount * mandatedRate : writeOffAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
-            </div>
-          ) : (
-            <div className="text-sm text-muted-foreground">-</div>
-          )}
         </div>
       )}
 

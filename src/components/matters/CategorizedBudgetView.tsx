@@ -410,21 +410,24 @@ export function CategorizedBudgetView({
       <div className="flex flex-wrap gap-2">
         {BUDGET_CATEGORIES.map(category => {
           const catData = categoryTotals[category];
-          if (catData.budget === 0 && catData.used === 0) return null;
+          if (catData.budget === 0 && catData.used === 0 && catData.writeOff === 0) return null;
           
           const displayBudget = differentBillingCurrency && agreedBillingAmount > 0
             ? catData.budget * mandatedRate
             : catData.budget;
-          const displayUsed = differentBillingCurrency && agreedBillingAmount > 0
+          // catData.used is already the adjusted figure (raw - write-off)
+          const displayAdjUsed = differentBillingCurrency && agreedBillingAmount > 0
             ? catData.used * mandatedRate
             : catData.used;
           const displayWriteOff = differentBillingCurrency && agreedBillingAmount > 0
             ? catData.writeOff * mandatedRate
             : catData.writeOff;
+          // Raw WIP = adjusted + write-off
+          const displayRawWip = displayAdjUsed + displayWriteOff;
           const displayCurrency = differentBillingCurrency && agreedBillingAmount > 0 
             ? billingCurrency 
             : currency;
-          const burnPct = displayBudget > 0 ? Math.round((displayUsed / displayBudget) * 100) : 0;
+          const burnPct = displayBudget > 0 ? Math.round((displayAdjUsed / displayBudget) * 100) : 0;
           const burnColor = burnPct > 100 ? 'text-red-600 dark:text-red-400' : 
                            burnPct > 85 ? 'text-orange-600 dark:text-orange-400' : 
                            burnPct > 70 ? 'text-amber-600 dark:text-amber-400' : 
@@ -434,34 +437,57 @@ export function CategorizedBudgetView({
             <div
               key={category}
               className={cn(
-                'rounded-md px-3 py-2 border min-w-[120px]',
+                'rounded-md px-3 py-2 border min-w-[140px]',
                 categoryBgColors[category]
               )}
             >
-              <div className={cn('text-xs font-medium', categoryTextColors[category])}>
+              <div className={cn('text-xs font-medium mb-1', categoryTextColors[category])}>
                 {category}
               </div>
-              <div className="flex items-baseline gap-1">
-                {displayUsed > 0 && (
-                  <>
-                    <span className={cn('text-sm font-semibold', burnColor)}>
-                      {formatCurrency(displayUsed, displayCurrency)}
+              {/* Show Raw → W/O → Adj breakdown when there are write-offs */}
+              {displayWriteOff > 0 ? (
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span>Raw:</span>
+                    <span className="font-medium">{formatCurrency(displayRawWip, displayCurrency)}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-destructive">
+                    <span>W/O:</span>
+                    <span className="font-medium">-{formatCurrency(displayWriteOff, displayCurrency)}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-muted-foreground">Adj:</span>
+                    <span className={cn('font-semibold', burnColor)}>
+                      {formatCurrency(displayAdjUsed, displayCurrency)}
                     </span>
-                    <span className="text-xs text-muted-foreground">/</span>
-                  </>
-                )}
-                <span className={cn('text-sm font-semibold', categoryTextColors[category])}>
-                  {formatCurrency(displayBudget, displayCurrency)}
-                </span>
-                {displayUsed > 0 && (
-                  <span className={cn('text-xs font-medium', burnColor)}>
-                    ({burnPct}%)
+                    <span className="text-muted-foreground">/</span>
+                    <span className={cn('font-semibold', categoryTextColors[category])}>
+                      {formatCurrency(displayBudget, displayCurrency)}
+                    </span>
+                    <span className={cn('font-medium', burnColor)}>
+                      ({burnPct}%)
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                /* Simple display when no write-offs */
+                <div className="flex items-baseline gap-1">
+                  {displayAdjUsed > 0 && (
+                    <>
+                      <span className={cn('text-sm font-semibold', burnColor)}>
+                        {formatCurrency(displayAdjUsed, displayCurrency)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">/</span>
+                    </>
+                  )}
+                  <span className={cn('text-sm font-semibold', categoryTextColors[category])}>
+                    {formatCurrency(displayBudget, displayCurrency)}
                   </span>
-                )}
-              </div>
-              {displayWriteOff > 0 && (
-                <div className="text-xs text-destructive mt-0.5">
-                  W/O: {formatCurrency(displayWriteOff, displayCurrency)}
+                  {displayAdjUsed > 0 && (
+                    <span className={cn('text-xs font-medium', burnColor)}>
+                      ({burnPct}%)
+                    </span>
+                  )}
                 </div>
               )}
             </div>
@@ -471,54 +497,77 @@ export function CategorizedBudgetView({
         {/* Total Box */}
         {(() => {
           const grandBudget = Object.values(categoryTotals).reduce((sum, val) => sum + val.budget, 0);
-          const grandUsed = Object.values(categoryTotals).reduce((sum, val) => sum + val.used, 0);
+          const grandAdjUsed = Object.values(categoryTotals).reduce((sum, val) => sum + val.used, 0);
           const grandWriteOff = Object.values(categoryTotals).reduce((sum, val) => sum + val.writeOff, 0);
-          if (grandBudget === 0 && grandUsed === 0) return null;
+          if (grandBudget === 0 && grandAdjUsed === 0 && grandWriteOff === 0) return null;
           
           const displayGrandBudget = differentBillingCurrency && agreedBillingAmount > 0
             ? grandBudget * mandatedRate
             : grandBudget;
-          const displayGrandUsed = differentBillingCurrency && agreedBillingAmount > 0
-            ? grandUsed * mandatedRate
-            : grandUsed;
+          const displayGrandAdjUsed = differentBillingCurrency && agreedBillingAmount > 0
+            ? grandAdjUsed * mandatedRate
+            : grandAdjUsed;
           const displayGrandWriteOff = differentBillingCurrency && agreedBillingAmount > 0
             ? grandWriteOff * mandatedRate
             : grandWriteOff;
+          const displayGrandRawWip = displayGrandAdjUsed + displayGrandWriteOff;
           const displayCurrency = differentBillingCurrency && agreedBillingAmount > 0 
             ? billingCurrency 
             : currency;
-          const burnPct = displayGrandBudget > 0 ? Math.round((displayGrandUsed / displayGrandBudget) * 100) : 0;
+          const burnPct = displayGrandBudget > 0 ? Math.round((displayGrandAdjUsed / displayGrandBudget) * 100) : 0;
           const burnColor = burnPct > 100 ? 'text-red-600 dark:text-red-400' : 
                            burnPct > 85 ? 'text-orange-600 dark:text-orange-400' : 
                            burnPct > 70 ? 'text-amber-600 dark:text-amber-400' : 
                            'text-green-600 dark:text-green-400';
           
           return (
-            <div className="rounded-md px-3 py-2 border bg-primary/10 border-primary/30 min-w-[140px]">
-              <div className="text-xs font-medium text-primary">
+            <div className="rounded-md px-3 py-2 border bg-primary/10 border-primary/30 min-w-[160px]">
+              <div className="text-xs font-medium text-primary mb-1">
                 Total Budget
               </div>
-              <div className="flex items-baseline gap-1">
-                {displayGrandUsed > 0 && (
-                  <>
-                    <span className={cn('text-sm font-semibold', burnColor)}>
-                      {formatCurrency(displayGrandUsed, displayCurrency)}
+              {/* Show Raw → W/O → Adj breakdown when there are write-offs */}
+              {displayGrandWriteOff > 0 ? (
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span>Raw:</span>
+                    <span className="font-medium">{formatCurrency(displayGrandRawWip, displayCurrency)}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs text-destructive">
+                    <span>W/O:</span>
+                    <span className="font-medium">-{formatCurrency(displayGrandWriteOff, displayCurrency)}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="text-muted-foreground">Adj:</span>
+                    <span className={cn('font-semibold', burnColor)}>
+                      {formatCurrency(displayGrandAdjUsed, displayCurrency)}
                     </span>
-                    <span className="text-xs text-muted-foreground">/</span>
-                  </>
-                )}
-                <span className="text-sm font-semibold text-primary">
-                  {formatCurrency(displayGrandBudget, displayCurrency)}
-                </span>
-                {displayGrandUsed > 0 && (
-                  <span className={cn('text-xs font-medium', burnColor)}>
-                    ({burnPct}%)
+                    <span className="text-muted-foreground">/</span>
+                    <span className="font-semibold text-primary">
+                      {formatCurrency(displayGrandBudget, displayCurrency)}
+                    </span>
+                    <span className={cn('font-medium', burnColor)}>
+                      ({burnPct}%)
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-baseline gap-1">
+                  {displayGrandAdjUsed > 0 && (
+                    <>
+                      <span className={cn('text-sm font-semibold', burnColor)}>
+                        {formatCurrency(displayGrandAdjUsed, displayCurrency)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">/</span>
+                    </>
+                  )}
+                  <span className="text-sm font-semibold text-primary">
+                    {formatCurrency(displayGrandBudget, displayCurrency)}
                   </span>
-                )}
-              </div>
-              {displayGrandWriteOff > 0 && (
-                <div className="text-xs text-destructive mt-0.5">
-                  W/O: {formatCurrency(displayGrandWriteOff, displayCurrency)}
+                  {displayGrandAdjUsed > 0 && (
+                    <span className={cn('text-xs font-medium', burnColor)}>
+                      ({burnPct}%)
+                    </span>
+                  )}
                 </div>
               )}
             </div>

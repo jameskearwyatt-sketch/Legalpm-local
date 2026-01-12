@@ -169,20 +169,53 @@ export function CategorizedBudgetView({
     return subtotals;
   }, [groupedItems]);
 
+  // Calculate budget used (WIP - write-offs) per group
+  const groupBudgetUsed = useMemo(() => {
+    const used: Record<string, number> = {};
+    
+    Object.entries(groupedItems).forEach(([key, group]) => {
+      used[key] = group.items.reduce((sum, item) => {
+        const rawWip = (item as any).wip_amount || 0;
+        const writeOff = (item as any).wip_write_off || 0;
+        return sum + (rawWip - writeOff);
+      }, 0);
+    });
+    
+    return used;
+  }, [groupedItems]);
+
+  // Calculate write-off totals per group
+  const groupWriteOffs = useMemo(() => {
+    const writeOffs: Record<string, number> = {};
+    
+    Object.entries(groupedItems).forEach(([key, group]) => {
+      writeOffs[key] = group.items.reduce((sum, item) => {
+        return sum + ((item as any).wip_write_off || 0);
+      }, 0);
+    });
+    
+    return writeOffs;
+  }, [groupedItems]);
+
   // Calculate totals per master category (combining all providers)
   const categoryTotals = useMemo(() => {
-    const totals: Record<BudgetCategory, number> = {} as Record<BudgetCategory, number>;
+    const totals: Record<BudgetCategory, { budget: number; used: number; writeOff: number }> = {} as Record<BudgetCategory, { budget: number; used: number; writeOff: number }>;
     
     BUDGET_CATEGORIES.forEach(category => {
-      totals[category] = 0;
+      totals[category] = { budget: 0, used: 0, writeOff: 0 };
     });
     
     items.forEach(item => {
       const category = (item.category || 'Other') as BudgetCategory;
       const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
       if (isIncluded) {
-        totals[category] += item.fee_amount || 0;
+        totals[category].budget += item.fee_amount || 0;
       }
+      // Always count WIP regardless of optional status
+      const rawWip = (item as any).wip_amount || 0;
+      const writeOff = (item as any).wip_write_off || 0;
+      totals[category].used += rawWip - writeOff;
+      totals[category].writeOff += writeOff;
     });
     
     return totals;
@@ -376,54 +409,118 @@ export function CategorizedBudgetView({
       {/* Category Summary Boxes */}
       <div className="flex flex-wrap gap-2">
         {BUDGET_CATEGORIES.map(category => {
-          const total = categoryTotals[category];
-          if (total === 0) return null;
+          const catData = categoryTotals[category];
+          if (catData.budget === 0 && catData.used === 0) return null;
           
-          const displayTotal = differentBillingCurrency && agreedBillingAmount > 0
-            ? total * mandatedRate
-            : total;
+          const displayBudget = differentBillingCurrency && agreedBillingAmount > 0
+            ? catData.budget * mandatedRate
+            : catData.budget;
+          const displayUsed = differentBillingCurrency && agreedBillingAmount > 0
+            ? catData.used * mandatedRate
+            : catData.used;
+          const displayWriteOff = differentBillingCurrency && agreedBillingAmount > 0
+            ? catData.writeOff * mandatedRate
+            : catData.writeOff;
           const displayCurrency = differentBillingCurrency && agreedBillingAmount > 0 
             ? billingCurrency 
             : currency;
+          const burnPct = displayBudget > 0 ? Math.round((displayUsed / displayBudget) * 100) : 0;
+          const burnColor = burnPct > 100 ? 'text-red-600 dark:text-red-400' : 
+                           burnPct > 85 ? 'text-orange-600 dark:text-orange-400' : 
+                           burnPct > 70 ? 'text-amber-600 dark:text-amber-400' : 
+                           'text-green-600 dark:text-green-400';
           
           return (
             <div
               key={category}
               className={cn(
-                'rounded-md px-3 py-2 border',
+                'rounded-md px-3 py-2 border min-w-[120px]',
                 categoryBgColors[category]
               )}
             >
               <div className={cn('text-xs font-medium', categoryTextColors[category])}>
                 {category}
               </div>
-              <div className={cn('text-sm font-semibold', categoryTextColors[category])}>
-                {formatCurrency(displayTotal, displayCurrency)}
+              <div className="flex items-baseline gap-1">
+                {displayUsed > 0 && (
+                  <>
+                    <span className={cn('text-sm font-semibold', burnColor)}>
+                      {formatCurrency(displayUsed, displayCurrency)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">/</span>
+                  </>
+                )}
+                <span className={cn('text-sm font-semibold', categoryTextColors[category])}>
+                  {formatCurrency(displayBudget, displayCurrency)}
+                </span>
+                {displayUsed > 0 && (
+                  <span className={cn('text-xs font-medium', burnColor)}>
+                    ({burnPct}%)
+                  </span>
+                )}
               </div>
+              {displayWriteOff > 0 && (
+                <div className="text-xs text-destructive mt-0.5">
+                  W/O: {formatCurrency(displayWriteOff, displayCurrency)}
+                </div>
+              )}
             </div>
           );
         })}
         
         {/* Total Box */}
         {(() => {
-          const grandTotal = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0);
-          if (grandTotal === 0) return null;
+          const grandBudget = Object.values(categoryTotals).reduce((sum, val) => sum + val.budget, 0);
+          const grandUsed = Object.values(categoryTotals).reduce((sum, val) => sum + val.used, 0);
+          const grandWriteOff = Object.values(categoryTotals).reduce((sum, val) => sum + val.writeOff, 0);
+          if (grandBudget === 0 && grandUsed === 0) return null;
           
-          const displayGrandTotal = differentBillingCurrency && agreedBillingAmount > 0
-            ? grandTotal * mandatedRate
-            : grandTotal;
+          const displayGrandBudget = differentBillingCurrency && agreedBillingAmount > 0
+            ? grandBudget * mandatedRate
+            : grandBudget;
+          const displayGrandUsed = differentBillingCurrency && agreedBillingAmount > 0
+            ? grandUsed * mandatedRate
+            : grandUsed;
+          const displayGrandWriteOff = differentBillingCurrency && agreedBillingAmount > 0
+            ? grandWriteOff * mandatedRate
+            : grandWriteOff;
           const displayCurrency = differentBillingCurrency && agreedBillingAmount > 0 
             ? billingCurrency 
             : currency;
+          const burnPct = displayGrandBudget > 0 ? Math.round((displayGrandUsed / displayGrandBudget) * 100) : 0;
+          const burnColor = burnPct > 100 ? 'text-red-600 dark:text-red-400' : 
+                           burnPct > 85 ? 'text-orange-600 dark:text-orange-400' : 
+                           burnPct > 70 ? 'text-amber-600 dark:text-amber-400' : 
+                           'text-green-600 dark:text-green-400';
           
           return (
-            <div className="rounded-md px-3 py-2 border bg-primary/10 border-primary/30">
+            <div className="rounded-md px-3 py-2 border bg-primary/10 border-primary/30 min-w-[140px]">
               <div className="text-xs font-medium text-primary">
-                Total
+                Total Budget
               </div>
-              <div className="text-sm font-semibold text-primary">
-                {formatCurrency(displayGrandTotal, displayCurrency)}
+              <div className="flex items-baseline gap-1">
+                {displayGrandUsed > 0 && (
+                  <>
+                    <span className={cn('text-sm font-semibold', burnColor)}>
+                      {formatCurrency(displayGrandUsed, displayCurrency)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">/</span>
+                  </>
+                )}
+                <span className="text-sm font-semibold text-primary">
+                  {formatCurrency(displayGrandBudget, displayCurrency)}
+                </span>
+                {displayGrandUsed > 0 && (
+                  <span className={cn('text-xs font-medium', burnColor)}>
+                    ({burnPct}%)
+                  </span>
+                )}
               </div>
+              {displayGrandWriteOff > 0 && (
+                <div className="text-xs text-destructive mt-0.5">
+                  W/O: {formatCurrency(displayGrandWriteOff, displayCurrency)}
+                </div>
+              )}
             </div>
           );
         })()}
@@ -506,6 +603,8 @@ export function CategorizedBudgetView({
                     providerName={providerName}
                     groupKey={groupKey}
                     subtotal={0}
+                    budgetUsed={0}
+                    writeOffTotal={0}
                     formatCurrency={formatCurrency}
                     currency={differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : currency}
                     mandatedRate={mandatedRate}
@@ -524,6 +623,14 @@ export function CategorizedBudgetView({
               ? (groupSubtotals[groupKey] || 0) * mandatedRate
               : (groupSubtotals[groupKey] || 0);
             
+            const displayBudgetUsed = differentBillingCurrency && agreedBillingAmount > 0
+              ? (groupBudgetUsed[groupKey] || 0) * mandatedRate
+              : (groupBudgetUsed[groupKey] || 0);
+            
+            const displayWriteOffs = differentBillingCurrency && agreedBillingAmount > 0
+              ? (groupWriteOffs[groupKey] || 0) * mandatedRate
+              : (groupWriteOffs[groupKey] || 0);
+            
             return (
               <CategoryGroup
                 key={groupKey}
@@ -531,6 +638,8 @@ export function CategorizedBudgetView({
                 providerName={providerName}
                 groupKey={groupKey}
                 subtotal={displaySubtotal}
+                budgetUsed={displayBudgetUsed}
+                writeOffTotal={displayWriteOffs}
                 formatCurrency={formatCurrency}
                 currency={differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : currency}
                 mandatedRate={mandatedRate}

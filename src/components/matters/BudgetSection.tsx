@@ -1581,7 +1581,10 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         onClose={() => setIsWipHistoryOpen(false)}
         matterId={matterId}
         formatCurrency={formatCurrency}
-        currency={quoteCurrency}
+        billingCurrency={billingCurrency}
+        quoteCurrency={quoteCurrency}
+        mandatedRate={mandatedRate}
+        differentBillingCurrency={differentBillingCurrency}
       />
     </Card>
   );

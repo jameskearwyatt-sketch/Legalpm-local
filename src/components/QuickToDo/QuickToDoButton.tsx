@@ -1355,22 +1355,59 @@ export function QuickToDoButton() {
   // Personal tasks are separate and ordered separately
   const rawPersonalTasks = useMemo(() => personalSlateAsUnified, [personalSlateAsUnified]);
   
-  // Order slate tasks based on slate_sort_order from database
-  const orderedSlateTasks = useMemo(() => {
-    return [...rawSlateTasks].sort((a, b) => {
-      const aOrder = (a as any).slate_sort_order ?? 0;
-      const bOrder = (b as any).slate_sort_order ?? 0;
-      return aOrder - bOrder;
-    });
-  }, [rawSlateTasks]);
+  // Local state for optimistic reordering - stores the task IDs in order
+  const [optimisticSlateOrder, setOptimisticSlateOrder] = useState<string[] | null>(null);
+  const [optimisticPersonalOrder, setOptimisticPersonalOrder] = useState<string[] | null>(null);
 
-  // Order personal tasks based on sort_order from database
-  const orderedPersonalTasks = useMemo(() => {
-    return [...rawPersonalTasks].sort((a, b) => {
-      const aOrder = (a as any).slate_sort_order ?? 0;
-      const bOrder = (b as any).slate_sort_order ?? 0;
-      return aOrder - bOrder;
+  // Order slate tasks based on optimistic order (if any) or slate_sort_order from database
+  const orderedSlateTasks = useMemo(() => {
+    const sorted = [...rawSlateTasks].sort((a, b) => {
+      const aOrder = a.slate_sort_order ?? 0;
+      const bOrder = b.slate_sort_order ?? 0;
+      // Primary sort by slate_sort_order
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      // Secondary sort by created_at for stable ordering when sort_order is the same
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     });
+    
+    // If we have an optimistic order, use it
+    if (optimisticSlateOrder) {
+      return optimisticSlateOrder
+        .map(id => sorted.find(t => t.id === id))
+        .filter((t): t is UnifiedTask => t !== undefined);
+    }
+    
+    return sorted;
+  }, [rawSlateTasks, optimisticSlateOrder]);
+
+  // Order personal tasks based on optimistic order (if any) or sort_order from database
+  const orderedPersonalTasks = useMemo(() => {
+    const sorted = [...rawPersonalTasks].sort((a, b) => {
+      const aOrder = a.slate_sort_order ?? 0;
+      const bOrder = b.slate_sort_order ?? 0;
+      // Primary sort by slate_sort_order
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      // Secondary sort by created_at for stable ordering when sort_order is the same
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+    
+    // If we have an optimistic order, use it
+    if (optimisticPersonalOrder) {
+      return optimisticPersonalOrder
+        .map(id => sorted.find(t => t.id === id))
+        .filter((t): t is UnifiedTask => t !== undefined);
+    }
+    
+    return sorted;
+  }, [rawPersonalTasks, optimisticPersonalOrder]);
+
+  // Clear optimistic order when raw data changes (after refetch)
+  useEffect(() => {
+    setOptimisticSlateOrder(null);
+  }, [rawSlateTasks]);
+  
+  useEffect(() => {
+    setOptimisticPersonalOrder(null);
   }, [rawPersonalTasks]);
 
   // Sensors for dnd-kit (for slate reordering)
@@ -1379,50 +1416,71 @@ export function QuickToDoButton() {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  // Handle slate task reorder - save to database
+  // Handle slate task reorder - optimistic update + save to database
   const handleSlateDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = orderedSlateTasks.findIndex(t => t.id === active.id);
-    const newIndex = orderedSlateTasks.findIndex(t => t.id === over.id);
+    const currentOrder = optimisticSlateOrder || orderedSlateTasks.map(t => t.id);
+    const oldIndex = currentOrder.indexOf(String(active.id));
+    const newIndex = currentOrder.indexOf(String(over.id));
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      const newOrder = arrayMove(orderedSlateTasks, oldIndex, newIndex);
+      const newOrder = arrayMove(currentOrder, oldIndex, newIndex);
+      
+      // Optimistically update the UI immediately
+      setOptimisticSlateOrder(newOrder);
+      
+      // Get the full task objects for the update
+      const tasksInNewOrder = newOrder.map(id => orderedSlateTasks.find(t => t.id === id)).filter(Boolean) as UnifiedTask[];
+      
       // Save new order to database
-      const updates = newOrder.map((task, idx) => ({
+      const updates = tasksInNewOrder.map((task, idx) => ({
         id: task.id,
         source: task.source === 'slate-only' ? 'slate-item' as const : task.source as 'quick' | 'growth',
         sortOrder: idx,
       }));
+      
       batchUpdateSlateOrder.mutate(updates, {
         onSuccess: () => {
-          // Refetch quick tasks manually since they don't use react-query
+          // Refetch to get fresh data from database
           fetchTasks();
+          refetchGrowthTasks();
+        },
+        onError: () => {
+          // Rollback optimistic update on error
+          setOptimisticSlateOrder(null);
         }
       });
     }
-  }, [orderedSlateTasks, batchUpdateSlateOrder, fetchTasks]);
+  }, [orderedSlateTasks, optimisticSlateOrder, batchUpdateSlateOrder, fetchTasks, refetchGrowthTasks]);
 
-  // Handle personal task reorder - save to database
+  // Handle personal task reorder - optimistic update + save to database
   const handlePersonalDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
-    const oldIndex = orderedPersonalTasks.findIndex(t => t.id === active.id);
-    const newIndex = orderedPersonalTasks.findIndex(t => t.id === over.id);
+    const currentOrder = optimisticPersonalOrder || orderedPersonalTasks.map(t => t.id);
+    const oldIndex = currentOrder.indexOf(String(active.id));
+    const newIndex = currentOrder.indexOf(String(over.id));
 
     if (oldIndex !== -1 && newIndex !== -1) {
-      const newOrder = arrayMove(orderedPersonalTasks, oldIndex, newIndex);
+      const newOrder = arrayMove(currentOrder, oldIndex, newIndex);
+      
+      // Optimistically update the UI immediately
+      setOptimisticPersonalOrder(newOrder);
+      
       // Save order to database (personal items are all slate-items)
-      const updates = newOrder.map((task, idx) => ({
-        id: task.id,
-        source: 'slate-item' as const,
-        sortOrder: idx,
-      }));
-      reorderSlateItems.mutate(updates.map(u => ({ id: u.id, sort_order: u.sortOrder })));
+      const updates = newOrder.map((id, idx) => ({ id, sort_order: idx }));
+      
+      reorderSlateItems.mutate(updates, {
+        onError: () => {
+          // Rollback optimistic update on error
+          setOptimisticPersonalOrder(null);
+        }
+      });
     }
-  }, [orderedPersonalTasks, reorderSlateItems]);
+  }, [orderedPersonalTasks, optimisticPersonalOrder, reorderSlateItems]);
 
   const groupedTasks = useMemo(() => {
     let filtered = pendingTasks;

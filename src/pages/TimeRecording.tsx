@@ -148,10 +148,8 @@ export default function TimeRecording() {
   
   // Date state
   const [singleDate, setSingleDate] = useState<Date>(new Date());
-  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
-    from: undefined,
-    to: undefined,
-  });
+  // For multi-day: array of individually selected dates (non-contiguous allowed)
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   
   // Grid entries - one row per matter/non-chargeable
   const [gridEntries, setGridEntries] = useState<GridRowEntry[]>([]);
@@ -171,11 +169,11 @@ export default function TimeRecording() {
     [matters]
   );
 
-  // Get all dates in range for multi-day
+  // Get all selected dates for multi-day (sorted)
   const datesInRange = useMemo(() => {
-    if (mode !== 'multi' || !dateRange.from || !dateRange.to) return [];
-    return eachDayOfInterval({ start: dateRange.from, end: dateRange.to });
-  }, [mode, dateRange]);
+    if (mode !== 'multi' || selectedDates.length === 0) return [];
+    return [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
+  }, [mode, selectedDates]);
 
   // Hours targets: minimum 8 per day, ideal 10 per day
   const HOURS_MINIMUM_PER_DAY = 8;
@@ -328,11 +326,15 @@ export default function TimeRecording() {
     if (draft.single_date) {
       setSingleDate(parseISO(draft.single_date));
     }
+    // Load selected dates - support both old format (from/to) and new format (array)
     if (draft.date_range_from && draft.date_range_to) {
-      setDateRange({
-        from: parseISO(draft.date_range_from),
-        to: parseISO(draft.date_range_to),
-      });
+      // Legacy format: convert range to array
+      const from = parseISO(draft.date_range_from);
+      const to = parseISO(draft.date_range_to);
+      setSelectedDates(eachDayOfInterval({ start: from, end: to }));
+    } else if ((draft as any).selected_dates) {
+      // New format: array of dates
+      setSelectedDates((draft as any).selected_dates.map((d: string) => parseISO(d)));
     }
     
     // Restore grid entries, converting date strings back to Date objects
@@ -372,8 +374,8 @@ export default function TimeRecording() {
       // Generate a default name based on date
       const defaultName = mode === 'single' 
         ? `Time for ${format(singleDate, 'd MMM yyyy')}`
-        : dateRange.from && dateRange.to
-          ? `Time for ${format(dateRange.from, 'd MMM')} - ${format(dateRange.to, 'd MMM yyyy')}`
+        : datesInRange.length > 0
+          ? `Time for ${format(datesInRange[0], 'd MMM')} - ${format(datesInRange[datesInRange.length - 1], 'd MMM yyyy')}`
           : `Time recording ${format(new Date(), 'd MMM yyyy HH:mm')}`;
       
       // Serialize grid entries, converting Dates to ISO strings
@@ -393,8 +395,9 @@ export default function TimeRecording() {
         name: defaultName,
         mode,
         singleDate: mode === 'single' ? singleDate : null,
-        dateRangeFrom: mode === 'multi' ? dateRange.from || null : null,
-        dateRangeTo: mode === 'multi' ? dateRange.to || null : null,
+        // For backwards compatibility, store first and last dates as range
+        dateRangeFrom: mode === 'multi' && datesInRange.length > 0 ? datesInRange[0] : null,
+        dateRangeTo: mode === 'multi' && datesInRange.length > 0 ? datesInRange[datesInRange.length - 1] : null,
         gridEntries: serializedEntries,
         processedOutput: serializedOutput,
         isPolished: !!processedOutput,
@@ -940,7 +943,7 @@ export default function TimeRecording() {
     setCurrentDraftId(null);
     setGridEntries([]);
     setProcessedOutput(null);
-    setDateRange({ from: undefined, to: undefined });
+    setSelectedDates([]);
   };
 
   // Go back to grid input from output (keeps all data intact)
@@ -1163,42 +1166,31 @@ export default function TimeRecording() {
             <div className="flex flex-wrap gap-4 items-center">
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="justify-start text-left font-normal">
+                  <Button variant="outline" className="justify-start text-left font-normal min-w-[200px]">
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.from ? format(dateRange.from, "d MMM") : "Start date"}
+                    {selectedDates.length > 0 
+                      ? `${selectedDates.length} day${selectedDates.length > 1 ? 's' : ''} selected`
+                      : "Select days"}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
-                    mode="single"
-                    selected={dateRange.from}
-                    onSelect={(date) => setDateRange(prev => ({ ...prev, from: date }))}
-                    initialFocus
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-              <span className="text-muted-foreground">to</span>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" className="justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateRange.to ? format(dateRange.to, "d MMM") : "End date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dateRange.to}
-                    onSelect={(date) => setDateRange(prev => ({ ...prev, to: date }))}
-                    disabled={(date) => dateRange.from ? date < dateRange.from : false}
+                    mode="multiple"
+                    selected={selectedDates}
+                    onSelect={(dates) => setSelectedDates(dates || [])}
                     initialFocus
                     className="pointer-events-auto"
                   />
                 </PopoverContent>
               </Popover>
               {datesInRange.length > 0 && (
-                <Badge variant="secondary">{datesInRange.length} days</Badge>
+                <div className="flex flex-wrap gap-1">
+                  {datesInRange.map(date => (
+                    <Badge key={format(date, 'yyyy-MM-dd')} variant="secondary" className="text-xs">
+                      {format(date, 'EEE d MMM')}
+                    </Badge>
+                  ))}
+                </div>
               )}
             </div>
           )}

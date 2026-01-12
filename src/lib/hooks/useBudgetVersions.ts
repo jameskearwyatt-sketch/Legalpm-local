@@ -236,29 +236,54 @@ export function useBudgetVersions(matterId?: string) {
       // Get remaining versions after deletion
       const remainingVersions = (versionsQuery.data || []).filter(v => v.id !== versionId);
 
+      // Fetch current matter to check for different billing currency
+      const { data: currentMatter } = await supabase
+        .from('matters')
+        .select('different_billing_currency, agreed_billing_amount, fee_amount_upper_end')
+        .eq('id', matterId!)
+        .single();
+
       // Update matters table with the previous version's totals, or zero if no versions left
       if (remainingVersions.length > 0) {
         // Sort by version number to get the new latest
         const newLatest = remainingVersions.sort((a, b) => b.version_number - a.version_number)[0];
+        
+        const matterUpdate: Record<string, number> = {
+          fee_amount_upper_end: newLatest.total_amount,
+          bm_fee_component: newLatest.bm_total,
+          local_counsel_fee: newLatest.local_counsel_total,
+        };
+
+        // Update agreed_billing_amount proportionally if different billing currency
+        if (currentMatter?.different_billing_currency && 
+            currentMatter.agreed_billing_amount > 0 && 
+            currentMatter.fee_amount_upper_end > 0) {
+          const mandatedRate = currentMatter.agreed_billing_amount / currentMatter.fee_amount_upper_end;
+          matterUpdate.agreed_billing_amount = newLatest.total_amount * mandatedRate;
+        }
+
         const { error: matterError } = await supabase
           .from('matters')
-          .update({
-            fee_amount_upper_end: newLatest.total_amount,
-            bm_fee_component: newLatest.bm_total,
-            local_counsel_fee: newLatest.local_counsel_total,
-          })
+          .update(matterUpdate)
           .eq('id', matterId!);
 
         if (matterError) throw matterError;
       } else {
         // No versions left, reset to zero
+        const matterUpdate: Record<string, number> = {
+          fee_amount_upper_end: 0,
+          bm_fee_component: 0,
+          local_counsel_fee: 0,
+        };
+
+        // Also reset agreed_billing_amount if different billing currency
+        if (currentMatter?.different_billing_currency) {
+          matterUpdate.agreed_billing_amount = 0;
+        }
+
         const { error: matterError } = await supabase
           .from('matters')
-          .update({
-            fee_amount_upper_end: 0,
-            bm_fee_component: 0,
-            local_counsel_fee: 0,
-          })
+          .update(matterUpdate)
           .eq('id', matterId!);
 
         if (matterError) throw matterError;

@@ -600,14 +600,32 @@ export function usePricingProposal(proposalId?: string) {
             .insert(lineItems);
         }
 
+        // Fetch current matter to check for different billing currency
+        const { data: currentMatter } = await supabase
+          .from('matters')
+          .select('different_billing_currency, agreed_billing_amount, fee_amount_upper_end')
+          .eq('id', matterId)
+          .single();
+
+        // Build update object
+        const matterUpdate: Record<string, number> = {
+          fee_amount_upper_end: latestVersion.total_amount,
+          bm_fee_component: latestVersion.bm_total,
+          local_counsel_fee: latestVersion.local_counsel_total,
+        };
+
+        // Update agreed_billing_amount proportionally if different billing currency
+        if (currentMatter?.different_billing_currency && 
+            currentMatter.agreed_billing_amount > 0 && 
+            currentMatter.fee_amount_upper_end > 0) {
+          const mandatedRate = currentMatter.agreed_billing_amount / currentMatter.fee_amount_upper_end;
+          matterUpdate.agreed_billing_amount = latestVersion.total_amount * mandatedRate;
+        }
+
         // Update matter totals
         await supabase
           .from('matters')
-          .update({
-            fee_amount_upper_end: latestVersion.total_amount,
-            bm_fee_component: latestVersion.bm_total,
-            local_counsel_fee: latestVersion.local_counsel_total,
-          })
+          .update(matterUpdate)
           .eq('id', matterId);
       }
 

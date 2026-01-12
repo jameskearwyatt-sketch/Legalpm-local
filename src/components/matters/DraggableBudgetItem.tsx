@@ -252,9 +252,13 @@ export function DraggableBudgetItem({
   }
 
   // Normal viewing mode (no budget yet or just viewing)
-  const wipAmount = item.wip_amount || 0;
+  const rawWipAmount = item.wip_amount || 0;
+  const writeOffAmount = (item as any).wip_write_off || 0;
+  // Net WIP = raw WIP minus write-offs (write-offs reduce actual WIP)
+  const wipAmount = rawWipAmount - writeOffAmount;
   const wipHealth = getHealthColor(wipAmount, item.fee_amount || 0);
-  const hasWipData = wipAmount > 0;
+  const hasWipData = rawWipAmount > 0;
+  const hasWriteOff = writeOffAmount > 0;
   const wipPercentage = (item.fee_amount || 0) > 0 ? Math.round((wipAmount / (item.fee_amount || 1)) * 100) : 0;
   
   return (
@@ -373,6 +377,12 @@ export function DraggableBudgetItem({
               </span>
             )}
           </div>
+          {/* Write-off amount in red */}
+          {hasWriteOff && (
+            <div className="text-xs text-destructive">
+              W/O: {formatCurrency(isInBillingCurrencyMode ? writeOffAmount * mandatedRate : writeOffAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
+            </div>
+          )}
         </div>
       )}
 

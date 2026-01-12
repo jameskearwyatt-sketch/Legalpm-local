@@ -9,6 +9,7 @@ export interface FinancialSnapshot {
   user_id: string;
   as_of_date: string;
   wip_amount: number;
+  wip_write_off_amount: number;
   billed_amount: number;
   paid_amount: number;
   notes: string | null;

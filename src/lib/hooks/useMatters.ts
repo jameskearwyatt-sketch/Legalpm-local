@@ -81,6 +81,7 @@ export interface LocalCounselBrief {
 export interface MatterWithFinancials extends Matter {
   latest_snapshot?: {
     wip_amount: number;
+    wip_write_off_amount: number;
     billed_amount: number;
     paid_amount: number;
     as_of_date: string;
@@ -207,7 +208,10 @@ export function useMatters() {
       // Combine matters with their financial data
       return matters?.map(matter => {
         const snapshot = snapshotMap.get(matter.id);
-        const wipAmount = snapshot?.wip_amount || 0;
+        const rawWipAmount = snapshot?.wip_amount || 0;
+        const wipWriteOffAmount = snapshot?.wip_write_off_amount || 0;
+        // Net WIP = raw WIP minus write-offs (write-offs reduce actual WIP)
+        const wipAmount = rawWipAmount - wipWriteOffAmount;
         const billedAmount = snapshot?.billed_amount || 0;
         const paidAmount = snapshot?.paid_amount || 0;
         const budget = matter.agreed_budget_amount || 0;
@@ -276,7 +280,8 @@ export function useMatters() {
         return {
           ...matter,
           latest_snapshot: snapshot ? {
-            wip_amount: wipAmount,
+            wip_amount: wipAmount, // Net WIP (after write-offs)
+            wip_write_off_amount: wipWriteOffAmount,
             billed_amount: billedAmount,
             paid_amount: paidAmount,
             as_of_date: snapshot.as_of_date,

@@ -1193,6 +1193,14 @@ export default function Matters() {
                                       }}
                                     />
                                   </div>
+                                  {/* Show write-off amount in red if present */}
+                                  {(matter.latest_snapshot?.wip_write_off_amount || 0) > 0 && (
+                                    <div className="flex items-center justify-end gap-1">
+                                      <span className="text-[9px] text-destructive leading-tight">
+                                        W/O: {formatCurrency(matter.latest_snapshot?.wip_write_off_amount || 0, matter.fee_currency)}
+                                      </span>
+                                    </div>
+                                  )}
                                   <div className="flex items-center justify-end gap-1">
                                     <span className="text-[10px] text-muted-foreground leading-tight">Billed:</span>
                                     <BilledAmountCell

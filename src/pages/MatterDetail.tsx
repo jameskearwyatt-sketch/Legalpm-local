@@ -411,7 +411,10 @@ export default function MatterDetail() {
   }
 
   const latestSnapshot = snapshots[0];
-  const wipAmount = latestSnapshot?.wip_amount || 0;
+  const rawWipAmount = latestSnapshot?.wip_amount || 0;
+  const wipWriteOffAmount = latestSnapshot?.wip_write_off_amount || 0;
+  // Net WIP = raw WIP minus write-offs (write-offs reduce actual WIP)
+  const wipAmount = rawWipAmount - wipWriteOffAmount;
   const billedAmount = latestSnapshot?.billed_amount || 0;
   const paidAmount = latestSnapshot?.paid_amount || 0;
   
@@ -708,7 +711,14 @@ export default function MatterDetail() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center py-3 border-b">
-                  <span className="text-muted-foreground">Work in Progress</span>
+                  <div>
+                    <span className="text-muted-foreground">Work in Progress</span>
+                    {wipWriteOffAmount > 0 && (
+                      <div className="text-xs text-destructive">
+                        (Write-off: {formatCurrency(wipWriteOffAmount, currency)})
+                      </div>
+                    )}
+                  </div>
                   <div className="w-28">
                     <EditableFinancialCell
                       value={wipAmount}

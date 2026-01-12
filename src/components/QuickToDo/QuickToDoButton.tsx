@@ -116,6 +116,8 @@ interface SlateOnlyItem {
 
 const STORAGE_KEY = 'todo-button-position';
 const SLATE_POSITION_KEY = 'slate-panel-position';
+const PANEL_OPEN_KEY = 'todo-panel-open';
+const SLATE_OPEN_KEY = 'slate-panel-open';
 
 const deadlineOptions: TaskDeadlineType[] = [
   'this_week',
@@ -651,7 +653,13 @@ export function QuickToDoButton() {
   } = useSlateItems();
   const { batchUpdateSlateOrder } = useSlateOrder();
   
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(() => {
+    try {
+      return localStorage.getItem(PANEL_OPEN_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [isExpanded, setIsExpanded] = useState(false);
   const [tasks, setTasks] = useState<QuickTask[]>([]);
   const [newTask, setNewTask] = useState("");
@@ -682,7 +690,13 @@ export function QuickToDoButton() {
   const [viewingNotesTask, setViewingNotesTask] = useState<UnifiedTask | null>(null);
   
   // Slate panel state
-  const [isSlateOpen, setIsSlateOpen] = useState(false);
+  const [isSlateOpen, setIsSlateOpen] = useState(() => {
+    try {
+      return localStorage.getItem(SLATE_OPEN_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [slatePosition, setSlatePosition] = useState<{ x: number; y: number } | null>(null);
   const [isDraggingSlate, setIsDraggingSlate] = useState(false);
   const slateDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
@@ -726,6 +740,16 @@ export function QuickToDoButton() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(position));
     }
   }, [position]);
+
+  // Persist panel open state
+  useEffect(() => {
+    localStorage.setItem(PANEL_OPEN_KEY, isOpen ? 'true' : 'false');
+  }, [isOpen]);
+
+  // Persist slate open state
+  useEffect(() => {
+    localStorage.setItem(SLATE_OPEN_KEY, isSlateOpen ? 'true' : 'false');
+  }, [isSlateOpen]);
 
   // Load saved slate position on mount
   useEffect(() => {

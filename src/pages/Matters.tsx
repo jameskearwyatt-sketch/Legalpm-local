@@ -16,6 +16,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -38,7 +43,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { BilledAmountCell } from '@/components/matters/BilledAmountCell';
-import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2 } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown } from 'lucide-react';
 import { format, differenceInDays, parseISO, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -491,6 +496,7 @@ export default function Matters() {
   const [search, setSearch] = useState('');
   const [tabFilter, setTabFilter] = useState<TabFilter>('Live');
   const [clientFilter, setClientFilter] = useState<string>('all');
+  const [practiceAreaFilter, setPracticeAreaFilter] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>('matter_name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
@@ -550,6 +556,17 @@ export default function Matters() {
     });
     return usedIds;
   }, [matters, allMatterClients]);
+
+  // Extract unique practice areas from all matters
+  const uniquePracticeAreas = useMemo(() => {
+    const areas = new Set<string>();
+    matters.forEach((m) => {
+      if (m.practice_area && m.practice_area.trim()) {
+        areas.add(m.practice_area.trim());
+      }
+    });
+    return Array.from(areas).sort();
+  }, [matters]);
 
   // Silent update for local counsel billing (no toast) - legacy matter-level
   const updateLocalCounselBilling = async (matterId: string, value: 'Direct' | 'Disb' | null) => {
@@ -687,6 +704,14 @@ export default function Matters() {
       });
     }
 
+    // Practice area filter - if any are selected, filter to those
+    if (practiceAreaFilter.length > 0) {
+      result = result.filter((m) => {
+        if (!m.practice_area) return false;
+        return practiceAreaFilter.includes(m.practice_area.trim());
+      });
+    }
+
     // Sort
     result.sort((a, b) => {
       let aVal: any, bVal: any;
@@ -746,7 +771,7 @@ export default function Matters() {
     });
 
     return result;
-  }, [matters, search, tabFilter, categoryFilter, clientFilter, sortField, sortDirection, matterToClientsMap]);
+  }, [matters, search, tabFilter, categoryFilter, clientFilter, practiceAreaFilter, sortField, sortDirection, matterToClientsMap]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<MatterCategory, number> = { Live: 0, Pipeline: 0, Closed: 0, Lost: 0 };
@@ -890,7 +915,7 @@ export default function Matters() {
                     <SelectTrigger className="w-full sm:w-48">
                       <SelectValue placeholder="Client" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-background border shadow-lg z-50">
                       <SelectItem value="all">All Clients</SelectItem>
                       {clients.map((client) => (
                         <SelectItem key={client.id} value={client.id}>
@@ -899,6 +924,72 @@ export default function Matters() {
                       ))}
                     </SelectContent>
                   </Select>
+                  
+                  {/* Practice Area Multi-Select Filter */}
+                  {uniquePracticeAreas.length > 0 && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full sm:w-48 justify-between",
+                            practiceAreaFilter.length > 0 && "border-primary"
+                          )}
+                        >
+                          <span className="flex items-center gap-2 truncate">
+                            <Filter className="h-4 w-4 shrink-0" />
+                            {practiceAreaFilter.length === 0 
+                              ? "All Practices" 
+                              : practiceAreaFilter.length === 1 
+                                ? practiceAreaFilter[0]
+                                : `${practiceAreaFilter.length} selected`}
+                          </span>
+                          <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent 
+                        className="w-56 p-0 bg-background border shadow-lg z-50" 
+                        align="start"
+                      >
+                        <div className="p-2 border-b">
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-medium">Practice Areas</span>
+                            {practiceAreaFilter.length > 0 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 px-2 text-xs"
+                                onClick={() => setPracticeAreaFilter([])}
+                              >
+                                Clear
+                                <X className="h-3 w-3 ml-1" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="max-h-64 overflow-y-auto p-2 space-y-1">
+                          {uniquePracticeAreas.map((area) => (
+                            <label
+                              key={area}
+                              className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-muted cursor-pointer"
+                            >
+                              <Checkbox
+                                checked={practiceAreaFilter.includes(area)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setPracticeAreaFilter([...practiceAreaFilter, area]);
+                                  } else {
+                                    setPracticeAreaFilter(practiceAreaFilter.filter(a => a !== area));
+                                  }
+                                }}
+                              />
+                              <span className="text-sm">{area}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  )}
                 </div>
               </div>
             </CardContent>

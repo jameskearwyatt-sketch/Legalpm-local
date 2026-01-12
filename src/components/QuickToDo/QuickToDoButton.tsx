@@ -4,7 +4,7 @@ import {
   Briefcase, GraduationCap, Lightbulb, Maximize2, Minimize2,
   ListTodo, LayoutGrid, Filter, Check, ChevronDown, ChevronRight,
   Zap, Target, CalendarClock, Feather, Flame, MessageSquare, Pin, PinOff,
-  Clipboard, ClipboardCheck, GripHorizontal, GripVertical, Search
+  Clipboard, ClipboardCheck, GripHorizontal, GripVertical, Search, Home
 } from "lucide-react";
 import { 
   DndContext, 
@@ -106,6 +106,7 @@ interface SlateOnlyItem {
   id: string;
   title: string;
   created_at: string;
+  is_personal?: boolean; // Personal tasks (non-work reminders)
 }
 
 const STORAGE_KEY = 'todo-button-position';
@@ -671,8 +672,11 @@ export function QuickToDoButton() {
   const [slateTaskOrder, setSlateTaskOrder] = useState<string[]>([]);
   const [slateOnlyItems, setSlateOnlyItems] = useState<SlateOnlyItem[]>([]);
   const [newSlateItem, setNewSlateItem] = useState("");
+  const [newPersonalItem, setNewPersonalItem] = useState("");
   const SLATE_ORDER_KEY = 'slate-task-order';
   const SLATE_ONLY_ITEMS_KEY = 'slate-only-items';
+  const PERSONAL_SLATE_ORDER_KEY = 'personal-slate-order';
+  const [personalSlateOrder, setPersonalSlateOrder] = useState<string[]>([]);
   // Triage debouncing - track tasks being actively triaged
   // Key: taskId, Value: { lastTriageTime, previousQuadrant }
   const [tasksBeingTriaged, setTasksBeingTriaged] = useState<Map<string, { lastTriageTime: number; previousQuadrant: EisenhowerQuadrant }>>(new Map());
@@ -769,6 +773,26 @@ export function QuickToDoButton() {
   useEffect(() => {
     localStorage.setItem(SLATE_ONLY_ITEMS_KEY, JSON.stringify(slateOnlyItems));
   }, [slateOnlyItems]);
+
+  // Load saved personal slate order on mount
+  useEffect(() => {
+    const saved = localStorage.getItem(PERSONAL_SLATE_ORDER_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setPersonalSlateOrder(parsed);
+        }
+      } catch {
+        // Invalid saved order
+      }
+    }
+  }, []);
+
+  // Save personal slate order when it changes
+  useEffect(() => {
+    localStorage.setItem(PERSONAL_SLATE_ORDER_KEY, JSON.stringify(personalSlateOrder));
+  }, [personalSlateOrder]);
 
   // Slate drag handlers
   const handleSlateMouseDown = useCallback((e: React.MouseEvent) => {
@@ -1166,8 +1190,8 @@ export function QuickToDoButton() {
     }
   };
 
-  // Add slate-only item
-  const addSlateOnlyItem = (title: string) => {
+  // Add slate-only item (work or personal)
+  const addSlateOnlyItem = (title: string, isPersonal: boolean = false) => {
     const trimmed = title.trim();
     if (!trimmed || trimmed.length > 200) return;
     
@@ -1175,9 +1199,14 @@ export function QuickToDoButton() {
       id: `slate-only-${Date.now()}`,
       title: trimmed,
       created_at: new Date().toISOString(),
+      is_personal: isPersonal,
     };
     setSlateOnlyItems(prev => [...prev, newItem]);
-    setNewSlateItem("");
+    if (isPersonal) {
+      setNewPersonalItem("");
+    } else {
+      setNewSlateItem("");
+    }
   };
 
   // Promote slate-only item to main task list
@@ -1333,9 +1362,15 @@ export function QuickToDoButton() {
   const untriagedCount = useMemo(() => pendingTasks.filter(t => !isFullyTriaged(t)).length, [pendingTasks]);
   
   // Slate tasks (both quick and growth tasks can be on slate) - ordered by user preference
-  // Also include slate-only items
+  // Also include slate-only items (split into work and personal)
+  const workSlateOnlyItems = useMemo(() => 
+    slateOnlyItems.filter(item => !item.is_personal), [slateOnlyItems]);
+  
+  const personalSlateOnlyItems = useMemo(() => 
+    slateOnlyItems.filter(item => item.is_personal), [slateOnlyItems]);
+
   const slateOnlyAsUnified: UnifiedTask[] = useMemo(() => {
-    return slateOnlyItems.map(item => ({
+    return workSlateOnlyItems.map(item => ({
       id: item.id,
       title: item.title,
       is_completed: false,
@@ -1346,12 +1381,29 @@ export function QuickToDoButton() {
       source: 'slate-only' as const,
       on_slate: true,
     }));
-  }, [slateOnlyItems]);
+  }, [workSlateOnlyItems]);
+
+  const personalSlateAsUnified: UnifiedTask[] = useMemo(() => {
+    return personalSlateOnlyItems.map(item => ({
+      id: item.id,
+      title: item.title,
+      is_completed: false,
+      importance: 'unset' as TaskImportance,
+      urgency: 'unset' as TaskUrgency,
+      effort: 'unset' as TaskEffort,
+      created_at: item.created_at,
+      source: 'slate-only' as const,
+      on_slate: true,
+    }));
+  }, [personalSlateOnlyItems]);
 
   const rawSlateTasks = useMemo(() => {
     const fromTasks = allUnifiedTasks.filter(t => t.on_slate && !t.is_completed);
     return [...fromTasks, ...slateOnlyAsUnified];
   }, [allUnifiedTasks, slateOnlyAsUnified]);
+  
+  // Personal tasks are separate and ordered separately
+  const rawPersonalTasks = useMemo(() => personalSlateAsUnified, [personalSlateAsUnified]);
   
   // Auto-populate slate order when rawSlateTasks change (e.g., new tasks added)
   // This ensures all current slate tasks are tracked in the order and order is preserved
@@ -1413,6 +1465,58 @@ export function QuickToDoButton() {
     return orderedTasks;
   }, [rawSlateTasks, slateTaskOrder]);
 
+  // Auto-populate personal slate order when rawPersonalTasks change
+  useEffect(() => {
+    setPersonalSlateOrder(prevOrder => {
+      if (rawPersonalTasks.length > 0) {
+        const currentIds = new Set(rawPersonalTasks.map(t => t.id));
+        const savedOrderIds = new Set(prevOrder);
+        
+        const hasNewTasks = rawPersonalTasks.some(t => !savedOrderIds.has(t.id));
+        const hasRemovedTasks = prevOrder.some(id => !currentIds.has(id));
+        
+        if (hasNewTasks || hasRemovedTasks) {
+          const newOrder: string[] = [];
+          prevOrder.forEach(id => {
+            if (currentIds.has(id)) {
+              newOrder.push(id);
+            }
+          });
+          rawPersonalTasks.forEach(t => {
+            if (!newOrder.includes(t.id)) {
+              newOrder.push(t.id);
+            }
+          });
+          return newOrder;
+        }
+        return prevOrder;
+      } else if (prevOrder.length > 0) {
+        return [];
+      }
+      return prevOrder;
+    });
+  }, [rawPersonalTasks]);
+
+  // Order personal tasks based on saved order
+  const orderedPersonalTasks = useMemo(() => {
+    if (personalSlateOrder.length === 0) return rawPersonalTasks;
+    
+    const orderedTasks: UnifiedTask[] = [];
+    const taskMap = new Map(rawPersonalTasks.map(t => [t.id, t]));
+    
+    personalSlateOrder.forEach(id => {
+      const task = taskMap.get(id);
+      if (task) {
+        orderedTasks.push(task);
+        taskMap.delete(id);
+      }
+    });
+    
+    taskMap.forEach(task => orderedTasks.push(task));
+    
+    return orderedTasks;
+  }, [rawPersonalTasks, personalSlateOrder]);
+
   // Sensors for dnd-kit (for slate reordering)
   const slateSensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -1432,6 +1536,20 @@ export function QuickToDoButton() {
       setSlateTaskOrder(newOrder);
     }
   }, [orderedSlateTasks]);
+
+  // Handle personal task reorder
+  const handlePersonalDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = orderedPersonalTasks.findIndex(t => t.id === active.id);
+    const newIndex = orderedPersonalTasks.findIndex(t => t.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newOrder = arrayMove(orderedPersonalTasks.map(t => t.id), oldIndex, newIndex);
+      setPersonalSlateOrder(newOrder);
+    }
+  }, [orderedPersonalTasks]);
 
   const groupedTasks = useMemo(() => {
     let filtered = pendingTasks;
@@ -2271,7 +2389,7 @@ export function QuickToDoButton() {
                 <div>
                   <h3 className="font-bold text-white text-sm">Slate</h3>
                   <p className="text-[10px] text-white/80">
-                    {orderedSlateTasks.length} {orderedSlateTasks.length === 1 ? 'task' : 'tasks'} to do now
+                    {orderedSlateTasks.length + orderedPersonalTasks.length} {(orderedSlateTasks.length + orderedPersonalTasks.length) === 1 ? 'item' : 'items'} today
                   </p>
                 </div>
               </div>
@@ -2291,84 +2409,156 @@ export function QuickToDoButton() {
           {/* Slate Tasks - scrollable area */}
           <div className="flex-1 min-h-0 overflow-hidden">
             <ScrollArea className="h-full [&>[data-radix-scroll-area-viewport]]:max-h-full">
-              <div className="p-3 pb-4">
-                {orderedSlateTasks.length === 0 ? (
+              <div className="p-3 pb-4 space-y-4">
+                {/* Work Tasks Section */}
+                {orderedSlateTasks.length === 0 && orderedPersonalTasks.length === 0 ? (
                   <p className="text-center text-muted-foreground text-sm py-8">
                     No tasks on your Slate yet.<br />
                     Add tasks from your triaged list.
                   </p>
                 ) : (
-                  <DndContext
-                    sensors={slateSensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleSlateDragEnd}
-                  >
-                    <SortableContext 
-                      items={orderedSlateTasks.map(t => t.id)} 
-                      strategy={verticalListSortingStrategy}
-                    >
-                      <div className="space-y-2">
-                        {orderedSlateTasks.map((task, index) => (
-                          <SortableSlateItem
-                            key={task.id}
-                            task={task}
-                            index={index}
-                            onCompleteWithNotes={() => {
-                              if (task.source === 'slate-only') {
-                                // For slate-only, just remove it
-                                setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
-                                return;
-                              }
-                              const unified: UnifiedTask = { ...task, source: task.source };
-                              setTaskToComplete(unified);
-                              setCompletionNotes("");
-                              setCompleteDialogOpen(true);
-                            }}
-                            onQuickComplete={async () => {
-                              if (task.source === 'slate-only') {
-                                // For slate-only, just remove it
-                                setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
-                                return;
-                              }
-                              if (task.source === 'growth') {
-                                const realId = task.id.replace('growth-', '');
-                                const { error } = await supabase
-                                  .from('growth_tasks')
-                                  .update({
-                                    is_completed: true,
-                                    completed_at: new Date().toISOString(),
-                                  })
-                                  .eq('id', realId);
-                                if (error) {
-                                  toast.error('Failed to complete task');
-                                } else {
-                                  refetchGrowthTasks();
-                                }
-                              } else {
-                                const { error } = await supabase
-                                  .from('quick_tasks')
-                                  .update({
-                                    is_completed: true,
-                                    completed_at: new Date().toISOString(),
-                                  })
-                                  .eq('id', task.id);
-                                if (error) {
-                                  toast.error('Failed to complete task');
-                                } else {
-                                  fetchTasks();
-                                }
-                              }
-                            }}
-                            onRemoveFromSlate={() => toggleSlate(task.id, true, task.source)}
-                            onPromoteToTaskList={task.source === 'slate-only' ? () => {
-                              const slateItem = slateOnlyItems.find(i => i.id === task.id);
-                              if (slateItem) promoteSlateOnlyToTaskList(slateItem);
-                            } : undefined}
-                          />
-                        ))}
+                  <>
+                    {/* Work Tasks */}
+                    {orderedSlateTasks.length > 0 && (
+                      <div>
+                        <div className="flex items-center gap-2 mb-2 px-1">
+                          <Briefcase className="h-3.5 w-3.5 text-blue-500" />
+                          <span className="text-xs font-medium text-muted-foreground">Work Tasks</span>
+                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{orderedSlateTasks.length}</Badge>
+                        </div>
+                        <DndContext
+                          sensors={slateSensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={handleSlateDragEnd}
+                        >
+                          <SortableContext 
+                            items={orderedSlateTasks.map(t => t.id)} 
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <div className="space-y-2">
+                              {orderedSlateTasks.map((task, index) => (
+                                <SortableSlateItem
+                                  key={task.id}
+                                  task={task}
+                                  index={index}
+                                  onCompleteWithNotes={() => {
+                                    if (task.source === 'slate-only') {
+                                      setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
+                                      return;
+                                    }
+                                    const unified: UnifiedTask = { ...task, source: task.source };
+                                    setTaskToComplete(unified);
+                                    setCompletionNotes("");
+                                    setCompleteDialogOpen(true);
+                                  }}
+                                  onQuickComplete={async () => {
+                                    if (task.source === 'slate-only') {
+                                      setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
+                                      return;
+                                    }
+                                    if (task.source === 'growth') {
+                                      const realId = task.id.replace('growth-', '');
+                                      const { error } = await supabase
+                                        .from('growth_tasks')
+                                        .update({
+                                          is_completed: true,
+                                          completed_at: new Date().toISOString(),
+                                        })
+                                        .eq('id', realId);
+                                      if (error) {
+                                        toast.error('Failed to complete task');
+                                      } else {
+                                        refetchGrowthTasks();
+                                      }
+                                    } else {
+                                      const { error } = await supabase
+                                        .from('quick_tasks')
+                                        .update({
+                                          is_completed: true,
+                                          completed_at: new Date().toISOString(),
+                                        })
+                                        .eq('id', task.id);
+                                      if (error) {
+                                        toast.error('Failed to complete task');
+                                      } else {
+                                        fetchTasks();
+                                      }
+                                    }
+                                  }}
+                                  onRemoveFromSlate={() => toggleSlate(task.id, true, task.source)}
+                                  onPromoteToTaskList={task.source === 'slate-only' ? () => {
+                                    const slateItem = slateOnlyItems.find(i => i.id === task.id);
+                                    if (slateItem) promoteSlateOnlyToTaskList(slateItem);
+                                  } : undefined}
+                                />
+                              ))}
+                            </div>
+                          </SortableContext>
+                        </DndContext>
                       </div>
-                    </SortableContext>
-                  </DndContext>
+                    )}
+
+                    {/* Personal Tasks Section */}
+                    {orderedPersonalTasks.length > 0 && (
+                      <div className="pt-2">
+                        <div className="flex items-center gap-2 mb-2 px-1">
+                          <Home className="h-3.5 w-3.5 text-rose-500" />
+                          <span className="text-xs font-medium text-muted-foreground">Personal</span>
+                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">{orderedPersonalTasks.length}</Badge>
+                        </div>
+                        <DndContext
+                          sensors={slateSensors}
+                          collisionDetection={closestCenter}
+                          onDragEnd={handlePersonalDragEnd}
+                        >
+                          <SortableContext 
+                            items={orderedPersonalTasks.map(t => t.id)} 
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <div className="space-y-2">
+                              {orderedPersonalTasks.map((task, index) => (
+                                <div 
+                                  key={task.id}
+                                  className="flex items-center gap-2 p-2 rounded-lg group min-w-0 bg-rose-50/50 dark:bg-rose-950/20 border border-dashed border-rose-300/50 dark:border-rose-700/30"
+                                >
+                                  {/* Number badge */}
+                                  <div className="flex items-center justify-center w-5 h-5 rounded text-xs font-bold bg-rose-200/50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 shrink-0">
+                                    {index + 1}
+                                  </div>
+                                  
+                                  {/* Checkbox */}
+                                  <Checkbox
+                                    checked={false}
+                                    onCheckedChange={() => {
+                                      setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
+                                    }}
+                                    className="h-4 w-4 shrink-0"
+                                    title="Complete"
+                                  />
+                                  
+                                  <span className="flex-1 text-sm truncate min-w-0 italic text-muted-foreground">
+                                    {task.title}
+                                  </span>
+                                  
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100"
+                                    onClick={() => {
+                                      setSlateOnlyItems(prev => prev.filter(i => i.id !== task.id));
+                                    }}
+                                    title="Remove"
+                                  >
+                                    <X className="h-3.5 w-3.5 text-rose-500" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </SortableContext>
+                        </DndContext>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </ScrollArea>
@@ -2376,19 +2566,22 @@ export function QuickToDoButton() {
           
           {/* Footer - fixed at bottom */}
           <div className="shrink-0 border-t bg-background">
-            {/* Add new slate item */}
-            <div className="p-2">
+            {/* Add new work item */}
+            <div className="p-2 pb-1">
               <form 
                 onSubmit={(e) => {
                   e.preventDefault();
-                  addSlateOnlyItem(newSlateItem);
+                  addSlateOnlyItem(newSlateItem, false);
                 }}
                 className="flex gap-2"
               >
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Briefcase className="h-3.5 w-3.5 text-blue-500" />
+                </div>
                 <Input
                   value={newSlateItem}
                   onChange={(e) => setNewSlateItem(e.target.value)}
-                  placeholder="Add item to slate..."
+                  placeholder="Add work item..."
                   className="h-8 text-sm flex-1"
                   maxLength={200}
                 />
@@ -2400,6 +2593,37 @@ export function QuickToDoButton() {
                   disabled={!newSlateItem.trim()}
                 >
                   <Plus className="h-4 w-4" />
+                </Button>
+              </form>
+            </div>
+            
+            {/* Add new personal item */}
+            <div className="px-2 pb-2">
+              <form 
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  addSlateOnlyItem(newPersonalItem, true);
+                }}
+                className="flex gap-2"
+              >
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Home className="h-3.5 w-3.5 text-rose-500" />
+                </div>
+                <Input
+                  value={newPersonalItem}
+                  onChange={(e) => setNewPersonalItem(e.target.value)}
+                  placeholder="Add personal reminder..."
+                  className="h-8 text-sm flex-1 border-rose-200 focus-visible:ring-rose-500/20 dark:border-rose-800"
+                  maxLength={200}
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0 shrink-0"
+                  disabled={!newPersonalItem.trim()}
+                >
+                  <Plus className="h-4 w-4 text-rose-500" />
                 </Button>
               </form>
             </div>

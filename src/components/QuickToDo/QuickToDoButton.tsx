@@ -745,11 +745,9 @@ export function QuickToDoButton() {
     }
   }, []);
 
-  // Save slate task order when it changes
+  // Save slate task order when it changes - always save, even empty array
   useEffect(() => {
-    if (slateTaskOrder.length > 0) {
-      localStorage.setItem(SLATE_ORDER_KEY, JSON.stringify(slateTaskOrder));
-    }
+    localStorage.setItem(SLATE_ORDER_KEY, JSON.stringify(slateTaskOrder));
   }, [slateTaskOrder]);
 
   // Load saved slate-only items on mount
@@ -1354,6 +1352,44 @@ export function QuickToDoButton() {
     const fromTasks = allUnifiedTasks.filter(t => t.on_slate && !t.is_completed);
     return [...fromTasks, ...slateOnlyAsUnified];
   }, [allUnifiedTasks, slateOnlyAsUnified]);
+  
+  // Auto-populate slate order when rawSlateTasks change (e.g., new tasks added)
+  // This ensures all current slate tasks are tracked in the order and order is preserved
+  useEffect(() => {
+    setSlateTaskOrder(prevOrder => {
+      if (rawSlateTasks.length > 0) {
+        const currentIds = new Set(rawSlateTasks.map(t => t.id));
+        const savedOrderIds = new Set(prevOrder);
+        
+        // Check if there are new tasks not in the saved order
+        const hasNewTasks = rawSlateTasks.some(t => !savedOrderIds.has(t.id));
+        // Check if there are removed tasks still in the saved order
+        const hasRemovedTasks = prevOrder.some(id => !currentIds.has(id));
+        
+        if (hasNewTasks || hasRemovedTasks) {
+          // Rebuild the order: keep existing order for known tasks, append new ones
+          const newOrder: string[] = [];
+          prevOrder.forEach(id => {
+            if (currentIds.has(id)) {
+              newOrder.push(id);
+            }
+          });
+          // Add any new tasks at the end
+          rawSlateTasks.forEach(t => {
+            if (!newOrder.includes(t.id)) {
+              newOrder.push(t.id);
+            }
+          });
+          return newOrder;
+        }
+        return prevOrder;
+      } else if (prevOrder.length > 0) {
+        // Clear the order when there are no slate tasks
+        return [];
+      }
+      return prevOrder;
+    });
+  }, [rawSlateTasks]);
   
   // Order slate tasks based on saved order, with new tasks at the end
   const orderedSlateTasks = useMemo(() => {

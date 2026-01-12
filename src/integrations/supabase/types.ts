@@ -1244,6 +1244,7 @@ export type Database = {
       quick_tasks: {
         Row: {
           completed_at: string | null
+          completion_notes: string | null
           created_at: string
           effort: Database["public"]["Enums"]["task_effort"]
           id: string
@@ -1257,6 +1258,7 @@ export type Database = {
         }
         Insert: {
           completed_at?: string | null
+          completion_notes?: string | null
           created_at?: string
           effort?: Database["public"]["Enums"]["task_effort"]
           id?: string
@@ -1270,6 +1272,7 @@ export type Database = {
         }
         Update: {
           completed_at?: string | null
+          completion_notes?: string | null
           created_at?: string
           effort?: Database["public"]["Enums"]["task_effort"]
           id?: string

@@ -16,7 +16,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Clock, Trash2, User, MessageSquare, Pencil, ListTodo } from 'lucide-react';
+import { Clock, Trash2, User, MessageSquare, Pencil, ListTodo, Mail, Loader2, Copy, Check } from 'lucide-react';
 import { 
   type GrowthTask, 
   type TaskDeadlineType, 
@@ -27,6 +27,9 @@ import {
 import { formatDistanceToNow, format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { getDeadlineTextColor, getDeadlineBadgeColor } from '@/lib/deadlineColors';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { useAuth } from '@/lib/auth';
 
 interface TaskItemProps {
   task: GrowthTask;
@@ -34,6 +37,8 @@ interface TaskItemProps {
   onUpdate: (updates: Partial<GrowthTask>) => void;
   onDelete: () => void;
   isOverdue?: boolean;
+  projectName?: string;
+  projectType?: string;
 }
 
 const deadlineOptions: TaskDeadlineType[] = [
@@ -46,7 +51,8 @@ const deadlineOptions: TaskDeadlineType[] = [
   'no_deadline',
 ];
 
-export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: TaskItemProps) => {
+export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue, projectName, projectType }: TaskItemProps) => {
+  const { user } = useAuth();
   const { assignees, addAssignee } = useKnownAssignees();
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [deadlineOpen, setDeadlineOpen] = useState(false);
@@ -57,6 +63,10 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
   const [completionNotes, setCompletionNotes] = useState('');
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [editedNotes, setEditedNotes] = useState(task.completion_notes || '');
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [isDraftingEmail, setIsDraftingEmail] = useState(false);
+  const [draftedEmail, setDraftedEmail] = useState<{ subject: string; body: string } | null>(null);
+  const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const notesInputRef = useRef<HTMLTextAreaElement>(null);
@@ -165,6 +175,55 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
       ...(task.deadline_set_at ? { currentDeadlineSetAt: task.deadline_set_at } : {})
     } as Partial<GrowthTask>);
     setDeadlineOpen(false);
+  };
+
+  // Check if task is delegated (assignee is not "Me" or user's name)
+  const isDelegated = task.assignee && 
+    task.assignee.toLowerCase() !== 'me' && 
+    task.assignee.toLowerCase() !== (user?.user_metadata?.full_name?.toLowerCase() || '');
+
+  // Draft delegation email
+  const handleDraftEmail = async () => {
+    if (!task.assignee) return;
+    
+    setIsDraftingEmail(true);
+    setDraftedEmail(null);
+    setShowEmailDialog(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('draft-delegation-email', {
+        body: {
+          taskTitle: task.title,
+          assigneeName: task.assignee,
+          projectName: projectName,
+          projectType: projectType,
+          senderName: user?.user_metadata?.full_name || undefined,
+        },
+      });
+
+      if (error) throw error;
+
+      setDraftedEmail({
+        subject: data.subject,
+        body: data.body,
+      });
+    } catch (err) {
+      console.error('Error drafting email:', err);
+      toast.error('Failed to draft email');
+      setShowEmailDialog(false);
+    } finally {
+      setIsDraftingEmail(false);
+    }
+  };
+
+  const handleCopyEmail = async () => {
+    if (!draftedEmail) return;
+    
+    const fullEmail = `Subject: ${draftedEmail.subject}\n\n${draftedEmail.body}`;
+    await navigator.clipboard.writeText(fullEmail);
+    setCopied(true);
+    toast.success('Email copied to clipboard');
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -367,6 +426,20 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
 
       {/* Action buttons - separate from triage */}
       <div className="flex flex-col gap-1 shrink-0">
+        {/* Draft Email button for delegated tasks */}
+        {!task.is_completed && isDelegated && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 px-2 text-xs border-dashed"
+            onClick={handleDraftEmail}
+            title={`Draft email to ${task.assignee}`}
+          >
+            <Mail className="h-3.5 w-3.5 mr-1" />
+            Draft Email
+          </Button>
+        )}
+
         {/* Pin to Task List button */}
         {!task.is_completed && (
           <Button
@@ -425,6 +498,62 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue }: Task
             <Button onClick={handleConfirmComplete}>
               Complete with Notes
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Draft Email dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Draft Email to {task.assignee?.split(' ')[0]}
+            </DialogTitle>
+            <DialogDescription>
+              AI-generated email for delegating this task
+            </DialogDescription>
+          </DialogHeader>
+          
+          {isDraftingEmail ? (
+            <div className="flex flex-col items-center justify-center py-8 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Drafting email...</p>
+            </div>
+          ) : draftedEmail ? (
+            <div className="space-y-4 py-4">
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Subject</label>
+                <p className="text-sm font-medium mt-1 p-2 bg-muted rounded">{draftedEmail.subject}</p>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-muted-foreground">Body</label>
+                <div className="mt-1 p-3 bg-muted rounded whitespace-pre-wrap text-sm">
+                  {draftedEmail.body}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEmailDialog(false)}>
+              Close
+            </Button>
+            {draftedEmail && (
+              <Button onClick={handleCopyEmail}>
+                {copied ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Email
+                  </>
+                )}
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

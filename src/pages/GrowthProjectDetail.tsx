@@ -392,6 +392,8 @@ const GrowthProjectDetail = () => {
                   onUpdate={(updates) => updateTask.mutate({ id: task.id, ...updates })}
                   onDelete={() => deleteTask.mutate(task.id)}
                   isOverdue
+                  projectName={project.name}
+                  projectType={project.project_type}
                 />
               ))}
             </CardContent>

@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertTriangle, TrendingUp, Upload } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, AlertTriangle, TrendingUp, Upload, Link2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BudgetLineItem } from '@/lib/hooks/useBudgetVersions';
 import { useDetailedWipUpdates } from '@/lib/hooks/useDetailedWipUpdates';
@@ -27,6 +28,12 @@ interface WipLineItem {
   wip_amount: number;
 }
 
+interface CombinedGroup {
+  id: string;
+  itemIds: string[];
+  combinedWip: number;
+}
+
 interface DetailedWipUpdateModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -39,6 +46,11 @@ interface DetailedWipUpdateModalProps {
   differentBillingCurrency: boolean;
 }
 
+// Round to 2 decimal places to avoid floating point issues
+function roundCurrency(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
 // Get health color based on WIP percentage of estimate
 function getHealthColor(wipAmount: number, feeAmount: number): { bg: string; text: string; indicator: string } {
   if (feeAmount <= 0) {
@@ -48,19 +60,14 @@ function getHealthColor(wipAmount: number, feeAmount: number): { bg: string; tex
   const percentage = (wipAmount / feeAmount) * 100;
   
   if (percentage <= 50) {
-    // Green - 0-50%
     return { bg: 'bg-green-50 dark:bg-green-950/30', text: 'text-green-700 dark:text-green-400', indicator: 'bg-green-500' };
   } else if (percentage <= 70) {
-    // Yellow-green - 50-70%
     return { bg: 'bg-lime-50 dark:bg-lime-950/30', text: 'text-lime-700 dark:text-lime-400', indicator: 'bg-lime-500' };
   } else if (percentage <= 85) {
-    // Amber - 70-85%
     return { bg: 'bg-amber-50 dark:bg-amber-950/30', text: 'text-amber-700 dark:text-amber-400', indicator: 'bg-amber-500' };
   } else if (percentage <= 100) {
-    // Orange - 85-100%
     return { bg: 'bg-orange-50 dark:bg-orange-950/30', text: 'text-orange-700 dark:text-orange-400', indicator: 'bg-orange-500' };
   } else {
-    // Red - 100%+
     return { bg: 'bg-red-50 dark:bg-red-950/30', text: 'text-red-700 dark:text-red-400', indicator: 'bg-red-500' };
   }
 }
@@ -86,6 +93,11 @@ export function DetailedWipUpdateModal({
   const [isFinalizing, setIsFinalizing] = useState(false);
   const [hasAcknowledged, setHasAcknowledged] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  
+  // Combined items state
+  const [isCombineMode, setIsCombineMode] = useState(false);
+  const [selectedForCombine, setSelectedForCombine] = useState<Set<string>>(new Set());
+  const [combinedGroups, setCombinedGroups] = useState<CombinedGroup[]>([]);
 
   // Handle imported WIP matches
   const handleApplyMatches = (matches: Array<{ budget_line_item_id: string; wip_amount: number }>) => {
@@ -93,7 +105,7 @@ export function DetailedWipUpdateModal({
       prev.map(item => {
         const match = matches.find(m => m.budget_line_item_id === item.id);
         if (match) {
-          return { ...item, wip_amount: match.wip_amount };
+          return { ...item, wip_amount: roundCurrency(match.wip_amount) };
         }
         return item;
       })
@@ -111,26 +123,104 @@ export function DetailedWipUpdateModal({
           fee_amount: item.fee_amount,
           provider: item.provider,
           lc_firm_name: item.lc_firm_name,
-          wip_amount: (item as any).wip_amount || 0,
+          wip_amount: roundCurrency((item as any).wip_amount || 0),
         }))
       );
       setHasAcknowledged(false);
+      setIsCombineMode(false);
+      setSelectedForCombine(new Set());
+      setCombinedGroups([]);
     }
   }, [isOpen, lineItems]);
 
   const updateWipAmount = (id: string, value: string) => {
-    const numValue = parseFloat(value) || 0;
+    const numValue = roundCurrency(parseFloat(value) || 0);
     setWipItems(prev =>
       prev.map(item => (item.id === id ? { ...item, wip_amount: numValue } : item))
     );
   };
 
+  // Toggle item selection for combining
+  const toggleItemSelection = (id: string) => {
+    setSelectedForCombine(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  // Create a combined group from selected items
+  const createCombinedGroup = () => {
+    if (selectedForCombine.size < 2) return;
+    
+    const groupId = `group-${Date.now()}`;
+    const itemIds = Array.from(selectedForCombine);
+    
+    // Calculate existing WIP sum for the combined items
+    const existingWipSum = wipItems
+      .filter(item => itemIds.includes(item.id))
+      .reduce((sum, item) => sum + item.wip_amount, 0);
+    
+    setCombinedGroups(prev => [...prev, {
+      id: groupId,
+      itemIds,
+      combinedWip: roundCurrency(existingWipSum),
+    }]);
+    
+    // Clear individual WIP for combined items
+    setWipItems(prev =>
+      prev.map(item => 
+        itemIds.includes(item.id) ? { ...item, wip_amount: 0 } : item
+      )
+    );
+    
+    setSelectedForCombine(new Set());
+    setIsCombineMode(false);
+  };
+
+  // Remove a combined group
+  const removeCombinedGroup = (groupId: string) => {
+    setCombinedGroups(prev => prev.filter(g => g.id !== groupId));
+  };
+
+  // Update combined group WIP
+  const updateCombinedGroupWip = (groupId: string, value: string) => {
+    const numValue = roundCurrency(parseFloat(value) || 0);
+    setCombinedGroups(prev =>
+      prev.map(g => g.id === groupId ? { ...g, combinedWip: numValue } : g)
+    );
+  };
+
+  // Check if item is in a combined group
+  const getItemCombinedGroup = (itemId: string): CombinedGroup | undefined => {
+    return combinedGroups.find(g => g.itemIds.includes(itemId));
+  };
+
   const handleFinalize = async () => {
     setIsFinalizing(true);
     try {
+      // Distribute combined group WIP proportionally among items based on fee_amount
+      const finalWipItems = wipItems.map(item => {
+        const group = getItemCombinedGroup(item.id);
+        if (group) {
+          const groupItems = wipItems.filter(i => group.itemIds.includes(i.id));
+          const totalFee = groupItems.reduce((sum, i) => sum + i.fee_amount, 0);
+          const proportion = totalFee > 0 ? item.fee_amount / totalFee : 1 / groupItems.length;
+          return {
+            ...item,
+            wip_amount: roundCurrency(group.combinedWip * proportion),
+          };
+        }
+        return item;
+      });
+
       await createWipUpdate.mutateAsync({
         matterId,
-        wipItems: wipItems.map(item => ({
+        wipItems: finalWipItems.map(item => ({
           budget_line_item_id: item.id,
           work_item: item.work_item,
           provider: item.provider,
@@ -150,11 +240,16 @@ export function DetailedWipUpdateModal({
 
   // Calculate totals - convert to billing currency if needed
   const totalEstimateQuote = wipItems.reduce((sum, item) => sum + item.fee_amount, 0);
-  const totalWipQuote = wipItems.reduce((sum, item) => sum + item.wip_amount, 0);
+  const individualWipQuote = wipItems.reduce((sum, item) => {
+    if (getItemCombinedGroup(item.id)) return sum; // Skip items in groups
+    return sum + item.wip_amount;
+  }, 0);
+  const combinedWipQuote = combinedGroups.reduce((sum, g) => sum + g.combinedWip, 0);
+  const totalWipQuote = individualWipQuote + combinedWipQuote;
   
   // Convert to billing currency for display
-  const totalEstimate = differentBillingCurrency ? totalEstimateQuote * mandatedRate : totalEstimateQuote;
-  const totalWip = differentBillingCurrency ? totalWipQuote * mandatedRate : totalWipQuote;
+  const totalEstimate = roundCurrency(differentBillingCurrency ? totalEstimateQuote * mandatedRate : totalEstimateQuote);
+  const totalWip = roundCurrency(differentBillingCurrency ? totalWipQuote * mandatedRate : totalWipQuote);
   const overallHealth = getHealthColor(totalWip, totalEstimate);
 
   // Group items by category
@@ -204,8 +299,42 @@ export function DetailedWipUpdateModal({
 
         {hasAcknowledged && (
           <>
-            {/* Import Button */}
-            <div className="flex justify-end">
+            {/* Action Buttons */}
+            <div className="flex justify-between items-center gap-2">
+              <div className="flex items-center gap-2">
+                {!isCombineMode ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsCombineMode(true)}
+                    className="flex items-center gap-2"
+                  >
+                    <Link2 className="h-4 w-4" />
+                    Combine Items for Single WIP Entry
+                  </Button>
+                ) : (
+                  <>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={createCombinedGroup}
+                      disabled={selectedForCombine.size < 2}
+                    >
+                      Combine Selected ({selectedForCombine.size})
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsCombineMode(false);
+                        setSelectedForCombine(new Set());
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
+              </div>
               <Button
                 variant="outline"
                 onClick={() => setShowImportDialog(true)}
@@ -215,6 +344,85 @@ export function DetailedWipUpdateModal({
                 Upload or Paste Information
               </Button>
             </div>
+
+            {isCombineMode && (
+              <Alert className="border-blue-500 bg-blue-50 dark:bg-blue-950/30">
+                <Link2 className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800 dark:text-blue-300">
+                  <p className="text-sm">
+                    Select 2 or more budget items to combine them. WIP will be entered once for the combined items 
+                    and distributed proportionally based on each item's budget allocation.
+                  </p>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {/* Combined Groups Display */}
+            {combinedGroups.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Combined WIP Entries</Label>
+                {combinedGroups.map(group => {
+                  const groupItems = wipItems.filter(i => group.itemIds.includes(i.id));
+                  const groupTotalFee = groupItems.reduce((sum, i) => sum + i.fee_amount, 0);
+                  const displayFee = roundCurrency(differentBillingCurrency ? groupTotalFee * mandatedRate : groupTotalFee);
+                  const displayWip = roundCurrency(differentBillingCurrency ? group.combinedWip * mandatedRate : group.combinedWip);
+                  const groupHealth = getHealthColor(displayWip, displayFee);
+                  
+                  return (
+                    <div key={group.id} className={cn('rounded-lg border p-3', groupHealth.bg)}>
+                      <div className="flex items-start gap-3">
+                        <div className={cn('w-3 h-3 rounded-full flex-shrink-0 mt-1', groupHealth.indicator)} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-sm font-medium">Combined Entry ({groupItems.length} items)</p>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeCombinedGroup(group.id)}
+                              className="h-6 w-6 p-0"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                          <ul className="text-xs text-muted-foreground space-y-0.5 mb-2">
+                            {groupItems.map(item => (
+                              <li key={item.id}>• {item.work_item}</li>
+                            ))}
+                          </ul>
+                          <div className="flex items-center gap-4">
+                            <div>
+                              <Label className="text-xs text-muted-foreground">Combined Estimate</Label>
+                              <p className="text-sm font-medium">{formatCurrency(displayFee, billingCurrency)}</p>
+                            </div>
+                            <div className="flex-shrink-0 w-32">
+                              <Label className="text-xs text-muted-foreground">Combined WIP ({billingCurrency})</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={roundCurrency(displayWip) || ''}
+                                onChange={e => {
+                                  const billingValue = parseFloat(e.target.value) || 0;
+                                  const quoteValue = differentBillingCurrency && mandatedRate > 0 
+                                    ? billingValue / mandatedRate 
+                                    : billingValue;
+                                  updateCombinedGroupWip(group.id, quoteValue.toString());
+                                }}
+                                className="h-8 text-sm"
+                                placeholder="0"
+                              />
+                            </div>
+                            <div className={cn('font-bold', groupHealth.text)}>
+                              {getPercentage(displayWip, displayFee)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
             {/* Overall Summary */}
             <div className={cn('rounded-lg p-4 border', overallHealth.bg)}>
@@ -251,15 +459,35 @@ export function DetailedWipUpdateModal({
                   </div>
                   <div className="divide-y">
                     {items.map(item => {
+                      const combinedGroup = getItemCombinedGroup(item.id);
+                      const isInCombinedGroup = !!combinedGroup;
+                      const isSelected = selectedForCombine.has(item.id);
+                      
                       // Convert amounts to billing currency for display
-                      const displayFeeAmount = differentBillingCurrency ? item.fee_amount * mandatedRate : item.fee_amount;
-                      const displayWipAmount = differentBillingCurrency ? item.wip_amount * mandatedRate : item.wip_amount;
-                      const health = getHealthColor(displayWipAmount, displayFeeAmount);
+                      const displayFeeAmount = roundCurrency(differentBillingCurrency ? item.fee_amount * mandatedRate : item.fee_amount);
+                      const displayWipAmount = roundCurrency(differentBillingCurrency ? item.wip_amount * mandatedRate : item.wip_amount);
+                      const health = isInCombinedGroup 
+                        ? { bg: 'bg-blue-50/50 dark:bg-blue-950/20', text: 'text-blue-600', indicator: 'bg-blue-400' }
+                        : getHealthColor(displayWipAmount, displayFeeAmount);
+                      
                       return (
                         <div
                           key={item.id}
-                          className={cn('px-4 py-3 flex items-center gap-4', health.bg)}
+                          className={cn(
+                            'px-4 py-3 flex items-center gap-4',
+                            health.bg,
+                            isSelected && 'ring-2 ring-inset ring-primary'
+                          )}
                         >
+                          {/* Checkbox for combine mode */}
+                          {isCombineMode && !isInCombinedGroup && (
+                            <Checkbox
+                              checked={isSelected}
+                              onCheckedChange={() => toggleItemSelection(item.id)}
+                              className="flex-shrink-0"
+                            />
+                          )}
+                          
                           {/* Health indicator dot */}
                           <div className={cn('w-3 h-3 rounded-full flex-shrink-0', health.indicator)} />
                           
@@ -271,6 +499,11 @@ export function DetailedWipUpdateModal({
                                 ? item.lc_firm_name
                                 : item.provider}
                             </p>
+                            {isInCombinedGroup && (
+                              <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
+                                Part of combined entry
+                              </p>
+                            )}
                           </div>
                           
                           {/* Estimate - in billing currency */}
@@ -279,16 +512,15 @@ export function DetailedWipUpdateModal({
                             <p className="text-sm font-medium">{formatCurrency(displayFeeAmount, billingCurrency)}</p>
                           </div>
                           
-                          {/* WIP Input - in billing currency */}
+                          {/* WIP Input - in billing currency (disabled if in combined group) */}
                           <div className="flex-shrink-0 w-32">
                             <Label className="text-xs text-muted-foreground">WIP ({billingCurrency})</Label>
                             <Input
                               type="number"
                               min="0"
                               step="0.01"
-                              value={displayWipAmount || ''}
+                              value={isInCombinedGroup ? '' : (displayWipAmount || '')}
                               onChange={e => {
-                                // Convert input back to quote currency for storage
                                 const billingValue = parseFloat(e.target.value) || 0;
                                 const quoteValue = differentBillingCurrency && mandatedRate > 0 
                                   ? billingValue / mandatedRate 
@@ -296,13 +528,14 @@ export function DetailedWipUpdateModal({
                                 updateWipAmount(item.id, quoteValue.toString());
                               }}
                               className="h-8 text-sm"
-                              placeholder="0"
+                              placeholder={isInCombinedGroup ? 'Combined' : '0'}
+                              disabled={isInCombinedGroup}
                             />
                           </div>
                           
                           {/* Percentage */}
                           <div className={cn('w-16 text-right font-bold', health.text)}>
-                            {getPercentage(displayWipAmount, displayFeeAmount)}
+                            {isInCombinedGroup ? '-' : getPercentage(displayWipAmount, displayFeeAmount)}
                           </div>
                         </div>
                       );

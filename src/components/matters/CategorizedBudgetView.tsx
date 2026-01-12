@@ -175,8 +175,8 @@ export function CategorizedBudgetView({
     
     Object.entries(groupedItems).forEach(([key, group]) => {
       used[key] = group.items.reduce((sum, item) => {
-        const rawWip = (item as any).wip_amount || 0;
-        const writeOff = (item as any).wip_write_off || 0;
+        const rawWip = item.wip_amount || 0;
+        const writeOff = item.wip_write_off || 0;
         return sum + (rawWip - writeOff);
       }, 0);
     });
@@ -190,7 +190,7 @@ export function CategorizedBudgetView({
     
     Object.entries(groupedItems).forEach(([key, group]) => {
       writeOffs[key] = group.items.reduce((sum, item) => {
-        return sum + ((item as any).wip_write_off || 0);
+        return sum + (item.wip_write_off || 0);
       }, 0);
     });
     
@@ -212,8 +212,8 @@ export function CategorizedBudgetView({
         totals[category].budget += item.fee_amount || 0;
       }
       // Always count WIP regardless of optional status
-      const rawWip = (item as any).wip_amount || 0;
-      const writeOff = (item as any).wip_write_off || 0;
+      const rawWip = item.wip_amount || 0;
+      const writeOff = item.wip_write_off || 0;
       totals[category].used += rawWip - writeOff;
       totals[category].writeOff += writeOff;
     });

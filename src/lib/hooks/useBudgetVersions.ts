@@ -17,6 +17,7 @@ export interface BudgetLineItem {
   is_included: boolean;
   category: string | null;
   wip_amount: number;
+  wip_write_off: number;
   wip_updated_at: string | null;
   created_at: string;
   updated_at: string;
@@ -60,6 +61,7 @@ export interface DraftLineItem {
   is_included?: boolean;
   category?: string | null;
   wip_amount?: number;
+  wip_write_off?: number;
   wip_updated_at?: string | null;
 }
 

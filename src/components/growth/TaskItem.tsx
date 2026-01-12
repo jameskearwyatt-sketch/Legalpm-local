@@ -442,11 +442,15 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue, projec
 
         {/* Pin to Task List button */}
         {!task.is_completed && (() => {
-          // Check if task is on the task list (pinned OR auto-added via short deadline)
+          // Check if task is on the task list
+          // Short deadline tasks are ALWAYS on the task list (auto-added)
+          // Other tasks are on the task list only if explicitly pinned
           const shortDeadlines: TaskDeadlineType[] = ['this_week', 'next_week'];
-          const isAutoAdded = task.pinned_to_tasklist !== false && shortDeadlines.includes(task.deadline_type);
-          const isOnTaskList = task.pinned_to_tasklist === true || isAutoAdded;
+          const hasShortDeadline = shortDeadlines.includes(task.deadline_type);
+          const isOnTaskList = hasShortDeadline || task.pinned_to_tasklist === true;
           
+          // For short deadline tasks, the button just shows status (can't remove - change deadline instead)
+          // For other tasks, clicking toggles the pin
           return (
             <Button
               variant={isOnTaskList ? "default" : "outline"}
@@ -459,14 +463,24 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue, projec
               )}
               onClick={(e) => {
                 e.stopPropagation();
-                // If currently on task list, explicitly remove (set to false)
-                // If not on task list, explicitly add (set to true)
-                onUpdate({ pinned_to_tasklist: !isOnTaskList });
+                if (hasShortDeadline) {
+                  // Can't unpin short deadline tasks - they're auto-included
+                  // User needs to change deadline to remove from task list
+                  return;
+                }
+                onUpdate({ pinned_to_tasklist: !task.pinned_to_tasklist });
               }}
-              title={isOnTaskList ? "Remove from Task List" : "Add to Task List"}
+              title={
+                hasShortDeadline 
+                  ? "Auto-added due to deadline (change deadline to remove)" 
+                  : isOnTaskList 
+                    ? "Remove from Task List" 
+                    : "Add to Task List"
+              }
+              disabled={hasShortDeadline}
             >
               <ListTodo className="h-3.5 w-3.5 mr-1" />
-              {isOnTaskList ? 'On Tasks' : 'Add to Tasks'}
+              {isOnTaskList ? (hasShortDeadline ? 'Auto' : 'On Tasks') : 'Add to Tasks'}
             </Button>
           );
         })()}

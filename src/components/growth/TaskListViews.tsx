@@ -373,10 +373,11 @@ const TaskRow = ({
       <div className="flex items-center gap-1 shrink-0">
         {/* Pin to Task List button */}
         {!task.is_completed && (() => {
-          // Check if task is on the task list (pinned OR auto-added via short deadline)
+          // Check if task is on the task list
+          // Short deadline tasks are ALWAYS on the task list (auto-added)
           const shortDeadlines: TaskDeadlineType[] = ['this_week', 'next_week'];
-          const isAutoAdded = task.pinned_to_tasklist !== false && shortDeadlines.includes(task.deadline_type);
-          const isOnTaskList = task.pinned_to_tasklist === true || isAutoAdded;
+          const hasShortDeadline = shortDeadlines.includes(task.deadline_type);
+          const isOnTaskList = hasShortDeadline || task.pinned_to_tasklist === true;
           
           return (
             <Button
@@ -390,14 +391,18 @@ const TaskRow = ({
               )}
               onClick={(e) => {
                 e.stopPropagation();
-                // If currently on task list, explicitly remove (set to false)
-                // If not on task list, explicitly add (set to true)
-                onUpdate({ pinned_to_tasklist: !isOnTaskList });
+                if (hasShortDeadline) return; // Can't unpin auto-added tasks
+                onUpdate({ pinned_to_tasklist: !task.pinned_to_tasklist });
               }}
-              title={isOnTaskList ? "Remove from Task List" : "Add to Task List"}
+              title={
+                hasShortDeadline 
+                  ? "Auto-added due to deadline" 
+                  : isOnTaskList ? "Remove from Task List" : "Add to Task List"
+              }
+              disabled={hasShortDeadline}
             >
               <ListTodo className="h-3 w-3 mr-1" />
-              {isOnTaskList ? 'On Tasks' : 'Add'}
+              {isOnTaskList ? (hasShortDeadline ? 'Auto' : 'On Tasks') : 'Add'}
             </Button>
           );
         })()}

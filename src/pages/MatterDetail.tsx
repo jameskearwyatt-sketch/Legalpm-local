@@ -411,20 +411,20 @@ export default function MatterDetail() {
   }
 
   const latestSnapshot = snapshots[0];
-  const rawWipAmount = latestSnapshot?.wip_amount || 0;
-  const wipWriteOffAmount = latestSnapshot?.wip_write_off_amount || 0;
+  const rawWipAmountQuote = latestSnapshot?.wip_amount || 0;
+  const wipWriteOffAmountQuote = latestSnapshot?.wip_write_off_amount || 0;
   // Net WIP = raw WIP minus write-offs (write-offs reduce actual WIP)
-  const wipAmount = rawWipAmount - wipWriteOffAmount;
-  const billedAmount = latestSnapshot?.billed_amount || 0;
-  const paidAmount = latestSnapshot?.paid_amount || 0;
+  const wipAmountQuote = rawWipAmountQuote - wipWriteOffAmountQuote;
+  const billedAmountQuote = latestSnapshot?.billed_amount || 0;
+  const paidAmountQuote = latestSnapshot?.paid_amount || 0;
   
   // LC financial data - use aggregated data from useLocalCounsels hook
   const lcBillingMode = formData.local_counsel_billing || matter?.local_counsel_billing || '';
   const isLcDisbursement = lcBillingMode === 'Disb';
   
-  // LC totals from hook (aggregated from matter_local_counsels table)
-  const lcWip = lcTotalWip;
-  const lcBilled = lcTotalBilled;
+  // LC totals from hook (aggregated from matter_local_counsels table) - these are in quote currency
+  const lcWipQuote = lcTotalWip;
+  const lcBilledQuote = lcTotalBilled;
   
   // Calculate effective budget - account for billing currency conversion
   const feeUpperEnd = formData.fee_amount_upper_end || matter.fee_amount_upper_end || 0;
@@ -436,6 +436,26 @@ export default function MatterDetail() {
   const mandatedRate = (differentBillingCurrency && feeUpperEnd > 0 && agreedBillingAmount > 0)
     ? agreedBillingAmount / feeUpperEnd
     : 1;
+  
+  // Convert WIP and financial values to billing currency
+  const wipAmount = differentBillingCurrency && agreedBillingAmount > 0
+    ? wipAmountQuote * mandatedRate
+    : wipAmountQuote;
+  const wipWriteOffAmount = differentBillingCurrency && agreedBillingAmount > 0
+    ? wipWriteOffAmountQuote * mandatedRate
+    : wipWriteOffAmountQuote;
+  const billedAmount = differentBillingCurrency && agreedBillingAmount > 0
+    ? billedAmountQuote * mandatedRate
+    : billedAmountQuote;
+  const paidAmount = differentBillingCurrency && agreedBillingAmount > 0
+    ? paidAmountQuote * mandatedRate
+    : paidAmountQuote;
+  const lcWip = differentBillingCurrency && agreedBillingAmount > 0
+    ? lcWipQuote * mandatedRate
+    : lcWipQuote;
+  const lcBilled = differentBillingCurrency && agreedBillingAmount > 0
+    ? lcBilledQuote * mandatedRate
+    : lcBilledQuote;
   
   // Use effective values for display (in billing currency when applicable)
   const totalBudget = differentBillingCurrency && agreedBillingAmount > 0 
@@ -451,12 +471,12 @@ export default function MatterDetail() {
     ? (formData.fee_currency || matter.fee_currency || 'GBP')
     : (formData.fee_currency || matter.fee_currency || 'GBP');
   
-  // BM Budget Burn = BM WIP + BM Billed (from snapshots - this is BM only)
+  // BM Budget Burn = BM WIP + BM Billed (now in billing currency)
   const bmTotalUsed = wipAmount + billedAmount;
   const bmHeadroom = bmFee - bmTotalUsed;
   const bmBudgetUsedPercent = bmFee > 0 ? (bmTotalUsed / bmFee) * 100 : 0;
   
-  // LC Budget Burn = LC WIP + LC Billed (from aggregated local counsels)
+  // LC Budget Burn = LC WIP + LC Billed (now in billing currency)
   const lcTotalUsed = lcWip + lcBilled;
   const lcHeadroom = localCounsel - lcTotalUsed;
   const lcBudgetUsedPercent = localCounsel > 0 ? (lcTotalUsed / localCounsel) * 100 : 0;

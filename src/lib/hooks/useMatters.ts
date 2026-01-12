@@ -252,18 +252,39 @@ export function useMatters() {
           ? billingCurrency
           : matter.fee_currency;
         
-        // BM budget burn (from snapshots)
-        const bmTotalUsed = billedAmount + wipAmount;
+        // Convert WIP and billed amounts to billing currency if different billing currency is enabled
+        // These values are stored in quote currency (e.g., USD) but need to be displayed in billing currency (e.g., GBP)
+        const effectiveWipAmount = differentBillingCurrency && agreedBillingAmount > 0
+          ? wipAmount * mandatedRate
+          : wipAmount;
+        const effectiveBilledAmount = differentBillingCurrency && agreedBillingAmount > 0
+          ? billedAmount * mandatedRate
+          : billedAmount;
+        const effectivePaidAmount = differentBillingCurrency && agreedBillingAmount > 0
+          ? paidAmount * mandatedRate
+          : paidAmount;
+        const effectiveWipWriteOffAmount = differentBillingCurrency && agreedBillingAmount > 0
+          ? wipWriteOffAmount * mandatedRate
+          : wipWriteOffAmount;
         
-        // LC budget burn (only for Disbursement mode)
-        const lcTotalUsed = localCounselBilling === 'Disb' ? (lcWip + lcBilled) : 0;
+        // BM budget burn (from snapshots) - now in billing currency
+        const bmTotalUsed = effectiveBilledAmount + effectiveWipAmount;
+        
+        // LC budget burn (only for Disbursement mode) - also needs conversion
+        const effectiveLcWip = differentBillingCurrency && agreedBillingAmount > 0
+          ? lcWip * mandatedRate
+          : lcWip;
+        const effectiveLcBilled = differentBillingCurrency && agreedBillingAmount > 0
+          ? lcBilled * mandatedRate
+          : lcBilled;
+        const lcTotalUsed = localCounselBilling === 'Disb' ? (effectiveLcWip + effectiveLcBilled) : 0;
         
         // Total budget burn includes both BM and LC (when in Disb mode)
         const totalUsed = bmTotalUsed + lcTotalUsed;
         
         const remainingBudget = budget - totalUsed;
         const budgetUsedPercent = budget > 0 ? (totalUsed / budget) * 100 : 0;
-        const collectionRate = billedAmount > 0 ? (paidAmount / billedAmount) * 100 : 0;
+        const collectionRate = effectiveBilledAmount > 0 ? (effectivePaidAmount / effectiveBilledAmount) * 100 : 0;
         
         // BM Headroom (BM Budget - BM Used)
         const bmHeadroom = effectiveBmFee - bmTotalUsed;
@@ -280,10 +301,10 @@ export function useMatters() {
         return {
           ...matter,
           latest_snapshot: snapshot ? {
-            wip_amount: wipAmount, // Net WIP (after write-offs)
-            wip_write_off_amount: wipWriteOffAmount,
-            billed_amount: billedAmount,
-            paid_amount: paidAmount,
+            wip_amount: effectiveWipAmount, // Net WIP (after write-offs) in billing currency
+            wip_write_off_amount: effectiveWipWriteOffAmount,
+            billed_amount: effectiveBilledAmount,
+            paid_amount: effectivePaidAmount,
             as_of_date: snapshot.as_of_date,
           } : undefined,
           remaining_budget: remainingBudget,
@@ -302,9 +323,9 @@ export function useMatters() {
           billing_currency: billingCurrency,
           different_billing_currency: differentBillingCurrency,
           agreed_billing_amount: agreedBillingAmount,
-          // Override legacy lc_wip/lc_billed with aggregated values from matter_local_counsels
-          lc_wip: lcWip,
-          lc_billed: lcBilled,
+          // Override legacy lc_wip/lc_billed with aggregated values from matter_local_counsels (in billing currency)
+          lc_wip: effectiveLcWip,
+          lc_billed: effectiveLcBilled,
           // Include full local counsels list for per-LC billing mode display
           local_counsels: localCounsels,
         } as MatterWithFinancials;

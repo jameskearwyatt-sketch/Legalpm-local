@@ -30,6 +30,7 @@ import {
 import { useGrowthProjects, useOverdueTasks, useAllTasksByCategory, calculateDueDate, getDeadlineLabel, type GrowthProjectType, type TaskWithProject } from '@/lib/hooks/useGrowthProjects';
 import AppLayout from '@/components/layout/AppLayout';
 import { GrowthProjectList } from '@/components/growth/GrowthProjectList';
+import { BDProjectList } from '@/components/growth/BDProjectList';
 import { NewProjectDialog } from '@/components/growth/NewProjectDialog';
 import { cn } from '@/lib/utils';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -158,8 +159,7 @@ const Growth = () => {
           </TabsContent>
 
           <TabsContent value="business" className="mt-6">
-            <GrowthProjectList 
-              projectType="business_development"
+            <BDProjectList 
               title="Business Development"
               description="Track BD initiatives, client relationships, and growth opportunities"
               icon={<Briefcase className="h-5 w-5" />}

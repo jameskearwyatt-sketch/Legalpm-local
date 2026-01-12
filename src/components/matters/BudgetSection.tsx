@@ -1569,7 +1569,10 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         lineItems={latestLineItems}
         matterId={matterId}
         formatCurrency={formatCurrency}
-        currency={quoteCurrency}
+        billingCurrency={billingCurrency}
+        quoteCurrency={quoteCurrency}
+        mandatedRate={mandatedRate}
+        differentBillingCurrency={differentBillingCurrency}
       />
 
       {/* WIP History Modal */}

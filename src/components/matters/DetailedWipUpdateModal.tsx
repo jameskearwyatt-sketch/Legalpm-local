@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, AlertTriangle, TrendingUp, Upload, Link2, X } from 'lucide-react';
+import { Loader2, AlertTriangle, TrendingUp, Upload, Link2, X, MinusCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BudgetLineItem } from '@/lib/hooks/useBudgetVersions';
 import { useDetailedWipUpdates } from '@/lib/hooks/useDetailedWipUpdates';
@@ -26,12 +26,14 @@ interface WipLineItem {
   provider: string;
   lc_firm_name: string | null;
   wip_amount: number;
+  write_off_amount: number;
 }
 
 interface CombinedGroup {
   id: string;
   itemIds: string[];
   combinedWip: number;
+  combinedWriteOff: number;
 }
 
 interface DetailedWipUpdateModalProps {
@@ -124,6 +126,7 @@ export function DetailedWipUpdateModal({
           provider: item.provider,
           lc_firm_name: item.lc_firm_name,
           wip_amount: roundCurrency((item as any).wip_amount || 0),
+          write_off_amount: roundCurrency((item as any).wip_write_off || 0),
         }))
       );
       setHasAcknowledged(false);
@@ -139,6 +142,14 @@ export function DetailedWipUpdateModal({
       prev.map(item => (item.id === id ? { ...item, wip_amount: numValue } : item))
     );
   };
+
+  const updateWriteOffAmount = (id: string, value: string) => {
+    const numValue = roundCurrency(parseFloat(value) || 0);
+    setWipItems(prev =>
+      prev.map(item => (item.id === id ? { ...item, write_off_amount: numValue } : item))
+    );
+  };
+
 
   // Toggle item selection for combining
   const toggleItemSelection = (id: string) => {
@@ -160,21 +171,22 @@ export function DetailedWipUpdateModal({
     const groupId = `group-${Date.now()}`;
     const itemIds = Array.from(selectedForCombine);
     
-    // Calculate existing WIP sum for the combined items
-    const existingWipSum = wipItems
-      .filter(item => itemIds.includes(item.id))
-      .reduce((sum, item) => sum + item.wip_amount, 0);
+    // Calculate existing WIP sum and write-off sum for the combined items
+    const selectedItems = wipItems.filter(item => itemIds.includes(item.id));
+    const existingWipSum = selectedItems.reduce((sum, item) => sum + item.wip_amount, 0);
+    const existingWriteOffSum = selectedItems.reduce((sum, item) => sum + item.write_off_amount, 0);
     
     setCombinedGroups(prev => [...prev, {
       id: groupId,
       itemIds,
       combinedWip: roundCurrency(existingWipSum),
+      combinedWriteOff: roundCurrency(existingWriteOffSum),
     }]);
     
-    // Clear individual WIP for combined items
+    // Clear individual WIP and write-offs for combined items
     setWipItems(prev =>
       prev.map(item => 
-        itemIds.includes(item.id) ? { ...item, wip_amount: 0 } : item
+        itemIds.includes(item.id) ? { ...item, wip_amount: 0, write_off_amount: 0 } : item
       )
     );
     
@@ -195,6 +207,14 @@ export function DetailedWipUpdateModal({
     );
   };
 
+  // Update combined group write-off
+  const updateCombinedGroupWriteOff = (groupId: string, value: string) => {
+    const numValue = roundCurrency(parseFloat(value) || 0);
+    setCombinedGroups(prev =>
+      prev.map(g => g.id === groupId ? { ...g, combinedWriteOff: numValue } : g)
+    );
+  };
+
   // Check if item is in a combined group
   const getItemCombinedGroup = (itemId: string): CombinedGroup | undefined => {
     return combinedGroups.find(g => g.itemIds.includes(itemId));
@@ -203,7 +223,7 @@ export function DetailedWipUpdateModal({
   const handleFinalize = async () => {
     setIsFinalizing(true);
     try {
-      // Distribute combined group WIP proportionally among items based on fee_amount
+      // Distribute combined group WIP and write-offs proportionally among items based on fee_amount
       const finalWipItems = wipItems.map(item => {
         const group = getItemCombinedGroup(item.id);
         if (group) {
@@ -213,6 +233,7 @@ export function DetailedWipUpdateModal({
           return {
             ...item,
             wip_amount: roundCurrency(group.combinedWip * proportion),
+            write_off_amount: roundCurrency(group.combinedWriteOff * proportion),
           };
         }
         return item;
@@ -228,6 +249,7 @@ export function DetailedWipUpdateModal({
           lc_firm_name: item.lc_firm_name,
           fee_amount: item.fee_amount,
           wip_amount: item.wip_amount,
+          write_off_amount: item.write_off_amount,
         })),
       });
       onClose();
@@ -247,9 +269,18 @@ export function DetailedWipUpdateModal({
   const combinedWipQuote = combinedGroups.reduce((sum, g) => sum + g.combinedWip, 0);
   const totalWipQuote = individualWipQuote + combinedWipQuote;
   
+  // Calculate write-off totals
+  const individualWriteOffQuote = wipItems.reduce((sum, item) => {
+    if (getItemCombinedGroup(item.id)) return sum; // Skip items in groups
+    return sum + item.write_off_amount;
+  }, 0);
+  const combinedWriteOffQuote = combinedGroups.reduce((sum, g) => sum + g.combinedWriteOff, 0);
+  const totalWriteOffQuote = individualWriteOffQuote + combinedWriteOffQuote;
+  
   // Convert to billing currency for display
   const totalEstimate = roundCurrency(differentBillingCurrency ? totalEstimateQuote * mandatedRate : totalEstimateQuote);
   const totalWip = roundCurrency(differentBillingCurrency ? totalWipQuote * mandatedRate : totalWipQuote);
+  const totalWriteOff = roundCurrency(differentBillingCurrency ? totalWriteOffQuote * mandatedRate : totalWriteOffQuote);
   const overallHealth = getHealthColor(totalWip, totalEstimate);
 
   // Group items by category
@@ -389,13 +420,13 @@ export function DetailedWipUpdateModal({
                               <li key={item.id}>• {item.work_item}</li>
                             ))}
                           </ul>
-                          <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-4 flex-wrap">
                             <div>
                               <Label className="text-xs text-muted-foreground">Combined Estimate</Label>
                               <p className="text-sm font-medium">{formatCurrency(displayFee, billingCurrency)}</p>
                             </div>
-                            <div className="flex-shrink-0 w-32">
-                              <Label className="text-xs text-muted-foreground">Combined WIP ({billingCurrency})</Label>
+                            <div className="flex-shrink-0 w-28">
+                              <Label className="text-xs text-muted-foreground">WIP ({billingCurrency})</Label>
                               <Input
                                 type="number"
                                 min="0"
@@ -409,6 +440,27 @@ export function DetailedWipUpdateModal({
                                   updateCombinedGroupWip(group.id, quoteValue.toString());
                                 }}
                                 className="h-8 text-sm"
+                                placeholder="0"
+                              />
+                            </div>
+                            <div className="flex-shrink-0 w-28">
+                              <Label className="text-xs text-destructive flex items-center gap-1">
+                                <MinusCircle className="h-3 w-3" />
+                                Write-off
+                              </Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={roundCurrency(differentBillingCurrency ? group.combinedWriteOff * mandatedRate : group.combinedWriteOff) || ''}
+                                onChange={e => {
+                                  const billingValue = parseFloat(e.target.value) || 0;
+                                  const quoteValue = differentBillingCurrency && mandatedRate > 0 
+                                    ? billingValue / mandatedRate 
+                                    : billingValue;
+                                  updateCombinedGroupWriteOff(group.id, quoteValue.toString());
+                                }}
+                                className="h-8 text-sm border-destructive/50 text-destructive"
                                 placeholder="0"
                               />
                             </div>
@@ -432,6 +484,12 @@ export function DetailedWipUpdateModal({
                   <p className={cn('text-2xl font-bold', overallHealth.text)}>
                     {formatCurrency(totalWip, billingCurrency)} / {formatCurrency(totalEstimate, billingCurrency)}
                   </p>
+                  {totalWriteOff > 0 && (
+                    <p className="text-sm text-destructive mt-1 flex items-center gap-1">
+                      <MinusCircle className="h-3 w-3" />
+                      Write-off: {formatCurrency(totalWriteOff, billingCurrency)}
+                    </p>
+                  )}
                   {differentBillingCurrency && (
                     <p className="text-xs text-muted-foreground mt-1">
                       All values shown in {billingCurrency} (billing currency)
@@ -513,7 +571,7 @@ export function DetailedWipUpdateModal({
                           </div>
                           
                           {/* WIP Input - in billing currency (disabled if in combined group) */}
-                          <div className="flex-shrink-0 w-32">
+                          <div className="flex-shrink-0 w-28">
                             <Label className="text-xs text-muted-foreground">WIP ({billingCurrency})</Label>
                             <Input
                               type="number"
@@ -533,8 +591,32 @@ export function DetailedWipUpdateModal({
                             />
                           </div>
                           
+                          {/* Write-off Input */}
+                          <div className="flex-shrink-0 w-28">
+                            <Label className="text-xs text-destructive flex items-center gap-1">
+                              <MinusCircle className="h-3 w-3" />
+                              Write-off
+                            </Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={isInCombinedGroup ? '' : (roundCurrency(differentBillingCurrency ? item.write_off_amount * mandatedRate : item.write_off_amount) || '')}
+                              onChange={e => {
+                                const billingValue = parseFloat(e.target.value) || 0;
+                                const quoteValue = differentBillingCurrency && mandatedRate > 0 
+                                  ? billingValue / mandatedRate 
+                                  : billingValue;
+                                updateWriteOffAmount(item.id, quoteValue.toString());
+                              }}
+                              className="h-8 text-sm border-destructive/50 text-destructive"
+                              placeholder={isInCombinedGroup ? 'Combined' : '0'}
+                              disabled={isInCombinedGroup}
+                            />
+                          </div>
+                          
                           {/* Percentage */}
-                          <div className={cn('w-16 text-right font-bold', health.text)}>
+                          <div className={cn('w-14 text-right font-bold', health.text)}>
                             {isInCombinedGroup ? '-' : getPercentage(displayWipAmount, displayFeeAmount)}
                           </div>
                         </div>

@@ -84,6 +84,7 @@ export type Database = {
           user_id: string
           wip_amount: number
           wip_updated_at: string | null
+          wip_write_off: number
           work_item: string
         }
         Insert: {
@@ -102,6 +103,7 @@ export type Database = {
           user_id: string
           wip_amount?: number
           wip_updated_at?: string | null
+          wip_write_off?: number
           work_item: string
         }
         Update: {
@@ -120,6 +122,7 @@ export type Database = {
           user_id?: string
           wip_amount?: number
           wip_updated_at?: string | null
+          wip_write_off?: number
           work_item?: string
         }
         Relationships: [
@@ -216,6 +219,7 @@ export type Database = {
           wip_amount: number
           wip_update_id: string
           work_item: string
+          write_off_amount: number
         }
         Insert: {
           budget_line_item_id: string
@@ -228,6 +232,7 @@ export type Database = {
           wip_amount?: number
           wip_update_id: string
           work_item: string
+          write_off_amount?: number
         }
         Update: {
           budget_line_item_id?: string
@@ -240,6 +245,7 @@ export type Database = {
           wip_amount?: number
           wip_update_id?: string
           work_item?: string
+          write_off_amount?: number
         }
         Relationships: [
           {
@@ -257,6 +263,7 @@ export type Database = {
           id: string
           matter_id: string
           total_wip_amount: number
+          total_write_off_amount: number
           updated_at: string
           user_id: string
         }
@@ -265,6 +272,7 @@ export type Database = {
           id?: string
           matter_id: string
           total_wip_amount?: number
+          total_write_off_amount?: number
           updated_at?: string
           user_id: string
         }
@@ -273,6 +281,7 @@ export type Database = {
           id?: string
           matter_id?: string
           total_wip_amount?: number
+          total_write_off_amount?: number
           updated_at?: string
           user_id?: string
         }
@@ -298,6 +307,7 @@ export type Database = {
           updated_at: string
           user_id: string
           wip_amount: number
+          wip_write_off_amount: number
         }
         Insert: {
           as_of_date: string
@@ -310,6 +320,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           wip_amount?: number
+          wip_write_off_amount?: number
         }
         Update: {
           as_of_date?: string
@@ -322,6 +333,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           wip_amount?: number
+          wip_write_off_amount?: number
         }
         Relationships: [
           {

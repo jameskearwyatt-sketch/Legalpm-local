@@ -13,6 +13,7 @@ export interface DetailedWipUpdateItem {
   lc_firm_name: string | null;
   fee_amount: number;
   wip_amount: number;
+  write_off_amount: number;
   created_at: string;
 }
 
@@ -21,6 +22,7 @@ export interface DetailedWipUpdate {
   matter_id: string;
   user_id: string;
   total_wip_amount: number;
+  total_write_off_amount: number;
   updated_at: string;
   created_at: string;
   items?: DetailedWipUpdateItem[];
@@ -76,12 +78,14 @@ export function useDetailedWipUpdates(matterId?: string) {
         category: string | null;
         lc_firm_name: string | null;
         fee_amount: number;
-        wip_amount: number; 
+        wip_amount: number;
+        write_off_amount?: number;
       }[] 
     }) => {
       const now = new Date().toISOString();
       const today = now.split('T')[0];
       const totalWip = wipItems.reduce((sum, item) => sum + item.wip_amount, 0);
+      const totalWriteOff = wipItems.reduce((sum, item) => sum + (item.write_off_amount || 0), 0);
 
       // Create the WIP update record
       const { data: wipUpdate, error: wipUpdateError } = await supabase
@@ -90,6 +94,7 @@ export function useDetailedWipUpdates(matterId?: string) {
           matter_id: matterId,
           user_id: user!.id,
           total_wip_amount: totalWip,
+          total_write_off_amount: totalWriteOff,
         })
         .select()
         .single();
@@ -106,6 +111,7 @@ export function useDetailedWipUpdates(matterId?: string) {
         lc_firm_name: item.lc_firm_name,
         fee_amount: item.fee_amount,
         wip_amount: item.wip_amount,
+        write_off_amount: item.write_off_amount || 0,
       }));
 
       const { error: itemsError } = await supabase
@@ -114,12 +120,13 @@ export function useDetailedWipUpdates(matterId?: string) {
 
       if (itemsError) throw itemsError;
 
-      // Update the budget line items with current WIP
+      // Update the budget line items with current WIP and write-offs
       for (const item of wipItems) {
         const { error } = await supabase
           .from('budget_line_items')
           .update({ 
             wip_amount: item.wip_amount,
+            wip_write_off: item.write_off_amount || 0,
             wip_updated_at: now
           })
           .eq('id', item.budget_line_item_id);
@@ -140,6 +147,7 @@ export function useDetailedWipUpdates(matterId?: string) {
           .from('financial_snapshots')
           .update({ 
             wip_amount: totalWip,
+            wip_write_off_amount: totalWriteOff,
             updated_at: now,
             notes: existingSnapshot.notes 
               ? `${existingSnapshot.notes}\n[Detailed WIP Update]` 
@@ -164,6 +172,7 @@ export function useDetailedWipUpdates(matterId?: string) {
             user_id: user!.id,
             as_of_date: today,
             wip_amount: totalWip,
+            wip_write_off_amount: totalWriteOff,
             billed_amount: latestSnapshot?.billed_amount || 0,
             paid_amount: latestSnapshot?.paid_amount || 0,
             notes: '[Detailed WIP Update]'
@@ -226,6 +235,7 @@ export function useDetailedWipUpdates(matterId?: string) {
               .from('budget_line_items')
               .update({ 
                 wip_amount: item.wip_amount,
+                wip_write_off: item.write_off_amount || 0,
                 wip_updated_at: previousUpdate.created_at
               })
               .eq('id', item.budget_line_item_id);
@@ -246,6 +256,7 @@ export function useDetailedWipUpdates(matterId?: string) {
             .from('budget_line_items')
             .update({ 
               wip_amount: 0,
+              wip_write_off: 0,
               wip_updated_at: null
             })
             .eq('budget_version_id', budgetVersions[0].id);

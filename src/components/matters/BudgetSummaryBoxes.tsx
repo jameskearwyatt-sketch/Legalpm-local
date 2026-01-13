@@ -69,9 +69,9 @@ export function BudgetSummaryBoxes({
     return totals;
   }, [items]);
 
-  // Calculate totals per provider
+  // Calculate totals per provider (budget, wip, write-off)
   const providerTotals = useMemo(() => {
-    const totals: Record<string, number> = {};
+    const totals: Record<string, { budget: number; rawWip: number; writeOff: number }> = {};
     
     items.forEach(item => {
       const providerName = item.provider === 'Local Counsel' && item.lc_firm_name 
@@ -79,12 +79,15 @@ export function BudgetSummaryBoxes({
         : 'Baker McKenzie';
       const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
       
-      if (isIncluded) {
-        if (!totals[providerName]) {
-          totals[providerName] = 0;
-        }
-        totals[providerName] += item.fee_amount || 0;
+      if (!totals[providerName]) {
+        totals[providerName] = { budget: 0, rawWip: 0, writeOff: 0 };
       }
+      
+      if (isIncluded) {
+        totals[providerName].budget += item.fee_amount || 0;
+      }
+      totals[providerName].rawWip += item.wip_amount || 0;
+      totals[providerName].writeOff += item.wip_write_off || 0;
     });
     
     return totals;
@@ -258,23 +261,76 @@ export function BudgetSummaryBoxes({
         })()}
       </div>
 
-      {/* Provider Subtotals */}
+      {/* Provider Subtotals with WIP breakdown */}
       {Object.keys(providerTotals).length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {providerTotals['Baker McKenzie'] > 0 && (() => {
-            const total = providerTotals['Baker McKenzie'];
-            const displayTotal = differentBillingCurrency && agreedBillingAmount > 0
-              ? total * mandatedRate
-              : total;
+          {providerTotals['Baker McKenzie'] && providerTotals['Baker McKenzie'].budget > 0 && (() => {
+            const data = providerTotals['Baker McKenzie'];
+            const displayBudget = differentBillingCurrency && agreedBillingAmount > 0
+              ? data.budget * mandatedRate
+              : data.budget;
+            const displayRawWip = differentBillingCurrency && agreedBillingAmount > 0
+              ? data.rawWip * mandatedRate
+              : data.rawWip;
+            const displayWriteOff = differentBillingCurrency && agreedBillingAmount > 0
+              ? data.writeOff * mandatedRate
+              : data.writeOff;
+            const displayAdjWip = displayRawWip - displayWriteOff;
+            const burnPct = displayBudget > 0 ? Math.round((displayAdjWip / displayBudget) * 100) : 0;
+            const burnColor = burnPct > 100 ? 'text-red-600 dark:text-red-400' : 
+                             burnPct > 85 ? 'text-orange-600 dark:text-orange-400' : 
+                             burnPct > 70 ? 'text-amber-600 dark:text-amber-400' : 
+                             'text-green-600 dark:text-green-400';
             
             return (
-              <div className="rounded-md px-3 py-2 border bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600">
-                <div className="text-xs font-medium text-slate-600 dark:text-slate-300">
+              <div className="rounded-md px-3 py-2 border bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600 min-w-[160px]">
+                <div className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
                   Baker McKenzie
                 </div>
-                <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
-                  {formatCurrency(displayTotal, displayCurrency)}
-                </div>
+                {displayWriteOff > 0 ? (
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <span>Raw:</span>
+                      <span className="font-medium">{formatCurrency(displayRawWip, displayCurrency)}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs text-destructive">
+                      <span>W/O:</span>
+                      <span className="font-medium">-{formatCurrency(displayWriteOff, displayCurrency)}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-xs">
+                      <span className="text-muted-foreground">Adj:</span>
+                      <span className={cn('font-semibold', burnColor)}>
+                        {formatCurrency(displayAdjWip, displayCurrency)}
+                      </span>
+                      <span className="text-muted-foreground">/</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-200">
+                        {formatCurrency(displayBudget, displayCurrency)}
+                      </span>
+                      <span className={cn('font-medium', burnColor)}>
+                        ({burnPct}%)
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-baseline gap-1">
+                    {displayRawWip > 0 && (
+                      <>
+                        <span className={cn('text-sm font-semibold', burnColor)}>
+                          {formatCurrency(displayRawWip, displayCurrency)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">/</span>
+                      </>
+                    )}
+                    <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+                      {formatCurrency(displayBudget, displayCurrency)}
+                    </span>
+                    {displayRawWip > 0 && (
+                      <span className={cn('text-xs font-medium', burnColor)}>
+                        ({burnPct}%)
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })()}
@@ -282,24 +338,77 @@ export function BudgetSummaryBoxes({
           {Object.entries(providerTotals)
             .filter(([name]) => name !== 'Baker McKenzie')
             .sort(([a], [b]) => a.localeCompare(b))
-            .map(([lcName, total]) => {
-              if (total === 0) return null;
+            .map(([lcName, data]) => {
+              if (data.budget === 0 && data.rawWip === 0) return null;
               
-              const displayTotal = differentBillingCurrency && agreedBillingAmount > 0
-                ? total * mandatedRate
-                : total;
+              const displayBudget = differentBillingCurrency && agreedBillingAmount > 0
+                ? data.budget * mandatedRate
+                : data.budget;
+              const displayRawWip = differentBillingCurrency && agreedBillingAmount > 0
+                ? data.rawWip * mandatedRate
+                : data.rawWip;
+              const displayWriteOff = differentBillingCurrency && agreedBillingAmount > 0
+                ? data.writeOff * mandatedRate
+                : data.writeOff;
+              const displayAdjWip = displayRawWip - displayWriteOff;
+              const burnPct = displayBudget > 0 ? Math.round((displayAdjWip / displayBudget) * 100) : 0;
+              const burnColor = burnPct > 100 ? 'text-red-600 dark:text-red-400' : 
+                               burnPct > 85 ? 'text-orange-600 dark:text-orange-400' : 
+                               burnPct > 70 ? 'text-amber-600 dark:text-amber-400' : 
+                               'text-green-600 dark:text-green-400';
               
               return (
                 <div
                   key={lcName}
-                  className="rounded-md px-3 py-2 border bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-700"
+                  className="rounded-md px-3 py-2 border bg-emerald-50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-700 min-w-[160px]"
                 >
-                  <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                  <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-1">
                     {lcName}
                   </div>
-                  <div className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                    {formatCurrency(displayTotal, displayCurrency)}
-                  </div>
+                  {displayWriteOff > 0 ? (
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        <span>Raw:</span>
+                        <span className="font-medium">{formatCurrency(displayRawWip, displayCurrency)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-destructive">
+                        <span>W/O:</span>
+                        <span className="font-medium">-{formatCurrency(displayWriteOff, displayCurrency)}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-xs">
+                        <span className="text-muted-foreground">Adj:</span>
+                        <span className={cn('font-semibold', burnColor)}>
+                          {formatCurrency(displayAdjWip, displayCurrency)}
+                        </span>
+                        <span className="text-muted-foreground">/</span>
+                        <span className="font-semibold text-emerald-700 dark:text-emerald-300">
+                          {formatCurrency(displayBudget, displayCurrency)}
+                        </span>
+                        <span className={cn('font-medium', burnColor)}>
+                          ({burnPct}%)
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-baseline gap-1">
+                      {displayRawWip > 0 && (
+                        <>
+                          <span className={cn('text-sm font-semibold', burnColor)}>
+                            {formatCurrency(displayRawWip, displayCurrency)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">/</span>
+                        </>
+                      )}
+                      <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                        {formatCurrency(displayBudget, displayCurrency)}
+                      </span>
+                      {displayRawWip > 0 && (
+                        <span className={cn('text-xs font-medium', burnColor)}>
+                          ({burnPct}%)
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })}

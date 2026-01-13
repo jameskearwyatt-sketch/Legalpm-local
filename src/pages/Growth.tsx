@@ -338,7 +338,7 @@ const TaskRow = ({
         <button
           onClick={onClick}
           className={cn(
-            "text-left text-sm hover:underline truncate block w-full",
+            "text-left text-sm hover:underline break-words w-full",
             titleColor
           )}
         >

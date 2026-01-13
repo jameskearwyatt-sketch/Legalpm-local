@@ -35,7 +35,7 @@ import { useMatterClients, UpdateMatterClientInput } from '@/lib/hooks/useMatter
 import { useLocalCounsels } from '@/lib/hooks/useLocalCounsels';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getClientDisplayName, getMatterClientDisplayName } from '@/lib/clientUtils';
 import {
   AlertDialog,
@@ -209,6 +209,7 @@ function EditableMatterClients({ matterClients, updateMatterClient }: EditableMa
 export default function MatterDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const { data: matter, isLoading: matterLoading } = useMatter(id!);
   const { deleteMatter, updateMatter } = useMatters();
@@ -244,6 +245,7 @@ export default function MatterDetail() {
   
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [showFinancialUpdateDialog, setShowFinancialUpdateDialog] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState<Record<string, any>>({});
@@ -665,8 +667,18 @@ export default function MatterDetail() {
                       />
                     </div>
 
-                    {/* Headroom Grid */}
-                    <div className={cn("grid gap-4", localCounsel > 0 ? "grid-cols-3" : "grid-cols-2")}>
+                    {/* Headroom Grid - now includes Budget Used */}
+                    <div className={cn("grid gap-4", localCounsel > 0 ? "grid-cols-4" : "grid-cols-3")}>
+                      {/* BM Budget Used */}
+                      <div className="p-4 rounded-lg bg-muted/50">
+                        <p className="text-sm text-muted-foreground">BM Budget Used</p>
+                        <p className="text-xl font-heading font-bold text-foreground">
+                          {formatCurrency(bmTotalUsed, currency)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {bmBudgetUsedPercent.toFixed(0)}% of {formatCurrency(bmFee, currency)}
+                        </p>
+                      </div>
                       <div className={cn(
                         "p-4 rounded-lg",
                         bmHeadroom < 0 ? "bg-danger/10" : "bg-success/10"
@@ -723,13 +735,23 @@ export default function MatterDetail() {
 
             {/* Financial Summary */}
             <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle className="text-lg font-heading">Financial Summary</CardTitle>
-                {latestSnapshot && (
-                  <CardDescription>
-                    Updated {formatDate(latestSnapshot.updated_at)}
-                  </CardDescription>
-                )}
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-lg font-heading">Financial Summary</CardTitle>
+                  {latestSnapshot && (
+                    <CardDescription>
+                      Updated {formatDate(latestSnapshot.updated_at)}
+                    </CardDescription>
+                  )}
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowFinancialUpdateDialog(true)}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Update Snapshot
+                </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center py-3 border-b">
@@ -741,47 +763,21 @@ export default function MatterDetail() {
                       </div>
                     )}
                   </div>
-                  <div className="w-28">
-                    <EditableFinancialCell
-                      value={wipAmount}
-                      currency={currency}
-                      onSave={async (value) => {
-                        await upsertTodaySnapshot.mutateAsync({
-                          matterId: id!,
-                          field: 'wip_amount',
-                          value,
-                        });
-                      }}
-                    />
-                  </div>
+                  <span className="text-lg font-semibold">
+                    {formatCurrency(wipAmount, currency)}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center py-3 border-b">
                   <span className="text-muted-foreground">AR (Billed)</span>
-                  <div className="w-28">
-                    <BilledAmountCell
-                      matterId={id!}
-                      currentBilledAmount={billedAmount}
-                      currency={currency}
-                      compact={false}
-                    />
-                  </div>
+                  <span className="text-lg font-semibold">
+                    {formatCurrency(billedAmount, currency)}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center py-3 border-b">
                   <span className="text-muted-foreground">Paid</span>
-                  <div className="w-28">
-                    <EditableFinancialCell
-                      value={paidAmount}
-                      currency={currency}
-                      className="text-success"
-                      onSave={async (value) => {
-                        await upsertTodaySnapshot.mutateAsync({
-                          matterId: id!,
-                          field: 'paid_amount',
-                          value,
-                        });
-                      }}
-                    />
-                  </div>
+                  <span className="text-lg font-semibold text-success">
+                    {formatCurrency(paidAmount, currency)}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center py-3">
                   <span className="text-muted-foreground">Collection Rate</span>
@@ -797,6 +793,65 @@ export default function MatterDetail() {
               </CardContent>
             </Card>
           </div>
+        )}
+
+        {/* Financial Snapshot Update Dialog - outside the conditional grid but still checks for non-pipeline */}
+        {!isPipeline && (
+          <FinancialSnapshotUpdateDialog
+            isOpen={showFinancialUpdateDialog}
+            onClose={() => setShowFinancialUpdateDialog(false)}
+            currency={currency}
+            matterName={(matter as any).matter_display_name || matter.matter_name}
+            differentBillingCurrency={differentBillingCurrency}
+            quoteCurrency={quoteCurrency}
+            currentValues={{
+              wip_amount: rawWipAmountQuote,
+              wip_write_off_amount: wipWriteOffAmountQuote,
+              billed_amount: billedAmountQuote,
+              paid_amount: paidAmountQuote,
+            }}
+            onSave={async (data) => {
+              const today = new Date().toISOString().split('T')[0];
+              const { data: existing } = await supabase
+                .from('financial_snapshots')
+                .select('*')
+                .eq('matter_id', id!)
+                .eq('as_of_date', today)
+                .maybeSingle();
+
+              if (existing) {
+                await supabase
+                  .from('financial_snapshots')
+                  .update({
+                    wip_amount: data.wip_amount,
+                    wip_write_off_amount: data.wip_write_off_amount,
+                    billed_amount: data.billed_amount,
+                    paid_amount: data.paid_amount,
+                    notes: data.notes,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', existing.id);
+              } else {
+                await supabase
+                  .from('financial_snapshots')
+                  .insert({
+                    matter_id: id!,
+                    user_id: user!.id,
+                    as_of_date: today,
+                    wip_amount: data.wip_amount,
+                    wip_write_off_amount: data.wip_write_off_amount,
+                    billed_amount: data.billed_amount,
+                    paid_amount: data.paid_amount,
+                    notes: data.notes,
+                  });
+              }
+              // Invalidate queries
+              queryClient.invalidateQueries({ queryKey: ['snapshots', id] });
+              queryClient.invalidateQueries({ queryKey: ['matter', id] });
+              queryClient.invalidateQueries({ queryKey: ['matters'] });
+              toast.success('Financial snapshot updated');
+            }}
+          />
         )}
 
         {/* Local Counsel Financials - show when LC fee exists */}

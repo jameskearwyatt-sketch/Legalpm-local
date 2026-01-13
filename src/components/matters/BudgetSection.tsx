@@ -874,53 +874,6 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           )}>
             <div className="flex flex-col gap-1">
               <span className="text-muted-foreground">Local Counsel Total:</span>
-              {!isEditing && localCounselTotal > 0 && (() => {
-                const hasSelection = matter?.local_counsel_billing === 'Disb' || matter?.local_counsel_billing === 'Direct';
-                return (
-                  <div className="flex items-center gap-2">
-                    <label 
-                      className={cn(
-                        "flex items-center gap-1 cursor-pointer text-xs",
-                        hasSelection ? "text-success" : "text-destructive"
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={matter?.local_counsel_billing === 'Disb'}
-                        onChange={async () => {
-                          const newValue = matter?.local_counsel_billing === 'Disb' ? null : 'Disb';
-                          await updateLocalCounselBilling(newValue);
-                        }}
-                        className={cn(
-                          "h-3 w-3 rounded-sm border cursor-pointer accent-current",
-                          matter?.local_counsel_billing === 'Disb' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
-                        )}
-                      />
-                      Disb
-                    </label>
-                    <label 
-                      className={cn(
-                        "flex items-center gap-1 cursor-pointer text-xs",
-                        hasSelection ? "text-success" : "text-destructive"
-                      )}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={matter?.local_counsel_billing === 'Direct'}
-                        onChange={async () => {
-                          const newValue = matter?.local_counsel_billing === 'Direct' ? null : 'Direct';
-                          await updateLocalCounselBilling(newValue);
-                        }}
-                        className={cn(
-                          "h-3 w-3 rounded-sm border cursor-pointer accent-current",
-                          matter?.local_counsel_billing === 'Direct' ? "border-success" : hasSelection ? "border-success" : "border-destructive"
-                        )}
-                      />
-                      Direct
-                    </label>
-                  </div>
-                );
-              })()}
             </div>
             {isEditing && hasExistingBudget && originalItems.length > 0 ? (
               <>

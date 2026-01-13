@@ -861,9 +861,13 @@ export default function Matters() {
           </div>
           <div className="flex items-center gap-2">
             {isLive && (
-              <Button variant="outline" onClick={() => setShowMasterWipDialog(true)}>
+              <Button 
+                variant="default" 
+                onClick={() => setShowMasterWipDialog(true)}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+              >
                 <Upload className="mr-2 h-4 w-4" />
-                Master WIP Update
+                Master Financial Snapshot Update
               </Button>
             )}
             {!isClosed && !isSpecialTab && (

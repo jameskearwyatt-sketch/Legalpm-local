@@ -61,13 +61,15 @@ import {
   X,
   ChevronDown,
   FileText,
-  History
+  History,
+  Download
 } from 'lucide-react';
 import { FinancialSnapshotUpdateDialog } from '@/components/matters/FinancialSnapshotUpdateDialog';
 import { FinancialSnapshotHistoryModal } from '@/components/matters/FinancialSnapshotHistoryModal';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { exportBudgetToExcel } from '@/lib/exportBudgetToExcel';
 
 const practiceAreas = [
   'Voluntary Carbon', 'PPAs', 'Nuclear', 'SAF', 'Renewables',
@@ -671,16 +673,43 @@ export default function MatterDetail() {
           <div className="grid md:grid-cols-2 gap-6">
             {/* Budget overview */}
             <Card className="shadow-card">
-              <CardHeader>
-                <CardTitle className="text-lg font-heading">Budget Overview</CardTitle>
-                {(formData as any).pay_full_time_costs ? (
-                  <CardDescription className="text-xs text-muted-foreground">
-                    Client pays full time costs
-                  </CardDescription>
-                ) : formData.fee_type && (
-                  <CardDescription className="text-xs text-muted-foreground">
-                    {formData.fee_type}
-                  </CardDescription>
+              <CardHeader className="flex flex-row items-start justify-between">
+                <div>
+                  <CardTitle className="text-lg font-heading">Budget Overview</CardTitle>
+                  {(formData as any).pay_full_time_costs ? (
+                    <CardDescription className="text-xs text-muted-foreground">
+                      Client pays full time costs
+                    </CardDescription>
+                  ) : formData.fee_type && (
+                    <CardDescription className="text-xs text-muted-foreground">
+                      {formData.fee_type}
+                    </CardDescription>
+                  )}
+                </div>
+                {!(formData as any).pay_full_time_costs && latestLineItems.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        await exportBudgetToExcel({
+                          items: latestLineItems,
+                          matterName: (matter as any)?.matter_display_name || matter?.matter_name || 'Unknown Matter',
+                          clientName: (matter?.clients as any)?.display_name || matter?.clients?.name || 'Unknown Client',
+                          currency: currency,
+                          versionNumber: undefined,
+                          versionDate: undefined,
+                        });
+                        toast.success('Budget report exported successfully');
+                      } catch (error) {
+                        console.error('Export failed:', error);
+                        toast.error('Failed to export budget report');
+                      }
+                    }}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Export Budget
+                  </Button>
                 )}
               </CardHeader>
               <CardContent className="space-y-6">

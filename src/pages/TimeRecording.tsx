@@ -1426,8 +1426,11 @@ export default function TimeRecording() {
                               const isSelected = entry.selectedDays.some(d => format(d, 'yyyy-MM-dd') === dateKey);
                               return (
                                 <div key={dateKey} className="flex flex-col items-center">
-                                  <span className="text-[10px] text-muted-foreground mb-0.5">
+                                  <span className="text-[10px] text-muted-foreground leading-tight">
                                     {format(date, 'EEE')}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground mb-0.5 leading-tight">
+                                    {format(date, 'd')}
                                   </span>
                                   <Checkbox
                                     checked={isSelected}
@@ -1542,8 +1545,11 @@ export default function TimeRecording() {
                               const isSelected = entry.selectedDays.some(d => format(d, 'yyyy-MM-dd') === dateKey);
                               return (
                                 <div key={dateKey} className="flex flex-col items-center">
-                                  <span className="text-[10px] text-muted-foreground mb-0.5">
+                                  <span className="text-[10px] text-muted-foreground leading-tight">
                                     {format(date, 'EEE')}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground mb-0.5 leading-tight">
+                                    {format(date, 'd')}
                                   </span>
                                   <Checkbox
                                     checked={isSelected}

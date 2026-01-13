@@ -31,7 +31,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Loader2, ChevronDown, History, Check, FileText, Upload, Sparkles, TrendingUp } from 'lucide-react';
+import { Plus, Trash2, Loader2, ChevronDown, History, Check, FileText, Upload, Sparkles, TrendingUp, Download } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
@@ -48,6 +48,7 @@ import { BudgetSummaryBoxes } from './BudgetSummaryBoxes';
 import { DetailedWipUpdateModal } from './DetailedWipUpdateModal';
 import { WipHistoryModal } from './WipHistoryModal';
 import { formatCurrency as sharedFormatCurrency } from '@/lib/currencyUtils';
+import { exportBudgetToExcel } from '@/lib/exportBudgetToExcel';
 
 interface BudgetSectionProps {
   matterId: string;
@@ -734,6 +735,29 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
               >
                 <History className="h-4 w-4 mr-2" />
                 Budget Utilisation History
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    await exportBudgetToExcel({
+                      items: draftItems,
+                      matterName: (matter as any)?.matter_display_name || matter?.matter_name || 'Unknown Matter',
+                      clientName: (matter?.clients as any)?.display_name || matter?.clients?.name || 'Unknown Client',
+                      currency: billingCurrency,
+                      versionNumber: latestVersion?.version_number,
+                      versionDate: latestVersion?.finalized_at,
+                    });
+                    toast.success('Budget report exported successfully');
+                  } catch (error) {
+                    console.error('Export failed:', error);
+                    toast.error('Failed to export budget report');
+                  }
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export to Excel
               </Button>
             </>
           )}

@@ -134,52 +134,8 @@ export function useDetailedWipUpdates(matterId?: string) {
         if (error) throw error;
       }
 
-      // Create or update financial snapshot for today
-      const { data: existingSnapshot } = await supabase
-        .from('financial_snapshots')
-        .select('*')
-        .eq('matter_id', matterId)
-        .eq('as_of_date', today)
-        .maybeSingle();
-
-      if (existingSnapshot) {
-        const { error } = await supabase
-          .from('financial_snapshots')
-          .update({ 
-            wip_amount: totalWip,
-            wip_write_off_amount: totalWriteOff,
-            updated_at: now,
-            notes: existingSnapshot.notes 
-              ? `${existingSnapshot.notes}\n[Detailed WIP Update]` 
-              : '[Detailed WIP Update]'
-          })
-          .eq('id', existingSnapshot.id);
-        
-        if (error) throw error;
-      } else {
-        const { data: latestSnapshot } = await supabase
-          .from('financial_snapshots')
-          .select('*')
-          .eq('matter_id', matterId)
-          .order('as_of_date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        const { error } = await supabase
-          .from('financial_snapshots')
-          .insert({
-            matter_id: matterId,
-            user_id: user!.id,
-            as_of_date: today,
-            wip_amount: totalWip,
-            wip_write_off_amount: totalWriteOff,
-            billed_amount: latestSnapshot?.billed_amount || 0,
-            paid_amount: latestSnapshot?.paid_amount || 0,
-            notes: '[Detailed WIP Update]'
-          });
-        
-        if (error) throw error;
-      }
+      // Budget utilization updates are now separate from financial snapshots
+      // Financial snapshots (WIP/AR/Paid) are updated independently by the user
 
       return wipUpdate;
     },

@@ -120,6 +120,9 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [isDetailedWipOpen, setIsDetailedWipOpen] = useState(false);
   const [isWipHistoryOpen, setIsWipHistoryOpen] = useState(false);
   
+  // Line items collapsible state - default open when editing or no budget
+  const [isLineItemsOpen, setIsLineItemsOpen] = useState(false);
+  
   const { createBulkAssumptions } = useAssumptions(matterId);
 
   const hasExistingBudget = versions.length > 0;
@@ -960,13 +963,13 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         </div>
 
         {/* Collapsible Budget Line Items */}
-        <Collapsible defaultOpen={isEditing || !hasExistingBudget}>
+        <Collapsible open={isLineItemsOpen || isEditing || !hasExistingBudget} onOpenChange={setIsLineItemsOpen}>
           <CollapsibleTrigger asChild>
             <Button variant="ghost" className="w-full justify-between text-muted-foreground hover:text-foreground p-0 h-auto py-2">
               <span className="flex items-center gap-2 text-sm font-medium">
                 Budget Line Items ({draftItems.filter(i => i.work_item.trim()).length} items)
               </span>
-              <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+              <ChevronDown className={cn("h-4 w-4 transition-transform", (isLineItemsOpen || isEditing || !hasExistingBudget) && "rotate-180")} />
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="pt-2">

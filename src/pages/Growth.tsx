@@ -69,6 +69,20 @@ const Growth = () => {
     },
   });
 
+  const updateTaskTitleMutation = useMutation({
+    mutationFn: async ({ taskId, title }: { taskId: string; title: string }) => {
+      const { error } = await supabase
+        .from('growth_tasks')
+        .update({ title })
+        .eq('id', taskId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-growth-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['overdue-tasks'] });
+    },
+  });
+
   const handleCompleteWithNotes = (task: TaskWithProject) => {
     setTaskToComplete(task);
     setCompletionNotes('');
@@ -168,6 +182,7 @@ const Growth = () => {
                 onToggleTask={(id) => toggleTaskMutation.mutate({ taskId: id })}
                 onCompleteWithNotes={handleCompleteWithNotes}
                 onTaskClick={(projectId) => navigate(`/growth/${projectId}`)}
+                onUpdateTaskTitle={(taskId, title) => updateTaskTitleMutation.mutate({ taskId, title })}
               />
               <OverviewCard
                 title="Professional Development"
@@ -181,6 +196,7 @@ const Growth = () => {
                 onToggleTask={(id) => toggleTaskMutation.mutate({ taskId: id })}
                 onCompleteWithNotes={handleCompleteWithNotes}
                 onTaskClick={(projectId) => navigate(`/growth/${projectId}`)}
+                onUpdateTaskTitle={(taskId, title) => updateTaskTitleMutation.mutate({ taskId, title })}
               />
               <OverviewCard
                 title="Learning & Development"
@@ -194,6 +210,7 @@ const Growth = () => {
                 onToggleTask={(id) => toggleTaskMutation.mutate({ taskId: id })}
                 onCompleteWithNotes={handleCompleteWithNotes}
                 onTaskClick={(projectId) => navigate(`/growth/${projectId}`)}
+                onUpdateTaskTitle={(taskId, title) => updateTaskTitleMutation.mutate({ taskId, title })}
               />
             </div>
           </TabsContent>
@@ -326,19 +343,25 @@ interface OverviewCardProps {
   onToggleTask: (taskId: string) => void;
   onCompleteWithNotes: (task: TaskWithProject) => void;
   onTaskClick: (projectId: string) => void;
+  onUpdateTaskTitle: (taskId: string, newTitle: string) => void;
 }
 
 const TaskRow = ({ 
   task, 
   onToggle,
   onCompleteWithNotes,
-  onClick 
+  onClick,
+  onUpdateTitle
 }: { 
   task: TaskWithProject; 
   onToggle: () => void;
   onCompleteWithNotes: () => void;
   onClick: () => void;
+  onUpdateTitle: (newTitle: string) => void;
 }) => {
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(task.title);
+  
   const dueDate = task.deadline_set_at 
     ? calculateDueDate(new Date(task.deadline_set_at), task.deadline_type) 
     : null;
@@ -346,6 +369,24 @@ const TaskRow = ({
   
   // Get text color based on deadline
   const titleColor = getDeadlineTextColor(dueDate, false);
+
+  const handleTitleSave = () => {
+    const trimmed = editedTitle.trim();
+    if (trimmed && trimmed !== task.title) {
+      onUpdateTitle(trimmed);
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTitleSave();
+    } else if (e.key === 'Escape') {
+      setEditedTitle(task.title);
+      setIsEditingTitle(false);
+    }
+  };
 
   return (
     <div 
@@ -375,17 +416,38 @@ const TaskRow = ({
         title="Quick complete"
       />
       <div className="flex-1 min-w-0">
-        <button
-          onClick={onClick}
-          className={cn(
-            "text-left text-sm hover:underline break-words w-full",
-            titleColor
-          )}
-        >
-          {task.title}
-        </button>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span className="truncate">{task.growth_projects.name}</span>
+        {isEditingTitle ? (
+          <input
+            type="text"
+            value={editedTitle}
+            onChange={(e) => setEditedTitle(e.target.value)}
+            onBlur={handleTitleSave}
+            onKeyDown={handleTitleKeyDown}
+            autoFocus
+            className="w-full text-sm font-medium bg-background border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        ) : (
+          <button
+            onClick={() => {
+              setEditedTitle(task.title);
+              setIsEditingTitle(true);
+            }}
+            className={cn(
+              "text-left text-sm hover:bg-muted/50 rounded px-1 -mx-1 break-words w-full cursor-text",
+              titleColor
+            )}
+            title="Click to edit"
+          >
+            {task.title}
+          </button>
+        )}
+        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+          <button 
+            onClick={onClick}
+            className="truncate hover:underline hover:text-foreground"
+          >
+            {task.growth_projects.name}
+          </button>
           {task.assignee && task.assignee !== 'Me' && (
             <>
               <span>•</span>
@@ -418,7 +480,8 @@ const OverviewCard = ({
   othersTasks,
   onToggleTask,
   onCompleteWithNotes,
-  onTaskClick
+  onTaskClick,
+  onUpdateTaskTitle
 }: OverviewCardProps) => {
   const totalTasks = myTasks.length + othersTasks.length;
 
@@ -445,6 +508,7 @@ const OverviewCard = ({
                       onToggle={() => onToggleTask(task.id)}
                       onCompleteWithNotes={() => onCompleteWithNotes(task)}
                       onClick={() => onTaskClick(task.project_id)}
+                      onUpdateTitle={(newTitle) => onUpdateTaskTitle(task.id, newTitle)}
                     />
                   ))}
                 </div>
@@ -461,6 +525,7 @@ const OverviewCard = ({
                       onToggle={() => onToggleTask(task.id)}
                       onCompleteWithNotes={() => onCompleteWithNotes(task)}
                       onClick={() => onTaskClick(task.project_id)}
+                      onUpdateTitle={(newTitle) => onUpdateTaskTitle(task.id, newTitle)}
                     />
                   ))}
                 </div>

@@ -805,12 +805,30 @@ export default function MatterDetail() {
             differentBillingCurrency={differentBillingCurrency}
             quoteCurrency={quoteCurrency}
             currentValues={{
-              wip_amount: rawWipAmountQuote,
-              wip_write_off_amount: wipWriteOffAmountQuote,
-              billed_amount: billedAmountQuote,
-              paid_amount: paidAmountQuote,
+              // Show current values in billing currency (converted from quote currency)
+              wip_amount: differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0
+                ? rawWipAmountQuote * mandatedRate
+                : rawWipAmountQuote,
+              wip_write_off_amount: differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0
+                ? wipWriteOffAmountQuote * mandatedRate
+                : wipWriteOffAmountQuote,
+              billed_amount: differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0
+                ? billedAmountQuote * mandatedRate
+                : billedAmountQuote,
+              paid_amount: differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0
+                ? paidAmountQuote * mandatedRate
+                : paidAmountQuote,
             }}
             onSave={async (data) => {
+              // User inputs in billing currency - convert back to quote currency for storage
+              const shouldConvert = differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0;
+              const conversionRate = shouldConvert ? (1 / mandatedRate) : 1;
+              
+              const wipToStore = data.wip_amount * conversionRate;
+              const writeOffToStore = data.wip_write_off_amount * conversionRate;
+              const billedToStore = data.billed_amount * conversionRate;
+              const paidToStore = data.paid_amount * conversionRate;
+              
               const today = new Date().toISOString().split('T')[0];
               const { data: existing } = await supabase
                 .from('financial_snapshots')
@@ -823,10 +841,10 @@ export default function MatterDetail() {
                 await supabase
                   .from('financial_snapshots')
                   .update({
-                    wip_amount: data.wip_amount,
-                    wip_write_off_amount: data.wip_write_off_amount,
-                    billed_amount: data.billed_amount,
-                    paid_amount: data.paid_amount,
+                    wip_amount: wipToStore,
+                    wip_write_off_amount: writeOffToStore,
+                    billed_amount: billedToStore,
+                    paid_amount: paidToStore,
                     notes: data.notes,
                     updated_at: new Date().toISOString(),
                   })
@@ -838,10 +856,10 @@ export default function MatterDetail() {
                     matter_id: id!,
                     user_id: user!.id,
                     as_of_date: today,
-                    wip_amount: data.wip_amount,
-                    wip_write_off_amount: data.wip_write_off_amount,
-                    billed_amount: data.billed_amount,
-                    paid_amount: data.paid_amount,
+                    wip_amount: wipToStore,
+                    wip_write_off_amount: writeOffToStore,
+                    billed_amount: billedToStore,
+                    paid_amount: paidToStore,
                     notes: data.notes,
                   });
               }

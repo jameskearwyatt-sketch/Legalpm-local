@@ -326,18 +326,8 @@ export default function TimeRecording() {
     if (draft.single_date) {
       setSingleDate(parseISO(draft.single_date));
     }
-    // Load selected dates - support both old format (from/to) and new format (array)
-    if (draft.date_range_from && draft.date_range_to) {
-      // Legacy format: convert range to array
-      const from = parseISO(draft.date_range_from);
-      const to = parseISO(draft.date_range_to);
-      setSelectedDates(eachDayOfInterval({ start: from, end: to }));
-    } else if ((draft as any).selected_dates) {
-      // New format: array of dates
-      setSelectedDates((draft as any).selected_dates.map((d: string) => parseISO(d)));
-    }
     
-    // Restore grid entries, converting date strings back to Date objects
+    // Restore grid entries first, converting date strings back to Date objects
     const restoredEntries = (draft.grid_entries as GridRowEntry[]).map(entry => ({
       ...entry,
       selectedDays: entry.selectedDays?.map((d: any) => 
@@ -345,6 +335,29 @@ export default function TimeRecording() {
       ) || [],
     }));
     setGridEntries(restoredEntries);
+    
+    // Derive selected dates from the grid entries' selectedDays
+    // This ensures non-contiguous date selections are preserved correctly
+    const allSelectedDaysFromEntries = new Set<string>();
+    restoredEntries.forEach(entry => {
+      entry.selectedDays.forEach((d: Date) => {
+        allSelectedDaysFromEntries.add(format(d, 'yyyy-MM-dd'));
+      });
+    });
+    
+    // Convert to sorted array of Dates
+    const derivedDates = Array.from(allSelectedDaysFromEntries)
+      .map(dateStr => parseISO(dateStr))
+      .sort((a, b) => a.getTime() - b.getTime());
+    
+    if (derivedDates.length > 0) {
+      setSelectedDates(derivedDates);
+    } else if (draft.date_range_from && draft.date_range_to) {
+      // Fallback for drafts with no entry selections but with date range
+      const from = parseISO(draft.date_range_from);
+      const to = parseISO(draft.date_range_to);
+      setSelectedDates(eachDayOfInterval({ start: from, end: to }));
+    }
     
     // Restore processed output if polished
     if (draft.is_polished && draft.processed_output) {

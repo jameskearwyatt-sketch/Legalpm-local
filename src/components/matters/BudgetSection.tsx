@@ -774,33 +774,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Budget Line Items - Always Categorized View */}
-        <CategorizedBudgetView
-          items={draftItems}
-          onItemsChange={setDraftItems}
-          onItemEdit={handleItemEdit}
-          onRemoveItem={removeLineItem}
-          onAddItem={addLineItem}
-          isEditing={isEditing}
-          hasExistingBudget={hasExistingBudget}
-          formatCurrency={formatCurrency}
-          currency={currency}
-          billingCurrency={billingCurrency}
-          quoteCurrency={quoteCurrency}
-          differentBillingCurrency={differentBillingCurrency}
-          agreedBillingAmount={agreedBillingAmount}
-          mandatedRate={mandatedRate}
-          existingLcFirmNames={existingLcFirmNames}
-          hasOptionalItems={hasOptionalItems}
-          aiSuggestedIndices={aiSuggestedIndices}
-          originalItems={originalItems}
-          updateLineItemOptional={updateLineItemOptional}
-          toggleLineItemIncluded={toggleLineItemIncluded}
-          matterId={matterId}
-        />
-
-        {/* Totals */}
-        <div className="border-t pt-4 space-y-2">
+        {/* Budget Summary Totals - Always Visible */}
+        <div className="space-y-2">
           {/* Show header row for Current vs New during editing */}
           {isEditing && hasExistingBudget && originalItems.length > 0 && (
             <div className="grid grid-cols-3 gap-2 text-xs font-medium text-muted-foreground mb-2">
@@ -983,6 +958,43 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
             )}
           </div>
         </div>
+
+        {/* Collapsible Budget Line Items */}
+        <Collapsible defaultOpen={isEditing || !hasExistingBudget}>
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" className="w-full justify-between text-muted-foreground hover:text-foreground p-0 h-auto py-2">
+              <span className="flex items-center gap-2 text-sm font-medium">
+                Budget Line Items ({draftItems.filter(i => i.work_item.trim()).length} items)
+              </span>
+              <ChevronDown className="h-4 w-4 transition-transform data-[state=open]:rotate-180" />
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-2">
+            <CategorizedBudgetView
+              items={draftItems}
+              onItemsChange={setDraftItems}
+              onItemEdit={handleItemEdit}
+              onRemoveItem={removeLineItem}
+              onAddItem={addLineItem}
+              isEditing={isEditing}
+              hasExistingBudget={hasExistingBudget}
+              formatCurrency={formatCurrency}
+              currency={currency}
+              billingCurrency={billingCurrency}
+              quoteCurrency={quoteCurrency}
+              differentBillingCurrency={differentBillingCurrency}
+              agreedBillingAmount={agreedBillingAmount}
+              mandatedRate={mandatedRate}
+              existingLcFirmNames={existingLcFirmNames}
+              hasOptionalItems={hasOptionalItems}
+              aiSuggestedIndices={aiSuggestedIndices}
+              originalItems={originalItems}
+              updateLineItemOptional={updateLineItemOptional}
+              toggleLineItemIncluded={toggleLineItemIncluded}
+              matterId={matterId}
+            />
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Different Billing Currency Section */}
         <div className="border-t pt-4 space-y-4">

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ClearableDateInput } from '@/components/ui/clearable-date-input';
@@ -8,11 +8,12 @@ import { useSnapshots, FinancialSnapshot, CreateSnapshotInput } from '@/lib/hook
 import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import { format } from 'date-fns';
-import { getCurrencySymbol } from '@/lib/currencyUtils';
+import { getCurrencySymbol, formatCurrency } from '@/lib/currencyUtils';
 
 const snapshotSchema = z.object({
   as_of_date: z.string().min(1, 'Date is required'),
-  wip_amount: z.number().min(0, 'WIP must be 0 or greater'),
+  wip_amount: z.number().min(0, 'Raw WIP must be 0 or greater'),
+  wip_write_off_amount: z.number().min(0, 'Write-off must be 0 or greater'),
   billed_amount: z.number().min(0, 'Billed must be 0 or greater'),
   paid_amount: z.number().min(0, 'Paid must be 0 or greater'),
   notes: z.string().optional(),
@@ -33,12 +34,18 @@ export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }
   const [formData, setFormData] = useState({
     as_of_date: snapshot?.as_of_date || format(new Date(), 'yyyy-MM-dd'),
     wip_amount: snapshot?.wip_amount || 0,
+    wip_write_off_amount: snapshot?.wip_write_off_amount || 0,
     billed_amount: snapshot?.billed_amount || 0,
     paid_amount: snapshot?.paid_amount || 0,
     notes: snapshot?.notes || '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Calculate net WIP (Raw WIP - Write-offs)
+  const netWip = useMemo(() => {
+    return Math.max(0, formData.wip_amount - formData.wip_write_off_amount);
+  }, [formData.wip_amount, formData.wip_write_off_amount]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,23 +99,52 @@ export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }
         {errors.as_of_date && <p className="text-sm text-destructive">{errors.as_of_date}</p>}
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="wip_amount">WIP ({currencySymbol.trim()})</Label>
-          <Input
-            id="wip_amount"
-            type="number"
-            min="0"
-            step="0.01"
-            value={formData.wip_amount}
-            onChange={(e) => updateField('wip_amount', parseFloat(e.target.value) || 0)}
-            className={errors.wip_amount ? 'border-destructive' : ''}
-          />
-          {errors.wip_amount && <p className="text-sm text-destructive">{errors.wip_amount}</p>}
-        </div>
+      {/* WIP Section with Write-offs */}
+      <div className="space-y-3 p-4 bg-muted/30 rounded-lg border">
+        <h4 className="text-sm font-medium text-muted-foreground">Work in Progress</h4>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="wip_amount">Raw WIP ({currencySymbol.trim()})</Label>
+            <Input
+              id="wip_amount"
+              type="number"
+              min="0"
+              step="0.01"
+              value={formData.wip_amount}
+              onChange={(e) => updateField('wip_amount', parseFloat(e.target.value) || 0)}
+              className={errors.wip_amount ? 'border-destructive' : ''}
+            />
+            {errors.wip_amount && <p className="text-sm text-destructive">{errors.wip_amount}</p>}
+          </div>
 
+          <div className="space-y-2">
+            <Label htmlFor="wip_write_off_amount">Write-offs ({currencySymbol.trim()})</Label>
+            <Input
+              id="wip_write_off_amount"
+              type="number"
+              min="0"
+              step="0.01"
+              value={formData.wip_write_off_amount}
+              onChange={(e) => updateField('wip_write_off_amount', parseFloat(e.target.value) || 0)}
+              className={errors.wip_write_off_amount ? 'border-destructive' : ''}
+            />
+            {errors.wip_write_off_amount && <p className="text-sm text-destructive">{errors.wip_write_off_amount}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label className="text-muted-foreground">Net WIP ({currencySymbol.trim()})</Label>
+            <div className="h-10 px-3 py-2 bg-muted rounded-md border flex items-center font-medium">
+              {formatCurrency(netWip, currency)}
+            </div>
+            <p className="text-xs text-muted-foreground">Raw WIP − Write-offs</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Billed and Paid */}
+      <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="billed_amount">Billed ({currencySymbol.trim()})</Label>
+          <Label htmlFor="billed_amount">Billed / AR ({currencySymbol.trim()})</Label>
           <Input
             id="billed_amount"
             type="number"

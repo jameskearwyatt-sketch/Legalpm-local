@@ -228,30 +228,32 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue, projec
 
   return (
     <div className={cn(
-      "flex items-start gap-3 p-3 rounded-lg border transition-colors",
+      "p-3 rounded-lg border transition-colors",
       task.is_completed ? 'bg-muted/30' : 'bg-background',
       isOverdue && !task.is_completed && 'border-destructive/50'
     )}>
-      {/* Two completion options for pending tasks, single checkbox for completed */}
-      <div className="flex items-center gap-1 mt-1">
-        <Checkbox
-          checked={task.is_completed}
-          onCheckedChange={handleQuickComplete}
-          title={task.is_completed ? "Mark incomplete" : "Quick complete"}
-        />
-        {!task.is_completed && (
-          <button
-            type="button"
-            onClick={handleCompleteWithNotes}
-            className="h-4 w-4 rounded border border-input flex items-center justify-center hover:bg-accent hover:border-primary transition-colors"
-            title="Complete with notes"
-          >
-            <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
-          </button>
-        )}
-      </div>
-      
-      <div className="flex-1 min-w-0">
+      {/* Top row: checkbox + title taking full width */}
+      <div className="flex items-start gap-3">
+        {/* Two completion options for pending tasks, single checkbox for completed */}
+        <div className="flex items-center gap-1 mt-0.5 shrink-0">
+          <Checkbox
+            checked={task.is_completed}
+            onCheckedChange={handleQuickComplete}
+            title={task.is_completed ? "Mark incomplete" : "Quick complete"}
+          />
+          {!task.is_completed && (
+            <button
+              type="button"
+              onClick={handleCompleteWithNotes}
+              className="h-4 w-4 rounded border border-input flex items-center justify-center hover:bg-accent hover:border-primary transition-colors"
+              title="Complete with notes"
+            >
+              <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+            </button>
+          )}
+        </div>
+        
+        <div className="flex-1 min-w-0">
         {isEditingTitle ? (
           <Input
             ref={titleInputRef}
@@ -422,10 +424,11 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue, projec
             )}
           </div>
         )}
+        </div>
       </div>
 
-      {/* Action buttons - separate from triage */}
-      <div className="flex flex-col gap-1 shrink-0">
+      {/* Action buttons - moved below title for more space */}
+      <div className="flex items-center gap-2 mt-2 ml-9">
         {/* Draft Email button for delegated tasks */}
         {!task.is_completed && isDelegated && (
           <Button

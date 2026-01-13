@@ -264,10 +264,10 @@ export const TaskItem = ({ task, onToggle, onUpdate, onDelete, isOverdue, projec
             className="h-7 text-sm font-medium"
           />
         ) : (
-          <div className="flex items-center gap-2">
+          <div>
             <p 
               className={cn(
-                "text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1",
+                "text-sm font-medium cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1 break-words",
                 titleColor
               )}
               onClick={() => setIsEditingTitle(true)}

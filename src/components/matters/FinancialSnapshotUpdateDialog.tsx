@@ -13,9 +13,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2, Info } from 'lucide-react';
 import { formatCurrency, getCurrencySymbol } from '@/lib/currencyUtils';
-import { format } from 'date-fns';
 
 export interface LocalCounselUpdate {
   id: string;
@@ -68,9 +68,12 @@ export function FinancialSnapshotUpdateDialog({
 }: FinancialSnapshotUpdateDialogProps) {
   const currencySymbol = getCurrencySymbol(currency);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Toggle between entering write-off or adjusted WIP
+  const [wipEntryMode, setWipEntryMode] = useState<'writeoff' | 'adjusted'>('writeoff');
   const [formData, setFormData] = useState({
     wip_amount: currentValues?.wip_amount || 0,
     wip_write_off_amount: currentValues?.wip_write_off_amount || 0,
+    adjusted_wip: (currentValues?.wip_amount || 0) - (currentValues?.wip_write_off_amount || 0),
     billed_amount: currentValues?.billed_amount || 0,
     paid_amount: currentValues?.paid_amount || 0,
     notes: '',
@@ -83,13 +86,17 @@ export function FinancialSnapshotUpdateDialog({
   // Reset form when dialog opens with new values
   useEffect(() => {
     if (isOpen) {
+      const rawWip = currentValues?.wip_amount || 0;
+      const writeOff = currentValues?.wip_write_off_amount || 0;
       setFormData({
-        wip_amount: currentValues?.wip_amount || 0,
-        wip_write_off_amount: currentValues?.wip_write_off_amount || 0,
+        wip_amount: rawWip,
+        wip_write_off_amount: writeOff,
+        adjusted_wip: rawWip - writeOff,
         billed_amount: currentValues?.billed_amount || 0,
         paid_amount: currentValues?.paid_amount || 0,
         notes: '',
       });
+      setWipEntryMode('writeoff');
       // Initialize LC form data
       const lcData: Record<string, { wip_amount: number; billed_amount: number }> = {};
       disbursementLCs.forEach(lc => {
@@ -102,10 +109,18 @@ export function FinancialSnapshotUpdateDialog({
     }
   }, [isOpen, currentValues, localCounsels]);
 
-  // Calculate net WIP
-  const netWip = useMemo(() => {
-    return Math.max(0, formData.wip_amount - formData.wip_write_off_amount);
-  }, [formData.wip_amount, formData.wip_write_off_amount]);
+  // Calculate derived values based on entry mode
+  const calculatedValues = useMemo(() => {
+    if (wipEntryMode === 'writeoff') {
+      // User entered write-off, calculate adjusted WIP
+      const netWip = Math.max(0, formData.wip_amount - formData.wip_write_off_amount);
+      return { netWip, writeOff: formData.wip_write_off_amount };
+    } else {
+      // User entered adjusted WIP, calculate write-off
+      const writeOff = Math.max(0, formData.wip_amount - formData.adjusted_wip);
+      return { netWip: formData.adjusted_wip, writeOff };
+    }
+  }, [wipEntryMode, formData.wip_amount, formData.wip_write_off_amount, formData.adjusted_wip]);
 
   const updateField = (field: string, value: number | string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -136,7 +151,7 @@ export function FinancialSnapshotUpdateDialog({
 
       await onSave({
         wip_amount: formData.wip_amount,
-        wip_write_off_amount: formData.wip_write_off_amount,
+        wip_write_off_amount: calculatedValues.writeOff,
         billed_amount: formData.billed_amount,
         paid_amount: formData.paid_amount,
         notes: formData.notes || undefined,
@@ -177,7 +192,24 @@ export function FinancialSnapshotUpdateDialog({
             
             {/* WIP Section with Write-offs */}
             <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">Work in Progress</p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Work in Progress</p>
+                <RadioGroup
+                  value={wipEntryMode}
+                  onValueChange={(value) => setWipEntryMode(value as 'writeoff' | 'adjusted')}
+                  className="flex items-center gap-4"
+                >
+                  <div className="flex items-center space-x-1.5">
+                    <RadioGroupItem value="writeoff" id="mode-writeoff" className="h-3 w-3" />
+                    <Label htmlFor="mode-writeoff" className="text-xs cursor-pointer">Enter Write-off</Label>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <RadioGroupItem value="adjusted" id="mode-adjusted" className="h-3 w-3" />
+                    <Label htmlFor="mode-adjusted" className="text-xs cursor-pointer">Enter Adjusted WIP</Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="wip_amount" className="text-xs">Raw WIP ({currencySymbol.trim()})</Label>
@@ -192,25 +224,50 @@ export function FinancialSnapshotUpdateDialog({
                   />
                 </div>
 
-                <div className="space-y-1.5">
-                  <Label htmlFor="wip_write_off_amount" className="text-xs text-destructive">Write-offs ({currencySymbol.trim()})</Label>
-                  <Input
-                    id="wip_write_off_amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.wip_write_off_amount}
-                    onChange={(e) => updateField('wip_write_off_amount', parseFloat(e.target.value) || 0)}
-                    className="h-9"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">Net WIP</Label>
-                  <div className="h-9 px-3 py-2 bg-muted rounded-md border flex items-center font-medium text-sm">
-                    {formatCurrency(netWip, currency)}
-                  </div>
-                </div>
+                {wipEntryMode === 'writeoff' ? (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="wip_write_off_amount" className="text-xs text-destructive">Write-offs ({currencySymbol.trim()})</Label>
+                      <Input
+                        id="wip_write_off_amount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formData.wip_write_off_amount}
+                        onChange={(e) => updateField('wip_write_off_amount', parseFloat(e.target.value) || 0)}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Net WIP (calculated)</Label>
+                      <div className="h-9 px-3 py-2 bg-muted rounded-md border flex items-center font-medium text-sm">
+                        {formatCurrency(calculatedValues.netWip, currency)}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="adjusted_wip" className="text-xs text-primary">Adjusted WIP ({currencySymbol.trim()})</Label>
+                      <Input
+                        id="adjusted_wip"
+                        type="number"
+                        min="0"
+                        max={formData.wip_amount}
+                        step="0.01"
+                        value={formData.adjusted_wip}
+                        onChange={(e) => updateField('adjusted_wip', parseFloat(e.target.value) || 0)}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground text-destructive">Write-off (calculated)</Label>
+                      <div className="h-9 px-3 py-2 bg-muted rounded-md border flex items-center font-medium text-sm text-destructive">
+                        {formatCurrency(calculatedValues.writeOff, currency)}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

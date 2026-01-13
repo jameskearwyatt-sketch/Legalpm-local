@@ -1084,7 +1084,22 @@ export default function Matters() {
                 </TableScrollControls>
               </StickyTableHeader>
             ) : (
-              <StickyTableHeader>
+              <>
+                {/* Health warning for Live tab - financial data source notice */}
+                {isLive && (
+                  <div className="mb-4 flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                    <div className="text-sm">
+                      <p className="font-medium text-amber-800 dark:text-amber-200">
+                        Budget burn figures use Financial Snapshot data only
+                      </p>
+                      <p className="text-amber-700 dark:text-amber-300 mt-0.5">
+                        For detailed line-item WIP tracking, view individual matter budgets.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <StickyTableHeader>
                 <TableScrollControls>
                   <Table>
                   <TableHeader>
@@ -1568,6 +1583,7 @@ export default function Matters() {
                 </Table>
               </TableScrollControls>
             </StickyTableHeader>
+              </>
             )}
           </CardContent>
         </Card>

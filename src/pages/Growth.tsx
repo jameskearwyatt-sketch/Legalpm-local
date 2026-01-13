@@ -114,6 +114,46 @@ const Growth = () => {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
+          {/* Tab Navigation Bar - always visible for easy navigation */}
+          <div className="flex items-center gap-2 mb-6 flex-wrap">
+            <Button
+              variant={activeTab === 'overview' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('overview')}
+              className="gap-2"
+            >
+              <Target className="h-4 w-4" />
+              Overview
+            </Button>
+            <Button
+              variant={activeTab === 'business' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('business')}
+              className="gap-2"
+            >
+              <Briefcase className="h-4 w-4" />
+              Business Development
+            </Button>
+            <Button
+              variant={activeTab === 'professional' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('professional')}
+              className="gap-2"
+            >
+              <Users className="h-4 w-4" />
+              Professional Development
+            </Button>
+            <Button
+              variant={activeTab === 'learning' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setActiveTab('learning')}
+              className="gap-2"
+            >
+              <GraduationCap className="h-4 w-4" />
+              Learning & Development
+            </Button>
+          </div>
+
           <TabsContent value="overview" className="mt-0">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <OverviewCard

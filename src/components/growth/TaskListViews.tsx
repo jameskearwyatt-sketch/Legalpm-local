@@ -302,9 +302,9 @@ const TaskRow = ({
       />
       
       <div className="flex-1 min-w-0 space-y-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-start gap-2">
           <span className={cn(
-            "text-sm font-medium truncate",
+            "text-sm font-medium break-words",
             task.is_completed && 'text-muted-foreground'
           )}>
             {task.title}

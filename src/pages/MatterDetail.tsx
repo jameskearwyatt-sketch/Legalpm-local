@@ -790,11 +790,11 @@ export default function MatterDetail() {
               </CardContent>
             </Card>
 
-            {/* Financial Summary */}
+            {/* BM Financial Summary */}
             <Card className="shadow-card">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg font-heading">Financial Summary</CardTitle>
+                  <CardTitle className="text-lg font-heading">BM Financial Summary</CardTitle>
                   {latestSnapshot && (
                     <CardDescription>
                       Updated {formatDate(latestSnapshot.updated_at)}
@@ -973,11 +973,11 @@ export default function MatterDetail() {
           />
         )}
 
-        {/* Local Counsel Financials - show when LC fee exists */}
+        {/* Local Counsels Financial Summary - show when LC fee exists */}
         {!isPipeline && localCounsel > 0 && (
           <Card className="shadow-card border-l-4 border-l-primary">
             <CardHeader>
-              <CardTitle className="text-lg font-heading">Local Counsel Financials</CardTitle>
+              <CardTitle className="text-lg font-heading">Local Counsels Financial Summary</CardTitle>
               <CardDescription>
                 {localCounsels.length > 0 
                   ? `${localCounsels.length} local counsel firm${localCounsels.length > 1 ? 's' : ''}`

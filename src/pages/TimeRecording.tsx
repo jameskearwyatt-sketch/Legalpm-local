@@ -1357,12 +1357,12 @@ export default function TimeRecording() {
                   )}
                 </TableRow>
                 {mode === 'multi' && datesInRange.length > 0 && (
-                  <TableRow className="bg-muted/30 border-b-2 border-primary/20">
-                    <TableHead colSpan={2} className="text-right text-sm font-medium text-foreground/70 py-3">
+                  <TableRow className="bg-muted/20 border-b-2 border-primary/20">
+                    <TableHead colSpan={2} className="text-right text-sm font-medium text-foreground/70 py-5 pr-6">
                       Daily totals
                     </TableHead>
-                    <TableHead className="py-3">
-                      <div className="flex gap-4 justify-start px-2">
+                    <TableHead className="py-5">
+                      <div className="flex gap-6 justify-start px-4">
                         {datesInRange.map(date => {
                           const dateKey = format(date, 'yyyy-MM-dd');
                           // Calculate running total for this day across all entries
@@ -1381,19 +1381,19 @@ export default function TimeRecording() {
                             <div 
                               key={dateKey} 
                               className={cn(
-                                "flex flex-col items-center px-3 py-1.5 rounded-md min-w-[52px]",
-                                dayTotal > 0 ? "bg-primary/10" : "bg-muted/50"
+                                "flex flex-col items-center px-5 py-3 rounded-lg min-w-[72px] shadow-sm",
+                                dayTotal > 0 ? "bg-primary/10 ring-1 ring-primary/20" : "bg-background ring-1 ring-border/50"
                               )}
                             >
-                              <span className="text-xs font-medium text-foreground/80">
+                              <span className="text-sm font-medium text-foreground">
                                 {format(date, 'EEE')}
                               </span>
-                              <span className="text-xs text-muted-foreground">
+                              <span className="text-xs text-muted-foreground mt-0.5">
                                 {format(date, 'd MMM')}
                               </span>
                               <span className={cn(
-                                "text-sm font-semibold mt-1",
-                                dayTotal > 0 ? "text-primary" : "text-muted-foreground/40"
+                                "text-base font-bold mt-2",
+                                dayTotal > 0 ? "text-primary" : "text-muted-foreground/30"
                               )}>
                                 {dayTotal > 0 ? `${dayTotal.toFixed(1)}h` : '—'}
                               </span>

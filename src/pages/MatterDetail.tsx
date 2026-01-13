@@ -804,6 +804,13 @@ export default function MatterDetail() {
             matterName={(matter as any).matter_display_name || matter.matter_name}
             differentBillingCurrency={differentBillingCurrency}
             quoteCurrency={quoteCurrency}
+            localCounsels={localCounsels.map(lc => ({
+              id: lc.id,
+              firm_name: lc.firm_name,
+              wip_amount: lc.wip_amount || 0,
+              billed_amount: lc.billed_amount || 0,
+              billing_mode: lc.billing_mode,
+            }))}
             currentValues={{
               // Show current values in billing currency (converted from quote currency)
               wip_amount: differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0
@@ -863,10 +870,24 @@ export default function MatterDetail() {
                     notes: data.notes,
                   });
               }
+
+              // Update local counsels if provided
+              if (data.localCounsels && data.localCounsels.length > 0) {
+                for (const lcUpdate of data.localCounsels) {
+                  await updateLocalCounsel.mutateAsync({
+                    id: lcUpdate.id,
+                    wip_amount: lcUpdate.wip_amount,
+                    billed_amount: lcUpdate.billed_amount,
+                    last_updated: today,
+                  });
+                }
+              }
+
               // Invalidate queries
               queryClient.invalidateQueries({ queryKey: ['snapshots', id] });
               queryClient.invalidateQueries({ queryKey: ['matter', id] });
               queryClient.invalidateQueries({ queryKey: ['matters'] });
+              queryClient.invalidateQueries({ queryKey: ['localCounsels', id] });
               toast.success('Financial snapshot updated');
             }}
           />
@@ -961,53 +982,22 @@ export default function MatterDetail() {
                               Budget: {formatCurrency(lc.allocated_budget, currency)}
                             </span>
                           </div>
-                          {/* Only show WIP/Billed inputs if billing mode is Disbursement */}
+                          {/* Display WIP/Billed/Burn for disbursement mode (read-only - update via snapshot) */}
                           {isLcDisbursementMode && (
-                            <div className="grid sm:grid-cols-3 gap-3">
+                            <div className="grid sm:grid-cols-3 gap-3 text-sm">
                               <div className="space-y-1">
-                                <Label className="text-xs">WIP</Label>
-                                <Input
-                                  type="number"
-                                  value={lc.wip_amount || ''}
-                                  onChange={(e) => {
-                                    updateLocalCounsel.mutate({
-                                      id: lc.id,
-                                      wip_amount: parseFloat(e.target.value) || 0,
-                                      last_updated: new Date().toISOString().split('T')[0],
-                                    });
-                                  }}
-                                  placeholder="0"
-                                  className="h-8 text-sm"
-                                />
+                                <span className="text-xs text-muted-foreground">WIP</span>
+                                <p className="font-medium">{formatCurrency(lc.wip_amount || 0, currency)}</p>
                               </div>
                               <div className="space-y-1">
-                                <Label className="text-xs">Billed</Label>
-                                <Input
-                                  type="number"
-                                  value={lc.billed_amount || ''}
-                                  onChange={(e) => {
-                                    updateLocalCounsel.mutate({
-                                      id: lc.id,
-                                      billed_amount: parseFloat(e.target.value) || 0,
-                                      last_updated: new Date().toISOString().split('T')[0],
-                                    });
-                                  }}
-                                  placeholder="0"
-                                  className="h-8 text-sm"
-                                />
+                                <span className="text-xs text-muted-foreground">Billed</span>
+                                <p className="font-medium">{formatCurrency(lc.billed_amount || 0, currency)}</p>
                               </div>
                               <div className="space-y-1">
-                                <Label className="text-xs">Last Updated</Label>
-                                <ClearableDateInput 
-                                  value={lc.last_updated || ''} 
-                                  onChange={(value) => {
-                                    updateLocalCounsel.mutate({
-                                      id: lc.id,
-                                      last_updated: value || null,
-                                    });
-                                  }}
-                                  className="h-8 text-sm"
-                                />
+                                <span className="text-xs text-muted-foreground">Last Updated</span>
+                                <p className="font-medium text-muted-foreground">
+                                  {lc.last_updated ? format(new Date(lc.last_updated), 'dd MMM yyyy') : '—'}
+                                </p>
                               </div>
                             </div>
                           )}
@@ -1387,19 +1377,7 @@ export default function MatterDetail() {
 
         {/* Budget Section - only for non-pipeline matters */}
         {!isPipeline && (
-          <Collapsible defaultOpen={false} className="group">
-            <CollapsibleTrigger className="w-full">
-              <Card className="shadow-card hover:bg-muted/50 transition-colors cursor-pointer">
-                <CardHeader className="flex flex-row items-center justify-between py-4">
-                  <CardTitle className="text-lg font-heading">Budget</CardTitle>
-                  <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
-                </CardHeader>
-              </Card>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="mt-2">
-              <BudgetSection matterId={id!} currency={currency} />
-            </CollapsibleContent>
-          </Collapsible>
+          <BudgetSection matterId={id!} currency={currency} />
         )}
 
         {/* Assumptions Section - only for non-pipeline matters */}

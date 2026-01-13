@@ -1344,20 +1344,8 @@ export default function TimeRecording() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[320px]">Client / Matter / Number</TableHead>
-                  <TableHead className="w-[100px] text-center">Hours</TableHead>
-                  {mode === 'single' ? (
-                    <TableHead>Narrative</TableHead>
-                  ) : (
-                    <>
-                      <TableHead className="text-center">Days</TableHead>
-                      <TableHead>Narratives (one per day)</TableHead>
-                    </>
-                  )}
-                </TableRow>
                 {mode === 'multi' && datesInRange.length > 0 && (
-                  <TableRow className="bg-muted/20 border-b-2 border-primary/20">
+                  <TableRow className="bg-muted/20 border-b border-border/30">
                     <TableHead colSpan={2} className="text-right text-sm font-medium text-foreground/70 py-5 pr-6">
                       Daily totals
                     </TableHead>
@@ -1405,6 +1393,18 @@ export default function TimeRecording() {
                     <TableHead />
                   </TableRow>
                 )}
+                <TableRow>
+                  <TableHead className="w-[320px]">Client / Matter / Number</TableHead>
+                  <TableHead className="w-[100px] text-center">Hours</TableHead>
+                  {mode === 'single' ? (
+                    <TableHead>Narrative</TableHead>
+                  ) : (
+                    <>
+                      <TableHead className="text-center">Days</TableHead>
+                      <TableHead>Narratives (one per day)</TableHead>
+                    </>
+                  )}
+                </TableRow>
               </TableHeader>
               <TableBody>
                 {/* Live Matters Section */}

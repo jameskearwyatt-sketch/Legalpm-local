@@ -60,9 +60,11 @@ import {
   Check,
   X,
   ChevronDown,
-  FileText
+  FileText,
+  History
 } from 'lucide-react';
 import { FinancialSnapshotUpdateDialog } from '@/components/matters/FinancialSnapshotUpdateDialog';
+import { FinancialSnapshotHistoryModal } from '@/components/matters/FinancialSnapshotHistoryModal';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -214,7 +216,7 @@ export default function MatterDetail() {
   const { user } = useAuth();
   const { data: matter, isLoading: matterLoading } = useMatter(id!);
   const { deleteMatter, updateMatter } = useMatters();
-  const { snapshots, upsertTodaySnapshot } = useSnapshots(id);
+  const { snapshots, upsertTodaySnapshot, deleteSnapshot } = useSnapshots(id);
   const { latestLineItems } = useBudgetVersions(id);
   const { clients, isLoading: clientsLoading } = useClients();
   const { data: exchangeRatesData, refetch: refetchRates } = useExchangeRates();
@@ -260,6 +262,7 @@ export default function MatterDetail() {
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showFinancialUpdateDialog, setShowFinancialUpdateDialog] = useState(false);
+  const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState<Record<string, any>>({});
@@ -776,14 +779,24 @@ export default function MatterDetail() {
                     </CardDescription>
                   )}
                 </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => setShowFinancialUpdateDialog(true)}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  Update Snapshot
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => setShowSnapshotHistory(true)}
+                  >
+                    <History className="h-4 w-4 mr-2" />
+                    History
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setShowFinancialUpdateDialog(true)}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    Update Snapshot
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center py-3 border-b">
@@ -921,6 +934,19 @@ export default function MatterDetail() {
               queryClient.invalidateQueries({ queryKey: ['matters'] });
               queryClient.invalidateQueries({ queryKey: ['localCounsels', id] });
               toast.success('Financial snapshot updated');
+            }}
+          />
+        )}
+
+        {/* Financial Snapshot History Modal */}
+        {!isPipeline && (
+          <FinancialSnapshotHistoryModal
+            isOpen={showSnapshotHistory}
+            onClose={() => setShowSnapshotHistory(false)}
+            snapshots={snapshots}
+            currency={currency}
+            onDelete={async (snapshotId) => {
+              await deleteSnapshot.mutateAsync(snapshotId);
             }}
           />
         )}

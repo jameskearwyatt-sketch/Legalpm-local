@@ -271,12 +271,14 @@ const TaskRow = ({
       onMouseMove={handleRowMouseMove}
       onMouseLeave={handleRowMouseLeave}
       className={cn(
-        "flex items-start gap-2 p-2 rounded-lg border transition-all group",
+        "p-2 rounded-lg border transition-all group",
         task.is_completed ? 'bg-muted/30 opacity-60' : 'bg-background',
         isFocused && 'ring-2 ring-primary ring-offset-1',
         isSelected && 'bg-primary/5'
       )}
     >
+      {/* Top row: checkbox + title */}
+      <div className="flex items-start gap-2">
       {/* Complete with notes button - visible for incomplete tasks */}
       {onCompleteWithNotes && !task.is_completed && (
         <Button
@@ -433,9 +435,10 @@ const TaskRow = ({
           </Popover>
         </div>
       </div>
+      </div>
       
-      {/* Action buttons - separate from triage */}
-      <div className="flex items-center gap-1 shrink-0">
+      {/* Action buttons - moved below for more title space */}
+      <div className="flex items-center gap-1 mt-2 ml-8">
         {/* Draft Email button for delegated tasks */}
         {!task.is_completed && isDelegated && (
           <Button

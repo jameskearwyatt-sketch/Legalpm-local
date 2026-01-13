@@ -847,7 +847,7 @@ export default function MatterDetail() {
                     {formatCurrency(paidAmount, currency)}
                   </span>
                 </div>
-                <div className="flex justify-between items-center py-3">
+                <div className="flex justify-between items-center py-3 border-b">
                   <span className="text-muted-foreground">Collection Rate</span>
                   <span className={cn(
                     "text-lg font-semibold",
@@ -857,6 +857,32 @@ export default function MatterDetail() {
                   )}>
                     {collectionRate.toFixed(1)}%
                   </span>
+                </div>
+                
+                {/* Budget Burn Reference */}
+                <div className="pt-2 border-t border-dashed space-y-2">
+                  <p className="text-xs text-muted-foreground font-medium">Budget Burn (from Financial Snapshot)</p>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <span className="text-muted-foreground">Budget</span>
+                      <p className="font-medium">{formatCurrency(bmFee, currency)}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Used</span>
+                      <p className="font-medium">{formatCurrency(wipAmount + billedAmount, currency)}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Burn</span>
+                      <p className={cn(
+                        "font-medium",
+                        bmFee > 0 && ((wipAmount + billedAmount) / bmFee) * 100 > 100 && "text-danger",
+                        bmFee > 0 && ((wipAmount + billedAmount) / bmFee) * 100 >= 80 && ((wipAmount + billedAmount) / bmFee) * 100 <= 100 && "text-warning",
+                        bmFee > 0 && ((wipAmount + billedAmount) / bmFee) * 100 < 80 && "text-success"
+                      )}>
+                        {bmFee > 0 ? (((wipAmount + billedAmount) / bmFee) * 100).toFixed(0) : 0}%
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>

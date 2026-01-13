@@ -1354,6 +1354,7 @@ export type Database = {
           mode: string
           name: string
           processed_output: Json | null
+          selected_dates: Json | null
           single_date: string | null
           updated_at: string
           user_id: string
@@ -1368,6 +1369,7 @@ export type Database = {
           mode: string
           name: string
           processed_output?: Json | null
+          selected_dates?: Json | null
           single_date?: string | null
           updated_at?: string
           user_id: string
@@ -1382,6 +1384,7 @@ export type Database = {
           mode?: string
           name?: string
           processed_output?: Json | null
+          selected_dates?: Json | null
           single_date?: string | null
           updated_at?: string
           user_id?: string

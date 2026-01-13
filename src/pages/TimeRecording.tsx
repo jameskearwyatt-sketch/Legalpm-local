@@ -336,27 +336,33 @@ export default function TimeRecording() {
     }));
     setGridEntries(restoredEntries);
     
-    // Derive selected dates from the grid entries' selectedDays
-    // This ensures non-contiguous date selections are preserved correctly
-    const allSelectedDaysFromEntries = new Set<string>();
-    restoredEntries.forEach(entry => {
-      entry.selectedDays.forEach((d: Date) => {
-        allSelectedDaysFromEntries.add(format(d, 'yyyy-MM-dd'));
+    // Load selected dates from the dedicated column first (preferred)
+    if (draft.selected_dates && Array.isArray(draft.selected_dates) && draft.selected_dates.length > 0) {
+      const restoredDates = draft.selected_dates
+        .map((d: string) => parseISO(d))
+        .sort((a, b) => a.getTime() - b.getTime());
+      setSelectedDates(restoredDates);
+    } else {
+      // Fallback: derive from grid entries for older drafts
+      const allSelectedDaysFromEntries = new Set<string>();
+      restoredEntries.forEach(entry => {
+        entry.selectedDays.forEach((d: Date) => {
+          allSelectedDaysFromEntries.add(format(d, 'yyyy-MM-dd'));
+        });
       });
-    });
-    
-    // Convert to sorted array of Dates
-    const derivedDates = Array.from(allSelectedDaysFromEntries)
-      .map(dateStr => parseISO(dateStr))
-      .sort((a, b) => a.getTime() - b.getTime());
-    
-    if (derivedDates.length > 0) {
-      setSelectedDates(derivedDates);
-    } else if (draft.date_range_from && draft.date_range_to) {
-      // Fallback for drafts with no entry selections but with date range
-      const from = parseISO(draft.date_range_from);
-      const to = parseISO(draft.date_range_to);
-      setSelectedDates(eachDayOfInterval({ start: from, end: to }));
+      
+      const derivedDates = Array.from(allSelectedDaysFromEntries)
+        .map(dateStr => parseISO(dateStr))
+        .sort((a, b) => a.getTime() - b.getTime());
+      
+      if (derivedDates.length > 0) {
+        setSelectedDates(derivedDates);
+      } else if (draft.date_range_from && draft.date_range_to) {
+        // Final fallback for very old drafts
+        const from = parseISO(draft.date_range_from);
+        const to = parseISO(draft.date_range_to);
+        setSelectedDates(eachDayOfInterval({ start: from, end: to }));
+      }
     }
     
     // Restore processed output if polished
@@ -411,6 +417,7 @@ export default function TimeRecording() {
         // For backwards compatibility, store first and last dates as range
         dateRangeFrom: mode === 'multi' && datesInRange.length > 0 ? datesInRange[0] : null,
         dateRangeTo: mode === 'multi' && datesInRange.length > 0 ? datesInRange[datesInRange.length - 1] : null,
+        selectedDates: mode === 'multi' ? selectedDates : [],
         gridEntries: serializedEntries,
         processedOutput: serializedOutput,
         isPolished: !!processedOutput,

@@ -11,6 +11,7 @@ export interface TimeRecordingDraft {
   single_date: string | null;
   date_range_from: string | null;
   date_range_to: string | null;
+  selected_dates: string[] | null;
   grid_entries: any[];
   processed_output: any[] | null;
   is_polished: boolean;
@@ -48,6 +49,7 @@ export function useTimeRecordingDrafts() {
       singleDate: Date | null;
       dateRangeFrom: Date | null;
       dateRangeTo: Date | null;
+      selectedDates: Date[];
       gridEntries: any[];
       processedOutput: any[] | null;
       isPolished: boolean;
@@ -61,6 +63,7 @@ export function useTimeRecordingDrafts() {
         single_date: draft.singleDate ? draft.singleDate.toISOString().split('T')[0] : null,
         date_range_from: draft.dateRangeFrom ? draft.dateRangeFrom.toISOString().split('T')[0] : null,
         date_range_to: draft.dateRangeTo ? draft.dateRangeTo.toISOString().split('T')[0] : null,
+        selected_dates: draft.selectedDates.map(d => d.toISOString().split('T')[0]),
         grid_entries: draft.gridEntries,
         processed_output: draft.processedOutput,
         is_polished: draft.isPolished,

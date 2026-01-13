@@ -1356,6 +1356,49 @@ export default function TimeRecording() {
                     </>
                   )}
                 </TableRow>
+                {mode === 'multi' && datesInRange.length > 0 && (
+                  <TableRow className="bg-muted/30">
+                    <TableHead colSpan={2} className="text-right text-xs text-muted-foreground font-normal">
+                      Daily totals:
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex flex-wrap gap-1 justify-center">
+                        {datesInRange.map(date => {
+                          const dateKey = format(date, 'yyyy-MM-dd');
+                          // Calculate running total for this day across all entries
+                          const dayTotal = gridEntries.reduce((sum, entry) => {
+                            if (entry.hours > 0 && entry.selectedDays.length > 0) {
+                              const isSelected = entry.selectedDays.some(d => format(d, 'yyyy-MM-dd') === dateKey);
+                              if (isSelected) {
+                                const hoursPerDay = entry.hours / entry.selectedDays.length;
+                                return sum + (Math.round(hoursPerDay * 4) / 4);
+                              }
+                            }
+                            return sum;
+                          }, 0);
+                          
+                          return (
+                            <div key={dateKey} className="flex flex-col items-center min-w-[32px]">
+                              <span className="text-[10px] text-muted-foreground leading-tight">
+                                {format(date, 'EEE')}
+                              </span>
+                              <span className="text-[10px] text-muted-foreground leading-tight">
+                                {format(date, 'd')}
+                              </span>
+                              <span className={cn(
+                                "text-[10px] font-medium leading-tight mt-0.5",
+                                dayTotal > 0 ? "text-primary" : "text-muted-foreground/50"
+                              )}>
+                                {dayTotal > 0 ? `${dayTotal.toFixed(1)}h` : '-'}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </TableHead>
+                    <TableHead />
+                  </TableRow>
+                )}
               </TableHeader>
               <TableBody>
                 {/* Live Matters Section */}

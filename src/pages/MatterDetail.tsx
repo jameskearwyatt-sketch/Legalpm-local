@@ -58,8 +58,10 @@ import {
   Pencil,
   Check,
   X,
-  ChevronDown
+  ChevronDown,
+  FileText
 } from 'lucide-react';
+import { FinancialSnapshotUpdateDialog } from '@/components/matters/FinancialSnapshotUpdateDialog';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';

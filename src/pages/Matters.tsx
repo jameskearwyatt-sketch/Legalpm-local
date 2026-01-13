@@ -43,7 +43,8 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { BilledAmountCell } from '@/components/matters/BilledAmountCell';
-import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload } from 'lucide-react';
+import { MasterWipUpdateDialog } from '@/components/matters/MasterWipUpdateDialog';
 import { format, differenceInDays, parseISO, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -499,6 +500,7 @@ export default function Matters() {
   const [practiceAreaFilter, setPracticeAreaFilter] = useState<string[]>([]);
   const [sortField, setSortField] = useState<SortField>('matter_name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [showMasterWipDialog, setShowMasterWipDialog] = useState(false);
 
   // Fetch user profile for "Me" checkbox
   const { data: userProfile } = useQuery({
@@ -857,14 +859,22 @@ export default function Matters() {
             <h1 className="text-2xl lg:text-3xl font-heading font-bold text-foreground">Matters</h1>
             <p className="text-muted-foreground mt-1">Track live transactions, pipeline, and closed matters</p>
           </div>
-          {!isClosed && !isSpecialTab && (
-            <Button asChild>
-              <Link to="/matters/new">
-                <Plus className="mr-2 h-4 w-4" />
-                New Matter
-              </Link>
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {isLive && (
+              <Button variant="outline" onClick={() => setShowMasterWipDialog(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Master WIP Update
+              </Button>
+            )}
+            {!isClosed && !isSpecialTab && (
+              <Button asChild>
+                <Link to="/matters/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Matter
+                </Link>
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Category Tabs */}
@@ -1180,51 +1190,29 @@ export default function Matters() {
                                 <div className="flex flex-col gap-0.5 text-right">
                                   <div className="flex items-center justify-end gap-1">
                                     <span className="text-[10px] text-muted-foreground leading-tight">WIP:</span>
-                                    <EditableFinancialCell
-                                      value={matter.latest_snapshot?.wip_amount || 0}
-                                      currency={matter.fee_currency}
-                                      compact
-                                      onSave={async (value) => {
-                                        await upsertTodaySnapshot.mutateAsync({
-                                          matterId: matter.id,
-                                          field: 'wip_amount',
-                                          value,
-                                        });
-                                      }}
-                                    />
+                                    <span className="text-xs font-medium">
+                                      {formatCurrency(matter.latest_snapshot?.wip_amount || 0, (matter as any).effective_currency ?? matter.fee_currency)}
+                                    </span>
                                   </div>
                                   {/* Show write-off amount in red if present */}
                                   {(matter.latest_snapshot?.wip_write_off_amount || 0) > 0 && (
                                     <div className="flex items-center justify-end gap-1">
                                       <span className="text-[9px] text-destructive leading-tight">
-                                        W/O: {formatCurrency(matter.latest_snapshot?.wip_write_off_amount || 0, matter.fee_currency)}
+                                        W/O: {formatCurrency(matter.latest_snapshot?.wip_write_off_amount || 0, (matter as any).effective_currency ?? matter.fee_currency)}
                                       </span>
                                     </div>
                                   )}
                                   <div className="flex items-center justify-end gap-1">
                                     <span className="text-[10px] text-muted-foreground leading-tight">Billed:</span>
-                                    <BilledAmountCell
-                                      matterId={matter.id}
-                                      currentBilledAmount={matter.latest_snapshot?.billed_amount || 0}
-                                      currency={matter.fee_currency}
-                                      compact
-                                    />
+                                    <span className="text-xs font-medium">
+                                      {formatCurrency(matter.latest_snapshot?.billed_amount || 0, (matter as any).effective_currency ?? matter.fee_currency)}
+                                    </span>
                                   </div>
                                   <div className="flex items-center justify-end gap-1">
                                     <span className="text-[10px] text-muted-foreground leading-tight">Paid:</span>
-                                    <EditableFinancialCell
-                                      value={matter.latest_snapshot?.paid_amount || 0}
-                                      currency={matter.fee_currency}
-                                      compact
-                                      onSave={async (value) => {
-                                        await upsertTodaySnapshot.mutateAsync({
-                                          matterId: matter.id,
-                                          field: 'paid_amount',
-                                          value,
-                                        });
-                                      }}
-                                      className="text-success"
-                                    />
+                                    <span className="text-xs font-medium text-success">
+                                      {formatCurrency(matter.latest_snapshot?.paid_amount || 0, (matter as any).effective_currency ?? matter.fee_currency)}
+                                    </span>
                                   </div>
                                 </div>
                               </TableCell>
@@ -1585,6 +1573,37 @@ export default function Matters() {
         </Card>
         )}
       </div>
+
+      {/* Master WIP Update Dialog */}
+      <MasterWipUpdateDialog
+        isOpen={showMasterWipDialog}
+        onClose={() => setShowMasterWipDialog(false)}
+        matters={matters.filter(m => m.category === 'Live')}
+        onApplyUpdates={async (updates) => {
+          for (const update of updates) {
+            await upsertTodaySnapshot.mutateAsync({
+              matterId: update.matter_id,
+              field: 'wip_amount',
+              value: update.wip_amount,
+            });
+            await upsertTodaySnapshot.mutateAsync({
+              matterId: update.matter_id,
+              field: 'wip_write_off_amount',
+              value: update.wip_write_off_amount,
+            });
+            await upsertTodaySnapshot.mutateAsync({
+              matterId: update.matter_id,
+              field: 'billed_amount',
+              value: update.billed_amount,
+            });
+            await upsertTodaySnapshot.mutateAsync({
+              matterId: update.matter_id,
+              field: 'paid_amount',
+              value: update.paid_amount,
+            });
+          }
+        }}
+      />
     </AppLayout>
   );
 }

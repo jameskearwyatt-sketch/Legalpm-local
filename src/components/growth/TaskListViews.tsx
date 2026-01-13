@@ -98,7 +98,10 @@ const TaskRow = ({
   const [assigneeOpen, setAssigneeOpen] = useState(false);
   const [deadlineOpen, setDeadlineOpen] = useState(false);
   const [editingAssignee, setEditingAssignee] = useState(task.assignee || '');
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [editedTitle, setEditedTitle] = useState(task.title);
   const inputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   
   // Hover-controlled triage expansion
   const [triageExpanded, setTriageExpanded] = useState(false);
@@ -130,6 +133,35 @@ const TaskRow = ({
   const isDelegated = task.assignee && 
     task.assignee.toLowerCase() !== 'me' && 
     task.assignee.toLowerCase() !== (user?.user_metadata?.full_name?.toLowerCase() || '');
+
+  // Focus title input when editing
+  useEffect(() => {
+    if (isEditingTitle) {
+      setEditedTitle(task.title);
+      setTimeout(() => {
+        titleInputRef.current?.focus();
+        titleInputRef.current?.select();
+      }, 0);
+    }
+  }, [isEditingTitle, task.title]);
+
+  const handleTitleSave = () => {
+    const trimmed = editedTitle.trim();
+    if (trimmed && trimmed !== task.title) {
+      onUpdate({ title: trimmed });
+    }
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleTitleSave();
+    } else if (e.key === 'Escape') {
+      setEditedTitle(task.title);
+      setIsEditingTitle(false);
+    }
+  };
 
   // Draft delegation email
   const handleDraftEmail = async () => {
@@ -305,12 +337,29 @@ const TaskRow = ({
       
       <div className="flex-1 min-w-0 space-y-1">
         <div className="flex items-start gap-2">
-          <span className={cn(
-            "text-sm font-medium break-words",
-            task.is_completed && 'text-muted-foreground'
-          )}>
-            {task.title}
-          </span>
+          {isEditingTitle ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={editedTitle}
+              onChange={(e) => setEditedTitle(e.target.value)}
+              onBlur={handleTitleSave}
+              onKeyDown={handleTitleKeyDown}
+              className="flex-1 text-sm font-medium bg-background border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setIsEditingTitle(true)}
+              className={cn(
+                "text-left text-sm font-medium break-words hover:bg-muted/50 rounded px-1 -mx-1 cursor-text",
+                task.is_completed && 'text-muted-foreground'
+              )}
+              title="Click to edit"
+            >
+              {task.title}
+            </button>
+          )}
         </div>
         
         <div className="flex items-center gap-2 flex-wrap">

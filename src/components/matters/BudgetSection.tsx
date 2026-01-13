@@ -44,6 +44,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { CategorizedBudgetView } from './CategorizedBudgetView';
+import { BudgetSummaryBoxes } from './BudgetSummaryBoxes';
 import { DetailedWipUpdateModal } from './DetailedWipUpdateModal';
 import { WipHistoryModal } from './WipHistoryModal';
 import { formatCurrency as sharedFormatCurrency } from '@/lib/currencyUtils';
@@ -784,202 +785,111 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Budget Summary Totals - Always Visible */}
-        <div className="space-y-2">
-          {/* Show header row for Current vs New during editing */}
-          {isEditing && hasExistingBudget && originalItems.length > 0 && (
-            <div className="grid grid-cols-3 gap-2 text-xs font-medium text-muted-foreground mb-2">
-              <div></div>
-              <div className="text-right">Current</div>
-              <div className="text-right">New</div>
-            </div>
-          )}
-          
-          {/* Baker McKenzie Total */}
-          <div className={cn(
-            "flex justify-between items-end text-sm",
-            isEditing && hasExistingBudget && originalItems.length > 0 && "grid grid-cols-3 gap-2"
-          )}>
-            <span className="text-muted-foreground">Baker McKenzie Total:</span>
-            {isEditing && hasExistingBudget && originalItems.length > 0 ? (
-              <>
-                <div className="text-right text-muted-foreground">
-                  {formatCurrency(
-                    differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                      ? originalBmTotal * mandatedRate
-                      : originalBmTotal,
-                    differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
-                  )}
-                </div>
-                <div className={cn(
-                  "text-right font-medium",
-                  Math.abs(bmTotal - originalBmTotal) > 0.01 && "text-blue-600 dark:text-blue-400"
-                )}>
-                  {formatCurrency(
-                    differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                      ? bmTotal * mandatedRate
-                      : bmTotal,
-                    differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
-                  )}
-                  {Math.abs(bmTotal - originalBmTotal) > 0.01 && (
-                    <span className={cn(
-                      "ml-1 text-xs",
-                      bmTotal > originalBmTotal ? "text-amber-600" : "text-green-600"
-                    )}>
-                      ({bmTotal > originalBmTotal ? '+' : ''}{formatCurrency(
-                        differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                          ? (bmTotal - originalBmTotal) * mandatedRate
-                          : bmTotal - originalBmTotal,
-                        differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
-                      )})
-                    </span>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="text-right">
-                <span className="font-medium">
-                  {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                    ? formatCurrency(bmTotal * mandatedRate, billingCurrency)
-                    : formatCurrency(bmTotal, quoteCurrency)}
-                </span>
-                {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && (
-                  <div className="text-xs text-muted-foreground">
-                    (quoted: {formatCurrency(bmTotal, quoteCurrency)})
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          
-          {/* Local Counsel Total */}
-          <div className={cn(
-            "flex justify-between items-start text-sm",
-            isEditing && hasExistingBudget && originalItems.length > 0 && "grid grid-cols-3 gap-2 items-center"
-          )}>
-            <div className="flex flex-col gap-1">
-              <span className="text-muted-foreground">Local Counsel Total:</span>
-            </div>
-            {isEditing && hasExistingBudget && originalItems.length > 0 ? (
-              <>
-                <div className="text-right text-muted-foreground">
-                  {formatCurrency(
-                    differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                      ? originalLcTotal * mandatedRate
-                      : originalLcTotal,
-                    differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
-                  )}
-                </div>
-                <div className={cn(
-                  "text-right font-medium",
-                  Math.abs(localCounselTotal - originalLcTotal) > 0.01 && "text-blue-600 dark:text-blue-400"
-                )}>
-                  {formatCurrency(
-                    differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                      ? localCounselTotal * mandatedRate
-                      : localCounselTotal,
-                    differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
-                  )}
-                  {Math.abs(localCounselTotal - originalLcTotal) > 0.01 && (
-                    <span className={cn(
-                      "ml-1 text-xs",
-                      localCounselTotal > originalLcTotal ? "text-amber-600" : "text-green-600"
-                    )}>
-                      ({localCounselTotal > originalLcTotal ? '+' : ''}{formatCurrency(
-                        differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                          ? (localCounselTotal - originalLcTotal) * mandatedRate
-                          : localCounselTotal - originalLcTotal,
-                        differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
-                      )})
-                    </span>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="text-right">
-                <span className="font-medium">
-                  {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                    ? formatCurrency(localCounselTotal * mandatedRate, billingCurrency)
-                    : formatCurrency(localCounselTotal, quoteCurrency)}
-                </span>
-                {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && localCounselTotal > 0 && (
-                  <div className="text-xs text-muted-foreground">
-                    (quoted: {formatCurrency(localCounselTotal, quoteCurrency)})
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          
-          {/* Overall Budget Total */}
-          <div className={cn(
-            "flex justify-between items-end text-base font-semibold border-t pt-2",
-            isEditing && hasExistingBudget && originalItems.length > 0 && "grid grid-cols-3 gap-2"
-          )}>
-            <span>Overall Budget:</span>
-            {isEditing && hasExistingBudget && originalItems.length > 0 ? (
-              <>
-                <div className="text-right text-muted-foreground font-normal">
-                  {formatCurrency(
-                    differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                      ? originalOverallTotal * mandatedRate
-                      : originalOverallTotal,
-                    differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
-                  )}
-                </div>
-                <div className={cn(
-                  "text-right",
-                  Math.abs(overallTotal - originalOverallTotal) > 0.01 ? "text-blue-600 dark:text-blue-400" : "text-primary"
-                )}>
-                  {formatCurrency(
-                    differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                      ? overallTotal * mandatedRate
-                      : overallTotal,
-                    differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
-                  )}
-                  {Math.abs(overallTotal - originalOverallTotal) > 0.01 && (
-                    <span className={cn(
-                      "ml-1 text-sm",
-                      overallTotal > originalOverallTotal ? "text-amber-600" : "text-green-600"
-                    )}>
-                      ({overallTotal > originalOverallTotal ? '+' : ''}{formatCurrency(
-                        differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                          ? (overallTotal - originalOverallTotal) * mandatedRate
-                          : overallTotal - originalOverallTotal,
-                        differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
-                      )})
-                    </span>
-                  )}
-                </div>
-              </>
-            ) : (
-              <div className="text-right">
-                <span className="text-primary">
-                  {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
-                    ? formatCurrency(overallTotal * mandatedRate, billingCurrency)
-                    : formatCurrency(overallTotal, quoteCurrency)}
-                </span>
-                {differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0 && (
-                  <div className="text-xs text-muted-foreground font-normal">
-                    (quoted: {formatCurrency(overallTotal, quoteCurrency)})
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        {/* Budget Summary Boxes - Always Visible */}
+        <BudgetSummaryBoxes
+          items={draftItems}
+          formatCurrency={formatCurrency}
+          currency={currency}
+          billingCurrency={billingCurrency}
+          differentBillingCurrency={differentBillingCurrency}
+          agreedBillingAmount={agreedBillingAmount}
+          mandatedRate={mandatedRate}
+        />
 
         {/* Collapsible Budget Line Items */}
         <Collapsible open={isLineItemsOpen} onOpenChange={setIsLineItemsOpen}>
           <CollapsibleTrigger asChild>
             <Button variant="ghost" className="w-full justify-between text-muted-foreground hover:text-foreground p-0 h-auto py-2 border-b">
               <span className="flex items-center gap-2 text-sm font-medium">
-                Budget Line Items ({draftItems.filter(i => i.work_item.trim()).length} items)
+                View Line Items ({draftItems.filter(i => i.work_item.trim()).length} items)
               </span>
               <ChevronDown className={cn("h-4 w-4 transition-transform", isLineItemsOpen && "rotate-180")} />
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="pt-4">
+            {/* Budget Editing Summary - Show when editing */}
+            {isEditing && hasExistingBudget && originalItems.length > 0 && (
+              <div className="mb-4 p-3 bg-muted/30 rounded-lg space-y-2">
+                <div className="grid grid-cols-3 gap-2 text-xs font-medium text-muted-foreground">
+                  <div></div>
+                  <div className="text-right">Current</div>
+                  <div className="text-right">New</div>
+                </div>
+                
+                {/* BM Total */}
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <span className="text-muted-foreground">Baker McKenzie:</span>
+                  <div className="text-right text-muted-foreground">
+                    {formatCurrency(
+                      differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                        ? originalBmTotal * mandatedRate
+                        : originalBmTotal,
+                      differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                    )}
+                  </div>
+                  <div className={cn(
+                    "text-right font-medium",
+                    Math.abs(bmTotal - originalBmTotal) > 0.01 && "text-blue-600 dark:text-blue-400"
+                  )}>
+                    {formatCurrency(
+                      differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                        ? bmTotal * mandatedRate
+                        : bmTotal,
+                      differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                    )}
+                  </div>
+                </div>
+                
+                {/* LC Total */}
+                <div className="grid grid-cols-3 gap-2 text-sm">
+                  <span className="text-muted-foreground">Local Counsel:</span>
+                  <div className="text-right text-muted-foreground">
+                    {formatCurrency(
+                      differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                        ? originalLcTotal * mandatedRate
+                        : originalLcTotal,
+                      differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                    )}
+                  </div>
+                  <div className={cn(
+                    "text-right font-medium",
+                    Math.abs(localCounselTotal - originalLcTotal) > 0.01 && "text-blue-600 dark:text-blue-400"
+                  )}>
+                    {formatCurrency(
+                      differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                        ? localCounselTotal * mandatedRate
+                        : localCounselTotal,
+                      differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                    )}
+                  </div>
+                </div>
+                
+                {/* Overall Total */}
+                <div className="grid grid-cols-3 gap-2 text-sm font-semibold border-t pt-2">
+                  <span>Overall:</span>
+                  <div className="text-right text-muted-foreground font-normal">
+                    {formatCurrency(
+                      differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                        ? originalOverallTotal * mandatedRate
+                        : originalOverallTotal,
+                      differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                    )}
+                  </div>
+                  <div className={cn(
+                    "text-right",
+                    Math.abs(overallTotal - originalOverallTotal) > 0.01 ? "text-blue-600 dark:text-blue-400" : "text-primary"
+                  )}>
+                    {formatCurrency(
+                      differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0
+                        ? overallTotal * mandatedRate
+                        : overallTotal,
+                      differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : quoteCurrency
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <CategorizedBudgetView
               items={draftItems}
               onItemsChange={setDraftItems}

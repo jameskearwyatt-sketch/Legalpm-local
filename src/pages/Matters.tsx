@@ -1094,7 +1094,7 @@ export default function Matters() {
                         Budget burn figures use Financial Snapshot data only
                       </p>
                       <p className="text-amber-700 dark:text-amber-300 mt-0.5">
-                        For detailed line-item WIP tracking, view individual matter budgets.
+                        For detailed line-item Budget usage tracking, view individual matter budgets.
                       </p>
                     </div>
                   </div>

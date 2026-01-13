@@ -231,16 +231,28 @@ export default function MatterDetail() {
     isLoading: lcLoading 
   } = useLocalCounsels(id);
 
-  // Calculate BM WIP totals from budget line items (NOT from financial snapshots)
+  // Calculate BM and LC WIP totals from budget line items (NOT from financial snapshots)
   const budgetLineItemTotals = useMemo(() => {
+    // BM items
     const bmItems = latestLineItems.filter(item => item.provider === 'Baker McKenzie');
     const includedBmItems = bmItems.filter(item => !item.is_optional || item.is_included);
     
-    const rawWip = includedBmItems.reduce((sum, item) => sum + (item.wip_amount || 0), 0);
-    const writeOff = includedBmItems.reduce((sum, item) => sum + (item.wip_write_off || 0), 0);
-    const adjustedWip = rawWip - writeOff;
+    const bmRawWip = includedBmItems.reduce((sum, item) => sum + (item.wip_amount || 0), 0);
+    const bmWriteOff = includedBmItems.reduce((sum, item) => sum + (item.wip_write_off || 0), 0);
+    const bmAdjustedWip = bmRawWip - bmWriteOff;
     
-    return { rawWip, writeOff, adjustedWip };
+    // LC items (all non-BM providers)
+    const lcItems = latestLineItems.filter(item => item.provider === 'Local Counsel');
+    const includedLcItems = lcItems.filter(item => !item.is_optional || item.is_included);
+    
+    const lcRawWip = includedLcItems.reduce((sum, item) => sum + (item.wip_amount || 0), 0);
+    const lcWriteOff = includedLcItems.reduce((sum, item) => sum + (item.wip_write_off || 0), 0);
+    const lcAdjustedWip = lcRawWip - lcWriteOff;
+    
+    return { 
+      bm: { rawWip: bmRawWip, writeOff: bmWriteOff, adjustedWip: bmAdjustedWip },
+      lc: { rawWip: lcRawWip, writeOff: lcWriteOff, adjustedWip: lcAdjustedWip }
+    };
   }, [latestLineItems]);
   
   // Fetch current user's profile for "Me" checkbox functionality
@@ -495,23 +507,33 @@ export default function MatterDetail() {
   // BM Budget Burn - use budget line item WIP data (NOT financial snapshots)
   // Convert from quote currency to billing currency if needed
   const bmWipFromBudget = differentBillingCurrency && agreedBillingAmount > 0
-    ? budgetLineItemTotals.adjustedWip * mandatedRate
-    : budgetLineItemTotals.adjustedWip;
+    ? budgetLineItemTotals.bm.adjustedWip * mandatedRate
+    : budgetLineItemTotals.bm.adjustedWip;
   const bmWriteOffFromBudget = differentBillingCurrency && agreedBillingAmount > 0
-    ? budgetLineItemTotals.writeOff * mandatedRate
-    : budgetLineItemTotals.writeOff;
+    ? budgetLineItemTotals.bm.writeOff * mandatedRate
+    : budgetLineItemTotals.bm.writeOff;
   const bmRawWipFromBudget = differentBillingCurrency && agreedBillingAmount > 0
-    ? budgetLineItemTotals.rawWip * mandatedRate
-    : budgetLineItemTotals.rawWip;
+    ? budgetLineItemTotals.bm.rawWip * mandatedRate
+    : budgetLineItemTotals.bm.rawWip;
+  
+  // LC Budget Burn - use budget line item WIP data (NOT financial snapshots)
+  const lcWipFromBudget = differentBillingCurrency && agreedBillingAmount > 0
+    ? budgetLineItemTotals.lc.adjustedWip * mandatedRate
+    : budgetLineItemTotals.lc.adjustedWip;
+  const lcWriteOffFromBudget = differentBillingCurrency && agreedBillingAmount > 0
+    ? budgetLineItemTotals.lc.writeOff * mandatedRate
+    : budgetLineItemTotals.lc.writeOff;
+  const lcRawWipFromBudget = differentBillingCurrency && agreedBillingAmount > 0
+    ? budgetLineItemTotals.lc.rawWip * mandatedRate
+    : budgetLineItemTotals.lc.rawWip;
   
   // BM Budget Burn = BM Adjusted WIP from budget (NOT from snapshots)
-  // Note: We don't add billedAmount here as that would double-count - billedAmount is from snapshots for AR display
   const bmTotalUsed = bmWipFromBudget;
   const bmHeadroom = bmFee - bmTotalUsed;
   const bmBudgetUsedPercent = bmFee > 0 ? (bmTotalUsed / bmFee) * 100 : 0;
   
-  // LC Budget Burn = LC WIP + LC Billed (now in billing currency)
-  const lcTotalUsed = lcWip + lcBilled;
+  // LC Budget Burn = LC Adjusted WIP from budget (NOT from snapshots)
+  const lcTotalUsed = lcWipFromBudget;
   const lcHeadroom = localCounsel - lcTotalUsed;
   const lcBudgetUsedPercent = localCounsel > 0 ? (lcTotalUsed / localCounsel) * 100 : 0;
   

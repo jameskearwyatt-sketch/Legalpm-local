@@ -403,7 +403,7 @@ export default function TimeRecording() {
         date: day.date.toISOString(),
       })) || null;
       
-      await saveDraft.mutateAsync({
+      const savedDraft = await saveDraft.mutateAsync({
         id: currentDraftId || undefined,
         name: defaultName,
         mode,
@@ -416,8 +416,10 @@ export default function TimeRecording() {
         isPolished: !!processedOutput,
       });
       
-      // If this was a new draft, we need to get the ID from the response
-      // The hook will refetch the drafts list
+      // Update currentDraftId so subsequent saves update the same draft
+      if (savedDraft?.id && !currentDraftId) {
+        setCurrentDraftId(savedDraft.id);
+      }
     } catch (err) {
       console.error('Save draft error:', err);
     } finally {

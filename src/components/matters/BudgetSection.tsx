@@ -120,12 +120,19 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [isDetailedWipOpen, setIsDetailedWipOpen] = useState(false);
   const [isWipHistoryOpen, setIsWipHistoryOpen] = useState(false);
   
-  // Line items collapsible state - default open when editing or no budget
+  // Line items collapsible state - controlled separately
   const [isLineItemsOpen, setIsLineItemsOpen] = useState(false);
   
   const { createBulkAssumptions } = useAssumptions(matterId);
 
   const hasExistingBudget = versions.length > 0;
+  
+  // Auto-open line items when editing or no budget exists
+  useEffect(() => {
+    if (isEditing || !hasExistingBudget) {
+      setIsLineItemsOpen(true);
+    }
+  }, [isEditing, hasExistingBudget]);
 
   // Initialize draft items from latest version when available
   // Only sync when NOT editing to preserve user edits
@@ -963,16 +970,16 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         </div>
 
         {/* Collapsible Budget Line Items */}
-        <Collapsible open={isLineItemsOpen || isEditing || !hasExistingBudget} onOpenChange={setIsLineItemsOpen}>
+        <Collapsible open={isLineItemsOpen} onOpenChange={setIsLineItemsOpen}>
           <CollapsibleTrigger asChild>
-            <Button variant="ghost" className="w-full justify-between text-muted-foreground hover:text-foreground p-0 h-auto py-2">
+            <Button variant="ghost" className="w-full justify-between text-muted-foreground hover:text-foreground p-0 h-auto py-2 border-b">
               <span className="flex items-center gap-2 text-sm font-medium">
                 Budget Line Items ({draftItems.filter(i => i.work_item.trim()).length} items)
               </span>
-              <ChevronDown className={cn("h-4 w-4 transition-transform", (isLineItemsOpen || isEditing || !hasExistingBudget) && "rotate-180")} />
+              <ChevronDown className={cn("h-4 w-4 transition-transform", isLineItemsOpen && "rotate-180")} />
             </Button>
           </CollapsibleTrigger>
-          <CollapsibleContent className="pt-2">
+          <CollapsibleContent className="pt-4">
             <CategorizedBudgetView
               items={draftItems}
               onItemsChange={setDraftItems}

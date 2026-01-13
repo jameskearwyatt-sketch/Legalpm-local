@@ -9,6 +9,8 @@ interface ExportBudgetOptions {
   currency: string;
   versionNumber?: number;
   versionDate?: string;
+  /** Conversion rate to apply to all monetary values (e.g., for quote → billing currency conversion) */
+  conversionRate?: number;
 }
 
 export async function exportBudgetToExcel({
@@ -18,7 +20,10 @@ export async function exportBudgetToExcel({
   currency,
   versionNumber,
   versionDate,
+  conversionRate = 1,
 }: ExportBudgetOptions): Promise<void> {
+  // Helper to convert values from quote currency to billing currency
+  const convert = (value: number) => value * conversionRate;
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Matter Management System';
   workbook.created = new Date();
@@ -171,10 +176,11 @@ export async function exportBudgetToExcel({
 
     // Add items
     for (const item of categoryItems) {
-      const rawWip = item.wip_amount || 0;
-      const writeOff = item.wip_write_off || 0;
+      // Convert all monetary values from quote currency to billing currency
+      const rawWip = convert(item.wip_amount || 0);
+      const writeOff = convert(item.wip_write_off || 0);
       const adjustedWip = rawWip - writeOff;
-      const budget = item.fee_amount || 0;
+      const budget = convert(item.fee_amount || 0);
       const remaining = budget - adjustedWip;
       const burnPct = budget > 0 ? (adjustedWip / budget) * 100 : 0;
 
@@ -362,7 +368,7 @@ export async function exportBudgetToExcel({
         item.lc_firm_name || '',
         '',
         '',
-        item.wip_write_off || 0,
+        convert(item.wip_write_off || 0),
         '',
         '',
         '',

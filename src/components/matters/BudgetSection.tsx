@@ -748,6 +748,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                       currency: billingCurrency,
                       versionNumber: latestVersion?.version_number,
                       versionDate: latestVersion?.finalized_at,
+                      conversionRate: mandatedRate,
                     });
                     toast.success('Budget report exported successfully');
                   } catch (error) {

@@ -699,6 +699,7 @@ export default function MatterDetail() {
                           currency: currency,
                           versionNumber: undefined,
                           versionDate: undefined,
+                          conversionRate: mandatedRate,
                         });
                         toast.success('Budget report exported successfully');
                       } catch (error) {

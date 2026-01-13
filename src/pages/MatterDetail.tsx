@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/collapsible';
 import { useMatter, useMatters, MatterCategory, MatterStage, FeeType, MatterSource, PipelineOutcome } from '@/lib/hooks/useMatters';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
+import { useBudgetVersions } from '@/lib/hooks/useBudgetVersions';
 import { BudgetSection } from '@/components/matters/BudgetSection';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { AssumptionsSection } from '@/components/matters/AssumptionsSection';
@@ -214,6 +215,7 @@ export default function MatterDetail() {
   const { data: matter, isLoading: matterLoading } = useMatter(id!);
   const { deleteMatter, updateMatter } = useMatters();
   const { snapshots, upsertTodaySnapshot } = useSnapshots(id);
+  const { latestLineItems } = useBudgetVersions(id);
   const { clients, isLoading: clientsLoading } = useClients();
   const { data: exchangeRatesData, refetch: refetchRates } = useExchangeRates();
   const { matterClients, updateMatterClient } = useMatterClients(id);
@@ -226,6 +228,18 @@ export default function MatterDetail() {
     totalBurn: lcTotalBurn,
     isLoading: lcLoading 
   } = useLocalCounsels(id);
+
+  // Calculate BM WIP totals from budget line items (NOT from financial snapshots)
+  const budgetLineItemTotals = useMemo(() => {
+    const bmItems = latestLineItems.filter(item => item.provider === 'Baker McKenzie');
+    const includedBmItems = bmItems.filter(item => !item.is_optional || item.is_included);
+    
+    const rawWip = includedBmItems.reduce((sum, item) => sum + (item.wip_amount || 0), 0);
+    const writeOff = includedBmItems.reduce((sum, item) => sum + (item.wip_write_off || 0), 0);
+    const adjustedWip = rawWip - writeOff;
+    
+    return { rawWip, writeOff, adjustedWip };
+  }, [latestLineItems]);
   
   // Fetch current user's profile for "Me" checkbox functionality
   const { data: userProfile } = useQuery({
@@ -475,8 +489,21 @@ export default function MatterDetail() {
     ? (formData.fee_currency || matter.fee_currency || 'GBP')
     : (formData.fee_currency || matter.fee_currency || 'GBP');
   
-  // BM Budget Burn = BM WIP + BM Billed (now in billing currency)
-  const bmTotalUsed = wipAmount + billedAmount;
+  // BM Budget Burn - use budget line item WIP data (NOT financial snapshots)
+  // Convert from quote currency to billing currency if needed
+  const bmWipFromBudget = differentBillingCurrency && agreedBillingAmount > 0
+    ? budgetLineItemTotals.adjustedWip * mandatedRate
+    : budgetLineItemTotals.adjustedWip;
+  const bmWriteOffFromBudget = differentBillingCurrency && agreedBillingAmount > 0
+    ? budgetLineItemTotals.writeOff * mandatedRate
+    : budgetLineItemTotals.writeOff;
+  const bmRawWipFromBudget = differentBillingCurrency && agreedBillingAmount > 0
+    ? budgetLineItemTotals.rawWip * mandatedRate
+    : budgetLineItemTotals.rawWip;
+  
+  // BM Budget Burn = BM Adjusted WIP from budget (NOT from snapshots)
+  // Note: We don't add billedAmount here as that would double-count - billedAmount is from snapshots for AR display
+  const bmTotalUsed = bmWipFromBudget;
   const bmHeadroom = bmFee - bmTotalUsed;
   const bmBudgetUsedPercent = bmFee > 0 ? (bmTotalUsed / bmFee) * 100 : 0;
   
@@ -669,12 +696,17 @@ export default function MatterDetail() {
 
                     {/* Headroom Grid - now includes Budget Used */}
                     <div className={cn("grid gap-4", localCounsel > 0 ? "grid-cols-4" : "grid-cols-3")}>
-                      {/* BM Budget Used */}
+                      {/* BM Budget Used - from budget line items */}
                       <div className="p-4 rounded-lg bg-muted/50">
                         <p className="text-sm text-muted-foreground">BM Budget Used</p>
                         <p className="text-xl font-heading font-bold text-foreground">
                           {formatCurrency(bmTotalUsed, currency)}
                         </p>
+                        {bmWriteOffFromBudget > 0 && (
+                          <p className="text-xs text-destructive mt-0.5">
+                            (W/O: {formatCurrency(bmWriteOffFromBudget, currency)})
+                          </p>
+                        )}
                         <p className="text-xs text-muted-foreground mt-1">
                           {bmBudgetUsedPercent.toFixed(0)}% of {formatCurrency(bmFee, currency)}
                         </p>

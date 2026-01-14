@@ -37,9 +37,7 @@ export async function exportDraftBudgetToExcel({
   workbook.creator = 'Baker McKenzie';
   workbook.created = new Date();
 
-  const worksheet = workbook.addWorksheet('Budget Proposal', {
-    views: [{ state: 'frozen', ySplit: 9 }],
-  });
+  const worksheet = workbook.addWorksheet('Budget Proposal');
 
   // Check if we have existing items to compare
   const hasComparison = existingItems.length > 0;
@@ -118,14 +116,17 @@ export async function exportDraftBudgetToExcel({
   matterCell.value = matterName;
   matterCell.font = subtitleFont;
 
-  // Draft info with date
+  // Draft info with date (only add date if not already in draftName)
   worksheet.mergeCells(`A4:${lastCol}4`);
   const draftCell = worksheet.getCell('A4');
-  draftCell.value = `${draftName} | ${new Date().toLocaleDateString('en-GB', { 
-    day: 'numeric', 
-    month: 'long', 
-    year: 'numeric' 
-  })}`;
+  const hasDateInName = /\d{1,2}\s+\w+\s+\d{4}/.test(draftName);
+  draftCell.value = hasDateInName 
+    ? draftName 
+    : `${draftName} | ${new Date().toLocaleDateString('en-GB', { 
+        day: 'numeric', 
+        month: 'long', 
+        year: 'numeric' 
+      })}`;
   draftCell.font = { ...subtitleFont, italic: true, color: { argb: 'FF6B7280' } };
 
   // Add notes if provided
@@ -186,6 +187,11 @@ export async function exportDraftBudgetToExcel({
     };
   });
   headerRow.height = 28;
+  
+  // Set freeze pane to freeze at the header row (currentRow is now the row after header)
+  const headerRowNumber = currentRow;
+  worksheet.views = [{ state: 'frozen', ySplit: headerRowNumber }];
+  
   currentRow++;
 
   // Create lookup map for existing items

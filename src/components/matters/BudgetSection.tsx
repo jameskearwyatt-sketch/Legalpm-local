@@ -37,6 +37,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useBudgetVersions, DraftLineItem, BudgetLineItem } from '@/lib/hooks/useBudgetVersions';
 import { useBudgetDrafts, BudgetDraft } from '@/lib/hooks/useBudgetDrafts';
+import { useBudgetAmendments } from '@/lib/hooks/useBudgetAmendments';
+import { useDetailedWipUpdates } from '@/lib/hooks/useDetailedWipUpdates';
+import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useLocalCounsels } from '@/lib/hooks/useLocalCounsels';
 import { useMatter } from '@/lib/hooks/useMatters';
 import { useAssumptions } from '@/lib/hooks/useAssumptions';
@@ -78,6 +81,10 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   
   const { localCounsels, syncLocalCounselsFromBudget } = useLocalCounsels(matterId);
   const { drafts, createDraft, deleteDraft } = useBudgetDrafts(matterId);
+  const { amendments: budgetAmendments } = useBudgetAmendments(matterId);
+  const { latestWipUpdate } = useDetailedWipUpdates(matterId);
+  const { snapshots } = useSnapshots(matterId);
+  const latestSnapshot = snapshots?.[0];
 
   const [draftItems, setDraftItems] = useState<DraftLineItem[]>([]);
   const [notes, setNotes] = useState('');
@@ -923,6 +930,51 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           agreedBillingAmount={agreedBillingAmount}
           mandatedRate={mandatedRate}
         />
+
+        {/* Budget and Utilization Update Dates */}
+        {hasExistingBudget && (
+          <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground border-t border-border/50 pt-3">
+            {/* Budget Date */}
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium">Budget:</span>
+              <span>
+                {budgetAmendments.length > 0 
+                  ? `Updated ${format(new Date(budgetAmendments[0].amendment_date), 'dd MMM yyyy')}`
+                  : 'Original budget'
+                }
+              </span>
+            </div>
+            
+            {/* Utilization Update Date */}
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium">Utilisation:</span>
+              <span>
+                {latestWipUpdate 
+                  ? `Updated ${format(new Date(latestWipUpdate.updated_at), 'dd MMM yyyy')}`
+                  : 'No utilisation recorded'
+                }
+              </span>
+            </div>
+            
+            {/* Staleness Warning - show if utilization is >1 month older than financial snapshot */}
+            {(() => {
+              if (!latestWipUpdate || !latestSnapshot) return null;
+              
+              const wipDate = new Date(latestWipUpdate.updated_at);
+              const snapshotDate = new Date(latestSnapshot.updated_at);
+              const oneMonthMs = 30 * 24 * 60 * 60 * 1000;
+              
+              if (snapshotDate.getTime() - wipDate.getTime() > oneMonthMs) {
+                return (
+                  <span className="text-destructive flex items-center gap-1">
+                    ⚠️ Utilisation is stale vs. financial snapshot
+                  </span>
+                );
+              }
+              return null;
+            })()}
+          </div>
+        )}
 
         {/* Collapsible Budget Line Items */}
         <Collapsible open={isLineItemsOpen} onOpenChange={setIsLineItemsOpen}>

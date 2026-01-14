@@ -26,6 +26,8 @@ import {
 import { useMatter, useMatters, MatterCategory, MatterStage, FeeType, MatterSource, PipelineOutcome } from '@/lib/hooks/useMatters';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useBudgetVersions } from '@/lib/hooks/useBudgetVersions';
+import { useBudgetAmendments } from '@/lib/hooks/useBudgetAmendments';
+import { useDetailedWipUpdates } from '@/lib/hooks/useDetailedWipUpdates';
 import { BudgetSection } from '@/components/matters/BudgetSection';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { AssumptionsSection } from '@/components/matters/AssumptionsSection';
@@ -219,7 +221,9 @@ export default function MatterDetail() {
   const { data: matter, isLoading: matterLoading } = useMatter(id!);
   const { deleteMatter, updateMatter } = useMatters();
   const { snapshots, upsertTodaySnapshot, deleteSnapshot } = useSnapshots(id);
-  const { latestLineItems } = useBudgetVersions(id);
+  const { latestLineItems, versions: budgetVersions } = useBudgetVersions(id);
+  const { amendments: budgetAmendments } = useBudgetAmendments(id);
+  const { latestWipUpdate } = useDetailedWipUpdates(id);
   const { clients, isLoading: clientsLoading } = useClients();
   const { data: exchangeRatesData, refetch: refetchRates } = useExchangeRates();
   const { matterClients, updateMatterClient } = useMatterClients(id);
@@ -814,6 +818,51 @@ export default function MatterDetail() {
                           of {formatCurrency(totalBudget, currency)}
                         </p>
                       </div>
+                    </div>
+
+                    {/* Budget and Utilization Update Dates */}
+                    <div className="pt-4 border-t border-border/50 space-y-2">
+                      {/* Budget Date */}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Budget:</span>
+                        <span className="text-muted-foreground">
+                          {budgetAmendments.length > 0 
+                            ? `Updated ${formatDate(budgetAmendments[0].amendment_date)}`
+                            : budgetVersions.length > 0
+                              ? 'Original budget'
+                              : 'No budget set'
+                          }
+                        </span>
+                      </div>
+                      
+                      {/* Utilization Update Date */}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Utilisation:</span>
+                        <span className="text-muted-foreground">
+                          {latestWipUpdate 
+                            ? `Updated ${formatDate(latestWipUpdate.updated_at)}`
+                            : 'No utilisation recorded'
+                          }
+                        </span>
+                      </div>
+                      
+                      {/* Staleness Warning - show if utilization is >1 month older than financial snapshot */}
+                      {(() => {
+                        if (!latestWipUpdate || !latestSnapshot) return null;
+                        
+                        const wipDate = new Date(latestWipUpdate.updated_at);
+                        const snapshotDate = new Date(latestSnapshot.updated_at);
+                        const oneMonthMs = 30 * 24 * 60 * 60 * 1000;
+                        
+                        if (snapshotDate.getTime() - wipDate.getTime() > oneMonthMs) {
+                          return (
+                            <p className="text-xs text-destructive mt-2">
+                              ⚠️ Budget utilisation is over a month older than the latest financial snapshot
+                            </p>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </>
                 )}

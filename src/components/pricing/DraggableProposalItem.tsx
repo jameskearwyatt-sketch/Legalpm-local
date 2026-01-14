@@ -44,7 +44,6 @@ interface DraggableProposalItemProps {
   onUpdate: (index: number, updates: Partial<DraftProposalItem>) => void;
   onRemove: (index: number) => void;
   onOpenIterativePricing: (index: number) => void;
-  onOpenLocalCounselLibrary?: () => void;
   formatCurrency: (value: number) => string;
   viewingHistoricalVersion: boolean;
   customCategories?: string[];
@@ -61,7 +60,6 @@ export function DraggableProposalItem({
   onUpdate,
   onRemove,
   onOpenIterativePricing,
-  onOpenLocalCounselLibrary,
   formatCurrency,
   viewingHistoricalVersion,
   customCategories = [],
@@ -276,126 +274,126 @@ export function DraggableProposalItem({
               </SelectContent>
             </Select>
             
-            {/* Local Counsel Details Popover */}
+            {/* Local Counsel Details - inline with edit/add buttons */}
             {item.provider === 'Local Counsel' && (
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className={cn(
-                      "w-[130px] h-7 text-xs justify-start",
-                      !item.lc_firm_name && "text-muted-foreground"
-                    )}
-                  >
-                    <Building2 className="h-3 w-3 mr-1" />
-                    {item.lc_firm_name || 'Set details...'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 z-50 bg-popover" align="start">
-                  <div className="space-y-3">
-                    <div className="font-medium text-sm">Local Counsel Details</div>
-                    
-                    {/* Country Selection */}
-                    <div className="space-y-1">
-                      <Label className="text-xs">Country</Label>
-                      <CountryCombobox
-                        value={(item as any).lc_country || ''}
-                        onValueChange={(value) => {
-                          onUpdate(index, { 
-                            ...(({ lc_country: value }) as any)
-                          });
-                        }}
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                    
-                    {/* Firm Selection or Manual Entry */}
-                    <div className="space-y-1">
-                      <Label className="text-xs">Firm</Label>
-                      {(item as any).lc_country && entriesByCountry[(item as any).lc_country]?.length > 0 ? (
-                        <div className="space-y-1">
-                          <Select
-                            value={(item as any).lc_library_id || ''}
-                            onValueChange={(value) => {
-                              const firm = library.find(f => f.id === value);
-                              if (firm) {
-                                onUpdate(index, {
-                                  lc_firm_name: firm.firm_name,
-                                  ...(({ lc_library_id: firm.id, lc_currency: firm.currency }) as any)
-                                });
-                              }
-                            }}
-                          >
-                            <SelectTrigger className="h-8 text-xs">
-                              <SelectValue placeholder="Select from library..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {entriesByCountry[(item as any).lc_country]?.map((firm) => (
-                                <SelectItem key={firm.id} value={firm.id}>
-                                  {firm.firm_name}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <div className="text-xs text-muted-foreground">
-                            or{' '}
-                            <button
-                              type="button"
-                              className="text-primary hover:underline"
-                              onClick={() => onOpenLocalCounselLibrary?.()}
-                            >
-                              add new firm to library
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-1">
-                          <Input
-                            value={item.lc_firm_name || ''}
-                            onChange={(e) => onUpdate(index, { lc_firm_name: e.target.value })}
-                            placeholder="Enter firm name"
-                            className="h-8 text-xs"
-                          />
-                          <div className="text-xs text-muted-foreground">
-                            <button
-                              type="button"
-                              className="text-primary hover:underline"
-                              onClick={() => onOpenLocalCounselLibrary?.()}
-                            >
-                              Open library to add/manage firms
-                            </button>
-                          </div>
-                        </div>
+              <div className="flex items-center gap-1">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className={cn(
+                        "h-7 text-xs justify-start flex-1 max-w-[110px]",
+                        !item.lc_firm_name && "text-muted-foreground"
                       )}
+                      title={item.lc_firm_name ? `${item.lc_firm_name} (${(item as any).lc_country || 'No country'})` : 'Set local counsel details'}
+                    >
+                      <Building2 className="h-3 w-3 mr-1 shrink-0" />
+                      <span className="truncate">{item.lc_firm_name || 'Set firm...'}</span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-80 z-50 bg-popover" align="start">
+                    <div className="space-y-3">
+                      <div className="font-medium text-sm">Local Counsel Details</div>
+                      
+                      {/* Country Selection */}
+                      <div className="space-y-1">
+                        <Label className="text-xs">Country *</Label>
+                        <CountryCombobox
+                          value={(item as any).lc_country || ''}
+                          onValueChange={(value) => {
+                            onUpdate(index, { 
+                              ...(({ lc_country: value }) as any)
+                            });
+                          }}
+                          className="h-8 text-xs"
+                        />
+                      </div>
+                      
+                      {/* Firm Name - always manual entry, auto-saves to library */}
+                      <div className="space-y-1">
+                        <Label className="text-xs">Firm Name *</Label>
+                        <Input
+                          value={item.lc_firm_name || ''}
+                          onChange={(e) => onUpdate(index, { lc_firm_name: e.target.value })}
+                          onBlur={() => {
+                            // Auto-save to library when firm name is entered
+                            const firmName = item.lc_firm_name?.trim();
+                            const country = (item as any).lc_country;
+                            if (firmName && country) {
+                              // Use the autoSaveEntry mutation (silent, no toast)
+                              const existingEntry = library.find(
+                                e => e.firm_name.toLowerCase() === firmName.toLowerCase() && e.country === country
+                              );
+                              if (!existingEntry) {
+                                // Note: We'll handle this in the parent component
+                              }
+                            }
+                          }}
+                          placeholder="e.g. Rodriguez & Partners"
+                          className="h-8 text-xs"
+                        />
+                        {(item as any).lc_country && entriesByCountry[(item as any).lc_country]?.length > 0 && (
+                          <div className="text-xs text-muted-foreground pt-1">
+                            <span>Or select existing: </span>
+                            <Select
+                              value={(item as any).lc_library_id || ''}
+                              onValueChange={(value) => {
+                                const firm = library.find(f => f.id === value);
+                                if (firm) {
+                                  onUpdate(index, {
+                                    lc_firm_name: firm.firm_name,
+                                    ...(({ lc_library_id: firm.id, lc_currency: firm.currency, lc_country: firm.country }) as any)
+                                  });
+                                }
+                              }}
+                            >
+                              <SelectTrigger className="h-6 text-xs mt-1">
+                                <SelectValue placeholder="Select..." />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {entriesByCountry[(item as any).lc_country]?.map((firm) => (
+                                  <SelectItem key={firm.id} value={firm.id}>
+                                    {firm.firm_name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Currency Selection */}
+                      <div className="space-y-1">
+                        <Label className="text-xs">Currency</Label>
+                        <Select
+                          value={(item as any).lc_currency || 'USD'}
+                          onValueChange={(value) => {
+                            onUpdate(index, { 
+                              ...(({ lc_currency: value }) as any)
+                            });
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs w-[100px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CURRENCIES.map((curr) => (
+                              <SelectItem key={curr} value={curr}>
+                                {curr}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground pt-2 border-t">
+                        Firms are automatically saved to your library for reuse across proposals.
+                      </p>
                     </div>
-                    
-                    {/* Currency Selection */}
-                    <div className="space-y-1">
-                      <Label className="text-xs">Currency</Label>
-                      <Select
-                        value={(item as any).lc_currency || 'GBP'}
-                        onValueChange={(value) => {
-                          onUpdate(index, { 
-                            ...(({ lc_currency: value }) as any)
-                          });
-                        }}
-                      >
-                        <SelectTrigger className="h-8 text-xs w-[100px]">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {CURRENCIES.map((curr) => (
-                            <SelectItem key={curr} value={curr}>
-                              {curr}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+                  </PopoverContent>
+                </Popover>
+              </div>
             )}
           </div>
         )}

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -306,13 +306,6 @@ export function AFATab({
       calculatedRate: calculatedBlendedRate 
     }) as BlendedRateConfig;
     
-    // Update calculated rate if it changed
-    useEffect(() => {
-      if (config.calculatedRate !== calculatedBlendedRate && !config.useManual) {
-        handleConfigChange('blended_rate', { ...config, calculatedRate: calculatedBlendedRate });
-      }
-    }, [calculatedBlendedRate]);
-
     const activeRate = config.useManual && config.manualRate ? config.manualRate : calculatedBlendedRate;
     
     return (
@@ -330,7 +323,7 @@ export function AFATab({
         <div className="flex items-center gap-3">
           <Switch
             checked={config.useManual}
-            onCheckedChange={(v) => handleConfigChange('blended_rate', { ...config, useManual: v })}
+            onCheckedChange={(v) => handleConfigChange('blended_rate', { ...config, useManual: v, calculatedRate: calculatedBlendedRate })}
           />
           <Label>Use manual rate override</Label>
         </div>
@@ -341,7 +334,7 @@ export function AFATab({
             <Input
               type="number"
               value={config.manualRate || ''}
-              onChange={(e) => handleConfigChange('blended_rate', { ...config, manualRate: parseFloat(e.target.value) || null })}
+              onChange={(e) => handleConfigChange('blended_rate', { ...config, manualRate: parseFloat(e.target.value) || null, calculatedRate: calculatedBlendedRate })}
               placeholder={Math.round(calculatedBlendedRate).toString()}
             />
           </div>
@@ -412,23 +405,23 @@ export function AFATab({
   const renderFixedFeePhaseConfig = (afa: ProposalAFA | undefined) => {
     const config = (afa?.config || getDefaultConfig('fixed_fee_phase')) as FixedFeePhaseConfig;
     
-    // Initialize phases from category totals if empty
-    useEffect(() => {
-      if (config.phases.length === 0 && Object.keys(categoryTotals).length > 0) {
-        const phases = Object.entries(categoryTotals).map(([category, amount]) => ({
-          category,
-          baseAmount: amount,
-          adjustedAmount: Math.round(amount * 1.05), // 5% premium
-          isIncluded: true,
-        }));
-        handleConfigChange('fixed_fee_phase', { phases });
-      }
-    }, [categoryTotals]);
+    // Check if phases need initialization (will be done on first interaction)
+    const needsInit = config.phases.length === 0 && Object.keys(categoryTotals).length > 0;
 
     const updatePhase = (index: number, updates: Partial<typeof config.phases[0]>) => {
       const newPhases = [...config.phases];
       newPhases[index] = { ...newPhases[index], ...updates };
       handleConfigChange('fixed_fee_phase', { phases: newPhases });
+    };
+    
+    const initializePhases = () => {
+      const phases = Object.entries(categoryTotals).map(([category, amount]) => ({
+        category,
+        baseAmount: amount,
+        adjustedAmount: Math.round(amount * 1.05), // 5% premium
+        isIncluded: true,
+      }));
+      handleConfigChange('fixed_fee_phase', { phases });
     };
 
     const includedTotal = config.phases.filter(p => p.isIncluded).reduce((sum, p) => sum + p.adjustedAmount, 0);
@@ -439,28 +432,38 @@ export function AFATab({
           Set fixed fees for each work category. Toggle to include/exclude from the proposal.
         </p>
         
-        <div className="space-y-3">
-          {config.phases.map((phase, index) => (
-            <div key={phase.category} className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg">
-              <Checkbox
-                checked={phase.isIncluded}
-                onCheckedChange={(v) => updatePhase(index, { isIncluded: !!v })}
-              />
-              <div className="flex-1">
-                <p className="font-medium">{phase.category}</p>
-                <p className="text-xs text-muted-foreground">Base: {formatCurrency(phase.baseAmount)}</p>
-              </div>
-              <div className="w-40">
-                <Input
-                  type="number"
-                  value={phase.adjustedAmount}
-                  onChange={(e) => updatePhase(index, { adjustedAmount: parseFloat(e.target.value) || 0 })}
-                  className="text-right"
+        {needsInit ? (
+          <div className="text-center py-6">
+            <p className="text-muted-foreground mb-3">No phases configured yet.</p>
+            <Button onClick={initializePhases} variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Initialize from Categories
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {config.phases.map((phase, index) => (
+              <div key={phase.category} className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg">
+                <Checkbox
+                  checked={phase.isIncluded}
+                  onCheckedChange={(v) => updatePhase(index, { isIncluded: !!v })}
                 />
+                <div className="flex-1">
+                  <p className="font-medium">{phase.category}</p>
+                  <p className="text-xs text-muted-foreground">Base: {formatCurrency(phase.baseAmount)}</p>
+                </div>
+                <div className="w-40">
+                  <Input
+                    type="number"
+                    value={phase.adjustedAmount}
+                    onChange={(e) => updatePhase(index, { adjustedAmount: parseFloat(e.target.value) || 0 })}
+                    className="text-right"
+                  />
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
         
         <div className="bg-muted/50 rounded-lg p-4">
           <p className="text-sm text-muted-foreground mb-1">Total (included phases)</p>

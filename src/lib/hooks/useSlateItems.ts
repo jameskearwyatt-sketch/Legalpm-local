@@ -173,6 +173,7 @@ export function useSlateItems() {
   });
 
   // Promote a slate item to quick_tasks
+  // Returns the new task so the caller can use onSuccess callback
   const promoteToQuickTask = useMutation({
     mutationFn: async (slateItem: SlateItem) => {
       if (!user) throw new Error('Not authenticated');
@@ -208,6 +209,8 @@ export function useSlateItems() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['slate-items'] });
       queryClient.invalidateQueries({ queryKey: ['quick-tasks'] });
+      // Note: The caller (QuickToDoButton) should also call fetchTasks() 
+      // since it uses local state instead of react-query for quick tasks
       toast.success('Added to task list');
     },
     onError: (error) => {

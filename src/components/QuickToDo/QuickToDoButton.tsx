@@ -1188,7 +1188,12 @@ export function QuickToDoButton() {
     
     // Use the database-backed hook if it's a SlateItem
     if ('user_id' in item) {
-      promoteToQuickTask.mutate(item as SlateItem);
+      promoteToQuickTask.mutate(item as SlateItem, {
+        onSuccess: () => {
+          // Refetch tasks since QuickToDoButton uses local state instead of react-query
+          fetchTasks();
+        }
+      });
     } else {
       // Legacy SlateOnlyItem support (shouldn't happen anymore)
       const { data, error } = await supabase

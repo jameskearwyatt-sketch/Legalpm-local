@@ -31,11 +31,12 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Loader2, ChevronDown, History, Check, FileText, Upload, Sparkles, TrendingUp, Download } from 'lucide-react';
+import { Plus, Trash2, Loader2, ChevronDown, History, Check, FileText, Upload, Sparkles, TrendingUp, Download, FileEdit, Send } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useBudgetVersions, DraftLineItem, BudgetLineItem } from '@/lib/hooks/useBudgetVersions';
+import { useBudgetDrafts, BudgetDraft } from '@/lib/hooks/useBudgetDrafts';
 import { useLocalCounsels } from '@/lib/hooks/useLocalCounsels';
 import { useMatter } from '@/lib/hooks/useMatters';
 import { useAssumptions } from '@/lib/hooks/useAssumptions';
@@ -49,6 +50,7 @@ import { DetailedWipUpdateModal } from './DetailedWipUpdateModal';
 import { WipHistoryModal } from './WipHistoryModal';
 import { formatCurrency as sharedFormatCurrency } from '@/lib/currencyUtils';
 import { exportBudgetToExcel } from '@/lib/exportBudgetToExcel';
+import { exportDraftBudgetToExcel } from '@/lib/exportDraftBudgetToExcel';
 
 interface BudgetSectionProps {
   matterId: string;
@@ -75,6 +77,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   } = useBudgetVersions(matterId);
   
   const { localCounsels, syncLocalCounselsFromBudget } = useLocalCounsels(matterId);
+  const { drafts, createDraft, deleteDraft } = useBudgetDrafts(matterId);
 
   const [draftItems, setDraftItems] = useState<DraftLineItem[]>([]);
   const [notes, setNotes] = useState('');
@@ -124,6 +127,12 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   
   // Line items collapsible state - controlled separately
   const [isLineItemsOpen, setIsLineItemsOpen] = useState(false);
+  
+  // Draft budget state
+  const [showSaveDraftPrompt, setShowSaveDraftPrompt] = useState(false);
+  const [showExportDraftPrompt, setShowExportDraftPrompt] = useState(false);
+  const [isDraftsDialogOpen, setIsDraftsDialogOpen] = useState(false);
+  const [selectedDraft, setSelectedDraft] = useState<BudgetDraft | null>(null);
   
   const { createBulkAssumptions } = useAssumptions(matterId);
 
@@ -522,6 +531,87 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     setPastedText('');
     setAiSuggestedIndices(new Set());
     setOriginalItems([]);
+  };
+
+  // Handle saving draft for client discussion
+  const handleSaveDraft = async () => {
+    const validItems = draftItems.filter(item => item.work_item.trim() !== '');
+    if (validItems.length === 0) {
+      toast.error('Please add at least one budget item');
+      return;
+    }
+    
+    await createDraft.mutateAsync({
+      matter_id: matterId,
+      name: `Draft - ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`,
+      notes: notes.trim() || undefined,
+      line_items: draftItems,
+    });
+    
+    // Show the export prompt
+    setShowExportDraftPrompt(true);
+  };
+
+  // Handle exporting draft to Excel
+  const handleExportDraft = async (draft?: BudgetDraft) => {
+    const itemsToExport = draft ? draft.line_items : draftItems;
+    try {
+      await exportDraftBudgetToExcel({
+        items: itemsToExport,
+        matterName: (matter as any)?.matter_display_name || matter?.matter_name || 'Unknown Matter',
+        clientName: (matter?.clients as any)?.display_name || matter?.clients?.name || 'Unknown Client',
+        currency: billingCurrency,
+        draftName: draft?.name || 'Draft Budget Proposal',
+        notes: draft?.notes || notes || undefined,
+        conversionRate: mandatedRate,
+      });
+      toast.success('Draft budget exported to Excel');
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast.error('Failed to export draft');
+    }
+  };
+
+  // Load draft into editor
+  const loadDraftForEditing = (draft: BudgetDraft) => {
+    setDraftItems(draft.line_items);
+    setNotes(draft.notes || '');
+    if (!isEditing) {
+      startEditing();
+    }
+    setIsDraftsDialogOpen(false);
+    toast.success('Draft loaded. You can now edit and save as final budget.');
+  };
+
+  // Finalize from a saved draft
+  const handleFinalizeDraft = async (draft: BudgetDraft) => {
+    setDraftItems(draft.line_items);
+    setNotes(draft.notes || '');
+    
+    // Filter out empty items
+    const validItems = draft.line_items.filter(item => item.work_item.trim() !== '');
+    
+    await finalizeBudget.mutateAsync({
+      matter_id: matterId,
+      line_items: validItems,
+      notes: draft.notes?.trim() || undefined,
+    });
+    
+    // Sync local counsel entries from budget line items
+    const lcLineItems = validItems
+      .filter(item => item.provider === 'Local Counsel' && item.lc_firm_name)
+      .map(item => ({ firm_name: item.lc_firm_name!, fee_amount: item.fee_amount }));
+    
+    if (lcLineItems.length > 0) {
+      await syncLocalCounselsFromBudget.mutateAsync(lcLineItems);
+    }
+    
+    // Delete the draft after finalizing
+    await deleteDraft.mutateAsync(draft.id);
+    
+    setIsDraftsDialogOpen(false);
+    setNotes('');
+    setIsEditing(false);
   };
 
   // AI summarization for budget update rationale - also extracts budget changes
@@ -1096,44 +1186,233 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         )}
 
         {/* Action Buttons */}
-        <div className="flex gap-2 pt-2">
-          {!hasExistingBudget ? (
-            <Button
-              onClick={handleFinalize}
-              disabled={finalizeBudget.isPending || draftItems.every(i => !i.work_item.trim())}
-              className="flex-1"
-            >
-              {finalizeBudget.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Check className="h-4 w-4 mr-2" />
-              )}
-              Finalize Initial Budget
-            </Button>
-          ) : isEditing ? (
-            <>
-              <Button variant="outline" onClick={cancelEditing} className="flex-1">
-                Cancel
-              </Button>
-              <Button
-                onClick={handleFinalize}
-                disabled={finalizeBudget.isPending}
-                className="flex-1"
-              >
-                {finalizeBudget.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Check className="h-4 w-4 mr-2" />
+        <div className="flex flex-col gap-2 pt-2">
+          <div className="flex gap-2">
+            {!hasExistingBudget ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={handleSaveDraft}
+                  disabled={createDraft.isPending || draftItems.every(i => !i.work_item.trim())}
+                  className="flex-1"
+                >
+                  {createDraft.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileEdit className="h-4 w-4 mr-2" />
+                  )}
+                  Save Draft for Discussion
+                </Button>
+                <Button
+                  onClick={handleFinalize}
+                  disabled={finalizeBudget.isPending || draftItems.every(i => !i.work_item.trim())}
+                  className="flex-1"
+                >
+                  {finalizeBudget.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4 mr-2" />
+                  )}
+                  Save Budget (Agreed)
+                </Button>
+              </>
+            ) : isEditing ? (
+              <>
+                <Button variant="outline" onClick={cancelEditing}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleSaveDraft}
+                  disabled={createDraft.isPending}
+                  className="flex-1"
+                >
+                  {createDraft.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileEdit className="h-4 w-4 mr-2" />
+                  )}
+                  Save Draft for Discussion
+                </Button>
+                <Button
+                  onClick={handleFinalize}
+                  disabled={finalizeBudget.isPending}
+                  className="flex-1"
+                >
+                  {finalizeBudget.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4 mr-2" />
+                  )}
+                  Save Budget (Agreed)
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={startEditing} className="flex-1">
+                  Update Budget
+                </Button>
+                {drafts.length > 0 && (
+                  <Button variant="outline" onClick={() => setIsDraftsDialogOpen(true)}>
+                    <FileEdit className="h-4 w-4 mr-2" />
+                    View Drafts ({drafts.length})
+                  </Button>
                 )}
-                Update Budget
+              </>
+            )}
+          </div>
+          
+          {/* Show draft indicator when not editing */}
+          {!isEditing && drafts.length > 0 && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-2">
+              <FileEdit className="h-3.5 w-3.5" />
+              <span>{drafts.length} draft{drafts.length > 1 ? 's' : ''} saved for client discussion</span>
+              <Button 
+                variant="link" 
+                size="sm" 
+                className="h-auto p-0 text-xs"
+                onClick={() => setIsDraftsDialogOpen(true)}
+              >
+                View &amp; Manage
               </Button>
-            </>
-          ) : (
-            <Button variant="outline" onClick={startEditing} className="flex-1">
-              Update Budget
-            </Button>
+            </div>
           )}
         </div>
+
+        {/* Export Draft Prompt Dialog */}
+        <Dialog open={showExportDraftPrompt} onOpenChange={setShowExportDraftPrompt}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Draft Saved Successfully</DialogTitle>
+              <DialogDescription>
+                Your draft budget has been saved. Would you like to download it as an Excel file to share with the client?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button 
+                variant="outline" 
+                onClick={() => {
+                  setShowExportDraftPrompt(false);
+                  setIsEditing(false);
+                }}
+              >
+                No, Continue Editing
+              </Button>
+              <Button 
+                onClick={async () => {
+                  await handleExportDraft();
+                  setShowExportDraftPrompt(false);
+                  setIsEditing(false);
+                }}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download Excel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Drafts Management Dialog */}
+        <Dialog open={isDraftsDialogOpen} onOpenChange={setIsDraftsDialogOpen}>
+          <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Saved Draft Budgets</DialogTitle>
+              <DialogDescription>
+                Draft budgets saved for client discussion. You can download, edit, or finalize these drafts.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {drafts.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No drafts saved yet.</p>
+              ) : (
+                drafts.map((draft) => (
+                  <div 
+                    key={draft.id} 
+                    className="border rounded-lg p-4 space-y-3"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <h4 className="font-medium">{draft.name}</h4>
+                        <p className="text-xs text-muted-foreground">
+                          Created {format(new Date(draft.created_at), 'dd MMM yyyy HH:mm')}
+                        </p>
+                        {draft.notes && (
+                          <p className="text-sm text-muted-foreground mt-1 italic">{draft.notes}</p>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">{formatCurrency(draft.total_amount)}</p>
+                        <p className="text-xs text-muted-foreground">
+                          BM: {formatCurrency(draft.bm_total)} | LC: {formatCurrency(draft.local_counsel_total)}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleExportDraft(draft)}
+                      >
+                        <Download className="h-3.5 w-3.5 mr-1.5" />
+                        Download Excel
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => loadDraftForEditing(draft)}
+                      >
+                        <FileEdit className="h-3.5 w-3.5 mr-1.5" />
+                        Edit Draft
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => handleFinalizeDraft(draft)}
+                        disabled={finalizeBudget.isPending}
+                      >
+                        {finalizeBudget.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        ) : (
+                          <Check className="h-3.5 w-3.5 mr-1.5" />
+                        )}
+                        Save as Agreed Budget
+                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                            Delete
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Draft?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this draft? This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteDraft.mutate(draft.id)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Budget History */}
         {versions.length > 1 && (

@@ -67,6 +67,56 @@ export type Database = {
           },
         ]
       }
+      budget_drafts: {
+        Row: {
+          bm_total: number
+          created_at: string
+          id: string
+          line_items: Json
+          local_counsel_total: number
+          matter_id: string
+          name: string
+          notes: string | null
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          bm_total?: number
+          created_at?: string
+          id?: string
+          line_items?: Json
+          local_counsel_total?: number
+          matter_id: string
+          name?: string
+          notes?: string | null
+          total_amount?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          bm_total?: number
+          created_at?: string
+          id?: string
+          line_items?: Json
+          local_counsel_total?: number
+          matter_id?: string
+          name?: string
+          notes?: string | null
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_drafts_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budget_line_items: {
         Row: {
           budget_version_id: string

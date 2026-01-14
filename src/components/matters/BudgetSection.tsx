@@ -1354,10 +1354,24 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">{formatCurrency(draft.total_amount, billingCurrency)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          BM: {formatCurrency(draft.bm_total, billingCurrency)} | LC: {formatCurrency(draft.local_counsel_total, billingCurrency)}
-                        </p>
+                        {differentBillingCurrency && mandatedRate !== 1 ? (
+                          <>
+                            <p className="font-semibold">{formatCurrency(draft.total_amount * mandatedRate, billingCurrency)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              ({formatCurrency(draft.total_amount, quoteCurrency)})
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              BM: {formatCurrency(draft.bm_total * mandatedRate, billingCurrency)} | LC: {formatCurrency(draft.local_counsel_total * mandatedRate, billingCurrency)}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-semibold">{formatCurrency(draft.total_amount, quoteCurrency)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              BM: {formatCurrency(draft.bm_total, quoteCurrency)} | LC: {formatCurrency(draft.local_counsel_total, quoteCurrency)}
+                            </p>
+                          </>
+                        )}
                       </div>
                     </div>
                     

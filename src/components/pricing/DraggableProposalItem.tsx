@@ -34,8 +34,7 @@ import { cn } from '@/lib/utils';
 import { DraftProposalItem, BUDGET_CATEGORIES } from '@/lib/hooks/usePricingProposals';
 import { categoryBgColors, categoryTextColors, categoryBorderColors } from '@/components/pricing/CategorizedProposalView';
 import { CountryCombobox } from './CountryCombobox';
-import { useLocalCounselLibrary, LocalCounselLibraryEntry } from '@/lib/hooks/useLocalCounselLibrary';
-import { CURRENCY_SYMBOLS } from '@/lib/currencyUtils';
+// Note: LC management now happens in LocalCounselPanel
 
 interface DraggableProposalItemProps {
   id: string;
@@ -51,7 +50,7 @@ interface DraggableProposalItemProps {
   afaDiscountMultiplier?: number;
 }
 
-const CURRENCIES = Object.keys(CURRENCY_SYMBOLS);
+// CURRENCIES no longer needed here
 
 export function DraggableProposalItem({
   id,
@@ -66,7 +65,6 @@ export function DraggableProposalItem({
   onAddCustomCategory,
   afaDiscountMultiplier = 1,
 }: DraggableProposalItemProps) {
-  const { library, entriesByCountry } = useLocalCounselLibrary();
   const [isCustomCategoryDialogOpen, setIsCustomCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   
@@ -274,29 +272,35 @@ export function DraggableProposalItem({
               </SelectContent>
             </Select>
             
-            {/* Local Counsel Details - inline with edit/add buttons */}
+            {/* Local Counsel Details - simplified: just country selection and firm display */}
             {item.provider === 'Local Counsel' && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-2">
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button 
                       variant="outline" 
                       size="sm" 
                       className={cn(
-                        "h-7 text-xs justify-start flex-1 max-w-[110px]",
-                        !item.lc_firm_name && "text-muted-foreground"
+                        "h-7 text-xs justify-start max-w-[160px]",
+                        !(item as any).lc_country && "text-destructive border-destructive"
                       )}
-                      title={item.lc_firm_name ? `${item.lc_firm_name} (${(item as any).lc_country || 'No country'})` : 'Set local counsel details'}
+                      title={(item as any).lc_country 
+                        ? `${(item as any).lc_country}${item.lc_firm_name ? ` — ${item.lc_firm_name}` : ''}` 
+                        : 'Set country (required)'}
                     >
                       <Building2 className="h-3 w-3 mr-1 shrink-0" />
-                      <span className="truncate">{item.lc_firm_name || 'Set firm...'}</span>
+                      <span className="truncate">
+                        {(item as any).lc_country 
+                          ? `${(item as any).lc_country}${item.lc_firm_name ? ` — ${item.lc_firm_name}` : ''}` 
+                          : 'Set country...'}
+                      </span>
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-80 z-50 bg-popover" align="start">
+                  <PopoverContent className="w-72 z-50 bg-popover" align="start">
                     <div className="space-y-3">
                       <div className="font-medium text-sm">Local Counsel Details</div>
                       
-                      {/* Country Selection */}
+                      {/* Country Selection - Required */}
                       <div className="space-y-1">
                         <Label className="text-xs">Country *</Label>
                         <CountryCombobox
@@ -310,85 +314,16 @@ export function DraggableProposalItem({
                         />
                       </div>
                       
-                      {/* Firm Name - always manual entry, auto-saves to library */}
-                      <div className="space-y-1">
-                        <Label className="text-xs">Firm Name *</Label>
-                        <Input
-                          value={item.lc_firm_name || ''}
-                          onChange={(e) => onUpdate(index, { lc_firm_name: e.target.value })}
-                          onBlur={() => {
-                            // Auto-save to library when firm name is entered
-                            const firmName = item.lc_firm_name?.trim();
-                            const country = (item as any).lc_country;
-                            if (firmName && country) {
-                              // Use the autoSaveEntry mutation (silent, no toast)
-                              const existingEntry = library.find(
-                                e => e.firm_name.toLowerCase() === firmName.toLowerCase() && e.country === country
-                              );
-                              if (!existingEntry) {
-                                // Note: We'll handle this in the parent component
-                              }
-                            }
-                          }}
-                          placeholder="e.g. Rodriguez & Partners"
-                          className="h-8 text-xs"
-                        />
-                        {(item as any).lc_country && entriesByCountry[(item as any).lc_country]?.length > 0 && (
-                          <div className="text-xs text-muted-foreground pt-1">
-                            <span>Or select existing: </span>
-                            <Select
-                              value={(item as any).lc_library_id || ''}
-                              onValueChange={(value) => {
-                                const firm = library.find(f => f.id === value);
-                                if (firm) {
-                                  onUpdate(index, {
-                                    lc_firm_name: firm.firm_name,
-                                    ...(({ lc_library_id: firm.id, lc_currency: firm.currency, lc_country: firm.country }) as any)
-                                  });
-                                }
-                              }}
-                            >
-                              <SelectTrigger className="h-6 text-xs mt-1">
-                                <SelectValue placeholder="Select..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {entriesByCountry[(item as any).lc_country]?.map((firm) => (
-                                  <SelectItem key={firm.id} value={firm.id}>
-                                    {firm.firm_name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {/* Currency Selection */}
-                      <div className="space-y-1">
-                        <Label className="text-xs">Currency</Label>
-                        <Select
-                          value={(item as any).lc_currency || 'USD'}
-                          onValueChange={(value) => {
-                            onUpdate(index, { 
-                              ...(({ lc_currency: value }) as any)
-                            });
-                          }}
-                        >
-                          <SelectTrigger className="h-8 text-xs w-[100px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {CURRENCIES.map((curr) => (
-                              <SelectItem key={curr} value={curr}>
-                                {curr}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                      {/* Firm Name - Read-only display */}
+                      {item.lc_firm_name && (
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Selected Firm</Label>
+                          <p className="text-sm font-medium">{item.lc_firm_name}</p>
+                        </div>
+                      )}
 
                       <p className="text-xs text-muted-foreground pt-2 border-t">
-                        Firms are automatically saved to your library for reuse across proposals.
+                        Manage firms and enter quotes in the Local Counsel tab.
                       </p>
                     </div>
                   </PopoverContent>

@@ -59,7 +59,6 @@ import { getCurrencySymbol } from "@/lib/currencyUtils";
 import { IterativePricingDialog, FeeOwnerHours } from "@/components/pricing/IterativePricingDialog";
 import { EditableRateCard } from "@/components/pricing/EditableRateCard";
 import { CategorizedProposalView, categoryBgColors, categoryTextColors, categoryBorderColors } from "@/components/pricing/CategorizedProposalView";
-import { LocalCounselDialog } from "@/components/pricing/LocalCounselDialog";
 import { LocalCounselPanel } from "@/components/pricing/LocalCounselPanel";
 import {
   DndContext,
@@ -126,7 +125,6 @@ export default function PricingProposalDetail() {
   // Iterative pricing dialog state
   const [iterativeDialogOpen, setIterativeDialogOpen] = useState(false);
   const [iterativeDialogIndex, setIterativeDialogIndex] = useState<number | null>(null);
-  const [localCounselDialogOpen, setLocalCounselDialogOpen] = useState(false);
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -1484,7 +1482,6 @@ export default function PricingProposalDetail() {
             <LocalCounselPanel
               draftItems={draftItems}
               onUpdateItem={updateItem}
-              onOpenLibrary={() => setLocalCounselDialogOpen(true)}
               proposalCurrency={proposal?.currency || 'GBP'}
             />
           </TabsContent>
@@ -1863,12 +1860,6 @@ export default function PricingProposalDetail() {
           initialTurns={currentIterativeItem?.num_turns || 1}
           initialItemType={currentIterativeItem?.item_type || 'documentation'}
           onApply={applyIterativePricing}
-        />
-
-        {/* Local Counsel Library Dialog */}
-        <LocalCounselDialog
-          open={localCounselDialogOpen}
-          onOpenChange={setLocalCounselDialogOpen}
         />
       </div>
     </AppLayout>

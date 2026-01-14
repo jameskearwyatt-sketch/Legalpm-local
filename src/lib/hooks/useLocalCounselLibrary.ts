@@ -61,20 +61,23 @@ export function useLocalCounselLibrary() {
     },
   });
 
-  // Create new local counsel
+  // Create new local counsel (or upsert if exists)
   const createEntry = useMutation({
     mutationFn: async (input: CreateLocalCounselLibraryInput) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
+      // Try to insert, but if it already exists, just return success
       const { data, error } = await supabase
         .from('local_counsel_library')
-        .insert({
+        .upsert({
           user_id: userData.user.id,
           firm_name: input.firm_name,
           country: input.country,
-          currency: input.currency || 'GBP',
+          currency: input.currency || 'USD',
           rate_card: input.rate_card as unknown as Json,
+        }, {
+          onConflict: 'user_id,firm_name,country',
         })
         .select()
         .single();
@@ -84,14 +87,39 @@ export function useLocalCounselLibrary() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['local-counsel-library'] });
-      toast({ title: 'Local counsel added to library' });
+      toast({ title: 'Local counsel saved' });
     },
     onError: (error: Error) => {
-      if (error.message.includes('duplicate')) {
-        toast({ title: 'This firm already exists for this country', variant: 'destructive' });
-      } else {
-        toast({ title: 'Failed to add local counsel', variant: 'destructive' });
-      }
+      console.error('Error saving local counsel:', error);
+      toast({ title: 'Failed to save local counsel', variant: 'destructive' });
+    },
+  });
+
+  // Auto-save a firm when entering inline (silent, no toast)
+  const autoSaveEntry = useMutation({
+    mutationFn: async (input: CreateLocalCounselLibraryInput) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase
+        .from('local_counsel_library')
+        .upsert({
+          user_id: userData.user.id,
+          firm_name: input.firm_name,
+          country: input.country,
+          currency: input.currency || 'USD',
+          rate_card: input.rate_card as unknown as Json,
+        }, {
+          onConflict: 'user_id,firm_name,country',
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['local-counsel-library'] });
     },
   });
 
@@ -133,7 +161,7 @@ export function useLocalCounselLibrary() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['local-counsel-library'] });
-      toast({ title: 'Local counsel removed from library' });
+      toast({ title: 'Local counsel removed' });
     },
     onError: () => {
       toast({ title: 'Failed to remove local counsel', variant: 'destructive' });
@@ -152,6 +180,13 @@ export function useLocalCounselLibrary() {
   // Get unique countries
   const countries = [...new Set(libraryQuery.data?.map(e => e.country) || [])].sort();
 
+  // Find entry by firm name and country
+  const findEntry = (firmName: string, country: string) => {
+    return libraryQuery.data?.find(
+      e => e.firm_name.toLowerCase() === firmName.toLowerCase() && e.country === country
+    );
+  };
+
   return {
     library: libraryQuery.data || [],
     entriesByCountry,
@@ -159,8 +194,10 @@ export function useLocalCounselLibrary() {
     isLoading: libraryQuery.isLoading,
     error: libraryQuery.error,
     createEntry,
+    autoSaveEntry,
     updateEntry,
     deleteEntry,
+    findEntry,
   };
 }
 

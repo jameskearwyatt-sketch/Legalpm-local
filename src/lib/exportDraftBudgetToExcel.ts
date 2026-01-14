@@ -292,7 +292,8 @@ export async function exportDraftBudgetToExcel({
           item.provider,
           item.lc_firm_name || '',
           existingFee || '',
-          proposedFee,
+          // Only show proposed fee if it's different from existing OR if it's a new item
+          (hasChange || isNewItem) ? proposedFee : '',
           hasChange || isNewItem ? change : '',
         ];
 
@@ -308,10 +309,12 @@ export async function exportDraftBudgetToExcel({
           dataRow.getCell(4).font = { size: 10, color: { argb: 'FF6B7280' } };
         }
         
-        // Format proposed fee
-        dataRow.getCell(5).numFmt = '#,##0';
-        dataRow.getCell(5).alignment = { horizontal: 'right' };
-        dataRow.getCell(5).font = { size: 11, bold: hasChange || isNewItem };
+        // Format proposed fee - only if there's a change or it's a new item
+        if (hasChange || isNewItem) {
+          dataRow.getCell(5).numFmt = '#,##0';
+          dataRow.getCell(5).alignment = { horizontal: 'right' };
+          dataRow.getCell(5).font = { size: 11, bold: true };
+        }
         
         // Format change column
         if (hasChange || isNewItem) {

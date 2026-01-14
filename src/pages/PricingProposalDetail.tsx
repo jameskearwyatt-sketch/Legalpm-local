@@ -1574,6 +1574,29 @@ export default function PricingProposalDetail() {
             />
           </TabsContent>
 
+          {/* AFA TAB */}
+          <TabsContent value="afa" className="space-y-4">
+            <AFATab
+              proposalId={proposalId!}
+              draftItems={draftItems}
+              rateCard={rateCard}
+              assumptions={assumptions}
+              currencySymbol={currencySymbol}
+              formatCurrency={formatCurrency}
+              baselineTotals={{
+                bmTotal: workItemTotals.bmTotal,
+                localCounselTotal: workItemTotals.localCounselTotal,
+                total: workItemTotals.total,
+                totalHours: summary.totalHours,
+                blendedRate: summary.blendedRate,
+                margin: summary.margin,
+                marginPercent: summary.marginPercent,
+                totalCost: summary.totalCost,
+              }}
+              customCategories={customCategories}
+            />
+          </TabsContent>
+
           {/* SUMMARY TAB */}
           <TabsContent value="summary" className="space-y-6">
             <div className="grid gap-4 md:grid-cols-3">

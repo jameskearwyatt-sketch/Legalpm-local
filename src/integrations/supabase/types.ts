@@ -688,6 +688,39 @@ export type Database = {
         }
         Relationships: []
       }
+      local_counsel_library: {
+        Row: {
+          country: string
+          created_at: string
+          currency: string
+          firm_name: string
+          id: string
+          rate_card: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          country: string
+          created_at?: string
+          currency?: string
+          firm_name: string
+          id?: string
+          rate_card?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          country?: string
+          created_at?: string
+          currency?: string
+          firm_name?: string
+          id?: string
+          rate_card?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       matter_assumptions: {
         Row: {
           assumption_text: string
@@ -1108,7 +1141,10 @@ export type Database = {
           is_included: boolean
           is_optional: boolean
           item_type: string
+          lc_country: string | null
+          lc_currency: string | null
           lc_firm_name: string | null
+          lc_library_id: string | null
           num_turns: number
           partner_hours: number
           pricing_method: string
@@ -1132,7 +1168,10 @@ export type Database = {
           is_included?: boolean
           is_optional?: boolean
           item_type?: string
+          lc_country?: string | null
+          lc_currency?: string | null
           lc_firm_name?: string | null
+          lc_library_id?: string | null
           num_turns?: number
           partner_hours?: number
           pricing_method?: string
@@ -1156,7 +1195,10 @@ export type Database = {
           is_included?: boolean
           is_optional?: boolean
           item_type?: string
+          lc_country?: string | null
+          lc_currency?: string | null
           lc_firm_name?: string | null
+          lc_library_id?: string | null
           num_turns?: number
           partner_hours?: number
           pricing_method?: string

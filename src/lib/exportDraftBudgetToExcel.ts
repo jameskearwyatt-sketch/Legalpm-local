@@ -1,6 +1,13 @@
 import ExcelJS from 'exceljs';
 import { DraftLineItem, BUDGET_CATEGORIES, BudgetCategory } from '@/lib/hooks/useBudgetVersions';
-import { formatCurrency } from '@/lib/currencyUtils';
+
+interface ExistingBudgetItem {
+  work_item: string;
+  provider: string;
+  fee_amount: number;
+  lc_firm_name?: string;
+  category?: string;
+}
 
 interface ExportDraftBudgetOptions {
   items: DraftLineItem[];
@@ -11,6 +18,8 @@ interface ExportDraftBudgetOptions {
   notes?: string;
   /** Conversion rate to apply to all monetary values */
   conversionRate?: number;
+  /** Existing budget items for comparison */
+  existingItems?: ExistingBudgetItem[];
 }
 
 export async function exportDraftBudgetToExcel({
@@ -21,6 +30,7 @@ export async function exportDraftBudgetToExcel({
   draftName = 'Draft Budget Proposal',
   notes,
   conversionRate = 1,
+  existingItems = [],
 }: ExportDraftBudgetOptions): Promise<void> {
   const convert = (value: number) => value * conversionRate;
   const workbook = new ExcelJS.Workbook();
@@ -28,23 +38,40 @@ export async function exportDraftBudgetToExcel({
   workbook.created = new Date();
 
   const worksheet = workbook.addWorksheet('Budget Proposal', {
-    views: [{ state: 'frozen', ySplit: 8 }],
+    views: [{ state: 'frozen', ySplit: 9 }],
   });
 
-  // Set column widths - clean client-facing layout
-  worksheet.columns = [
-    { key: 'workItem', width: 50 },
-    { key: 'provider', width: 20 },
-    { key: 'lcFirmName', width: 25 },
-    { key: 'feeAmount', width: 18 },
-    { key: 'notes', width: 30 },
-  ];
+  // Check if we have existing items to compare
+  const hasComparison = existingItems.length > 0;
+
+  // Set column widths - clean client-facing layout with comparison columns
+  if (hasComparison) {
+    worksheet.columns = [
+      { key: 'workItem', width: 45 },
+      { key: 'provider', width: 18 },
+      { key: 'lcFirmName', width: 22 },
+      { key: 'existingFee', width: 16 },
+      { key: 'proposedFee', width: 16 },
+      { key: 'change', width: 14 },
+    ];
+  } else {
+    worksheet.columns = [
+      { key: 'workItem', width: 50 },
+      { key: 'provider', width: 20 },
+      { key: 'lcFirmName', width: 25 },
+      { key: 'feeAmount', width: 18 },
+      { key: 'notes', width: 30 },
+    ];
+  }
 
   // Professional color palette - Baker McKenzie inspired
   const primaryColor = 'FF1A1A2E'; // Dark navy
   const accentColor = 'FF8B0000'; // Deep red
   const lightGray = 'FFF8F9FA';
   const borderColor = 'FFE5E7EB';
+  const changeUpColor = 'FFDC2626'; // Red for increases
+  const changeDownColor = 'FF059669'; // Green for decreases
+  const newItemColor = 'FF3B82F6'; // Blue for new items
 
   // Header styling
   const headerFill: ExcelJS.Fill = {
@@ -71,27 +98,28 @@ export async function exportDraftBudgetToExcel({
   };
 
   // Title section - clean and professional
-  worksheet.mergeCells('A1:E1');
+  const lastCol = hasComparison ? 'F' : 'E';
+  worksheet.mergeCells(`A1:${lastCol}1`);
   const titleCell = worksheet.getCell('A1');
-  titleCell.value = 'Fee Estimate';
+  titleCell.value = hasComparison ? 'Proposed Budget Amendment' : 'Fee Estimate';
   titleCell.font = titleFont;
   titleCell.alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.getRow(1).height = 36;
 
   // Client info
-  worksheet.mergeCells('A2:E2');
+  worksheet.mergeCells(`A2:${lastCol}2`);
   const clientCell = worksheet.getCell('A2');
   clientCell.value = clientName;
   clientCell.font = { ...subtitleFont, bold: true, size: 14 };
 
   // Matter info
-  worksheet.mergeCells('A3:E3');
+  worksheet.mergeCells(`A3:${lastCol}3`);
   const matterCell = worksheet.getCell('A3');
   matterCell.value = matterName;
   matterCell.font = subtitleFont;
 
   // Draft info with date
-  worksheet.mergeCells('A4:E4');
+  worksheet.mergeCells(`A4:${lastCol}4`);
   const draftCell = worksheet.getCell('A4');
   draftCell.value = `${draftName} | ${new Date().toLocaleDateString('en-GB', { 
     day: 'numeric', 
@@ -101,42 +129,72 @@ export async function exportDraftBudgetToExcel({
   draftCell.font = { ...subtitleFont, italic: true, color: { argb: 'FF6B7280' } };
 
   // Add notes if provided
+  let currentRow = 5;
   if (notes) {
-    worksheet.mergeCells('A5:E5');
-    const notesCell = worksheet.getCell('A5');
+    worksheet.mergeCells(`A${currentRow}:${lastCol}${currentRow}`);
+    const notesCell = worksheet.getCell(`A${currentRow}`);
     notesCell.value = notes;
     notesCell.font = { size: 10, color: { argb: 'FF6B7280' }, italic: true };
     notesCell.alignment = { wrapText: true };
+    currentRow++;
   }
 
   // Disclaimer/Draft watermark row
-  worksheet.mergeCells('A6:E6');
-  const disclaimerCell = worksheet.getCell('A6');
+  worksheet.mergeCells(`A${currentRow}:${lastCol}${currentRow}`);
+  const disclaimerCell = worksheet.getCell(`A${currentRow}`);
   disclaimerCell.value = 'DRAFT - FOR DISCUSSION PURPOSES ONLY';
   disclaimerCell.font = { bold: true, size: 10, color: { argb: accentColor } };
   disclaimerCell.alignment = { horizontal: 'center' };
+  currentRow++;
 
   // Empty row for spacing
-  worksheet.getRow(7).height = 15;
+  worksheet.getRow(currentRow).height = 15;
+  currentRow++;
 
   // Column headers
-  const headerRow = worksheet.getRow(8);
-  headerRow.values = [
-    'Scope of Work',
-    'Provider',
-    'Local Counsel',
-    `Fee Estimate (${currency})`,
-    'Remarks',
-  ];
+  const headerRow = worksheet.getRow(currentRow);
+  if (hasComparison) {
+    headerRow.values = [
+      'Scope of Work',
+      'Provider',
+      'Local Counsel',
+      `Current (${currency})`,
+      `Proposed (${currency})`,
+      'Change',
+    ];
+    [4, 5, 6].forEach(col => {
+      headerRow.getCell(col).alignment = { horizontal: 'right', vertical: 'middle' };
+    });
+  } else {
+    headerRow.values = [
+      'Scope of Work',
+      'Provider',
+      'Local Counsel',
+      `Fee Estimate (${currency})`,
+      'Remarks',
+    ];
+    headerRow.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' };
+  }
   headerRow.eachCell((cell, colNumber) => {
     cell.fill = headerFill;
     cell.font = headerFont;
-    cell.alignment = { horizontal: colNumber === 4 ? 'right' : 'left', vertical: 'middle' };
+    if (!cell.alignment) {
+      cell.alignment = { horizontal: 'left', vertical: 'middle' };
+    }
     cell.border = {
       bottom: { style: 'medium', color: { argb: primaryColor } },
     };
   });
   headerRow.height = 28;
+  currentRow++;
+
+  // Create lookup map for existing items
+  const existingItemsMap = new Map<string, ExistingBudgetItem>();
+  existingItems.forEach(item => {
+    // Create a normalized key for matching
+    const key = `${item.work_item.toLowerCase().trim()}|${item.provider}|${item.lc_firm_name || ''}`;
+    existingItemsMap.set(key, item);
+  });
 
   // Group items by category
   const groupedItems: Record<string, DraftLineItem[]> = {};
@@ -153,10 +211,10 @@ export async function exportDraftBudgetToExcel({
     groupedItems[category].push(item);
   });
 
-  let rowIndex = 9;
-  let grandTotal = 0;
-  let bmTotal = 0;
-  let lcTotal = 0;
+  let grandTotalExisting = 0;
+  let grandTotalProposed = 0;
+  let bmTotalProposed = 0;
+  let lcTotalProposed = 0;
 
   // Category colors - subtle and professional
   const categoryColors: Record<string, string> = {
@@ -177,8 +235,8 @@ export async function exportDraftBudgetToExcel({
     if (categoryItems.length === 0) continue;
 
     // Category header row
-    const catHeaderRow = worksheet.getRow(rowIndex);
-    worksheet.mergeCells(`A${rowIndex}:E${rowIndex}`);
+    const catHeaderRow = worksheet.getRow(currentRow);
+    worksheet.mergeCells(`A${currentRow}:${lastCol}${currentRow}`);
     catHeaderRow.getCell(1).value = category.toUpperCase();
     catHeaderRow.getCell(1).font = { bold: true, size: 10, color: { argb: primaryColor } };
     catHeaderRow.getCell(1).fill = {
@@ -191,25 +249,25 @@ export async function exportDraftBudgetToExcel({
       bottom: { style: 'thin', color: { argb: borderColor } },
     };
     catHeaderRow.height = 22;
-    rowIndex++;
+    currentRow++;
 
-    let categoryTotal = 0;
+    let categoryTotalExisting = 0;
+    let categoryTotalProposed = 0;
 
     // Add items
     for (const item of categoryItems) {
       // Skip optional items that are not included
       if (item.is_optional && item.is_included === false) continue;
       
-      const feeAmount = convert(item.fee_amount || 0);
-      categoryTotal += feeAmount;
+      const proposedFee = convert(item.fee_amount || 0);
       
       if (item.provider === 'Baker McKenzie') {
-        bmTotal += feeAmount;
+        bmTotalProposed += proposedFee;
       } else {
-        lcTotal += feeAmount;
+        lcTotalProposed += proposedFee;
       }
 
-      const dataRow = worksheet.getRow(rowIndex);
+      const dataRow = worksheet.getRow(currentRow);
       
       // Format work item with optional indicator
       let workItemDisplay = item.work_item;
@@ -217,31 +275,92 @@ export async function exportDraftBudgetToExcel({
         workItemDisplay = `${item.work_item} (Optional)`;
       }
       
-      dataRow.values = [
-        workItemDisplay,
-        item.provider,
-        item.lc_firm_name || '',
-        feeAmount,
-        '',
-      ];
+      if (hasComparison) {
+        // Find matching existing item
+        const key = `${item.work_item.toLowerCase().trim()}|${item.provider}|${item.lc_firm_name || ''}`;
+        const existingItem = existingItemsMap.get(key);
+        const existingFee = existingItem ? convert(existingItem.fee_amount || 0) : 0;
+        const isNewItem = !existingItem;
+        const change = proposedFee - existingFee;
+        const hasChange = Math.abs(change) > 0.01;
+        
+        categoryTotalExisting += existingFee;
+        categoryTotalProposed += proposedFee;
+        
+        dataRow.values = [
+          workItemDisplay,
+          item.provider,
+          item.lc_firm_name || '',
+          existingFee || '',
+          proposedFee,
+          hasChange || isNewItem ? change : '',
+        ];
 
-      // Style the row
-      dataRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
-      dataRow.getCell(2).font = { size: 10, color: { argb: 'FF6B7280' } };
-      dataRow.getCell(3).font = { size: 10, color: { argb: 'FF6B7280' } };
-      
-      // Format fee amount
-      dataRow.getCell(4).numFmt = '#,##0';
-      dataRow.getCell(4).alignment = { horizontal: 'right' };
-      dataRow.getCell(4).font = { size: 11 };
-      
-      if (item.is_optional) {
-        dataRow.getCell(1).font = { italic: true, color: { argb: 'FF6B7280' } };
-        dataRow.getCell(4).font = { italic: true, color: { argb: 'FF6B7280' } };
+        // Style the row
+        dataRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+        dataRow.getCell(2).font = { size: 10, color: { argb: 'FF6B7280' } };
+        dataRow.getCell(3).font = { size: 10, color: { argb: 'FF6B7280' } };
+        
+        // Format existing fee
+        if (existingFee > 0) {
+          dataRow.getCell(4).numFmt = '#,##0';
+          dataRow.getCell(4).alignment = { horizontal: 'right' };
+          dataRow.getCell(4).font = { size: 10, color: { argb: 'FF6B7280' } };
+        }
+        
+        // Format proposed fee
+        dataRow.getCell(5).numFmt = '#,##0';
+        dataRow.getCell(5).alignment = { horizontal: 'right' };
+        dataRow.getCell(5).font = { size: 11, bold: hasChange || isNewItem };
+        
+        // Format change column
+        if (hasChange || isNewItem) {
+          dataRow.getCell(6).numFmt = '+#,##0;-#,##0;0';
+          dataRow.getCell(6).alignment = { horizontal: 'right' };
+          if (isNewItem) {
+            dataRow.getCell(6).font = { size: 10, color: { argb: newItemColor }, bold: true };
+            dataRow.getCell(1).font = { color: { argb: newItemColor } };
+            // Add "NEW" indicator
+            dataRow.getCell(6).value = 'NEW';
+          } else if (change > 0) {
+            dataRow.getCell(6).font = { size: 10, color: { argb: changeUpColor }, bold: true };
+          } else {
+            dataRow.getCell(6).font = { size: 10, color: { argb: changeDownColor }, bold: true };
+          }
+        }
+        
+        if (item.is_optional) {
+          dataRow.getCell(1).font = { ...dataRow.getCell(1).font, italic: true };
+        }
+      } else {
+        categoryTotalProposed += proposedFee;
+        
+        dataRow.values = [
+          workItemDisplay,
+          item.provider,
+          item.lc_firm_name || '',
+          proposedFee,
+          '',
+        ];
+
+        // Style the row
+        dataRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+        dataRow.getCell(2).font = { size: 10, color: { argb: 'FF6B7280' } };
+        dataRow.getCell(3).font = { size: 10, color: { argb: 'FF6B7280' } };
+        
+        // Format fee amount
+        dataRow.getCell(4).numFmt = '#,##0';
+        dataRow.getCell(4).alignment = { horizontal: 'right' };
+        dataRow.getCell(4).font = { size: 11 };
+        
+        if (item.is_optional) {
+          dataRow.getCell(1).font = { italic: true, color: { argb: 'FF6B7280' } };
+          dataRow.getCell(4).font = { italic: true, color: { argb: 'FF6B7280' } };
+        }
       }
 
       // Alternate row colors
-      if (rowIndex % 2 === 0) {
+      if (currentRow % 2 === 0) {
         dataRow.eachCell((cell) => {
           if (!cell.fill || (cell.fill as ExcelJS.FillPattern).pattern !== 'solid') {
             cell.fill = {
@@ -268,70 +387,157 @@ export async function exportDraftBudgetToExcel({
         };
       });
 
-      rowIndex++;
+      currentRow++;
     }
 
-    grandTotal += categoryTotal;
+    grandTotalExisting += categoryTotalExisting;
+    grandTotalProposed += categoryTotalProposed;
 
-    // Category subtotal (subtle)
-    if (categoryTotal > 0) {
-      const subtotalRow = worksheet.getRow(rowIndex);
-      subtotalRow.values = ['', '', '', categoryTotal, ''];
-      subtotalRow.getCell(4).numFmt = '#,##0';
-      subtotalRow.getCell(4).alignment = { horizontal: 'right' };
-      subtotalRow.getCell(4).font = { bold: true, size: 10, color: { argb: 'FF4B5563' } };
+    // Category subtotal
+    if (categoryTotalProposed > 0) {
+      const subtotalRow = worksheet.getRow(currentRow);
+      if (hasComparison) {
+        const categoryChange = categoryTotalProposed - categoryTotalExisting;
+        subtotalRow.values = [
+          '',
+          '',
+          '',
+          categoryTotalExisting > 0 ? categoryTotalExisting : '',
+          categoryTotalProposed,
+          Math.abs(categoryChange) > 0.01 ? categoryChange : '',
+        ];
+        [4, 5].forEach(col => {
+          if (subtotalRow.getCell(col).value) {
+            subtotalRow.getCell(col).numFmt = '#,##0';
+            subtotalRow.getCell(col).alignment = { horizontal: 'right' };
+          }
+        });
+        if (Math.abs(categoryChange) > 0.01) {
+          subtotalRow.getCell(6).numFmt = '+#,##0;-#,##0;0';
+          subtotalRow.getCell(6).alignment = { horizontal: 'right' };
+          subtotalRow.getCell(6).font = { 
+            bold: true, 
+            size: 10, 
+            color: { argb: categoryChange > 0 ? changeUpColor : changeDownColor } 
+          };
+        }
+      } else {
+        subtotalRow.values = ['', '', '', categoryTotalProposed, ''];
+        subtotalRow.getCell(4).numFmt = '#,##0';
+        subtotalRow.getCell(4).alignment = { horizontal: 'right' };
+      }
+      subtotalRow.font = { bold: true, size: 10, color: { argb: '4B5563' } };
       subtotalRow.getCell(4).border = {
         top: { style: 'thin', color: { argb: borderColor } },
       };
-      rowIndex++;
+      currentRow++;
     }
 
     // Spacing between categories
-    rowIndex++;
+    currentRow++;
   }
 
   // Provider breakdown
-  rowIndex++;
-  const breakdownHeaderRow = worksheet.getRow(rowIndex);
-  worksheet.mergeCells(`A${rowIndex}:C${rowIndex}`);
+  currentRow++;
+  const breakdownHeaderRow = worksheet.getRow(currentRow);
+  worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
   breakdownHeaderRow.getCell(1).value = 'Fee Breakdown by Provider';
   breakdownHeaderRow.getCell(1).font = { bold: true, size: 11, color: { argb: primaryColor } };
   breakdownHeaderRow.height = 24;
-  rowIndex++;
+  currentRow++;
 
   // Baker McKenzie fees
-  const bmRow = worksheet.getRow(rowIndex);
-  bmRow.values = ['Baker McKenzie Fees', '', '', bmTotal, ''];
+  const bmRow = worksheet.getRow(currentRow);
+  if (hasComparison) {
+    const existingBmTotal = existingItems
+      .filter(i => i.provider === 'Baker McKenzie')
+      .reduce((sum, i) => sum + convert(i.fee_amount || 0), 0);
+    bmRow.values = ['Baker McKenzie Fees', '', '', existingBmTotal > 0 ? existingBmTotal : '', bmTotalProposed, ''];
+    bmRow.getCell(4).numFmt = '#,##0';
+    bmRow.getCell(5).numFmt = '#,##0';
+    [4, 5].forEach(col => bmRow.getCell(col).alignment = { horizontal: 'right' });
+  } else {
+    bmRow.values = ['Baker McKenzie Fees', '', '', bmTotalProposed, ''];
+    bmRow.getCell(4).numFmt = '#,##0';
+    bmRow.getCell(4).alignment = { horizontal: 'right' };
+  }
   bmRow.getCell(1).font = { size: 11 };
-  bmRow.getCell(4).numFmt = '#,##0';
-  bmRow.getCell(4).alignment = { horizontal: 'right' };
-  bmRow.getCell(4).font = { size: 11 };
-  rowIndex++;
+  currentRow++;
 
   // Local Counsel fees
-  if (lcTotal > 0) {
-    const lcRow = worksheet.getRow(rowIndex);
-    lcRow.values = ['Local Counsel Fees', '', '', lcTotal, ''];
+  if (lcTotalProposed > 0) {
+    const lcRow = worksheet.getRow(currentRow);
+    if (hasComparison) {
+      const existingLcTotal = existingItems
+        .filter(i => i.provider === 'Local Counsel')
+        .reduce((sum, i) => sum + convert(i.fee_amount || 0), 0);
+      lcRow.values = ['Local Counsel Fees', '', '', existingLcTotal > 0 ? existingLcTotal : '', lcTotalProposed, ''];
+      lcRow.getCell(4).numFmt = '#,##0';
+      lcRow.getCell(5).numFmt = '#,##0';
+      [4, 5].forEach(col => lcRow.getCell(col).alignment = { horizontal: 'right' });
+    } else {
+      lcRow.values = ['Local Counsel Fees', '', '', lcTotalProposed, ''];
+      lcRow.getCell(4).numFmt = '#,##0';
+      lcRow.getCell(4).alignment = { horizontal: 'right' };
+    }
     lcRow.getCell(1).font = { size: 11 };
-    lcRow.getCell(4).numFmt = '#,##0';
-    lcRow.getCell(4).alignment = { horizontal: 'right' };
-    lcRow.getCell(4).font = { size: 11 };
-    rowIndex++;
+    currentRow++;
   }
 
   // Grand total row
-  rowIndex++;
-  const totalRow = worksheet.getRow(rowIndex);
-  totalRow.values = ['TOTAL FEE ESTIMATE', '', '', grandTotal, ''];
+  currentRow++;
+  const totalRow = worksheet.getRow(currentRow);
+  const grandChange = grandTotalProposed - grandTotalExisting;
+  
+  if (hasComparison) {
+    totalRow.values = [
+      'TOTAL FEE ESTIMATE',
+      '',
+      '',
+      grandTotalExisting > 0 ? grandTotalExisting : '',
+      grandTotalProposed,
+      Math.abs(grandChange) > 0.01 ? grandChange : '',
+    ];
+    [4, 5].forEach(col => {
+      if (totalRow.getCell(col).value) {
+        totalRow.getCell(col).numFmt = '#,##0';
+        totalRow.getCell(col).alignment = { horizontal: 'right' };
+        totalRow.getCell(col).fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF3F4F6' },
+        };
+      }
+    });
+    if (Math.abs(grandChange) > 0.01) {
+      totalRow.getCell(6).numFmt = '+#,##0;-#,##0;0';
+      totalRow.getCell(6).alignment = { horizontal: 'right' };
+      totalRow.getCell(6).font = { 
+        bold: true, 
+        size: 13, 
+        color: { argb: grandChange > 0 ? changeUpColor : changeDownColor } 
+      };
+      totalRow.getCell(6).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFF3F4F6' },
+      };
+    }
+    totalRow.getCell(4).font = { size: 12, color: { argb: 'FF6B7280' } };
+    totalRow.getCell(5).font = { bold: true, size: 13, color: { argb: primaryColor } };
+  } else {
+    totalRow.values = ['TOTAL FEE ESTIMATE', '', '', grandTotalProposed, ''];
+    totalRow.getCell(4).numFmt = '#,##0';
+    totalRow.getCell(4).alignment = { horizontal: 'right' };
+    totalRow.getCell(4).font = { bold: true, size: 13, color: { argb: primaryColor } };
+    totalRow.getCell(4).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFF3F4F6' },
+    };
+  }
+  
   totalRow.getCell(1).font = { bold: true, size: 13, color: { argb: primaryColor } };
-  totalRow.getCell(4).numFmt = '#,##0';
-  totalRow.getCell(4).alignment = { horizontal: 'right' };
-  totalRow.getCell(4).font = { bold: true, size: 13, color: { argb: primaryColor } };
-  totalRow.getCell(4).fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FFF3F4F6' },
-  };
   totalRow.eachCell((cell) => {
     cell.border = {
       top: { style: 'medium', color: { argb: primaryColor } },
@@ -341,12 +547,12 @@ export async function exportDraftBudgetToExcel({
   totalRow.height = 28;
 
   // Footer with assumptions/notes
-  rowIndex += 3;
-  worksheet.mergeCells(`A${rowIndex}:E${rowIndex}`);
-  const footerCell = worksheet.getCell(`A${rowIndex}`);
+  currentRow += 3;
+  worksheet.mergeCells(`A${currentRow}:${lastCol}${currentRow}`);
+  const footerCell = worksheet.getCell(`A${currentRow}`);
   footerCell.value = 'Notes:';
   footerCell.font = { bold: true, size: 10, color: { argb: 'FF6B7280' } };
-  rowIndex++;
+  currentRow++;
 
   const assumptions = [
     'This fee estimate is provided for discussion purposes and is subject to change.',
@@ -356,12 +562,12 @@ export async function exportDraftBudgetToExcel({
   ];
 
   for (const assumption of assumptions) {
-    worksheet.mergeCells(`A${rowIndex}:E${rowIndex}`);
-    const noteCell = worksheet.getCell(`A${rowIndex}`);
+    worksheet.mergeCells(`A${currentRow}:${lastCol}${currentRow}`);
+    const noteCell = worksheet.getCell(`A${currentRow}`);
     noteCell.value = `• ${assumption}`;
     noteCell.font = { size: 9, color: { argb: 'FF9CA3AF' } };
     noteCell.alignment = { wrapText: true };
-    rowIndex++;
+    currentRow++;
   }
 
   // Generate and download

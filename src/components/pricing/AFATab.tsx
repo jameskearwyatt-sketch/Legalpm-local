@@ -235,8 +235,13 @@ export function AFATab({
       await toggleAFA.mutateAsync({ afaType: type, enabled: false });
     }
     
-    if (enabled && !expandedTypes.includes(type)) {
-      setExpandedTypes(prev => [...prev, type]);
+    // Auto-expand on enable, auto-collapse on disable
+    if (enabled) {
+      if (!expandedTypes.includes(type)) {
+        setExpandedTypes(prev => [...prev, type]);
+      }
+    } else {
+      setExpandedTypes(prev => prev.filter(t => t !== type));
     }
   };
 

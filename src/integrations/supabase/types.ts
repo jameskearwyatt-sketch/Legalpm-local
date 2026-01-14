@@ -688,6 +688,60 @@ export type Database = {
         }
         Relationships: []
       }
+      lc_work_item_quotes: {
+        Row: {
+          created_at: string
+          fee_amount: number
+          fee_lower: number
+          fee_upper: number
+          id: string
+          lc_library_id: string
+          proposal_id: string
+          updated_at: string
+          user_id: string
+          work_item_key: string
+        }
+        Insert: {
+          created_at?: string
+          fee_amount?: number
+          fee_lower?: number
+          fee_upper?: number
+          id?: string
+          lc_library_id: string
+          proposal_id: string
+          updated_at?: string
+          user_id: string
+          work_item_key: string
+        }
+        Update: {
+          created_at?: string
+          fee_amount?: number
+          fee_lower?: number
+          fee_upper?: number
+          id?: string
+          lc_library_id?: string
+          proposal_id?: string
+          updated_at?: string
+          user_id?: string
+          work_item_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lc_work_item_quotes_lc_library_id_fkey"
+            columns: ["lc_library_id"]
+            isOneToOne: false
+            referencedRelation: "local_counsel_library"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lc_work_item_quotes_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       local_counsel_library: {
         Row: {
           country: string

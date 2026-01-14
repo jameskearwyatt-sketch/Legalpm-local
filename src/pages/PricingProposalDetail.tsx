@@ -1483,6 +1483,7 @@ export default function PricingProposalDetail() {
               draftItems={draftItems}
               onUpdateItem={updateItem}
               proposalCurrency={proposal?.currency || 'GBP'}
+              proposalId={proposalId!}
             />
           </TabsContent>
 

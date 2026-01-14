@@ -51,6 +51,7 @@ import {
   EstimationMethod
 } from "@/lib/hooks/usePricingProposals";
 import { useMatters } from "@/lib/hooks/useMatters";
+import { useProposalAFAs, AFA_TYPE_LABELS } from "@/lib/hooks/useProposalAFAs";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
@@ -62,6 +63,8 @@ import { EditableRateCard } from "@/components/pricing/EditableRateCard";
 import { CategorizedProposalView, categoryBgColors, categoryTextColors, categoryBorderColors } from "@/components/pricing/CategorizedProposalView";
 import { LocalCounselPanel } from "@/components/pricing/LocalCounselPanel";
 import { AFATab } from "@/components/pricing/AFATab";
+import { exportAFAProposalToExcel } from "@/lib/exportAFAProposalToExcel";
+import { applyAFAFilters, getAFASummary } from "@/lib/afaFilterUtils";
 import {
   DndContext,
   DragEndEvent,
@@ -103,6 +106,7 @@ export default function PricingProposalDetail() {
   } = usePricingProposal(proposalId);
   
   const { matters } = useMatters();
+  const { afas: proposalAFAs } = useProposalAFAs(proposalId);
 
   // Local state for editing work items
   const [draftItems, setDraftItems] = useState<DraftProposalItem[]>([]);
@@ -218,6 +222,10 @@ export default function PricingProposalDetail() {
       upperTotal,
     };
   }, [draftItems]);
+
+  const enabledAFAs = useMemo(() => {
+    return proposalAFAs.filter(a => a.is_enabled);
+  }, [proposalAFAs]);
 
   // Calculate hours with decay for negotiation turns
   const calculateNegotiationHours = (baseHours: number, decay: number, turns: number) => {
@@ -797,162 +805,27 @@ export default function PricingProposalDetail() {
     setVersionNotes("");
   };
 
-  // Export to Excel with nice formatting
+  // Export to Excel with AFA filters applied
   const exportToExcel = async () => {
-    const currencySymbol = getCurrencySymbol(proposal?.currency || 'GBP');
-    
-    // Category order for sorting
-    const categoryOrder: Record<string, number> = {
-      'Pre-signing': 1,
-      'Signing': 2,
-      'Completion': 3,
-      'Post-completion': 4,
-      'Project management': 5,
-      '': 6 // Uncategorized last
-    };
-    
-    // Filter included items and sort by category
-    const sortedItems = [...draftItems]
-      .filter(item => item.is_included || !item.is_optional)
-      .sort((a, b) => {
-        const orderA = categoryOrder[a.category || ''] ?? 99;
-        const orderB = categoryOrder[b.category || ''] ?? 99;
-        return orderA - orderB;
-      });
-    
-    // Group by category and calculate subtotals
-    const categorizedData: { category: string; items: typeof sortedItems; subtotalLower: number; subtotalUpper: number }[] = [];
-    let currentCategory = '';
-    let currentItems: typeof sortedItems = [];
-    let currentSubtotalLower = 0;
-    let currentSubtotalUpper = 0;
-    
-    sortedItems.forEach(item => {
-      const cat = item.category || 'Other';
-      if (cat !== currentCategory && currentItems.length > 0) {
-        categorizedData.push({ category: currentCategory, items: currentItems, subtotalLower: currentSubtotalLower, subtotalUpper: currentSubtotalUpper });
-        currentItems = [];
-        currentSubtotalLower = 0;
-        currentSubtotalUpper = 0;
-      }
-      currentCategory = cat;
-      currentItems.push(item);
-      currentSubtotalLower += item.fee_lower ?? item.fee_amount;
-      currentSubtotalUpper += item.fee_upper ?? item.fee_amount;
-    });
-    if (currentItems.length > 0) {
-      categorizedData.push({ category: currentCategory, items: currentItems, subtotalLower: currentSubtotalLower, subtotalUpper: currentSubtotalUpper });
-    }
-    
-    // Create workbook and worksheet
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Pricing Proposal');
-    
-    // Set column widths
-    worksheet.columns = [
-      { key: 'category', width: 22 },
-      { key: 'workItem', width: 55 },
-      { key: 'provider', width: 20 },
-      { key: 'lowerEstimate', width: 16 },
-      { key: 'upperEstimate', width: 16 },
-    ];
-    
-    // Title row with client name and proposal name
-    const clientName = proposal?.client?.name || 'Client';
-    const proposalName = proposal?.name || 'Pricing Proposal';
-    const titleRow = worksheet.addRow([`${clientName} - ${proposalName}`, '', '', '', '']);
-    titleRow.font = { bold: true, size: 16 };
-    titleRow.height = 28;
-    worksheet.mergeCells('A1:E1');
-    
-    // Empty row
-    worksheet.addRow(['', '', '', '', '']);
-    
-    // Header row
-    const headerRow = worksheet.addRow(['Category', 'Work Item', 'Provider', 'Lower Est.', 'Upper Est.']);
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    headerRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF1a365d' } // Dark blue
-    };
-    headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
-    headerRow.height = 24;
-    headerRow.getCell(4).alignment = { vertical: 'middle', horizontal: 'right' };
-    headerRow.getCell(5).alignment = { vertical: 'middle', horizontal: 'right' };
-    headerRow.eachCell(cell => {
-      cell.border = {
-        bottom: { style: 'medium', color: { argb: 'FF1a365d' } }
-      };
+    await exportAFAProposalToExcel({
+      items: draftItems,
+      enabledAFAs,
+      proposalName: proposal?.name || 'Pricing Proposal',
+      clientName: proposal?.client?.name || 'Client',
+      currency: proposal?.currency || 'GBP',
+      baselineTotal: workItemTotals.total,
+      notes: versionNotes || undefined,
     });
     
-    let grandTotalLower = 0;
-    let grandTotalUpper = 0;
-    let rowIndex = 0;
-    
-    // Colors for alternating rows
-    const lightGray = { argb: 'FFF7FAFC' };
-    const white = { argb: 'FFFFFFFF' };
-    const subtotalBg = { argb: 'FFEDF2F7' };
-    const totalBg = { argb: 'FF2D3748' };
-    
-    categorizedData.forEach(({ category, items, subtotalLower, subtotalUpper }) => {
-      items.forEach((item, idx) => {
-        const row = worksheet.addRow([
-          idx === 0 ? category : '',
-          item.work_item,
-          item.provider,
-          item.fee_lower ?? item.fee_amount,
-          item.fee_upper ?? item.fee_amount
-        ]);
-        row.fill = { type: 'pattern', pattern: 'solid', fgColor: rowIndex % 2 === 0 ? white : lightGray };
-        row.alignment = { vertical: 'middle' };
-        row.getCell(4).numFmt = `"${currencySymbol}"#,##0`;
-        row.getCell(4).alignment = { horizontal: 'right' };
-        row.getCell(5).numFmt = `"${currencySymbol}"#,##0`;
-        row.getCell(5).alignment = { horizontal: 'right' };
-        if (idx === 0) row.getCell(1).font = { bold: true };
-        rowIndex++;
-      });
-      
-      const subtotalRow = worksheet.addRow(['', `${category} Subtotal`, '', subtotalLower, subtotalUpper]);
-      subtotalRow.font = { bold: true };
-      subtotalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: subtotalBg };
-      subtotalRow.getCell(4).numFmt = `"${currencySymbol}"#,##0`;
-      subtotalRow.getCell(4).alignment = { horizontal: 'right' };
-      subtotalRow.getCell(5).numFmt = `"${currencySymbol}"#,##0`;
-      subtotalRow.getCell(5).alignment = { horizontal: 'right' };
-      
-      grandTotalLower += subtotalLower;
-      grandTotalUpper += subtotalUpper;
-      worksheet.addRow(['', '', '', '', '']);
-      rowIndex = 0;
+    toast({ 
+      title: 'Exported to Excel', 
+      description: enabledAFAs.length > 0 
+        ? `AFA-adjusted figures exported with ${enabledAFAs.length} fee arrangement(s) applied`
+        : 'Baseline figures exported'
     });
-    
-    const totalRow = worksheet.addRow(['', 'TOTAL ESTIMATE', '', grandTotalLower, grandTotalUpper]);
-    totalRow.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 12 };
-    totalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: totalBg };
-    totalRow.height = 26;
-    totalRow.getCell(4).numFmt = `"${currencySymbol}"#,##0`;
-    totalRow.getCell(4).alignment = { horizontal: 'right', vertical: 'middle' };
-    totalRow.getCell(5).numFmt = `"${currencySymbol}"#,##0`;
-    totalRow.getCell(5).alignment = { horizontal: 'right', vertical: 'middle' };
-    
-    // Generate and download file
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const fileName = `${proposal?.name || 'Proposal'}_Pricing_V${proposal?.current_version || 1}.xlsx`;
-    link.download = fileName;
-    link.click();
-    window.URL.revokeObjectURL(url);
-    
-    toast({ title: 'Exported to Excel', description: fileName });
   };
 
-  // Send to matter
+  // Send to matter (uses raw items - AFA info stored in notes)
   const handleSendToMatter = async () => {
     if (!selectedMatterId) {
       toast({ title: 'Please select a matter', variant: 'destructive' });
@@ -961,7 +834,12 @@ export default function PricingProposalDetail() {
 
     await markAsAgreed.mutateAsync({ matterId: selectedMatterId });
     setIsSendToMatterOpen(false);
-    toast({ title: 'Proposal sent to matter successfully' });
+    toast({ 
+      title: 'Proposal sent to matter successfully',
+      description: enabledAFAs.length > 0 
+        ? `${enabledAFAs.length} AFA(s) applied: ${enabledAFAs.map(a => AFA_TYPE_LABELS[a.afa_type]).join(', ')}`
+        : undefined
+    });
   };
 
   // Reactivate an agreed proposal

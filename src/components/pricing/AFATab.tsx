@@ -939,21 +939,6 @@ export function AFATab({
               <p className="font-medium">{currencySymbol}{Math.round(baselineTotals.blendedRate)}/hr</p>
             </div>
           </div>
-          <Separator className="my-4" />
-          <div className="grid grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-muted-foreground">Estimated Cost</p>
-              <p className="font-medium">{formatCurrency(baselineTotals.totalCost)}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Margin</p>
-              <p className="font-medium">{formatCurrency(baselineTotals.margin)}</p>
-            </div>
-            <div>
-              <p className="text-muted-foreground">Margin %</p>
-              <p className="font-medium">{baselineTotals.marginPercent.toFixed(1)}%</p>
-            </div>
-          </div>
         </CardContent>
       </Card>
 

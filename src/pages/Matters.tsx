@@ -719,8 +719,11 @@ export default function Matters() {
       let aVal: any, bVal: any;
       switch (sortField) {
         case 'matter_name':
-          aVal = a.matter_name.toLowerCase();
-          bVal = b.matter_name.toLowerCase();
+          // Sort by "Client Name - Matter Name" combined for alphabetical ordering
+          const aClient = ((a as any).clients?.display_name || (a as any).clients?.name || '').toLowerCase();
+          const bClient = ((b as any).clients?.display_name || (b as any).clients?.name || '').toLowerCase();
+          aVal = `${aClient} - ${a.matter_name.toLowerCase()}`;
+          bVal = `${bClient} - ${b.matter_name.toLowerCase()}`;
           break;
         case 'fee_amount':
           aVal = a.fee_amount_upper_end || 0;

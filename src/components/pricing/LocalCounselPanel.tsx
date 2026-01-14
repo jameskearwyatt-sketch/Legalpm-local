@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { Building2, Globe, Plus, Edit2, Trash2, CheckCircle2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -115,6 +115,51 @@ export function LocalCounselPanel({
       return a.country.localeCompare(b.country);
     });
   }, [draftItems]);
+
+  // Track if we're currently syncing to prevent loops
+  const isSyncingRef = useRef(false);
+
+  // Auto-sync: When a firm is selected and has stored quotes, apply them to work items
+  useEffect(() => {
+    if (isSyncingRef.current) return;
+    
+    // Check each jurisdiction for items that need syncing
+    jurisdictionData.forEach((jData) => {
+      if (!jData.activeFirmId || jData.country === 'Unassigned') return;
+      
+      const firmQuotes = getQuotesForFirm(jData.activeFirmId);
+      if (Object.keys(firmQuotes).length === 0) return;
+      
+      // Check if any work items need updating
+      jData.items.forEach(({ item, index, workItemKey }) => {
+        const storedQuote = firmQuotes[workItemKey];
+        if (!storedQuote) return;
+        
+        // Check if current values differ from stored quotes
+        const currentAmount = item.fee_amount || 0;
+        const currentLower = (item as any).fee_lower ?? currentAmount;
+        const currentUpper = (item as any).fee_upper ?? currentAmount;
+        
+        const needsUpdate = 
+          currentAmount !== storedQuote.fee_amount ||
+          currentLower !== storedQuote.fee_lower ||
+          currentUpper !== storedQuote.fee_upper;
+        
+        if (needsUpdate) {
+          isSyncingRef.current = true;
+          onUpdateItem(index, {
+            fee_amount: storedQuote.fee_amount,
+            fee_lower: storedQuote.fee_lower,
+            fee_upper: storedQuote.fee_upper,
+          });
+          // Reset sync flag after a short delay
+          setTimeout(() => {
+            isSyncingRef.current = false;
+          }, 100);
+        }
+      });
+    });
+  }, [quotesByFirm, jurisdictionData, getQuotesForFirm, onUpdateItem]);
 
   // Get firms for a specific country (from library)
   const getFirmsForCountry = (country: string): LocalCounselLibraryEntry[] => {

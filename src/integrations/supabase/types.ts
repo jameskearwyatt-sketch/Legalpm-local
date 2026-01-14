@@ -126,7 +126,10 @@ export type Database = {
           id: string
           is_included: boolean
           is_optional: boolean
+          lc_country: string | null
+          lc_currency: string | null
           lc_firm_name: string | null
+          lc_library_id: string | null
           matter_id: string
           provider: string
           sort_order: number
@@ -145,7 +148,10 @@ export type Database = {
           id?: string
           is_included?: boolean
           is_optional?: boolean
+          lc_country?: string | null
+          lc_currency?: string | null
           lc_firm_name?: string | null
+          lc_library_id?: string | null
           matter_id: string
           provider: string
           sort_order?: number
@@ -164,7 +170,10 @@ export type Database = {
           id?: string
           is_included?: boolean
           is_optional?: boolean
+          lc_country?: string | null
+          lc_currency?: string | null
           lc_firm_name?: string | null
+          lc_library_id?: string | null
           matter_id?: string
           provider?: string
           sort_order?: number

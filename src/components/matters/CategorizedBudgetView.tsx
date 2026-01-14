@@ -145,15 +145,28 @@ export function CategorizedBudgetView({
   }, [items]);
 
   // Get all possible group keys in order (category order, then provider order)
+  // Include both standard categories and any custom categories found in items
   const orderedGroupKeys = useMemo(() => {
+    // First, get all categories from items (including custom ones)
+    const customCategories = new Set<string>();
+    items.forEach(item => {
+      const category = item.category || 'Other';
+      if (!(BUDGET_CATEGORIES as readonly string[]).includes(category)) {
+        customCategories.add(category);
+      }
+    });
+    
+    // Combine standard categories with custom ones
+    const allCategories = [...BUDGET_CATEGORIES, ...Array.from(customCategories).sort()];
+    
     const keys: string[] = [];
-    BUDGET_CATEGORIES.forEach(category => {
+    allCategories.forEach(category => {
       providerNames.forEach(providerName => {
         keys.push(`${category}|${providerName}`);
       });
     });
     return keys;
-  }, [providerNames]);
+  }, [items, providerNames]);
 
   // Calculate subtotals per group
   const groupSubtotals = useMemo(() => {

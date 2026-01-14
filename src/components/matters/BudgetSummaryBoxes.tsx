@@ -46,19 +46,31 @@ export function BudgetSummaryBoxes({
   agreedBillingAmount,
   mandatedRate,
 }: BudgetSummaryBoxesProps) {
+  // Get all categories including custom ones
+  const allCategories = useMemo(() => {
+    const customCategories = new Set<string>();
+    items.forEach(item => {
+      const category = item.category || 'Other';
+      if (!(BUDGET_CATEGORIES as readonly string[]).includes(category)) {
+        customCategories.add(category);
+      }
+    });
+    return [...BUDGET_CATEGORIES, ...Array.from(customCategories).sort()];
+  }, [items]);
+
   // Calculate totals per category
   const categoryTotals = useMemo(() => {
-    const totals: Record<BudgetCategory, { budget: number; used: number; writeOff: number }> = {} as Record<BudgetCategory, { budget: number; used: number; writeOff: number }>;
+    const totals: Record<string, { budget: number; used: number; writeOff: number }> = {};
     
-    BUDGET_CATEGORIES.forEach(category => {
+    allCategories.forEach(category => {
       totals[category] = { budget: 0, used: 0, writeOff: 0 };
     });
     
     items.forEach(item => {
-      const category = (item.category || 'Other') as BudgetCategory;
+      const category = item.category || 'Other';
       const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
       
-      // Ensure category exists in totals (fallback to 'Other' if not a standard category)
+      // Ensure category exists in totals (fallback for any new categories)
       if (!totals[category]) {
         totals[category] = { budget: 0, used: 0, writeOff: 0 };
       }
@@ -73,7 +85,7 @@ export function BudgetSummaryBoxes({
     });
     
     return totals;
-  }, [items]);
+  }, [items, allCategories]);
 
   // Calculate totals per provider (budget, wip, write-off)
   const providerTotals = useMemo(() => {
@@ -111,9 +123,9 @@ export function BudgetSummaryBoxes({
     <div className="space-y-3">
       {/* Category Summary Boxes */}
       <div className="flex flex-wrap gap-2">
-        {BUDGET_CATEGORIES.map(category => {
+        {allCategories.map(category => {
           const catData = categoryTotals[category];
-          if (catData.budget === 0 && catData.used === 0 && catData.writeOff === 0) return null;
+          if (!catData || (catData.budget === 0 && catData.used === 0 && catData.writeOff === 0)) return null;
           
           const displayBudget = differentBillingCurrency && agreedBillingAmount > 0
             ? catData.budget * mandatedRate
@@ -131,15 +143,20 @@ export function BudgetSummaryBoxes({
                            burnPct > 70 ? 'text-amber-600 dark:text-amber-400' : 
                            'text-green-600 dark:text-green-400';
           
+          // Get colors - use fallback for custom categories
+          const isStandardCategory = (BUDGET_CATEGORIES as readonly string[]).includes(category);
+          const bgColor = isStandardCategory ? categoryBgColors[category as BudgetCategory] : 'bg-slate-100 dark:bg-slate-800/50';
+          const textColor = isStandardCategory ? categoryTextColors[category as BudgetCategory] : 'text-slate-700 dark:text-slate-300';
+          
           return (
             <div
               key={category}
               className={cn(
                 'rounded-md px-3 py-2 border min-w-[140px]',
-                categoryBgColors[category]
+                bgColor
               )}
             >
-              <div className={cn('text-xs font-medium mb-1', categoryTextColors[category])}>
+              <div className={cn('text-xs font-medium mb-1', textColor)}>
                 {category}
               </div>
               {displayWriteOff > 0 ? (
@@ -158,7 +175,7 @@ export function BudgetSummaryBoxes({
                       {formatCurrency(displayAdjUsed, displayCurrency)}
                     </span>
                     <span className="text-muted-foreground">/</span>
-                    <span className={cn('font-semibold', categoryTextColors[category])}>
+                    <span className={cn('font-semibold', textColor)}>
                       {formatCurrency(displayBudget, displayCurrency)}
                     </span>
                     <span className={cn('font-medium', burnColor)}>
@@ -176,7 +193,7 @@ export function BudgetSummaryBoxes({
                       <span className="text-xs text-muted-foreground">/</span>
                     </>
                   )}
-                  <span className={cn('text-sm font-semibold', categoryTextColors[category])}>
+                  <span className={cn('text-sm font-semibold', textColor)}>
                     {formatCurrency(displayBudget, displayCurrency)}
                   </span>
                   {displayAdjUsed > 0 && (

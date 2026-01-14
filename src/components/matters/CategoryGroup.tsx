@@ -3,10 +3,10 @@ import { useDroppable } from '@dnd-kit/core';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
-import { BudgetCategory } from '@/lib/hooks/useBudgetVersions';
+import { BudgetCategory, BUDGET_CATEGORIES } from '@/lib/hooks/useBudgetVersions';
 
 interface CategoryGroupProps {
-  category: BudgetCategory;
+  category: string; // Changed from BudgetCategory to string to support custom categories
   providerName?: string;
   groupKey: string;
   subtotal: number;
@@ -54,6 +54,21 @@ function getBurnHealth(budgetUsed: number, budget: number): string {
   return 'text-red-600 dark:text-red-400';
 }
 
+// Helper to get colors for a category (with fallback for custom categories)
+function getCategoryColor(category: string): string {
+  if ((BUDGET_CATEGORIES as readonly string[]).includes(category)) {
+    return categoryColors[category as BudgetCategory];
+  }
+  return 'bg-slate-100 dark:bg-slate-800/50 border-slate-300 dark:border-slate-600';
+}
+
+function getCategoryTextColor(category: string): string {
+  if ((BUDGET_CATEGORIES as readonly string[]).includes(category)) {
+    return categoryTextColors[category as BudgetCategory];
+  }
+  return 'text-slate-700 dark:text-slate-300';
+}
+
 export function CategoryGroup({
   category,
   providerName,
@@ -93,7 +108,7 @@ export function CategoryGroup({
       ref={setNodeRef}
       className={cn(
         'rounded-lg border transition-all',
-        categoryColors[category],
+        getCategoryColor(category),
         isOver && 'ring-2 ring-primary ring-offset-2',
         isEmpty && 'opacity-60'
       )}
@@ -103,7 +118,7 @@ export function CategoryGroup({
         className={cn(
           'flex items-center justify-between px-3 py-2 cursor-pointer select-none',
           !isEmpty && 'border-b',
-          categoryColors[category]
+          getCategoryColor(category)
         )}
         onClick={() => !isEmpty && setIsCollapsed(!isCollapsed)}
       >
@@ -115,7 +130,7 @@ export function CategoryGroup({
               <ChevronDown className="h-4 w-4 text-muted-foreground" />
             )
           )}
-          <span className={cn('font-semibold text-sm', categoryTextColors[category])}>
+          <span className={cn('font-semibold text-sm', getCategoryTextColor(category))}>
             {displayName}
           </span>
         </div>
@@ -150,7 +165,7 @@ export function CategoryGroup({
                   <span className="text-muted-foreground">/</span>
                 </>
               )}
-              <span className={cn('font-medium', categoryTextColors[category])}>
+              <span className={cn('font-medium', getCategoryTextColor(category))}>
                 {formatCurrency(subtotal, currency)}
               </span>
               {adjBudgetUsed > 0 && (

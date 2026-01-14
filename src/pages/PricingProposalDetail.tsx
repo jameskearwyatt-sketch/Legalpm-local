@@ -95,6 +95,7 @@ export default function PricingProposalDetail() {
     updateCurrentVersion,
     saveVersion,
     markAsAgreed,
+    reactivateProposal,
     fetchVersionItems,
     deleteVersion
   } = usePricingProposal(proposalId);
@@ -112,6 +113,7 @@ export default function PricingProposalDetail() {
   
   const [isDeletingVersion, setIsDeletingVersion] = useState(false);
   const [isSendToMatterOpen, setIsSendToMatterOpen] = useState(false);
+  const [isReactivateDialogOpen, setIsReactivateDialogOpen] = useState(false);
   const [selectedMatterId, setSelectedMatterId] = useState<string>("");
   const [versionNotes, setVersionNotes] = useState("");
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
@@ -948,6 +950,12 @@ export default function PricingProposalDetail() {
     toast({ title: 'Proposal sent to matter successfully' });
   };
 
+  // Reactivate an agreed proposal
+  const handleReactivate = async () => {
+    await reactivateProposal.mutateAsync();
+    setIsReactivateDialogOpen(false);
+  };
+
   // View version history
   const handleViewVersion = async (versionId: string) => {
     setSelectedVersionId(versionId);
@@ -1155,6 +1163,61 @@ export default function PricingProposalDetail() {
                 </Dialog>
               </>
             )}
+                {proposal.status === 'Agreed' && (
+                  <Dialog open={isReactivateDialogOpen} onOpenChange={setIsReactivateDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        Reactivate Proposal
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Reactivate Proposal</DialogTitle>
+                        <DialogDescription>
+                          This will set the proposal back to Draft status so you can edit and resend it.
+                          {proposal.linked_matter_id && (
+                            <span className="block mt-2 text-destructive">
+                              The budget imported to the linked matter will be deleted.
+                            </span>
+                          )}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="py-4">
+                        <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                          <p className="text-sm text-amber-800 dark:text-amber-200">
+                            <strong>What will happen:</strong>
+                          </p>
+                          <ul className="text-sm text-amber-700 dark:text-amber-300 list-disc list-inside mt-2 space-y-1">
+                            <li>Proposal status will change from Agreed to Draft</li>
+                            {proposal.linked_matter_id && (
+                              <li>The budget version created from this proposal will be removed from the matter</li>
+                            )}
+                            <li>You'll be able to edit work items and pricing</li>
+                            <li>You can send the proposal to a matter again when ready</li>
+                          </ul>
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsReactivateDialogOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button 
+                          variant="destructive"
+                          onClick={handleReactivate}
+                          disabled={reactivateProposal.isPending}
+                        >
+                          {reactivateProposal.isPending ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          ) : (
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                          )}
+                          Reactivate
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                )}
               </>
             )}
           </div>

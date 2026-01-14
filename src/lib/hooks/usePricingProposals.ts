@@ -74,6 +74,7 @@ export interface PricingProposal {
   rate_card: RateCard | null;
   work_phases: WorkPhase[] | null;
   assumptions: ProposalAssumptions | null;
+  linked_matter_id: string | null;
   created_at: string;
   updated_at: string;
   client?: {
@@ -552,10 +553,13 @@ export function usePricingProposal(proposalId?: string) {
   // Mark as agreed and optionally send to matter
   const markAsAgreed = useMutation({
     mutationFn: async ({ matterId, createNewMatter }: { matterId?: string; createNewMatter?: boolean }) => {
-      // Update proposal status
+      // Update proposal status and link to matter
       await supabase
         .from('pricing_proposals')
-        .update({ status: 'Agreed' })
+        .update({ 
+          status: 'Agreed',
+          linked_matter_id: matterId || null
+        })
         .eq('id', proposalId!);
 
       // If sending to a matter
@@ -643,6 +647,116 @@ export function usePricingProposal(proposalId?: string) {
     },
   });
 
+  // Reactivate an agreed proposal - delete budget from matter and set back to draft
+  const reactivateProposal = useMutation({
+    mutationFn: async () => {
+      const linkedMatterId = proposalQuery.data?.linked_matter_id;
+      
+      // If linked to a matter, delete the budget version(s) created from this proposal
+      if (linkedMatterId) {
+        // Get all budget versions for this matter that came from this proposal
+        const { data: versions } = await supabase
+          .from('budget_versions')
+          .select('id')
+          .eq('matter_id', linkedMatterId)
+          .ilike('notes', `%Imported from pricing proposal: ${proposalQuery.data?.name}%`);
+
+        if (versions && versions.length > 0) {
+          // Delete budget line items first (they reference budget versions)
+          for (const version of versions) {
+            await supabase
+              .from('budget_line_items')
+              .delete()
+              .eq('budget_version_id', version.id);
+          }
+
+          // Delete the budget versions
+          for (const version of versions) {
+            await supabase
+              .from('budget_versions')
+              .delete()
+              .eq('id', version.id);
+          }
+        }
+
+        // Get remaining versions after deletion
+        const { data: remainingVersions } = await supabase
+          .from('budget_versions')
+          .select('*')
+          .eq('matter_id', linkedMatterId)
+          .order('version_number', { ascending: false });
+
+        // Fetch current matter to check for different billing currency
+        const { data: currentMatter } = await supabase
+          .from('matters')
+          .select('different_billing_currency, agreed_billing_amount, fee_amount_upper_end')
+          .eq('id', linkedMatterId)
+          .single();
+
+        // Update matters table with the previous version's totals, or zero if no versions left
+        if (remainingVersions && remainingVersions.length > 0) {
+          const newLatest = remainingVersions[0];
+          
+          const matterUpdate: Record<string, number> = {
+            fee_amount_upper_end: newLatest.total_amount,
+            bm_fee_component: newLatest.bm_total,
+            local_counsel_fee: newLatest.local_counsel_total,
+          };
+
+          // Update agreed_billing_amount proportionally if different billing currency
+          if (currentMatter?.different_billing_currency && 
+              currentMatter.agreed_billing_amount > 0 && 
+              currentMatter.fee_amount_upper_end > 0) {
+            const mandatedRate = currentMatter.agreed_billing_amount / currentMatter.fee_amount_upper_end;
+            matterUpdate.agreed_billing_amount = newLatest.total_amount * mandatedRate;
+          }
+
+          await supabase
+            .from('matters')
+            .update(matterUpdate)
+            .eq('id', linkedMatterId);
+        } else {
+          // No versions left, reset to zero
+          const matterUpdate: Record<string, number> = {
+            fee_amount_upper_end: 0,
+            bm_fee_component: 0,
+            local_counsel_fee: 0,
+          };
+
+          // Also reset agreed_billing_amount if different billing currency
+          if (currentMatter?.different_billing_currency) {
+            matterUpdate.agreed_billing_amount = 0;
+          }
+
+          await supabase
+            .from('matters')
+            .update(matterUpdate)
+            .eq('id', linkedMatterId);
+        }
+      }
+
+      // Reset proposal status to Draft and clear linked matter
+      await supabase
+        .from('pricing_proposals')
+        .update({ 
+          status: 'Draft',
+          linked_matter_id: null
+        })
+        .eq('id', proposalId!);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pricing-proposal', proposalId] });
+      queryClient.invalidateQueries({ queryKey: ['pricing-proposals'] });
+      queryClient.invalidateQueries({ queryKey: ['matters'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-versions'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-line-items'] });
+      toast({ title: 'Proposal reactivated', description: 'You can now edit and resend this proposal' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to reactivate proposal', description: error.message, variant: 'destructive' });
+    },
+  });
+
   // Delete a specific version
   const deleteVersion = useMutation({
     mutationFn: async (versionId: string) => {
@@ -684,6 +798,7 @@ export function usePricingProposal(proposalId?: string) {
     updateCurrentVersion,
     saveVersion,
     markAsAgreed,
+    reactivateProposal,
     fetchVersionItems,
     deleteVersion,
   };

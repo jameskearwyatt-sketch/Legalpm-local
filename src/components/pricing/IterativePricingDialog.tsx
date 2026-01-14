@@ -149,7 +149,7 @@ export function IterativePricingDialog({
 
   // Calculate the breakdown and total fee
   const calculation = useMemo(() => {
-    const discountMultiplier = 1 - (assumptions.afaDiscount / 100);
+    // Use standard rates (no discount applied - AFA handles discounts separately)
     const decay = getDecayFactor();
 
     const grades = [
@@ -166,7 +166,7 @@ export function IterativePricingDialog({
     const breakdown = grades.map(grade => {
       const firstTurnHours = feeOwnerHours[grade.key] || 0;
       const totalGradeHours = calculateTotalHoursWithDecay(firstTurnHours);
-      const effectiveRate = grade.rate * discountMultiplier;
+      const effectiveRate = grade.rate; // No discount - AFA handles discounts
       const fee = totalGradeHours * effectiveRate;
       const cost = totalGradeHours * grade.cost;
       

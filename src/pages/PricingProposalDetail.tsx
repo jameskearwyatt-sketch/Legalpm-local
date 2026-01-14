@@ -121,6 +121,7 @@ export default function PricingProposalDetail() {
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [isViewingHistory, setIsViewingHistory] = useState(false);
   const [activeTab, setActiveTab] = useState("items");
+  const [afaDiscountPercent, setAfaDiscountPercent] = useState(0);
 
   // Local state for proposal-specific settings
   const [rateCard, setRateCard] = useState<RateCard>(DEFAULT_RATE_CARD);
@@ -187,31 +188,26 @@ export default function PricingProposalDetail() {
     }
   }, [savedItems]);
 
-  // AFA discount multiplier for dynamic application
-  const afaDiscountMultiplier = 1 - (assumptions.afaDiscount / 100);
-
-  // Calculate work items totals with AFA discount applied
+  // Calculate work items totals (baseline - no discount applied here, discount is handled in AFA)
   const workItemTotals = useMemo(() => {
     const includedItems = draftItems.filter(item => 
       !item.is_optional || (item.is_optional && item.is_included !== false)
     );
     
-    // Apply AFA discount to Baker McKenzie fees only (Local Counsel fees are pass-through)
     const bmTotal = includedItems
       .filter(item => item.provider === 'Baker McKenzie')
-      .reduce((sum, item) => sum + ((item.fee_amount || 0) * afaDiscountMultiplier), 0);
+      .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
     const localCounselTotal = includedItems
       .filter(item => item.provider === 'Local Counsel')
       .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
     
-    // Calculate lower and upper totals with AFA discount applied to BM fees
     const lowerTotal = includedItems.reduce((sum, item) => {
       const baseFee = item.fee_lower ?? item.fee_amount ?? 0;
-      return sum + (item.provider === 'Baker McKenzie' ? baseFee * afaDiscountMultiplier : baseFee);
+      return sum + baseFee;
     }, 0);
     const upperTotal = includedItems.reduce((sum, item) => {
       const baseFee = item.fee_upper ?? item.fee_amount ?? 0;
-      return sum + (item.provider === 'Baker McKenzie' ? baseFee * afaDiscountMultiplier : baseFee);
+      return sum + baseFee;
     }, 0);
     
     return {
@@ -221,7 +217,7 @@ export default function PricingProposalDetail() {
       lowerTotal,
       upperTotal,
     };
-  }, [draftItems, afaDiscountMultiplier]);
+  }, [draftItems]);
 
   // Calculate hours with decay for negotiation turns
   const calculateNegotiationHours = (baseHours: number, decay: number, turns: number) => {
@@ -253,10 +249,9 @@ export default function PricingProposalDetail() {
     const totalPartnerHours = calculateNegotiationHours(partnerHours, decayFactor, numTurns);
     const totalAssociateHours = calculateNegotiationHours(associateHours, decayFactor, numTurns);
     
-    // Apply AFA discount
-    const discountMultiplier = 1 - (assumptions.afaDiscount / 100);
-    const partnerRate = rateCard.partner.rate * discountMultiplier;
-    const associateRate = rateCard.associate.rate * discountMultiplier;
+    // Use standard rates (no discount applied to baseline - AFA handles discounts separately)
+    const partnerRate = rateCard.partner.rate;
+    const associateRate = rateCard.associate.rate;
     
     return Math.round((totalPartnerHours * partnerRate) + (totalAssociateHours * associateRate));
   };
@@ -310,7 +305,7 @@ export default function PricingProposalDetail() {
   const summary = useMemo(() => {
     const rates = rateCard;
     const ass = assumptions;
-    const discountMultiplier = 1 - (ass.afaDiscount / 100);
+    // No discount applied to baseline - AFA tab handles discounts separately
 
     // Sum hours from all Baker McKenzie items
     let totalPartnerHours = 0;
@@ -340,7 +335,7 @@ export default function PricingProposalDetail() {
           // Estimate hours using pyramid structure for manual/AI items
           const feeAmount = item.fee_amount || 0;
           if (feeAmount > 0) {
-            const estimated = estimateHoursFromFee(feeAmount, discountMultiplier);
+            const estimated = estimateHoursFromFee(feeAmount, 1); // No discount multiplier
             totalPartnerHours += estimated.partnerHours;
             totalSeniorAssociateHours += estimated.seniorAssociateHours;
             totalAssociateHours += estimated.associateHours;
@@ -355,11 +350,11 @@ export default function PricingProposalDetail() {
     totalPartnerHours += meetingPartnerHours;
     totalAssociateHours += meetingAssociateHours;
 
-    // Rates with discount
-    const afaPartnerRate = rates.partner.rate * discountMultiplier;
-    const afaSeniorAssociateRate = rates.seniorAssociate.rate * discountMultiplier;
-    const afaAssociateRate = rates.associate.rate * discountMultiplier;
-    const afaTraineeRate = rates.trainee.rate * discountMultiplier;
+    // Standard rates (no discount - AFA handles discounts)
+    const afaPartnerRate = rates.partner.rate;
+    const afaSeniorAssociateRate = rates.seniorAssociate.rate;
+    const afaAssociateRate = rates.associate.rate;
+    const afaTraineeRate = rates.trainee.rate;
 
     // Revenue by grade
     const partnerRevenue = totalPartnerHours * afaPartnerRate;
@@ -1093,9 +1088,9 @@ export default function PricingProposalDetail() {
                     ? versions.find(v => v.id === selectedVersionId)?.version_number || proposal.current_version
                     : proposal.current_version}
                 </Badge>
-                {assumptions.afaDiscount > 0 && (
+                {afaDiscountPercent > 0 && (
                   <Badge variant="destructive" className="bg-red-600 text-white">
-                    AFA discount applied: {assumptions.afaDiscount}%
+                    Discounted Rates: {afaDiscountPercent}%
                   </Badge>
                 )}
               </div>
@@ -1523,7 +1518,6 @@ export default function PricingProposalDetail() {
                                   viewingHistoricalVersion={viewingHistoricalVersion}
                                   customCategories={customCategories}
                                   onAddCustomCategory={addCustomCategory}
-                                  afaDiscountMultiplier={afaDiscountMultiplier}
                                 />
                               ))}
                             </SortableContext>
@@ -1594,6 +1588,7 @@ export default function PricingProposalDetail() {
                 totalCost: summary.totalCost,
               }}
               customCategories={customCategories}
+              onDiscountChange={setAfaDiscountPercent}
             />
           </TabsContent>
 
@@ -1714,20 +1709,6 @@ export default function PricingProposalDetail() {
                 </div>
 
                 <div className="grid gap-2 max-w-md">
-                  <Label>AFA Discount (%)</Label>
-                  <Input
-                    type="number"
-                    value={assumptions.afaDiscount}
-                    onChange={(e) => setAssumptions(prev => ({ ...prev, afaDiscount: parseFloat(e.target.value) || 0 }))}
-                    min={0}
-                    max={100}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Discount applied to standard billing rates for alternative fee arrangements
-                  </p>
-                </div>
-
-                <div className="grid gap-2 max-w-md">
                   <div className="flex items-center gap-2">
                     <Label>Hours Estimation Method</Label>
                     <TooltipProvider>
@@ -1800,7 +1781,7 @@ export default function PricingProposalDetail() {
                 toast({ title: 'Rate card saved' });
               }}
               isSaving={updateProposal.isPending}
-              afaDiscount={assumptions.afaDiscount}
+              afaDiscount={afaDiscountPercent}
             />
           </TabsContent>
 

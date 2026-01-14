@@ -177,7 +177,9 @@ export function AFATab({
       }
       case 'success_fee': {
         const cfg = config as SuccessFeeConfig;
-        return cfg.upliftAmount;
+        // Success fee is the baseline + uplift amount
+        const uplift = cfg.upliftAmount || Math.round(baseline * (cfg.upliftPercent / 100));
+        return baseline + uplift;
       }
       default:
         return baseline;
@@ -801,13 +803,14 @@ export function AFATab({
   // Render Success Fee configuration
   const renderSuccessFeeConfig = (afa: ProposalAFA | undefined) => {
     const config = (afa?.config || getDefaultConfig('success_fee')) as SuccessFeeConfig;
+    const upliftAmount = config.upliftAmount || Math.round(baselineTotals.total * (config.upliftPercent / 100));
     
     return (
       <div className="space-y-4">
-        <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 border border-amber-200 dark:border-amber-800">
-          <p className="text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2">
+        <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
+          <p className="text-sm text-blue-800 dark:text-blue-200 flex items-center gap-2">
             <Info className="h-4 w-4" />
-            This is an add-on. Select a base pricing structure above.
+            Success fee added to baseline estimate of {formatCurrency(baselineTotals.total)}
           </p>
         </div>
         
@@ -829,10 +832,11 @@ export function AFATab({
                 value={config.upliftPercent}
                 onChange={(e) => {
                   const percent = parseFloat(e.target.value) || 0;
+                  const newUplift = Math.round(baselineTotals.total * (percent / 100));
                   handleConfigChange('success_fee', { 
                     ...config, 
                     upliftPercent: percent,
-                    upliftAmount: Math.round(baselineTotals.total * (percent / 100))
+                    upliftAmount: newUplift
                   });
                 }}
                 className="w-24"
@@ -850,11 +854,20 @@ export function AFATab({
           </div>
         </div>
         
-        <div className="bg-muted/50 rounded-lg p-4">
-          <p className="text-sm text-muted-foreground mb-1">Success fee amount</p>
-          <p className="text-xl font-bold">
-            {formatCurrency(config.upliftAmount || Math.round(baselineTotals.total * (config.upliftPercent / 100)))}
-          </p>
+        <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span>Baseline fees</span>
+            <span>{formatCurrency(baselineTotals.total)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Success fee uplift</span>
+            <span className="text-green-600">+{formatCurrency(upliftAmount)}</span>
+          </div>
+          <Separator />
+          <div className="flex justify-between font-bold">
+            <span>Total on success</span>
+            <span>{formatCurrency(baselineTotals.total + upliftAmount)}</span>
+          </div>
         </div>
       </div>
     );

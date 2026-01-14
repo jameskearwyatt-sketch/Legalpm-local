@@ -57,6 +57,12 @@ export function BudgetSummaryBoxes({
     items.forEach(item => {
       const category = (item.category || 'Other') as BudgetCategory;
       const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
+      
+      // Ensure category exists in totals (fallback to 'Other' if not a standard category)
+      if (!totals[category]) {
+        totals[category] = { budget: 0, used: 0, writeOff: 0 };
+      }
+      
       if (isIncluded) {
         totals[category].budget += item.fee_amount || 0;
       }

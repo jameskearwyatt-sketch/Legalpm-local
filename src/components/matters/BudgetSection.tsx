@@ -555,6 +555,18 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   // Handle exporting draft to Excel
   const handleExportDraft = async (draft?: BudgetDraft) => {
     const itemsToExport = draft ? draft.line_items : draftItems;
+    
+    // Get existing budget items for comparison (if there's an existing budget)
+    const existingItems = hasExistingBudget && latestLineItems.length > 0 
+      ? latestLineItems.map(item => ({
+          work_item: item.work_item,
+          provider: item.provider,
+          fee_amount: item.fee_amount,
+          lc_firm_name: item.lc_firm_name || undefined,
+          category: item.category || undefined,
+        }))
+      : [];
+    
     try {
       await exportDraftBudgetToExcel({
         items: itemsToExport,
@@ -564,6 +576,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         draftName: draft?.name || 'Draft Budget Proposal',
         notes: draft?.notes || notes || undefined,
         conversionRate: mandatedRate,
+        existingItems,
       });
       toast.success('Draft budget exported to Excel');
     } catch (error) {
@@ -1341,9 +1354,9 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                         )}
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">{formatCurrency(draft.total_amount)}</p>
+                        <p className="font-semibold">{formatCurrency(draft.total_amount, billingCurrency)}</p>
                         <p className="text-xs text-muted-foreground">
-                          BM: {formatCurrency(draft.bm_total)} | LC: {formatCurrency(draft.local_counsel_total)}
+                          BM: {formatCurrency(draft.bm_total, billingCurrency)} | LC: {formatCurrency(draft.local_counsel_total, billingCurrency)}
                         </p>
                       </div>
                     </div>

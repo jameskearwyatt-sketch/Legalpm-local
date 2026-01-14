@@ -108,6 +108,9 @@ export interface PricingProposalItem {
   pricing_method: 'ai_suggested' | 'pricing_tool' | 'manual';
   category: string | null;
   lc_firm_name: string | null;
+  lc_country: string | null;
+  lc_library_id: string | null;
+  lc_currency: string | null;
   is_optional: boolean;
   is_included: boolean;
   sort_order: number;
@@ -137,6 +140,9 @@ export interface DraftProposalItem {
   pricing_method: 'ai_suggested' | 'pricing_tool' | 'manual';
   category?: string | null;
   lc_firm_name?: string;
+  lc_country?: string | null;
+  lc_library_id?: string | null;
+  lc_currency?: string | null;
   is_optional?: boolean;
   is_included?: boolean;
   ai_rationale?: string | null;
@@ -512,6 +518,9 @@ export function usePricingProposal(proposalId?: string) {
             pricing_method: item.pricing_method,
             category: item.category || null,
             lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
+            lc_country: item.provider === 'Local Counsel' ? (item.lc_country || null) : null,
+            lc_library_id: item.provider === 'Local Counsel' ? (item.lc_library_id || null) : null,
+            lc_currency: item.provider === 'Local Counsel' ? (item.lc_currency || null) : null,
             is_optional: item.is_optional ?? false,
             is_included: item.is_included ?? true,
             sort_order: index,

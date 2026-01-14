@@ -50,6 +50,7 @@ interface CategorizedProposalViewProps {
   onItemsChange: (items: DraftProposalItem[]) => void;
   formatCurrency: (value: number) => string;
   currencySymbol: string;
+  customCategories?: string[];
 }
 
 export function CategorizedProposalView({
@@ -57,27 +58,38 @@ export function CategorizedProposalView({
   onItemsChange,
   formatCurrency,
   currencySymbol,
+  customCategories = [],
 }: CategorizedProposalViewProps) {
   const [isCategorizing, setIsCategorizing] = useState(false);
 
-  // Calculate totals per category
+  // Combine standard and custom categories for display
+  const allCategories = useMemo(() => {
+    return [...BUDGET_CATEGORIES, ...customCategories];
+  }, [customCategories]);
+
+  // Calculate totals per category (including custom ones)
   const categoryTotals = useMemo(() => {
-    const totals: Record<BudgetCategory, number> = {} as Record<BudgetCategory, number>;
+    const totals: Record<string, number> = {};
     
-    BUDGET_CATEGORIES.forEach(category => {
+    // Initialize all known categories
+    allCategories.forEach(category => {
       totals[category] = 0;
     });
     
     items.forEach(item => {
-      const category = (item.category || 'Other') as BudgetCategory;
+      const category = item.category || 'Other';
       const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
       if (isIncluded) {
+        // Ensure category exists in totals (in case item has a category not in allCategories)
+        if (totals[category] === undefined) {
+          totals[category] = 0;
+        }
         totals[category] += item.fee_amount || 0;
       }
     });
     
     return totals;
-  }, [items]);
+  }, [items, allCategories]);
 
   // Grand total
   const grandTotal = useMemo(() => {
@@ -190,23 +202,29 @@ export function CategorizedProposalView({
 
       {/* Category Summary Boxes */}
       <div className="flex flex-wrap gap-2">
-        {BUDGET_CATEGORIES.map(category => {
+        {allCategories.map(category => {
           const total = categoryTotals[category];
           if (total === 0) return null;
+          
+          // Get colors - use 'Other' colors as fallback for custom categories
+          const isStandardCategory = (BUDGET_CATEGORIES as readonly string[]).includes(category);
+          const bgColor = isStandardCategory ? categoryBgColors[category as BudgetCategory] : 'bg-slate-100 dark:bg-slate-800/50';
+          const textColor = isStandardCategory ? categoryTextColors[category as BudgetCategory] : 'text-slate-700 dark:text-slate-300';
+          const borderColor = isStandardCategory ? categoryBorderColors[category as BudgetCategory] : 'border-slate-300 dark:border-slate-600';
           
           return (
             <div
               key={category}
               className={cn(
                 'rounded-md px-3 py-2 border',
-                categoryBgColors[category],
-                categoryBorderColors[category]
+                bgColor,
+                borderColor
               )}
             >
-              <div className={cn('text-xs font-medium', categoryTextColors[category])}>
+              <div className={cn('text-xs font-medium', textColor)}>
                 {category}
               </div>
-              <div className={cn('text-sm font-semibold', categoryTextColors[category])}>
+              <div className={cn('text-sm font-semibold', textColor)}>
                 {formatCurrency(total)}
               </div>
             </div>

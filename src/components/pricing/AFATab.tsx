@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -68,6 +68,7 @@ interface AFATabProps {
     totalCost: number;
   };
   customCategories?: string[];
+  onDiscountChange?: (discountPercent: number) => void;
 }
 
 const AFA_TYPES: AFAType[] = [
@@ -91,9 +92,23 @@ export function AFATab({
   formatCurrency,
   baselineTotals,
   customCategories = [],
+  onDiscountChange,
 }: AFATabProps) {
   const { afas, isLoading, upsertAFA, toggleAFA, selectForExport } = useProposalAFAs(proposalId);
   const [expandedTypes, setExpandedTypes] = useState<string[]>([]);
+
+  // Get the discounted rates AFA (for external consumption)
+  const discountedRatesAFA = afas.find(a => a.afa_type === 'discounted_rates' && a.is_enabled);
+  const activeDiscountPercent = discountedRatesAFA 
+    ? (discountedRatesAFA.config as DiscountedRatesConfig).discountPercent 
+    : 0;
+
+  // Notify parent when discount changes
+  useEffect(() => {
+    if (onDiscountChange) {
+      onDiscountChange(activeDiscountPercent);
+    }
+  }, [activeDiscountPercent, onDiscountChange]);
 
   const allCategories = useMemo(() => {
     return [...BUDGET_CATEGORIES, ...customCategories];
@@ -198,13 +213,33 @@ export function AFATab({
     });
   };
 
-  // Handle toggle
+  // Handle toggle - calculate and save initial price when enabling
   const handleToggle = async (type: AFAType, enabled: boolean) => {
-    await toggleAFA.mutateAsync({ afaType: type, enabled });
+    if (enabled) {
+      // When enabling, calculate the initial price with default config
+      const existingAfa = getAFA(type);
+      const config = existingAfa?.config || getDefaultConfig(type);
+      const clientPrice = calculateClientPrice(type, config);
+      const effectiveRate = calculateEffectiveRate(clientPrice);
+      const marginImpact = calculateMarginImpact(clientPrice);
+      
+      await upsertAFA.mutateAsync({
+        afa_type: type,
+        is_enabled: true,
+        config,
+        client_price: clientPrice,
+        effective_rate: effectiveRate,
+        margin_impact_percent: marginImpact,
+      });
+    } else {
+      await toggleAFA.mutateAsync({ afaType: type, enabled: false });
+    }
+    
     if (enabled && !expandedTypes.includes(type)) {
       setExpandedTypes(prev => [...prev, type]);
     }
   };
+
 
   // Render risk indicator badge
   const RiskBadge = ({ clientPrice, marginPercent }: { clientPrice: number; marginPercent: number }) => {

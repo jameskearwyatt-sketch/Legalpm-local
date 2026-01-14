@@ -146,9 +146,10 @@ export default function PricingProposalDetail() {
     }
   }, [proposal]);
 
-  // Initialize draft items from saved items
-  useMemo(() => {
+  // Initialize draft items from saved items and extract custom categories
+  useEffect(() => {
     if (savedItems.length > 0 && draftItems.length === 0 && !hasUnsavedChanges) {
+      // Map saved items to draft items
       setDraftItems(savedItems.map(item => ({
         id: item.id,
         work_item: item.work_item,
@@ -157,6 +158,9 @@ export default function PricingProposalDetail() {
         pricing_method: item.pricing_method,
         category: item.category,
         lc_firm_name: item.lc_firm_name || undefined,
+        lc_country: item.lc_country || undefined,
+        lc_library_id: item.lc_library_id || undefined,
+        lc_currency: item.lc_currency || undefined,
         is_optional: item.is_optional,
         is_included: item.is_included,
         ai_rationale: item.ai_rationale,
@@ -165,6 +169,19 @@ export default function PricingProposalDetail() {
         num_turns: item.num_turns || 1,
         item_type: item.item_type || 'documentation',
       })));
+
+      // Extract custom categories from saved items
+      const extractedCategories = savedItems
+        .map(item => item.category)
+        .filter((cat): cat is string => 
+          cat !== null && 
+          cat !== undefined && 
+          !(BUDGET_CATEGORIES as readonly string[]).includes(cat)
+        );
+      const uniqueCustomCategories = [...new Set(extractedCategories)];
+      if (uniqueCustomCategories.length > 0) {
+        setCustomCategories(uniqueCustomCategories);
+      }
     }
   }, [savedItems]);
 
@@ -1434,6 +1451,7 @@ export default function PricingProposalDetail() {
                     }}
                     formatCurrency={formatCurrency}
                     currencySymbol={currencySymbol}
+                    customCategories={customCategories}
                   />
                 </CardContent>
               </Card>

@@ -1334,6 +1334,7 @@ export type Database = {
           current_version: number
           description: string | null
           id: string
+          linked_matter_id: string | null
           name: string
           rate_card: Json | null
           status: string
@@ -1349,6 +1350,7 @@ export type Database = {
           current_version?: number
           description?: string | null
           id?: string
+          linked_matter_id?: string | null
           name: string
           rate_card?: Json | null
           status?: string
@@ -1364,6 +1366,7 @@ export type Database = {
           current_version?: number
           description?: string | null
           id?: string
+          linked_matter_id?: string | null
           name?: string
           rate_card?: Json | null
           status?: string
@@ -1377,6 +1380,13 @@ export type Database = {
             columns: ["client_id"]
             isOneToOne: false
             referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pricing_proposals_linked_matter_id_fkey"
+            columns: ["linked_matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
             referencedColumns: ["id"]
           },
         ]

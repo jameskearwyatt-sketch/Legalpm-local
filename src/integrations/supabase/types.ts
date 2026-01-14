@@ -1191,6 +1191,62 @@ export type Database = {
           },
         ]
       }
+      pricing_proposal_afas: {
+        Row: {
+          afa_type: string
+          client_narrative: string | null
+          client_price: number | null
+          config: Json | null
+          created_at: string
+          effective_rate: number | null
+          id: string
+          is_enabled: boolean | null
+          is_selected_for_export: boolean | null
+          margin_impact_percent: number | null
+          proposal_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          afa_type: string
+          client_narrative?: string | null
+          client_price?: number | null
+          config?: Json | null
+          created_at?: string
+          effective_rate?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          is_selected_for_export?: boolean | null
+          margin_impact_percent?: number | null
+          proposal_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          afa_type?: string
+          client_narrative?: string | null
+          client_price?: number | null
+          config?: Json | null
+          created_at?: string
+          effective_rate?: number | null
+          id?: string
+          is_enabled?: boolean | null
+          is_selected_for_export?: boolean | null
+          margin_impact_percent?: number | null
+          proposal_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_proposal_afas_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "pricing_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pricing_proposal_items: {
         Row: {
           ai_rationale: string | null

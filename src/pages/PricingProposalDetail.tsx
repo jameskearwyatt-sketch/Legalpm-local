@@ -36,7 +36,8 @@ import {
   Percent,
   DollarSign,
   HelpCircle,
-  RotateCcw
+  RotateCcw,
+  Layers
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
@@ -60,6 +61,7 @@ import { IterativePricingDialog, FeeOwnerHours } from "@/components/pricing/Iter
 import { EditableRateCard } from "@/components/pricing/EditableRateCard";
 import { CategorizedProposalView, categoryBgColors, categoryTextColors, categoryBorderColors } from "@/components/pricing/CategorizedProposalView";
 import { LocalCounselPanel } from "@/components/pricing/LocalCounselPanel";
+import { AFATab } from "@/components/pricing/AFATab";
 import {
   DndContext,
   DragEndEvent,
@@ -1242,7 +1244,7 @@ export default function PricingProposalDetail() {
 
         {/* Main Content with Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-6 max-w-4xl">
+          <TabsList className="grid w-full grid-cols-7 max-w-5xl">
             <TabsTrigger value="assumptions">
               <Calculator className="h-4 w-4 mr-2" />
               Assumptions
@@ -1254,6 +1256,10 @@ export default function PricingProposalDetail() {
             <TabsTrigger value="local-counsel">
               <Users className="h-4 w-4 mr-2" />
               Local Counsel
+            </TabsTrigger>
+            <TabsTrigger value="afa">
+              <Layers className="h-4 w-4 mr-2" />
+              AFA
             </TabsTrigger>
             <TabsTrigger value="summary">
               <TrendingUp className="h-4 w-4 mr-2" />

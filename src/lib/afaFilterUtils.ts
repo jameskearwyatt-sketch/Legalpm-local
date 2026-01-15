@@ -136,6 +136,15 @@ export function applyAFAFilters(
         const config = primaryAFA.config as FixedFeePhaseConfig;
         const phaseMap = new Map(config.phases.map(p => [p.category, p]));
         
+        // Helper to calculate adjusted amount for a phase
+        const getPhaseAdjustedAmount = (phase: typeof config.phases[0]) => {
+          const adjusted = phase.baseAmount * (1 + phase.adjustmentPercent / 100);
+          if (config.roundToNearest1000) {
+            return Math.round(adjusted / 1000) * 1000;
+          }
+          return Math.round(adjusted);
+        };
+        
         filteredItems = draftItems.map(item => {
           const phase = phaseMap.get(item.category || '');
           if (phase && phase.isIncluded && item.provider === 'Baker McKenzie') {
@@ -145,14 +154,15 @@ export function applyAFAFilters(
             );
             const categoryTotal = categoryItems.reduce((sum, i) => sum + (i.fee_amount || 0), 0);
             const ratio = categoryTotal > 0 ? (item.fee_amount || 0) / categoryTotal : 0;
-            const adjustedFee = Math.round(phase.adjustedAmount * ratio);
+            const phaseAdjustedAmount = getPhaseAdjustedAmount(phase);
+            const adjustedFee = Math.round(phaseAdjustedAmount * ratio);
             
             return {
               ...item,
               original_fee_amount: item.fee_amount,
               fee_amount: adjustedFee,
               afa_adjusted: true,
-              afa_comment: `Fixed fee for ${item.category}: ${currencySymbol}${phase.adjustedAmount.toLocaleString()}`,
+              afa_comment: `Fixed fee for ${item.category}: ${currencySymbol}${phaseAdjustedAmount.toLocaleString()}`,
             };
           }
           return {
@@ -163,7 +173,7 @@ export function applyAFAFilters(
         });
         
         const includedPhases = config.phases.filter(p => p.isIncluded);
-        globalComment = `Fixed fees by phase: ${includedPhases.map(p => `${p.category} (${currencySymbol}${p.adjustedAmount.toLocaleString()})`).join(', ')}`;
+        globalComment = `Fixed fees by phase: ${includedPhases.map(p => `${p.category} (${currencySymbol}${getPhaseAdjustedAmount(p).toLocaleString()})`).join(', ')}`;
         break;
       }
 

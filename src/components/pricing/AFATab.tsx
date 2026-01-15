@@ -157,7 +157,10 @@ export function AFATab({
         const cfg = config as FixedFeePhaseConfig;
         return cfg.phases
           .filter(p => p.isIncluded)
-          .reduce((sum, p) => sum + p.adjustedAmount, 0);
+          .reduce((sum, p) => {
+            const adjusted = p.baseAmount * (1 + p.adjustmentPercent / 100);
+            return sum + (cfg.roundToNearest1000 ? Math.round(adjusted / 1000) * 1000 : Math.round(adjusted));
+          }, 0);
       }
       case 'fee_collar': {
         const cfg = config as FeeCollarConfig;
@@ -453,26 +456,48 @@ export function AFATab({
     const updatePhase = (index: number, updates: Partial<typeof config.phases[0]>) => {
       const newPhases = [...config.phases];
       newPhases[index] = { ...newPhases[index], ...updates };
-      handleConfigChange('fixed_fee_phase', { phases: newPhases });
+      handleConfigChange('fixed_fee_phase', { ...config, phases: newPhases });
     };
     
     const initializePhases = () => {
       const phases = Object.entries(categoryTotals).map(([category, amount]) => ({
         category,
         baseAmount: amount,
-        adjustedAmount: Math.round(amount * 1.05), // 5% premium
+        adjustmentPercent: 0, // Start at 0% adjustment
         isIncluded: true,
       }));
-      handleConfigChange('fixed_fee_phase', { phases });
+      handleConfigChange('fixed_fee_phase', { ...config, phases });
     };
 
-    const includedTotal = config.phases.filter(p => p.isIncluded).reduce((sum, p) => sum + p.adjustedAmount, 0);
+    // Calculate adjusted amount for a phase
+    const getAdjustedAmount = (phase: typeof config.phases[0]) => {
+      const adjusted = phase.baseAmount * (1 + phase.adjustmentPercent / 100);
+      if (config.roundToNearest1000) {
+        return Math.round(adjusted / 1000) * 1000;
+      }
+      return Math.round(adjusted);
+    };
+
+    const includedTotal = config.phases
+      .filter(p => p.isIncluded)
+      .reduce((sum, p) => sum + getAdjustedAmount(p), 0);
     
     return (
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
-          Set fixed fees for each work category. Toggle to include/exclude from the proposal.
+          Apply percentage adjustments to each phase. Use negative values for discounts.
         </p>
+        
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="round-checkbox"
+            checked={config.roundToNearest1000}
+            onCheckedChange={(v) => handleConfigChange('fixed_fee_phase', { ...config, roundToNearest1000: !!v })}
+          />
+          <Label htmlFor="round-checkbox" className="text-sm cursor-pointer">
+            Round to nearest 1,000
+          </Label>
+        </div>
         
         {needsInit ? (
           <div className="text-center py-6">
@@ -484,26 +509,47 @@ export function AFATab({
           </div>
         ) : (
           <div className="space-y-3">
-            {config.phases.map((phase, index) => (
-              <div key={phase.category} className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg">
-                <Checkbox
-                  checked={phase.isIncluded}
-                  onCheckedChange={(v) => updatePhase(index, { isIncluded: !!v })}
-                />
-                <div className="flex-1">
-                  <p className="font-medium">{phase.category}</p>
-                  <p className="text-xs text-muted-foreground">Base: {formatCurrency(phase.baseAmount)}</p>
-                </div>
-                <div className="w-40">
-                  <Input
-                    type="number"
-                    value={phase.adjustedAmount}
-                    onChange={(e) => updatePhase(index, { adjustedAmount: parseFloat(e.target.value) || 0 })}
-                    className="text-right"
+            {config.phases.map((phase, index) => {
+              const adjustedAmount = getAdjustedAmount(phase);
+              const isUplift = phase.adjustmentPercent > 0;
+              const isDownlift = phase.adjustmentPercent < 0;
+              
+              return (
+                <div key={phase.category} className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg">
+                  <Checkbox
+                    checked={phase.isIncluded}
+                    onCheckedChange={(v) => updatePhase(index, { isIncluded: !!v })}
                   />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{phase.category}</p>
+                    <p className="text-xs text-muted-foreground">Base: {formatCurrency(phase.baseAmount)}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24">
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          value={phase.adjustmentPercent}
+                          onChange={(e) => updatePhase(index, { adjustmentPercent: parseFloat(e.target.value) || 0 })}
+                          className="text-right pr-6"
+                          step="0.5"
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">%</span>
+                      </div>
+                    </div>
+                    <div className="w-28 text-right">
+                      <p className={cn(
+                        "font-medium",
+                        isUplift && "text-green-600 dark:text-green-400",
+                        isDownlift && "text-amber-600 dark:text-amber-400"
+                      )}>
+                        {formatCurrency(adjustedAmount)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
         

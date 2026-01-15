@@ -858,21 +858,22 @@ export function QuickToDoButton() {
     const handleMouseMove = (e: MouseEvent) => {
       if (!slateResizeRef.current) return;
 
-      const deltaX = e.clientX - slateResizeRef.current.startX;
-      const deltaY = e.clientY - slateResizeRef.current.startY;
+      const { startX, startY, startWidth, startHeight, startPosY } = slateResizeRef.current;
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
 
       // Calculate new dimensions (resize from top-right corner)
-      const newWidth = Math.max(320, Math.min(window.innerWidth - 100, slateResizeRef.current.startWidth + deltaX));
-      const newHeight = Math.max(300, Math.min(window.innerHeight - 50, slateResizeRef.current.startHeight - deltaY));
+      const newWidth = Math.max(320, Math.min(window.innerWidth - 100, startWidth + deltaX));
+      const newHeight = Math.max(300, Math.min(window.innerHeight - 50, startHeight - deltaY));
 
       setSlateSize({ width: newWidth, height: newHeight });
       
       // Adjust position to keep bottom edge in place when height changes
       if (slatePosition) {
-        const heightDiff = newHeight - slateResizeRef.current.startHeight;
+        const heightDiff = newHeight - startHeight;
         setSlatePosition(prev => prev ? {
           ...prev,
-          y: slateResizeRef.current!.startPosY - heightDiff
+          y: startPosY - heightDiff
         } : prev);
       }
     };

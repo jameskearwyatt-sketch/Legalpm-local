@@ -787,6 +787,70 @@ export type Database = {
         }
         Relationships: []
       }
+      master_wip_snapshot_changes: {
+        Row: {
+          before_accounts_receivable: number | null
+          before_billed_amount: number | null
+          before_paid_amount: number | null
+          before_wip_amount: number | null
+          before_wip_write_off_amount: number | null
+          created_at: string
+          id: string
+          matter_id: string
+          snapshot_id: string | null
+          was_new_snapshot: boolean
+          wip_update_id: string
+        }
+        Insert: {
+          before_accounts_receivable?: number | null
+          before_billed_amount?: number | null
+          before_paid_amount?: number | null
+          before_wip_amount?: number | null
+          before_wip_write_off_amount?: number | null
+          created_at?: string
+          id?: string
+          matter_id: string
+          snapshot_id?: string | null
+          was_new_snapshot?: boolean
+          wip_update_id: string
+        }
+        Update: {
+          before_accounts_receivable?: number | null
+          before_billed_amount?: number | null
+          before_paid_amount?: number | null
+          before_wip_amount?: number | null
+          before_wip_write_off_amount?: number | null
+          created_at?: string
+          id?: string
+          matter_id?: string
+          snapshot_id?: string | null
+          was_new_snapshot?: boolean
+          wip_update_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_wip_snapshot_changes_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "master_wip_snapshot_changes_snapshot_id_fkey"
+            columns: ["snapshot_id"]
+            isOneToOne: false
+            referencedRelation: "financial_snapshots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "master_wip_snapshot_changes_wip_update_id_fkey"
+            columns: ["wip_update_id"]
+            isOneToOne: false
+            referencedRelation: "detailed_wip_updates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       matter_assumptions: {
         Row: {
           assumption_text: string

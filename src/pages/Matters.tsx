@@ -43,8 +43,10 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { BilledAmountCell } from '@/components/matters/BilledAmountCell';
-import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload, History } from 'lucide-react';
 import { MasterWipUpdateDialog } from '@/components/matters/MasterWipUpdateDialog';
+import { MasterWipHistoryDialog } from '@/components/matters/MasterWipHistoryDialog';
+import { useMasterWipUpdates } from '@/lib/hooks/useMasterWipUpdates';
 import { format, differenceInDays, parseISO, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -501,6 +503,8 @@ export default function Matters() {
   const [sortField, setSortField] = useState<SortField>('matter_name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [showMasterWipDialog, setShowMasterWipDialog] = useState(false);
+  const [showMasterWipHistoryDialog, setShowMasterWipHistoryDialog] = useState(false);
+  const { createMasterUpdate } = useMasterWipUpdates();
 
   // Fetch user profile for "Me" checkbox
   const { data: userProfile } = useQuery({
@@ -864,14 +868,24 @@ export default function Matters() {
           </div>
           <div className="flex items-center gap-2">
             {isLive && (
-              <Button 
-                variant="default" 
-                onClick={() => setShowMasterWipDialog(true)}
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-              >
-                <Upload className="mr-2 h-4 w-4" />
-                Master Financial Snapshot Update
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline"
+                  onClick={() => setShowMasterWipHistoryDialog(true)}
+                  size="sm"
+                >
+                  <History className="mr-2 h-4 w-4" />
+                  History
+                </Button>
+                <Button 
+                  variant="default" 
+                  onClick={() => setShowMasterWipDialog(true)}
+                  className="bg-amber-600 hover:bg-amber-700 text-white"
+                >
+                  <Upload className="mr-2 h-4 w-4" />
+                  Master Financial Snapshot Update
+                </Button>
+              </div>
             )}
             {!isClosed && !isSpecialTab && (
               <Button asChild>
@@ -1619,7 +1633,44 @@ export default function Matters() {
         onClose={() => setShowMasterWipDialog(false)}
         matters={matters.filter(m => m.category === 'Live')}
         onApplyUpdates={async (updates) => {
+          const today = new Date().toISOString().split('T')[0];
+          const snapshotChanges: Array<{
+            matter_id: string;
+            snapshot_id: string | null;
+            was_new_snapshot: boolean;
+            before_wip_amount: number;
+            before_billed_amount: number;
+            before_paid_amount: number;
+            before_accounts_receivable: number;
+            before_wip_write_off_amount: number;
+          }> = [];
+
           for (const update of updates) {
+            // Get the current snapshot to track "before" values
+            const matter = matters.find(m => m.id === update.matter_id);
+            const currentSnapshot = matter?.latest_snapshot;
+            
+            // Check if there's already a snapshot for today
+            const { data: existingTodaySnapshot } = await supabase
+              .from('financial_snapshots')
+              .select('*')
+              .eq('matter_id', update.matter_id)
+              .eq('as_of_date', today)
+              .maybeSingle();
+
+            // Track the before state
+            snapshotChanges.push({
+              matter_id: update.matter_id,
+              snapshot_id: null, // Will be updated after upsert
+              was_new_snapshot: !existingTodaySnapshot,
+              before_wip_amount: existingTodaySnapshot?.wip_amount ?? currentSnapshot?.wip_amount ?? 0,
+              before_billed_amount: existingTodaySnapshot?.billed_amount ?? currentSnapshot?.billed_amount ?? 0,
+              before_paid_amount: existingTodaySnapshot?.paid_amount ?? currentSnapshot?.paid_amount ?? 0,
+              before_accounts_receivable: existingTodaySnapshot?.accounts_receivable ?? currentSnapshot?.accounts_receivable ?? 0,
+              before_wip_write_off_amount: existingTodaySnapshot?.wip_write_off_amount ?? currentSnapshot?.wip_write_off_amount ?? 0,
+            });
+
+            // Apply the updates
             await upsertTodaySnapshot.mutateAsync({
               matterId: update.matter_id,
               field: 'wip_amount',
@@ -1640,13 +1691,36 @@ export default function Matters() {
               field: 'accounts_receivable',
               value: update.accounts_receivable,
             });
-            await upsertTodaySnapshot.mutateAsync({
+            const result = await upsertTodaySnapshot.mutateAsync({
               matterId: update.matter_id,
               field: 'paid_amount',
               value: update.paid_amount,
             });
+
+            // Update the snapshot_id in our tracking
+            const idx = snapshotChanges.findIndex(c => c.matter_id === update.matter_id);
+            if (idx >= 0 && result.data) {
+              snapshotChanges[idx].snapshot_id = result.data.id;
+            }
+          }
+
+          // Save the changes to the tracking table
+          if (snapshotChanges.length > 0) {
+            try {
+              await createMasterUpdate.mutateAsync({ updates: snapshotChanges });
+            } catch (error) {
+              console.error('Failed to save master update tracking:', error);
+              // Don't throw - the updates were still applied successfully
+            }
           }
         }}
+      />
+
+      {/* Master WIP History Dialog */}
+      <MasterWipHistoryDialog
+        isOpen={showMasterWipHistoryDialog}
+        onClose={() => setShowMasterWipHistoryDialog(false)}
+        matters={matters.map(m => ({ id: m.id, matter_name: m.matter_name, fee_currency: m.fee_currency }))}
       />
     </AppLayout>
   );

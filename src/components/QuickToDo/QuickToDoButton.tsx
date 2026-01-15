@@ -698,8 +698,17 @@ export function QuickToDoButton() {
     }
   });
   const [slatePosition, setSlatePosition] = useState<{ x: number; y: number } | null>(null);
+  const [slateSize, setSlateSize] = useState<{ width: number; height: number }>(() => {
+    try {
+      const saved = localStorage.getItem('slate_size');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { width: 544, height: window.innerHeight * 0.8 }; // 34rem = 544px, 80vh
+  });
   const [isDraggingSlate, setIsDraggingSlate] = useState(false);
+  const [isResizingSlate, setIsResizingSlate] = useState(false);
   const slateDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null);
+  const slateResizeRef = useRef<{ startX: number; startY: number; startWidth: number; startHeight: number; startPosY: number } | null>(null);
   const slateRef = useRef<HTMLDivElement>(null);
   
   const [newSlateItem, setNewSlateItem] = useState("");
@@ -803,7 +812,7 @@ export function QuickToDoButton() {
       const newY = slateDragRef.current.startPosY + deltaY;
 
       // Constrain to viewport
-      const maxX = window.innerWidth - 544; // 34rem = 544px
+      const maxX = window.innerWidth - slateSize.width;
       const maxY = window.innerHeight - 100;
       
       setSlatePosition({
@@ -824,7 +833,67 @@ export function QuickToDoButton() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isDraggingSlate]);
+  }, [isDraggingSlate, slateSize.width]);
+
+  // Slate resize handlers
+  const handleSlateResizeMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const currentY = slatePosition?.y ?? (window.innerHeight / 2 - slateSize.height / 2);
+    
+    slateResizeRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startWidth: slateSize.width,
+      startHeight: slateSize.height,
+      startPosY: currentY,
+    };
+    setIsResizingSlate(true);
+  }, [slateSize, slatePosition]);
+
+  useEffect(() => {
+    if (!isResizingSlate) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!slateResizeRef.current) return;
+
+      const deltaX = e.clientX - slateResizeRef.current.startX;
+      const deltaY = e.clientY - slateResizeRef.current.startY;
+
+      // Calculate new dimensions (resize from top-right corner)
+      const newWidth = Math.max(320, Math.min(window.innerWidth - 100, slateResizeRef.current.startWidth + deltaX));
+      const newHeight = Math.max(300, Math.min(window.innerHeight - 50, slateResizeRef.current.startHeight - deltaY));
+
+      setSlateSize({ width: newWidth, height: newHeight });
+      
+      // Adjust position to keep bottom edge in place when height changes
+      if (slatePosition) {
+        const heightDiff = newHeight - slateResizeRef.current.startHeight;
+        setSlatePosition(prev => prev ? {
+          ...prev,
+          y: slateResizeRef.current!.startPosY - heightDiff
+        } : prev);
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsResizingSlate(false);
+      // Save size to localStorage
+      try {
+        localStorage.setItem('slate_size', JSON.stringify(slateSize));
+      } catch {}
+      slateResizeRef.current = null;
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizingSlate, slatePosition, slateSize]);
 
   // Cleanup triage timeouts on unmount
   useEffect(() => {
@@ -2318,10 +2387,12 @@ export function QuickToDoButton() {
         <div
           ref={slateRef}
           className={cn(
-            "fixed z-50 w-[34rem] h-[80vh] max-h-[80vh] rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
-            isDraggingSlate && "select-none"
+            "fixed z-50 rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
+            (isDraggingSlate || isResizingSlate) && "select-none"
           )}
           style={{
+            width: slateSize.width,
+            height: slateSize.height,
             ...(slatePosition ? {
               left: slatePosition.x,
               top: slatePosition.y,
@@ -2333,6 +2404,16 @@ export function QuickToDoButton() {
             boxShadow: '0 0 20px rgba(59, 130, 246, 0.3), 0 0 40px rgba(99, 102, 241, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           }}
         >
+          {/* Resize Handle - Top Right Corner */}
+          <div
+            className={cn(
+              "absolute top-0 right-0 w-4 h-4 z-10 cursor-ne-resize group",
+              isResizingSlate && "cursor-ne-resize"
+            )}
+            onMouseDown={handleSlateResizeMouseDown}
+          >
+            <div className="absolute top-1 right-1 w-2 h-2 border-t-2 border-r-2 border-white/50 group-hover:border-white transition-colors" />
+          </div>
           {/* Slate Header - Draggable */}
           <div 
             className={cn(

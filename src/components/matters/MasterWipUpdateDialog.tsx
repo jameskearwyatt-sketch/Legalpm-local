@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Upload, FileText, AlertTriangle, Brain, Settings2, Search, ChevronDown, ChevronRight, Link2, Trash2, Eye } from 'lucide-react';
+import { Loader2, Upload, FileText, AlertTriangle, Brain, Settings2, Search, ChevronDown, ChevronRight, Link2, Trash2, Eye, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -41,13 +41,16 @@ interface MasterWipUpdateDialogProps {
 
 interface ImportedMatterData {
   rowIndex: number;
+  rowIndices?: number[]; // For aggregated multi-client rows
   matterNumber: string;
   matterName: string;
   clientName?: string;
+  clientNames?: string[]; // For multi-client matters
   matchedMatterId: string | null;
   matchedMatterName: string | null;
   matchConfidence: 'high' | 'medium' | 'low' | 'none';
   needsConfirmation?: boolean;
+  isMultiClientAggregate?: boolean;
   currency: string;
   wip: { value: number; current: number; changed: boolean; selected: boolean };
   accountsReceivable: { value: number; current: number; changed: boolean; selected: boolean };
@@ -235,6 +238,7 @@ export function MasterWipUpdateDialog({
           current_ar: snapshot?.accounts_receivable || 0,
           current_billed: snapshot?.billed_amount || 0,
           current_paid: snapshot?.paid_amount || 0,
+          is_multi_client: m.is_multi_client || false,
         };
       });
 
@@ -547,7 +551,24 @@ export function MasterWipUpdateDialog({
   };
 
   // Proceed from confirm-matches step to review step
-  const proceedToReview = () => {
+  const proceedToReview = async () => {
+    // Save mappings for all remaining low-confidence items that have a matched matter
+    // This ensures we remember these matches for future imports
+    for (const item of lowConfidenceData) {
+      if (item.matchedMatterId) {
+        try {
+          await saveMapping.mutateAsync({
+            imported_matter_number: item.matterNumber || null,
+            imported_matter_name: item.matterName || null,
+            imported_client_name: item.clientName || null,
+            mapped_matter_id: item.matchedMatterId,
+          });
+        } catch (error) {
+          console.error('Failed to save mapping for:', item.matterName, error);
+        }
+      }
+    }
+
     // Move any remaining low confidence items to imported data with their suggested match
     const remaining = lowConfidenceData.map(item => ({
       ...item,
@@ -560,6 +581,7 @@ export function MasterWipUpdateDialog({
     setImportedData(prev => [...prev, ...remaining]);
     setLowConfidenceData([]);
     setStep('review');
+    toast.success('Mappings saved for future imports');
   };
 
   const renderFieldChange = (
@@ -872,12 +894,21 @@ export function MasterWipUpdateDialog({
                     <div key={item.rowIndex} className="p-4 space-y-3">
                       <div className="flex items-start gap-3">
                         <div className="flex-1">
-                          <div className="font-medium">{item.matterName || item.matterNumber}</div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{item.matterName || item.matterNumber}</span>
+                            {item.isMultiClientAggregate && (
+                              <Badge variant="outline" className="text-xs flex items-center gap-1 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                                <Users className="h-3 w-3" />
+                                {item.rowIndices?.length || 1} clients
+                              </Badge>
+                            )}
+                          </div>
                           <div className="text-sm text-muted-foreground">
                             {item.matterNumber} {item.clientName && `• ${item.clientName}`}
                           </div>
                           <div className="text-sm text-muted-foreground">
                             WIP: {formatCurrency(item.wip.value, item.currency)}
+                            {item.isMultiClientAggregate && ' (aggregated)'}
                           </div>
                         </div>
                         <Badge variant="outline" className="text-xs">
@@ -898,6 +929,7 @@ export function MasterWipUpdateDialog({
                             {matters.map((m) => (
                               <SelectItem key={m.id} value={m.id}>
                                 {m.matter_name} ({m.matter_number})
+                                {m.is_multi_client && ' [Multi-client]'}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -1018,7 +1050,13 @@ export function MasterWipUpdateDialog({
                               <span className="font-medium truncate">
                                 {item.matchedMatterName || item.matterName}
                               </span>
-                              {item.matchConfidence !== 'high' && (
+                              {item.isMultiClientAggregate && (
+                                <Badge variant="outline" className="text-xs flex items-center gap-1 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                                  <Users className="h-3 w-3" />
+                                  {item.rowIndices?.length || 1} clients aggregated
+                                </Badge>
+                              )}
+                              {item.matchConfidence !== 'high' && !item.isMultiClientAggregate && (
                                 <Badge variant="outline" className="text-xs">
                                   {item.matchConfidence} match
                                 </Badge>
@@ -1026,6 +1064,9 @@ export function MasterWipUpdateDialog({
                             </div>
                             <div className="text-xs text-muted-foreground">
                               {item.matterNumber}
+                              {item.clientNames && item.clientNames.length > 1 && (
+                                <span className="ml-1">• Clients: {item.clientNames.join(', ')}</span>
+                              )}
                             </div>
                           </div>
                           {!hasChanges && (

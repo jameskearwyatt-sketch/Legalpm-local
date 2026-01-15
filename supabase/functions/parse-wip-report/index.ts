@@ -15,6 +15,7 @@ interface MatterInfo {
   current_ar: number;
   current_billed: number;
   current_paid: number;
+  is_multi_client?: boolean;
 }
 
 interface ColumnMappings {
@@ -47,13 +48,16 @@ interface MatterMapping {
 
 interface MatchedData {
   rowIndex: number;
+  rowIndices?: number[]; // For aggregated multi-client rows
   matterNumber: string;
   matterName: string;
   clientName: string;
+  clientNames?: string[]; // For multi-client matters, track all client names
   matchedMatterId: string | null;
   matchedMatterName: string | null;
   matchConfidence: 'high' | 'medium' | 'low' | 'none';
   needsConfirmation: boolean;
+  isMultiClientAggregate?: boolean;
   currency: string;
   wip: { value: number; current: number; changed: boolean };
   accountsReceivable: { value: number; current: number; changed: boolean };
@@ -82,6 +86,12 @@ function parseNumber(value: string | number | null | undefined): number {
 
 function normalizeString(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]/g, '').trim();
+}
+
+// Normalize for mapping comparison - less aggressive, keeps more structure
+function normalizeForMapping(str: string | null | undefined): string {
+  if (!str) return '';
+  return str.toLowerCase().trim().replace(/\s+/g, ' ');
 }
 
 function calculateMatchScore(
@@ -142,6 +152,50 @@ function calculateMatchScore(
   return { score, confidence };
 }
 
+// Find a saved mapping using normalized comparison
+function findSavedMapping(
+  matterNumber: string,
+  matterName: string,
+  clientName: string,
+  savedMappings: MatterMapping[] | undefined
+): MatterMapping | undefined {
+  if (!savedMappings || savedMappings.length === 0) return undefined;
+
+  const normNum = normalizeForMapping(matterNumber);
+  const normName = normalizeForMapping(matterName);
+  const normClient = normalizeForMapping(clientName);
+
+  // First, try exact normalized match on number + name
+  let match = savedMappings.find(m => {
+    const mapNum = normalizeForMapping(m.imported_matter_number);
+    const mapName = normalizeForMapping(m.imported_matter_name);
+    return mapNum === normNum && mapName === normName;
+  });
+
+  if (match) return match;
+
+  // If no match, try matching on just matter number (if present)
+  if (normNum) {
+    match = savedMappings.find(m => {
+      const mapNum = normalizeForMapping(m.imported_matter_number);
+      return mapNum && mapNum === normNum;
+    });
+    if (match) return match;
+  }
+
+  // Try matching on matter name + client name
+  if (normName && normClient) {
+    match = savedMappings.find(m => {
+      const mapName = normalizeForMapping(m.imported_matter_name);
+      const mapClient = normalizeForMapping(m.imported_client_name);
+      return mapName === normName && mapClient === normClient;
+    });
+    if (match) return match;
+  }
+
+  return undefined;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -171,19 +225,28 @@ serve(async (req) => {
       totalPaid: columnMappings.total_paid !== undefined ? parseNumber(row[columnMappings.total_paid]) : 0,
     }));
 
-    // Match each parsed row to a matter
-    const matchedData: MatchedData[] = [];
-    const unmatchedData: MatchedData[] = [];
-    const lowConfidenceData: MatchedData[] = [];
+    // First pass: match each row to a matter
+    interface RowMatch {
+      parsed: ParsedRow;
+      matterId: string | null;
+      matterName: string | null;
+      confidence: 'high' | 'medium' | 'low' | 'none';
+      usedSavedMapping: boolean;
+      matter: MatterInfo | null;
+    }
+
+    const rowMatches: RowMatch[] = [];
 
     for (const parsed of parsedRows) {
       // Skip rows with no matter identifier
       if (!parsed.matterNumber && !parsed.matterName) continue;
 
-      // First, check for a saved mapping
-      const savedMapping = savedMappings?.find(
-        m => m.imported_matter_number === parsed.matterNumber && 
-             m.imported_matter_name === parsed.matterName
+      // Check for a saved mapping using normalized comparison
+      const savedMapping = findSavedMapping(
+        parsed.matterNumber,
+        parsed.matterName,
+        parsed.clientName,
+        savedMappings
       );
 
       let bestMatch: MatterInfo | null = null;
@@ -218,59 +281,214 @@ serve(async (req) => {
         }
       }
 
-      const currency = bestMatch?.currency || 'GBP';
-      const currentWip = bestMatch?.current_wip || 0;
-      const currentAr = bestMatch?.current_ar || 0;
-      const currentBilled = bestMatch?.current_billed || 0;
-      const currentPaid = bestMatch?.current_paid || 0;
+      rowMatches.push({
+        parsed,
+        matterId: bestMatch?.id || null,
+        matterName: bestMatch?.matter_name || null,
+        confidence: bestConfidence,
+        usedSavedMapping,
+        matter: bestMatch,
+      });
+    }
 
-      // Determine if this needs user confirmation
-      const needsConfirmation = !usedSavedMapping && bestConfidence !== 'high' && bestMatch !== null;
+    // Second pass: aggregate rows that match the same multi-client matter
+    const matterAggregates = new Map<string, {
+      rowIndices: number[];
+      clientNames: string[];
+      totalWip: number;
+      totalAr: number;
+      totalBilled: number;
+      totalPaid: number;
+      matter: MatterInfo;
+      confidence: 'high' | 'medium' | 'low' | 'none';
+      usedSavedMapping: boolean;
+      firstRow: ParsedRow;
+    }>();
 
-      const result: MatchedData = {
-        rowIndex: parsed.rowIndex,
-        matterNumber: parsed.matterNumber,
-        matterName: parsed.matterName,
-        clientName: parsed.clientName,
-        matchedMatterId: bestMatch?.id || null,
-        matchedMatterName: bestMatch?.matter_name || null,
-        matchConfidence: bestConfidence,
-        needsConfirmation,
-        currency,
-        wip: {
-          value: parsed.wip,
-          current: currentWip,
-          changed: !isWithinTolerance(parsed.wip, currentWip),
-        },
-        accountsReceivable: {
-          value: parsed.accountsReceivable,
-          current: currentAr,
-          changed: !isWithinTolerance(parsed.accountsReceivable, currentAr),
-        },
-        totalBilled: {
-          value: parsed.totalBilled,
-          current: currentBilled,
-          changed: !isWithinTolerance(parsed.totalBilled, currentBilled),
-        },
-        totalPaid: {
-          value: parsed.totalPaid,
-          current: currentPaid,
-          changed: !isWithinTolerance(parsed.totalPaid, currentPaid),
-        },
-      };
+    const unmatchedRows: RowMatch[] = [];
+    const processedRowIndices = new Set<number>();
 
-      if (bestMatch && bestConfidence !== 'none') {
-        if (needsConfirmation) {
-          lowConfidenceData.push(result);
+    for (const match of rowMatches) {
+      if (!match.matterId || match.confidence === 'none') {
+        unmatchedRows.push(match);
+        continue;
+      }
+
+      const matter = match.matter!;
+      
+      // Check if this matter is multi-client
+      if (matter.is_multi_client) {
+        const existing = matterAggregates.get(match.matterId);
+        if (existing) {
+          // Aggregate with existing
+          existing.rowIndices.push(match.parsed.rowIndex);
+          if (match.parsed.clientName && !existing.clientNames.includes(match.parsed.clientName)) {
+            existing.clientNames.push(match.parsed.clientName);
+          }
+          existing.totalWip += match.parsed.wip;
+          existing.totalAr += match.parsed.accountsReceivable;
+          existing.totalBilled += match.parsed.totalBilled;
+          existing.totalPaid += match.parsed.totalPaid;
+          // Keep highest confidence
+          if (match.confidence === 'high' || (existing.confidence !== 'high' && match.confidence === 'medium')) {
+            existing.confidence = match.confidence;
+          }
+          if (match.usedSavedMapping) {
+            existing.usedSavedMapping = true;
+          }
         } else {
-          matchedData.push(result);
+          matterAggregates.set(match.matterId, {
+            rowIndices: [match.parsed.rowIndex],
+            clientNames: match.parsed.clientName ? [match.parsed.clientName] : [],
+            totalWip: match.parsed.wip,
+            totalAr: match.parsed.accountsReceivable,
+            totalBilled: match.parsed.totalBilled,
+            totalPaid: match.parsed.totalPaid,
+            matter,
+            confidence: match.confidence,
+            usedSavedMapping: match.usedSavedMapping,
+            firstRow: match.parsed,
+          });
         }
-      } else {
-        unmatchedData.push(result);
+        processedRowIndices.add(match.parsed.rowIndex);
       }
     }
 
+    // Build result arrays
+    const matchedData: MatchedData[] = [];
+    const lowConfidenceData: MatchedData[] = [];
+    const unmatchedData: MatchedData[] = [];
+
+    // Add aggregated multi-client matters
+    for (const [matterId, agg] of matterAggregates) {
+      const needsConfirmation = !agg.usedSavedMapping && agg.confidence !== 'high';
+      
+      const result: MatchedData = {
+        rowIndex: agg.firstRow.rowIndex,
+        rowIndices: agg.rowIndices.length > 1 ? agg.rowIndices : undefined,
+        matterNumber: agg.firstRow.matterNumber,
+        matterName: agg.firstRow.matterName,
+        clientName: agg.clientNames.join(', '),
+        clientNames: agg.clientNames.length > 1 ? agg.clientNames : undefined,
+        matchedMatterId: matterId,
+        matchedMatterName: agg.matter.matter_name,
+        matchConfidence: agg.confidence,
+        needsConfirmation,
+        isMultiClientAggregate: agg.rowIndices.length > 1,
+        currency: agg.matter.currency || 'GBP',
+        wip: {
+          value: agg.totalWip,
+          current: agg.matter.current_wip,
+          changed: !isWithinTolerance(agg.totalWip, agg.matter.current_wip),
+        },
+        accountsReceivable: {
+          value: agg.totalAr,
+          current: agg.matter.current_ar,
+          changed: !isWithinTolerance(agg.totalAr, agg.matter.current_ar),
+        },
+        totalBilled: {
+          value: agg.totalBilled,
+          current: agg.matter.current_billed,
+          changed: !isWithinTolerance(agg.totalBilled, agg.matter.current_billed),
+        },
+        totalPaid: {
+          value: agg.totalPaid,
+          current: agg.matter.current_paid,
+          changed: !isWithinTolerance(agg.totalPaid, agg.matter.current_paid),
+        },
+      };
+
+      if (needsConfirmation) {
+        lowConfidenceData.push(result);
+      } else {
+        matchedData.push(result);
+      }
+    }
+
+    // Add non-multi-client matched rows
+    for (const match of rowMatches) {
+      if (processedRowIndices.has(match.parsed.rowIndex)) continue;
+      if (!match.matterId || match.confidence === 'none') continue;
+
+      const matter = match.matter!;
+      const needsConfirmation = !match.usedSavedMapping && match.confidence !== 'high';
+
+      const result: MatchedData = {
+        rowIndex: match.parsed.rowIndex,
+        matterNumber: match.parsed.matterNumber,
+        matterName: match.parsed.matterName,
+        clientName: match.parsed.clientName,
+        matchedMatterId: match.matterId,
+        matchedMatterName: match.matterName,
+        matchConfidence: match.confidence,
+        needsConfirmation,
+        currency: matter.currency || 'GBP',
+        wip: {
+          value: match.parsed.wip,
+          current: matter.current_wip,
+          changed: !isWithinTolerance(match.parsed.wip, matter.current_wip),
+        },
+        accountsReceivable: {
+          value: match.parsed.accountsReceivable,
+          current: matter.current_ar,
+          changed: !isWithinTolerance(match.parsed.accountsReceivable, matter.current_ar),
+        },
+        totalBilled: {
+          value: match.parsed.totalBilled,
+          current: matter.current_billed,
+          changed: !isWithinTolerance(match.parsed.totalBilled, matter.current_billed),
+        },
+        totalPaid: {
+          value: match.parsed.totalPaid,
+          current: matter.current_paid,
+          changed: !isWithinTolerance(match.parsed.totalPaid, matter.current_paid),
+        },
+      };
+
+      if (needsConfirmation) {
+        lowConfidenceData.push(result);
+      } else {
+        matchedData.push(result);
+      }
+    }
+
+    // Add unmatched rows
+    for (const match of unmatchedRows) {
+      unmatchedData.push({
+        rowIndex: match.parsed.rowIndex,
+        matterNumber: match.parsed.matterNumber,
+        matterName: match.parsed.matterName,
+        clientName: match.parsed.clientName,
+        matchedMatterId: null,
+        matchedMatterName: null,
+        matchConfidence: 'none',
+        needsConfirmation: false,
+        currency: 'GBP',
+        wip: {
+          value: match.parsed.wip,
+          current: 0,
+          changed: true,
+        },
+        accountsReceivable: {
+          value: match.parsed.accountsReceivable,
+          current: 0,
+          changed: true,
+        },
+        totalBilled: {
+          value: match.parsed.totalBilled,
+          current: 0,
+          changed: true,
+        },
+        totalPaid: {
+          value: match.parsed.totalPaid,
+          current: 0,
+          changed: true,
+        },
+      });
+    }
+
     console.log(`Matched: ${matchedData.length}, Low confidence: ${lowConfidenceData.length}, Unmatched: ${unmatchedData.length}`);
+    console.log(`Multi-client aggregations: ${[...matterAggregates.values()].filter(a => a.rowIndices.length > 1).length}`);
 
     return new Response(
       JSON.stringify({
@@ -287,6 +505,7 @@ serve(async (req) => {
             d.wip.changed || d.accountsReceivable.changed || 
             d.totalBilled.changed || d.totalPaid.changed
           ).length,
+          multiClientAggregations: [...matterAggregates.values()].filter(a => a.rowIndices.length > 1).length,
         },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

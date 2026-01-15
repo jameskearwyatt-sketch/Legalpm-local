@@ -312,6 +312,8 @@ export function useMatters() {
           collection_rate: collectionRate,
           headroom,
           headroom_percent: headroomPercent,
+          bm_headroom_percent: bmHeadroomPercent,
+          lc_headroom_percent: lcHeadroomPercent,
           total_paid_ar_wip: totalUsed, // Budget burn = WIP + Billed
           // Add effective values for display
           effective_fee_upper_end: effectiveFeeUpperEnd,

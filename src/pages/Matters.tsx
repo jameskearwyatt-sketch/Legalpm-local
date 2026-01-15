@@ -1128,9 +1128,6 @@ export default function Matters() {
                           <TableHead className="text-right min-w-[80px]">
                             <SortableHeader field="headroom">Headroom</SortableHeader>
                           </TableHead>
-                          <TableHead className="text-right min-w-[45px]">
-                            <SortableHeader field="headroom_pct">%</SortableHeader>
-                          </TableHead>
                         </>
                       )}
                       <TableHead className="text-right min-w-[90px]">
@@ -1238,38 +1235,58 @@ export default function Matters() {
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-right text-muted-foreground">
-                                {formatCurrency(budgetBurn, (matter as any).effective_currency ?? matter.fee_currency)}
+                              <TableCell className="text-right">
+                                <div className="flex flex-col items-end">
+                                  <span className="text-muted-foreground">
+                                    {formatCurrency(budgetBurn, (matter as any).effective_currency ?? matter.fee_currency)}
+                                  </span>
+                                  <span className={cn(
+                                    "text-[10px]",
+                                    (100 - ((matter as any).bm_headroom_percent || 0)) > 100 ? "text-danger" :
+                                    (100 - ((matter as any).bm_headroom_percent || 0)) > 80 ? "text-warning" : "text-success"
+                                  )}>
+                                    {(100 - ((matter as any).bm_headroom_percent || 0)).toFixed(0)}%
+                                  </span>
+                                </div>
                               </TableCell>
-                              <TableCell className="text-right text-muted-foreground">
+                              <TableCell className="text-right">
                                 {matter.local_counsel_billing === 'Disb' && matter.local_counsel_fee > 0 ? (
-                                  formatCurrency(((matter as any).lc_wip || 0) + ((matter as any).lc_billed || 0), (matter as any).effective_currency ?? matter.fee_currency)
+                                  <div className="flex flex-col items-end">
+                                    <span className="text-muted-foreground">
+                                      {formatCurrency(((matter as any).lc_wip || 0) + ((matter as any).lc_billed || 0), (matter as any).effective_currency ?? matter.fee_currency)}
+                                    </span>
+                                    <span className={cn(
+                                      "text-[10px]",
+                                      (100 - ((matter as any).lc_headroom_percent || 0)) > 100 ? "text-danger" :
+                                      (100 - ((matter as any).lc_headroom_percent || 0)) > 80 ? "text-warning" : "text-success"
+                                    )}>
+                                      {(100 - ((matter as any).lc_headroom_percent || 0)).toFixed(0)}%
+                                    </span>
+                                  </div>
                                 ) : (
                                   <span className="text-muted-foreground/50">-</span>
-                                )}
-                              </TableCell>
-                              <TableCell className={cn(
-                                "text-right font-medium",
-                                !(matter as any).pay_full_time_costs && matter.headroom < 0 ? "text-danger" : "text-foreground"
-                              )}>
-                                {(matter as any).pay_full_time_costs ? (
-                                  <span className="text-muted-foreground">N/A</span>
-                                ) : (
-                                  formatCurrency(matter.headroom, (matter as any).effective_currency ?? matter.fee_currency)
                                 )}
                               </TableCell>
                               <TableCell className="text-right">
                                 {(matter as any).pay_full_time_costs ? (
                                   <span className="text-muted-foreground">N/A</span>
                                 ) : (
-                                  <span className={cn(
-                                    "font-medium",
-                                    headroomStatus === 'danger' && 'text-danger',
-                                    headroomStatus === 'warning' && 'text-warning',
-                                    headroomStatus === 'success' && 'text-success'
-                                  )}>
-                                    {matter.headroom_percent.toFixed(0)}%
-                                  </span>
+                                  <div className="flex flex-col items-end">
+                                    <span className={cn(
+                                      "font-medium",
+                                      matter.headroom < 0 ? "text-danger" : "text-foreground"
+                                    )}>
+                                      {formatCurrency(matter.headroom, (matter as any).effective_currency ?? matter.fee_currency)}
+                                    </span>
+                                    <span className={cn(
+                                      "text-[10px]",
+                                      headroomStatus === 'danger' && 'text-danger',
+                                      headroomStatus === 'warning' && 'text-warning',
+                                      headroomStatus === 'success' && 'text-success'
+                                    )}>
+                                      {matter.headroom_percent.toFixed(0)}%
+                                    </span>
+                                  </div>
                                 )}
                               </TableCell>
                             </>

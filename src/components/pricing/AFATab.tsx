@@ -79,17 +79,33 @@ interface AFATabProps {
   onDiscountChange?: (discountPercent: number) => void;
 }
 
-const AFA_TYPES: AFAType[] = [
-  'fee_cap',
-  'blended_rate',
-  'fixed_fee_whole',
-  'fixed_fee_phase',
-  'fee_collar',
-  'milestone',
-  'monthly_retainer',
-  'discounted_rates',
-  'success_fee',
+// Grouped AFA types matching the layering logic
+const AFA_GROUPS = [
+  {
+    id: 'rate_modifiers',
+    label: 'Rate Modifiers',
+    description: 'Choose one to modify how rates are calculated. Can be used as basis for fixed fees.',
+    icon: 'Percent',
+    types: ['discounted_rates', 'blended_rate'] as AFAType[],
+  },
+  {
+    id: 'pricing_models',
+    label: 'Pricing Models',
+    description: 'Choose how to structure the final fee. Fixed fees and caps are mutually exclusive.',
+    icon: 'Calculator',
+    types: ['fixed_fee_whole', 'fixed_fee_phase', 'fee_cap', 'fee_collar', 'milestone', 'monthly_retainer'] as AFAType[],
+  },
+  {
+    id: 'add_ons',
+    label: 'Add-ons',
+    description: 'Can be combined with any pricing model above.',
+    icon: 'Plus',
+    types: ['success_fee'] as AFAType[],
+  },
 ];
+
+// Flat list for backward compatibility
+const AFA_TYPES: AFAType[] = AFA_GROUPS.flatMap(g => g.types);
 
 export function AFATab({
   proposalId,
@@ -1162,176 +1178,218 @@ export function AFATab({
             )}
           </div>
         </CardHeader>
-        <CardContent>
-          <Accordion type="multiple" value={expandedTypes} onValueChange={setExpandedTypes}>
-            {AFA_TYPES.map(type => {
-              const afa = getAFA(type);
-              const isEnabled = afa?.is_enabled ?? false;
-              const Icon = getAFAIcon(type);
-              const clientPrice = afa ? afa.client_price : calculateClientPrice(type, getDefaultConfig(type));
-              const marginPercent = afa ? afa.margin_impact_percent : calculateMarginImpact(clientPrice);
-              
-              // Check compatibility with currently enabled AFAs
-              const compatibility = checkAFACompatibility(type, enabledAFATypes.filter(t => t !== type));
-              const isUsedAsBasis = isRateModifierUsedAsBasis(type, enabledAFATypes);
-              const layeringExplanation = getLayeringExplanation(type, enabledAFATypes.filter(t => t !== type));
-              
-              return (
-                <AccordionItem key={type} value={type} className={cn(
-                  "border rounded-lg mb-2 px-4",
-                  !isEnabled && compatibility.isBlocked && "opacity-60"
+        <CardContent className="space-y-6">
+          {AFA_GROUPS.map((group, groupIndex) => {
+            const groupHasEnabled = group.types.some(t => afas.find(a => a.afa_type === t)?.is_enabled);
+            const GroupIcon = group.id === 'rate_modifiers' ? Percent : group.id === 'pricing_models' ? Calculator : Plus;
+            
+            return (
+              <div key={group.id}>
+                {/* Group Header */}
+                <div className={cn(
+                  "flex items-center gap-3 mb-3 pb-2",
+                  groupIndex > 0 && "pt-2 border-t"
                 )}>
-                  <div className="flex items-center gap-3 py-2">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <div>
-                            <Switch
-                              checked={isEnabled}
-                              onCheckedChange={(v) => handleToggle(type, v)}
-                            />
-                          </div>
-                        </TooltipTrigger>
-                        {!isEnabled && compatibility.isBlocked && (
-                          <TooltipContent>
-                            <p className="max-w-xs">
-                              {compatibility.reason}
-                              <br />
-                              <span className="text-xs text-muted-foreground">
-                                Enabling will disable: {compatibility.blockedBy.map(t => AFA_TYPE_LABELS[t]).join(', ')}
-                              </span>
-                            </p>
-                          </TooltipContent>
-                        )}
-                      </Tooltip>
-                    </TooltipProvider>
-                    <AccordionTrigger className="flex-1 hover:no-underline py-3">
-                      <div className="flex items-center gap-3">
-                        <Icon className="h-4 w-4 text-muted-foreground" />
-                        <div className="text-left">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium">{AFA_TYPE_LABELS[type]}</p>
-                            {/* Show basis indicator */}
-                            {isEnabled && isUsedAsBasis && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <Badge variant="outline" className="text-xs gap-1 border-blue-500 text-blue-600">
-                                      <Link2 className="h-3 w-3" />
-                                      Basis
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>Used as calculation basis for other active AFAs</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
-                            {/* Show blocked indicator */}
-                            {!isEnabled && compatibility.isBlocked && (
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger>
-                                    <Badge variant="outline" className="text-xs gap-1 border-amber-500 text-amber-600">
-                                      <Ban className="h-3 w-3" />
-                                      Conflicts
-                                    </Badge>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p>{compatibility.reason}</p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">{AFA_TYPE_DESCRIPTIONS[type]}</p>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    {isEnabled && (
-                      <div className="flex items-center gap-3 mr-4">
-                        <span className="font-medium">{formatCurrency(clientPrice)}</span>
-                        <RiskBadge clientPrice={clientPrice} marginPercent={marginPercent} />
-                      </div>
-                    )}
+                  <div className={cn(
+                    "p-2 rounded-lg",
+                    group.id === 'rate_modifiers' && "bg-blue-100 dark:bg-blue-950",
+                    group.id === 'pricing_models' && "bg-purple-100 dark:bg-purple-950",
+                    group.id === 'add_ons' && "bg-green-100 dark:bg-green-950"
+                  )}>
+                    <GroupIcon className={cn(
+                      "h-4 w-4",
+                      group.id === 'rate_modifiers' && "text-blue-600 dark:text-blue-400",
+                      group.id === 'pricing_models' && "text-purple-600 dark:text-purple-400",
+                      group.id === 'add_ons' && "text-green-600 dark:text-green-400"
+                    )} />
                   </div>
-                  <AccordionContent className="pt-0 pb-4">
-                    <div className="pl-10 pr-2">
-                      {/* Show layering explanation if applicable */}
-                      {layeringExplanation && (
-                        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg flex items-start gap-2">
-                          <Link2 className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
-                          <p className="text-sm text-blue-700 dark:text-blue-300">{layeringExplanation}</p>
-                        </div>
-                      )}
-                      
-                      {renderConfig(type)}
-                      
-                      {isEnabled && (
-                        <>
-                          <Separator className="my-4" />
-                          
-                          {/* Internal Economics */}
-                          <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4">
-                            <p className="text-sm font-medium mb-3">Internal Economics</p>
-                            <div className="grid grid-cols-4 gap-4 text-sm">
-                              <div>
-                                <p className="text-muted-foreground">Client Price</p>
-                                <p className="font-bold text-lg">{formatCurrency(clientPrice)}</p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Effective Rate</p>
-                                <p className="font-medium">
-                                  {currencySymbol}{Math.round(afa?.effective_rate || calculateEffectiveRate(clientPrice))}/hr
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">vs Baseline</p>
-                                <p className={cn(
-                                  "font-medium",
-                                  clientPrice < baselineTotals.total ? "text-red-600" : "text-green-600"
-                                )}>
-                                  {clientPrice >= baselineTotals.total ? '+' : ''}{formatCurrency(clientPrice - baselineTotals.total)}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-muted-foreground">Margin</p>
-                                <p className="font-medium">{marginPercent.toFixed(1)}%</p>
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm">{group.label}</p>
+                    <p className="text-xs text-muted-foreground">{group.description}</p>
+                  </div>
+                  {groupHasEnabled && (
+                    <Badge variant="secondary" className="text-xs">
+                      Active
+                    </Badge>
+                  )}
+                </div>
+                
+                {/* Group AFAs */}
+                <Accordion type="multiple" value={expandedTypes} onValueChange={setExpandedTypes}>
+                  {group.types.map(type => {
+                    const afa = getAFA(type);
+                    const isEnabled = afa?.is_enabled ?? false;
+                    const Icon = getAFAIcon(type);
+                    const clientPrice = afa ? afa.client_price : calculateClientPrice(type, getDefaultConfig(type));
+                    const marginPercent = afa ? afa.margin_impact_percent : calculateMarginImpact(clientPrice);
+                    
+                    // Check compatibility with currently enabled AFAs
+                    const compatibility = checkAFACompatibility(type, enabledAFATypes.filter(t => t !== type));
+                    const isUsedAsBasis = isRateModifierUsedAsBasis(type, enabledAFATypes);
+                    const layeringExplanation = getLayeringExplanation(type, enabledAFATypes.filter(t => t !== type));
+                    
+                    return (
+                      <AccordionItem key={type} value={type} className={cn(
+                        "border rounded-lg mb-2 px-4",
+                        !isEnabled && compatibility.isBlocked && "opacity-60",
+                        group.id === 'rate_modifiers' && isEnabled && "border-blue-300 bg-blue-50/30 dark:border-blue-800 dark:bg-blue-950/20",
+                        group.id === 'pricing_models' && isEnabled && "border-purple-300 bg-purple-50/30 dark:border-purple-800 dark:bg-purple-950/20",
+                        group.id === 'add_ons' && isEnabled && "border-green-300 bg-green-50/30 dark:border-green-800 dark:bg-green-950/20"
+                      )}>
+                        <div className="flex items-center gap-3 py-2">
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div>
+                                  <Switch
+                                    checked={isEnabled}
+                                    onCheckedChange={(v) => handleToggle(type, v)}
+                                  />
+                                </div>
+                              </TooltipTrigger>
+                              {!isEnabled && compatibility.isBlocked && (
+                                <TooltipContent>
+                                  <p className="max-w-xs">
+                                    {compatibility.reason}
+                                    <br />
+                                    <span className="text-xs text-muted-foreground">
+                                      Enabling will disable: {compatibility.blockedBy.map(t => AFA_TYPE_LABELS[t]).join(', ')}
+                                    </span>
+                                  </p>
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          </TooltipProvider>
+                          <AccordionTrigger className="flex-1 hover:no-underline py-3">
+                            <div className="flex items-center gap-3">
+                              <Icon className="h-4 w-4 text-muted-foreground" />
+                              <div className="text-left">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium">{AFA_TYPE_LABELS[type]}</p>
+                                  {/* Show basis indicator */}
+                                  {isEnabled && isUsedAsBasis && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger>
+                                          <Badge variant="outline" className="text-xs gap-1 border-blue-500 text-blue-600">
+                                            <Link2 className="h-3 w-3" />
+                                            Basis
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>Used as calculation basis for other active AFAs</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                  {/* Show blocked indicator */}
+                                  {!isEnabled && compatibility.isBlocked && (
+                                    <TooltipProvider>
+                                      <Tooltip>
+                                        <TooltipTrigger>
+                                          <Badge variant="outline" className="text-xs gap-1 border-amber-500 text-amber-600">
+                                            <Ban className="h-3 w-3" />
+                                            Conflicts
+                                          </Badge>
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          <p>{compatibility.reason}</p>
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </TooltipProvider>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground">{AFA_TYPE_DESCRIPTIONS[type]}</p>
                               </div>
                             </div>
+                          </AccordionTrigger>
+                          {isEnabled && (
+                            <div className="flex items-center gap-3 mr-4">
+                              <span className="font-medium">{formatCurrency(clientPrice)}</span>
+                              <RiskBadge clientPrice={clientPrice} marginPercent={marginPercent} />
+                            </div>
+                          )}
+                        </div>
+                        <AccordionContent className="pt-0 pb-4">
+                          <div className="pl-10 pr-2">
+                            {/* Show layering explanation if applicable */}
+                            {layeringExplanation && (
+                              <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg flex items-start gap-2">
+                                <Link2 className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+                                <p className="text-sm text-blue-700 dark:text-blue-300">{layeringExplanation}</p>
+                              </div>
+                            )}
+                            
+                            {renderConfig(type)}
+                            
+                            {isEnabled && (
+                              <>
+                                <Separator className="my-4" />
+                                
+                                {/* Internal Economics */}
+                                <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4">
+                                  <p className="text-sm font-medium mb-3">Internal Economics</p>
+                                  <div className="grid grid-cols-4 gap-4 text-sm">
+                                    <div>
+                                      <p className="text-muted-foreground">Client Price</p>
+                                      <p className="font-bold text-lg">{formatCurrency(clientPrice)}</p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Effective Rate</p>
+                                      <p className="font-medium">
+                                        {currencySymbol}{Math.round(afa?.effective_rate || calculateEffectiveRate(clientPrice))}/hr
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">vs Baseline</p>
+                                      <p className={cn(
+                                        "font-medium",
+                                        clientPrice < baselineTotals.total ? "text-red-600" : "text-green-600"
+                                      )}>
+                                        {clientPrice >= baselineTotals.total ? '+' : ''}{formatCurrency(clientPrice - baselineTotals.total)}
+                                      </p>
+                                    </div>
+                                    <div>
+                                      <p className="text-muted-foreground">Margin</p>
+                                      <p className="font-medium">{marginPercent.toFixed(1)}%</p>
+                                    </div>
+                                  </div>
+                                </div>
+                                
+                                {/* Client Narrative */}
+                                <div className="mt-4 space-y-2">
+                                  <Label>Client-Facing Narrative (optional)</Label>
+                                  <Textarea
+                                    value={afa?.client_narrative || ''}
+                                    onChange={(e) => upsertAFA.mutateAsync({
+                                      ...afa!,
+                                      afa_type: type,
+                                      client_narrative: e.target.value,
+                                    })}
+                                    placeholder="Add client-ready description of this pricing option..."
+                                    className="min-h-[80px]"
+                                  />
+                                </div>
+                                
+                                {/* Select for Export */}
+                                <div className="mt-4 flex items-center gap-2">
+                                  <Checkbox
+                                    checked={afa?.is_selected_for_export ?? false}
+                                    onCheckedChange={(v) => afa && selectForExport.mutateAsync({ afaId: afa.id, selected: !!v })}
+                                  />
+                                  <Label>Include in Excel export</Label>
+                                </div>
+                              </>
+                            )}
                           </div>
-                          
-                          {/* Client Narrative */}
-                          <div className="mt-4 space-y-2">
-                            <Label>Client-Facing Narrative (optional)</Label>
-                            <Textarea
-                              value={afa?.client_narrative || ''}
-                              onChange={(e) => upsertAFA.mutateAsync({
-                                ...afa!,
-                                afa_type: type,
-                                client_narrative: e.target.value,
-                              })}
-                              placeholder="Add client-ready description of this pricing option..."
-                              className="min-h-[80px]"
-                            />
-                          </div>
-                          
-                          {/* Select for Export */}
-                          <div className="mt-4 flex items-center gap-2">
-                            <Checkbox
-                              checked={afa?.is_selected_for_export ?? false}
-                              onCheckedChange={(v) => afa && selectForExport.mutateAsync({ afaId: afa.id, selected: !!v })}
-                            />
-                            <Label>Include in Excel export</Label>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
+                        </AccordionContent>
+                      </AccordionItem>
+                    );
+                  })}
+                </Accordion>
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 

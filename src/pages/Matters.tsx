@@ -1637,6 +1637,11 @@ export default function Matters() {
             });
             await upsertTodaySnapshot.mutateAsync({
               matterId: update.matter_id,
+              field: 'accounts_receivable',
+              value: update.accounts_receivable,
+            });
+            await upsertTodaySnapshot.mutateAsync({
+              matterId: update.matter_id,
               field: 'paid_amount',
               value: update.paid_amount,
             });

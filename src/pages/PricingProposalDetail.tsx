@@ -1122,12 +1122,16 @@ export default function PricingProposalDetail() {
               <Calculator className="h-4 w-4 mr-2" />
               Assumptions
             </TabsTrigger>
+            <TabsTrigger value="rates">
+              <Users className="h-4 w-4 mr-2" />
+              Team & Rates
+            </TabsTrigger>
             <TabsTrigger value="items">
               <FileText className="h-4 w-4 mr-2" />
               Work Items
             </TabsTrigger>
             <TabsTrigger value="local-counsel">
-              <Users className="h-4 w-4 mr-2" />
+              <DollarSign className="h-4 w-4 mr-2" />
               Local Counsel
             </TabsTrigger>
             <TabsTrigger value="afa">
@@ -1137,10 +1141,6 @@ export default function PricingProposalDetail() {
             <TabsTrigger value="summary">
               <TrendingUp className="h-4 w-4 mr-2" />
               Summary
-            </TabsTrigger>
-            <TabsTrigger value="rates">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Rate Card
             </TabsTrigger>
             <TabsTrigger value="history">
               <History className="h-4 w-4 mr-2" />
@@ -1648,7 +1648,7 @@ export default function PricingProposalDetail() {
             </div>
           </TabsContent>
 
-          {/* RATE CARD TAB */}
+          {/* TEAM & RATES TAB */}
           <TabsContent value="rates" className="space-y-4">
             <EditableRateCard
               rateCard={rateCard}

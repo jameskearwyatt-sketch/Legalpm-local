@@ -182,7 +182,7 @@ export function EditableRateCard({
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
               <Users className="h-4 w-4" />
-              Team Rate Card
+              Team & Rates
             </CardTitle>
             <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setIsAddDialogOpen(true)}>
               <Plus className="h-3 w-3 mr-1" />

@@ -15,7 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Upload, FileText, AlertTriangle, Brain, Settings2, Search, ChevronDown, ChevronRight, Link2 } from 'lucide-react';
+import { Loader2, Upload, FileText, AlertTriangle, Brain, Settings2, Search, ChevronDown, ChevronRight, Link2, Trash2, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -85,8 +85,10 @@ export function MasterWipUpdateDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { format, isLoading: formatLoading, saveFormat, checkFormatMatch, createHeaderSignature } = useReportFormats();
+  const { format, isLoading: formatLoading, saveFormat, deleteFormat, checkFormatMatch, createHeaderSignature } = useReportFormats();
   const { mappings: savedMappings, saveMapping, isLoading: mappingsLoading } = useReportMatterMappings();
+  const [showFormatDetails, setShowFormatDetails] = useState(false);
+  const [isDeletingFormat, setIsDeletingFormat] = useState(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -593,7 +595,7 @@ export function MasterWipUpdateDialog({
                 )}>
                   {format ? (
                     <>
-                      <Brain className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      <Brain className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
                       <div className="flex-1">
                         <p className="font-medium text-green-800 dark:text-green-200">
                           Format learned: "{format.format_name}"
@@ -602,19 +604,53 @@ export function MasterWipUpdateDialog({
                           Upload a matching report and it will be processed automatically.
                         </p>
                       </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-green-700"
-                        onClick={() => setShowTrainingDialog(true)}
-                      >
-                        <Settings2 className="h-4 w-4 mr-1" />
-                        Edit
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-green-700 dark:text-green-300"
+                          onClick={() => setShowFormatDetails(!showFormatDetails)}
+                        >
+                          <Eye className="h-4 w-4 mr-1" />
+                          {showFormatDetails ? 'Hide' : 'View'}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-green-700 dark:text-green-300"
+                          onClick={() => setShowTrainingDialog(true)}
+                        >
+                          <Settings2 className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-destructive hover:text-destructive"
+                          onClick={async () => {
+                            if (confirm('Delete this report format? You will need to train the system again on your next upload.')) {
+                              setIsDeletingFormat(true);
+                              try {
+                                await deleteFormat.mutateAsync();
+                                setShowFormatDetails(false);
+                              } finally {
+                                setIsDeletingFormat(false);
+                              }
+                            }
+                          }}
+                          disabled={isDeletingFormat}
+                        >
+                          {isDeletingFormat ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
                     </>
                   ) : (
                     <>
-                      <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                      <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
                       <div className="flex-1">
                         <p className="font-medium text-amber-800 dark:text-amber-200">
                           No format learned yet
@@ -624,6 +660,79 @@ export function MasterWipUpdateDialog({
                         </p>
                       </div>
                     </>
+                  )}
+                </div>
+              )}
+
+              {/* Format Details Panel */}
+              {showFormatDetails && format && (
+                <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium text-sm">Column Mappings</h4>
+                    <span className="text-xs text-muted-foreground">
+                      Trained on {new Date(format.created_at).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {format.column_mappings.matter_number !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Matter Number:</span>
+                        <span>Column {(format.column_mappings.matter_number) + 1}</span>
+                      </div>
+                    )}
+                    {format.column_mappings.matter_name !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Matter Name:</span>
+                        <span>Column {(format.column_mappings.matter_name) + 1}</span>
+                      </div>
+                    )}
+                    {format.column_mappings.client_name !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Client Name:</span>
+                        <span>Column {(format.column_mappings.client_name) + 1}</span>
+                      </div>
+                    )}
+                    {format.column_mappings.wip !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">WIP:</span>
+                        <span>Column {(format.column_mappings.wip) + 1}</span>
+                      </div>
+                    )}
+                    {format.column_mappings.accounts_receivable !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Accounts Receivable:</span>
+                        <span>Column {(format.column_mappings.accounts_receivable) + 1}</span>
+                      </div>
+                    )}
+                    {format.column_mappings.total_billed !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Billed:</span>
+                        <span>Column {(format.column_mappings.total_billed) + 1}</span>
+                      </div>
+                    )}
+                    {format.column_mappings.total_paid !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Total Paid:</span>
+                        <span>Column {(format.column_mappings.total_paid) + 1}</span>
+                      </div>
+                    )}
+                  </div>
+                  {format.sample_headers && (
+                    <div className="pt-2 border-t">
+                      <p className="text-xs text-muted-foreground mb-1">Sample headers from training:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {(format.sample_headers as string[]).slice(0, 10).map((header, idx) => (
+                          <span key={idx} className="text-xs bg-muted px-2 py-0.5 rounded">
+                            {header || `(empty)`}
+                          </span>
+                        ))}
+                        {(format.sample_headers as string[]).length > 10 && (
+                          <span className="text-xs text-muted-foreground">
+                            +{(format.sample_headers as string[]).length - 10} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}

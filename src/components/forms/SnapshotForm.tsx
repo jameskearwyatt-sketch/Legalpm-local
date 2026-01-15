@@ -14,8 +14,9 @@ const snapshotSchema = z.object({
   as_of_date: z.string().min(1, 'Date is required'),
   wip_amount: z.number().min(0, 'Raw WIP must be 0 or greater'),
   wip_write_off_amount: z.number().min(0, 'Write-off must be 0 or greater'),
-  billed_amount: z.number().min(0, 'Billed must be 0 or greater'),
-  paid_amount: z.number().min(0, 'Paid must be 0 or greater'),
+  billed_amount: z.number().min(0, 'Total Billed must be 0 or greater'),
+  accounts_receivable: z.number().min(0, 'Accounts Receivable must be 0 or greater'),
+  paid_amount: z.number().min(0, 'Total Paid must be 0 or greater'),
   notes: z.string().optional(),
 });
 
@@ -36,6 +37,7 @@ export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }
     wip_amount: snapshot?.wip_amount || 0,
     wip_write_off_amount: snapshot?.wip_write_off_amount || 0,
     billed_amount: snapshot?.billed_amount || 0,
+    accounts_receivable: (snapshot as any)?.accounts_receivable || 0,
     paid_amount: snapshot?.paid_amount || 0,
     notes: snapshot?.notes || '',
   });
@@ -141,10 +143,10 @@ export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }
         </div>
       </div>
 
-      {/* Billed and Paid */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Total Billed, Accounts Receivable, and Total Paid */}
+      <div className="grid grid-cols-3 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="billed_amount">Billed / AR ({currencySymbol.trim()})</Label>
+          <Label htmlFor="billed_amount">Total Billed ({currencySymbol.trim()})</Label>
           <Input
             id="billed_amount"
             type="number"
@@ -158,7 +160,21 @@ export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="paid_amount">Paid ({currencySymbol.trim()})</Label>
+          <Label htmlFor="accounts_receivable">Accounts Receivable ({currencySymbol.trim()})</Label>
+          <Input
+            id="accounts_receivable"
+            type="number"
+            min="0"
+            step="0.01"
+            value={formData.accounts_receivable}
+            onChange={(e) => updateField('accounts_receivable', parseFloat(e.target.value) || 0)}
+            className={errors.accounts_receivable ? 'border-destructive' : ''}
+          />
+          {errors.accounts_receivable && <p className="text-sm text-destructive">{errors.accounts_receivable}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="paid_amount">Total Paid ({currencySymbol.trim()})</Label>
           <Input
             id="paid_amount"
             type="number"

@@ -32,6 +32,7 @@ interface FinancialSnapshotUpdateDialogProps {
     wip_amount: number;
     wip_write_off_amount: number;
     billed_amount: number;
+    accounts_receivable: number;
     paid_amount: number;
     notes?: string;
     localCounsels?: LocalCounselUpdate[];
@@ -41,6 +42,7 @@ interface FinancialSnapshotUpdateDialogProps {
     wip_amount: number;
     wip_write_off_amount: number;
     billed_amount: number;
+    accounts_receivable: number;
     paid_amount: number;
   };
   matterName?: string;
@@ -75,6 +77,7 @@ export function FinancialSnapshotUpdateDialog({
     wip_write_off_amount: currentValues?.wip_write_off_amount || 0,
     adjusted_wip: (currentValues?.wip_amount || 0) - (currentValues?.wip_write_off_amount || 0),
     billed_amount: currentValues?.billed_amount || 0,
+    accounts_receivable: currentValues?.accounts_receivable || 0,
     paid_amount: currentValues?.paid_amount || 0,
     notes: '',
   });
@@ -93,6 +96,7 @@ export function FinancialSnapshotUpdateDialog({
         wip_write_off_amount: writeOff,
         adjusted_wip: rawWip - writeOff,
         billed_amount: currentValues?.billed_amount || 0,
+        accounts_receivable: currentValues?.accounts_receivable || 0,
         paid_amount: currentValues?.paid_amount || 0,
         notes: '',
       });
@@ -153,6 +157,7 @@ export function FinancialSnapshotUpdateDialog({
         wip_amount: formData.wip_amount,
         wip_write_off_amount: calculatedValues.writeOff,
         billed_amount: formData.billed_amount,
+        accounts_receivable: formData.accounts_receivable,
         paid_amount: formData.paid_amount,
         notes: formData.notes || undefined,
         localCounsels: lcUpdates.length > 0 ? lcUpdates : undefined,
@@ -171,7 +176,7 @@ export function FinancialSnapshotUpdateDialog({
         <DialogHeader>
           <DialogTitle>Update Financial Snapshot</DialogTitle>
           <DialogDescription>
-            {matterName ? `Update WIP, AR and Paid for ${matterName}` : 'Update financial figures for this matter'}
+            {matterName ? `Update WIP, Accounts Receivable and Total Paid for ${matterName}` : 'Update financial figures for this matter'}
           </DialogDescription>
         </DialogHeader>
 
@@ -271,10 +276,10 @@ export function FinancialSnapshotUpdateDialog({
               </div>
             </div>
 
-            {/* Billed and Paid */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Total Billed, Accounts Receivable, and Total Paid */}
+            <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="billed_amount" className="text-xs">Billed / AR ({currencySymbol.trim()})</Label>
+                <Label htmlFor="billed_amount" className="text-xs">Total Billed ({currencySymbol.trim()})</Label>
                 <Input
                   id="billed_amount"
                   type="number"
@@ -287,7 +292,20 @@ export function FinancialSnapshotUpdateDialog({
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="paid_amount" className="text-xs">Paid ({currencySymbol.trim()})</Label>
+                <Label htmlFor="accounts_receivable" className="text-xs">Accounts Receivable ({currencySymbol.trim()})</Label>
+                <Input
+                  id="accounts_receivable"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formData.accounts_receivable}
+                  onChange={(e) => updateField('accounts_receivable', parseFloat(e.target.value) || 0)}
+                  className="h-9"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="paid_amount" className="text-xs">Total Paid ({currencySymbol.trim()})</Label>
                 <Input
                   id="paid_amount"
                   type="number"

@@ -30,6 +30,7 @@ interface FinancialSnapshot {
   wip_amount: number;
   wip_write_off_amount: number;
   billed_amount: number;
+  accounts_receivable: number;
   paid_amount: number;
   notes: string | null;
   created_at: string;
@@ -163,14 +164,18 @@ export function FinancialSnapshotHistoryModal({
                         <p className="font-medium">{formatCurrency(netWip, currency)}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-muted-foreground">AR (Billed)</p>
+                        <p className="text-xs text-muted-foreground">Total Billed</p>
                         <p className="font-medium">{formatCurrency(snapshot.billed_amount, currency)}</p>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="grid grid-cols-3 gap-3 text-sm">
                       <div>
-                        <p className="text-xs text-muted-foreground">Paid</p>
+                        <p className="text-xs text-muted-foreground">Accounts Receivable</p>
+                        <p className="font-medium">{formatCurrency(snapshot.accounts_receivable, currency)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground">Total Paid</p>
                         <p className="font-medium text-success">{formatCurrency(snapshot.paid_amount, currency)}</p>
                       </div>
                       <div>

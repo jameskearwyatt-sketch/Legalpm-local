@@ -455,6 +455,7 @@ export default function MatterDetail() {
   // Net WIP = raw WIP minus write-offs (write-offs reduce actual WIP)
   const wipAmountQuote = rawWipAmountQuote - wipWriteOffAmountQuote;
   const billedAmountQuote = latestSnapshot?.billed_amount || 0;
+  const accountsReceivableQuote = latestSnapshot?.accounts_receivable || 0;
   const paidAmountQuote = latestSnapshot?.paid_amount || 0;
   
   // LC financial data - use aggregated data from useLocalCounsels hook
@@ -486,6 +487,9 @@ export default function MatterDetail() {
   const billedAmount = differentBillingCurrency && agreedBillingAmount > 0
     ? billedAmountQuote * mandatedRate
     : billedAmountQuote;
+  const accountsReceivable = differentBillingCurrency && agreedBillingAmount > 0
+    ? accountsReceivableQuote * mandatedRate
+    : accountsReceivableQuote;
   const paidAmount = differentBillingCurrency && agreedBillingAmount > 0
     ? paidAmountQuote * mandatedRate
     : paidAmountQuote;
@@ -915,13 +919,19 @@ export default function MatterDetail() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-3 border-b">
-                  <span className="text-muted-foreground">AR (Billed)</span>
+                  <span className="text-muted-foreground">Total Billed</span>
                   <span className="text-lg font-semibold">
                     {formatCurrency(billedAmount, currency)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-3 border-b">
-                  <span className="text-muted-foreground">Paid</span>
+                  <span className="text-muted-foreground">Accounts Receivable</span>
+                  <span className="text-lg font-semibold">
+                    {formatCurrency(accountsReceivable, currency)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-3 border-b">
+                  <span className="text-muted-foreground">Total Paid</span>
                   <span className="text-lg font-semibold text-success">
                     {formatCurrency(paidAmount, currency)}
                   </span>
@@ -995,6 +1005,9 @@ export default function MatterDetail() {
               billed_amount: differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0
                 ? billedAmountQuote * mandatedRate
                 : billedAmountQuote,
+              accounts_receivable: differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0
+                ? accountsReceivableQuote * mandatedRate
+                : accountsReceivableQuote,
               paid_amount: differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0
                 ? paidAmountQuote * mandatedRate
                 : paidAmountQuote,
@@ -1007,6 +1020,7 @@ export default function MatterDetail() {
               const wipToStore = data.wip_amount * conversionRate;
               const writeOffToStore = data.wip_write_off_amount * conversionRate;
               const billedToStore = data.billed_amount * conversionRate;
+              const arToStore = data.accounts_receivable * conversionRate;
               const paidToStore = data.paid_amount * conversionRate;
               
               const today = new Date().toISOString().split('T')[0];
@@ -1024,6 +1038,7 @@ export default function MatterDetail() {
                     wip_amount: wipToStore,
                     wip_write_off_amount: writeOffToStore,
                     billed_amount: billedToStore,
+                    accounts_receivable: arToStore,
                     paid_amount: paidToStore,
                     notes: data.notes,
                     updated_at: new Date().toISOString(),
@@ -1039,6 +1054,7 @@ export default function MatterDetail() {
                     wip_amount: wipToStore,
                     wip_write_off_amount: writeOffToStore,
                     billed_amount: billedToStore,
+                    accounts_receivable: arToStore,
                     paid_amount: paidToStore,
                     notes: data.notes,
                   });
@@ -1299,7 +1315,7 @@ export default function MatterDetail() {
                     <Line 
                       type="monotone" 
                       dataKey="ar" 
-                      name="AR"
+                      name="Total Billed"
                       stroke="hsl(var(--chart-1))" 
                       strokeWidth={2}
                       dot={{ fill: 'hsl(var(--chart-1))' }}
@@ -1307,7 +1323,7 @@ export default function MatterDetail() {
                     <Line 
                       type="monotone" 
                       dataKey="paid" 
-                      name="Paid"
+                      name="Total Paid"
                       stroke="hsl(var(--chart-2))" 
                       strokeWidth={2}
                       dot={{ fill: 'hsl(var(--chart-2))' }}

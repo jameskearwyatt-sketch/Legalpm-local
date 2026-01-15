@@ -67,6 +67,42 @@ export function useMasterWipUpdates() {
     enabled: !!user,
   });
 
+  // Fetch the last master update's changes (for highlighting)
+  const lastMasterChangesQuery = useQuery({
+    queryKey: ['last-master-wip-changes'],
+    queryFn: async () => {
+      // First get the most recent master update that has changes
+      const { data: latestUpdate, error: updateError } = await supabase
+        .from('detailed_wip_updates')
+        .select('id, created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (updateError) throw updateError;
+      if (!latestUpdate) return { changes: [], updateDate: null };
+
+      // Check if this update has any snapshot changes
+      const { data: changes, error: changesError } = await supabase
+        .from('master_wip_snapshot_changes')
+        .select('*')
+        .eq('wip_update_id', latestUpdate.id);
+
+      if (changesError) throw changesError;
+
+      // If no changes, return empty
+      if (!changes || changes.length === 0) {
+        return { changes: [], updateDate: null };
+      }
+
+      return {
+        changes: changes as MasterWipSnapshotChange[],
+        updateDate: latestUpdate.created_at,
+      };
+    },
+    enabled: !!user,
+  });
+
   // Fetch changes for a specific master WIP update
   const fetchChangesForUpdate = async (wipUpdateId: string): Promise<MasterWipSnapshotChange[]> => {
     const { data, error } = await supabase
@@ -132,6 +168,7 @@ export function useMasterWipUpdates() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['master-wip-updates'] });
+      queryClient.invalidateQueries({ queryKey: ['last-master-wip-changes'] });
     },
     onError: (error: Error) => {
       console.error('Failed to create master WIP update record:', error);
@@ -187,6 +224,7 @@ export function useMasterWipUpdates() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['master-wip-updates'] });
+      queryClient.invalidateQueries({ queryKey: ['last-master-wip-changes'] });
       queryClient.invalidateQueries({ queryKey: ['snapshots'] });
       queryClient.invalidateQueries({ queryKey: ['matters'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -201,6 +239,9 @@ export function useMasterWipUpdates() {
     masterUpdates: masterUpdatesQuery.data || [],
     isLoading: masterUpdatesQuery.isLoading,
     error: masterUpdatesQuery.error,
+    lastMasterChanges: lastMasterChangesQuery.data?.changes || [],
+    lastMasterUpdateDate: lastMasterChangesQuery.data?.updateDate || null,
+    isLoadingLastChanges: lastMasterChangesQuery.isLoading,
     fetchChangesForUpdate,
     createMasterUpdate,
     revertMasterUpdate,

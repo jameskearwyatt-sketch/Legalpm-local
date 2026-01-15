@@ -43,10 +43,12 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { BilledAmountCell } from '@/components/matters/BilledAmountCell';
-import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload, History } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload, History, Eye } from 'lucide-react';
 import { MasterWipUpdateDialog } from '@/components/matters/MasterWipUpdateDialog';
 import { MasterWipHistoryDialog } from '@/components/matters/MasterWipHistoryDialog';
 import { useMasterWipUpdates } from '@/lib/hooks/useMasterWipUpdates';
+import { useHighlightMovements } from '@/lib/hooks/useHighlightMovements';
+import { HighlightedFinancialValue } from '@/components/matters/HighlightedFinancialValue';
 import { format, differenceInDays, parseISO, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -504,7 +506,31 @@ export default function Matters() {
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [showMasterWipDialog, setShowMasterWipDialog] = useState(false);
   const [showMasterWipHistoryDialog, setShowMasterWipHistoryDialog] = useState(false);
-  const { createMasterUpdate } = useMasterWipUpdates();
+  const { createMasterUpdate, lastMasterChanges, lastMasterUpdateDate } = useMasterWipUpdates();
+  const { masterHighlightEnabled, toggleMasterHighlight } = useHighlightMovements();
+
+  // Build a map of matter_id -> change data for quick lookup when highlighting
+  const masterChangesMap = useMemo(() => {
+    const map = new Map<string, {
+      before_wip_amount: number;
+      before_billed_amount: number;
+      before_paid_amount: number;
+      before_accounts_receivable: number;
+      before_wip_write_off_amount: number;
+      created_at: string;
+    }>();
+    lastMasterChanges.forEach((change) => {
+      map.set(change.matter_id, {
+        before_wip_amount: change.before_wip_amount,
+        before_billed_amount: change.before_billed_amount,
+        before_paid_amount: change.before_paid_amount,
+        before_accounts_receivable: change.before_accounts_receivable,
+        before_wip_write_off_amount: change.before_wip_write_off_amount,
+        created_at: change.created_at,
+      });
+    });
+    return map;
+  }, [lastMasterChanges]);
 
   // Fetch user profile for "Me" checkbox
   const { data: userProfile } = useQuery({
@@ -868,23 +894,40 @@ export default function Matters() {
           </div>
           <div className="flex items-center gap-2">
             {isLive && (
-              <div className="flex items-center gap-2">
-                <Button 
-                  variant="outline"
-                  onClick={() => setShowMasterWipHistoryDialog(true)}
-                  size="sm"
-                >
-                  <History className="mr-2 h-4 w-4" />
-                  History
-                </Button>
-                <Button 
-                  variant="default" 
-                  onClick={() => setShowMasterWipDialog(true)}
-                  className="bg-amber-600 hover:bg-amber-700 text-white"
-                >
-                  <Upload className="mr-2 h-4 w-4" />
-                  Master Financial Snapshot Update
-                </Button>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline"
+                    onClick={() => setShowMasterWipHistoryDialog(true)}
+                    size="sm"
+                  >
+                    <History className="mr-2 h-4 w-4" />
+                    History
+                  </Button>
+                  <Button 
+                    variant="default" 
+                    onClick={() => setShowMasterWipDialog(true)}
+                    className="bg-amber-600 hover:bg-amber-700 text-white"
+                  >
+                    <Upload className="mr-2 h-4 w-4" />
+                    Master Financial Snapshot Update
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2 justify-end">
+                  <Checkbox
+                    id="highlight-movements-master"
+                    checked={masterHighlightEnabled}
+                    onCheckedChange={(checked) => toggleMasterHighlight(!!checked)}
+                    className="h-4 w-4"
+                  />
+                  <label 
+                    htmlFor="highlight-movements-master" 
+                    className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1"
+                  >
+                    <Eye className="h-3 w-3" />
+                    Highlight Recent Movements
+                  </label>
+                </div>
               </div>
             )}
             {!isClosed && !isSpecialTab && (
@@ -1219,34 +1262,71 @@ export default function Matters() {
                           {isLive && (
                             <>
                               <TableCell className="p-1">
-                                <div className="flex flex-col gap-0.5 text-right">
-                                  <div className="flex items-center justify-end gap-1">
-                                    <span className="text-[10px] text-muted-foreground leading-tight">WIP:</span>
-                                    <span className="text-xs font-medium">
-                                      {formatCurrency(matter.latest_snapshot?.wip_amount || 0, (matter as any).effective_currency ?? matter.fee_currency)}
-                                    </span>
-                                  </div>
-                                  {/* Show write-off amount in red if present */}
-                                  {(matter.latest_snapshot?.wip_write_off_amount || 0) > 0 && (
-                                    <div className="flex items-center justify-end gap-1">
-                                      <span className="text-[9px] text-destructive leading-tight">
-                                        W/O: {formatCurrency(matter.latest_snapshot?.wip_write_off_amount || 0, (matter as any).effective_currency ?? matter.fee_currency)}
-                                      </span>
+                                {(() => {
+                                  const changeData = masterChangesMap.get(matter.id);
+                                  const currency = (matter as any).effective_currency ?? matter.fee_currency;
+                                  const currentWip = matter.latest_snapshot?.wip_amount || 0;
+                                  const currentAr = matter.latest_snapshot?.accounts_receivable || 0;
+                                  const currentPaid = matter.latest_snapshot?.paid_amount || 0;
+                                  const currentWriteOff = matter.latest_snapshot?.wip_write_off_amount || 0;
+                                  
+                                  // Check if values changed (only if highlighting is enabled and we have change data)
+                                  const wipChanged = masterHighlightEnabled && changeData && currentWip !== changeData.before_wip_amount;
+                                  const arChanged = masterHighlightEnabled && changeData && currentAr !== changeData.before_accounts_receivable;
+                                  const paidChanged = masterHighlightEnabled && changeData && currentPaid !== changeData.before_paid_amount;
+                                  const writeOffChanged = masterHighlightEnabled && changeData && currentWriteOff !== changeData.before_wip_write_off_amount;
+                                  
+                                  return (
+                                    <div className="flex flex-col gap-0.5 text-right">
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span className="text-[10px] text-muted-foreground leading-tight">WIP:</span>
+                                        <HighlightedFinancialValue
+                                          currentValue={formatCurrency(currentWip, currency)}
+                                          previousValue={changeData?.before_wip_amount}
+                                          previousDate={changeData?.created_at}
+                                          isHighlighted={!!wipChanged}
+                                          className="text-xs font-medium"
+                                          formatFn={(v) => formatCurrency(v, currency)}
+                                        />
+                                      </div>
+                                      {/* Show write-off amount in red if present */}
+                                      {currentWriteOff > 0 && (
+                                        <div className="flex items-center justify-end gap-1">
+                                          <HighlightedFinancialValue
+                                            currentValue={`W/O: ${formatCurrency(currentWriteOff, currency)}`}
+                                            previousValue={changeData?.before_wip_write_off_amount}
+                                            previousDate={changeData?.created_at}
+                                            isHighlighted={!!writeOffChanged}
+                                            className="text-[9px] text-destructive leading-tight"
+                                            formatFn={(v) => formatCurrency(v, currency)}
+                                          />
+                                        </div>
+                                      )}
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span className="text-[10px] text-muted-foreground leading-tight">AR:</span>
+                                        <HighlightedFinancialValue
+                                          currentValue={formatCurrency(currentAr, currency)}
+                                          previousValue={changeData?.before_accounts_receivable}
+                                          previousDate={changeData?.created_at}
+                                          isHighlighted={!!arChanged}
+                                          className="text-xs font-medium"
+                                          formatFn={(v) => formatCurrency(v, currency)}
+                                        />
+                                      </div>
+                                      <div className="flex items-center justify-end gap-1">
+                                        <span className="text-[10px] text-muted-foreground leading-tight">Paid:</span>
+                                        <HighlightedFinancialValue
+                                          currentValue={formatCurrency(currentPaid, currency)}
+                                          previousValue={changeData?.before_paid_amount}
+                                          previousDate={changeData?.created_at}
+                                          isHighlighted={!!paidChanged}
+                                          className="text-xs font-medium text-success"
+                                          formatFn={(v) => formatCurrency(v, currency)}
+                                        />
+                                      </div>
                                     </div>
-                                  )}
-                                  <div className="flex items-center justify-end gap-1">
-                                    <span className="text-[10px] text-muted-foreground leading-tight">AR:</span>
-                                    <span className="text-xs font-medium">
-                                      {formatCurrency(matter.latest_snapshot?.accounts_receivable || 0, (matter as any).effective_currency ?? matter.fee_currency)}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center justify-end gap-1">
-                                    <span className="text-[10px] text-muted-foreground leading-tight">Paid:</span>
-                                    <span className="text-xs font-medium text-success">
-                                      {formatCurrency(matter.latest_snapshot?.paid_amount || 0, (matter as any).effective_currency ?? matter.fee_currency)}
-                                    </span>
-                                  </div>
-                                </div>
+                                  );
+                                })()}
                               </TableCell>
                               <TableCell className="text-right">
                                 <div className="flex flex-col items-end">

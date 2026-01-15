@@ -64,10 +64,13 @@ import {
   ChevronDown,
   FileText,
   History,
-  Download
+  Download,
+  Eye
 } from 'lucide-react';
 import { FinancialSnapshotUpdateDialog } from '@/components/matters/FinancialSnapshotUpdateDialog';
 import { FinancialSnapshotHistoryModal } from '@/components/matters/FinancialSnapshotHistoryModal';
+import { HighlightedFinancialValue } from '@/components/matters/HighlightedFinancialValue';
+import { useMatterHighlightMovements } from '@/lib/hooks/useHighlightMovements';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -281,6 +284,16 @@ export default function MatterDetail() {
   const [hasChanges, setHasChanges] = useState(false);
   const [showFinancialUpdateDialog, setShowFinancialUpdateDialog] = useState(false);
   const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
+  
+  // Highlight movements for individual matter
+  const { highlightEnabled, toggleHighlight } = useMatterHighlightMovements(id || '');
+  
+  // Get previous snapshot for highlighting (second most recent snapshot)
+  const previousSnapshot = useMemo(() => {
+    if (!snapshots || snapshots.length < 2) return null;
+    // Snapshots are ordered by as_of_date desc, so [1] is the previous one
+    return snapshots[1];
+  }, [snapshots]);
   
   // Form state
   const [formData, setFormData] = useState<Record<string, any>>({});
@@ -886,69 +899,126 @@ export default function MatterDetail() {
                     </CardDescription>
                   )}
                 </div>
-                <div className="flex gap-2">
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setShowSnapshotHistory(true)}
-                  >
-                    <History className="h-4 w-4 mr-2" />
-                    History
-                  </Button>
-                  <Button 
-                    variant="default" 
-                    size="sm"
-                    onClick={() => setShowFinancialUpdateDialog(true)}
-                    className="bg-amber-600 hover:bg-amber-700 text-white"
-                  >
-                    <FileText className="h-4 w-4 mr-2" />
-                    Update Financial Snapshot
-                  </Button>
+                <div className="flex flex-col gap-2 items-end">
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setShowSnapshotHistory(true)}
+                    >
+                      <History className="h-4 w-4 mr-2" />
+                      History
+                    </Button>
+                    <Button 
+                      variant="default" 
+                      size="sm"
+                      onClick={() => setShowFinancialUpdateDialog(true)}
+                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Update Financial Snapshot
+                    </Button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="highlight-movements-matter"
+                      checked={highlightEnabled}
+                      onCheckedChange={(checked) => toggleHighlight(!!checked)}
+                      className="h-4 w-4"
+                    />
+                    <label 
+                      htmlFor="highlight-movements-matter" 
+                      className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1"
+                    >
+                      <Eye className="h-3 w-3" />
+                      Highlight Recent Movements
+                    </label>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-between items-center py-3 border-b">
-                  <div>
-                    <span className="text-muted-foreground">Work in Progress</span>
-                    {wipWriteOffAmount > 0 && (
-                      <div className="text-xs text-destructive">
-                        (Write-off: {formatCurrency(wipWriteOffAmount, currency)})
+                {(() => {
+                  // Determine if values changed compared to previous snapshot
+                  const wipChanged = highlightEnabled && previousSnapshot && wipAmount !== previousSnapshot.wip_amount;
+                  const arChanged = highlightEnabled && previousSnapshot && accountsReceivable !== previousSnapshot.accounts_receivable;
+                  const billedChanged = highlightEnabled && previousSnapshot && billedAmount !== previousSnapshot.billed_amount;
+                  const paidChanged = highlightEnabled && previousSnapshot && paidAmount !== previousSnapshot.paid_amount;
+                  const writeOffChanged = highlightEnabled && previousSnapshot && wipWriteOffAmount !== previousSnapshot.wip_write_off_amount;
+                  
+                  return (
+                    <>
+                      <div className="flex justify-between items-center py-3 border-b">
+                        <div>
+                          <span className="text-muted-foreground">Work in Progress</span>
+                          {wipWriteOffAmount > 0 && (
+                            <div className="text-xs text-destructive">
+                              (Write-off: <HighlightedFinancialValue
+                                currentValue={formatCurrency(wipWriteOffAmount, currency)}
+                                previousValue={previousSnapshot?.wip_write_off_amount}
+                                previousDate={previousSnapshot?.as_of_date}
+                                isHighlighted={!!writeOffChanged}
+                                className=""
+                                formatFn={(v) => formatCurrency(v, currency)}
+                              />)
+                            </div>
+                          )}
+                        </div>
+                        <HighlightedFinancialValue
+                          currentValue={formatCurrency(wipAmount, currency)}
+                          previousValue={previousSnapshot?.wip_amount}
+                          previousDate={previousSnapshot?.as_of_date}
+                          isHighlighted={!!wipChanged}
+                          className="text-lg font-semibold"
+                          formatFn={(v) => formatCurrency(v, currency)}
+                        />
                       </div>
-                    )}
-                  </div>
-                  <span className="text-lg font-semibold">
-                    {formatCurrency(wipAmount, currency)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-3 border-b">
-                  <span className="text-muted-foreground">Accounts Receivable</span>
-                  <span className="text-lg font-semibold">
-                    {formatCurrency(accountsReceivable, currency)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-3 border-b">
-                  <span className="text-muted-foreground">Total Billed</span>
-                  <span className="text-lg font-semibold">
-                    {formatCurrency(billedAmount, currency)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-3 border-b">
-                  <span className="text-muted-foreground">Total Paid</span>
-                  <span className="text-lg font-semibold text-success">
-                    {formatCurrency(paidAmount, currency)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-3 border-b">
-                  <span className="text-muted-foreground">Collection Rate</span>
-                  <span className={cn(
-                    "text-lg font-semibold",
-                    collectionRate >= 80 && "text-success",
-                    collectionRate >= 60 && collectionRate < 80 && "text-warning",
-                    collectionRate < 60 && "text-danger"
-                  )}>
-                    {collectionRate.toFixed(1)}%
-                  </span>
-                </div>
+                      <div className="flex justify-between items-center py-3 border-b">
+                        <span className="text-muted-foreground">Accounts Receivable</span>
+                        <HighlightedFinancialValue
+                          currentValue={formatCurrency(accountsReceivable, currency)}
+                          previousValue={previousSnapshot?.accounts_receivable}
+                          previousDate={previousSnapshot?.as_of_date}
+                          isHighlighted={!!arChanged}
+                          className="text-lg font-semibold"
+                          formatFn={(v) => formatCurrency(v, currency)}
+                        />
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b">
+                        <span className="text-muted-foreground">Total Billed</span>
+                        <HighlightedFinancialValue
+                          currentValue={formatCurrency(billedAmount, currency)}
+                          previousValue={previousSnapshot?.billed_amount}
+                          previousDate={previousSnapshot?.as_of_date}
+                          isHighlighted={!!billedChanged}
+                          className="text-lg font-semibold"
+                          formatFn={(v) => formatCurrency(v, currency)}
+                        />
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b">
+                        <span className="text-muted-foreground">Total Paid</span>
+                        <HighlightedFinancialValue
+                          currentValue={formatCurrency(paidAmount, currency)}
+                          previousValue={previousSnapshot?.paid_amount}
+                          previousDate={previousSnapshot?.as_of_date}
+                          isHighlighted={!!paidChanged}
+                          className="text-lg font-semibold text-success"
+                          formatFn={(v) => formatCurrency(v, currency)}
+                        />
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b">
+                        <span className="text-muted-foreground">Collection Rate</span>
+                        <span className={cn(
+                          "text-lg font-semibold",
+                          collectionRate >= 80 && "text-success",
+                          collectionRate >= 60 && collectionRate < 80 && "text-warning",
+                          collectionRate < 60 && "text-danger"
+                        )}>
+                          {collectionRate.toFixed(1)}%
+                        </span>
+                      </div>
+                    </>
+                  );
+                })()}
                 
                 {/* Budget Burn Reference */}
                 <div className="pt-2 border-t border-dashed space-y-2">

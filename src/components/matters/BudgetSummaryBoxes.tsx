@@ -127,15 +127,10 @@ export function BudgetSummaryBoxes({
           const catData = categoryTotals[category];
           if (!catData || (catData.budget === 0 && catData.used === 0 && catData.writeOff === 0)) return null;
           
-          const displayBudget = differentBillingCurrency && agreedBillingAmount > 0
-            ? catData.budget * mandatedRate
-            : catData.budget;
-          const displayAdjUsed = differentBillingCurrency && agreedBillingAmount > 0
-            ? catData.used * mandatedRate
-            : catData.used;
-          const displayWriteOff = differentBillingCurrency && agreedBillingAmount > 0
-            ? catData.writeOff * mandatedRate
-            : catData.writeOff;
+          // Budget values are stored in billing currency - no conversion needed
+          const displayBudget = catData.budget;
+          const displayAdjUsed = catData.used;
+          const displayWriteOff = catData.writeOff;
           const displayRawWip = displayAdjUsed + displayWriteOff;
           const burnPct = displayBudget > 0 ? Math.round((displayAdjUsed / displayBudget) * 100) : 0;
           const burnColor = burnPct > 100 ? 'text-red-600 dark:text-red-400' : 
@@ -214,15 +209,10 @@ export function BudgetSummaryBoxes({
           const grandWriteOff = Object.values(categoryTotals).reduce((sum, val) => sum + val.writeOff, 0);
           if (grandBudget === 0 && grandAdjUsed === 0 && grandWriteOff === 0) return null;
           
-          const displayGrandBudget = differentBillingCurrency && agreedBillingAmount > 0
-            ? grandBudget * mandatedRate
-            : grandBudget;
-          const displayGrandAdjUsed = differentBillingCurrency && agreedBillingAmount > 0
-            ? grandAdjUsed * mandatedRate
-            : grandAdjUsed;
-          const displayGrandWriteOff = differentBillingCurrency && agreedBillingAmount > 0
-            ? grandWriteOff * mandatedRate
-            : grandWriteOff;
+          // Budget values are stored in billing currency - no conversion needed
+          const displayGrandBudget = grandBudget;
+          const displayGrandAdjUsed = grandAdjUsed;
+          const displayGrandWriteOff = grandWriteOff;
           const displayGrandRawWip = displayGrandAdjUsed + displayGrandWriteOff;
           const burnPct = displayGrandBudget > 0 ? Math.round((displayGrandAdjUsed / displayGrandBudget) * 100) : 0;
           const burnColor = burnPct > 100 ? 'text-red-600 dark:text-red-400' : 
@@ -289,15 +279,10 @@ export function BudgetSummaryBoxes({
         <div className="flex flex-wrap gap-2">
           {providerTotals['Baker McKenzie'] && providerTotals['Baker McKenzie'].budget > 0 && (() => {
             const data = providerTotals['Baker McKenzie'];
-            const displayBudget = differentBillingCurrency && agreedBillingAmount > 0
-              ? data.budget * mandatedRate
-              : data.budget;
-            const displayRawWip = differentBillingCurrency && agreedBillingAmount > 0
-              ? data.rawWip * mandatedRate
-              : data.rawWip;
-            const displayWriteOff = differentBillingCurrency && agreedBillingAmount > 0
-              ? data.writeOff * mandatedRate
-              : data.writeOff;
+            // Budget values are stored in billing currency - no conversion needed
+            const displayBudget = data.budget;
+            const displayRawWip = data.rawWip;
+            const displayWriteOff = data.writeOff;
             const displayAdjWip = displayRawWip - displayWriteOff;
             const burnPct = displayBudget > 0 ? Math.round((displayAdjWip / displayBudget) * 100) : 0;
             const burnColor = burnPct > 100 ? 'text-red-600 dark:text-red-400' : 
@@ -364,15 +349,10 @@ export function BudgetSummaryBoxes({
             .map(([lcName, data]) => {
               if (data.budget === 0 && data.rawWip === 0) return null;
               
-              const displayBudget = differentBillingCurrency && agreedBillingAmount > 0
-                ? data.budget * mandatedRate
-                : data.budget;
-              const displayRawWip = differentBillingCurrency && agreedBillingAmount > 0
-                ? data.rawWip * mandatedRate
-                : data.rawWip;
-              const displayWriteOff = differentBillingCurrency && agreedBillingAmount > 0
-                ? data.writeOff * mandatedRate
-                : data.writeOff;
+              // Budget values are stored in billing currency - no conversion needed
+              const displayBudget = data.budget;
+              const displayRawWip = data.rawWip;
+              const displayWriteOff = data.writeOff;
               const displayAdjWip = displayRawWip - displayWriteOff;
               const burnPct = displayBudget > 0 ? Math.round((displayAdjWip / displayBudget) * 100) : 0;
               const burnColor = burnPct > 100 ? 'text-red-600 dark:text-red-400' : 

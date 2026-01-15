@@ -101,15 +101,14 @@ export function DraggableBudgetItem({
     transition,
   };
 
+  // Budget values are stored in billing currency - no mandatedRate conversion needed
   const isInBillingCurrencyMode = differentBillingCurrency && agreedBillingAmount > 0;
-  const displayAmount = isInBillingCurrencyMode
-    ? (item.fee_amount || 0) * mandatedRate
-    : item.fee_amount || 0;
+  const displayAmount = item.fee_amount || 0;
   
   const originalFee = originalItem?.fee_amount || 0;
-  const originalDisplayFee = isInBillingCurrencyMode ? originalFee * mandatedRate : originalFee;
+  const originalDisplayFee = originalFee;
   const newFee = item.fee_amount || 0;
-  const newDisplayFee = isInBillingCurrencyMode ? newFee * mandatedRate : newFee;
+  const newDisplayFee = newFee;
   const hasChanged = isEditing && hasExistingBudget && originalItem && Math.abs(newFee - originalFee) > 0.01;
   const isNewItem = isEditing && hasExistingBudget && !item.id;
 
@@ -341,9 +340,7 @@ export function DraggableBudgetItem({
         {!hasExistingBudget ? (
           <Input
             type="number"
-            value={isInBillingCurrencyMode 
-              ? (Math.round((item.fee_amount || 0) * mandatedRate) || '') 
-              : (item.fee_amount || '')}
+            value={item.fee_amount || ''}
             onChange={(e) => onEdit(index, 'fee_amount', e.target.value)}
             placeholder="0"
             className="text-right text-sm"
@@ -364,7 +361,7 @@ export function DraggableBudgetItem({
           <div className="text-xs text-muted-foreground">Raw WIP</div>
           <div className="font-medium text-sm text-muted-foreground">
             {hasWipData 
-              ? formatCurrency(isInBillingCurrencyMode ? rawWipAmount * mandatedRate : rawWipAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)
+              ? formatCurrency(rawWipAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)
               : '-'}
           </div>
         </div>
@@ -376,7 +373,7 @@ export function DraggableBudgetItem({
           <div className="text-xs text-muted-foreground">Write-off</div>
           {hasWriteOff ? (
             <div className="font-medium text-sm text-destructive">
-              -{formatCurrency(isInBillingCurrencyMode ? writeOffAmount * mandatedRate : writeOffAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
+              -{formatCurrency(writeOffAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
             </div>
           ) : (
             <div className="text-sm text-muted-foreground">-</div>
@@ -394,7 +391,7 @@ export function DraggableBudgetItem({
             )}
             <span>
               {hasWipData 
-                ? formatCurrency(isInBillingCurrencyMode ? wipAmount * mandatedRate : wipAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)
+                ? formatCurrency(wipAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)
                 : '-'}
             </span>
             {hasWipData && (

@@ -27,7 +27,9 @@ import {
   Loader2,
   Clock,
   Target,
-  Layers
+  Layers,
+  Ban,
+  Link2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -49,6 +51,12 @@ import {
   ProposalAFA,
 } from '@/lib/hooks/useProposalAFAs';
 import { DraftProposalItem, BUDGET_CATEGORIES, RateCard, ProposalAssumptions } from '@/lib/hooks/usePricingProposals';
+import { 
+  checkAFACompatibility, 
+  getActiveRateModifier, 
+  isRateModifierUsedAsBasis,
+  getLayeringExplanation,
+} from '@/lib/afaCompatibility';
 
 interface AFATabProps {
   proposalId: string;
@@ -136,14 +144,79 @@ export function AFATab({
     return totals;
   }, [draftItems]);
 
+  // Get enabled AFA types for compatibility checking
+  const enabledAFATypes = useMemo(() => {
+    return afas.filter(a => a.is_enabled).map(a => a.afa_type);
+  }, [afas]);
+
+  // Get active rate modifier for basis calculations
+  const activeRateModifier = useMemo(() => {
+    return getActiveRateModifier(enabledAFATypes);
+  }, [enabledAFATypes]);
+
+  // Calculate adjusted category totals when rate modifier is active
+  const adjustedCategoryTotals = useMemo(() => {
+    if (!activeRateModifier) return categoryTotals;
+    
+    const rateModifierAFA = afas.find(a => a.afa_type === activeRateModifier && a.is_enabled);
+    if (!rateModifierAFA) return categoryTotals;
+    
+    let multiplier = 1;
+    if (activeRateModifier === 'discounted_rates') {
+      const config = rateModifierAFA.config as DiscountedRatesConfig;
+      multiplier = 1 - config.discountPercent / 100;
+    }
+    
+    const adjusted: Record<string, number> = {};
+    Object.entries(categoryTotals).forEach(([cat, amount]) => {
+      adjusted[cat] = amount * multiplier;
+    });
+    return adjusted;
+  }, [categoryTotals, activeRateModifier, afas]);
+
+  // Calculate the adjusted baseline based on active rate modifier
+  const adjustedBaseline = useMemo(() => {
+    if (!activeRateModifier) return baselineTotals;
+    
+    const rateModifierAFA = afas.find(a => a.afa_type === activeRateModifier && a.is_enabled);
+    if (!rateModifierAFA) return baselineTotals;
+    
+    if (activeRateModifier === 'discounted_rates') {
+      const config = rateModifierAFA.config as DiscountedRatesConfig;
+      const multiplier = 1 - config.discountPercent / 100;
+      return {
+        ...baselineTotals,
+        bmTotal: baselineTotals.bmTotal * multiplier,
+        total: baselineTotals.bmTotal * multiplier + baselineTotals.localCounselTotal,
+      };
+    }
+    
+    if (activeRateModifier === 'blended_rate') {
+      const config = rateModifierAFA.config as BlendedRateConfig;
+      const rate = config.useManual && config.manualRate ? config.manualRate : config.calculatedRate;
+      const adjustedBmTotal = rate * baselineTotals.totalHours;
+      return {
+        ...baselineTotals,
+        bmTotal: adjustedBmTotal,
+        total: adjustedBmTotal + baselineTotals.localCounselTotal,
+        blendedRate: rate,
+      };
+    }
+    
+    return baselineTotals;
+  }, [activeRateModifier, afas, baselineTotals]);
+
   // Get AFA by type
   const getAFA = (type: AFAType): ProposalAFA | undefined => {
     return afas.find(a => a.afa_type === type);
   };
 
   // Calculate client price for each AFA type
+  // For fixed fee variants, use the adjusted baseline when a rate modifier is active
   const calculateClientPrice = (type: AFAType, config: any): number => {
-    const baseline = baselineTotals.total;
+    // Fixed fees should use adjusted baseline if rate modifier is active
+    const useAdjustedBaseline = ['fixed_fee_whole', 'fixed_fee_phase'].includes(type);
+    const baseline = useAdjustedBaseline ? adjustedBaseline.total : baselineTotals.total;
     
     switch (type) {
       case 'fee_cap': {
@@ -161,6 +234,7 @@ export function AFATab({
       case 'fixed_fee_whole': {
         const cfg = config as FixedFeeWholeConfig;
         if (cfg.adjustedFee !== null) return cfg.adjustedFee;
+        // Use adjusted baseline (includes rate modifier if active)
         return baseline * (1 + cfg.riskPremiumPercent / 100);
       }
       case 'fixed_fee_phase': {
@@ -186,13 +260,14 @@ export function AFATab({
       }
       case 'discounted_rates': {
         const cfg = config as DiscountedRatesConfig;
-        return baseline * (1 - cfg.discountPercent / 100);
+        return baselineTotals.total * (1 - cfg.discountPercent / 100);
       }
       case 'success_fee': {
         const cfg = config as SuccessFeeConfig;
-        // Success fee is the baseline + uplift amount
-        const uplift = cfg.upliftAmount || Math.round(baseline * (cfg.upliftPercent / 100));
-        return baseline + uplift;
+        // Success fee uses the final client price from the primary pricing model
+        const basePrice = adjustedBaseline.total;
+        const uplift = cfg.upliftAmount || Math.round(basePrice * (cfg.upliftPercent / 100));
+        return basePrice + uplift;
       }
       default:
         return baseline;
@@ -229,8 +304,19 @@ export function AFATab({
   };
 
   // Handle toggle - calculate and save initial price when enabling
+  // Also handles mutual exclusivity by disabling conflicting AFAs
   const handleToggle = async (type: AFAType, enabled: boolean) => {
     if (enabled) {
+      // Check compatibility
+      const compatibility = checkAFACompatibility(type, enabledAFATypes);
+      
+      // Disable any conflicting AFAs first
+      if (compatibility.blockedBy.length > 0) {
+        for (const conflictType of compatibility.blockedBy) {
+          await toggleAFA.mutateAsync({ afaType: conflictType, enabled: false });
+        }
+      }
+      
       // When enabling, calculate the initial price with default config
       const existingAfa = getAFA(type);
       const config = existingAfa?.config || getDefaultConfig(type);
@@ -411,10 +497,23 @@ export function AFATab({
   // Render Fixed Fee (Whole) configuration
   const renderFixedFeeWholeConfig = (afa: ProposalAFA | undefined) => {
     const config = (afa?.config || getDefaultConfig('fixed_fee_whole')) as FixedFeeWholeConfig;
-    const baseWithPremium = baselineTotals.total * (1 + config.riskPremiumPercent / 100);
+    // Use adjusted baseline (includes rate modifier if active)
+    const effectiveBaseline = adjustedBaseline.total;
+    const baseWithPremium = effectiveBaseline * (1 + config.riskPremiumPercent / 100);
     
     return (
       <div className="space-y-4">
+        {/* Show rate modifier basis if active */}
+        {activeRateModifier && (
+          <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              <strong>Using adjusted baseline:</strong> {formatCurrency(effectiveBaseline)} 
+              {activeRateModifier === 'discounted_rates' && ' (with discounted rates applied)'}
+              {activeRateModifier === 'blended_rate' && ' (with blended rate applied)'}
+            </p>
+          </div>
+        )}
+        
         <div className="space-y-2">
           <Label>Risk Premium (%)</Label>
           <div className="flex items-center gap-2">
@@ -460,8 +559,11 @@ export function AFATab({
   const renderFixedFeePhaseConfig = (afa: ProposalAFA | undefined) => {
     const config = (afa?.config || getDefaultConfig('fixed_fee_phase')) as FixedFeePhaseConfig;
     
-    // Check if phases need initialization (will be done on first interaction)
-    const needsInit = config.phases.length === 0 && Object.keys(categoryTotals).length > 0;
+    // Use adjusted category totals if rate modifier is active
+    const effectiveCategoryTotals = activeRateModifier ? adjustedCategoryTotals : categoryTotals;
+    
+    // Check if phases need initialization
+    const needsInit = config.phases.length === 0 && Object.keys(effectiveCategoryTotals).length > 0;
 
     const updatePhase = (index: number, updates: Partial<typeof config.phases[0]>) => {
       const newPhases = [...config.phases];
@@ -470,10 +572,10 @@ export function AFATab({
     };
     
     const initializePhases = () => {
-      const phases = Object.entries(categoryTotals).map(([category, amount]) => ({
+      const phases = Object.entries(effectiveCategoryTotals).map(([category, amount]) => ({
         category,
         baseAmount: amount,
-        adjustmentPercent: 0, // Start at 0% adjustment
+        adjustmentPercent: 0,
         isIncluded: true,
       }));
       handleConfigChange('fixed_fee_phase', { ...config, phases });
@@ -494,6 +596,17 @@ export function AFATab({
     
     return (
       <div className="space-y-4">
+        {/* Show rate modifier basis if active */}
+        {activeRateModifier && (
+          <div className="p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <p className="text-sm text-blue-700 dark:text-blue-300">
+              <strong>Using adjusted baseline:</strong> Phase amounts reflect 
+              {activeRateModifier === 'discounted_rates' && ' discounted rates'}
+              {activeRateModifier === 'blended_rate' && ' blended rate'}
+            </p>
+          </div>
+        )}
+        
         <p className="text-sm text-muted-foreground">
           Apply percentage adjustments to each phase. Use negative values for discounts.
         </p>
@@ -1058,18 +1171,79 @@ export function AFATab({
               const clientPrice = afa ? afa.client_price : calculateClientPrice(type, getDefaultConfig(type));
               const marginPercent = afa ? afa.margin_impact_percent : calculateMarginImpact(clientPrice);
               
+              // Check compatibility with currently enabled AFAs
+              const compatibility = checkAFACompatibility(type, enabledAFATypes.filter(t => t !== type));
+              const isUsedAsBasis = isRateModifierUsedAsBasis(type, enabledAFATypes);
+              const layeringExplanation = getLayeringExplanation(type, enabledAFATypes.filter(t => t !== type));
+              
               return (
-                <AccordionItem key={type} value={type} className="border rounded-lg mb-2 px-4">
+                <AccordionItem key={type} value={type} className={cn(
+                  "border rounded-lg mb-2 px-4",
+                  !isEnabled && compatibility.isBlocked && "opacity-60"
+                )}>
                   <div className="flex items-center gap-3 py-2">
-                    <Switch
-                      checked={isEnabled}
-                      onCheckedChange={(v) => handleToggle(type, v)}
-                    />
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div>
+                            <Switch
+                              checked={isEnabled}
+                              onCheckedChange={(v) => handleToggle(type, v)}
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        {!isEnabled && compatibility.isBlocked && (
+                          <TooltipContent>
+                            <p className="max-w-xs">
+                              {compatibility.reason}
+                              <br />
+                              <span className="text-xs text-muted-foreground">
+                                Enabling will disable: {compatibility.blockedBy.map(t => AFA_TYPE_LABELS[t]).join(', ')}
+                              </span>
+                            </p>
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    </TooltipProvider>
                     <AccordionTrigger className="flex-1 hover:no-underline py-3">
                       <div className="flex items-center gap-3">
                         <Icon className="h-4 w-4 text-muted-foreground" />
                         <div className="text-left">
-                          <p className="font-medium">{AFA_TYPE_LABELS[type]}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium">{AFA_TYPE_LABELS[type]}</p>
+                            {/* Show basis indicator */}
+                            {isEnabled && isUsedAsBasis && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Badge variant="outline" className="text-xs gap-1 border-blue-500 text-blue-600">
+                                      <Link2 className="h-3 w-3" />
+                                      Basis
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>Used as calculation basis for other active AFAs</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            {/* Show blocked indicator */}
+                            {!isEnabled && compatibility.isBlocked && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger>
+                                    <Badge variant="outline" className="text-xs gap-1 border-amber-500 text-amber-600">
+                                      <Ban className="h-3 w-3" />
+                                      Conflicts
+                                    </Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{compatibility.reason}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">{AFA_TYPE_DESCRIPTIONS[type]}</p>
                         </div>
                       </div>
@@ -1083,6 +1257,14 @@ export function AFATab({
                   </div>
                   <AccordionContent className="pt-0 pb-4">
                     <div className="pl-10 pr-2">
+                      {/* Show layering explanation if applicable */}
+                      {layeringExplanation && (
+                        <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg flex items-start gap-2">
+                          <Link2 className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+                          <p className="text-sm text-blue-700 dark:text-blue-300">{layeringExplanation}</p>
+                        </div>
+                      )}
+                      
                       {renderConfig(type)}
                       
                       {isEnabled && (

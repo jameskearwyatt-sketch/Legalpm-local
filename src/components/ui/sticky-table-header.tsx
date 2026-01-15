@@ -10,9 +10,14 @@ interface StickyTableHeaderProps {
 /**
  * Provides sticky header behavior for tables that also need horizontal scrolling.
  * Uses JavaScript to clone and fix the header when it scrolls out of view.
+ * 
+ * IMPORTANT: This component clones the thead element for sticky display.
+ * Event handlers on the original thead buttons continue to work because
+ * we forward click events from the cloned header to the original.
  */
 export function StickyTableHeader({ children, className }: StickyTableHeaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const clonedTheadRef = useRef<HTMLTableSectionElement>(null);
   const [isSticky, setIsSticky] = useState(false);
   const [headerInfo, setHeaderInfo] = useState<{
     html: string;
@@ -86,6 +91,43 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
     };
   }, [updateHeader]);
 
+  // Handle clicks on the cloned header - forward them to the original header buttons
+  const handleClonedHeaderClick = useCallback((e: React.MouseEvent<HTMLTableSectionElement>) => {
+    const target = e.target as HTMLElement;
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Find the clicked button or its parent button
+    const clickedButton = target.closest('button');
+    if (!clickedButton) return;
+
+    // Get the index of the th containing this button
+    const clickedTh = clickedButton.closest('th');
+    if (!clickedTh) return;
+
+    const clonedThead = clonedTheadRef.current;
+    if (!clonedThead) return;
+
+    const allClonedThs = Array.from(clonedThead.querySelectorAll('th'));
+    const thIndex = allClonedThs.indexOf(clickedTh);
+    
+    if (thIndex === -1) return;
+
+    // Find the corresponding th in the original thead
+    const originalThead = container.querySelector('thead');
+    if (!originalThead) return;
+
+    const originalThs = originalThead.querySelectorAll('th');
+    const originalTh = originalThs[thIndex];
+    if (!originalTh) return;
+
+    // Find and click the button in the original th
+    const originalButton = originalTh.querySelector('button');
+    if (originalButton) {
+      originalButton.click();
+    }
+  }, []);
+
   // Sync scroll position when clicking on fixed header
   const handleFixedHeaderScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const container = containerRef.current;
@@ -133,8 +175,10 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
                 ))}
               </colgroup>
               <thead 
-                className="bg-background [&_tr]:border-b border-b shadow-sm"
+                ref={clonedTheadRef}
+                className="bg-background [&_tr]:border-b border-b shadow-sm cursor-pointer"
                 dangerouslySetInnerHTML={{ __html: headerInfo.html }}
+                onClick={handleClonedHeaderClick}
               />
             </table>
           </div>

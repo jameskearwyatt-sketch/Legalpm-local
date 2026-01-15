@@ -56,7 +56,7 @@ import { formatCurrency, convertToUsd } from '@/lib/currencyUtils';
 import { useExchangeRates } from '@/lib/hooks/useExchangeRates';
 import { getClientDisplayName } from '@/lib/clientUtils';
 
-type SortField = 'matter_name' | 'fee_amount' | 'bm_fee' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'local_counsel' | 'stage';
+type SortField = 'matter_name' | 'fee_amount' | 'bm_fee' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'budget_burn_pct' | 'local_burn_pct' | 'local_counsel' | 'stage';
 type SortDirection = 'asc' | 'desc';
 type TabFilter = MatterCategory | 'MMA/BP' | 'Clients';
 
@@ -760,8 +760,9 @@ export default function Matters() {
           bVal = b.fee_amount_upper_end || 0;
           break;
         case 'headroom':
-          aVal = a.headroom || 0;
-          bVal = b.headroom || 0;
+          // Sort by headroom percentage (high to low by default)
+          aVal = a.headroom_percent || 0;
+          bVal = b.headroom_percent || 0;
           break;
         case 'headroom_pct':
           aVal = a.headroom_percent || 0;
@@ -784,13 +785,30 @@ export default function Matters() {
           aVal = (a.latest_snapshot?.wip_amount || 0) + (a.latest_snapshot?.accounts_receivable || 0) + (a.latest_snapshot?.paid_amount || 0);
           bVal = (b.latest_snapshot?.wip_amount || 0) + (b.latest_snapshot?.accounts_receivable || 0) + (b.latest_snapshot?.paid_amount || 0);
           break;
+        case 'budget_burn_pct':
+          // Sort by BM burn percentage (100 - bm_headroom_percent) - higher burn first
+          aVal = 100 - ((a as any).bm_headroom_percent || 0);
+          bVal = 100 - ((b as any).bm_headroom_percent || 0);
+          break;
+        case 'local_burn_pct':
+          // Sort by LC burn percentage (100 - lc_headroom_percent) - higher burn first
+          aVal = 100 - ((a as any).lc_headroom_percent || 0);
+          bVal = 100 - ((b as any).lc_headroom_percent || 0);
+          break;
         case 'local_counsel':
           aVal = a.local_counsel_fee || 0;
           bVal = b.local_counsel_fee || 0;
           break;
         case 'bm_fee':
-          aVal = a.bm_fee_component || 0;
-          bVal = b.bm_fee_component || 0;
+          // Sort by USD equivalent value
+          const aFeeCurrency = a.fee_currency || 'GBP';
+          const bFeeCurrency = b.fee_currency || 'GBP';
+          const aExchangeRate = a.exchange_rate || 1;
+          const bExchangeRate = b.exchange_rate || 1;
+          const aBmFee = a.bm_fee_component || 0;
+          const bBmFee = b.bm_fee_component || 0;
+          aVal = convertToUsd(aBmFee, aFeeCurrency, aExchangeRate, gbpToUsdRate, liveRates);
+          bVal = convertToUsd(bBmFee, bFeeCurrency, bExchangeRate, gbpToUsdRate, liveRates);
           break;
         case 'stage':
           aVal = a.current_stage || '';
@@ -1177,10 +1195,10 @@ export default function Matters() {
                             Financials
                           </TableHead>
                           <TableHead className="text-right min-w-[75px]">
-                            <SortableHeader field="budget_burn">BM Burn</SortableHeader>
+                            <SortableHeader field="budget_burn_pct">BM Burn</SortableHeader>
                           </TableHead>
                           <TableHead className="text-right min-w-[75px]">
-                            Local Burn
+                            <SortableHeader field="local_burn_pct">Local Burn</SortableHeader>
                           </TableHead>
                           <TableHead className="text-right min-w-[80px]">
                             <SortableHeader field="headroom">Headroom (BM + Local)</SortableHeader>

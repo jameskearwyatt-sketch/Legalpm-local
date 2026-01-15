@@ -1158,6 +1158,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 <Label className="text-sm">Upper end estimate agreed with client in billing currency ({billingCurrency})</Label>
                 <Input
                   type="number"
+                  step="0.01"
+                  min="0"
                   value={agreedBillingAmount || ''}
                   onChange={(e) => updateBillingCurrencyField('agreed_billing_amount', parseFloat(e.target.value) || 0)}
                   placeholder="0"

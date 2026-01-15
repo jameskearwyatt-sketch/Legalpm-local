@@ -219,7 +219,9 @@ export function BudgetUpdateModal({
               <Label htmlFor="newBudget">Total Budget</Label>
               <Input
                 id="newBudget"
-                type="text"
+                type="number"
+                step="0.01"
+                min="0"
                 value={newBudget}
                 onChange={(e) => setNewBudget(e.target.value)}
                 placeholder="Enter new budget"
@@ -233,7 +235,9 @@ export function BudgetUpdateModal({
               <Label htmlFor="newBmFee">Baker McKenzie Fee</Label>
               <Input
                 id="newBmFee"
-                type="text"
+                type="number"
+                step="0.01"
+                min="0"
                 value={newBmFee}
                 onChange={(e) => setNewBmFee(e.target.value)}
                 placeholder="Enter BM fee component"
@@ -247,7 +251,9 @@ export function BudgetUpdateModal({
               <Label htmlFor="newLocalCounsel">Local Counsel Fee</Label>
               <Input
                 id="newLocalCounsel"
-                type="text"
+                type="number"
+                step="0.01"
+                min="0"
                 value={newLocalCounsel}
                 onChange={(e) => setNewLocalCounsel(e.target.value)}
                 placeholder="Enter local counsel fee"

@@ -218,6 +218,8 @@ export function EditableRateCard({
                 <span className="text-xs text-muted-foreground w-4 text-right">{currencySymbol}</span>
                 <Input
                   type="number"
+                  step="0.01"
+                  min="0"
                   value={earner.rate}
                   onChange={(e) => updateFeeEarner(earner.key, parseFloat(e.target.value) || 0)}
                   className="h-7 text-right text-sm px-2"
@@ -296,9 +298,10 @@ export function EditableRateCard({
                 <span className="text-sm text-muted-foreground">{currencySymbol}</span>
                 <Input
                   type="number"
+                  step="0.01"
+                  min={0}
                   value={newEarnerRate}
                   onChange={(e) => setNewEarnerRate(parseFloat(e.target.value) || 0)}
-                  min={0}
                 />
               </div>
             </div>

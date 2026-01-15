@@ -79,6 +79,12 @@ function getPercentage(wipAmount: number, feeAmount: number): string {
   return `${Math.round((wipAmount / feeAmount) * 100)}%`;
 }
 
+function getNetPercentage(wipAmount: number, writeOffAmount: number, feeAmount: number): string | null {
+  if (feeAmount <= 0 || writeOffAmount <= 0) return null;
+  const netWip = wipAmount - writeOffAmount;
+  return `${Math.round((netWip / feeAmount) * 100)}%`;
+}
+
 export function DetailedWipUpdateModal({
   isOpen,
   onClose,
@@ -232,29 +238,55 @@ export function DetailedWipUpdateModal({
         const groupItems = wipItems.filter(i => group.itemIds.includes(i.id));
         const totalGroupFee = groupItems.reduce((sum, i) => sum + i.fee_amount, 0);
         const itemProportion = totalGroupFee > 0 ? item.fee_amount / totalGroupFee : 1 / groupItems.length;
-        return { id: item.id, wipShare: group.combinedWip * itemProportion };
+        return { id: item.id, wipShare: group.combinedWip * itemProportion, groupId: group.id };
       }
-      return { id: item.id, wipShare: item.wip_amount };
+      return { id: item.id, wipShare: item.wip_amount, groupId: null };
     });
     
     const totalWip = itemWipValues.reduce((sum, item) => sum + item.wipShare, 0);
     
+    // Calculate proportion for each affected item
+    const itemProportions = new Map<string, number>();
+    allAffectedIds.forEach(id => {
+      const itemWipInfo = itemWipValues.find(i => i.id === id);
+      if (itemWipInfo) {
+        const proportion = totalWip > 0 
+          ? itemWipInfo.wipShare / totalWip 
+          : 1 / allAffectedIds.length;
+        itemProportions.set(id, proportion);
+      }
+    });
+    
     // Distribute proportionally based on WIP shares (or equally if no WIP)
     setWipItems(prev =>
       prev.map(item => {
-        const itemWipInfo = itemWipValues.find(i => i.id === item.id);
-        if (!itemWipInfo) return item;
-        
-        let proportion: number;
-        if (totalWip > 0) {
-          proportion = itemWipInfo.wipShare / totalWip;
-        } else {
-          proportion = 1 / allAffectedIds.length;
-        }
+        const proportion = itemProportions.get(item.id);
+        if (proportion === undefined) return item;
         
         return {
           ...item,
           write_off_amount: roundCurrency(item.write_off_amount + (billingValue * proportion)),
+        };
+      })
+    );
+    
+    // Update combinedGroups to reflect new write-off totals for affected groups
+    setCombinedGroups(prev =>
+      prev.map(group => {
+        if (!selectedGroupsForWriteOff.has(group.id)) return group;
+        
+        // Calculate total write-off allocated to this group's items
+        let groupWriteOffAllocation = 0;
+        group.itemIds.forEach(itemId => {
+          const proportion = itemProportions.get(itemId);
+          if (proportion !== undefined) {
+            groupWriteOffAllocation += billingValue * proportion;
+          }
+        });
+        
+        return {
+          ...group,
+          combinedWriteOff: roundCurrency(group.combinedWriteOff + groupWriteOffAllocation),
         };
       })
     );
@@ -635,8 +667,21 @@ export function DetailedWipUpdateModal({
                                 placeholder="0"
                               />
                             </div>
-                            <div className={cn('font-bold', groupHealth.text)}>
-                              {getPercentage(displayWip, displayFee)}
+                            {/* Percentage - with net percentage if write-off exists */}
+                            <div className={cn('w-16 text-right', groupHealth.text)}>
+                              <div className="flex flex-col items-end">
+                                {group.combinedWriteOff > 0 && (
+                                  <span className="text-xs text-muted-foreground line-through">
+                                    {getPercentage(displayWip, displayFee)}
+                                  </span>
+                                )}
+                                <span className="font-bold">
+                                  {group.combinedWriteOff > 0 
+                                    ? getNetPercentage(displayWip, group.combinedWriteOff, displayFee) || getPercentage(displayWip, displayFee)
+                                    : getPercentage(displayWip, displayFee)
+                                  }
+                                </span>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -794,9 +839,23 @@ export function DetailedWipUpdateModal({
                             />
                           </div>
                           
-                          {/* Percentage */}
-                          <div className={cn('w-14 text-right font-bold', health.text)}>
-                            {isInCombinedGroup ? '-' : getPercentage(displayWipAmount, displayFeeAmount)}
+                          {/* Percentage - with net percentage above if write-off exists */}
+                          <div className={cn('w-16 text-right', health.text)}>
+                            {isInCombinedGroup ? '-' : (
+                              <div className="flex flex-col items-end">
+                                {displayWriteOffAmount > 0 && (
+                                  <span className="text-xs text-muted-foreground line-through">
+                                    {getPercentage(displayWipAmount, displayFeeAmount)}
+                                  </span>
+                                )}
+                                <span className="font-bold">
+                                  {displayWriteOffAmount > 0 
+                                    ? getNetPercentage(displayWipAmount, displayWriteOffAmount, displayFeeAmount) || getPercentage(displayWipAmount, displayFeeAmount)
+                                    : getPercentage(displayWipAmount, displayFeeAmount)
+                                  }
+                                </span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

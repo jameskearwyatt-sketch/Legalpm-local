@@ -96,6 +96,16 @@ export function AFATab({
 }: AFATabProps) {
   const { afas, isLoading, upsertAFA, toggleAFA, selectForExport } = useProposalAFAs(proposalId);
   const [expandedTypes, setExpandedTypes] = useState<string[]>([]);
+  const [showAutoSaved, setShowAutoSaved] = useState(false);
+
+  // Show auto-saved indicator briefly after mutations
+  useEffect(() => {
+    if (upsertAFA.isSuccess || toggleAFA.isSuccess) {
+      setShowAutoSaved(true);
+      const timer = setTimeout(() => setShowAutoSaved(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [upsertAFA.isSuccess, toggleAFA.isSuccess]);
 
   // Get the discounted rates AFA (for external consumption)
   const discountedRatesAFA = afas.find(a => a.afa_type === 'discounted_rates' && a.is_enabled);
@@ -1009,13 +1019,35 @@ export function AFATab({
       {/* AFA Options */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Layers className="h-5 w-5" />
-            Alternative Fee Arrangements
-          </CardTitle>
-          <CardDescription>
-            Enable and configure alternative pricing structures. Multiple options can be generated for comparison.
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Layers className="h-5 w-5" />
+                Alternative Fee Arrangements
+              </CardTitle>
+              <CardDescription>
+                Enable and configure alternative pricing structures. Multiple options can be generated for comparison.
+              </CardDescription>
+            </div>
+            {(showAutoSaved || upsertAFA.isPending || toggleAFA.isPending) && (
+              <Badge variant="outline" className={cn(
+                "gap-1.5 transition-opacity",
+                (upsertAFA.isPending || toggleAFA.isPending) ? "text-muted-foreground" : "text-green-600 border-green-500"
+              )}>
+                {(upsertAFA.isPending || toggleAFA.isPending) ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="h-3 w-3" />
+                    Auto-saved
+                  </>
+                )}
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <Accordion type="multiple" value={expandedTypes} onValueChange={setExpandedTypes}>

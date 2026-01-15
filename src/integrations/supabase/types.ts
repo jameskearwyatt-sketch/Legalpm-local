@@ -1615,6 +1615,39 @@ export type Database = {
         }
         Relationships: []
       }
+      user_report_formats: {
+        Row: {
+          column_mappings: Json
+          created_at: string
+          format_name: string
+          header_signature: string | null
+          id: string
+          sample_headers: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          column_mappings?: Json
+          created_at?: string
+          format_name: string
+          header_signature?: string | null
+          id?: string
+          sample_headers?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          column_mappings?: Json
+          created_at?: string
+          format_name?: string
+          header_signature?: string | null
+          id?: string
+          sample_headers?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

@@ -59,10 +59,11 @@ export interface FixedFeeWholeConfig {
 }
 
 export interface FixedFeePhaseConfig {
+  roundToNearest1000: boolean;
   phases: Array<{
     category: string;
     baseAmount: number;
-    adjustedAmount: number;
+    adjustmentPercent: number; // +/- percentage (e.g., 5 for +5%, -10 for -10%)
     isIncluded: boolean;
   }>;
 }
@@ -182,7 +183,7 @@ export function getDefaultConfig(afaType: AFAType): AFAConfig {
     case 'fixed_fee_whole':
       return { riskPremiumPercent: 5, adjustedFee: null };
     case 'fixed_fee_phase':
-      return { phases: [] };
+      return { roundToNearest1000: false, phases: [] };
     case 'fee_collar':
       return { targetFee: 0, collarWidth: 10, upsideSharePercent: 50, downsideSharePercent: 50 };
     case 'milestone':

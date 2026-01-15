@@ -503,7 +503,7 @@ export function MasterWipUpdateDialog({
                                 />
                               </div>
                               <div>
-                                <Label className="text-xs">Billed/AR ({getCurrencySymbol(match.currency).trim()})</Label>
+                                <Label className="text-xs">Total Billed ({getCurrencySymbol(match.currency).trim()})</Label>
                                 <Input
                                   type="number"
                                   min="0"
@@ -514,7 +514,7 @@ export function MasterWipUpdateDialog({
                                 />
                               </div>
                               <div>
-                                <Label className="text-xs">Paid ({getCurrencySymbol(match.currency).trim()})</Label>
+                                <Label className="text-xs">Total Paid ({getCurrencySymbol(match.currency).trim()})</Label>
                                 <Input
                                   type="number"
                                   min="0"
@@ -543,7 +543,7 @@ export function MasterWipUpdateDialog({
                                 </span>
                               )}
                               <span>
-                                <span className="text-muted-foreground">AR:</span>{' '}
+                                <span className="text-muted-foreground">Billed:</span>{' '}
                                 <span className="font-medium">{formatCurrency(match.edited_billed_amount ?? match.billed_amount, match.currency)}</span>
                               </span>
                               <span>

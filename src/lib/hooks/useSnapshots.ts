@@ -11,6 +11,7 @@ export interface FinancialSnapshot {
   wip_amount: number;
   wip_write_off_amount: number;
   billed_amount: number;
+  accounts_receivable: number;
   paid_amount: number;
   notes: string | null;
   created_at: string;
@@ -23,6 +24,7 @@ export interface CreateSnapshotInput {
   wip_amount: number;
   wip_write_off_amount?: number;
   billed_amount: number;
+  accounts_receivable: number;
   paid_amount: number;
   notes?: string;
 }
@@ -74,7 +76,7 @@ export function useSnapshots(matterId?: string) {
 
   // Upsert snapshot for today - used for inline editing
   const upsertTodaySnapshot = useMutation({
-    mutationFn: async ({ matterId, field, value }: { matterId: string; field: 'wip_amount' | 'wip_write_off_amount' | 'billed_amount' | 'paid_amount'; value: number }) => {
+    mutationFn: async ({ matterId, field, value }: { matterId: string; field: 'wip_amount' | 'wip_write_off_amount' | 'billed_amount' | 'accounts_receivable' | 'paid_amount'; value: number }) => {
       const today = new Date().toISOString().split('T')[0];
       const now = new Date().toISOString();
       
@@ -116,6 +118,7 @@ export function useSnapshots(matterId?: string) {
             wip_amount: field === 'wip_amount' ? value : (latestSnapshot?.wip_amount || 0),
             wip_write_off_amount: field === 'wip_write_off_amount' ? value : (latestSnapshot?.wip_write_off_amount || 0),
             billed_amount: field === 'billed_amount' ? value : (latestSnapshot?.billed_amount || 0),
+            accounts_receivable: field === 'accounts_receivable' ? value : (latestSnapshot?.accounts_receivable || 0),
             paid_amount: field === 'paid_amount' ? value : (latestSnapshot?.paid_amount || 0),
             updated_at: now,
           })

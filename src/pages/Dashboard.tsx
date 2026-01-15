@@ -339,13 +339,13 @@ export default function Dashboard() {
       variant: 'default' as const,
     },
     {
-      title: 'AR (Total Billed)',
+      title: 'Total Billed',
       value: formatCurrency(stats?.totalBilled || 0, 'USD'),
       icon: <FileText className="h-5 w-5" />,
       variant: 'default' as const,
     },
     {
-      title: 'Cash Received',
+      title: 'Total Paid',
       value: formatCurrency(stats?.totalPaid || 0, 'USD'),
       icon: <CheckCircle className="h-5 w-5" />,
       variant: 'success' as const,

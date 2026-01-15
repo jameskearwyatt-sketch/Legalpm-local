@@ -356,6 +356,7 @@ export type Database = {
       }
       financial_snapshots: {
         Row: {
+          accounts_receivable: number
           as_of_date: string
           billed_amount: number
           created_at: string
@@ -369,6 +370,7 @@ export type Database = {
           wip_write_off_amount: number
         }
         Insert: {
+          accounts_receivable?: number
           as_of_date: string
           billed_amount?: number
           created_at?: string
@@ -382,6 +384,7 @@ export type Database = {
           wip_write_off_amount?: number
         }
         Update: {
+          accounts_receivable?: number
           as_of_date?: string
           billed_amount?: number
           created_at?: string

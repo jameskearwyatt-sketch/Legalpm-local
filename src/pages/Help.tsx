@@ -57,8 +57,9 @@ export default function Help() {
               </p>
               <ul className="list-disc list-inside text-muted-foreground mt-2 space-y-1">
                 <li><strong>WIP (Work in Progress)</strong> – Time recorded but not yet billed</li>
-                <li><strong>Billed</strong> – Total amount invoiced to the client</li>
-                <li><strong>Paid</strong> – Total amount received from the client</li>
+                <li><strong>Total Billed</strong> – Total amount invoiced to the client</li>
+                <li><strong>Accounts Receivable</strong> – Outstanding bills not yet paid</li>
+                <li><strong>Total Paid</strong> – Total amount received from the client</li>
               </ul>
               <p className="text-muted-foreground mt-2">
                 Create snapshots weekly or monthly to track trends over time. The dashboard uses the

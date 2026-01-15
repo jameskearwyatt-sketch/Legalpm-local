@@ -530,9 +530,9 @@ export default function MatterDetail() {
     ? budgetLineItemTotals.lc.rawWip * mandatedRate
     : budgetLineItemTotals.lc.rawWip;
   
-  // BM Budget Burn = BM Adjusted WIP + Total Paid
-  // WIP includes AR (AR only stops being WIP when actually paid)
-  const bmTotalUsed = bmWipFromBudget + paidAmount;
+  // BM Budget Burn = BM Adjusted WIP + AR + Total Paid
+  // Each value is mutually exclusive: WIP → AR (when billed) → Paid (when collected)
+  const bmTotalUsed = bmWipFromBudget + accountsReceivable + paidAmount;
   const bmHeadroom = bmFee - bmTotalUsed;
   const bmBudgetUsedPercent = bmFee > 0 ? (bmTotalUsed / bmFee) * 100 : 0;
   

@@ -261,9 +261,9 @@ export function useMatters() {
         const effectivePaidAmount = paidAmount;
         const effectiveWipWriteOffAmount = wipWriteOffAmount;
         
-        // BM budget burn = WIP + Total Paid
-        // WIP includes AR (AR only stops being WIP when actually paid)
-        const bmTotalUsed = effectiveWipAmount + effectivePaidAmount;
+        // BM budget burn = WIP + AR + Paid
+        // Each value is mutually exclusive: WIP → AR (when billed) → Paid (when collected)
+        const bmTotalUsed = effectiveWipAmount + effectiveAccountsReceivable + effectivePaidAmount;
         
         // LC financial data - also stored in billing currency, no conversion needed
         const effectiveLcWip = lcWip;

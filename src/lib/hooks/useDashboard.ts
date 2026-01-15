@@ -209,7 +209,9 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           totalPaidUsd += convertToUsd(paidAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
         }
 
-        const totalUsed = billedAmount + wipAmount;
+        // Budget burn = WIP + AR + Paid (each value is mutually exclusive)
+        const accountsReceivable = Number(snapshot?.accounts_receivable) || 0;
+        const totalUsed = wipAmount + accountsReceivable + paidAmount;
         const budgetUsedPercent = budget > 0 ? (totalUsed / budget) * 100 : 0;
         const collectionRate = billedAmount > 0 ? (paidAmount / billedAmount) * 100 : 100;
         const clientName = matter.clients?.name || 'Unknown Client';

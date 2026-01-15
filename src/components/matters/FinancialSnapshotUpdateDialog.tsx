@@ -87,17 +87,20 @@ export function FinancialSnapshotUpdateDialog({
   const [lcFormData, setLcFormData] = useState<Record<string, { wip_amount: number; billed_amount: number }>>({});
 
   // Reset form when dialog opens with new values
+  // Round values to 2 decimal places to avoid floating point weirdness
+  const roundTo2 = (n: number) => Math.round(n * 100) / 100;
+  
   useEffect(() => {
     if (isOpen) {
-      const rawWip = currentValues?.wip_amount || 0;
-      const writeOff = currentValues?.wip_write_off_amount || 0;
+      const rawWip = roundTo2(currentValues?.wip_amount || 0);
+      const writeOff = roundTo2(currentValues?.wip_write_off_amount || 0);
       setFormData({
         wip_amount: rawWip,
         wip_write_off_amount: writeOff,
-        adjusted_wip: rawWip - writeOff,
-        billed_amount: currentValues?.billed_amount || 0,
-        accounts_receivable: currentValues?.accounts_receivable || 0,
-        paid_amount: currentValues?.paid_amount || 0,
+        adjusted_wip: roundTo2(rawWip - writeOff),
+        billed_amount: roundTo2(currentValues?.billed_amount || 0),
+        accounts_receivable: roundTo2(currentValues?.accounts_receivable || 0),
+        paid_amount: roundTo2(currentValues?.paid_amount || 0),
         notes: '',
       });
       setWipEntryMode('writeoff');
@@ -105,8 +108,8 @@ export function FinancialSnapshotUpdateDialog({
       const lcData: Record<string, { wip_amount: number; billed_amount: number }> = {};
       disbursementLCs.forEach(lc => {
         lcData[lc.id] = {
-          wip_amount: lc.wip_amount || 0,
-          billed_amount: lc.billed_amount || 0,
+          wip_amount: roundTo2(lc.wip_amount || 0),
+          billed_amount: roundTo2(lc.billed_amount || 0),
         };
       });
       setLcFormData(lcData);

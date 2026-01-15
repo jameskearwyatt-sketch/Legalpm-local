@@ -206,10 +206,7 @@ export function DetailedWipUpdateModal({
     const billingValue = parseFloat(writeOffAmount) || 0;
     if (billingValue <= 0) return;
     
-    // Convert to quote currency if needed
-    const quoteValue = differentBillingCurrency && mandatedRate > 0 
-      ? billingValue / mandatedRate 
-      : billingValue;
+    // Values are stored in billing currency - no conversion needed
     
     // Collect all item IDs that should receive write-off allocation
     // This includes directly selected items AND items within selected groups
@@ -257,7 +254,7 @@ export function DetailedWipUpdateModal({
         
         return {
           ...item,
-          write_off_amount: roundCurrency(item.write_off_amount + (quoteValue * proportion)),
+          write_off_amount: roundCurrency(item.write_off_amount + (billingValue * proportion)),
         };
       })
     );
@@ -382,10 +379,10 @@ export function DetailedWipUpdateModal({
   const combinedWriteOffQuote = combinedGroups.reduce((sum, g) => sum + g.combinedWriteOff, 0);
   const totalWriteOffQuote = individualWriteOffQuote + combinedWriteOffQuote;
   
-  // Convert to billing currency for display
-  const totalEstimate = roundCurrency(differentBillingCurrency ? totalEstimateQuote * mandatedRate : totalEstimateQuote);
-  const totalWip = roundCurrency(differentBillingCurrency ? totalWipQuote * mandatedRate : totalWipQuote);
-  const totalWriteOff = roundCurrency(differentBillingCurrency ? totalWriteOffQuote * mandatedRate : totalWriteOffQuote);
+  // All values are already stored in billing currency - no conversion needed for display
+  const totalEstimate = roundCurrency(totalEstimateQuote);
+  const totalWip = roundCurrency(totalWipQuote);
+  const totalWriteOff = roundCurrency(totalWriteOffQuote);
   const overallHealth = getHealthColor(totalWip, totalEstimate);
 
   // Group items by category
@@ -558,8 +555,9 @@ export function DetailedWipUpdateModal({
                 {combinedGroups.map(group => {
                   const groupItems = wipItems.filter(i => group.itemIds.includes(i.id));
                   const groupTotalFee = groupItems.reduce((sum, i) => sum + i.fee_amount, 0);
-                  const displayFee = roundCurrency(differentBillingCurrency ? groupTotalFee * mandatedRate : groupTotalFee);
-                  const displayWip = roundCurrency(differentBillingCurrency ? group.combinedWip * mandatedRate : group.combinedWip);
+                  // All values are stored in billing currency - no conversion needed
+                  const displayFee = roundCurrency(groupTotalFee);
+                  const displayWip = roundCurrency(group.combinedWip);
                   const groupHealth = getHealthColor(displayWip, displayFee);
                   
                   const isGroupSelectedForWriteOff = selectedGroupsForWriteOff.has(group.id);
@@ -608,14 +606,12 @@ export function DetailedWipUpdateModal({
                                 type="number"
                                 min="0"
                                 step="0.01"
-                                value={roundCurrency(displayWip) || ''}
-                                onChange={e => {
-                                  const billingValue = parseFloat(e.target.value) || 0;
-                                  const quoteValue = differentBillingCurrency && mandatedRate > 0 
-                                    ? billingValue / mandatedRate 
-                                    : billingValue;
-                                  updateCombinedGroupWip(group.id, quoteValue.toString());
-                                }}
+                              value={roundCurrency(displayWip) || ''}
+                              onChange={e => {
+                                // Values are stored in billing currency - no conversion needed
+                                const billingValue = parseFloat(e.target.value) || 0;
+                                updateCombinedGroupWip(group.id, billingValue.toString());
+                              }}
                                 className="h-8 text-sm"
                                 placeholder="0"
                               />
@@ -629,13 +625,11 @@ export function DetailedWipUpdateModal({
                                 type="number"
                                 min="0"
                                 step="0.01"
-                                value={roundCurrency(differentBillingCurrency ? group.combinedWriteOff * mandatedRate : group.combinedWriteOff) || ''}
+                                value={roundCurrency(group.combinedWriteOff) || ''}
                                 onChange={e => {
+                                  // Values are stored in billing currency - no conversion needed
                                   const billingValue = parseFloat(e.target.value) || 0;
-                                  const quoteValue = differentBillingCurrency && mandatedRate > 0 
-                                    ? billingValue / mandatedRate 
-                                    : billingValue;
-                                  updateCombinedGroupWriteOff(group.id, quoteValue.toString());
+                                  updateCombinedGroupWriteOff(group.id, billingValue.toString());
                                 }}
                                 className="h-8 text-sm border-destructive/50 text-destructive"
                                 placeholder="0"
@@ -699,10 +693,10 @@ export function DetailedWipUpdateModal({
                       const isSelected = selectedForCombine.has(item.id);
                       const isSelectedForWriteOff = selectedForWriteOff.has(item.id);
                       
-                      // Convert amounts to billing currency for display
-                      const displayFeeAmount = roundCurrency(differentBillingCurrency ? item.fee_amount * mandatedRate : item.fee_amount);
-                      const displayWipAmount = roundCurrency(differentBillingCurrency ? item.wip_amount * mandatedRate : item.wip_amount);
-                      const displayWriteOffAmount = roundCurrency(differentBillingCurrency ? item.write_off_amount * mandatedRate : item.write_off_amount);
+                      // All values are stored in billing currency - no conversion needed
+                      const displayFeeAmount = roundCurrency(item.fee_amount);
+                      const displayWipAmount = roundCurrency(item.wip_amount);
+                      const displayWriteOffAmount = roundCurrency(item.write_off_amount);
                       const health = isInCombinedGroup 
                         ? { bg: 'bg-blue-50/50 dark:bg-blue-950/20', text: 'text-blue-600', indicator: 'bg-blue-400' }
                         : getHealthColor(displayWipAmount, displayFeeAmount);
@@ -768,11 +762,9 @@ export function DetailedWipUpdateModal({
                               step="0.01"
                               value={isInCombinedGroup ? '' : (displayWipAmount || '')}
                               onChange={e => {
+                                // Values are stored in billing currency - no conversion needed
                                 const billingValue = parseFloat(e.target.value) || 0;
-                                const quoteValue = differentBillingCurrency && mandatedRate > 0 
-                                  ? billingValue / mandatedRate 
-                                  : billingValue;
-                                updateWipAmount(item.id, quoteValue.toString());
+                                updateWipAmount(item.id, billingValue.toString());
                               }}
                               className="h-8 text-sm"
                               placeholder={isInCombinedGroup ? 'Combined' : '0'}
@@ -790,13 +782,11 @@ export function DetailedWipUpdateModal({
                               type="number"
                               min="0"
                               step="0.01"
-                              value={isInCombinedGroup ? '' : (roundCurrency(differentBillingCurrency ? item.write_off_amount * mandatedRate : item.write_off_amount) || '')}
+                              value={isInCombinedGroup ? '' : (displayWriteOffAmount || '')}
                               onChange={e => {
+                                // Values are stored in billing currency - no conversion needed
                                 const billingValue = parseFloat(e.target.value) || 0;
-                                const quoteValue = differentBillingCurrency && mandatedRate > 0 
-                                  ? billingValue / mandatedRate 
-                                  : billingValue;
-                                updateWriteOffAmount(item.id, quoteValue.toString());
+                                updateWriteOffAmount(item.id, billingValue.toString());
                               }}
                               className="h-8 text-sm border-destructive/50 text-destructive"
                               placeholder={isInCombinedGroup ? 'Combined' : '0'}

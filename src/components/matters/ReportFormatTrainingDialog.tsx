@@ -174,65 +174,63 @@ export function ReportFormatTrainingDialog({
           </div>
 
           {/* Data Preview Table */}
-          <div className="flex-1 overflow-hidden border rounded-lg">
-            <ScrollArea className="h-full">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted sticky top-0">
-                    <tr>
-                      {headers.map((header, idx) => {
-                        const field = getColumnField(idx);
-                        return (
-                          <th
-                            key={idx}
-                            onClick={() => handleColumnClick(idx)}
-                            className={cn(
-                              'px-3 py-2 text-left font-medium border-r last:border-r-0 cursor-pointer transition-colors',
-                              activeField && 'hover:bg-primary/20',
-                              field && FIELD_CONFIG[field].color,
-                              field && 'text-white'
+          <div className="flex-1 border rounded-lg overflow-auto max-h-[300px]">
+            <div className="min-w-max">
+              <table className="text-sm">
+                <thead className="bg-muted sticky top-0 z-10">
+                  <tr>
+                    {headers.map((header, idx) => {
+                      const field = getColumnField(idx);
+                      return (
+                        <th
+                          key={idx}
+                          onClick={() => handleColumnClick(idx)}
+                          className={cn(
+                            'px-3 py-2 text-left font-medium border-r last:border-r-0 cursor-pointer transition-colors whitespace-nowrap',
+                            activeField && 'hover:bg-primary/20',
+                            field && FIELD_CONFIG[field].color,
+                            field && 'text-white'
+                          )}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-muted-foreground mr-1">
+                              {idx + 1}
+                            </span>
+                            {header}
+                            {field && (
+                              <Badge variant="secondary" className="ml-1 text-[10px]">
+                                {FIELD_CONFIG[field].label}
+                              </Badge>
                             )}
+                          </div>
+                        </th>
+                      );
+                    })}
+                  </tr>
+                </thead>
+                <tbody>
+                  {sampleRows.slice(0, 10).map((row, rowIdx) => (
+                    <tr key={rowIdx} className="border-t hover:bg-muted/50">
+                      {row.map((cell, cellIdx) => {
+                        const field = getColumnField(cellIdx);
+                        return (
+                          <td
+                            key={cellIdx}
+                            className={cn(
+                              'px-3 py-1.5 border-r last:border-r-0 whitespace-nowrap',
+                              field && 'bg-primary/5'
+                            )}
+                            title={cell}
                           >
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-muted-foreground mr-1">
-                                {idx + 1}
-                              </span>
-                              {header}
-                              {field && (
-                                <Badge variant="secondary" className="ml-1 text-[10px]">
-                                  {FIELD_CONFIG[field].label}
-                                </Badge>
-                              )}
-                            </div>
-                          </th>
+                            {cell}
+                          </td>
                         );
                       })}
                     </tr>
-                  </thead>
-                  <tbody>
-                    {sampleRows.slice(0, 10).map((row, rowIdx) => (
-                      <tr key={rowIdx} className="border-t hover:bg-muted/50">
-                        {row.map((cell, cellIdx) => {
-                          const field = getColumnField(cellIdx);
-                          return (
-                            <td
-                              key={cellIdx}
-                              className={cn(
-                                'px-3 py-1.5 border-r last:border-r-0 truncate max-w-[200px]',
-                                field && 'bg-primary/5'
-                              )}
-                              title={cell}
-                            >
-                              {cell}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </ScrollArea>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Help text */}

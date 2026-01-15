@@ -272,9 +272,9 @@ export function useMatters() {
           ? wipWriteOffAmount * mandatedRate
           : wipWriteOffAmount;
         
-        // BM budget burn (from snapshots) - WIP stays as WIP until paid (not when billed to AR)
-        // So budget burn = WIP only (WIP doesn't reduce when billed, only when paid)
-        const bmTotalUsed = effectiveWipAmount;
+        // BM budget burn = WIP + Total Billed (total budget consumed so far)
+        // WIP = unbilled work in progress, Total Billed = work that has been invoiced
+        const bmTotalUsed = effectiveWipAmount + effectiveBilledAmount;
         
         // LC budget burn (only for Disbursement mode) - also needs conversion
         const effectiveLcWip = differentBillingCurrency && agreedBillingAmount > 0

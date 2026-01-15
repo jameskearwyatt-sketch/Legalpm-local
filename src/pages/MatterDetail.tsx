@@ -537,13 +537,14 @@ export default function MatterDetail() {
     ? budgetLineItemTotals.lc.rawWip * mandatedRate
     : budgetLineItemTotals.lc.rawWip;
   
-  // BM Budget Burn = BM Adjusted WIP from budget (NOT from snapshots)
-  const bmTotalUsed = bmWipFromBudget;
+  // BM Budget Burn = BM Adjusted WIP from budget + Total Billed from snapshots
+  // WIP = unbilled work in progress, Total Billed = work that has been invoiced
+  const bmTotalUsed = bmWipFromBudget + billedAmount;
   const bmHeadroom = bmFee - bmTotalUsed;
   const bmBudgetUsedPercent = bmFee > 0 ? (bmTotalUsed / bmFee) * 100 : 0;
   
-  // LC Budget Burn = LC Adjusted WIP from budget (NOT from snapshots)
-  const lcTotalUsed = lcWipFromBudget;
+  // LC Budget Burn = LC Adjusted WIP from budget + LC Billed
+  const lcTotalUsed = lcWipFromBudget + lcBilled;
   const lcHeadroom = localCounsel - lcTotalUsed;
   const lcBudgetUsedPercent = localCounsel > 0 ? (lcTotalUsed / localCounsel) * 100 : 0;
   

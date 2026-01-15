@@ -939,39 +939,76 @@ export default function MatterDetail() {
               <CardContent className="space-y-4">
                 {(() => {
                   // Determine if values changed compared to previous snapshot
+                  // For individual matter page: highlight ANY figure that has ever changed
+                  // If there's a previous snapshot, compare against it
+                  // If there's only one snapshot, highlight any non-zero value (it "changed" from nothing)
+                  const hasPrevious = !!previousSnapshot;
+                  
+                  // Current raw values from latest snapshot
+                  const currentWip = latestSnapshot?.wip_amount || 0;
+                  const currentWipWriteOff = latestSnapshot?.wip_write_off_amount || 0;
+                  const currentAr = latestSnapshot?.accounts_receivable || 0;
+                  const currentBilled = latestSnapshot?.billed_amount || 0;
+                  const currentPaid = latestSnapshot?.paid_amount || 0;
+                  
                   // Compare raw values from snapshots (not converted values) to check for actual changes
-                  const wipChanged = highlightEnabled && previousSnapshot && latestSnapshot && latestSnapshot.wip_amount !== previousSnapshot.wip_amount;
-                  const arChanged = highlightEnabled && previousSnapshot && latestSnapshot && latestSnapshot.accounts_receivable !== previousSnapshot.accounts_receivable;
-                  const billedChanged = highlightEnabled && previousSnapshot && latestSnapshot && latestSnapshot.billed_amount !== previousSnapshot.billed_amount;
-                  const paidChanged = highlightEnabled && previousSnapshot && latestSnapshot && latestSnapshot.paid_amount !== previousSnapshot.paid_amount;
-                  const writeOffChanged = highlightEnabled && previousSnapshot && latestSnapshot && latestSnapshot.wip_write_off_amount !== previousSnapshot.wip_write_off_amount;
+                  // If no previous snapshot exists, highlight any non-zero value
+                  const wipChanged = highlightEnabled && latestSnapshot && (
+                    hasPrevious 
+                      ? currentWip !== previousSnapshot.wip_amount
+                      : currentWip !== 0
+                  );
+                  const arChanged = highlightEnabled && latestSnapshot && (
+                    hasPrevious 
+                      ? currentAr !== previousSnapshot.accounts_receivable
+                      : currentAr !== 0
+                  );
+                  const billedChanged = highlightEnabled && latestSnapshot && (
+                    hasPrevious 
+                      ? currentBilled !== previousSnapshot.billed_amount
+                      : currentBilled !== 0
+                  );
+                  const paidChanged = highlightEnabled && latestSnapshot && (
+                    hasPrevious 
+                      ? currentPaid !== previousSnapshot.paid_amount
+                      : currentPaid !== 0
+                  );
+                  const writeOffChanged = highlightEnabled && latestSnapshot && (
+                    hasPrevious 
+                      ? currentWipWriteOff !== previousSnapshot.wip_write_off_amount
+                      : currentWipWriteOff !== 0
+                  );
                   
                   // Convert previous snapshot values for display in tooltip (apply same conversion)
-                  const prevWipDisplay = previousSnapshot 
+                  // If no previous snapshot, show 0 as the "previous" value
+                  const prevWipDisplay = hasPrevious 
                     ? (differentBillingCurrency && agreedBillingAmount > 0 
                         ? (previousSnapshot.wip_amount - previousSnapshot.wip_write_off_amount) * mandatedRate 
                         : previousSnapshot.wip_amount - previousSnapshot.wip_write_off_amount)
-                    : undefined;
-                  const prevArDisplay = previousSnapshot 
+                    : 0;
+                  const prevArDisplay = hasPrevious 
                     ? (differentBillingCurrency && agreedBillingAmount > 0 
                         ? previousSnapshot.accounts_receivable * mandatedRate 
                         : previousSnapshot.accounts_receivable)
-                    : undefined;
-                  const prevBilledDisplay = previousSnapshot 
+                    : 0;
+                  const prevBilledDisplay = hasPrevious 
                     ? (differentBillingCurrency && agreedBillingAmount > 0 
                         ? previousSnapshot.billed_amount * mandatedRate 
                         : previousSnapshot.billed_amount)
-                    : undefined;
-                  const prevPaidDisplay = previousSnapshot 
+                    : 0;
+                  const prevPaidDisplay = hasPrevious 
                     ? (differentBillingCurrency && agreedBillingAmount > 0 
                         ? previousSnapshot.paid_amount * mandatedRate 
                         : previousSnapshot.paid_amount)
-                    : undefined;
-                  const prevWriteOffDisplay = previousSnapshot 
+                    : 0;
+                  const prevWriteOffDisplay = hasPrevious 
                     ? (differentBillingCurrency && agreedBillingAmount > 0 
                         ? previousSnapshot.wip_write_off_amount * mandatedRate 
                         : previousSnapshot.wip_write_off_amount)
-                    : undefined;
+                    : 0;
+                  
+                  // Previous date - use previous snapshot date if available, otherwise use latest snapshot date
+                  const prevDate = hasPrevious ? previousSnapshot.as_of_date : latestSnapshot?.as_of_date;
                   
                   return (
                     <>
@@ -983,7 +1020,7 @@ export default function MatterDetail() {
                               (Write-off: <HighlightedFinancialValue
                                 currentValue={formatCurrency(wipWriteOffAmount, currency)}
                                 previousValue={prevWriteOffDisplay}
-                                previousDate={previousSnapshot?.as_of_date}
+                                previousDate={prevDate}
                                 isHighlighted={!!writeOffChanged}
                                 className=""
                                 formatFn={(v) => formatCurrency(v, currency)}
@@ -994,7 +1031,7 @@ export default function MatterDetail() {
                         <HighlightedFinancialValue
                           currentValue={formatCurrency(wipAmount, currency)}
                           previousValue={prevWipDisplay}
-                          previousDate={previousSnapshot?.as_of_date}
+                          previousDate={prevDate}
                           isHighlighted={!!wipChanged}
                           className="text-lg font-semibold"
                           formatFn={(v) => formatCurrency(v, currency)}
@@ -1005,7 +1042,7 @@ export default function MatterDetail() {
                         <HighlightedFinancialValue
                           currentValue={formatCurrency(accountsReceivable, currency)}
                           previousValue={prevArDisplay}
-                          previousDate={previousSnapshot?.as_of_date}
+                          previousDate={prevDate}
                           isHighlighted={!!arChanged}
                           className="text-lg font-semibold"
                           formatFn={(v) => formatCurrency(v, currency)}
@@ -1016,7 +1053,7 @@ export default function MatterDetail() {
                         <HighlightedFinancialValue
                           currentValue={formatCurrency(billedAmount, currency)}
                           previousValue={prevBilledDisplay}
-                          previousDate={previousSnapshot?.as_of_date}
+                          previousDate={prevDate}
                           isHighlighted={!!billedChanged}
                           className="text-lg font-semibold"
                           formatFn={(v) => formatCurrency(v, currency)}
@@ -1027,7 +1064,7 @@ export default function MatterDetail() {
                         <HighlightedFinancialValue
                           currentValue={formatCurrency(paidAmount, currency)}
                           previousValue={prevPaidDisplay}
-                          previousDate={previousSnapshot?.as_of_date}
+                          previousDate={prevDate}
                           isHighlighted={!!paidChanged}
                           className="text-lg font-semibold text-success"
                           formatFn={(v) => formatCurrency(v, currency)}

@@ -26,11 +26,12 @@ interface ReportFormatTrainingDialogProps {
   existingName?: string;
 }
 
-type FieldType = 'matter_number' | 'matter_name' | 'wip' | 'accounts_receivable' | 'total_billed' | 'total_paid';
+type FieldType = 'matter_number' | 'matter_name' | 'client_name' | 'wip' | 'accounts_receivable' | 'total_billed' | 'total_paid';
 
 const FIELD_CONFIG: Record<FieldType, { label: string; color: string; required: boolean }> = {
   matter_number: { label: 'Matter Number', color: 'bg-blue-500', required: true },
   matter_name: { label: 'Matter Name', color: 'bg-indigo-500', required: false },
+  client_name: { label: 'Client Name', color: 'bg-cyan-500', required: false },
   wip: { label: 'WIP', color: 'bg-amber-500', required: true },
   accounts_receivable: { label: 'Accounts Receivable', color: 'bg-orange-500', required: true },
   total_billed: { label: 'Total Billed', color: 'bg-purple-500', required: true },

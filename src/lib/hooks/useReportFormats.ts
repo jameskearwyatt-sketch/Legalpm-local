@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 export interface ColumnMappings {
   matter_number?: number;
   matter_name?: number;
+  client_name?: number;
   wip?: number;
   accounts_receivable?: number;
   total_billed?: number;

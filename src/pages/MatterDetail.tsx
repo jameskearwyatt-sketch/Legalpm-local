@@ -919,15 +919,15 @@ export default function MatterDetail() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-3 border-b">
-                  <span className="text-muted-foreground">Total Billed</span>
-                  <span className="text-lg font-semibold">
-                    {formatCurrency(billedAmount, currency)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center py-3 border-b">
                   <span className="text-muted-foreground">Accounts Receivable</span>
                   <span className="text-lg font-semibold">
                     {formatCurrency(accountsReceivable, currency)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center py-3 border-b">
+                  <span className="text-muted-foreground">Total Billed</span>
+                  <span className="text-lg font-semibold">
+                    {formatCurrency(billedAmount, currency)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center py-3 border-b">

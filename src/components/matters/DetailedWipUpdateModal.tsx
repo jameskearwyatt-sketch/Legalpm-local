@@ -205,67 +205,146 @@ export function DetailedWipUpdateModal({
     });
   };
 
-  // Apply write-off to selected items proportionally
+  // Apply write-off to selected items using a "leveling" algorithm
+  // Goal: bring all selected items to the same target percentage of their estimate
+  // If write-off is enough, bring all to 100%; otherwise, bring all to the same % (e.g., all at 102%)
   const applyWriteOffToSelected = () => {
     if (selectedForWriteOff.size < 1 && selectedGroupsForWriteOff.size < 1) return;
     
-    const billingValue = parseFloat(writeOffAmount) || 0;
-    if (billingValue <= 0) return;
+    const totalWriteOff = parseFloat(writeOffAmount) || 0;
+    if (totalWriteOff <= 0) return;
     
-    // Values are stored in billing currency - no conversion needed
+    // Build "units" - each unit is either an individual item or a combined group
+    // A unit has: id, currentWip, estimate, isGroup, itemIds
+    interface WriteOffUnit {
+      id: string;
+      currentWip: number;
+      estimate: number;
+      isGroup: boolean;
+      itemIds: string[];
+    }
     
-    // Collect all item IDs that should receive write-off allocation
-    // This includes directly selected items AND items within selected groups
-    const directlySelectedIds = Array.from(selectedForWriteOff);
-    const groupItemIds: string[] = [];
+    const units: WriteOffUnit[] = [];
     
+    // Add selected groups as units
     selectedGroupsForWriteOff.forEach(groupId => {
       const group = combinedGroups.find(g => g.id === groupId);
       if (group) {
-        groupItemIds.push(...group.itemIds);
-      }
-    });
-    
-    const allAffectedIds = [...new Set([...directlySelectedIds, ...groupItemIds])];
-    const affectedItems = wipItems.filter(item => allAffectedIds.includes(item.id));
-    
-    // For items in combined groups, use the group's combinedWip proportionally
-    // For individual items, use their own wip_amount
-    const itemWipValues = affectedItems.map(item => {
-      const group = combinedGroups.find(g => g.itemIds.includes(item.id));
-      if (group && selectedGroupsForWriteOff.has(group.id)) {
-        // Calculate this item's share of the group's WIP based on fee_amount
         const groupItems = wipItems.filter(i => group.itemIds.includes(i.id));
+        const groupEstimate = groupItems.reduce((sum, i) => sum + i.fee_amount, 0);
+        units.push({
+          id: groupId,
+          currentWip: group.combinedWip,
+          estimate: groupEstimate,
+          isGroup: true,
+          itemIds: group.itemIds,
+        });
+      }
+    });
+    
+    // Add individually selected items as units (excluding those already in selected groups)
+    const itemsInSelectedGroups = new Set<string>();
+    selectedGroupsForWriteOff.forEach(groupId => {
+      const group = combinedGroups.find(g => g.id === groupId);
+      if (group) {
+        group.itemIds.forEach(id => itemsInSelectedGroups.add(id));
+      }
+    });
+    
+    selectedForWriteOff.forEach(itemId => {
+      if (!itemsInSelectedGroups.has(itemId)) {
+        const item = wipItems.find(i => i.id === itemId);
+        if (item) {
+          units.push({
+            id: itemId,
+            currentWip: item.wip_amount,
+            estimate: item.fee_amount,
+            isGroup: false,
+            itemIds: [itemId],
+          });
+        }
+      }
+    });
+    
+    if (units.length === 0) return;
+    
+    // Binary search to find target percentage
+    // We want to find T such that sum of (currentWip - T * estimate) for units where currentWip > T * estimate = totalWriteOff
+    const maxPercentage = Math.max(...units.map(u => u.estimate > 0 ? u.currentWip / u.estimate : 0));
+    const minPercentage = 0;
+    
+    let low = minPercentage;
+    let high = maxPercentage;
+    let targetPercentage = 1.0; // Start at 100%
+    
+    // Binary search for ~50 iterations for precision
+    for (let iter = 0; iter < 50; iter++) {
+      const mid = (low + high) / 2;
+      let writeOffNeeded = 0;
+      
+      for (const unit of units) {
+        const targetWip = mid * unit.estimate;
+        if (unit.currentWip > targetWip) {
+          writeOffNeeded += unit.currentWip - targetWip;
+        }
+      }
+      
+      if (Math.abs(writeOffNeeded - totalWriteOff) < 0.01) {
+        targetPercentage = mid;
+        break;
+      }
+      
+      if (writeOffNeeded > totalWriteOff) {
+        // Need higher target percentage (less write-off)
+        low = mid;
+      } else {
+        // Need lower target percentage (more write-off)
+        high = mid;
+      }
+      
+      targetPercentage = (low + high) / 2;
+    }
+    
+    // Calculate write-off for each unit based on target percentage
+    const unitWriteOffs = new Map<string, number>();
+    for (const unit of units) {
+      const targetWip = targetPercentage * unit.estimate;
+      const unitWriteOff = Math.max(0, unit.currentWip - targetWip);
+      unitWriteOffs.set(unit.id, roundCurrency(unitWriteOff));
+    }
+    
+    // Now distribute to individual items
+    // For groups: distribute proportionally by fee_amount within the group
+    // For individual items: apply directly
+    const itemWriteOffs = new Map<string, number>();
+    
+    for (const unit of units) {
+      const unitWriteOff = unitWriteOffs.get(unit.id) || 0;
+      
+      if (unit.isGroup) {
+        // Distribute proportionally within group by fee_amount
+        const groupItems = wipItems.filter(i => unit.itemIds.includes(i.id));
         const totalGroupFee = groupItems.reduce((sum, i) => sum + i.fee_amount, 0);
-        const itemProportion = totalGroupFee > 0 ? item.fee_amount / totalGroupFee : 1 / groupItems.length;
-        return { id: item.id, wipShare: group.combinedWip * itemProportion, groupId: group.id };
+        
+        for (const item of groupItems) {
+          const itemProportion = totalGroupFee > 0 ? item.fee_amount / totalGroupFee : 1 / groupItems.length;
+          const itemShare = roundCurrency(unitWriteOff * itemProportion);
+          itemWriteOffs.set(item.id, (itemWriteOffs.get(item.id) || 0) + itemShare);
+        }
+      } else {
+        itemWriteOffs.set(unit.itemIds[0], unitWriteOff);
       }
-      return { id: item.id, wipShare: item.wip_amount, groupId: null };
-    });
+    }
     
-    const totalWip = itemWipValues.reduce((sum, item) => sum + item.wipShare, 0);
-    
-    // Calculate proportion for each affected item
-    const itemProportions = new Map<string, number>();
-    allAffectedIds.forEach(id => {
-      const itemWipInfo = itemWipValues.find(i => i.id === id);
-      if (itemWipInfo) {
-        const proportion = totalWip > 0 
-          ? itemWipInfo.wipShare / totalWip 
-          : 1 / allAffectedIds.length;
-        itemProportions.set(id, proportion);
-      }
-    });
-    
-    // Distribute proportionally based on WIP shares (or equally if no WIP)
+    // Apply write-offs to wipItems
     setWipItems(prev =>
       prev.map(item => {
-        const proportion = itemProportions.get(item.id);
-        if (proportion === undefined) return item;
+        const additionalWriteOff = itemWriteOffs.get(item.id);
+        if (additionalWriteOff === undefined) return item;
         
         return {
           ...item,
-          write_off_amount: roundCurrency(item.write_off_amount + (billingValue * proportion)),
+          write_off_amount: roundCurrency(item.write_off_amount + additionalWriteOff),
         };
       })
     );
@@ -273,20 +352,12 @@ export function DetailedWipUpdateModal({
     // Update combinedGroups to reflect new write-off totals for affected groups
     setCombinedGroups(prev =>
       prev.map(group => {
-        if (!selectedGroupsForWriteOff.has(group.id)) return group;
-        
-        // Calculate total write-off allocated to this group's items
-        let groupWriteOffAllocation = 0;
-        group.itemIds.forEach(itemId => {
-          const proportion = itemProportions.get(itemId);
-          if (proportion !== undefined) {
-            groupWriteOffAllocation += billingValue * proportion;
-          }
-        });
+        const groupWriteOff = unitWriteOffs.get(group.id);
+        if (groupWriteOff === undefined) return group;
         
         return {
           ...group,
-          combinedWriteOff: roundCurrency(group.combinedWriteOff + groupWriteOffAllocation),
+          combinedWriteOff: roundCurrency(group.combinedWriteOff + groupWriteOff),
         };
       })
     );

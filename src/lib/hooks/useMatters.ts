@@ -83,6 +83,7 @@ export interface MatterWithFinancials extends Matter {
     wip_amount: number;
     wip_write_off_amount: number;
     billed_amount: number;
+    accounts_receivable: number;
     paid_amount: number;
     as_of_date: string;
   };
@@ -213,6 +214,7 @@ export function useMatters() {
         // Net WIP = raw WIP minus write-offs (write-offs reduce actual WIP)
         const wipAmount = rawWipAmount - wipWriteOffAmount;
         const billedAmount = snapshot?.billed_amount || 0;
+        const accountsReceivable = snapshot?.accounts_receivable || 0;
         const paidAmount = snapshot?.paid_amount || 0;
         const budget = matter.agreed_budget_amount || 0;
         const feeUpperEnd = matter.fee_amount_upper_end || 0;
@@ -260,6 +262,9 @@ export function useMatters() {
         const effectiveBilledAmount = differentBillingCurrency && agreedBillingAmount > 0
           ? billedAmount * mandatedRate
           : billedAmount;
+        const effectiveAccountsReceivable = differentBillingCurrency && agreedBillingAmount > 0
+          ? accountsReceivable * mandatedRate
+          : accountsReceivable;
         const effectivePaidAmount = differentBillingCurrency && agreedBillingAmount > 0
           ? paidAmount * mandatedRate
           : paidAmount;
@@ -267,8 +272,9 @@ export function useMatters() {
           ? wipWriteOffAmount * mandatedRate
           : wipWriteOffAmount;
         
-        // BM budget burn (from snapshots) - now in billing currency
-        const bmTotalUsed = effectiveBilledAmount + effectiveWipAmount;
+        // BM budget burn (from snapshots) - WIP stays as WIP until paid (not when billed to AR)
+        // So budget burn = WIP only (WIP doesn't reduce when billed, only when paid)
+        const bmTotalUsed = effectiveWipAmount;
         
         // LC budget burn (only for Disbursement mode) - also needs conversion
         const effectiveLcWip = differentBillingCurrency && agreedBillingAmount > 0
@@ -304,6 +310,7 @@ export function useMatters() {
             wip_amount: effectiveWipAmount, // Net WIP (after write-offs) in billing currency
             wip_write_off_amount: effectiveWipWriteOffAmount,
             billed_amount: effectiveBilledAmount,
+            accounts_receivable: effectiveAccountsReceivable,
             paid_amount: effectivePaidAmount,
             as_of_date: snapshot.as_of_date,
           } : undefined,
@@ -314,7 +321,7 @@ export function useMatters() {
           headroom_percent: headroomPercent,
           bm_headroom_percent: bmHeadroomPercent,
           lc_headroom_percent: lcHeadroomPercent,
-          total_paid_ar_wip: totalUsed, // Budget burn = WIP + Billed
+          total_paid_ar_wip: totalUsed, // Budget burn = WIP only (WIP stays until paid)
           // Add effective values for display
           effective_fee_upper_end: effectiveFeeUpperEnd,
           effective_bm_fee: effectiveBmFee,

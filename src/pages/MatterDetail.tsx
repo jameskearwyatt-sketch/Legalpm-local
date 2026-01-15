@@ -463,55 +463,35 @@ export default function MatterDetail() {
   }
 
   const latestSnapshot = snapshots[0];
-  const rawWipAmountQuote = latestSnapshot?.wip_amount || 0;
-  const wipWriteOffAmountQuote = latestSnapshot?.wip_write_off_amount || 0;
+  // Financial snapshots are stored in BILLING currency - no conversion needed
+  const rawWipAmount = latestSnapshot?.wip_amount || 0;
+  const wipWriteOffAmount = latestSnapshot?.wip_write_off_amount || 0;
   // Net WIP = raw WIP minus write-offs (write-offs reduce actual WIP)
-  const wipAmountQuote = rawWipAmountQuote - wipWriteOffAmountQuote;
-  const billedAmountQuote = latestSnapshot?.billed_amount || 0;
-  const accountsReceivableQuote = latestSnapshot?.accounts_receivable || 0;
-  const paidAmountQuote = latestSnapshot?.paid_amount || 0;
+  const wipAmount = rawWipAmount - wipWriteOffAmount;
+  const billedAmount = latestSnapshot?.billed_amount || 0;
+  const accountsReceivable = latestSnapshot?.accounts_receivable || 0;
+  const paidAmount = latestSnapshot?.paid_amount || 0;
   
   // LC financial data - use aggregated data from useLocalCounsels hook
   const lcBillingMode = formData.local_counsel_billing || matter?.local_counsel_billing || '';
   const isLcDisbursement = lcBillingMode === 'Disb';
   
-  // LC totals from hook (aggregated from matter_local_counsels table) - these are in quote currency
-  const lcWipQuote = lcTotalWip;
-  const lcBilledQuote = lcTotalBilled;
+  // LC totals from hook (aggregated from matter_local_counsels table) - stored in billing currency
+  const lcWip = lcTotalWip;
+  const lcBilled = lcTotalBilled;
   
   // Calculate effective budget - account for billing currency conversion
+  // The mandatedRate only applies to BUDGET figures (the original quote), NOT to financial snapshots
   const feeUpperEnd = formData.fee_amount_upper_end || matter.fee_amount_upper_end || 0;
   const agreedBillingAmount = formData.agreed_billing_amount || matter.agreed_billing_amount || 0;
   const differentBillingCurrency = formData.different_billing_currency ?? matter.different_billing_currency ?? false;
   const quoteCurrency = formData.quote_currency || matter.quote_currency || formData.fee_currency || matter.fee_currency || 'GBP';
   
   // Calculate mandated exchange rate if different billing currency is enabled
+  // This rate ONLY applies to converting the original quote/budget figures, NOT financial snapshots
   const mandatedRate = (differentBillingCurrency && feeUpperEnd > 0 && agreedBillingAmount > 0)
     ? agreedBillingAmount / feeUpperEnd
     : 1;
-  
-  // Convert WIP and financial values to billing currency
-  const wipAmount = differentBillingCurrency && agreedBillingAmount > 0
-    ? wipAmountQuote * mandatedRate
-    : wipAmountQuote;
-  const wipWriteOffAmount = differentBillingCurrency && agreedBillingAmount > 0
-    ? wipWriteOffAmountQuote * mandatedRate
-    : wipWriteOffAmountQuote;
-  const billedAmount = differentBillingCurrency && agreedBillingAmount > 0
-    ? billedAmountQuote * mandatedRate
-    : billedAmountQuote;
-  const accountsReceivable = differentBillingCurrency && agreedBillingAmount > 0
-    ? accountsReceivableQuote * mandatedRate
-    : accountsReceivableQuote;
-  const paidAmount = differentBillingCurrency && agreedBillingAmount > 0
-    ? paidAmountQuote * mandatedRate
-    : paidAmountQuote;
-  const lcWip = differentBillingCurrency && agreedBillingAmount > 0
-    ? lcWipQuote * mandatedRate
-    : lcWipQuote;
-  const lcBilled = differentBillingCurrency && agreedBillingAmount > 0
-    ? lcBilledQuote * mandatedRate
-    : lcBilledQuote;
   
   // Use effective values for display (in billing currency when applicable)
   const totalBudget = differentBillingCurrency && agreedBillingAmount > 0 
@@ -979,32 +959,23 @@ export default function MatterDetail() {
                       : currentWipWriteOff !== 0
                   );
                   
-                  // Convert previous snapshot values for display in tooltip (apply same conversion)
+                  // Previous snapshot values for display in tooltip
+                  // Financial snapshots are stored in billing currency - no conversion needed
                   // If no previous snapshot, show 0 as the "previous" value
                   const prevWipDisplay = hasPrevious 
-                    ? (differentBillingCurrency && agreedBillingAmount > 0 
-                        ? (previousSnapshot.wip_amount - previousSnapshot.wip_write_off_amount) * mandatedRate 
-                        : previousSnapshot.wip_amount - previousSnapshot.wip_write_off_amount)
+                    ? previousSnapshot.wip_amount - previousSnapshot.wip_write_off_amount
                     : 0;
                   const prevArDisplay = hasPrevious 
-                    ? (differentBillingCurrency && agreedBillingAmount > 0 
-                        ? previousSnapshot.accounts_receivable * mandatedRate 
-                        : previousSnapshot.accounts_receivable)
+                    ? previousSnapshot.accounts_receivable
                     : 0;
                   const prevBilledDisplay = hasPrevious 
-                    ? (differentBillingCurrency && agreedBillingAmount > 0 
-                        ? previousSnapshot.billed_amount * mandatedRate 
-                        : previousSnapshot.billed_amount)
+                    ? previousSnapshot.billed_amount
                     : 0;
                   const prevPaidDisplay = hasPrevious 
-                    ? (differentBillingCurrency && agreedBillingAmount > 0 
-                        ? previousSnapshot.paid_amount * mandatedRate 
-                        : previousSnapshot.paid_amount)
+                    ? previousSnapshot.paid_amount
                     : 0;
                   const prevWriteOffDisplay = hasPrevious 
-                    ? (differentBillingCurrency && agreedBillingAmount > 0 
-                        ? previousSnapshot.wip_write_off_amount * mandatedRate 
-                        : previousSnapshot.wip_write_off_amount)
+                    ? previousSnapshot.wip_write_off_amount
                     : 0;
                   
                   // Previous date - use previous snapshot date if available, otherwise use latest snapshot date
@@ -1132,33 +1103,20 @@ export default function MatterDetail() {
               billing_mode: lc.billing_mode,
             }))}
             currentValues={{
-              // Show current values in billing currency (converted from quote currency)
-              wip_amount: differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0
-                ? rawWipAmountQuote * mandatedRate
-                : rawWipAmountQuote,
-              wip_write_off_amount: differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0
-                ? wipWriteOffAmountQuote * mandatedRate
-                : wipWriteOffAmountQuote,
-              billed_amount: differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0
-                ? billedAmountQuote * mandatedRate
-                : billedAmountQuote,
-              accounts_receivable: differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0
-                ? accountsReceivableQuote * mandatedRate
-                : accountsReceivableQuote,
-              paid_amount: differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0
-                ? paidAmountQuote * mandatedRate
-                : paidAmountQuote,
+              // Financial snapshots are stored in billing currency - no conversion needed
+              wip_amount: rawWipAmount,
+              wip_write_off_amount: wipWriteOffAmount,
+              billed_amount: billedAmount,
+              accounts_receivable: accountsReceivable,
+              paid_amount: paidAmount,
             }}
             onSave={async (data) => {
-              // User inputs in billing currency - convert back to quote currency for storage
-              const shouldConvert = differentBillingCurrency && agreedBillingAmount > 0 && mandatedRate > 0;
-              const conversionRate = shouldConvert ? (1 / mandatedRate) : 1;
-              
-              const wipToStore = data.wip_amount * conversionRate;
-              const writeOffToStore = data.wip_write_off_amount * conversionRate;
-              const billedToStore = data.billed_amount * conversionRate;
-              const arToStore = data.accounts_receivable * conversionRate;
-              const paidToStore = data.paid_amount * conversionRate;
+              // Financial snapshots are stored directly in billing currency - no conversion needed
+              const wipToStore = data.wip_amount;
+              const writeOffToStore = data.wip_write_off_amount;
+              const billedToStore = data.billed_amount;
+              const arToStore = data.accounts_receivable;
+              const paidToStore = data.paid_amount;
               
               const today = new Date().toISOString().split('T')[0];
               const { data: existing } = await supabase

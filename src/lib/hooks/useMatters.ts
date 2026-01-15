@@ -254,35 +254,21 @@ export function useMatters() {
           ? billingCurrency
           : matter.fee_currency;
         
-        // Convert WIP and billed amounts to billing currency if different billing currency is enabled
-        // These values are stored in quote currency (e.g., USD) but need to be displayed in billing currency (e.g., GBP)
-        const effectiveWipAmount = differentBillingCurrency && agreedBillingAmount > 0
-          ? wipAmount * mandatedRate
-          : wipAmount;
-        const effectiveBilledAmount = differentBillingCurrency && agreedBillingAmount > 0
-          ? billedAmount * mandatedRate
-          : billedAmount;
-        const effectiveAccountsReceivable = differentBillingCurrency && agreedBillingAmount > 0
-          ? accountsReceivable * mandatedRate
-          : accountsReceivable;
-        const effectivePaidAmount = differentBillingCurrency && agreedBillingAmount > 0
-          ? paidAmount * mandatedRate
-          : paidAmount;
-        const effectiveWipWriteOffAmount = differentBillingCurrency && agreedBillingAmount > 0
-          ? wipWriteOffAmount * mandatedRate
-          : wipWriteOffAmount;
+        // Financial snapshots are stored in BILLING currency - no conversion needed
+        // The mandatedRate only applies to budget/quote figures, NOT to financial snapshots
+        const effectiveWipAmount = wipAmount;
+        const effectiveBilledAmount = billedAmount;
+        const effectiveAccountsReceivable = accountsReceivable;
+        const effectivePaidAmount = paidAmount;
+        const effectiveWipWriteOffAmount = wipWriteOffAmount;
         
         // BM budget burn = WIP + Total Paid
         // WIP includes AR (AR only stops being WIP when actually paid)
         const bmTotalUsed = effectiveWipAmount + effectivePaidAmount;
         
-        // LC budget burn (only for Disbursement mode) - also needs conversion
-        const effectiveLcWip = differentBillingCurrency && agreedBillingAmount > 0
-          ? lcWip * mandatedRate
-          : lcWip;
-        const effectiveLcBilled = differentBillingCurrency && agreedBillingAmount > 0
-          ? lcBilled * mandatedRate
-          : lcBilled;
+        // LC financial data - also stored in billing currency, no conversion needed
+        const effectiveLcWip = lcWip;
+        const effectiveLcBilled = lcBilled;
         const lcTotalUsed = localCounselBilling === 'Disb' ? (effectiveLcWip + effectiveLcBilled) : 0;
         
         // Total budget burn includes both BM and LC (when in Disb mode)

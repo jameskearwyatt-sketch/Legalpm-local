@@ -418,23 +418,7 @@ export function MasterWipUpdateDialog({
       const updates = importedData
         .filter((d) => d.selected && d.matchedMatterId)
         .map((d) => {
-          // Find the matched matter to check if currency conversion is needed
-          const matchedMatter = matters.find(m => m.id === d.matchedMatterId);
-          
-          // Calculate conversion rate for matters with different billing currency
-          // Imported values are in billing currency - need to convert back to quote currency for storage
-          let conversionRate = 1;
-          if (matchedMatter) {
-            const differentBillingCurrency = matchedMatter.different_billing_currency;
-            const feeUpperEnd = matchedMatter.fee_amount_upper_end || 0;
-            const agreedBillingAmount = matchedMatter.agreed_billing_amount || 0;
-            
-            if (differentBillingCurrency && feeUpperEnd > 0 && agreedBillingAmount > 0) {
-              const mandatedRate = agreedBillingAmount / feeUpperEnd;
-              conversionRate = 1 / mandatedRate; // Divide to convert from billing to quote currency
-            }
-          }
-          
+          // Financial snapshots are stored in billing currency - no conversion needed
           // Get raw values (in billing currency from the report)
           const rawWip = d.wip.selected ? d.wip.value : d.wip.current;
           const rawBilled = d.totalBilled.selected ? d.totalBilled.value : d.totalBilled.current;
@@ -443,11 +427,11 @@ export function MasterWipUpdateDialog({
           
           return {
             matter_id: d.matchedMatterId!,
-            wip_amount: rawWip * conversionRate,
+            wip_amount: rawWip,
             wip_write_off_amount: 0, // Not tracked in new flow
-            billed_amount: rawBilled * conversionRate,
-            accounts_receivable: rawAr * conversionRate,
-            paid_amount: rawPaid * conversionRate,
+            billed_amount: rawBilled,
+            accounts_receivable: rawAr,
+            paid_amount: rawPaid,
           };
         });
 

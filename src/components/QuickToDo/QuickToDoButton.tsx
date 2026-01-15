@@ -866,24 +866,25 @@ export function QuickToDoButton() {
       const newWidth = Math.max(320, Math.min(window.innerWidth - 50, startWidth + deltaX));
       const newHeight = Math.max(200, Math.min(window.innerHeight, startHeight - deltaY));
 
-      setSlateSize({ width: newWidth, height: newHeight });
+      setSlateSize(size => {
+        // Save to localStorage on each update
+        const newSize = { width: newWidth, height: newHeight };
+        try {
+          localStorage.setItem('slate_size', JSON.stringify(newSize));
+        } catch {}
+        return newSize;
+      });
       
       // Adjust position to keep bottom edge in place when height changes
-      if (slatePosition) {
-        const heightDiff = newHeight - startHeight;
-        setSlatePosition(prev => prev ? {
-          ...prev,
-          y: startPosY - heightDiff
-        } : prev);
-      }
+      const heightDiff = newHeight - startHeight;
+      setSlatePosition(prev => prev ? {
+        ...prev,
+        y: startPosY - heightDiff
+      } : prev);
     };
 
     const handleMouseUp = () => {
       setIsResizingSlate(false);
-      // Save size to localStorage
-      try {
-        localStorage.setItem('slate_size', JSON.stringify(slateSize));
-      } catch {}
       slateResizeRef.current = null;
     };
 
@@ -894,7 +895,7 @@ export function QuickToDoButton() {
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizingSlate, slatePosition, slateSize]);
+  }, [isResizingSlate]);
 
   // Cleanup triage timeouts on unmount
   useEffect(() => {

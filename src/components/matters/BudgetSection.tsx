@@ -202,19 +202,13 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   };
 
   // Format with conversion for different billing currency
+  // NOTE: Budget values are stored in the BILLING currency, not the quote currency.
+  // The mandated rate was only used during initial budget creation to convert from quote to billing.
+  // For display, we should just show values in the billing currency directly.
   const formatWithConversion = (value: number) => {
-    if (differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0) {
-      const convertedValue = value * mandatedRate;
-      return (
-        <div className="flex flex-col items-end">
-          <span>{formatCurrency(value, quoteCurrency)}</span>
-          <span className="text-xs text-muted-foreground">
-            ({formatCurrency(convertedValue, billingCurrency)})
-          </span>
-        </div>
-      );
-    }
-    return formatCurrency(value);
+    // Just display in billing currency - values are already in billing currency
+    const displayCurrency = differentBillingCurrency && billingCurrency ? billingCurrency : currency;
+    return formatCurrency(value, displayCurrency);
   };
 
   const formatDate = (date: string) => format(new Date(date), 'dd MMM yyyy HH:mm');
@@ -237,11 +231,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       // Create new object for the edited item
       const newItem = { ...item };
       if (field === 'fee_amount') {
+        // Values are stored directly in billing currency - no conversion needed
         let parsedValue = typeof value === 'string' ? parseFloat(value) || 0 : value;
-        // If in billing currency mode, convert back to quote currency for storage
-        if (isInBillingCurrencyMode && mandatedRate > 0) {
-          parsedValue = parsedValue / mandatedRate;
-        }
         newItem.fee_amount = parsedValue;
       } else if (field === 'provider') {
         newItem.provider = value as 'Baker McKenzie' | 'Local Counsel';

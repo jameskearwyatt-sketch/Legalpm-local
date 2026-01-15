@@ -463,17 +463,10 @@ export function CategorizedBudgetView({
               return null;
             }
             
-            const displaySubtotal = differentBillingCurrency && agreedBillingAmount > 0
-              ? (groupSubtotals[groupKey] || 0) * mandatedRate
-              : (groupSubtotals[groupKey] || 0);
-            
-            const displayBudgetUsed = differentBillingCurrency && agreedBillingAmount > 0
-              ? (groupBudgetUsed[groupKey] || 0) * mandatedRate
-              : (groupBudgetUsed[groupKey] || 0);
-            
-            const displayWriteOffs = differentBillingCurrency && agreedBillingAmount > 0
-              ? (groupWriteOffs[groupKey] || 0) * mandatedRate
-              : (groupWriteOffs[groupKey] || 0);
+            // Budget values are stored in billing currency - no mandatedRate conversion needed
+            const displaySubtotal = groupSubtotals[groupKey] || 0;
+            const displayBudgetUsed = groupBudgetUsed[groupKey] || 0;
+            const displayWriteOffs = groupWriteOffs[groupKey] || 0;
             
             return (
               <CategoryGroup

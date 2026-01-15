@@ -101,15 +101,15 @@ function WipUpdateCard({
     setIsExpanded(!isExpanded);
   };
 
-  // Calculate total estimate from items - convert to billing currency
+  // Calculate total estimate from items - values are stored in billing currency
   const totalEstimateQuote = items.reduce((sum, item) => sum + item.fee_amount, 0);
   const totalWipQuote = update.total_wip_amount;
   const totalWriteOffQuote = update.total_write_off_amount || 0;
   
-  // Convert to billing currency for display
-  const totalEstimate = differentBillingCurrency ? totalEstimateQuote * mandatedRate : totalEstimateQuote;
-  const totalWip = differentBillingCurrency ? totalWipQuote * mandatedRate : totalWipQuote;
-  const totalWriteOff = differentBillingCurrency ? totalWriteOffQuote * mandatedRate : totalWriteOffQuote;
+  // No conversion needed - values are already in billing currency
+  const totalEstimate = totalEstimateQuote;
+  const totalWip = totalWipQuote;
+  const totalWriteOff = totalWriteOffQuote;
   const overallHealth = getHealthColor(totalWip, totalEstimate || totalWip);
 
   // Group items by category
@@ -244,8 +244,9 @@ function WipUpdateCard({
                     </div>
                     <div className="divide-y">
                       {categoryItems.map(item => {
-                        const displayWip = differentBillingCurrency ? item.wip_amount * mandatedRate : item.wip_amount;
-                        const displayFee = differentBillingCurrency ? item.fee_amount * mandatedRate : item.fee_amount;
+                        // Values are stored in billing currency - no conversion needed
+                        const displayWip = item.wip_amount;
+                        const displayFee = item.fee_amount;
                         const health = getHealthColor(displayWip, displayFee);
                         return (
                           <div

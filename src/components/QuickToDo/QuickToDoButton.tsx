@@ -634,6 +634,82 @@ const SortableSlateItem = ({
   );
 };
 
+// Sortable wrapper for personal tasks
+interface SortablePersonalTaskProps {
+  task: { id: string; title: string };
+  index: number;
+  onComplete: () => void;
+  onDelete: () => void;
+}
+
+const SortablePersonalTask = ({ 
+  task, 
+  index, 
+  onComplete, 
+  onDelete,
+}: SortablePersonalTaskProps) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1 : 0,
+  };
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style}
+      className={cn(
+        "flex items-start gap-2 p-2 rounded-lg group min-w-0 bg-rose-50/50 dark:bg-rose-950/20 border border-dashed border-rose-300/50 dark:border-rose-700/30",
+        isDragging && "shadow-lg ring-2 ring-rose-300/50"
+      )}
+    >
+      {/* Drag handle with number */}
+      <div 
+        {...attributes} 
+        {...listeners}
+        className="flex items-center gap-1 shrink-0 cursor-grab active:cursor-grabbing touch-none"
+      >
+        <div className="flex items-center justify-center w-5 h-5 rounded text-xs font-bold bg-rose-200/50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">
+          {index + 1}
+        </div>
+        <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
+      </div>
+      
+      {/* Checkbox */}
+      <Checkbox
+        checked={false}
+        onCheckedChange={onComplete}
+        className="h-4 w-4 shrink-0"
+        title="Complete"
+      />
+      
+      <span className="flex-1 text-sm min-w-0 break-words italic text-muted-foreground">
+        {task.title}
+      </span>
+      
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100"
+        onClick={onDelete}
+        title="Remove"
+      >
+        <X className="h-3.5 w-3.5 text-rose-500" />
+      </Button>
+    </div>
+  );
+};
+
 export function QuickToDoButton() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -2556,45 +2632,17 @@ export function QuickToDoButton() {
                             strategy={verticalListSortingStrategy}
                           >
                             <div className="space-y-2">
-                              {orderedPersonalTasks.map((task, index) => (
-                                <div 
-                                  key={task.id}
-                                  className="flex items-start gap-2 p-2 rounded-lg group min-w-0 bg-rose-50/50 dark:bg-rose-950/20 border border-dashed border-rose-300/50 dark:border-rose-700/30"
-                                >
-                                  {/* Number badge */}
-                                  <div className="flex items-center justify-center w-5 h-5 rounded text-xs font-bold bg-rose-200/50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400 shrink-0">
-                                    {index + 1}
-                                  </div>
-                                  
-                                  {/* Checkbox */}
-                                  <Checkbox
-                                    checked={false}
-                                    onCheckedChange={() => {
-                                      // Complete personal slate item via database
-                                      completeSlateItem.mutate({ id: task.id, isCompleted: true });
-                                    }}
-                                    className="h-4 w-4 shrink-0"
-                                    title="Complete"
+                              {orderedPersonalTasks.map((task, index) => {
+                                return (
+                                  <SortablePersonalTask
+                                    key={task.id}
+                                    task={task}
+                                    index={index}
+                                    onComplete={() => completeSlateItem.mutate({ id: task.id, isCompleted: true })}
+                                    onDelete={() => deleteSlateItem.mutate(task.id)}
                                   />
-                                  
-                                  <span className="flex-1 text-sm min-w-0 break-words italic text-muted-foreground">
-                                    {task.title}
-                                  </span>
-                                  
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100"
-                                    onClick={() => {
-                                      // Delete personal slate item via database
-                                      deleteSlateItem.mutate(task.id);
-                                    }}
-                                    title="Remove"
-                                  >
-                                    <X className="h-3.5 w-3.5 text-rose-500" />
-                                  </Button>
-                                </div>
-                              ))}
+                                );
+                              })}
                             </div>
                           </SortableContext>
                         </DndContext>

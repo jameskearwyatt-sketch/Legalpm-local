@@ -20,6 +20,7 @@ interface MatterInfo {
 interface ColumnMappings {
   matter_number?: number;
   matter_name?: number;
+  client_name?: number;
   wip?: number;
   accounts_receivable?: number;
   total_billed?: number;
@@ -30,19 +31,29 @@ interface ParsedRow {
   rowIndex: number;
   matterNumber: string;
   matterName: string;
+  clientName: string;
   wip: number;
   accountsReceivable: number;
   totalBilled: number;
   totalPaid: number;
 }
 
+interface MatterMapping {
+  imported_matter_number: string | null;
+  imported_matter_name: string | null;
+  imported_client_name: string | null;
+  mapped_matter_id: string;
+}
+
 interface MatchedData {
   rowIndex: number;
   matterNumber: string;
   matterName: string;
+  clientName: string;
   matchedMatterId: string | null;
   matchedMatterName: string | null;
   matchConfidence: 'high' | 'medium' | 'low' | 'none';
+  needsConfirmation: boolean;
   currency: string;
   wip: { value: number; current: number; changed: boolean };
   accountsReceivable: { value: number; current: number; changed: boolean };
@@ -76,12 +87,15 @@ function normalizeString(str: string): string {
 function calculateMatchScore(
   importedNumber: string,
   importedName: string,
+  importedClientName: string,
   matter: MatterInfo
 ): { score: number; confidence: 'high' | 'medium' | 'low' | 'none' } {
   const normImportedNum = normalizeString(importedNumber);
   const normImportedName = normalizeString(importedName);
+  const normImportedClient = normalizeString(importedClientName);
   const normMatterNum = normalizeString(matter.matter_number);
   const normMatterName = normalizeString(matter.matter_name);
+  const normClientName = normalizeString(matter.client_name);
 
   let score = 0;
 
@@ -111,6 +125,15 @@ function calculateMatchScore(
     }
   }
 
+  // Client name matching - helps differentiate similar matters
+  if (normImportedClient && normClientName) {
+    if (normImportedClient === normClientName) {
+      score += 50;
+    } else if (normClientName.includes(normImportedClient) || normImportedClient.includes(normClientName)) {
+      score += 25;
+    }
+  }
+
   let confidence: 'high' | 'medium' | 'low' | 'none' = 'none';
   if (score >= 100) confidence = 'high';
   else if (score >= 60) confidence = 'medium';
@@ -125,20 +148,23 @@ serve(async (req) => {
   }
 
   try {
-    const { rows, columnMappings, matters } = await req.json() as {
+    const { rows, columnMappings, matters, savedMappings } = await req.json() as {
       rows: string[][];
       columnMappings: ColumnMappings;
       matters: MatterInfo[];
+      savedMappings?: MatterMapping[];
     };
 
     console.log(`Processing ${rows.length} rows with mappings:`, columnMappings);
     console.log(`Matching against ${matters.length} matters`);
+    console.log(`Using ${savedMappings?.length || 0} saved mappings`);
 
     // Parse rows according to column mappings
     const parsedRows: ParsedRow[] = rows.map((row, idx) => ({
       rowIndex: idx,
       matterNumber: columnMappings.matter_number !== undefined ? (row[columnMappings.matter_number] || '') : '',
       matterName: columnMappings.matter_name !== undefined ? (row[columnMappings.matter_name] || '') : '',
+      clientName: columnMappings.client_name !== undefined ? (row[columnMappings.client_name] || '') : '',
       wip: columnMappings.wip !== undefined ? parseNumber(row[columnMappings.wip]) : 0,
       accountsReceivable: columnMappings.accounts_receivable !== undefined ? parseNumber(row[columnMappings.accounts_receivable]) : 0,
       totalBilled: columnMappings.total_billed !== undefined ? parseNumber(row[columnMappings.total_billed]) : 0,
@@ -148,26 +174,47 @@ serve(async (req) => {
     // Match each parsed row to a matter
     const matchedData: MatchedData[] = [];
     const unmatchedData: MatchedData[] = [];
+    const lowConfidenceData: MatchedData[] = [];
 
     for (const parsed of parsedRows) {
       // Skip rows with no matter identifier
       if (!parsed.matterNumber && !parsed.matterName) continue;
 
-      // Find best match
-      let bestMatch: MatterInfo | null = null;
-      let bestScore = 0;
-      let bestConfidence: 'high' | 'medium' | 'low' | 'none' = 'none';
+      // First, check for a saved mapping
+      const savedMapping = savedMappings?.find(
+        m => m.imported_matter_number === parsed.matterNumber && 
+             m.imported_matter_name === parsed.matterName
+      );
 
-      for (const matter of matters) {
-        const { score, confidence } = calculateMatchScore(
-          parsed.matterNumber,
-          parsed.matterName,
-          matter
-        );
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = matter;
-          bestConfidence = confidence;
+      let bestMatch: MatterInfo | null = null;
+      let bestConfidence: 'high' | 'medium' | 'low' | 'none' = 'none';
+      let usedSavedMapping = false;
+
+      if (savedMapping) {
+        // Use saved mapping
+        bestMatch = matters.find(m => m.id === savedMapping.mapped_matter_id) || null;
+        if (bestMatch) {
+          bestConfidence = 'high';
+          usedSavedMapping = true;
+        }
+      }
+
+      if (!bestMatch) {
+        // Find best match using algorithm
+        let bestScore = 0;
+
+        for (const matter of matters) {
+          const { score, confidence } = calculateMatchScore(
+            parsed.matterNumber,
+            parsed.matterName,
+            parsed.clientName,
+            matter
+          );
+          if (score > bestScore) {
+            bestScore = score;
+            bestMatch = matter;
+            bestConfidence = confidence;
+          }
         }
       }
 
@@ -177,13 +224,18 @@ serve(async (req) => {
       const currentBilled = bestMatch?.current_billed || 0;
       const currentPaid = bestMatch?.current_paid || 0;
 
+      // Determine if this needs user confirmation
+      const needsConfirmation = !usedSavedMapping && bestConfidence !== 'high' && bestMatch !== null;
+
       const result: MatchedData = {
         rowIndex: parsed.rowIndex,
         matterNumber: parsed.matterNumber,
         matterName: parsed.matterName,
+        clientName: parsed.clientName,
         matchedMatterId: bestMatch?.id || null,
         matchedMatterName: bestMatch?.matter_name || null,
         matchConfidence: bestConfidence,
+        needsConfirmation,
         currency,
         wip: {
           value: parsed.wip,
@@ -208,24 +260,30 @@ serve(async (req) => {
       };
 
       if (bestMatch && bestConfidence !== 'none') {
-        matchedData.push(result);
+        if (needsConfirmation) {
+          lowConfidenceData.push(result);
+        } else {
+          matchedData.push(result);
+        }
       } else {
         unmatchedData.push(result);
       }
     }
 
-    console.log(`Matched: ${matchedData.length}, Unmatched: ${unmatchedData.length}`);
+    console.log(`Matched: ${matchedData.length}, Low confidence: ${lowConfidenceData.length}, Unmatched: ${unmatchedData.length}`);
 
     return new Response(
       JSON.stringify({
         success: true,
         matchedData,
+        lowConfidenceData,
         unmatchedData,
         summary: {
           totalRows: rows.length,
           matched: matchedData.length,
+          lowConfidence: lowConfidenceData.length,
           unmatched: unmatchedData.length,
-          changedCount: matchedData.filter(d => 
+          changedCount: [...matchedData, ...lowConfidenceData].filter(d => 
             d.wip.changed || d.accountsReceivable.changed || 
             d.totalBilled.changed || d.totalPaid.changed
           ).length,

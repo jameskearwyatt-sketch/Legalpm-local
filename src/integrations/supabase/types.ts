@@ -1531,6 +1531,47 @@ export type Database = {
         }
         Relationships: []
       }
+      report_matter_mappings: {
+        Row: {
+          created_at: string
+          id: string
+          imported_client_name: string | null
+          imported_matter_name: string | null
+          imported_matter_number: string | null
+          mapped_matter_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          imported_client_name?: string | null
+          imported_matter_name?: string | null
+          imported_matter_number?: string | null
+          mapped_matter_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          imported_client_name?: string | null
+          imported_matter_name?: string | null
+          imported_matter_number?: string | null
+          mapped_matter_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_matter_mappings_mapped_matter_id_fkey"
+            columns: ["mapped_matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       slate_items: {
         Row: {
           completed_at: string | null

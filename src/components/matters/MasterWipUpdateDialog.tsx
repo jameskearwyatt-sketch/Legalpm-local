@@ -10,18 +10,19 @@ import {
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Loader2, Upload, FileText, AlertTriangle, Brain, Settings2, Search, ChevronDown, ChevronRight } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Loader2, Upload, FileText, AlertTriangle, Brain, Settings2, Search, ChevronDown, ChevronRight, Link2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/currencyUtils';
 import { MatterWithFinancials } from '@/lib/hooks/useMatters';
 import { useReportFormats, ColumnMappings } from '@/lib/hooks/useReportFormats';
+import { useReportMatterMappings } from '@/lib/hooks/useReportMatterMappings';
 import { ReportFormatTrainingDialog } from './ReportFormatTrainingDialog';
 
 interface MasterWipUpdateDialogProps {
@@ -42,9 +43,11 @@ interface ImportedMatterData {
   rowIndex: number;
   matterNumber: string;
   matterName: string;
+  clientName?: string;
   matchedMatterId: string | null;
   matchedMatterName: string | null;
   matchConfidence: 'high' | 'medium' | 'low' | 'none';
+  needsConfirmation?: boolean;
   currency: string;
   wip: { value: number; current: number; changed: boolean; selected: boolean };
   accountsReceivable: { value: number; current: number; changed: boolean; selected: boolean };
@@ -53,7 +56,7 @@ interface ImportedMatterData {
   selected: boolean;
 }
 
-type Step = 'upload' | 'training' | 'review';
+type Step = 'upload' | 'training' | 'confirm-matches' | 'review';
 
 export function MasterWipUpdateDialog({
   isOpen,
@@ -75,6 +78,7 @@ export function MasterWipUpdateDialog({
   // Review state
   const [importedData, setImportedData] = useState<ImportedMatterData[]>([]);
   const [unmatchedData, setUnmatchedData] = useState<ImportedMatterData[]>([]);
+  const [lowConfidenceData, setLowConfidenceData] = useState<ImportedMatterData[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showUnchanged, setShowUnchanged] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
@@ -82,6 +86,7 @@ export function MasterWipUpdateDialog({
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { format, isLoading: formatLoading, saveFormat, checkFormatMatch, createHeaderSignature } = useReportFormats();
+  const { mappings: savedMappings, saveMapping, isLoading: mappingsLoading } = useReportMatterMappings();
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -231,11 +236,20 @@ export function MasterWipUpdateDialog({
         };
       });
 
+      // Convert saved mappings to format expected by edge function
+      const mappingsForEdge = savedMappings.map(m => ({
+        imported_matter_number: m.imported_matter_number,
+        imported_matter_name: m.imported_matter_name,
+        imported_client_name: m.imported_client_name,
+        mapped_matter_id: m.mapped_matter_id,
+      }));
+
       const { data, error } = await supabase.functions.invoke('parse-wip-report', {
         body: {
           rows,
           columnMappings: mappings,
           matters: mattersForMatching,
+          savedMappings: mappingsForEdge,
         },
       });
 
@@ -255,6 +269,15 @@ export function MasterWipUpdateDialog({
         selected: true,
       }));
 
+      const lowConf: ImportedMatterData[] = (data.lowConfidenceData || []).map((d: any) => ({
+        ...d,
+        wip: { ...d.wip, selected: d.wip.changed },
+        accountsReceivable: { ...d.accountsReceivable, selected: d.accountsReceivable.changed },
+        totalBilled: { ...d.totalBilled, selected: d.totalBilled.changed },
+        totalPaid: { ...d.totalPaid, selected: d.totalPaid.changed },
+        selected: true,
+      }));
+
       const unmatched: ImportedMatterData[] = (data.unmatchedData || []).map((d: any) => ({
         ...d,
         wip: { ...d.wip, selected: false },
@@ -265,18 +288,24 @@ export function MasterWipUpdateDialog({
       }));
 
       setImportedData(matched);
+      setLowConfidenceData(lowConf);
       setUnmatchedData(unmatched);
-      setStep('review');
 
-      const changedCount = matched.filter(d => 
-        d.wip.changed || d.accountsReceivable.changed || 
-        d.totalBilled.changed || d.totalPaid.changed
-      ).length;
-
-      toast.success(
-        `Found ${matched.length} matches, ${changedCount} with changes` + 
-        (unmatched.length > 0 ? `, ${unmatched.length} unmatched` : '')
-      );
+      // If there are low confidence matches, show confirmation step first
+      if (lowConf.length > 0) {
+        setStep('confirm-matches');
+        toast.info(`${lowConf.length} matter(s) need your confirmation for matching`);
+      } else {
+        setStep('review');
+        const changedCount = matched.filter(d => 
+          d.wip.changed || d.accountsReceivable.changed || 
+          d.totalBilled.changed || d.totalPaid.changed
+        ).length;
+        toast.success(
+          `Found ${matched.length} matches, ${changedCount} with changes` + 
+          (unmatched.length > 0 ? `, ${unmatched.length} unmatched` : '')
+        );
+      }
 
     } catch (error) {
       console.error('Processing error:', error);
@@ -411,6 +440,7 @@ export function MasterWipUpdateDialog({
     setUploadedFile(null);
     setImportedData([]);
     setUnmatchedData([]);
+    setLowConfidenceData([]);
     setParsedHeaders([]);
     setParsedRows([]);
     setSearchTerm('');
@@ -418,6 +448,91 @@ export function MasterWipUpdateDialog({
     setExpandedRows(new Set());
     setStep('upload');
     onClose();
+  };
+
+  // Handle confirming a low-confidence match
+  const confirmMatch = async (item: ImportedMatterData, matterId: string) => {
+    // Find the selected matter
+    const selectedMatter = matters.find(m => m.id === matterId);
+    if (!selectedMatter) return;
+
+    // Save the mapping for future use
+    try {
+      await saveMapping.mutateAsync({
+        imported_matter_number: item.matterNumber || null,
+        imported_matter_name: item.matterName || null,
+        imported_client_name: item.clientName || null,
+        mapped_matter_id: matterId,
+      });
+    } catch (error) {
+      console.error('Failed to save mapping:', error);
+    }
+
+    // Update the item with the confirmed match
+    const snapshot = selectedMatter.latest_snapshot;
+    const updatedItem: ImportedMatterData = {
+      ...item,
+      matchedMatterId: matterId,
+      matchedMatterName: selectedMatter.matter_name,
+      matchConfidence: 'high',
+      needsConfirmation: false,
+      currency: (selectedMatter as any).effective_currency ?? selectedMatter.fee_currency,
+      wip: { 
+        ...item.wip, 
+        current: snapshot?.wip_amount || 0,
+        changed: Math.abs(item.wip.value - (snapshot?.wip_amount || 0)) / Math.max(snapshot?.wip_amount || 1, 1) > 0.005,
+      },
+      accountsReceivable: { 
+        ...item.accountsReceivable, 
+        current: snapshot?.accounts_receivable || 0,
+        changed: Math.abs(item.accountsReceivable.value - (snapshot?.accounts_receivable || 0)) / Math.max(snapshot?.accounts_receivable || 1, 1) > 0.005,
+      },
+      totalBilled: { 
+        ...item.totalBilled, 
+        current: snapshot?.billed_amount || 0,
+        changed: Math.abs(item.totalBilled.value - (snapshot?.billed_amount || 0)) / Math.max(snapshot?.billed_amount || 1, 1) > 0.005,
+      },
+      totalPaid: { 
+        ...item.totalPaid, 
+        current: snapshot?.paid_amount || 0,
+        changed: Math.abs(item.totalPaid.value - (snapshot?.paid_amount || 0)) / Math.max(snapshot?.paid_amount || 1, 1) > 0.005,
+      },
+    };
+
+    // Remove from low confidence, add to imported data
+    setLowConfidenceData(prev => prev.filter(d => d.rowIndex !== item.rowIndex));
+    setImportedData(prev => [...prev, {
+      ...updatedItem,
+      wip: { ...updatedItem.wip, selected: updatedItem.wip.changed },
+      accountsReceivable: { ...updatedItem.accountsReceivable, selected: updatedItem.accountsReceivable.changed },
+      totalBilled: { ...updatedItem.totalBilled, selected: updatedItem.totalBilled.changed },
+      totalPaid: { ...updatedItem.totalPaid, selected: updatedItem.totalPaid.changed },
+      selected: true,
+    }]);
+
+    toast.success(`Confirmed match: ${selectedMatter.matter_name}`);
+  };
+
+  // Skip a low-confidence match (move to unmatched)
+  const skipMatch = (item: ImportedMatterData) => {
+    setLowConfidenceData(prev => prev.filter(d => d.rowIndex !== item.rowIndex));
+    setUnmatchedData(prev => [...prev, { ...item, matchedMatterId: null, matchedMatterName: null }]);
+  };
+
+  // Proceed from confirm-matches step to review step
+  const proceedToReview = () => {
+    // Move any remaining low confidence items to imported data with their suggested match
+    const remaining = lowConfidenceData.map(item => ({
+      ...item,
+      wip: { ...item.wip, selected: item.wip.changed },
+      accountsReceivable: { ...item.accountsReceivable, selected: item.accountsReceivable.changed },
+      totalBilled: { ...item.totalBilled, selected: item.totalBilled.changed },
+      totalPaid: { ...item.totalPaid, selected: item.totalPaid.changed },
+      selected: true,
+    }));
+    setImportedData(prev => [...prev, ...remaining]);
+    setLowConfidenceData([]);
+    setStep('review');
   };
 
   const renderFieldChange = (
@@ -603,6 +718,85 @@ export function MasterWipUpdateDialog({
             </>
           )}
 
+          {step === 'confirm-matches' && (
+            <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+              <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <Link2 className="h-5 w-5 text-amber-600" />
+                <div>
+                  <p className="font-medium text-amber-800 dark:text-amber-200">
+                    Confirm Matter Matches ({lowConfidenceData.length} remaining)
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    These matches need your confirmation. Your choices will be remembered for future imports.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto border rounded-lg">
+                <div className="divide-y">
+                  {lowConfidenceData.map((item) => (
+                    <div key={item.rowIndex} className="p-4 space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1">
+                          <div className="font-medium">{item.matterName || item.matterNumber}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {item.matterNumber} {item.clientName && `• ${item.clientName}`}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            WIP: {formatCurrency(item.wip.value, item.currency)}
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {item.matchConfidence} confidence
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-muted-foreground">Match to:</span>
+                        <Select
+                          value={item.matchedMatterId || ''}
+                          onValueChange={(value) => confirmMatch(item, value)}
+                        >
+                          <SelectTrigger className="flex-1">
+                            <SelectValue placeholder="Select a matter..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {matters.map((m) => (
+                              <SelectItem key={m.id} value={m.id}>
+                                {m.matter_name} ({m.matter_number})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button variant="ghost" size="sm" onClick={() => skipMatch(item)}>
+                          Skip
+                        </Button>
+                      </div>
+                      
+                      {item.matchedMatterName && (
+                        <div className="text-sm text-primary">
+                          Suggested: {item.matchedMatterName}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setStep('upload')}>
+                  Back
+                </Button>
+                <Button onClick={proceedToReview}>
+                  {lowConfidenceData.length > 0 
+                    ? `Continue with ${lowConfidenceData.length} suggested matches`
+                    : 'Continue to Review'
+                  }
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+
           {step === 'review' && (
             <div className="flex flex-col flex-1 overflow-hidden space-y-4">
               {/* Stats Bar */}
@@ -659,8 +853,8 @@ export function MasterWipUpdateDialog({
                 </div>
               </div>
 
-              {/* Data List */}
-              <ScrollArea className="flex-1 border rounded-lg">
+              {/* Data List - with proper scrolling */}
+              <div className="flex-1 overflow-auto border rounded-lg min-h-0">
                 <div className="divide-y">
                   {filteredData.map((item) => {
                     const hasChanges = item.wip.changed || item.accountsReceivable.changed || 
@@ -726,7 +920,7 @@ export function MasterWipUpdateDialog({
                     </div>
                   )}
                 </div>
-              </ScrollArea>
+              </div>
 
               {/* Unmatched Items Section */}
               {unmatchedData.length > 0 && (

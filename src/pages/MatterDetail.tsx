@@ -939,11 +939,39 @@ export default function MatterDetail() {
               <CardContent className="space-y-4">
                 {(() => {
                   // Determine if values changed compared to previous snapshot
-                  const wipChanged = highlightEnabled && previousSnapshot && wipAmount !== previousSnapshot.wip_amount;
-                  const arChanged = highlightEnabled && previousSnapshot && accountsReceivable !== previousSnapshot.accounts_receivable;
-                  const billedChanged = highlightEnabled && previousSnapshot && billedAmount !== previousSnapshot.billed_amount;
-                  const paidChanged = highlightEnabled && previousSnapshot && paidAmount !== previousSnapshot.paid_amount;
-                  const writeOffChanged = highlightEnabled && previousSnapshot && wipWriteOffAmount !== previousSnapshot.wip_write_off_amount;
+                  // Compare raw values from snapshots (not converted values) to check for actual changes
+                  const wipChanged = highlightEnabled && previousSnapshot && latestSnapshot && latestSnapshot.wip_amount !== previousSnapshot.wip_amount;
+                  const arChanged = highlightEnabled && previousSnapshot && latestSnapshot && latestSnapshot.accounts_receivable !== previousSnapshot.accounts_receivable;
+                  const billedChanged = highlightEnabled && previousSnapshot && latestSnapshot && latestSnapshot.billed_amount !== previousSnapshot.billed_amount;
+                  const paidChanged = highlightEnabled && previousSnapshot && latestSnapshot && latestSnapshot.paid_amount !== previousSnapshot.paid_amount;
+                  const writeOffChanged = highlightEnabled && previousSnapshot && latestSnapshot && latestSnapshot.wip_write_off_amount !== previousSnapshot.wip_write_off_amount;
+                  
+                  // Convert previous snapshot values for display in tooltip (apply same conversion)
+                  const prevWipDisplay = previousSnapshot 
+                    ? (differentBillingCurrency && agreedBillingAmount > 0 
+                        ? (previousSnapshot.wip_amount - previousSnapshot.wip_write_off_amount) * mandatedRate 
+                        : previousSnapshot.wip_amount - previousSnapshot.wip_write_off_amount)
+                    : undefined;
+                  const prevArDisplay = previousSnapshot 
+                    ? (differentBillingCurrency && agreedBillingAmount > 0 
+                        ? previousSnapshot.accounts_receivable * mandatedRate 
+                        : previousSnapshot.accounts_receivable)
+                    : undefined;
+                  const prevBilledDisplay = previousSnapshot 
+                    ? (differentBillingCurrency && agreedBillingAmount > 0 
+                        ? previousSnapshot.billed_amount * mandatedRate 
+                        : previousSnapshot.billed_amount)
+                    : undefined;
+                  const prevPaidDisplay = previousSnapshot 
+                    ? (differentBillingCurrency && agreedBillingAmount > 0 
+                        ? previousSnapshot.paid_amount * mandatedRate 
+                        : previousSnapshot.paid_amount)
+                    : undefined;
+                  const prevWriteOffDisplay = previousSnapshot 
+                    ? (differentBillingCurrency && agreedBillingAmount > 0 
+                        ? previousSnapshot.wip_write_off_amount * mandatedRate 
+                        : previousSnapshot.wip_write_off_amount)
+                    : undefined;
                   
                   return (
                     <>
@@ -954,7 +982,7 @@ export default function MatterDetail() {
                             <div className="text-xs text-destructive">
                               (Write-off: <HighlightedFinancialValue
                                 currentValue={formatCurrency(wipWriteOffAmount, currency)}
-                                previousValue={previousSnapshot?.wip_write_off_amount}
+                                previousValue={prevWriteOffDisplay}
                                 previousDate={previousSnapshot?.as_of_date}
                                 isHighlighted={!!writeOffChanged}
                                 className=""
@@ -965,7 +993,7 @@ export default function MatterDetail() {
                         </div>
                         <HighlightedFinancialValue
                           currentValue={formatCurrency(wipAmount, currency)}
-                          previousValue={previousSnapshot?.wip_amount}
+                          previousValue={prevWipDisplay}
                           previousDate={previousSnapshot?.as_of_date}
                           isHighlighted={!!wipChanged}
                           className="text-lg font-semibold"
@@ -976,7 +1004,7 @@ export default function MatterDetail() {
                         <span className="text-muted-foreground">Accounts Receivable</span>
                         <HighlightedFinancialValue
                           currentValue={formatCurrency(accountsReceivable, currency)}
-                          previousValue={previousSnapshot?.accounts_receivable}
+                          previousValue={prevArDisplay}
                           previousDate={previousSnapshot?.as_of_date}
                           isHighlighted={!!arChanged}
                           className="text-lg font-semibold"
@@ -987,7 +1015,7 @@ export default function MatterDetail() {
                         <span className="text-muted-foreground">Total Billed</span>
                         <HighlightedFinancialValue
                           currentValue={formatCurrency(billedAmount, currency)}
-                          previousValue={previousSnapshot?.billed_amount}
+                          previousValue={prevBilledDisplay}
                           previousDate={previousSnapshot?.as_of_date}
                           isHighlighted={!!billedChanged}
                           className="text-lg font-semibold"
@@ -998,7 +1026,7 @@ export default function MatterDetail() {
                         <span className="text-muted-foreground">Total Paid</span>
                         <HighlightedFinancialValue
                           currentValue={formatCurrency(paidAmount, currency)}
-                          previousValue={previousSnapshot?.paid_amount}
+                          previousValue={prevPaidDisplay}
                           previousDate={previousSnapshot?.as_of_date}
                           isHighlighted={!!paidChanged}
                           className="text-lg font-semibold text-success"

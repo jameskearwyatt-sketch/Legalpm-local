@@ -700,6 +700,18 @@ export default function Matters() {
     }
   };
 
+  // Calculate GBP to USD rate from exchange rates data
+  // The API returns rates as "1 USD = X currency", so GBP rate tells us how many GBP per USD
+  // To get USD per GBP: 1 / gbpRate
+  const gbpToUsdRate = useMemo(() => {
+    if (!exchangeRatesData?.rates?.GBP) return 1.35; // Default fallback
+    // If 1 USD = 0.74 GBP, then 1 GBP = 1/0.74 USD = 1.35 USD
+    return 1 / exchangeRatesData.rates.GBP;
+  }, [exchangeRatesData]);
+
+  // Get live rates for direct currency conversion
+  const liveRates = exchangeRatesData?.rates as Record<string, number> | undefined;
+
   const filteredMatters = useMemo(() => {
     let result = [...matters];
 
@@ -824,7 +836,7 @@ export default function Matters() {
     });
 
     return result;
-  }, [matters, search, tabFilter, categoryFilter, clientFilter, practiceAreaFilter, sortField, sortDirection, matterToClientsMap]);
+  }, [matters, search, tabFilter, categoryFilter, clientFilter, practiceAreaFilter, sortField, sortDirection, matterToClientsMap, gbpToUsdRate, liveRates]);
 
   const categoryCounts = useMemo(() => {
     const counts: Record<MatterCategory, number> = { Live: 0, Pipeline: 0, Closed: 0, Lost: 0 };
@@ -840,18 +852,6 @@ export default function Matters() {
   const mmaBpCount = useMemo(() => {
     return matters.filter(m => m.category === 'Live' || m.category === 'Pipeline').length;
   }, [matters]);
-
-  // Calculate GBP to USD rate from exchange rates data
-  // The API returns rates as "1 USD = X currency", so GBP rate tells us how many GBP per USD
-  // To get USD per GBP: 1 / gbpRate
-  const gbpToUsdRate = useMemo(() => {
-    if (!exchangeRatesData?.rates?.GBP) return 1.35; // Default fallback
-    // If 1 USD = 0.74 GBP, then 1 GBP = 1/0.74 USD = 1.35 USD
-    return 1 / exchangeRatesData.rates.GBP;
-  }, [exchangeRatesData]);
-
-  // Get live rates for direct currency conversion
-  const liveRates = exchangeRatesData?.rates as Record<string, number> | undefined;
 
   const categoryTotals = useMemo(() => {
     return filteredMatters.reduce((sum, m) => {

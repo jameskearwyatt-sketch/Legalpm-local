@@ -235,21 +235,20 @@ export function useMatters() {
         const billingCurrency = matterAny.billing_currency || matter.fee_currency;
         const agreedBillingAmount = matterAny.agreed_billing_amount || 0;
         
-        // Calculate mandated exchange rate if different billing currency is enabled
+        // Note: mandatedRate was previously used to convert from quote to billing currency
+        // during budget creation. All stored values are now in billing currency, so we
+        // only keep mandatedRate for legacy compatibility but don't use it for display.
         const mandatedRate = (differentBillingCurrency && feeUpperEnd > 0 && agreedBillingAmount > 0)
           ? agreedBillingAmount / feeUpperEnd
           : 1;
         
-        // Effective values for display (in billing currency when applicable)
+        // All budget values are now stored in billing currency - no conversion needed
         const effectiveFeeUpperEnd = differentBillingCurrency && agreedBillingAmount > 0 
           ? agreedBillingAmount 
           : feeUpperEnd;
-        const effectiveBmFee = differentBillingCurrency && agreedBillingAmount > 0
-          ? matter.bm_fee_component * mandatedRate
-          : matter.bm_fee_component;
-        const effectiveLocalCounselFee = differentBillingCurrency && agreedBillingAmount > 0
-          ? matter.local_counsel_fee * mandatedRate
-          : matter.local_counsel_fee;
+        // BM and LC fees are already stored in billing currency
+        const effectiveBmFee = matter.bm_fee_component;
+        const effectiveLocalCounselFee = matter.local_counsel_fee;
         const effectiveCurrency = differentBillingCurrency && agreedBillingAmount > 0
           ? billingCurrency
           : matter.fee_currency;

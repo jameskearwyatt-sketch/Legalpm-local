@@ -101,8 +101,8 @@ export function DraggableBudgetItem({
     transition,
   };
 
-  // Budget values are stored in billing currency - no mandatedRate conversion needed
-  const isInBillingCurrencyMode = differentBillingCurrency && agreedBillingAmount > 0;
+  // Budget values are stored in billing currency - determine display currency
+  const displayCurrency = differentBillingCurrency && billingCurrency ? billingCurrency : currency;
   const displayAmount = item.fee_amount || 0;
   
   const originalFee = originalItem?.fee_amount || 0;
@@ -191,7 +191,7 @@ export function DraggableBudgetItem({
         <div className="col-span-2 text-right">
           {originalItem ? (
             <span className="text-muted-foreground text-sm">
-              {formatCurrency(originalDisplayFee, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
+              {formatCurrency(originalDisplayFee, displayCurrency)}
             </span>
           ) : (
             <span className="text-xs text-green-600 dark:text-green-400 italic">NEW</span>
@@ -202,9 +202,7 @@ export function DraggableBudgetItem({
         <div className="col-span-2">
           <Input
             type="number"
-            value={isInBillingCurrencyMode 
-              ? (Math.round(newDisplayFee) || '') 
-              : (newFee || '')}
+            value={newFee || ''}
             onChange={(e) => onEdit(index, 'fee_amount', e.target.value)}
             placeholder="0"
             className={cn(
@@ -349,7 +347,7 @@ export function DraggableBudgetItem({
           <div className="text-right min-w-[80px]">
             <div className="text-xs text-muted-foreground">Estimate</div>
             <div className="font-medium text-sm">
-              {formatCurrency(displayAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
+              {formatCurrency(displayAmount, displayCurrency)}
             </div>
           </div>
         )}
@@ -361,7 +359,7 @@ export function DraggableBudgetItem({
           <div className="text-xs text-muted-foreground">Raw WIP</div>
           <div className="font-medium text-sm text-muted-foreground">
             {hasWipData 
-              ? formatCurrency(rawWipAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)
+              ? formatCurrency(rawWipAmount, displayCurrency)
               : '-'}
           </div>
         </div>
@@ -373,7 +371,7 @@ export function DraggableBudgetItem({
           <div className="text-xs text-muted-foreground">Write-off</div>
           {hasWriteOff ? (
             <div className="font-medium text-sm text-destructive">
-              -{formatCurrency(writeOffAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)}
+              -{formatCurrency(writeOffAmount, displayCurrency)}
             </div>
           ) : (
             <div className="text-sm text-muted-foreground">-</div>
@@ -391,7 +389,7 @@ export function DraggableBudgetItem({
             )}
             <span>
               {hasWipData 
-                ? formatCurrency(wipAmount, isInBillingCurrencyMode ? billingCurrency : quoteCurrency)
+                ? formatCurrency(wipAmount, displayCurrency)
                 : '-'}
             </span>
             {hasWipData && (

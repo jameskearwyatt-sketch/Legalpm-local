@@ -1126,7 +1126,7 @@ export default function Matters() {
                             Local Burn
                           </TableHead>
                           <TableHead className="text-right min-w-[80px]">
-                            <SortableHeader field="headroom">Headroom</SortableHeader>
+                            <SortableHeader field="headroom">Headroom (BM + Local)</SortableHeader>
                           </TableHead>
                         </>
                       )}

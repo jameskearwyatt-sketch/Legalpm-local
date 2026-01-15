@@ -760,12 +760,21 @@ export default function MatterDetail() {
                         <p className="text-xl font-heading font-bold text-foreground">
                           {formatCurrency(bmTotalUsed, currency)}
                         </p>
-                        {bmWriteOffFromBudget > 0 && (
-                          <p className="text-xs text-destructive mt-0.5">
-                            (W/O: {formatCurrency(bmWriteOffFromBudget, currency)})
+                        {/* Raw WIP, Write-off, Adjusted WIP breakdown */}
+                        <div className="text-xs mt-1 space-y-0.5">
+                          <p className="text-muted-foreground">
+                            Raw WIP: {formatCurrency(bmRawWipFromBudget, currency)}
                           </p>
-                        )}
-                        <p className="text-xs text-muted-foreground mt-1">
+                          {bmWriteOffFromBudget > 0 && (
+                            <p className="text-destructive">
+                              Write-off: ({formatCurrency(bmWriteOffFromBudget, currency)})
+                            </p>
+                          )}
+                          <p className="text-muted-foreground">
+                            Adjusted: {formatCurrency(bmWipFromBudget, currency)}
+                          </p>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 pt-1 border-t border-border/50">
                           {bmBudgetUsedPercent.toFixed(0)}% of {formatCurrency(bmFee, currency)}
                         </p>
                       </div>

@@ -742,17 +742,17 @@ export default function Matters() {
           bVal = b.latest_snapshot?.wip_amount || 0;
           break;
         case 'ar':
-          aVal = a.latest_snapshot?.billed_amount || 0;
-          bVal = b.latest_snapshot?.billed_amount || 0;
+          aVal = a.latest_snapshot?.accounts_receivable || 0;
+          bVal = b.latest_snapshot?.accounts_receivable || 0;
           break;
         case 'paid':
           aVal = a.latest_snapshot?.paid_amount || 0;
           bVal = b.latest_snapshot?.paid_amount || 0;
           break;
         case 'budget_burn':
-          // Budget burn = WIP + Billed only (paid is a subset of billed, not additional spend)
-          aVal = (a.latest_snapshot?.wip_amount || 0) + (a.latest_snapshot?.billed_amount || 0);
-          bVal = (b.latest_snapshot?.wip_amount || 0) + (b.latest_snapshot?.billed_amount || 0);
+          // Budget burn = WIP only (WIP stays as WIP until paid, not when billed to AR)
+          aVal = a.latest_snapshot?.wip_amount || 0;
+          bVal = b.latest_snapshot?.wip_amount || 0;
           break;
         case 'local_counsel':
           aVal = a.local_counsel_fee || 0;
@@ -1173,9 +1173,8 @@ export default function Matters() {
                   <TableBody>
                     {filteredMatters.map((matter) => {
                       const headroomStatus = getHeadroomStatus(matter);
-                      // Budget burn = WIP + Billed only (paid is a subset of billed)
-                      const budgetBurn = (matter.latest_snapshot?.wip_amount || 0) + 
-                                        (matter.latest_snapshot?.billed_amount || 0);
+                      // Budget burn = WIP only (WIP stays as WIP until paid, not when billed to AR)
+                      const budgetBurn = matter.latest_snapshot?.wip_amount || 0;
                       
                       // Get fee type label for display
                       const getFeeTypeLabel = (feeType: string | null) => {
@@ -1222,9 +1221,9 @@ export default function Matters() {
                                     </div>
                                   )}
                                   <div className="flex items-center justify-end gap-1">
-                                    <span className="text-[10px] text-muted-foreground leading-tight">Billed:</span>
+                                    <span className="text-[10px] text-muted-foreground leading-tight">AR:</span>
                                     <span className="text-xs font-medium">
-                                      {formatCurrency(matter.latest_snapshot?.billed_amount || 0, (matter as any).effective_currency ?? matter.fee_currency)}
+                                      {formatCurrency(matter.latest_snapshot?.accounts_receivable || 0, (matter as any).effective_currency ?? matter.fee_currency)}
                                     </span>
                                   </div>
                                   <div className="flex items-center justify-end gap-1">

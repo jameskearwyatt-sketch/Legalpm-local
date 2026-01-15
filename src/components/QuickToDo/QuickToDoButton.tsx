@@ -863,8 +863,8 @@ export function QuickToDoButton() {
       const deltaY = e.clientY - startY;
 
       // Calculate new dimensions (resize from top-right corner)
-      const newWidth = Math.max(320, Math.min(window.innerWidth - 100, startWidth + deltaX));
-      const newHeight = Math.max(300, Math.min(window.innerHeight - 50, startHeight - deltaY));
+      const newWidth = Math.max(320, Math.min(window.innerWidth - 50, startWidth + deltaX));
+      const newHeight = Math.max(200, Math.min(window.innerHeight, startHeight - deltaY));
 
       setSlateSize({ width: newWidth, height: newHeight });
       
@@ -2407,14 +2407,9 @@ export function QuickToDoButton() {
         >
           {/* Resize Handle - Top Right Corner */}
           <div
-            className={cn(
-              "absolute top-0 right-0 w-4 h-4 z-10 cursor-ne-resize group",
-              isResizingSlate && "cursor-ne-resize"
-            )}
+            className="absolute top-0 right-0 w-6 h-6 z-10 cursor-ne-resize"
             onMouseDown={handleSlateResizeMouseDown}
-          >
-            <div className="absolute top-1 right-1 w-2 h-2 border-t-2 border-r-2 border-white/50 group-hover:border-white transition-colors" />
-          </div>
+          />
           {/* Slate Header - Draggable */}
           <div 
             className={cn(

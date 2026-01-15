@@ -104,6 +104,7 @@ export function DetailedWipUpdateModal({
   // Write-off mode state
   const [isWriteOffMode, setIsWriteOffMode] = useState(false);
   const [selectedForWriteOff, setSelectedForWriteOff] = useState<Set<string>>(new Set());
+  const [selectedGroupsForWriteOff, setSelectedGroupsForWriteOff] = useState<Set<string>>(new Set());
   const [writeOffAmount, setWriteOffAmount] = useState<string>('');
 
   // Handle imported WIP matches
@@ -185,9 +186,22 @@ export function DetailedWipUpdateModal({
     });
   };
 
+  // Toggle group selection for write-off
+  const toggleGroupWriteOffSelection = (groupId: string) => {
+    setSelectedGroupsForWriteOff(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupId)) {
+        newSet.delete(groupId);
+      } else {
+        newSet.add(groupId);
+      }
+      return newSet;
+    });
+  };
+
   // Apply write-off to selected items proportionally
   const applyWriteOffToSelected = () => {
-    if (selectedForWriteOff.size < 1) return;
+    if (selectedForWriteOff.size < 1 && selectedGroupsForWriteOff.size < 1) return;
     
     const billingValue = parseFloat(writeOffAmount) || 0;
     if (billingValue <= 0) return;
@@ -197,20 +211,48 @@ export function DetailedWipUpdateModal({
       ? billingValue / mandatedRate 
       : billingValue;
     
-    const selectedIds = Array.from(selectedForWriteOff);
-    const selectedItems = wipItems.filter(item => selectedIds.includes(item.id));
-    const totalWip = selectedItems.reduce((sum, item) => sum + item.wip_amount, 0);
+    // Collect all item IDs that should receive write-off allocation
+    // This includes directly selected items AND items within selected groups
+    const directlySelectedIds = Array.from(selectedForWriteOff);
+    const groupItemIds: string[] = [];
     
-    // Distribute proportionally based on WIP amounts (or equally if no WIP)
+    selectedGroupsForWriteOff.forEach(groupId => {
+      const group = combinedGroups.find(g => g.id === groupId);
+      if (group) {
+        groupItemIds.push(...group.itemIds);
+      }
+    });
+    
+    const allAffectedIds = [...new Set([...directlySelectedIds, ...groupItemIds])];
+    const affectedItems = wipItems.filter(item => allAffectedIds.includes(item.id));
+    
+    // For items in combined groups, use the group's combinedWip proportionally
+    // For individual items, use their own wip_amount
+    const itemWipValues = affectedItems.map(item => {
+      const group = combinedGroups.find(g => g.itemIds.includes(item.id));
+      if (group && selectedGroupsForWriteOff.has(group.id)) {
+        // Calculate this item's share of the group's WIP based on fee_amount
+        const groupItems = wipItems.filter(i => group.itemIds.includes(i.id));
+        const totalGroupFee = groupItems.reduce((sum, i) => sum + i.fee_amount, 0);
+        const itemProportion = totalGroupFee > 0 ? item.fee_amount / totalGroupFee : 1 / groupItems.length;
+        return { id: item.id, wipShare: group.combinedWip * itemProportion };
+      }
+      return { id: item.id, wipShare: item.wip_amount };
+    });
+    
+    const totalWip = itemWipValues.reduce((sum, item) => sum + item.wipShare, 0);
+    
+    // Distribute proportionally based on WIP shares (or equally if no WIP)
     setWipItems(prev =>
       prev.map(item => {
-        if (!selectedIds.includes(item.id)) return item;
+        const itemWipInfo = itemWipValues.find(i => i.id === item.id);
+        if (!itemWipInfo) return item;
         
         let proportion: number;
         if (totalWip > 0) {
-          proportion = item.wip_amount / totalWip;
+          proportion = itemWipInfo.wipShare / totalWip;
         } else {
-          proportion = 1 / selectedIds.length;
+          proportion = 1 / allAffectedIds.length;
         }
         
         return {
@@ -223,6 +265,7 @@ export function DetailedWipUpdateModal({
     // Reset write-off mode
     setIsWriteOffMode(false);
     setSelectedForWriteOff(new Set());
+    setSelectedGroupsForWriteOff(new Set());
     setWriteOffAmount('');
   };
 
@@ -455,9 +498,9 @@ export function DetailedWipUpdateModal({
                       variant="destructive"
                       size="sm"
                       onClick={applyWriteOffToSelected}
-                      disabled={selectedForWriteOff.size < 1 || !writeOffAmount || parseFloat(writeOffAmount) <= 0}
+                      disabled={(selectedForWriteOff.size < 1 && selectedGroupsForWriteOff.size < 1) || !writeOffAmount || parseFloat(writeOffAmount) <= 0}
                     >
-                      Apply to {selectedForWriteOff.size} item{selectedForWriteOff.size !== 1 ? 's' : ''}
+                      Apply to {selectedForWriteOff.size + selectedGroupsForWriteOff.size} item{(selectedForWriteOff.size + selectedGroupsForWriteOff.size) !== 1 ? 's' : ''}
                     </Button>
                     <Button
                       variant="outline"
@@ -465,6 +508,7 @@ export function DetailedWipUpdateModal({
                       onClick={() => {
                         setIsWriteOffMode(false);
                         setSelectedForWriteOff(new Set());
+                        setSelectedGroupsForWriteOff(new Set());
                         setWriteOffAmount('');
                       }}
                     >
@@ -518,9 +562,23 @@ export function DetailedWipUpdateModal({
                   const displayWip = roundCurrency(differentBillingCurrency ? group.combinedWip * mandatedRate : group.combinedWip);
                   const groupHealth = getHealthColor(displayWip, displayFee);
                   
+                  const isGroupSelectedForWriteOff = selectedGroupsForWriteOff.has(group.id);
+                  
                   return (
-                    <div key={group.id} className={cn('rounded-lg border p-3', groupHealth.bg)}>
+                    <div key={group.id} className={cn(
+                      'rounded-lg border p-3', 
+                      groupHealth.bg,
+                      isGroupSelectedForWriteOff && 'ring-2 ring-inset ring-destructive'
+                    )}>
                       <div className="flex items-start gap-3">
+                        {/* Checkbox for write-off mode */}
+                        {isWriteOffMode && (
+                          <Checkbox
+                            checked={isGroupSelectedForWriteOff}
+                            onCheckedChange={() => toggleGroupWriteOffSelection(group.id)}
+                            className="flex-shrink-0 mt-1 border-destructive data-[state=checked]:bg-destructive"
+                          />
+                        )}
                         <div className={cn('w-3 h-3 rounded-full flex-shrink-0 mt-1', groupHealth.indicator)} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between mb-2">

@@ -170,7 +170,7 @@ function EditableMatterClients({ matterClients, updateMatterClient }: EditableMa
                 type="number"
                 min="0"
                 max="100"
-                step="0.1"
+                step="0.01"
                 value={editFeePercentage}
                 onChange={(e) => setEditFeePercentage(e.target.value)}
                 className="h-6 w-14 text-xs px-1"

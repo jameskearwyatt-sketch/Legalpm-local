@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/collapsible';
 import { useMatter, useMatters, MatterCategory, MatterStage, FeeType, MatterSource, PipelineOutcome } from '@/lib/hooks/useMatters';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
+import { useWipShapingProposals } from '@/lib/hooks/useWipShapingProposals';
 import { useBudgetVersions } from '@/lib/hooks/useBudgetVersions';
 import { useBudgetAmendments } from '@/lib/hooks/useBudgetAmendments';
 import { useDetailedWipUpdates } from '@/lib/hooks/useDetailedWipUpdates';
@@ -66,7 +67,8 @@ import {
   History,
   Download,
   Eye,
-  HelpCircle
+  HelpCircle,
+  Lightbulb
 } from 'lucide-react';
 import {
   Popover,
@@ -75,6 +77,8 @@ import {
 } from '@/components/ui/popover';
 import { FinancialSnapshotUpdateDialog } from '@/components/matters/FinancialSnapshotUpdateDialog';
 import { FinancialSnapshotHistoryModal } from '@/components/matters/FinancialSnapshotHistoryModal';
+import { WipShapingProposalDialog } from '@/components/matters/WipShapingProposalDialog';
+import { WipShapingProposalList } from '@/components/matters/WipShapingProposalList';
 import { HighlightedFinancialValue } from '@/components/matters/HighlightedFinancialValue';
 import { useMatterHighlightMovements } from '@/lib/hooks/useHighlightMovements';
 import { format } from 'date-fns';
@@ -230,6 +234,17 @@ export default function MatterDetail() {
   const { data: matter, isLoading: matterLoading } = useMatter(id!);
   const { deleteMatter, updateMatter } = useMatters();
   const { snapshots, upsertTodaySnapshot, deleteSnapshot } = useSnapshots(id);
+  const { 
+    proposals: wipProposals,
+    activeProposals,
+    archivedProposals,
+    selectedProposal,
+    createProposal,
+    updateProposal,
+    selectProposal,
+    deleteProposal,
+    archiveProposal,
+  } = useWipShapingProposals(id);
   const { latestLineItems, versions: budgetVersions } = useBudgetVersions(id);
   const { amendments: budgetAmendments } = useBudgetAmendments(id);
   const { latestWipUpdate } = useDetailedWipUpdates(id);
@@ -290,6 +305,9 @@ export default function MatterDetail() {
   const [hasChanges, setHasChanges] = useState(false);
   const [showFinancialUpdateDialog, setShowFinancialUpdateDialog] = useState(false);
   const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
+  const [showProposalDialog, setShowProposalDialog] = useState(false);
+  const [showProposalList, setShowProposalList] = useState(false);
+  const [editingProposal, setEditingProposal] = useState<typeof selectedProposal>(null);
   
   // Highlight movements for individual matter
   const { highlightEnabled, toggleHighlight } = useMatterHighlightMovements(id || '');
@@ -469,14 +487,30 @@ export default function MatterDetail() {
   }
 
   const latestSnapshot = snapshots[0];
+  
+  // Determine if we should show proposal values instead of real snapshot
+  // Cast to any to access new show_shaping_proposal field (types will update after regeneration)
+  const showProposalValues = (matter as any).show_shaping_proposal && selectedProposal;
+  
   // Financial snapshots are stored in BILLING currency - no conversion needed
-  const rawWipAmount = latestSnapshot?.wip_amount || 0;
-  const wipWriteOffAmount = latestSnapshot?.wip_write_off_amount || 0;
+  // If showing proposal, use proposal values; otherwise use snapshot values
+  const rawWipAmount = showProposalValues 
+    ? selectedProposal.wip_amount 
+    : (latestSnapshot?.wip_amount || 0);
+  const wipWriteOffAmount = showProposalValues 
+    ? selectedProposal.wip_write_off_amount 
+    : (latestSnapshot?.wip_write_off_amount || 0);
   // Net WIP = raw WIP minus write-offs (write-offs reduce actual WIP)
   const wipAmount = rawWipAmount - wipWriteOffAmount;
-  const billedAmount = latestSnapshot?.billed_amount || 0;
-  const accountsReceivable = latestSnapshot?.accounts_receivable || 0;
-  const paidAmount = latestSnapshot?.paid_amount || 0;
+  const billedAmount = showProposalValues 
+    ? selectedProposal.billed_amount 
+    : (latestSnapshot?.billed_amount || 0);
+  const accountsReceivable = showProposalValues 
+    ? selectedProposal.accounts_receivable 
+    : (latestSnapshot?.accounts_receivable || 0);
+  const paidAmount = showProposalValues 
+    ? selectedProposal.paid_amount 
+    : (latestSnapshot?.paid_amount || 0);
   
   // LC financial data - use aggregated data from useLocalCounsels hook
   const lcBillingMode = formData.local_counsel_billing || matter?.local_counsel_billing || '';
@@ -941,18 +975,33 @@ export default function MatterDetail() {
             </Card>
 
             {/* BM Financial Summary */}
-            <Card className="shadow-card">
+            <Card className={cn(
+              "shadow-card transition-all",
+              showProposalValues && "ring-2 ring-amber-500/50 bg-amber-500/5"
+            )}>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg font-heading">BM Financial Summary</CardTitle>
-                  {latestSnapshot && (
+                  <CardTitle className="text-lg font-heading flex items-center gap-2">
+                    BM Financial Summary
+                    {showProposalValues && (
+                      <span className="text-xs font-normal px-2 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-full">
+                        Showing Proposal
+                      </span>
+                    )}
+                  </CardTitle>
+                  {latestSnapshot && !showProposalValues && (
                     <CardDescription>
                       Updated {formatDate(latestSnapshot.updated_at)}
                     </CardDescription>
                   )}
+                  {showProposalValues && selectedProposal && (
+                    <CardDescription className="text-amber-600 dark:text-amber-400">
+                      Proposal from {formatDate(selectedProposal.proposal_date)}
+                    </CardDescription>
+                  )}
                 </div>
                 <div className="flex flex-col gap-2 items-end">
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap justify-end">
                     <Button 
                       variant="ghost" 
                       size="sm"
@@ -962,15 +1011,64 @@ export default function MatterDetail() {
                       History
                     </Button>
                     <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setEditingProposal(null);
+                        setShowProposalDialog(true);
+                      }}
+                      className="border-amber-500/50 text-amber-700 dark:text-amber-400 hover:bg-amber-500/10"
+                    >
+                      <Lightbulb className="h-4 w-4 mr-2" />
+                      Add WIP Shaping Proposal
+                    </Button>
+                    <Button 
                       variant="default" 
                       size="sm"
                       onClick={() => setShowFinancialUpdateDialog(true)}
                       className="bg-amber-600 hover:bg-amber-700 text-white"
                     >
                       <FileText className="h-4 w-4 mr-2" />
-                      Update Financial Snapshot
+                      Update Snapshot
                     </Button>
                   </div>
+                  {/* Proposals toggle */}
+                  {activeProposals.length > 0 && (
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowProposalList(true)}
+                        className="text-xs h-7"
+                      >
+                        <Lightbulb className="h-3 w-3 mr-1" />
+                        {activeProposals.length} Proposal{activeProposals.length !== 1 ? 's' : ''}
+                      </Button>
+                      {selectedProposal && (
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="show-proposal-toggle"
+                            checked={(matter as any).show_shaping_proposal || false}
+                            onCheckedChange={async (checked) => {
+                              await supabase
+                                .from('matters')
+                                .update({ show_shaping_proposal: !!checked })
+                                .eq('id', matter.id);
+                              queryClient.invalidateQueries({ queryKey: ['matter', id] });
+                              queryClient.invalidateQueries({ queryKey: ['matters'] });
+                            }}
+                            className="h-4 w-4"
+                          />
+                          <label 
+                            htmlFor="show-proposal-toggle" 
+                            className="text-xs text-muted-foreground cursor-pointer"
+                          >
+                            Show proposal figures
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <Checkbox
                       id="highlight-movements-matter"

@@ -265,11 +265,17 @@ export function MasterWipUpdateDialog({
     
     try {
       // Build matters info for matching
+      // CRITICAL: Use actual_snapshot (not latest_snapshot) to compare against REAL system figures
+      // This ensures we don't compare against WIP shaping proposal data, which is aspirational
       const mattersForMatching = matters.map(m => {
-        const snapshot = m.latest_snapshot;
+        // Use actual_snapshot for comparison - this NEVER contains proposal data
+        const snapshot = (m as any).actual_snapshot || m.latest_snapshot;
         // Check if the latest snapshot was manually updated
         const snapshotAny = snapshot as Record<string, unknown> | null;
         const wasManual = snapshotAny?.update_source === 'manual';
+        // Get LC data for disbursement comparison
+        const lcWip = (m as any).lc_wip || 0;
+        const lcBilled = (m as any).lc_billed || 0;
         return {
           id: m.id,
           matter_name: m.matter_name,
@@ -284,6 +290,9 @@ export function MasterWipUpdateDialog({
           // Track if latest snapshot was manually updated
           was_manually_updated: wasManual,
           last_manual_update_date: wasManual ? snapshot?.as_of_date : null,
+          // LC data for disbursement comparison - to avoid flagging already-logged LC fees
+          lc_wip: lcWip,
+          lc_billed: lcBilled,
         };
       });
 
@@ -388,17 +397,54 @@ export function MasterWipUpdateDialog({
 
   // Review helpers
   const DISBURSEMENT_THRESHOLD = 1000; // Flag disbursements above this amount
+  const LC_MATERIALITY_THRESHOLD = 0.05; // 5% - if disbursement is within 5% of existing LC amount, don't flag
+
+  // Helper to check if a disbursement amount is already tracked as LC fee
+  // Returns true if the amount is materially different from existing LC amounts
+  const isDisbursementNotAlreadyTracked = (
+    matterId: string | null,
+    wipDisb: number,
+    billedDisb: number // AR + Paid disbursements combined
+  ): boolean => {
+    if (!matterId) return true;
+    const matter = matters.find(m => m.id === matterId);
+    if (!matter) return true;
+    
+    const lcWip = (matter as any).lc_wip || 0;
+    const lcBilled = (matter as any).lc_billed || 0;
+    
+    // Check WIP disbursement - is it materially different from existing LC WIP?
+    const wipMateriallyDifferent = wipDisb >= DISBURSEMENT_THRESHOLD && (
+      lcWip === 0 || // No existing LC WIP
+      Math.abs(wipDisb - lcWip) / Math.max(wipDisb, lcWip) > LC_MATERIALITY_THRESHOLD
+    );
+    
+    // Check billed disbursement - is it materially different from existing LC Billed?
+    const billedMateriallyDifferent = billedDisb >= DISBURSEMENT_THRESHOLD && (
+      lcBilled === 0 || // No existing LC Billed
+      Math.abs(billedDisb - lcBilled) / Math.max(billedDisb, lcBilled) > LC_MATERIALITY_THRESHOLD
+    );
+    
+    return wipMateriallyDifferent || billedMateriallyDifferent;
+  };
 
   const changedData = useMemo(() => {
     return importedData.filter((item) => {
       const hasFinancialChanges = item.wip.changed || item.accountsReceivable.changed || 
                                    item.totalBilled.changed || item.totalPaid.changed;
-      const hasSignificantDisbursements = (item.wipDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
-                                           (item.arDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
-                                           (item.paidDisbursement || 0) >= DISBURSEMENT_THRESHOLD;
-      return hasFinancialChanges || hasSignificantDisbursements;
+      
+      // Only flag disbursements if they're NOT already tracked as LC fees in the database
+      const wipDisb = item.wipDisbursement || 0;
+      const billedDisb = (item.arDisbursement || 0) + (item.paidDisbursement || 0);
+      const hasUnaccountedDisbursements = isDisbursementNotAlreadyTracked(
+        item.matchedMatterId,
+        wipDisb,
+        billedDisb
+      );
+      
+      return hasFinancialChanges || hasUnaccountedDisbursements;
     });
-  }, [importedData]);
+  }, [importedData, matters]);
 
   const displayData = showUnchanged ? importedData : changedData;
 
@@ -425,13 +471,13 @@ export function MasterWipUpdateDialog({
         (d.totalPaid.selected && d.totalPaid.changed ? 1 : 0);
     }, 0);
     const manuallyUpdated = importedData.filter(d => d.wasManuallyUpdated && d.selected).length;
-    const withSignificantDisbursements = importedData.filter(d => 
-      d.selected && (
-        (d.wipDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
-        (d.arDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
-        (d.paidDisbursement || 0) >= DISBURSEMENT_THRESHOLD
-      )
-    ).length;
+    // Count matters with unaccounted disbursements (not already tracked as LC fees)
+    const withSignificantDisbursements = importedData.filter(d => {
+      if (!d.selected) return false;
+      const wipDisb = d.wipDisbursement || 0;
+      const billedDisb = (d.arDisbursement || 0) + (d.paidDisbursement || 0);
+      return isDisbursementNotAlreadyTracked(d.matchedMatterId, wipDisb, billedDisb);
+    }).length;
     return { matched, changed, unchanged, selectedFields, unmatched: unmatchedData.length, manuallyUpdated, withSignificantDisbursements };
   }, [importedData, changedData, unmatchedData]);
 
@@ -541,14 +587,13 @@ export function MasterWipUpdateDialog({
   }>) => {
     setIsSubmitting(true);
     try {
-      // Check for significant disbursements
-      const mattersWithDisbursements = importedData.filter(d => 
-        d.selected && d.matchedMatterId && (
-          (d.wipDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
-          (d.arDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
-          (d.paidDisbursement || 0) >= DISBURSEMENT_THRESHOLD
-        )
-      );
+      // Check for significant disbursements that are NOT already tracked as LC fees
+      const mattersWithDisbursements = importedData.filter(d => {
+        if (!d.selected || !d.matchedMatterId) return false;
+        const wipDisb = d.wipDisbursement || 0;
+        const billedDisb = (d.arDisbursement || 0) + (d.paidDisbursement || 0);
+        return isDisbursementNotAlreadyTracked(d.matchedMatterId, wipDisb, billedDisb);
+      });
 
       if (mattersWithDisbursements.length > 0) {
         // Fetch local counsels for these matters

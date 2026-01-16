@@ -88,6 +88,17 @@ export interface MatterWithFinancials extends Matter {
     as_of_date: string;
     update_source?: string | null;
   };
+  // Actual snapshot data - NEVER contains WIP shaping proposal data
+  // Use this for comparisons (e.g., Master WIP import) to ensure accurate system figures
+  actual_snapshot?: {
+    wip_amount: number;
+    wip_write_off_amount: number;
+    billed_amount: number;
+    accounts_receivable: number;
+    paid_amount: number;
+    as_of_date: string;
+    update_source?: string | null;
+  };
   remaining_budget: number;
   budget_used_percent: number;
   collection_rate: number;
@@ -315,6 +326,17 @@ export function useMatters() {
             billed_amount: effectiveBilledAmount,
             accounts_receivable: effectiveAccountsReceivable,
             paid_amount: effectivePaidAmount,
+            as_of_date: snapshot.as_of_date,
+            update_source: snapshot.update_source,
+          } : undefined,
+          // ACTUAL snapshot - never contains proposal data, always the real system figures
+          // Use this for Master WIP import comparisons to ensure accurate tracking
+          actual_snapshot: snapshot ? {
+            wip_amount: (snapshot.wip_amount || 0) - (snapshot.wip_write_off_amount || 0), // Net WIP from real snapshot
+            wip_write_off_amount: snapshot.wip_write_off_amount || 0,
+            billed_amount: snapshot.billed_amount || 0,
+            accounts_receivable: snapshot.accounts_receivable || 0,
+            paid_amount: snapshot.paid_amount || 0,
             as_of_date: snapshot.as_of_date,
             update_source: snapshot.update_source,
           } : undefined,

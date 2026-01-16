@@ -13,9 +13,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Loader2, Info, Lightbulb } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Loader2, Info, Lightbulb, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatCurrency, getCurrencySymbol } from '@/lib/currencyUtils';
 import { WipShapingProposal } from '@/lib/hooks/useWipShapingProposals';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface WipShapingProposalDialogProps {
   isOpen: boolean;
@@ -61,6 +64,9 @@ export function WipShapingProposalDialog({
 }: WipShapingProposalDialogProps) {
   const currencySymbol = getCurrencySymbol(currency);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [showAiHelper, setShowAiHelper] = useState(false);
+  const [pastedText, setPastedText] = useState('');
   const [wipEntryMode, setWipEntryMode] = useState<'writeoff' | 'adjusted'>('writeoff');
   const [formData, setFormData] = useState({
     wip_amount: 0,
@@ -111,8 +117,44 @@ export function WipShapingProposalDialog({
         });
       }
       setWipEntryMode('writeoff');
+      setPastedText('');
+      setShowAiHelper(false);
     }
   }, [isOpen, currentValues, existingProposal]);
+
+  const handleAiSummarize = async () => {
+    if (!pastedText.trim()) {
+      toast.error('Please paste some text to summarize');
+      return;
+    }
+
+    setIsSummarizing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('summarize-wip-proposal', {
+        body: { text: pastedText, matterName },
+      });
+
+      if (error) {
+        console.error('Summarization error:', error);
+        toast.error(error.message || 'Failed to summarize text');
+        return;
+      }
+
+      if (data?.summary) {
+        updateField('notes', data.summary);
+        setPastedText('');
+        setShowAiHelper(false);
+        toast.success('Summary generated and added to description');
+      } else {
+        toast.error('No summary was generated');
+      }
+    } catch (error) {
+      console.error('Summarization error:', error);
+      toast.error('Failed to summarize text');
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
 
   const calculatedValues = useMemo(() => {
     if (wipEntryMode === 'writeoff') {
@@ -191,9 +233,61 @@ export function WipShapingProposalDialog({
 
           {/* Notes Field - Required */}
           <div className="space-y-1.5">
-            <Label htmlFor="notes" className="text-sm font-medium">
-              Proposal Description <span className="text-destructive">*</span>
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="notes" className="text-sm font-medium">
+                Proposal Description <span className="text-destructive">*</span>
+              </Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAiHelper(!showAiHelper)}
+                className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+              >
+                <Sparkles className="h-3 w-3" />
+                AI Summarize
+                {showAiHelper ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+              </Button>
+            </div>
+
+            {/* AI Helper Section */}
+            <Collapsible open={showAiHelper}>
+              <CollapsibleContent className="space-y-2 pb-2">
+                <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Paste email chains or notes below and AI will summarize them into a professional description.
+                  </p>
+                  <Textarea
+                    value={pastedText}
+                    onChange={(e) => setPastedText(e.target.value)}
+                    placeholder="Paste email correspondence or notes here..."
+                    rows={4}
+                    className="text-sm"
+                    disabled={isSummarizing}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleAiSummarize}
+                    disabled={isSummarizing || !pastedText.trim()}
+                    className="w-full"
+                  >
+                    {isSummarizing ? (
+                      <>
+                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                        Summarizing...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-3 w-3" />
+                        Generate Summary
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+
             <Textarea
               id="notes"
               value={formData.notes}

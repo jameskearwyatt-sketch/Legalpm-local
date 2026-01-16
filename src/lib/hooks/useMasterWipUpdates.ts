@@ -119,6 +119,7 @@ export function useMasterWipUpdates() {
   const createMasterUpdate = useMutation({
     mutationFn: async ({
       updates,
+      lcChanges,
     }: {
       updates: Array<{
         matter_id: string;
@@ -129,6 +130,12 @@ export function useMasterWipUpdates() {
         before_paid_amount: number;
         before_accounts_receivable: number;
         before_wip_write_off_amount: number;
+      }>;
+      lcChanges?: Array<{
+        matter_id: string;
+        local_counsel_id: string;
+        before_wip_amount: number;
+        before_billed_amount: number;
       }>;
     }) => {
       // Create a new detailed_wip_updates record to group these changes
@@ -164,6 +171,26 @@ export function useMasterWipUpdates() {
 
       if (changesError) throw changesError;
 
+      // Insert local counsel changes if provided
+      if (lcChanges && lcChanges.length > 0) {
+        const lcChangeRecords = lcChanges.map((lc) => ({
+          wip_update_id: wipUpdate.id,
+          matter_id: lc.matter_id,
+          local_counsel_id: lc.local_counsel_id,
+          before_wip_amount: lc.before_wip_amount,
+          before_billed_amount: lc.before_billed_amount,
+        }));
+
+        const { error: lcError } = await supabase
+          .from('master_lc_changes')
+          .insert(lcChangeRecords);
+
+        if (lcError) {
+          console.error('Failed to save LC change tracking:', lcError);
+          // Don't throw - snapshot changes were still saved
+        }
+      }
+
       return wipUpdate.id;
     },
     onSuccess: () => {
@@ -178,7 +205,7 @@ export function useMasterWipUpdates() {
   // Revert a master WIP update
   const revertMasterUpdate = useMutation({
     mutationFn: async (wipUpdateId: string) => {
-      // Get all changes for this update
+      // Get all snapshot changes for this update
       const { data: changes, error: fetchError } = await supabase
         .from('master_wip_snapshot_changes')
         .select('*')
@@ -189,7 +216,18 @@ export function useMasterWipUpdates() {
         throw new Error('No changes found for this update');
       }
 
-      // Process each change
+      // Get all local counsel changes for this update
+      const { data: lcChanges, error: lcFetchError } = await supabase
+        .from('master_lc_changes')
+        .select('*')
+        .eq('wip_update_id', wipUpdateId);
+
+      if (lcFetchError) {
+        console.error('Failed to fetch LC changes:', lcFetchError);
+        // Continue anyway - we'll still revert the snapshot changes
+      }
+
+      // Process each snapshot change
       for (const change of changes) {
         if (change.was_new_snapshot && change.snapshot_id) {
           // This was a new snapshot - delete it entirely
@@ -212,7 +250,26 @@ export function useMasterWipUpdates() {
         }
       }
 
-      // Delete the master WIP update record (cascade deletes the changes)
+      // Revert local counsel changes
+      if (lcChanges && lcChanges.length > 0) {
+        for (const lcChange of lcChanges) {
+          const { error: lcRevertError } = await supabase
+            .from('matter_local_counsels')
+            .update({
+              wip_amount: lcChange.before_wip_amount,
+              billed_amount: lcChange.before_billed_amount,
+              update_source: 'reverted',
+              last_updated: new Date().toISOString(),
+            })
+            .eq('id', lcChange.local_counsel_id);
+
+          if (lcRevertError) {
+            console.error('Failed to revert LC change:', lcRevertError);
+          }
+        }
+      }
+
+      // Delete the master WIP update record (cascade deletes the changes including LC changes)
       const { error: deleteError } = await supabase
         .from('detailed_wip_updates')
         .delete()
@@ -220,15 +277,17 @@ export function useMasterWipUpdates() {
 
       if (deleteError) throw deleteError;
 
-      return wipUpdateId;
+      return { wipUpdateId, lcRevertedCount: lcChanges?.length || 0 };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['master-wip-updates'] });
       queryClient.invalidateQueries({ queryKey: ['last-master-wip-changes'] });
       queryClient.invalidateQueries({ queryKey: ['snapshots'] });
       queryClient.invalidateQueries({ queryKey: ['matters'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      toast({ title: 'Master update reverted successfully' });
+      queryClient.invalidateQueries({ queryKey: ['local-counsels'] });
+      const lcMsg = result.lcRevertedCount > 0 ? ` (including ${result.lcRevertedCount} local counsel update${result.lcRevertedCount > 1 ? 's' : ''})` : '';
+      toast({ title: `Master update reverted successfully${lcMsg}` });
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to revert update', description: error.message, variant: 'destructive' });

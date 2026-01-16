@@ -119,47 +119,59 @@ function calculateMatchScore(
   const normMatterName = normalizeString(matter.matter_name);
   const normClientName = normalizeString(matter.client_name);
 
-  let score = 0;
+  let matterNumberScore = 0;
+  let matterNameScore = 0;
+  let clientNameScore = 0;
 
   // Exact matter number match = very high confidence
   if (normImportedNum && normMatterNum && normImportedNum === normMatterNum) {
-    score += 100;
+    matterNumberScore = 100;
   } else if (normImportedNum && normMatterNum && normMatterNum.includes(normImportedNum)) {
-    score += 60;
+    matterNumberScore = 60;
   } else if (normImportedNum && normMatterNum && normImportedNum.includes(normMatterNum)) {
-    score += 50;
+    matterNumberScore = 50;
   }
 
   // Name matching
   if (normImportedName && normMatterName) {
     if (normImportedName === normMatterName) {
-      score += 80;
+      matterNameScore = 80;
     } else if (normMatterName.includes(normImportedName) || normImportedName.includes(normMatterName)) {
-      score += 40;
+      matterNameScore = 40;
     } else {
-      // Check for word overlap
+      // Check for word overlap - but require significant overlap to count
       const importedWords = normImportedName.split(/\s+/).filter(w => w.length > 2);
       const matterWords = normMatterName.split(/\s+/).filter(w => w.length > 2);
       const overlap = importedWords.filter(w => matterWords.includes(w)).length;
-      if (overlap > 0) {
-        score += Math.min(overlap * 15, 30);
+      // Require at least 2 word matches to count, or 1 if there's only 1-2 words
+      const minRequired = Math.min(2, importedWords.length);
+      if (overlap >= minRequired && overlap > 0) {
+        matterNameScore = Math.min(overlap * 15, 30);
       }
     }
   }
 
-  // Client name matching - helps differentiate similar matters
+  // Client name matching - ONLY use as a tiebreaker/boost if we already have a matter match
+  // Client name alone should NEVER be enough to create a match
   if (normImportedClient && normClientName) {
     if (normImportedClient === normClientName) {
-      score += 50;
+      clientNameScore = 25; // Reduced from 50
     } else if (normClientName.includes(normImportedClient) || normImportedClient.includes(normClientName)) {
-      score += 25;
+      clientNameScore = 10; // Reduced from 25
     }
   }
 
+  // CRITICAL: Only count client name score if we have at least SOME match on matter number OR matter name
+  // This prevents matching unrelated matters just because they share the same client
+  const hasMatterMatch = matterNumberScore >= 50 || matterNameScore >= 30;
+  const score = matterNumberScore + matterNameScore + (hasMatterMatch ? clientNameScore : 0);
+
   let confidence: 'high' | 'medium' | 'low' | 'none' = 'none';
+  // Raise thresholds to be more strict about what counts as a match
   if (score >= 100) confidence = 'high';
-  else if (score >= 60) confidence = 'medium';
-  else if (score >= 30) confidence = 'low';
+  else if (score >= 70) confidence = 'medium'; // Raised from 60
+  else if (score >= 40) confidence = 'low';    // Raised from 30
+  // Below 40 = 'none' - will be unmatched
 
   return { score, confidence };
 }

@@ -1077,7 +1077,7 @@ export default function MatterDetail() {
                       </div>
                       <div className="flex justify-between items-center py-3 border-b">
                         <div>
-                          <span className="text-muted-foreground">Work in Progress</span>
+                          <span className="text-muted-foreground">BM Work in Progress</span>
                           {wipWriteOffAmount > 0 && (
                             <div className="text-xs text-destructive">
                               (Write-off: <HighlightedFinancialValue

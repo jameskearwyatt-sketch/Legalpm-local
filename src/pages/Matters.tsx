@@ -1309,7 +1309,7 @@ export default function Matters() {
                                   return (
                                     <div className="flex flex-col gap-0.5 text-right">
                                       <div className="flex items-center justify-end gap-1">
-                                        <span className="text-[10px] text-muted-foreground leading-tight">WIP:</span>
+                                        <span className="text-[10px] text-muted-foreground leading-tight">BM WIP:</span>
                                         <HighlightedFinancialValue
                                           currentValue={formatCurrency(currentWip, currency)}
                                           previousValue={changeData?.before_wip_amount}

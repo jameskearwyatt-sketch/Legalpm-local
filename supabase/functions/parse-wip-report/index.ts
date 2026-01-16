@@ -77,13 +77,15 @@ interface MatchedData {
   paidDisbursement: number;
 }
 
-const TOLERANCE = 0.005; // 0.5%
-
+// Detect ANY difference - even tiny ones. The frontend handles material vs immaterial categorization.
+// We want to flag all changes so users can see them, then let the UI group them appropriately.
 function isWithinTolerance(newValue: number, currentValue: number): boolean {
-  if (currentValue === 0) return newValue === 0;
-  if (newValue === 0 && currentValue === 0) return true;
-  const diff = Math.abs(newValue - currentValue) / Math.max(Math.abs(currentValue), 1);
-  return diff <= TOLERANCE;
+  // Only consider identical values as "within tolerance"
+  // Any difference, no matter how small, should be flagged as a change
+  if (currentValue === 0 && newValue === 0) return true;
+  // Use a tiny epsilon for floating point comparison only
+  const epsilon = 0.001; // Less than 1 cent/penny difference
+  return Math.abs(newValue - currentValue) < epsilon;
 }
 
 function parseNumber(value: string | number | null | undefined): number {

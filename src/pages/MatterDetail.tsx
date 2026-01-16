@@ -65,8 +65,14 @@ import {
   FileText,
   History,
   Download,
-  Eye
+  Eye,
+  HelpCircle
 } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 import { FinancialSnapshotUpdateDialog } from '@/components/matters/FinancialSnapshotUpdateDialog';
 import { FinancialSnapshotHistoryModal } from '@/components/matters/FinancialSnapshotHistoryModal';
 import { HighlightedFinancialValue } from '@/components/matters/HighlightedFinancialValue';
@@ -904,6 +910,31 @@ export default function MatterDetail() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Info icon explaining difference between Budget Overview and Financial Summary */}
+            <div className="flex justify-center -mb-2 -mt-1">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="p-1 rounded-full text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/50 transition-colors">
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 text-sm" side="bottom">
+                  <div className="space-y-2">
+                    <p className="font-semibold text-foreground">Why might these figures differ?</p>
+                    <p className="text-muted-foreground">
+                      <strong>BM Financial Summary</strong> shows a top-down snapshot directly from the firm's billing system — it's always accurate to what's on the system.
+                    </p>
+                    <p className="text-muted-foreground">
+                      <strong>Budget Overview</strong> is built bottom-up from your budget utilisation updates. It's only as accurate as the WIP you've allocated to individual work streams.
+                    </p>
+                    <p className="text-muted-foreground">
+                      In a perfect world, these match. If they don't, some WIP may be unallocated or misallocated in your budget utilisation.
+                    </p>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
 
             {/* BM Financial Summary */}
             <Card className="shadow-card">

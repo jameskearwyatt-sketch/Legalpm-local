@@ -80,6 +80,7 @@ interface QuickTask {
   on_slate: boolean;
   completion_notes?: string | null;
   slate_sort_order?: number;
+  must_do_today?: boolean;
 }
 
 // Unified task type for display - can be a QuickTask or a Growth Task
@@ -605,8 +606,8 @@ const SortableSlateItem = ({
         )}
       </div>
       
-      {/* Must do today checkbox - only for slate-only items */}
-      {isSlateOnly && onToggleMustDoToday && (
+      {/* Must do today checkbox */}
+      {onToggleMustDoToday && (
         <button
           type="button"
           onClick={onToggleMustDoToday}
@@ -1084,6 +1085,7 @@ export function QuickToDoButton() {
       on_slate: t.on_slate || false,
       completion_notes: t.completion_notes || null,
       slate_sort_order: t.slate_sort_order || 0,
+      must_do_today: t.must_do_today || false,
     }));
 
     setTasks(mappedTasks);
@@ -1507,6 +1509,7 @@ export function QuickToDoButton() {
       assignee: gt.assignee,
       on_slate: gt.on_slate || false,
       slate_sort_order: gt.slate_sort_order || 0,
+      must_do_today: (gt as any).must_do_today || false,
     }));
   }, [upcomingGrowthTasks]);
 
@@ -2714,9 +2717,33 @@ export function QuickToDoButton() {
                                     if (slateItem) promoteSlateOnlyToTaskList(slateItem);
                                   } : undefined}
                                   onSnapToTop={() => handleSnapToTop(task.id)}
-                                  onToggleMustDoToday={task.source === 'slate-only' ? () => {
-                                    toggleMustDoToday.mutate({ id: task.id, mustDoToday: !task.must_do_today });
-                                  } : undefined}
+                                  onToggleMustDoToday={async () => {
+                                    const newValue = !task.must_do_today;
+                                    if (task.source === 'slate-only') {
+                                      toggleMustDoToday.mutate({ id: task.id, mustDoToday: newValue });
+                                    } else if (task.source === 'growth') {
+                                      const realId = task.id.replace('growth-', '');
+                                      const { error } = await supabase
+                                        .from('growth_tasks')
+                                        .update({ must_do_today: newValue })
+                                        .eq('id', realId);
+                                      if (error) {
+                                        toast.error('Failed to update task');
+                                      } else {
+                                        refetchGrowthTasks();
+                                      }
+                                    } else {
+                                      const { error } = await supabase
+                                        .from('quick_tasks')
+                                        .update({ must_do_today: newValue })
+                                        .eq('id', task.id);
+                                      if (error) {
+                                        toast.error('Failed to update task');
+                                      } else {
+                                        fetchTasks();
+                                      }
+                                    }
+                                  }}
                                 />
                               ))}
                             </div>

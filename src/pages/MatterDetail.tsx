@@ -877,9 +877,9 @@ export default function MatterDetail() {
                         // Only show if a budget utilization update exists
                         if (!latestWipUpdate) return null;
                         
-                        // Get the raw WIP from budget utilization (before currency conversion)
-                        const budgetUtilizationWip = budgetLineItemTotals.bm.rawWip + budgetLineItemTotals.lc.rawWip;
-                        // Get the raw WIP from financial snapshot
+                        // Get the raw WIP from budget utilization (already converted to billing currency)
+                        const budgetUtilizationWip = bmRawWipFromBudget + lcRawWipFromBudget;
+                        // Get the raw WIP from financial snapshot (in billing currency)
                         const snapshotWip = rawWipAmount;
                         
                         // Don't show warning if both are zero
@@ -893,7 +893,7 @@ export default function MatterDetail() {
                         if (percentDiff > 5) {
                           return (
                             <p className="text-sm font-bold text-destructive mt-3 animate-pulse">
-                              ⚠️ Warning: Budget utilisation WIP ({formatCurrency(budgetUtilizationWip, quoteCurrency)}) differs from financial snapshot ({formatCurrency(snapshotWip, currency)}) by {percentDiff.toFixed(0)}%
+                              ⚠️ Warning: Budget utilisation WIP ({formatCurrency(budgetUtilizationWip, currency)}) differs from financial snapshot ({formatCurrency(snapshotWip, currency)}) by {percentDiff.toFixed(0)}%
                             </p>
                           );
                         }

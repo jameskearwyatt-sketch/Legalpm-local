@@ -834,6 +834,58 @@ export type Database = {
         }
         Relationships: []
       }
+      master_lc_changes: {
+        Row: {
+          before_billed_amount: number | null
+          before_wip_amount: number | null
+          created_at: string
+          id: string
+          local_counsel_id: string
+          matter_id: string
+          wip_update_id: string
+        }
+        Insert: {
+          before_billed_amount?: number | null
+          before_wip_amount?: number | null
+          created_at?: string
+          id?: string
+          local_counsel_id: string
+          matter_id: string
+          wip_update_id: string
+        }
+        Update: {
+          before_billed_amount?: number | null
+          before_wip_amount?: number | null
+          created_at?: string
+          id?: string
+          local_counsel_id?: string
+          matter_id?: string
+          wip_update_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_lc_changes_local_counsel_id_fkey"
+            columns: ["local_counsel_id"]
+            isOneToOne: false
+            referencedRelation: "matter_local_counsels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "master_lc_changes_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "master_lc_changes_wip_update_id_fkey"
+            columns: ["wip_update_id"]
+            isOneToOne: false
+            referencedRelation: "detailed_wip_updates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       master_wip_snapshot_changes: {
         Row: {
           before_accounts_receivable: number | null

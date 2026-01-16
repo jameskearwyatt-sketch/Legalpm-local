@@ -1815,22 +1815,37 @@ export default function Matters() {
             }
           }
 
-          // Save the changes to the tracking table
-          if (snapshotChanges.length > 0) {
-            try {
-              await createMasterUpdate.mutateAsync({ updates: snapshotChanges });
-            } catch (error) {
-              console.error('Failed to save master update tracking:', error);
-              // Don't throw - the updates were still applied successfully
-            }
-          }
+          // Track LC changes for reverting later
+          const lcChanges: Array<{
+            matter_id: string;
+            local_counsel_id: string;
+            before_wip_amount: number;
+            before_billed_amount: number;
+          }> = [];
 
-          // Apply local counsel allocations if provided
+          // Apply local counsel allocations if provided and capture before values
           if (lcAllocations && lcAllocations.length > 0) {
             for (const allocation of lcAllocations) {
               if (!allocation.isLocalCounselFee || allocation.allocations.length === 0) continue;
               
               for (const lcAlloc of allocation.allocations) {
+                // Fetch current LC values before updating
+                const { data: currentLc } = await supabase
+                  .from('matter_local_counsels')
+                  .select('wip_amount, billed_amount')
+                  .eq('id', lcAlloc.localCounselId)
+                  .single();
+
+                // Track the before state
+                if (currentLc) {
+                  lcChanges.push({
+                    matter_id: allocation.matterId,
+                    local_counsel_id: lcAlloc.localCounselId,
+                    before_wip_amount: currentLc.wip_amount || 0,
+                    before_billed_amount: currentLc.billed_amount || 0,
+                  });
+                }
+
                 // Update the local counsel's WIP and billed amounts
                 const { error } = await supabase
                   .from('matter_local_counsels')
@@ -1856,6 +1871,19 @@ export default function Matters() {
             const lcCount = lcAllocations.filter(a => a.isLocalCounselFee && a.allocations.length > 0).length;
             if (lcCount > 0) {
               toast.success(`Updated local counsel data for ${lcCount} matter(s)`);
+            }
+          }
+
+          // Save the changes to the tracking table (including LC changes)
+          if (snapshotChanges.length > 0) {
+            try {
+              await createMasterUpdate.mutateAsync({ 
+                updates: snapshotChanges,
+                lcChanges: lcChanges.length > 0 ? lcChanges : undefined,
+              });
+            } catch (error) {
+              console.error('Failed to save master update tracking:', error);
+              // Don't throw - the updates were still applied successfully
             }
           }
         }}

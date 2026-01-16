@@ -7,6 +7,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
@@ -96,6 +106,10 @@ export function MasterWipUpdateDialog({
   const [showUnchanged, setShowUnchanged] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Manual data overwrite confirmation state
+  const [showManualOverwriteConfirm, setShowManualOverwriteConfirm] = useState(false);
+  const [mattersWithManualData, setMattersWithManualData] = useState<ImportedMatterData[]>([]);
   
   // Disbursement review state
   const [showDisbursementReview, setShowDisbursementReview] = useState(false);
@@ -502,35 +516,17 @@ export function MasterWipUpdateDialog({
     return grouped;
   };
 
-  const handleApply = async () => {
+  // The actual apply logic - called after all confirmations
+  const executeApply = async (updates: Array<{
+    matter_id: string;
+    wip_amount: number;
+    wip_write_off_amount: number;
+    billed_amount: number;
+    accounts_receivable: number;
+    paid_amount: number;
+  }>) => {
     setIsSubmitting(true);
     try {
-      const updates = importedData
-        .filter((d) => d.selected && d.matchedMatterId)
-        .map((d) => {
-          // Financial snapshots are stored in billing currency - no conversion needed
-          // Get raw values (in billing currency from the report)
-          const rawWip = d.wip.selected ? d.wip.value : d.wip.current;
-          const rawBilled = d.totalBilled.selected ? d.totalBilled.value : d.totalBilled.current;
-          const rawAr = d.accountsReceivable.selected ? d.accountsReceivable.value : d.accountsReceivable.current;
-          const rawPaid = d.totalPaid.selected ? d.totalPaid.value : d.totalPaid.current;
-          
-          return {
-            matter_id: d.matchedMatterId!,
-            wip_amount: rawWip,
-            wip_write_off_amount: 0, // Not tracked in new flow
-            billed_amount: rawBilled,
-            accounts_receivable: rawAr,
-            paid_amount: rawPaid,
-          };
-        });
-
-      if (updates.length === 0) {
-        toast.error('No changes selected');
-        setIsSubmitting(false);
-        return;
-      }
-
       // Check for significant disbursements
       const mattersWithDisbursements = importedData.filter(d => 
         d.selected && d.matchedMatterId && (
@@ -576,6 +572,66 @@ export function MasterWipUpdateDialog({
     }
   };
 
+  const handleApply = async () => {
+    const updates = importedData
+      .filter((d) => d.selected && d.matchedMatterId)
+      .map((d) => {
+        // Financial snapshots are stored in billing currency - no conversion needed
+        // Get raw values (in billing currency from the report)
+        const rawWip = d.wip.selected ? d.wip.value : d.wip.current;
+        const rawBilled = d.totalBilled.selected ? d.totalBilled.value : d.totalBilled.current;
+        const rawAr = d.accountsReceivable.selected ? d.accountsReceivable.value : d.accountsReceivable.current;
+        const rawPaid = d.totalPaid.selected ? d.totalPaid.value : d.totalPaid.current;
+        
+        return {
+          matter_id: d.matchedMatterId!,
+          wip_amount: rawWip,
+          wip_write_off_amount: 0, // Not tracked in new flow
+          billed_amount: rawBilled,
+          accounts_receivable: rawAr,
+          paid_amount: rawPaid,
+        };
+      });
+
+    if (updates.length === 0) {
+      toast.error('No changes selected');
+      return;
+    }
+
+    // Check for matters with manually-entered data that would be overwritten
+    const manualMatters = importedData.filter(d => 
+      d.selected && d.matchedMatterId && d.wasManuallyUpdated && (
+        d.wip.selected || d.accountsReceivable.selected || 
+        d.totalBilled.selected || d.totalPaid.selected
+      )
+    );
+
+    if (manualMatters.length > 0) {
+      // Show confirmation dialog
+      setMattersWithManualData(manualMatters);
+      setPendingUpdates(updates);
+      setShowManualOverwriteConfirm(true);
+      return;
+    }
+
+    // No manual data to confirm - proceed with apply
+    await executeApply(updates);
+  };
+
+  // Handle confirmation to proceed despite manual data
+  const handleConfirmManualOverwrite = async () => {
+    setShowManualOverwriteConfirm(false);
+    setMattersWithManualData([]);
+    await executeApply(pendingUpdates);
+  };
+
+  // Handle cancellation of manual overwrite
+  const handleCancelManualOverwrite = () => {
+    setShowManualOverwriteConfirm(false);
+    setMattersWithManualData([]);
+    setPendingUpdates([]);
+  };
+
   // Handle completion of disbursement review
   const handleDisbursementReviewComplete = async (results: DisbursementReviewResult[]) => {
     setShowDisbursementReview(false);
@@ -611,6 +667,8 @@ export function MasterWipUpdateDialog({
     setDisbursementData([]);
     setPendingUpdates([]);
     setMatterLocalCounsels({});
+    setShowManualOverwriteConfirm(false);
+    setMattersWithManualData([]);
     onClose();
   };
 
@@ -1406,6 +1464,55 @@ export function MasterWipUpdateDialog({
         disbursements={disbursementData}
         threshold={DISBURSEMENT_THRESHOLD}
       />
+
+      {/* Manual Data Overwrite Confirmation Dialog */}
+      <AlertDialog open={showManualOverwriteConfirm} onOpenChange={setShowManualOverwriteConfirm}>
+        <AlertDialogContent className="max-w-lg">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              Manual Data Will Be Overwritten
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  The following {mattersWithManualData.length} matter{mattersWithManualData.length !== 1 ? 's have' : ' has'} financial 
+                  data that was manually entered. Proceeding will overwrite this data with the imported values.
+                </p>
+                <div className="max-h-40 overflow-auto border rounded-lg divide-y">
+                  {mattersWithManualData.map((matter) => (
+                    <div key={matter.rowIndex} className="p-2 text-sm">
+                      <div className="font-medium text-foreground">{matter.matchedMatterName || matter.matterName}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {matter.matterNumber}
+                        {matter.lastManualUpdateDate && (
+                          <span className="ml-2">
+                            • Last manual update: {new Date(matter.lastManualUpdateDate).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm font-medium text-amber-700">
+                  Are you sure you want to proceed?
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelManualOverwrite}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmManualOverwrite}
+              className="bg-amber-600 hover:bg-amber-700"
+            >
+              Yes, Overwrite Manual Data
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

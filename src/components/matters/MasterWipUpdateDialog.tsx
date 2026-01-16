@@ -437,9 +437,23 @@ export function MasterWipUpdateDialog({
 
   const toggleMatterSelection = (rowIndex: number) => {
     setImportedData((prev) =>
-      prev.map((item) =>
-        item.rowIndex === rowIndex ? { ...item, selected: !item.selected } : item
-      )
+      prev.map((item) => {
+        if (item.rowIndex !== rowIndex) return item;
+        const newSelected = !item.selected;
+        // When selecting a matter, also enable its changed fields
+        // When deselecting, keep field selections as-is (user might want to re-select with same fields)
+        if (newSelected) {
+          return {
+            ...item,
+            selected: true,
+            wip: { ...item.wip, selected: item.wip.changed },
+            accountsReceivable: { ...item.accountsReceivable, selected: item.accountsReceivable.changed },
+            totalBilled: { ...item.totalBilled, selected: item.totalBilled.changed },
+            totalPaid: { ...item.totalPaid, selected: item.totalPaid.changed },
+          };
+        }
+        return { ...item, selected: false };
+      })
     );
   };
 

@@ -1026,11 +1026,18 @@ export default function MatterDetail() {
                           // Use financial snapshot figures: WIP + AR + Paid
                           const financialBmUsed = wipAmount + accountsReceivable + paidAmount;
                           const financialBmBurnPercent = bmFee > 0 ? (financialBmUsed / bmFee) * 100 : 0;
+                          
+                          // Color bands: green (0-50%), yellow (50-75%), orange (75-90%), red (90%+)
+                          const colorClass = financialBmBurnPercent >= 90 
+                            ? "text-destructive" 
+                            : financialBmBurnPercent >= 75 
+                              ? "text-orange-500" 
+                              : financialBmBurnPercent >= 50 
+                                ? "text-yellow-500" 
+                                : "text-success";
+                          
                           return (
-                            <span className={cn(
-                              "text-lg font-semibold",
-                              financialBmBurnPercent > 100 ? "text-destructive" : ""
-                            )}>
+                            <span className={cn("text-lg font-semibold", colorClass)}>
                               {financialBmBurnPercent.toFixed(0)}%
                             </span>
                           );

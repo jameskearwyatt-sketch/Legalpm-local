@@ -1022,12 +1022,19 @@ export default function MatterDetail() {
                     <>
                       <div className="flex justify-between items-center py-3 border-b">
                         <span className="text-muted-foreground">BM Budget Burn</span>
-                        <span className={cn(
-                          "text-lg font-semibold",
-                          bmBudgetUsedPercent > 100 ? "text-destructive" : ""
-                        )}>
-                          {bmBudgetUsedPercent.toFixed(0)}%
-                        </span>
+                        {(() => {
+                          // Use financial snapshot figures: WIP + AR + Paid
+                          const financialBmUsed = wipAmount + accountsReceivable + paidAmount;
+                          const financialBmBurnPercent = bmFee > 0 ? (financialBmUsed / bmFee) * 100 : 0;
+                          return (
+                            <span className={cn(
+                              "text-lg font-semibold",
+                              financialBmBurnPercent > 100 ? "text-destructive" : ""
+                            )}>
+                              {financialBmBurnPercent.toFixed(0)}%
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div className="flex justify-between items-center py-3 border-b">
                         <div>

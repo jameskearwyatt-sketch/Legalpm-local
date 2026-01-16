@@ -410,6 +410,7 @@ export function MasterWipUpdateDialog({
 
   // Helper to check if a disbursement amount is already tracked as LC fee
   // Returns true if the amount is materially different from existing LC amounts
+  // Returns false if the disbursement matches existing LC data (within materiality threshold)
   const isDisbursementNotAlreadyTracked = (
     matterId: string | null,
     wipDisb: number,
@@ -421,20 +422,62 @@ export function MasterWipUpdateDialog({
     
     const lcWip = (matter as any).lc_wip || 0;
     const lcBilled = (matter as any).lc_billed || 0;
+    const totalLcTracked = lcWip + lcBilled; // Total LC amount already tracked in the matter
     
-    // Check WIP disbursement - is it materially different from existing LC WIP?
-    const wipMateriallyDifferent = wipDisb >= DISBURSEMENT_THRESHOLD && (
-      lcWip === 0 || // No existing LC WIP
-      Math.abs(wipDisb - lcWip) / Math.max(wipDisb, lcWip) > LC_MATERIALITY_THRESHOLD
-    );
+    // If there's no existing LC data at all, any significant disbursement is potentially untracked
+    const hasExistingLcData = totalLcTracked > 0;
     
-    // Check billed disbursement - is it materially different from existing LC Billed?
-    const billedMateriallyDifferent = billedDisb >= DISBURSEMENT_THRESHOLD && (
-      lcBilled === 0 || // No existing LC Billed
-      Math.abs(billedDisb - lcBilled) / Math.max(billedDisb, lcBilled) > LC_MATERIALITY_THRESHOLD
-    );
+    // Total disbursement from Excel
+    const totalDisbFromExcel = wipDisb + billedDisb;
     
-    return wipMateriallyDifferent || billedMateriallyDifferent;
+    // If disbursement is below threshold, don't flag it
+    if (totalDisbFromExcel < DISBURSEMENT_THRESHOLD) {
+      return false;
+    }
+    
+    // If no existing LC data, this is a new potential LC fee
+    if (!hasExistingLcData) {
+      return true;
+    }
+    
+    // Compare TOTAL disbursement against TOTAL tracked LC amount
+    // This handles cases where LC has moved from WIP to Billed (normal billing cycle)
+    // e.g., Excel shows $33k billed disbursement, matter has $33k lc_billed = already tracked
+    const percentDifference = Math.abs(totalDisbFromExcel - totalLcTracked) / Math.max(totalDisbFromExcel, totalLcTracked);
+    
+    // If the disbursement is within materiality threshold of tracked LC, it's already accounted for
+    if (percentDifference <= LC_MATERIALITY_THRESHOLD) {
+      return false; // NOT untracked - it matches existing LC data
+    }
+    
+    // Disbursement is materially different from tracked LC - flag it
+    return true;
+  };
+
+  // Helper to check if disbursement is tracked but has a minor (immaterial) difference
+  const hasImmaterialDisbursementDifference = (
+    matterId: string | null,
+    wipDisb: number,
+    billedDisb: number
+  ): boolean => {
+    if (!matterId) return false;
+    const matter = matters.find(m => m.id === matterId);
+    if (!matter) return false;
+    
+    const lcWip = (matter as any).lc_wip || 0;
+    const lcBilled = (matter as any).lc_billed || 0;
+    const totalLcTracked = lcWip + lcBilled;
+    const totalDisbFromExcel = wipDisb + billedDisb;
+    
+    // Must have both existing LC data AND disbursement data
+    if (totalLcTracked === 0 || totalDisbFromExcel < DISBURSEMENT_THRESHOLD) {
+      return false;
+    }
+    
+    const percentDifference = Math.abs(totalDisbFromExcel - totalLcTracked) / Math.max(totalDisbFromExcel, totalLcTracked);
+    
+    // If there's a small but non-zero difference (within threshold), it's immaterial
+    return percentDifference > 0 && percentDifference <= LC_MATERIALITY_THRESHOLD;
   };
 
   // Categorize each matter's changes as material or immaterial
@@ -458,6 +501,9 @@ export function MasterWipUpdateDialog({
       const billedDisb = (item.arDisbursement || 0) + (item.paidDisbursement || 0);
       const hasUntrackedDisbursement = isDisbursementNotAlreadyTracked(item.matchedMatterId, wipDisb, billedDisb);
       
+      // Check if there's a minor disbursement difference (for display purposes in immaterial section)
+      const hasMinorLcDifference = hasImmaterialDisbursementDifference(item.matchedMatterId, wipDisb, billedDisb);
+      
       const isImmaterial = !hasAnyMaterialChange && !hasUntrackedDisbursement;
       
       return {
@@ -468,6 +514,7 @@ export function MasterWipUpdateDialog({
         billedImmaterial,
         paidImmaterial,
         hasUntrackedDisbursement,
+        hasMinorLcDifference, // Show in immaterial section that LC fee has tiny discrepancy
       };
     });
   }, [importedData, matters]);
@@ -1574,12 +1621,17 @@ export function MasterWipUpdateDialog({
                             </div>
 
                             {/* Expanded Field Details */}
-                            {isExpanded && hasFinancialChanges && (
+                            {isExpanded && (hasFinancialChanges || item.hasMinorLcDifference) && (
                               <div className="ml-12 mt-2 pl-3 border-l-2 border-muted">
                                 {renderFieldChange(item, 'wip', 'WIP')}
                                 {renderFieldChange(item, 'accountsReceivable', 'AR')}
                                 {renderFieldChange(item, 'totalBilled', 'Billed')}
                                 {renderFieldChange(item, 'totalPaid', 'Paid')}
+                                {item.hasMinorLcDifference && (
+                                  <div className="text-xs text-muted-foreground mt-1 italic">
+                                    Note: Disbursements match existing LC fees (minor ≤2% variance)
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>

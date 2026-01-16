@@ -228,8 +228,8 @@ export function ReportFormatTrainingDialog({
 
             {/* Data Preview Table - takes remaining space with minimum height */}
             <div className="border rounded-lg overflow-hidden">
-              <div className="overflow-auto min-h-[250px] max-h-[400px]">
-                <table className="text-sm w-full">
+              <div className="overflow-x-auto overflow-y-auto min-h-[250px] max-h-[400px]">
+                <table className="text-sm min-w-max">
                   <thead className="bg-muted sticky top-0 z-10">
                     <tr>
                       {headers.map((header, idx) => {

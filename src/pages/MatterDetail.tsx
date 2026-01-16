@@ -914,6 +914,9 @@ export default function MatterDetail() {
                         // Get the raw WIP from financial snapshot (in billing currency)
                         const snapshotWip = rawWipAmount;
                         
+                        // Don't show warning if budget utilization WIP is zero - means no actual detailed update was done
+                        if (budgetUtilizationWip === 0) return null;
+                        
                         // Don't show warning if both are zero
                         if (budgetUtilizationWip === 0 && snapshotWip === 0) return null;
                         

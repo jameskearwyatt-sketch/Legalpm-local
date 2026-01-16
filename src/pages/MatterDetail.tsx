@@ -979,15 +979,16 @@ export default function MatterDetail() {
               "shadow-card transition-all",
               showProposalValues && "ring-2 ring-amber-500/50 bg-amber-500/5"
             )}>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-row items-center justify-between relative">
+                {/* Floating proposal indicator - positioned absolutely to avoid layout shift */}
+                {showProposalValues && (
+                  <span className="absolute top-2 left-1/2 -translate-x-1/2 text-xs font-normal px-2 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-full z-10">
+                    Showing with proposal
+                  </span>
+                )}
                 <div>
-                  <CardTitle className="text-lg font-heading flex items-center gap-2">
+                  <CardTitle className="text-lg font-heading">
                     BM Financial Summary
-                    {showProposalValues && (
-                      <span className="text-xs font-normal px-2 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-full">
-                        Showing Proposal
-                      </span>
-                    )}
                   </CardTitle>
                   {latestSnapshot && !showProposalValues && (
                     <CardDescription>

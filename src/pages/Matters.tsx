@@ -1293,7 +1293,7 @@ export default function Matters() {
                               <div className="flex items-center gap-1 mt-1">
                                 <span className="text-[10px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded flex items-center gap-1">
                                   <Lightbulb className="h-3 w-3" />
-                                  Showing Proposal
+                                  Showing with proposal
                                 </span>
                               </div>
                             )}
@@ -1302,7 +1302,7 @@ export default function Matters() {
                             <>
                               <TableCell className={cn(
                                 "p-1",
-                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20 ring-1 ring-inset ring-amber-300 dark:ring-amber-700"
+                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
                               )}>
                                 {(() => {
                                   const changeData = masterChangesMap.get(matter.id);
@@ -1372,7 +1372,7 @@ export default function Matters() {
                               </TableCell>
                               <TableCell className={cn(
                                 "text-right",
-                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20 ring-1 ring-inset ring-amber-300 dark:ring-amber-700"
+                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
                               )}>
                                 <div className="flex flex-col items-end">
                                   <span className="text-muted-foreground">
@@ -1389,7 +1389,7 @@ export default function Matters() {
                               </TableCell>
                               <TableCell className={cn(
                                 "text-right",
-                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20 ring-1 ring-inset ring-amber-300 dark:ring-amber-700"
+                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
                               )}>
                                 {matter.local_counsel_billing === 'Disb' && matter.local_counsel_fee > 0 ? (
                                   <div className="flex flex-col items-end">
@@ -1410,7 +1410,7 @@ export default function Matters() {
                               </TableCell>
                               <TableCell className={cn(
                                 "text-right",
-                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20 ring-1 ring-inset ring-amber-300 dark:ring-amber-700"
+                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
                               )}>
                                 {(matter as any).pay_full_time_costs ? (
                                   <span className="text-muted-foreground">N/A</span>

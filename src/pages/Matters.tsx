@@ -1341,12 +1341,10 @@ export default function Matters() {
                               </p>
                             </Link>
                             {(matter as any).show_shaping_proposal && (matter as any).selected_proposal && (
-                              <div className="flex items-center gap-1 mt-1">
-                                <span className="text-[10px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded flex items-center gap-1">
-                                  <Lightbulb className="h-3 w-3" />
-                                  Showing WIP Proposal
-                                </span>
-                              </div>
+                              <span className="text-[10px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded flex items-center gap-1 whitespace-nowrap">
+                                <Lightbulb className="h-3 w-3" />
+                                WIP Proposal
+                              </span>
                             )}
                           </TableCell>
                           {isLive && (

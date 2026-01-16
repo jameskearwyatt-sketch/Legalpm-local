@@ -1386,6 +1386,62 @@ export default function MatterDetail() {
           />
         )}
 
+        {/* WIP Shaping Proposal Dialog */}
+        {!isPipeline && (
+          <WipShapingProposalDialog
+            isOpen={showProposalDialog}
+            onClose={() => {
+              setShowProposalDialog(false);
+              setEditingProposal(null);
+            }}
+            currency={currency}
+            matterName={(matter as any).matter_display_name || matter.matter_name}
+            differentBillingCurrency={differentBillingCurrency}
+            quoteCurrency={quoteCurrency}
+            existingProposal={editingProposal}
+            currentValues={{
+              wip_amount: latestSnapshot?.wip_amount || 0,
+              wip_write_off_amount: latestSnapshot?.wip_write_off_amount || 0,
+              billed_amount: latestSnapshot?.billed_amount || 0,
+              accounts_receivable: latestSnapshot?.accounts_receivable || 0,
+              paid_amount: latestSnapshot?.paid_amount || 0,
+            }}
+            onSave={async (data) => {
+              if (editingProposal) {
+                await updateProposal.mutateAsync({
+                  id: editingProposal.id,
+                  ...data,
+                });
+              } else {
+                await createProposal.mutateAsync({
+                  matter_id: id!,
+                  ...data,
+                });
+              }
+            }}
+          />
+        )}
+
+        {/* WIP Shaping Proposal List */}
+        {!isPipeline && (
+          <WipShapingProposalList
+            isOpen={showProposalList}
+            onClose={() => setShowProposalList(false)}
+            activeProposals={activeProposals}
+            archivedProposals={archivedProposals}
+            selectedProposal={selectedProposal}
+            currency={currency}
+            onSelect={(proposalId) => selectProposal.mutateAsync(proposalId)}
+            onArchive={(proposalId) => archiveProposal.mutateAsync(proposalId)}
+            onDelete={(proposalId) => deleteProposal.mutateAsync(proposalId)}
+            onEdit={(proposal) => {
+              setEditingProposal(proposal);
+              setShowProposalList(false);
+              setShowProposalDialog(true);
+            }}
+          />
+        )}
+
         {/* Local Counsels Financial Summary - show when LC fee exists */}
         {!isPipeline && localCounsel > 0 && (
           <Card className="shadow-card border-l-4 border-l-primary">

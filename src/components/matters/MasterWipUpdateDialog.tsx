@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,9 @@ import { MatterWithFinancials } from '@/lib/hooks/useMatters';
 import { useReportFormats, ColumnMappings } from '@/lib/hooks/useReportFormats';
 import { useReportMatterMappings } from '@/lib/hooks/useReportMatterMappings';
 import { ReportFormatTrainingDialog } from './ReportFormatTrainingDialog';
+import { DisbursementReviewDialog, DisbursementData, DisbursementReviewResult } from './DisbursementReviewDialog';
+import { useAuth } from '@/lib/auth';
+import { LocalCounsel } from '@/lib/hooks/useLocalCounsels';
 
 interface MasterWipUpdateDialogProps {
   isOpen: boolean;
@@ -36,7 +39,7 @@ interface MasterWipUpdateDialogProps {
     billed_amount: number;
     accounts_receivable: number;
     paid_amount: number;
-  }>) => Promise<void>;
+  }>, lcAllocations?: DisbursementReviewResult[]) => Promise<void>;
 }
 
 interface ImportedMatterData {
@@ -94,11 +97,26 @@ export function MasterWipUpdateDialog({
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
   
+  // Disbursement review state
+  const [showDisbursementReview, setShowDisbursementReview] = useState(false);
+  const [disbursementData, setDisbursementData] = useState<DisbursementData[]>([]);
+  const [pendingUpdates, setPendingUpdates] = useState<Array<{
+    matter_id: string;
+    wip_amount: number;
+    wip_write_off_amount: number;
+    billed_amount: number;
+    accounts_receivable: number;
+    paid_amount: number;
+  }>>([]);
+  const [matterLocalCounsels, setMatterLocalCounsels] = useState<Record<string, LocalCounsel[]>>({});
+  
+  const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { format, isLoading: formatLoading, saveFormat, deleteFormat, checkFormatMatch, createHeaderSignature } = useReportFormats();
   const { mappings: savedMappings, saveMapping, isLoading: mappingsLoading } = useReportMatterMappings();
   const [showFormatDetails, setShowFormatDetails] = useState(false);
   const [isDeletingFormat, setIsDeletingFormat] = useState(false);
+
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -459,6 +477,31 @@ export function MasterWipUpdateDialog({
     });
   };
 
+  // Fetch local counsels for matters with significant disbursements
+  const fetchLocalCounselsForMatters = async (matterIds: string[]) => {
+    if (matterIds.length === 0) return {};
+    
+    const { data, error } = await supabase
+      .from('matter_local_counsels')
+      .select('*')
+      .in('matter_id', matterIds);
+    
+    if (error) {
+      console.error('Failed to fetch local counsels:', error);
+      return {};
+    }
+    
+    // Group by matter_id
+    const grouped: Record<string, LocalCounsel[]> = {};
+    for (const lc of data || []) {
+      if (!grouped[lc.matter_id]) {
+        grouped[lc.matter_id] = [];
+      }
+      grouped[lc.matter_id].push(lc as LocalCounsel);
+    }
+    return grouped;
+  };
+
   const handleApply = async () => {
     setIsSubmitting(true);
     try {
@@ -484,9 +527,45 @@ export function MasterWipUpdateDialog({
 
       if (updates.length === 0) {
         toast.error('No changes selected');
+        setIsSubmitting(false);
         return;
       }
 
+      // Check for significant disbursements
+      const mattersWithDisbursements = importedData.filter(d => 
+        d.selected && d.matchedMatterId && (
+          (d.wipDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
+          (d.arDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
+          (d.paidDisbursement || 0) >= DISBURSEMENT_THRESHOLD
+        )
+      );
+
+      if (mattersWithDisbursements.length > 0) {
+        // Fetch local counsels for these matters
+        const matterIds = mattersWithDisbursements.map(d => d.matchedMatterId!);
+        const lcData = await fetchLocalCounselsForMatters(matterIds);
+        setMatterLocalCounsels(lcData);
+
+        // Build disbursement data for review dialog
+        const disbursements: DisbursementData[] = mattersWithDisbursements.map(d => ({
+          matterId: d.matchedMatterId!,
+          matterName: d.matchedMatterName || d.matterName,
+          matterNumber: d.matterNumber,
+          currency: d.currency,
+          wipDisbursement: d.wipDisbursement || 0,
+          arDisbursement: d.arDisbursement || 0,
+          paidDisbursement: d.paidDisbursement || 0,
+          localCounsels: lcData[d.matchedMatterId!] || [],
+        }));
+
+        setDisbursementData(disbursements);
+        setPendingUpdates(updates);
+        setShowDisbursementReview(true);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // No disbursements to review - apply updates directly
       await onApplyUpdates(updates);
       handleClose();
       toast.success(`Updated ${updates.length} matters`);
@@ -494,6 +573,25 @@ export function MasterWipUpdateDialog({
       toast.error('Failed to apply updates');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  // Handle completion of disbursement review
+  const handleDisbursementReviewComplete = async (results: DisbursementReviewResult[]) => {
+    setShowDisbursementReview(false);
+    setIsSubmitting(true);
+    
+    try {
+      // Apply the financial updates with LC allocation data
+      await onApplyUpdates(pendingUpdates, results);
+      handleClose();
+      toast.success(`Updated ${pendingUpdates.length} matters`);
+    } catch (error) {
+      toast.error('Failed to apply updates');
+    } finally {
+      setIsSubmitting(false);
+      setPendingUpdates([]);
+      setDisbursementData([]);
     }
   };
 
@@ -509,6 +607,10 @@ export function MasterWipUpdateDialog({
     setShowUnchanged(false);
     setExpandedRows(new Set());
     setStep('upload');
+    setShowDisbursementReview(false);
+    setDisbursementData([]);
+    setPendingUpdates([]);
+    setMatterLocalCounsels({});
     onClose();
   };
 
@@ -1289,6 +1391,20 @@ export function MasterWipUpdateDialog({
         sampleRows={parsedRows}
         existingMappings={format?.column_mappings as unknown as ColumnMappings}
         existingName={format?.format_name}
+      />
+
+      {/* Disbursement Review Dialog */}
+      <DisbursementReviewDialog
+        isOpen={showDisbursementReview}
+        onClose={() => {
+          setShowDisbursementReview(false);
+          // Don't apply updates if user cancels disbursement review
+          setPendingUpdates([]);
+          setDisbursementData([]);
+        }}
+        onComplete={handleDisbursementReviewComplete}
+        disbursements={disbursementData}
+        threshold={DISBURSEMENT_THRESHOLD}
       />
     </>
   );

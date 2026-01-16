@@ -45,6 +45,7 @@ import { EditableFinancialCell } from '@/components/matters/EditableFinancialCel
 import { BilledAmountCell } from '@/components/matters/BilledAmountCell';
 import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload, History, Eye } from 'lucide-react';
 import { MasterWipUpdateDialog } from '@/components/matters/MasterWipUpdateDialog';
+import { DisbursementReviewResult } from '@/components/matters/DisbursementReviewDialog';
 import { MasterWipHistoryDialog } from '@/components/matters/MasterWipHistoryDialog';
 import { useMasterWipUpdates } from '@/lib/hooks/useMasterWipUpdates';
 import { useHighlightMovements } from '@/lib/hooks/useHighlightMovements';
@@ -1742,7 +1743,7 @@ export default function Matters() {
         isOpen={showMasterWipDialog}
         onClose={() => setShowMasterWipDialog(false)}
         matters={matters.filter(m => m.category === 'Live')}
-        onApplyUpdates={async (updates) => {
+        onApplyUpdates={async (updates, lcAllocations) => {
           const today = new Date().toISOString().split('T')[0];
           const snapshotChanges: Array<{
             matter_id: string;
@@ -1821,6 +1822,40 @@ export default function Matters() {
             } catch (error) {
               console.error('Failed to save master update tracking:', error);
               // Don't throw - the updates were still applied successfully
+            }
+          }
+
+          // Apply local counsel allocations if provided
+          if (lcAllocations && lcAllocations.length > 0) {
+            for (const allocation of lcAllocations) {
+              if (!allocation.isLocalCounselFee || allocation.allocations.length === 0) continue;
+              
+              for (const lcAlloc of allocation.allocations) {
+                // Update the local counsel's WIP and billed amounts
+                const { error } = await supabase
+                  .from('matter_local_counsels')
+                  .update({
+                    wip_amount: lcAlloc.wipAmount,
+                    billed_amount: lcAlloc.billedAmount,
+                    wip_updated_at: new Date().toISOString(),
+                    billed_updated_at: new Date().toISOString(),
+                    update_source: 'bulk',
+                    last_updated: new Date().toISOString(),
+                  })
+                  .eq('id', lcAlloc.localCounselId);
+
+                if (error) {
+                  console.error('Failed to update local counsel:', error);
+                }
+              }
+            }
+            
+            // Invalidate local counsel queries
+            queryClient.invalidateQueries({ queryKey: ['local-counsels'] });
+            
+            const lcCount = lcAllocations.filter(a => a.isLocalCounselFee && a.allocations.length > 0).length;
+            if (lcCount > 0) {
+              toast.success(`Updated local counsel data for ${lcCount} matter(s)`);
             }
           }
         }}

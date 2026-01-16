@@ -877,8 +877,8 @@ export default function MatterDetail() {
                         // Only show if a budget utilization update exists
                         if (!latestWipUpdate) return null;
                         
-                        // Get the raw WIP from budget utilization (already converted to billing currency)
-                        const budgetUtilizationWip = bmRawWipFromBudget + lcRawWipFromBudget;
+                        // Get the BM raw WIP from budget utilization (already converted to billing currency)
+                        const budgetUtilizationWip = bmRawWipFromBudget;
                         // Get the raw WIP from financial snapshot (in billing currency)
                         const snapshotWip = rawWipAmount;
                         

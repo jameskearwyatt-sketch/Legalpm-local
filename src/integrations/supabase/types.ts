@@ -1996,6 +1996,8 @@ export type Database = {
           created_at: string
           id: string
           is_selected: boolean
+          lc_billed_amount: number
+          lc_wip_amount: number
           matter_id: string
           notes: string
           paid_amount: number
@@ -2012,6 +2014,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_selected?: boolean
+          lc_billed_amount?: number
+          lc_wip_amount?: number
           matter_id: string
           notes: string
           paid_amount?: number
@@ -2028,6 +2032,8 @@ export type Database = {
           created_at?: string
           id?: string
           is_selected?: boolean
+          lc_billed_amount?: number
+          lc_wip_amount?: number
           matter_id?: string
           notes?: string
           paid_amount?: number

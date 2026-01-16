@@ -871,6 +871,34 @@ export default function MatterDetail() {
                         }
                         return null;
                       })()}
+                      
+                      {/* WIP Discrepancy Warning - show if budget utilization WIP differs from snapshot WIP by >5% */}
+                      {(() => {
+                        // Only show if a budget utilization update exists
+                        if (!latestWipUpdate) return null;
+                        
+                        // Get the raw WIP from budget utilization (before currency conversion)
+                        const budgetUtilizationWip = budgetLineItemTotals.bm.rawWip + budgetLineItemTotals.lc.rawWip;
+                        // Get the raw WIP from financial snapshot
+                        const snapshotWip = rawWipAmount;
+                        
+                        // Don't show warning if both are zero
+                        if (budgetUtilizationWip === 0 && snapshotWip === 0) return null;
+                        
+                        // Calculate percentage difference relative to the larger value
+                        const maxWip = Math.max(budgetUtilizationWip, snapshotWip);
+                        const difference = Math.abs(budgetUtilizationWip - snapshotWip);
+                        const percentDiff = maxWip > 0 ? (difference / maxWip) * 100 : 0;
+                        
+                        if (percentDiff > 5) {
+                          return (
+                            <p className="text-sm font-bold text-destructive mt-3 animate-pulse">
+                              ⚠️ Warning: Budget utilisation WIP ({formatCurrency(budgetUtilizationWip, quoteCurrency)}) differs from financial snapshot ({formatCurrency(snapshotWip, currency)}) by {percentDiff.toFixed(0)}%
+                            </p>
+                          );
+                        }
+                        return null;
+                      })()}
                     </div>
                   </>
                 )}

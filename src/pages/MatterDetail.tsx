@@ -1230,6 +1230,7 @@ export default function MatterDetail() {
                     paid_amount: paidToStore,
                     notes: data.notes,
                     updated_at: new Date().toISOString(),
+                    update_source: 'manual', // Mark as manual update
                   })
                   .eq('id', existing.id);
               } else {
@@ -1245,6 +1246,7 @@ export default function MatterDetail() {
                     accounts_receivable: arToStore,
                     paid_amount: paidToStore,
                     notes: data.notes,
+                    update_source: 'manual', // Mark as manual update
                   });
               }
 

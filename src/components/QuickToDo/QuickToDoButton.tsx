@@ -4,7 +4,7 @@ import {
   Briefcase, GraduationCap, Lightbulb, Maximize2, Minimize2,
   ListTodo, LayoutGrid, Filter, Check, ChevronDown, ChevronRight,
   Zap, Target, CalendarClock, Feather, Flame, MessageSquare, Pin, PinOff,
-  Clipboard, ClipboardCheck, GripHorizontal, GripVertical, Search, Home
+  Clipboard, ClipboardCheck, GripHorizontal, GripVertical, Search, Home, ArrowUp
 } from "lucide-react";
 import { 
   DndContext, 
@@ -527,6 +527,7 @@ interface SortableSlateItemProps {
   onQuickComplete: () => void;
   onRemoveFromSlate: () => void;
   onPromoteToTaskList?: () => void;
+  onSnapToTop: () => void;
 }
 
 const SortableSlateItem = ({ 
@@ -536,6 +537,7 @@ const SortableSlateItem = ({
   onQuickComplete, 
   onRemoveFromSlate,
   onPromoteToTaskList,
+  onSnapToTop,
 }: SortableSlateItemProps) => {
   const {
     attributes,
@@ -567,21 +569,34 @@ const SortableSlateItem = ({
           : "bg-muted/50"
       )}
     >
-      {/* Drag handle with number */}
-      <div 
-        {...attributes} 
-        {...listeners}
-        className="flex items-center gap-1 shrink-0 cursor-grab active:cursor-grabbing touch-none"
-      >
-        <div className={cn(
-          "flex items-center justify-center w-5 h-5 rounded text-xs font-bold",
-          isSlateOnly 
-            ? "bg-amber-200/50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-            : "bg-primary/10 text-primary"
-        )}>
-          {index + 1}
+      {/* Drag handle with number and snap to top */}
+      <div className="flex items-center gap-0.5 shrink-0">
+        <div 
+          {...attributes} 
+          {...listeners}
+          className="flex items-center gap-1 cursor-grab active:cursor-grabbing touch-none"
+        >
+          <div className={cn(
+            "flex items-center justify-center w-5 h-5 rounded text-xs font-bold",
+            isSlateOnly 
+              ? "bg-amber-200/50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+              : "bg-primary/10 text-primary"
+          )}>
+            {index + 1}
+          </div>
+          <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
         </div>
-        <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
+        {index > 0 && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-5 w-5 shrink-0 opacity-60 hover:opacity-100 hover:bg-primary/10"
+            onClick={onSnapToTop}
+            title="Move to top"
+          >
+            <ArrowUp className="h-3.5 w-3.5 text-primary" />
+          </Button>
+        )}
       </div>
       
       {/* Dual checkbox */}
@@ -1658,6 +1673,39 @@ export function QuickToDoButton() {
     }
   }, [orderedPersonalTasks, optimisticPersonalOrder, reorderSlateItems]);
 
+  // Handle snap to top - move task to position 0
+  const handleSnapToTop = useCallback((taskId: string) => {
+    const currentOrder = optimisticSlateOrder || orderedSlateTasks.map(t => t.id);
+    const oldIndex = currentOrder.indexOf(taskId);
+    
+    if (oldIndex > 0) {
+      const newOrder = arrayMove(currentOrder, oldIndex, 0);
+      
+      // Optimistically update the UI immediately
+      setOptimisticSlateOrder(newOrder);
+      
+      // Get the full task objects for the update
+      const tasksInNewOrder = newOrder.map(id => orderedSlateTasks.find(t => t.id === id)).filter(Boolean) as UnifiedTask[];
+      
+      // Save new order to database
+      const updates = tasksInNewOrder.map((task, idx) => ({
+        id: task.id,
+        source: task.source === 'slate-only' ? 'slate-item' as const : task.source as 'quick' | 'growth',
+        sortOrder: idx,
+      }));
+      
+      batchUpdateSlateOrder.mutate(updates, {
+        onSuccess: () => {
+          fetchTasks();
+          refetchGrowthTasks();
+        },
+        onError: () => {
+          setOptimisticSlateOrder(null);
+        }
+      });
+    }
+  }, [orderedSlateTasks, optimisticSlateOrder, batchUpdateSlateOrder, fetchTasks, refetchGrowthTasks]);
+
   const groupedTasks = useMemo(() => {
     let filtered = pendingTasks;
     if (showUntriagedOnly) {
@@ -2606,6 +2654,7 @@ export function QuickToDoButton() {
                                     const slateItem = workSlateItems.find(i => i.id === task.id);
                                     if (slateItem) promoteSlateOnlyToTaskList(slateItem);
                                   } : undefined}
+                                  onSnapToTop={() => handleSnapToTop(task.id)}
                                 />
                               ))}
                             </div>

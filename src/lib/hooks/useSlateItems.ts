@@ -11,6 +11,7 @@ export interface SlateItem {
   is_completed: boolean;
   completed_at: string | null;
   sort_order: number;
+  must_do_today: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -219,6 +220,28 @@ export function useSlateItems() {
     },
   });
 
+  // Toggle must_do_today for a slate item
+  const toggleMustDoToday = useMutation({
+    mutationFn: async ({ id, mustDoToday }: { id: string; mustDoToday: boolean }) => {
+      const { data, error } = await supabase
+        .from('slate_items')
+        .update({ must_do_today: mustDoToday })
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['slate-items'] });
+    },
+    onError: (error) => {
+      console.error('Error updating must_do_today:', error);
+      toast.error('Failed to update item');
+    },
+  });
+
   return {
     slateItems,
     workSlateItems,
@@ -231,6 +254,7 @@ export function useSlateItems() {
     completeSlateItem,
     reorderSlateItems,
     promoteToQuickTask,
+    toggleMustDoToday,
   };
 }
 

@@ -862,6 +862,10 @@ export function QuickToDoButton() {
   
   const [newSlateItem, setNewSlateItem] = useState("");
   const [newPersonalItem, setNewPersonalItem] = useState("");
+  
+  // Email dialog state
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState("");
   // Triage debouncing - track tasks being actively triaged
   // Key: taskId, Value: { lastTriageTime, previousQuadrant }
   const [tasksBeingTriaged, setTasksBeingTriaged] = useState<Map<string, { lastTriageTime: number; previousQuadrant: EisenhowerQuadrant }>>(new Map());
@@ -1678,28 +1682,40 @@ export function QuickToDoButton() {
     [orderedPersonalTasks]
   );
 
-  // Generate email content for the slate
+  // Open email dialog
   const handleEmailSlate = useCallback(() => {
+    setRecipientEmail("");
+    setEmailDialogOpen(true);
+  }, []);
+
+  // Generate and send email content for the slate
+  const sendSlateEmail = useCallback(() => {
     const today = format(new Date(), 'EEEE, MMMM d, yyyy');
-    let emailBody = `My Task Slate for ${today}\n\n`;
+    const totalTasks = orderedSlateTasks.length + orderedPersonalTasks.length;
+    
+    let emailBody = `📋 MY TASK SLATE\n`;
+    emailBody += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    emailBody += `📅 ${today}\n`;
+    emailBody += `📊 ${totalTasks} task${totalTasks !== 1 ? 's' : ''} total\n\n`;
     
     // Today section
     if (hasTodayTasks) {
-      emailBody += '=== MUST DO TODAY ===\n\n';
+      emailBody += `🔥 MUST DO TODAY\n`;
+      emailBody += `─────────────────────────────────────\n\n`;
       
       if (todayWorkTasks.length > 0) {
-        emailBody += 'Work:\n';
+        emailBody += `💼 Work (${todayWorkTasks.length})\n`;
         todayWorkTasks.forEach((task, idx) => {
-          const projectInfo = task.projectName ? ` (${task.projectName})` : '';
-          emailBody += `  ${idx + 1}. ${task.title}${projectInfo}\n`;
+          const projectInfo = task.projectName ? ` → ${task.projectName}` : '';
+          emailBody += `   ☐ ${task.title}${projectInfo}\n`;
         });
         emailBody += '\n';
       }
       
       if (todayPersonalTasks.length > 0) {
-        emailBody += 'Personal:\n';
-        todayPersonalTasks.forEach((task, idx) => {
-          emailBody += `  ${idx + 1}. ${task.title}\n`;
+        emailBody += `🏠 Personal (${todayPersonalTasks.length})\n`;
+        todayPersonalTasks.forEach((task) => {
+          emailBody += `   ☐ ${task.title}\n`;
         });
         emailBody += '\n';
       }
@@ -1708,34 +1724,38 @@ export function QuickToDoButton() {
     // Remaining section
     const hasRemainingTasks = remainingWorkTasks.length > 0 || remainingPersonalTasks.length > 0;
     if (hasRemainingTasks) {
-      emailBody += '=== OTHER TASKS ===\n\n';
+      emailBody += `📌 OTHER TASKS\n`;
+      emailBody += `─────────────────────────────────────\n\n`;
       
       if (remainingWorkTasks.length > 0) {
-        emailBody += 'Work:\n';
-        remainingWorkTasks.forEach((task, idx) => {
-          const projectInfo = task.projectName ? ` (${task.projectName})` : '';
-          emailBody += `  ${idx + 1}. ${task.title}${projectInfo}\n`;
+        emailBody += `💼 Work (${remainingWorkTasks.length})\n`;
+        remainingWorkTasks.forEach((task) => {
+          const projectInfo = task.projectName ? ` → ${task.projectName}` : '';
+          emailBody += `   ☐ ${task.title}${projectInfo}\n`;
         });
         emailBody += '\n';
       }
       
       if (remainingPersonalTasks.length > 0) {
-        emailBody += 'Personal:\n';
-        remainingPersonalTasks.forEach((task, idx) => {
-          emailBody += `  ${idx + 1}. ${task.title}\n`;
+        emailBody += `🏠 Personal (${remainingPersonalTasks.length})\n`;
+        remainingPersonalTasks.forEach((task) => {
+          emailBody += `   ☐ ${task.title}\n`;
         });
         emailBody += '\n';
       }
     }
     
-    const totalTasks = orderedSlateTasks.length + orderedPersonalTasks.length;
-    emailBody += `---\nTotal: ${totalTasks} task${totalTasks !== 1 ? 's' : ''} on slate`;
+    emailBody += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    emailBody += `✨ Sent from my Task Slate`;
     
-    const subject = `Task Slate - ${today}`;
-    const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+    const subject = `📋 Task Slate - ${today}`;
+    const toEmail = recipientEmail.trim() || '';
+    const mailtoUrl = `mailto:${encodeURIComponent(toEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
     
     window.open(mailtoUrl, '_blank');
-  }, [hasTodayTasks, todayWorkTasks, todayPersonalTasks, remainingWorkTasks, remainingPersonalTasks, orderedSlateTasks, orderedPersonalTasks]);
+    setEmailDialogOpen(false);
+  }, [hasTodayTasks, todayWorkTasks, todayPersonalTasks, remainingWorkTasks, remainingPersonalTasks, orderedSlateTasks, orderedPersonalTasks, recipientEmail]);
+
   // Clear optimistic order when raw data changes (after refetch)
   useEffect(() => {
     setOptimisticSlateOrder(null);
@@ -3356,6 +3376,57 @@ export function QuickToDoButton() {
           </div>
         </div>
       )}
+
+      {/* Email Slate Dialog */}
+      <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Email Your Slate
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label htmlFor="recipient-email" className="text-sm font-medium">
+                Send to (optional)
+              </label>
+              <Input
+                id="recipient-email"
+                type="email"
+                placeholder="recipient@example.com"
+                value={recipientEmail}
+                onChange={(e) => setRecipientEmail(e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave blank to choose the recipient in your email client
+              </p>
+            </div>
+            <div className="bg-muted/50 rounded-lg p-3 text-xs space-y-1">
+              <p className="font-medium text-foreground">Email will include:</p>
+              <div className="text-muted-foreground space-y-0.5">
+                {hasTodayTasks && (
+                  <p>🔥 {todayWorkTasks.length + todayPersonalTasks.length} must-do-today task(s)</p>
+                )}
+                {(remainingWorkTasks.length > 0 || remainingPersonalTasks.length > 0) && (
+                  <p>📌 {remainingWorkTasks.length + remainingPersonalTasks.length} other task(s)</p>
+                )}
+                <p>📊 {orderedSlateTasks.length + orderedPersonalTasks.length} total items</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setEmailDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={sendSlateEmail} className="gap-2">
+              <Mail className="h-4 w-4" />
+              Open in Email Client
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

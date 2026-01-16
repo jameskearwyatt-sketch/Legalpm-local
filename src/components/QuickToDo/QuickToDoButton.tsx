@@ -1655,11 +1655,17 @@ export function QuickToDoButton() {
   }, [rawPersonalTasks, optimisticPersonalOrder]);
 
   // Filter out must-do-today tasks for the "Today" section
-  const todayTasks = useMemo(() => {
-    const workToday = orderedSlateTasks.filter(t => t.must_do_today);
-    const personalToday = orderedPersonalTasks.filter(t => t.must_do_today);
-    return [...workToday, ...personalToday];
-  }, [orderedSlateTasks, orderedPersonalTasks]);
+  const todayWorkTasks = useMemo(() => 
+    orderedSlateTasks.filter(t => t.must_do_today),
+    [orderedSlateTasks]
+  );
+
+  const todayPersonalTasks = useMemo(() => 
+    orderedPersonalTasks.filter(t => t.must_do_today),
+    [orderedPersonalTasks]
+  );
+
+  const hasTodayTasks = todayWorkTasks.length > 0 || todayPersonalTasks.length > 0;
 
   // Remaining tasks (not marked as must-do-today)
   const remainingWorkTasks = useMemo(() => 
@@ -2660,33 +2666,22 @@ export function QuickToDoButton() {
                 ) : (
                   <>
                     {/* TODAY Section - Must Do Today tasks */}
-                    {todayTasks.length > 0 && (
+                    {hasTodayTasks && (
                       <div className="bg-orange-50 dark:bg-orange-950/30 -mx-3 px-3 py-2 border-b border-orange-200 dark:border-orange-800/50">
                         <div className="flex items-center gap-2 mb-2 px-1">
                           <span className="text-orange-600 dark:text-orange-400 font-bold text-[10px]">!</span>
                           <span className="text-xs font-semibold text-orange-700 dark:text-orange-300">Today</span>
-                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-orange-200 text-orange-700 dark:bg-orange-900 dark:text-orange-300">{todayTasks.length}</Badge>
+                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-orange-200 text-orange-700 dark:bg-orange-900 dark:text-orange-300">{todayWorkTasks.length + todayPersonalTasks.length}</Badge>
                         </div>
-                        <div className="space-y-2">
-                          {todayTasks.map((task, index) => {
-                            const isPersonal = personalSlateItems.some(p => p.id === task.id);
-                            
-                            if (isPersonal) {
-                              return (
-                                <SortablePersonalTask
-                                  key={task.id}
-                                  task={task}
-                                  index={index}
-                                  onComplete={() => completeSlateItem.mutate({ id: task.id, isCompleted: true })}
-                                  onDelete={() => deleteSlateItem.mutate(task.id)}
-                                  onToggleMustDoToday={() => {
-                                    toggleMustDoToday.mutate({ id: task.id, mustDoToday: false });
-                                  }}
-                                />
-                              );
-                            }
-                            
-                            return (
+                        
+                        {/* Today - Work Items */}
+                        {todayWorkTasks.length > 0 && (
+                          <div className="space-y-2 mb-3">
+                            <div className="flex items-center gap-1.5 px-1">
+                              <Briefcase className="h-3 w-3 text-orange-600/70 dark:text-orange-400/70" />
+                              <span className="text-[10px] font-medium text-orange-600/70 dark:text-orange-400/70">Work</span>
+                            </div>
+                            {todayWorkTasks.map((task, index) => (
                               <SortableSlateItem
                                 key={task.id}
                                 task={task}
@@ -2760,9 +2755,31 @@ export function QuickToDoButton() {
                                   }
                                 }}
                               />
-                            );
-                          })}
-                        </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Today - Personal Items */}
+                        {todayPersonalTasks.length > 0 && (
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-1.5 px-1">
+                              <Home className="h-3 w-3 text-orange-600/70 dark:text-orange-400/70" />
+                              <span className="text-[10px] font-medium text-orange-600/70 dark:text-orange-400/70">Personal</span>
+                            </div>
+                            {todayPersonalTasks.map((task, index) => (
+                              <SortablePersonalTask
+                                key={task.id}
+                                task={task}
+                                index={index}
+                                onComplete={() => completeSlateItem.mutate({ id: task.id, isCompleted: true })}
+                                onDelete={() => deleteSlateItem.mutate(task.id)}
+                                onToggleMustDoToday={() => {
+                                  toggleMustDoToday.mutate({ id: task.id, mustDoToday: false });
+                                }}
+                              />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     )}
 

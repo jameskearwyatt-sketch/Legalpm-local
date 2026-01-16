@@ -26,9 +26,9 @@ interface ReportFormatTrainingDialogProps {
   existingName?: string;
 }
 
-type FieldType = 'matter_number' | 'matter_name' | 'client_name' | 'wip' | 'accounts_receivable' | 'total_billed' | 'total_paid';
+type FieldType = 'matter_number' | 'matter_name' | 'client_name' | 'wip' | 'accounts_receivable' | 'total_billed' | 'total_paid' | 'wip_disbursements' | 'ar_disbursements' | 'paid_disbursements';
 
-const FIELD_CONFIG: Record<FieldType, { label: string; color: string; required: boolean }> = {
+const FIELD_CONFIG: Record<FieldType, { label: string; color: string; required: boolean; group?: string }> = {
   matter_number: { label: 'Matter Number', color: 'bg-blue-500', required: true },
   matter_name: { label: 'Matter Name', color: 'bg-indigo-500', required: false },
   client_name: { label: 'Client Name', color: 'bg-cyan-500', required: false },
@@ -36,6 +36,10 @@ const FIELD_CONFIG: Record<FieldType, { label: string; color: string; required: 
   accounts_receivable: { label: 'Accounts Receivable', color: 'bg-orange-500', required: true },
   total_billed: { label: 'Total Billed', color: 'bg-purple-500', required: true },
   total_paid: { label: 'Total Paid', color: 'bg-green-500', required: true },
+  // Disbursement fields - optional, for local counsel tracking
+  wip_disbursements: { label: 'WIP Disbursements', color: 'bg-rose-500', required: false, group: 'disbursements' },
+  ar_disbursements: { label: 'AR Disbursements', color: 'bg-pink-500', required: false, group: 'disbursements' },
+  paid_disbursements: { label: 'Paid Disbursements', color: 'bg-fuchsia-500', required: false, group: 'disbursements' },
 };
 
 export function ReportFormatTrainingDialog({
@@ -124,8 +128,12 @@ export function ReportFormatTrainingDialog({
           {/* Field Selection */}
           <div className="space-y-2">
             <Label>Fields to Map (click one, then click a column below)</Label>
+            
+            {/* Main Fields */}
             <div className="flex flex-wrap gap-2">
-              {(Object.entries(FIELD_CONFIG) as [FieldType, typeof FIELD_CONFIG[FieldType]][]).map(([field, config]) => {
+              {(Object.entries(FIELD_CONFIG) as [FieldType, typeof FIELD_CONFIG[FieldType]][])
+                .filter(([_, config]) => !config.group)
+                .map(([field, config]) => {
                 const isMapped = mappings[field] !== undefined;
                 const isActive = activeField === field;
                 
@@ -167,6 +175,57 @@ export function ReportFormatTrainingDialog({
                 );
               })}
             </div>
+
+            {/* Disbursement Fields (Optional) */}
+            <div className="pt-2 border-t">
+              <Label className="text-xs text-muted-foreground mb-2 block">
+                Disbursement Columns (optional - for local counsel fee tracking)
+              </Label>
+              <div className="flex flex-wrap gap-2">
+                {(Object.entries(FIELD_CONFIG) as [FieldType, typeof FIELD_CONFIG[FieldType]][])
+                  .filter(([_, config]) => config.group === 'disbursements')
+                  .map(([field, config]) => {
+                  const isMapped = mappings[field] !== undefined;
+                  const isActive = activeField === field;
+                  
+                  return (
+                    <div key={field} className="flex items-center gap-1">
+                      <Button
+                        variant={isActive ? 'default' : isMapped ? 'outline' : 'secondary'}
+                        size="sm"
+                        onClick={() => setActiveField(isActive ? null : field)}
+                        className={cn(
+                          'gap-1',
+                          isActive && config.color,
+                          isMapped && !isActive && 'border-2 border-green-500'
+                        )}
+                      >
+                        {isMapped ? (
+                          <Check className="h-3 w-3 text-green-500" />
+                        ) : null}
+                        {config.label}
+                        {isMapped && (
+                          <span className="text-xs opacity-70">
+                            (Col {(mappings[field] ?? 0) + 1})
+                          </span>
+                        )}
+                      </Button>
+                      {isMapped && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => clearMapping(field)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {activeField && (
               <p className="text-sm text-primary">
                 Now click on the column header for "{FIELD_CONFIG[activeField].label}"

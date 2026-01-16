@@ -354,6 +354,65 @@ export type Database = {
           },
         ]
       }
+      financial_snapshot_history: {
+        Row: {
+          accounts_receivable: number
+          archived_at: string
+          as_of_date: string
+          billed_amount: number
+          id: string
+          matter_id: string
+          notes: string | null
+          operation: string
+          paid_amount: number
+          snapshot_id: string
+          update_source: string | null
+          user_id: string
+          wip_amount: number
+          wip_write_off_amount: number
+        }
+        Insert: {
+          accounts_receivable?: number
+          archived_at?: string
+          as_of_date: string
+          billed_amount?: number
+          id?: string
+          matter_id: string
+          notes?: string | null
+          operation: string
+          paid_amount?: number
+          snapshot_id: string
+          update_source?: string | null
+          user_id: string
+          wip_amount?: number
+          wip_write_off_amount?: number
+        }
+        Update: {
+          accounts_receivable?: number
+          archived_at?: string
+          as_of_date?: string
+          billed_amount?: number
+          id?: string
+          matter_id?: string
+          notes?: string | null
+          operation?: string
+          paid_amount?: number
+          snapshot_id?: string
+          update_source?: string | null
+          user_id?: string
+          wip_amount?: number
+          wip_write_off_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_snapshot_history_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       financial_snapshots: {
         Row: {
           accounts_receivable: number

@@ -10,7 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Check, X, HelpCircle } from 'lucide-react';
@@ -104,7 +104,7 @@ export function ReportFormatTrainingDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0">
+      <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="px-6 pt-6 pb-2 shrink-0">
           <DialogTitle>Train Report Format</DialogTitle>
           <DialogDescription>
@@ -112,26 +112,77 @@ export function ReportFormatTrainingDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 px-6">
-          <div className="space-y-3 pb-4">
-            {/* Format Name - compact */}
-            <div className="flex items-center gap-3">
-              <Label htmlFor="format_name" className="shrink-0">Format Name:</Label>
-              <Input
-                id="format_name"
-                value={formatName}
-                onChange={(e) => setFormatName(e.target.value)}
-                placeholder="e.g., Monthly WIP Report"
-                className="max-w-xs h-8"
-              />
+        {/* Top section - scrollable vertically if needed */}
+        <div className="px-6 shrink-0 space-y-3">
+          {/* Format Name - compact */}
+          <div className="flex items-center gap-3">
+            <Label htmlFor="format_name" className="shrink-0">Format Name:</Label>
+            <Input
+              id="format_name"
+              value={formatName}
+              onChange={(e) => setFormatName(e.target.value)}
+              placeholder="e.g., Monthly WIP Report"
+              className="max-w-xs h-8"
+            />
+          </div>
+
+          {/* Field Selection - more compact layout */}
+          <div className="space-y-2 p-3 bg-muted/30 rounded-lg border">
+            <Label className="text-xs font-medium">Required Fields (click one, then click a column header below)</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {(Object.entries(FIELD_CONFIG) as [FieldType, typeof FIELD_CONFIG[FieldType]][])
+                .filter(([_, config]) => !config.group)
+                .map(([field, config]) => {
+                const isMapped = mappings[field] !== undefined;
+                const isActive = activeField === field;
+                
+                return (
+                  <div key={field} className="flex items-center gap-0.5">
+                    <Button
+                      variant={isActive ? 'default' : isMapped ? 'outline' : 'secondary'}
+                      size="sm"
+                      onClick={() => setActiveField(isActive ? null : field)}
+                      className={cn(
+                        'gap-1 h-7 text-xs px-2',
+                        isActive && config.color,
+                        isMapped && !isActive && 'border-2 border-green-500'
+                      )}
+                    >
+                      {isMapped ? (
+                        <Check className="h-3 w-3 text-green-500" />
+                      ) : config.required ? (
+                        <span className="text-destructive">*</span>
+                      ) : null}
+                      {config.label}
+                      {isMapped && (
+                        <span className="text-[10px] opacity-70">
+                          ({(mappings[field] ?? 0) + 1})
+                        </span>
+                      )}
+                    </Button>
+                    {isMapped && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 w-5 p-0"
+                        onClick={() => clearMapping(field)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
-            {/* Field Selection - more compact layout */}
-            <div className="space-y-2 p-3 bg-muted/30 rounded-lg border">
-              <Label className="text-xs font-medium">Required Fields (click one, then click a column header below)</Label>
+            {/* Disbursement Fields - collapsible row */}
+            <div className="pt-1.5 border-t border-border/50">
+              <Label className="text-[10px] text-muted-foreground mb-1 block">
+                Optional: Disbursement columns for local counsel tracking
+              </Label>
               <div className="flex flex-wrap gap-1.5">
                 {(Object.entries(FIELD_CONFIG) as [FieldType, typeof FIELD_CONFIG[FieldType]][])
-                  .filter(([_, config]) => !config.group)
+                  .filter(([_, config]) => config.group === 'disbursements')
                   .map(([field, config]) => {
                   const isMapped = mappings[field] !== undefined;
                   const isActive = activeField === field;
@@ -143,162 +194,111 @@ export function ReportFormatTrainingDialog({
                         size="sm"
                         onClick={() => setActiveField(isActive ? null : field)}
                         className={cn(
-                          'gap-1 h-7 text-xs px-2',
+                          'gap-1 h-6 text-[10px] px-2',
                           isActive && config.color,
                           isMapped && !isActive && 'border-2 border-green-500'
                         )}
                       >
-                        {isMapped ? (
-                          <Check className="h-3 w-3 text-green-500" />
-                        ) : config.required ? (
-                          <span className="text-destructive">*</span>
-                        ) : null}
+                        {isMapped && <Check className="h-2.5 w-2.5 text-green-500" />}
                         {config.label}
-                        {isMapped && (
-                          <span className="text-[10px] opacity-70">
-                            ({(mappings[field] ?? 0) + 1})
-                          </span>
-                        )}
+                        {isMapped && <span className="opacity-70">({(mappings[field] ?? 0) + 1})</span>}
                       </Button>
                       {isMapped && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="h-5 w-5 p-0"
+                          className="h-4 w-4 p-0"
                           onClick={() => clearMapping(field)}
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-2.5 w-2.5" />
                         </Button>
                       )}
                     </div>
                   );
                 })}
               </div>
+            </div>
 
-              {/* Disbursement Fields - collapsible row */}
-              <div className="pt-1.5 border-t border-border/50">
-                <Label className="text-[10px] text-muted-foreground mb-1 block">
-                  Optional: Disbursement columns for local counsel tracking
-                </Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {(Object.entries(FIELD_CONFIG) as [FieldType, typeof FIELD_CONFIG[FieldType]][])
-                    .filter(([_, config]) => config.group === 'disbursements')
-                    .map(([field, config]) => {
-                    const isMapped = mappings[field] !== undefined;
-                    const isActive = activeField === field;
-                    
+            {activeField && (
+              <p className="text-xs text-primary font-medium pt-1">
+                ➜ Now click on the column header for "{FIELD_CONFIG[activeField].label}"
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Data Preview Table - OUTSIDE ScrollArea for proper horizontal scroll */}
+        <div className="flex-1 min-h-0 px-6 py-3">
+          <div 
+            className="border rounded-lg h-full overflow-auto"
+          >
+            <table className="text-sm w-max min-w-full">
+              <thead className="bg-muted sticky top-0 z-10">
+                <tr>
+                  {headers.map((header, idx) => {
+                    const field = getColumnField(idx);
                     return (
-                      <div key={field} className="flex items-center gap-0.5">
-                        <Button
-                          variant={isActive ? 'default' : isMapped ? 'outline' : 'secondary'}
-                          size="sm"
-                          onClick={() => setActiveField(isActive ? null : field)}
-                          className={cn(
-                            'gap-1 h-6 text-[10px] px-2',
-                            isActive && config.color,
-                            isMapped && !isActive && 'border-2 border-green-500'
-                          )}
-                        >
-                          {isMapped && <Check className="h-2.5 w-2.5 text-green-500" />}
-                          {config.label}
-                          {isMapped && <span className="opacity-70">({(mappings[field] ?? 0) + 1})</span>}
-                        </Button>
-                        {isMapped && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-4 w-4 p-0"
-                            onClick={() => clearMapping(field)}
-                          >
-                            <X className="h-2.5 w-2.5" />
-                          </Button>
+                      <th
+                        key={idx}
+                        onClick={() => handleColumnClick(idx)}
+                        className={cn(
+                          'px-3 py-2 text-left font-medium border-r last:border-r-0 cursor-pointer transition-colors whitespace-nowrap',
+                          activeField && 'hover:bg-primary/20',
+                          field && FIELD_CONFIG[field].color,
+                          field && 'text-white'
                         )}
-                      </div>
+                      >
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground mr-1">
+                            {idx + 1}
+                          </span>
+                          {header}
+                          {field && (
+                            <Badge variant="secondary" className="ml-1 text-[10px]">
+                              {FIELD_CONFIG[field].label}
+                            </Badge>
+                          )}
+                        </div>
+                      </th>
                     );
                   })}
-                </div>
-              </div>
-
-              {activeField && (
-                <p className="text-xs text-primary font-medium pt-1">
-                  ➜ Now click on the column header for "{FIELD_CONFIG[activeField].label}"
-                </p>
-              )}
-            </div>
-
-            {/* Data Preview Table - takes remaining space with minimum height */}
-            <div className="border rounded-lg">
-              <div 
-                className="min-h-[250px] max-h-[400px]" 
-                style={{ overflowX: 'auto', overflowY: 'auto' }}
-              >
-                <table className="text-sm" style={{ minWidth: 'max-content' }}>
-                  <thead className="bg-muted sticky top-0 z-10">
-                    <tr>
-                      {headers.map((header, idx) => {
-                        const field = getColumnField(idx);
-                        return (
-                          <th
-                            key={idx}
-                            onClick={() => handleColumnClick(idx)}
-                            className={cn(
-                              'px-3 py-2 text-left font-medium border-r last:border-r-0 cursor-pointer transition-colors whitespace-nowrap',
-                              activeField && 'hover:bg-primary/20',
-                              field && FIELD_CONFIG[field].color,
-                              field && 'text-white'
-                            )}
-                          >
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-muted-foreground mr-1">
-                                {idx + 1}
-                              </span>
-                              {header}
-                              {field && (
-                                <Badge variant="secondary" className="ml-1 text-[10px]">
-                                  {FIELD_CONFIG[field].label}
-                                </Badge>
-                              )}
-                            </div>
-                          </th>
-                        );
-                      })}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {sampleRows.slice(0, 10).map((row, rowIdx) => (
-                      <tr key={rowIdx} className="border-t hover:bg-muted/50">
-                        {row.map((cell, cellIdx) => {
-                          const field = getColumnField(cellIdx);
-                          return (
-                            <td
-                              key={cellIdx}
-                              className={cn(
-                                'px-3 py-1.5 border-r last:border-r-0 whitespace-nowrap',
-                                field && 'bg-primary/5'
-                              )}
-                              title={cell}
-                            >
-                              {cell}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Help text - compact */}
-            <div className="flex items-center gap-2 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
-              <HelpCircle className="h-3.5 w-3.5 shrink-0" />
-              <span>
-                Required fields marked with <span className="text-destructive">*</span>. 
-                Format will be auto-recognized in future uploads.
-              </span>
-            </div>
+                </tr>
+              </thead>
+              <tbody>
+                {sampleRows.slice(0, 10).map((row, rowIdx) => (
+                  <tr key={rowIdx} className="border-t hover:bg-muted/50">
+                    {row.map((cell, cellIdx) => {
+                      const field = getColumnField(cellIdx);
+                      return (
+                        <td
+                          key={cellIdx}
+                          className={cn(
+                            'px-3 py-1.5 border-r last:border-r-0 whitespace-nowrap',
+                            field && 'bg-primary/5'
+                          )}
+                          title={cell}
+                        >
+                          {cell}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </ScrollArea>
+        </div>
+
+        {/* Help text - compact */}
+        <div className="px-6 pb-2 shrink-0">
+          <div className="flex items-center gap-2 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
+            <HelpCircle className="h-3.5 w-3.5 shrink-0" />
+            <span>
+              Required fields marked with <span className="text-destructive">*</span>. 
+              Format will be auto-recognized in future uploads.
+            </span>
+          </div>
+        </div>
 
         <DialogFooter className="px-6 py-4 border-t shrink-0">
           <Button variant="outline" onClick={onClose}>

@@ -175,6 +175,13 @@ export function useMatters() {
         .from('matter_local_counsels')
         .select('*')
         .in('matter_id', matterIds);
+      
+      // Get selected WIP shaping proposals for matters with show_shaping_proposal enabled
+      const { data: selectedProposals } = await supabase
+        .from('wip_shaping_proposals')
+        .select('*')
+        .in('matter_id', matterIds)
+        .eq('is_selected', true);
 
       // Create a map of matter_id to latest snapshot
       const snapshotMap = new Map<string, any>();
@@ -206,17 +213,27 @@ export function useMatters() {
         });
         lcListMap.set(lc.matter_id, existingList);
       });
+      
+      // Create a map of matter_id to selected WIP shaping proposal
+      const selectedProposalMap = new Map<string, any>();
+      selectedProposals?.forEach(proposal => {
+        selectedProposalMap.set(proposal.matter_id, proposal);
+      });
 
       // Combine matters with their financial data
       return matters?.map(matter => {
         const snapshot = snapshotMap.get(matter.id);
-        const rawWipAmount = snapshot?.wip_amount || 0;
-        const wipWriteOffAmount = snapshot?.wip_write_off_amount || 0;
+        const selectedProposal = selectedProposalMap.get(matter.id);
+        const showProposalData = (matter as any).show_shaping_proposal && selectedProposal;
+        
+        // Use proposal data if enabled, otherwise use snapshot
+        const rawWipAmount = showProposalData ? selectedProposal.wip_amount : (snapshot?.wip_amount || 0);
+        const wipWriteOffAmount = showProposalData ? selectedProposal.wip_write_off_amount : (snapshot?.wip_write_off_amount || 0);
         // Net WIP = raw WIP minus write-offs (write-offs reduce actual WIP)
         const wipAmount = rawWipAmount - wipWriteOffAmount;
-        const billedAmount = snapshot?.billed_amount || 0;
-        const accountsReceivable = snapshot?.accounts_receivable || 0;
-        const paidAmount = snapshot?.paid_amount || 0;
+        const billedAmount = showProposalData ? selectedProposal.billed_amount : (snapshot?.billed_amount || 0);
+        const accountsReceivable = showProposalData ? selectedProposal.accounts_receivable : (snapshot?.accounts_receivable || 0);
+        const paidAmount = showProposalData ? selectedProposal.paid_amount : (snapshot?.paid_amount || 0);
         const budget = matter.agreed_budget_amount || 0;
         const feeUpperEnd = matter.fee_amount_upper_end || 0;
         
@@ -324,6 +341,9 @@ export function useMatters() {
           lc_billed: effectiveLcBilled,
           // Include full local counsels list for per-LC billing mode display
           local_counsels: localCounsels,
+          // Include proposal info for highlighting in master table
+          selected_proposal: selectedProposal || null,
+          show_shaping_proposal: (matter as any).show_shaping_proposal || false,
         } as MatterWithFinancials;
       }) || [];
     },

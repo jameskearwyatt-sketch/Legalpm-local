@@ -1011,6 +1011,15 @@ export default function MatterDetail() {
                       History
                     </Button>
                     <Button 
+                      variant="default" 
+                      size="sm"
+                      onClick={() => setShowFinancialUpdateDialog(true)}
+                      className="bg-amber-600 hover:bg-amber-700 text-white"
+                    >
+                      <FileText className="h-4 w-4 mr-2" />
+                      Update Snapshot
+                    </Button>
+                    <Button 
                       variant="outline" 
                       size="sm"
                       onClick={() => {
@@ -1021,15 +1030,6 @@ export default function MatterDetail() {
                     >
                       <Lightbulb className="h-4 w-4 mr-2" />
                       Add WIP Shaping Proposal
-                    </Button>
-                    <Button 
-                      variant="default" 
-                      size="sm"
-                      onClick={() => setShowFinancialUpdateDialog(true)}
-                      className="bg-amber-600 hover:bg-amber-700 text-white"
-                    >
-                      <FileText className="h-4 w-4 mr-2" />
-                      Update Snapshot
                     </Button>
                   </div>
                   {/* Proposals toggle */}

@@ -60,9 +60,13 @@ interface ImportedMatterData {
   // Manual update tracking
   wasManuallyUpdated?: boolean;
   lastManualUpdateDate?: string;
+  // Disbursement data for local counsel detection
+  wipDisbursement?: number;
+  arDisbursement?: number;
+  paidDisbursement?: number;
 }
 
-type Step = 'upload' | 'training' | 'confirm-matches' | 'review';
+type Step = 'upload' | 'training' | 'confirm-matches' | 'review' | 'disbursement-review';
 
 export function MasterWipUpdateDialog({
   isOpen,
@@ -370,6 +374,8 @@ export function MasterWipUpdateDialog({
     );
   }, [displayData, searchTerm]);
 
+  const DISBURSEMENT_THRESHOLD = 1000; // Flag disbursements above this amount
+  
   const stats = useMemo(() => {
     const matched = importedData.filter((d) => d.matchedMatterId).length;
     const changed = changedData.length;
@@ -382,7 +388,15 @@ export function MasterWipUpdateDialog({
         (d.totalBilled.selected && d.totalBilled.changed ? 1 : 0) +
         (d.totalPaid.selected && d.totalPaid.changed ? 1 : 0);
     }, 0);
-    return { matched, changed, unchanged, selectedFields, unmatched: unmatchedData.length };
+    const manuallyUpdated = importedData.filter(d => d.wasManuallyUpdated && d.selected).length;
+    const withSignificantDisbursements = importedData.filter(d => 
+      d.selected && (
+        (d.wipDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
+        (d.arDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
+        (d.paidDisbursement || 0) >= DISBURSEMENT_THRESHOLD
+      )
+    ).length;
+    return { matched, changed, unchanged, selectedFields, unmatched: unmatchedData.length, manuallyUpdated, withSignificantDisbursements };
   }, [importedData, changedData, unmatchedData]);
 
   const toggleMatterSelection = (rowIndex: number) => {
@@ -996,6 +1010,18 @@ export function MasterWipUpdateDialog({
                   <div>
                     <span className="text-muted-foreground">Unmatched:</span>{' '}
                     <span className="font-medium text-destructive">{stats.unmatched}</span>
+                  </div>
+                )}
+                {stats.manuallyUpdated > 0 && (
+                  <div className="flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                    <span className="text-amber-600 font-medium">{stats.manuallyUpdated} with manual data</span>
+                  </div>
+                )}
+                {stats.withSignificantDisbursements > 0 && (
+                  <div className="flex items-center gap-1">
+                    <AlertTriangle className="h-3.5 w-3.5 text-rose-500" />
+                    <span className="text-rose-600 font-medium">{stats.withSignificantDisbursements} with large disbursements</span>
                   </div>
                 )}
                 <div className="ml-auto">

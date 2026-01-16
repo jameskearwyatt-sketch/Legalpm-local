@@ -26,6 +26,10 @@ interface ColumnMappings {
   accounts_receivable?: number;
   total_billed?: number;
   total_paid?: number;
+  // Disbursement columns for local counsel tracking
+  wip_disbursements?: number;
+  ar_disbursements?: number;
+  paid_disbursements?: number;
 }
 
 interface ParsedRow {
@@ -37,6 +41,10 @@ interface ParsedRow {
   accountsReceivable: number;
   totalBilled: number;
   totalPaid: number;
+  // Disbursement data
+  wipDisbursement: number;
+  arDisbursement: number;
+  paidDisbursement: number;
 }
 
 interface MatterMapping {
@@ -63,6 +71,10 @@ interface MatchedData {
   accountsReceivable: { value: number; current: number; changed: boolean };
   totalBilled: { value: number; current: number; changed: boolean };
   totalPaid: { value: number; current: number; changed: boolean };
+  // Disbursement data for local counsel detection
+  wipDisbursement: number;
+  arDisbursement: number;
+  paidDisbursement: number;
 }
 
 const TOLERANCE = 0.005; // 0.5%
@@ -223,6 +235,10 @@ serve(async (req) => {
       accountsReceivable: columnMappings.accounts_receivable !== undefined ? parseNumber(row[columnMappings.accounts_receivable]) : 0,
       totalBilled: columnMappings.total_billed !== undefined ? parseNumber(row[columnMappings.total_billed]) : 0,
       totalPaid: columnMappings.total_paid !== undefined ? parseNumber(row[columnMappings.total_paid]) : 0,
+      // Disbursement data
+      wipDisbursement: columnMappings.wip_disbursements !== undefined ? parseNumber(row[columnMappings.wip_disbursements]) : 0,
+      arDisbursement: columnMappings.ar_disbursements !== undefined ? parseNumber(row[columnMappings.ar_disbursements]) : 0,
+      paidDisbursement: columnMappings.paid_disbursements !== undefined ? parseNumber(row[columnMappings.paid_disbursements]) : 0,
     }));
 
     // First pass: match each row to a matter
@@ -299,6 +315,9 @@ serve(async (req) => {
       totalAr: number;
       totalBilled: number;
       totalPaid: number;
+      totalWipDisbursement: number;
+      totalArDisbursement: number;
+      totalPaidDisbursement: number;
       matter: MatterInfo;
       confidence: 'high' | 'medium' | 'low' | 'none';
       usedSavedMapping: boolean;
@@ -329,6 +348,9 @@ serve(async (req) => {
           existing.totalAr += match.parsed.accountsReceivable;
           existing.totalBilled += match.parsed.totalBilled;
           existing.totalPaid += match.parsed.totalPaid;
+          existing.totalWipDisbursement += match.parsed.wipDisbursement;
+          existing.totalArDisbursement += match.parsed.arDisbursement;
+          existing.totalPaidDisbursement += match.parsed.paidDisbursement;
           // Keep highest confidence
           if (match.confidence === 'high' || (existing.confidence !== 'high' && match.confidence === 'medium')) {
             existing.confidence = match.confidence;
@@ -344,6 +366,9 @@ serve(async (req) => {
             totalAr: match.parsed.accountsReceivable,
             totalBilled: match.parsed.totalBilled,
             totalPaid: match.parsed.totalPaid,
+            totalWipDisbursement: match.parsed.wipDisbursement,
+            totalArDisbursement: match.parsed.arDisbursement,
+            totalPaidDisbursement: match.parsed.paidDisbursement,
             matter,
             confidence: match.confidence,
             usedSavedMapping: match.usedSavedMapping,
@@ -396,6 +421,9 @@ serve(async (req) => {
           current: agg.matter.current_paid,
           changed: !isWithinTolerance(agg.totalPaid, agg.matter.current_paid),
         },
+        wipDisbursement: agg.totalWipDisbursement,
+        arDisbursement: agg.totalArDisbursement,
+        paidDisbursement: agg.totalPaidDisbursement,
       };
 
       if (needsConfirmation) {
@@ -443,6 +471,9 @@ serve(async (req) => {
           current: matter.current_paid,
           changed: !isWithinTolerance(match.parsed.totalPaid, matter.current_paid),
         },
+        wipDisbursement: match.parsed.wipDisbursement,
+        arDisbursement: match.parsed.arDisbursement,
+        paidDisbursement: match.parsed.paidDisbursement,
       };
 
       if (needsConfirmation) {
@@ -484,6 +515,9 @@ serve(async (req) => {
           current: 0,
           changed: true,
         },
+        wipDisbursement: match.parsed.wipDisbursement,
+        arDisbursement: match.parsed.arDisbursement,
+        paidDisbursement: match.parsed.paidDisbursement,
       });
     }
 

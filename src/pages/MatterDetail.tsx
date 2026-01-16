@@ -893,7 +893,7 @@ export default function MatterDetail() {
                         if (percentDiff > 5) {
                           return (
                             <p className="text-sm font-bold text-destructive mt-3 animate-pulse">
-                              ⚠️ Warning: Budget utilisation WIP ({formatCurrency(budgetUtilizationWip, currency)}) differs from financial snapshot ({formatCurrency(snapshotWip, currency)}) by {percentDiff.toFixed(0)}%
+                              ⚠️ Warning: Budget utilisation raw WIP ({formatCurrency(budgetUtilizationWip, currency)}) differs from financial snapshot ({formatCurrency(snapshotWip, currency)}) by {percentDiff.toFixed(0)}%
                             </p>
                           );
                         }

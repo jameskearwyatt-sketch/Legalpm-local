@@ -86,6 +86,7 @@ export interface MatterWithFinancials extends Matter {
     accounts_receivable: number;
     paid_amount: number;
     as_of_date: string;
+    update_source?: string | null;
   };
   remaining_budget: number;
   budget_used_percent: number;
@@ -298,6 +299,7 @@ export function useMatters() {
             accounts_receivable: effectiveAccountsReceivable,
             paid_amount: effectivePaidAmount,
             as_of_date: snapshot.as_of_date,
+            update_source: snapshot.update_source,
           } : undefined,
           remaining_budget: remainingBudget,
           budget_used_percent: budgetUsedPercent,

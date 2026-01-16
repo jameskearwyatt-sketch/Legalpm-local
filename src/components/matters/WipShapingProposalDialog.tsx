@@ -26,6 +26,8 @@ interface WipShapingProposalDialogProps {
     billed_amount: number;
     accounts_receivable: number;
     paid_amount: number;
+    lc_wip_amount: number;
+    lc_billed_amount: number;
     notes: string;
   }) => Promise<void>;
   currency: string;
@@ -35,11 +37,14 @@ interface WipShapingProposalDialogProps {
     billed_amount: number;
     accounts_receivable: number;
     paid_amount: number;
+    lc_wip_amount: number;
+    lc_billed_amount: number;
   };
   matterName?: string;
   differentBillingCurrency?: boolean;
   quoteCurrency?: string;
   existingProposal?: WipShapingProposal | null;
+  hasLocalCounsel?: boolean;
 }
 
 export function WipShapingProposalDialog({
@@ -52,6 +57,7 @@ export function WipShapingProposalDialog({
   differentBillingCurrency,
   quoteCurrency,
   existingProposal,
+  hasLocalCounsel = false,
 }: WipShapingProposalDialogProps) {
   const currencySymbol = getCurrencySymbol(currency);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,6 +69,8 @@ export function WipShapingProposalDialog({
     billed_amount: 0,
     accounts_receivable: 0,
     paid_amount: 0,
+    lc_wip_amount: 0,
+    lc_billed_amount: 0,
     notes: '',
   });
 
@@ -82,6 +90,8 @@ export function WipShapingProposalDialog({
           billed_amount: roundTo2(existingProposal.billed_amount),
           accounts_receivable: roundTo2(existingProposal.accounts_receivable),
           paid_amount: roundTo2(existingProposal.paid_amount),
+          lc_wip_amount: roundTo2(existingProposal.lc_wip_amount || 0),
+          lc_billed_amount: roundTo2(existingProposal.lc_billed_amount || 0),
           notes: existingProposal.notes || '',
         });
       } else {
@@ -95,6 +105,8 @@ export function WipShapingProposalDialog({
           billed_amount: roundTo2(currentValues?.billed_amount || 0),
           accounts_receivable: roundTo2(currentValues?.accounts_receivable || 0),
           paid_amount: roundTo2(currentValues?.paid_amount || 0),
+          lc_wip_amount: roundTo2(currentValues?.lc_wip_amount || 0),
+          lc_billed_amount: roundTo2(currentValues?.lc_billed_amount || 0),
           notes: '',
         });
       }
@@ -131,6 +143,8 @@ export function WipShapingProposalDialog({
         billed_amount: formData.billed_amount,
         accounts_receivable: formData.accounts_receivable,
         paid_amount: formData.paid_amount,
+        lc_wip_amount: formData.lc_wip_amount,
+        lc_billed_amount: formData.lc_billed_amount,
         notes: formData.notes.trim(),
       });
       onClose();
@@ -321,6 +335,39 @@ export function WipShapingProposalDialog({
               </div>
             </div>
           </div>
+
+          {/* Local Counsel Section - only show if matter has local counsel */}
+          {hasLocalCounsel && (
+            <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/20">
+              <h4 className="text-sm font-medium">Local Counsel</h4>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="lc_wip_amount_proposal" className="text-xs">LC WIP ({currencySymbol.trim()})</Label>
+                  <Input
+                    id="lc_wip_amount_proposal"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.lc_wip_amount}
+                    onChange={(e) => updateField('lc_wip_amount', parseFloat(e.target.value) || 0)}
+                    className="h-9"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="lc_billed_amount_proposal" className="text-xs">LC Billed ({currencySymbol.trim()})</Label>
+                  <Input
+                    id="lc_billed_amount_proposal"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.lc_billed_amount}
+                    onChange={(e) => updateField('lc_billed_amount', parseFloat(e.target.value) || 0)}
+                    className="h-9"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           <DialogFooter className="pt-4">
             <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>

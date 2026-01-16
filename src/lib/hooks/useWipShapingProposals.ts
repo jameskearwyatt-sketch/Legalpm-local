@@ -14,6 +14,8 @@ export interface WipShapingProposal {
   billed_amount: number;
   paid_amount: number;
   accounts_receivable: number;
+  lc_wip_amount: number;
+  lc_billed_amount: number;
   status: 'active' | 'archived';
   is_selected: boolean;
   created_at: string;
@@ -28,6 +30,8 @@ export interface CreateProposalInput {
   billed_amount: number;
   paid_amount: number;
   accounts_receivable: number;
+  lc_wip_amount: number;
+  lc_billed_amount: number;
 }
 
 export interface UpdateProposalInput {
@@ -38,6 +42,8 @@ export interface UpdateProposalInput {
   billed_amount?: number;
   paid_amount?: number;
   accounts_receivable?: number;
+  lc_wip_amount?: number;
+  lc_billed_amount?: number;
   status?: 'active' | 'archived';
   is_selected?: boolean;
 }

@@ -1400,12 +1400,15 @@ export default function MatterDetail() {
             differentBillingCurrency={differentBillingCurrency}
             quoteCurrency={quoteCurrency}
             existingProposal={editingProposal}
+            hasLocalCounsel={localCounsel > 0}
             currentValues={{
               wip_amount: latestSnapshot?.wip_amount || 0,
               wip_write_off_amount: latestSnapshot?.wip_write_off_amount || 0,
               billed_amount: latestSnapshot?.billed_amount || 0,
               accounts_receivable: latestSnapshot?.accounts_receivable || 0,
               paid_amount: latestSnapshot?.paid_amount || 0,
+              lc_wip_amount: lcTotalWip || 0,
+              lc_billed_amount: lcTotalBilled || 0,
             }}
             onSave={async (data) => {
               if (editingProposal) {
@@ -1445,8 +1448,17 @@ export default function MatterDetail() {
 
         {/* Local Counsels Financial Summary - show when LC fee exists */}
         {!isPipeline && localCounsel > 0 && (
-          <Card className="shadow-card border-l-4 border-l-primary">
-            <CardHeader>
+          <Card className={cn(
+            "shadow-card border-l-4 border-l-primary transition-all",
+            showProposalValues && "ring-2 ring-amber-500/50 bg-amber-500/5"
+          )}>
+            <CardHeader className="relative">
+              {/* Floating proposal indicator for LC */}
+              {showProposalValues && (
+                <span className="absolute top-2 right-4 text-xs font-normal px-2 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-400 rounded-full z-10">
+                  WIP Proposal
+                </span>
+              )}
               <CardTitle className="text-lg font-heading">Local Counsels Financial Summary</CardTitle>
               <CardDescription>
                 {localCounsels.length > 0 
@@ -1576,20 +1588,40 @@ export default function MatterDetail() {
                   
                   {/* Total LC summary - only for disbursement LCs */}
                   {localCounsels.some(lc => lc.billing_mode === 'Disb') && (
-                    <div className="flex justify-between items-center py-3 bg-muted/50 rounded-lg px-4">
-                      <span className="text-muted-foreground font-medium">Total LC Budget Burn (Disb only)</span>
+                    <div className={cn(
+                      "flex justify-between items-center py-3 rounded-lg px-4",
+                      showProposalValues ? "bg-amber-100/50 dark:bg-amber-900/20" : "bg-muted/50"
+                    )}>
+                      <div>
+                        <span className="text-muted-foreground font-medium">Total LC Budget Burn (Disb only)</span>
+                        {showProposalValues && selectedProposal && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                            Proposal: WIP {formatCurrency(selectedProposal.lc_wip_amount || 0, currency)} + Billed {formatCurrency(selectedProposal.lc_billed_amount || 0, currency)}
+                          </p>
+                        )}
+                      </div>
                       <div className="text-right">
-                        <span className={cn(
-                          "text-lg font-semibold",
-                          lcBudgetUsedPercent > 100 && "text-danger",
-                          lcBudgetUsedPercent >= 80 && lcBudgetUsedPercent <= 100 && "text-warning",
-                          lcBudgetUsedPercent < 80 && "text-success"
-                        )}>
-                          {lcBudgetUsedPercent.toFixed(1)}%
-                        </span>
-                        <p className="text-xs text-muted-foreground">
-                          {formatCurrency(lcTotalUsed, currency)} of {formatCurrency(localCounsel, currency)}
-                        </p>
+                        {(() => {
+                          const displayLcWip = showProposalValues && selectedProposal ? (selectedProposal.lc_wip_amount || 0) : lcTotalWip;
+                          const displayLcBilled = showProposalValues && selectedProposal ? (selectedProposal.lc_billed_amount || 0) : lcTotalBilled;
+                          const displayLcTotal = displayLcWip + displayLcBilled;
+                          const displayLcPercent = localCounsel > 0 ? (displayLcTotal / localCounsel) * 100 : 0;
+                          return (
+                            <>
+                              <span className={cn(
+                                "text-lg font-semibold",
+                                displayLcPercent > 100 && "text-danger",
+                                displayLcPercent >= 80 && displayLcPercent <= 100 && "text-warning",
+                                displayLcPercent < 80 && "text-success"
+                              )}>
+                                {displayLcPercent.toFixed(1)}%
+                              </span>
+                              <p className="text-xs text-muted-foreground">
+                                {formatCurrency(displayLcTotal, currency)} of {formatCurrency(localCounsel, currency)}
+                              </p>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   )}

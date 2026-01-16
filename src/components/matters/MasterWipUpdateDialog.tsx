@@ -397,7 +397,16 @@ export function MasterWipUpdateDialog({
 
   // Review helpers
   const DISBURSEMENT_THRESHOLD = 1000; // Flag disbursements above this amount
-  const LC_MATERIALITY_THRESHOLD = 0.05; // 5% - if disbursement is within 5% of existing LC amount, don't flag
+  const LC_MATERIALITY_THRESHOLD = 0.02; // 2% - if disbursement is within 2% of existing LC amount, it's immaterial
+  const IMMATERIAL_CHANGE_THRESHOLD = 0.02; // 2% - changes below this are considered immaterial
+
+  // Helper to check if a value change is immaterial (within 2%)
+  const isImmaterialChange = (newValue: number, currentValue: number): boolean => {
+    if (currentValue === 0 && newValue === 0) return true;
+    if (currentValue === 0) return newValue < 100; // Small absolute change from zero
+    const percentChange = Math.abs(newValue - currentValue) / Math.abs(currentValue);
+    return percentChange <= IMMATERIAL_CHANGE_THRESHOLD;
+  };
 
   // Helper to check if a disbursement amount is already tracked as LC fee
   // Returns true if the amount is materially different from existing LC amounts
@@ -428,41 +437,81 @@ export function MasterWipUpdateDialog({
     return wipMateriallyDifferent || billedMateriallyDifferent;
   };
 
-  const changedData = useMemo(() => {
-    return importedData.filter((item) => {
-      const hasFinancialChanges = item.wip.changed || item.accountsReceivable.changed || 
-                                   item.totalBilled.changed || item.totalPaid.changed;
+  // Categorize each matter's changes as material or immaterial
+  const categorizedData = useMemo(() => {
+    return importedData.map(item => {
+      // Check each financial field for immateriality
+      const wipImmaterial = item.wip.changed && isImmaterialChange(item.wip.value, item.wip.current);
+      const arImmaterial = item.accountsReceivable.changed && isImmaterialChange(item.accountsReceivable.value, item.accountsReceivable.current);
+      const billedImmaterial = item.totalBilled.changed && isImmaterialChange(item.totalBilled.value, item.totalBilled.current);
+      const paidImmaterial = item.totalPaid.changed && isImmaterialChange(item.totalPaid.value, item.totalPaid.current);
       
-      // Only flag disbursements if they're NOT already tracked as LC fees in the database
+      // An item is "all immaterial" if all its changes are immaterial
+      const hasAnyMaterialChange = 
+        (item.wip.changed && !wipImmaterial) ||
+        (item.accountsReceivable.changed && !arImmaterial) ||
+        (item.totalBilled.changed && !billedImmaterial) ||
+        (item.totalPaid.changed && !paidImmaterial);
+      
+      // Check for untracked disbursements (these are always material if present)
       const wipDisb = item.wipDisbursement || 0;
       const billedDisb = (item.arDisbursement || 0) + (item.paidDisbursement || 0);
-      const hasUnaccountedDisbursements = isDisbursementNotAlreadyTracked(
-        item.matchedMatterId,
-        wipDisb,
-        billedDisb
-      );
+      const hasUntrackedDisbursement = isDisbursementNotAlreadyTracked(item.matchedMatterId, wipDisb, billedDisb);
       
-      return hasFinancialChanges || hasUnaccountedDisbursements;
+      const isImmaterial = !hasAnyMaterialChange && !hasUntrackedDisbursement;
+      
+      return {
+        ...item,
+        isImmaterial,
+        wipImmaterial,
+        arImmaterial,
+        billedImmaterial,
+        paidImmaterial,
+        hasUntrackedDisbursement,
+      };
     });
   }, [importedData, matters]);
 
-  const displayData = showUnchanged ? importedData : changedData;
+  const changedData = useMemo(() => {
+    return categorizedData.filter((item) => {
+      const hasFinancialChanges = item.wip.changed || item.accountsReceivable.changed || 
+                                   item.totalBilled.changed || item.totalPaid.changed;
+      return hasFinancialChanges || item.hasUntrackedDisbursement;
+    });
+  }, [categorizedData]);
+
+  // Split into material and immaterial for display
+  const materialData = useMemo(() => changedData.filter(d => !d.isImmaterial), [changedData]);
+  const immaterialData = useMemo(() => changedData.filter(d => d.isImmaterial), [changedData]);
+
+  const displayData = showUnchanged ? categorizedData : changedData;
 
   const filteredData = useMemo(() => {
-    if (!searchTerm) return displayData;
-    const lower = searchTerm.toLowerCase();
-    return displayData.filter((item) =>
-      item.matterNumber.toLowerCase().includes(lower) ||
-      item.matterName.toLowerCase().includes(lower) ||
-      item.matchedMatterName?.toLowerCase().includes(lower)
-    );
+    const applyFilter = (data: typeof displayData) => {
+      if (!searchTerm) return data;
+      const lower = searchTerm.toLowerCase();
+      return data.filter((item) =>
+        item.matterNumber.toLowerCase().includes(lower) ||
+        item.matterName.toLowerCase().includes(lower) ||
+        item.matchedMatterName?.toLowerCase().includes(lower)
+      );
+    };
+    return applyFilter(displayData);
   }, [displayData, searchTerm]);
 
+  // Split filtered data into material and immaterial for separate display
+  const filteredMaterialData = useMemo(() => 
+    filteredData.filter(d => !d.isImmaterial), [filteredData]);
+  const filteredImmaterialData = useMemo(() => 
+    filteredData.filter(d => d.isImmaterial), [filteredData]);
+
   const stats = useMemo(() => {
-    const matched = importedData.filter((d) => d.matchedMatterId).length;
+    const matched = categorizedData.filter((d) => d.matchedMatterId).length;
     const changed = changedData.length;
-    const unchanged = importedData.length - changed;
-    const selectedFields = importedData.reduce((sum, d) => {
+    const unchanged = categorizedData.length - changed;
+    
+    // Count financial field changes
+    const selectedFinancialFields = categorizedData.reduce((sum, d) => {
       if (!d.selected || !d.matchedMatterId) return sum;
       return sum + 
         (d.wip.selected && d.wip.changed ? 1 : 0) +
@@ -470,16 +519,34 @@ export function MasterWipUpdateDialog({
         (d.totalBilled.selected && d.totalBilled.changed ? 1 : 0) +
         (d.totalPaid.selected && d.totalPaid.changed ? 1 : 0);
     }, 0);
-    const manuallyUpdated = importedData.filter(d => d.wasManuallyUpdated && d.selected).length;
+    
     // Count matters with unaccounted disbursements (not already tracked as LC fees)
-    const withSignificantDisbursements = importedData.filter(d => {
-      if (!d.selected) return false;
-      const wipDisb = d.wipDisbursement || 0;
-      const billedDisb = (d.arDisbursement || 0) + (d.paidDisbursement || 0);
-      return isDisbursementNotAlreadyTracked(d.matchedMatterId, wipDisb, billedDisb);
-    }).length;
-    return { matched, changed, unchanged, selectedFields, unmatched: unmatchedData.length, manuallyUpdated, withSignificantDisbursements };
-  }, [importedData, changedData, unmatchedData]);
+    const withSignificantDisbursements = categorizedData.filter(d => 
+      d.selected && d.hasUntrackedDisbursement
+    ).length;
+    
+    // Total changes = financial fields + disbursements to review
+    const totalChanges = selectedFinancialFields + withSignificantDisbursements;
+    
+    const manuallyUpdated = categorizedData.filter(d => d.wasManuallyUpdated && d.selected).length;
+    
+    // Count material vs immaterial
+    const materialCount = materialData.filter(d => d.selected).length;
+    const immaterialCount = immaterialData.filter(d => d.selected).length;
+    
+    return { 
+      matched, 
+      changed, 
+      unchanged, 
+      selectedFields: selectedFinancialFields, 
+      totalChanges,
+      unmatched: unmatchedData.length, 
+      manuallyUpdated, 
+      withSignificantDisbursements,
+      materialCount,
+      immaterialCount,
+    };
+  }, [categorizedData, changedData, unmatchedData, materialData, immaterialData]);
 
   const toggleMatterSelection = (rowIndex: number) => {
     setImportedData((prev) =>
@@ -1247,9 +1314,14 @@ export function MasterWipUpdateDialog({
                     <span className="text-rose-600 font-medium">{stats.withSignificantDisbursements} with large disbursements</span>
                   </div>
                 )}
-                <div className="ml-auto">
+                <div className="ml-auto flex items-center gap-3">
                   <span className="text-muted-foreground">Will import:</span>{' '}
-                  <span className="font-medium text-primary">{stats.selectedFields} changes</span>
+                  <span className="font-medium text-primary">{stats.totalChanges} changes</span>
+                  {stats.immaterialCount > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      ({stats.immaterialCount} immaterial)
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1284,12 +1356,11 @@ export function MasterWipUpdateDialog({
               {/* Data List - with proper scrolling */}
               <div className="flex-1 overflow-auto border rounded-lg min-h-0">
                 <div className="divide-y">
-                  {filteredData.map((item) => {
+                  {/* Material Changes Section */}
+                  {filteredMaterialData.map((item) => {
                     const hasFinancialChanges = item.wip.changed || item.accountsReceivable.changed || 
                                        item.totalBilled.changed || item.totalPaid.changed;
-                    const hasSignificantDisbursements = (item.wipDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
-                                                        (item.arDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
-                                                        (item.paidDisbursement || 0) >= DISBURSEMENT_THRESHOLD;
+                    const hasSignificantDisbursements = item.hasUntrackedDisbursement;
                     const isExpanded = expandedRows.has(item.rowIndex);
 
                     return (
@@ -1443,6 +1514,80 @@ export function MasterWipUpdateDialog({
                     );
                   })}
 
+                  {/* Immaterial Changes Section */}
+                  {filteredImmaterialData.length > 0 && (
+                    <div className="border-t-2 border-dashed border-muted">
+                      <div className="p-3 bg-muted/30">
+                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                          <span>Immaterial Changes ({filteredImmaterialData.length})</span>
+                          <span className="text-xs font-normal">— small corrections (≤2%) to ensure data accuracy</span>
+                        </div>
+                      </div>
+                      {filteredImmaterialData.map((item) => {
+                        const hasFinancialChanges = item.wip.changed || item.accountsReceivable.changed || 
+                                           item.totalBilled.changed || item.totalPaid.changed;
+                        const isExpanded = expandedRows.has(item.rowIndex);
+
+                        return (
+                          <div 
+                            key={item.rowIndex} 
+                            className={cn(
+                              'p-3 bg-muted/10',
+                              !item.selected && 'opacity-60'
+                            )}
+                          >
+                            {/* Matter Header Row */}
+                            <div className="flex items-center gap-3">
+                              <Checkbox
+                                checked={item.selected}
+                                onCheckedChange={() => toggleMatterSelection(item.rowIndex)}
+                              />
+                              <button
+                                onClick={() => toggleRowExpanded(item.rowIndex)}
+                                className="p-1 hover:bg-muted rounded"
+                              >
+                                {isExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
+                              </button>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium truncate text-muted-foreground">
+                                    {item.matchedMatterName || item.matterName}
+                                  </span>
+                                  <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-600 dark:bg-slate-900/50 dark:text-slate-400 border-slate-300 dark:border-slate-700">
+                                    Immaterial
+                                  </Badge>
+                                  {item.isMultiClientAggregate && (
+                                    <Badge variant="outline" className="text-xs flex items-center gap-1 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                                      <Users className="h-3 w-3" />
+                                      {item.rowIndices?.length || 1} clients aggregated
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {item.matterNumber}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Expanded Field Details */}
+                            {isExpanded && hasFinancialChanges && (
+                              <div className="ml-12 mt-2 pl-3 border-l-2 border-muted">
+                                {renderFieldChange(item, 'wip', 'WIP')}
+                                {renderFieldChange(item, 'accountsReceivable', 'AR')}
+                                {renderFieldChange(item, 'totalBilled', 'Billed')}
+                                {renderFieldChange(item, 'totalPaid', 'Paid')}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
                   {filteredData.length === 0 && (
                     <div className="p-8 text-center text-muted-foreground">
                       {showUnchanged ? 'No matching items found' : 'No changes detected (all values within 0.5% tolerance)'}
@@ -1480,16 +1625,19 @@ export function MasterWipUpdateDialog({
                 </Button>
                 <div className="flex items-center gap-3">
                   <span className="text-sm text-muted-foreground">
-                    {stats.selectedFields} change{stats.selectedFields !== 1 ? 's' : ''} selected
+                    {stats.totalChanges} change{stats.totalChanges !== 1 ? 's' : ''} selected
+                    {stats.immaterialCount > 0 && (
+                      <span className="text-xs ml-1">({stats.immaterialCount} immaterial)</span>
+                    )}
                   </span>
-                  <Button onClick={handleApply} disabled={isSubmitting || stats.selectedFields === 0}>
+                  <Button onClick={handleApply} disabled={isSubmitting || stats.totalChanges === 0}>
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Applying...
                       </>
                     ) : (
-                      `Apply ${stats.selectedFields} Changes`
+                      `Apply ${stats.totalChanges} Changes`
                     )}
                   </Button>
                 </div>

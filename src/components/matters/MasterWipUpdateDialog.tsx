@@ -57,6 +57,9 @@ interface ImportedMatterData {
   totalBilled: { value: number; current: number; changed: boolean; selected: boolean };
   totalPaid: { value: number; current: number; changed: boolean; selected: boolean };
   selected: boolean;
+  // Manual update tracking
+  wasManuallyUpdated?: boolean;
+  lastManualUpdateDate?: string;
 }
 
 type Step = 'upload' | 'training' | 'confirm-matches' | 'review';
@@ -228,6 +231,9 @@ export function MasterWipUpdateDialog({
       // Build matters info for matching
       const mattersForMatching = matters.map(m => {
         const snapshot = m.latest_snapshot;
+        // Check if the latest snapshot was manually updated
+        const snapshotAny = snapshot as Record<string, unknown> | null;
+        const wasManual = snapshotAny?.update_source === 'manual';
         return {
           id: m.id,
           matter_name: m.matter_name,
@@ -239,6 +245,9 @@ export function MasterWipUpdateDialog({
           current_billed: snapshot?.billed_amount || 0,
           current_paid: snapshot?.paid_amount || 0,
           is_multi_client: m.is_multi_client || false,
+          // Track if latest snapshot was manually updated
+          was_manually_updated: wasManual,
+          last_manual_update_date: wasManual ? snapshot?.as_of_date : null,
         };
       });
 
@@ -266,23 +275,43 @@ export function MasterWipUpdateDialog({
       }
 
       // Convert to our format with selection state
-      const matched: ImportedMatterData[] = (data.matchedData || []).map((d: any) => ({
-        ...d,
-        wip: { ...d.wip, selected: d.wip.changed },
-        accountsReceivable: { ...d.accountsReceivable, selected: d.accountsReceivable.changed },
-        totalBilled: { ...d.totalBilled, selected: d.totalBilled.changed },
-        totalPaid: { ...d.totalPaid, selected: d.totalPaid.changed },
-        selected: true,
-      }));
+      // Also look up manual update info from mattersForMatching
+      const getMatterInfo = (matterId: string | null) => {
+        if (!matterId) return { wasManuallyUpdated: false, lastManualUpdateDate: null };
+        const mInfo = mattersForMatching.find(m => m.id === matterId);
+        return {
+          wasManuallyUpdated: mInfo?.was_manually_updated || false,
+          lastManualUpdateDate: mInfo?.last_manual_update_date || null,
+        };
+      };
 
-      const lowConf: ImportedMatterData[] = (data.lowConfidenceData || []).map((d: any) => ({
-        ...d,
-        wip: { ...d.wip, selected: d.wip.changed },
-        accountsReceivable: { ...d.accountsReceivable, selected: d.accountsReceivable.changed },
-        totalBilled: { ...d.totalBilled, selected: d.totalBilled.changed },
-        totalPaid: { ...d.totalPaid, selected: d.totalPaid.changed },
-        selected: true,
-      }));
+      const matched: ImportedMatterData[] = (data.matchedData || []).map((d: any) => {
+        const manualInfo = getMatterInfo(d.matchedMatterId);
+        return {
+          ...d,
+          wip: { ...d.wip, selected: d.wip.changed },
+          accountsReceivable: { ...d.accountsReceivable, selected: d.accountsReceivable.changed },
+          totalBilled: { ...d.totalBilled, selected: d.totalBilled.changed },
+          totalPaid: { ...d.totalPaid, selected: d.totalPaid.changed },
+          selected: true,
+          wasManuallyUpdated: manualInfo.wasManuallyUpdated,
+          lastManualUpdateDate: manualInfo.lastManualUpdateDate,
+        };
+      });
+
+      const lowConf: ImportedMatterData[] = (data.lowConfidenceData || []).map((d: any) => {
+        const manualInfo = getMatterInfo(d.matchedMatterId);
+        return {
+          ...d,
+          wip: { ...d.wip, selected: d.wip.changed },
+          accountsReceivable: { ...d.accountsReceivable, selected: d.accountsReceivable.changed },
+          totalBilled: { ...d.totalBilled, selected: d.totalBilled.changed },
+          totalPaid: { ...d.totalPaid, selected: d.totalPaid.changed },
+          selected: true,
+          wasManuallyUpdated: manualInfo.wasManuallyUpdated,
+          lastManualUpdateDate: manualInfo.lastManualUpdateDate,
+        };
+      });
 
       const unmatched: ImportedMatterData[] = (data.unmatchedData || []).map((d: any) => ({
         ...d,
@@ -1012,7 +1041,31 @@ export function MasterWipUpdateDialog({
                     const isExpanded = expandedRows.has(item.rowIndex);
 
                     return (
-                      <div key={item.rowIndex} className={cn('p-3', !item.selected && 'opacity-60')}>
+                      <div 
+                        key={item.rowIndex} 
+                        className={cn(
+                          'p-3',
+                          !item.selected && 'opacity-60',
+                          // Highlight matters with manual updates
+                          item.wasManuallyUpdated && item.selected && 'bg-amber-50/80 dark:bg-amber-950/30 border-l-4 border-l-amber-500'
+                        )}
+                      >
+                        {/* Manual Update Warning */}
+                        {item.wasManuallyUpdated && item.selected && (
+                          <div className="mb-2 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 font-medium">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            <span>
+                              Latest data was manually entered
+                              {item.lastManualUpdateDate && (
+                                <span className="font-normal text-amber-600 dark:text-amber-500">
+                                  {' '}on {new Date(item.lastManualUpdateDate).toLocaleDateString()}
+                                </span>
+                              )}
+                              — updating will overwrite your manual input
+                            </span>
+                          </div>
+                        )}
+                        
                         {/* Matter Header Row */}
                         <div className="flex items-center gap-3">
                           <Checkbox
@@ -1031,9 +1084,17 @@ export function MasterWipUpdateDialog({
                           </button>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium truncate">
+                              <span className={cn(
+                                "font-medium truncate",
+                                item.wasManuallyUpdated && item.selected && "text-amber-800 dark:text-amber-300"
+                              )}>
                                 {item.matchedMatterName || item.matterName}
                               </span>
+                              {item.wasManuallyUpdated && (
+                                <Badge className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border-amber-300 dark:border-amber-700">
+                                  Manual Data
+                                </Badge>
+                              )}
                               {item.isMultiClientAggregate && (
                                 <Badge variant="outline" className="text-xs flex items-center gap-1 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
                                   <Users className="h-3 w-3" />

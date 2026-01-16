@@ -364,6 +364,7 @@ export type Database = {
           matter_id: string
           notes: string | null
           paid_amount: number
+          update_source: string | null
           updated_at: string
           user_id: string
           wip_amount: number
@@ -378,6 +379,7 @@ export type Database = {
           matter_id: string
           notes?: string | null
           paid_amount?: number
+          update_source?: string | null
           updated_at?: string
           user_id: string
           wip_amount?: number
@@ -392,6 +394,7 @@ export type Database = {
           matter_id?: string
           notes?: string | null
           paid_amount?: number
+          update_source?: string | null
           updated_at?: string
           user_id?: string
           wip_amount?: number

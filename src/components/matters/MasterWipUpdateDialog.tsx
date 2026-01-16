@@ -355,11 +355,17 @@ export function MasterWipUpdateDialog({
   };
 
   // Review helpers
+  const DISBURSEMENT_THRESHOLD = 1000; // Flag disbursements above this amount
+
   const changedData = useMemo(() => {
-    return importedData.filter((item) => 
-      item.wip.changed || item.accountsReceivable.changed || 
-      item.totalBilled.changed || item.totalPaid.changed
-    );
+    return importedData.filter((item) => {
+      const hasFinancialChanges = item.wip.changed || item.accountsReceivable.changed || 
+                                   item.totalBilled.changed || item.totalPaid.changed;
+      const hasSignificantDisbursements = (item.wipDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
+                                           (item.arDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
+                                           (item.paidDisbursement || 0) >= DISBURSEMENT_THRESHOLD;
+      return hasFinancialChanges || hasSignificantDisbursements;
+    });
   }, [importedData]);
 
   const displayData = showUnchanged ? importedData : changedData;
@@ -374,8 +380,6 @@ export function MasterWipUpdateDialog({
     );
   }, [displayData, searchTerm]);
 
-  const DISBURSEMENT_THRESHOLD = 1000; // Flag disbursements above this amount
-  
   const stats = useMemo(() => {
     const matched = importedData.filter((d) => d.matchedMatterId).length;
     const changed = changedData.length;
@@ -1062,8 +1066,11 @@ export function MasterWipUpdateDialog({
               <div className="flex-1 overflow-auto border rounded-lg min-h-0">
                 <div className="divide-y">
                   {filteredData.map((item) => {
-                    const hasChanges = item.wip.changed || item.accountsReceivable.changed || 
+                    const hasFinancialChanges = item.wip.changed || item.accountsReceivable.changed || 
                                        item.totalBilled.changed || item.totalPaid.changed;
+                    const hasSignificantDisbursements = (item.wipDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
+                                                        (item.arDisbursement || 0) >= DISBURSEMENT_THRESHOLD ||
+                                                        (item.paidDisbursement || 0) >= DISBURSEMENT_THRESHOLD;
                     const isExpanded = expandedRows.has(item.rowIndex);
 
                     return (
@@ -1073,7 +1080,9 @@ export function MasterWipUpdateDialog({
                           'p-3',
                           !item.selected && 'opacity-60',
                           // Highlight matters with manual updates
-                          item.wasManuallyUpdated && item.selected && 'bg-amber-50/80 dark:bg-amber-950/30 border-l-4 border-l-amber-500'
+                          item.wasManuallyUpdated && item.selected && 'bg-amber-50/80 dark:bg-amber-950/30 border-l-4 border-l-amber-500',
+                          // Highlight matters with significant disbursements
+                          !item.wasManuallyUpdated && hasSignificantDisbursements && item.selected && 'bg-rose-50/80 dark:bg-rose-950/30 border-l-4 border-l-rose-500'
                         )}
                       >
                         {/* Manual Update Warning */}
@@ -1088,6 +1097,21 @@ export function MasterWipUpdateDialog({
                                 </span>
                               )}
                               — updating will overwrite your manual input
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Disbursement Warning */}
+                        {hasSignificantDisbursements && item.selected && (
+                          <div className="mb-2 flex items-center gap-2 text-xs text-rose-700 dark:text-rose-400 font-medium">
+                            <AlertTriangle className="h-3.5 w-3.5" />
+                            <span>
+                              Large disbursements detected — may be local counsel fees
+                              <span className="font-normal text-rose-600 dark:text-rose-500 ml-1">
+                                (WIP: {formatCurrency(item.wipDisbursement || 0, item.currency)}, 
+                                AR: {formatCurrency(item.arDisbursement || 0, item.currency)}, 
+                                Paid: {formatCurrency(item.paidDisbursement || 0, item.currency)})
+                              </span>
                             </span>
                           </div>
                         )}
@@ -1112,13 +1136,19 @@ export function MasterWipUpdateDialog({
                             <div className="flex items-center gap-2">
                               <span className={cn(
                                 "font-medium truncate",
-                                item.wasManuallyUpdated && item.selected && "text-amber-800 dark:text-amber-300"
+                                item.wasManuallyUpdated && item.selected && "text-amber-800 dark:text-amber-300",
+                                !item.wasManuallyUpdated && hasSignificantDisbursements && item.selected && "text-rose-800 dark:text-rose-300"
                               )}>
                                 {item.matchedMatterName || item.matterName}
                               </span>
                               {item.wasManuallyUpdated && (
                                 <Badge className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-300 border-amber-300 dark:border-amber-700">
                                   Manual Data
+                                </Badge>
+                              )}
+                              {hasSignificantDisbursements && (
+                                <Badge className="text-[10px] bg-rose-100 text-rose-800 dark:bg-rose-900/50 dark:text-rose-300 border-rose-300 dark:border-rose-700">
+                                  Large Disbursements
                                 </Badge>
                               )}
                               {item.isMultiClientAggregate && (
@@ -1140,20 +1170,54 @@ export function MasterWipUpdateDialog({
                               )}
                             </div>
                           </div>
-                          {!hasChanges && (
+                          {!hasFinancialChanges && !hasSignificantDisbursements && (
                             <Badge variant="secondary" className="text-xs">
                               No changes
+                            </Badge>
+                          )}
+                          {!hasFinancialChanges && hasSignificantDisbursements && (
+                            <Badge variant="outline" className="text-xs bg-rose-50 text-rose-700 border-rose-300">
+                              Disbursements only
                             </Badge>
                           )}
                         </div>
 
                         {/* Expanded Field Details */}
-                        {isExpanded && hasChanges && (
+                        {isExpanded && (hasFinancialChanges || hasSignificantDisbursements) && (
                           <div className="ml-12 mt-2 pl-3 border-l-2 border-muted">
-                            {renderFieldChange(item, 'wip', 'WIP')}
-                            {renderFieldChange(item, 'accountsReceivable', 'AR')}
-                            {renderFieldChange(item, 'totalBilled', 'Billed')}
-                            {renderFieldChange(item, 'totalPaid', 'Paid')}
+                            {hasFinancialChanges && (
+                              <>
+                                {renderFieldChange(item, 'wip', 'WIP')}
+                                {renderFieldChange(item, 'accountsReceivable', 'AR')}
+                                {renderFieldChange(item, 'totalBilled', 'Billed')}
+                                {renderFieldChange(item, 'totalPaid', 'Paid')}
+                              </>
+                            )}
+                            {hasSignificantDisbursements && (
+                              <div className="mt-2 pt-2 border-t border-muted">
+                                <div className="text-xs font-medium text-rose-700 dark:text-rose-400 mb-1">Disbursements (potential local counsel fees):</div>
+                                <div className="grid grid-cols-3 gap-2 text-xs">
+                                  {(item.wipDisbursement || 0) > 0 && (
+                                    <div className="p-2 bg-rose-50 dark:bg-rose-950/30 rounded">
+                                      <div className="text-muted-foreground">WIP Disb</div>
+                                      <div className="font-medium">{formatCurrency(item.wipDisbursement || 0, item.currency)}</div>
+                                    </div>
+                                  )}
+                                  {(item.arDisbursement || 0) > 0 && (
+                                    <div className="p-2 bg-rose-50 dark:bg-rose-950/30 rounded">
+                                      <div className="text-muted-foreground">AR Disb</div>
+                                      <div className="font-medium">{formatCurrency(item.arDisbursement || 0, item.currency)}</div>
+                                    </div>
+                                  )}
+                                  {(item.paidDisbursement || 0) > 0 && (
+                                    <div className="p-2 bg-rose-50 dark:bg-rose-950/30 rounded">
+                                      <div className="text-muted-foreground">Paid Disb</div>
+                                      <div className="font-medium">{formatCurrency(item.paidDisbursement || 0, item.currency)}</div>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>

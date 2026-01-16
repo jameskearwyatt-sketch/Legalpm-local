@@ -13,6 +13,9 @@ export interface LocalCounsel {
   billed_amount: number;
   billing_mode: 'Direct' | 'Disb' | null;
   last_updated: string | null;
+  update_source: 'manual' | 'bulk' | null;
+  wip_updated_at: string | null;
+  billed_updated_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -30,6 +33,9 @@ export interface UpdateLocalCounselInput {
   billing_mode?: 'Direct' | 'Disb' | null;
   last_updated?: string | null;
   allocated_budget?: number;
+  update_source?: 'manual' | 'bulk' | null;
+  wip_updated_at?: string | null;
+  billed_updated_at?: string | null;
 }
 
 export interface UpsertLocalCounselInput {
@@ -86,12 +92,15 @@ export function useLocalCounsels(matterId?: string) {
   // Update a local counsel's financial data
   const updateLocalCounsel = useMutation({
     mutationFn: async (input: UpdateLocalCounselInput) => {
-      const updateData: Partial<LocalCounsel> = {};
+      const updateData: Record<string, unknown> = {};
       if (input.wip_amount !== undefined) updateData.wip_amount = input.wip_amount;
       if (input.billed_amount !== undefined) updateData.billed_amount = input.billed_amount;
       if (input.billing_mode !== undefined) updateData.billing_mode = input.billing_mode;
       if (input.last_updated !== undefined) updateData.last_updated = input.last_updated;
       if (input.allocated_budget !== undefined) updateData.allocated_budget = input.allocated_budget;
+      if (input.update_source !== undefined) updateData.update_source = input.update_source;
+      if (input.wip_updated_at !== undefined) updateData.wip_updated_at = input.wip_updated_at;
+      if (input.billed_updated_at !== undefined) updateData.billed_updated_at = input.billed_updated_at;
 
       const { data, error } = await supabase
         .from('matter_local_counsels')

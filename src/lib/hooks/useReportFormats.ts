@@ -11,6 +11,10 @@ export interface ColumnMappings {
   accounts_receivable?: number;
   total_billed?: number;
   total_paid?: number;
+  // Disbursement columns (optional - for local counsel tracking)
+  wip_disbursements?: number;
+  ar_disbursements?: number;
+  paid_disbursements?: number;
 }
 
 export interface ReportFormat {

@@ -700,6 +700,50 @@ export type Database = {
         }
         Relationships: []
       }
+      lc_disbursement_allocations: {
+        Row: {
+          allocated_to_lc: boolean
+          allocations: Json | null
+          created_at: string
+          disbursement_type: string
+          id: string
+          import_date: string
+          matter_id: string
+          original_amount: number
+          user_id: string
+        }
+        Insert: {
+          allocated_to_lc?: boolean
+          allocations?: Json | null
+          created_at?: string
+          disbursement_type: string
+          id?: string
+          import_date?: string
+          matter_id: string
+          original_amount?: number
+          user_id: string
+        }
+        Update: {
+          allocated_to_lc?: boolean
+          allocations?: Json | null
+          created_at?: string
+          disbursement_type?: string
+          id?: string
+          import_date?: string
+          matter_id?: string
+          original_amount?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lc_disbursement_allocations_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lc_work_item_quotes: {
         Row: {
           created_at: string
@@ -982,41 +1026,50 @@ export type Database = {
         Row: {
           allocated_budget: number
           billed_amount: number
+          billed_updated_at: string | null
           billing_mode: string | null
           created_at: string
           firm_name: string
           id: string
           last_updated: string | null
           matter_id: string
+          update_source: string | null
           updated_at: string
           user_id: string
           wip_amount: number
+          wip_updated_at: string | null
         }
         Insert: {
           allocated_budget?: number
           billed_amount?: number
+          billed_updated_at?: string | null
           billing_mode?: string | null
           created_at?: string
           firm_name: string
           id?: string
           last_updated?: string | null
           matter_id: string
+          update_source?: string | null
           updated_at?: string
           user_id: string
           wip_amount?: number
+          wip_updated_at?: string | null
         }
         Update: {
           allocated_budget?: number
           billed_amount?: number
+          billed_updated_at?: string | null
           billing_mode?: string | null
           created_at?: string
           firm_name?: string
           id?: string
           last_updated?: string | null
           matter_id?: string
+          update_source?: string | null
           updated_at?: string
           user_id?: string
           wip_amount?: number
+          wip_updated_at?: string | null
         }
         Relationships: [
           {

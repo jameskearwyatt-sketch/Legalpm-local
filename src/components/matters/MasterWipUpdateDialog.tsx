@@ -1403,7 +1403,17 @@ export function MasterWipUpdateDialog({
               {/* Data List - with proper scrolling */}
               <div className="flex-1 overflow-auto border rounded-lg min-h-0">
                 <div className="divide-y">
-                  {/* Material Changes Section */}
+                  {/* Material Changes Section Header */}
+                  {filteredMaterialData.length > 0 && (
+                    <div className="p-3 bg-primary/5 border-b-2 border-primary/20 sticky top-0 z-10">
+                      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                        <span>Material Changes ({filteredMaterialData.length})</span>
+                        <span className="text-xs font-normal text-muted-foreground">— significant updates requiring review</span>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Material Changes Items */}
                   {filteredMaterialData.map((item) => {
                     const hasFinancialChanges = item.wip.changed || item.accountsReceivable.changed || 
                                        item.totalBilled.changed || item.totalPaid.changed;
@@ -1561,84 +1571,90 @@ export function MasterWipUpdateDialog({
                     );
                   })}
 
-                  {/* Immaterial Changes Section */}
-                  {filteredImmaterialData.length > 0 && (
-                    <div className="border-t-2 border-dashed border-muted">
-                      <div className="p-3 bg-muted/30">
-                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                          <span>Immaterial Changes ({filteredImmaterialData.length})</span>
-                          <span className="text-xs font-normal">— small corrections (≤2%) to ensure data accuracy</span>
-                        </div>
+                  {/* Immaterial Changes Section - Always show header for visual separation */}
+                  <div className="border-t-4 border-dashed border-muted-foreground/20 mt-2">
+                    <div className="p-3 bg-muted/40 sticky top-0 z-10">
+                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <span>Immaterial Changes ({filteredImmaterialData.length})</span>
+                        <span className="text-xs font-normal">— small corrections (≤2%) to ensure data accuracy</span>
                       </div>
-                      {filteredImmaterialData.map((item) => {
-                        const hasFinancialChanges = item.wip.changed || item.accountsReceivable.changed || 
-                                           item.totalBilled.changed || item.totalPaid.changed;
-                        const isExpanded = expandedRows.has(item.rowIndex);
+                    </div>
+                    {filteredImmaterialData.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-muted-foreground bg-muted/10">
+                        No immaterial changes detected
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-muted/30">
+                        {filteredImmaterialData.map((item) => {
+                          const hasFinancialChanges = item.wip.changed || item.accountsReceivable.changed || 
+                                             item.totalBilled.changed || item.totalPaid.changed;
+                          const isExpanded = expandedRows.has(item.rowIndex);
 
-                        return (
-                          <div 
-                            key={item.rowIndex} 
-                            className={cn(
-                              'p-3 bg-muted/10',
-                              !item.selected && 'opacity-60'
-                            )}
-                          >
-                            {/* Matter Header Row */}
-                            <div className="flex items-center gap-3">
-                              <Checkbox
-                                checked={item.selected}
-                                onCheckedChange={() => toggleMatterSelection(item.rowIndex)}
-                              />
-                              <button
-                                onClick={() => toggleRowExpanded(item.rowIndex)}
-                                className="p-1 hover:bg-muted rounded"
-                              >
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </button>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-medium truncate text-muted-foreground">
-                                    {item.matchedMatterName || item.matterName}
-                                  </span>
-                                  <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-600 dark:bg-slate-900/50 dark:text-slate-400 border-slate-300 dark:border-slate-700">
-                                    Immaterial
-                                  </Badge>
-                                  {item.isMultiClientAggregate && (
-                                    <Badge variant="outline" className="text-xs flex items-center gap-1 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
-                                      <Users className="h-3 w-3" />
-                                      {item.rowIndices?.length || 1} clients aggregated
+                          return (
+                            <div 
+                              key={item.rowIndex} 
+                              className={cn(
+                                'p-3 bg-muted/10',
+                                !item.selected && 'opacity-60'
+                              )}
+                            >
+                              {/* Matter Header Row */}
+                              <div className="flex items-center gap-3">
+                                <Checkbox
+                                  checked={item.selected}
+                                  onCheckedChange={() => toggleMatterSelection(item.rowIndex)}
+                                />
+                                <button
+                                  onClick={() => toggleRowExpanded(item.rowIndex)}
+                                  className="p-1 hover:bg-muted rounded"
+                                >
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4" />
+                                  )}
+                                </button>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium truncate text-muted-foreground">
+                                      {item.matchedMatterName || item.matterName}
+                                    </span>
+                                    <Badge variant="outline" className="text-[10px] bg-slate-100 text-slate-600 dark:bg-slate-900/50 dark:text-slate-400 border-slate-300 dark:border-slate-700">
+                                      Immaterial
                                     </Badge>
+                                    {item.isMultiClientAggregate && (
+                                      <Badge variant="outline" className="text-xs flex items-center gap-1 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800">
+                                        <Users className="h-3 w-3" />
+                                        {item.rowIndices?.length || 1} clients aggregated
+                                      </Badge>
+                                    )}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {item.matterNumber}
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Expanded Field Details */}
+                              {isExpanded && (hasFinancialChanges || item.hasMinorLcDifference) && (
+                                <div className="ml-12 mt-2 pl-3 border-l-2 border-muted">
+                                  {renderFieldChange(item, 'wip', 'WIP')}
+                                  {renderFieldChange(item, 'accountsReceivable', 'AR')}
+                                  {renderFieldChange(item, 'totalBilled', 'Billed')}
+                                  {renderFieldChange(item, 'totalPaid', 'Paid')}
+                                  {item.hasMinorLcDifference && (
+                                    <div className="text-xs text-muted-foreground mt-1 italic">
+                                      Note: Disbursements match existing LC fees (minor ≤2% variance)
+                                    </div>
                                   )}
                                 </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {item.matterNumber}
-                                </div>
-                              </div>
+                              )}
                             </div>
-
-                            {/* Expanded Field Details */}
-                            {isExpanded && (hasFinancialChanges || item.hasMinorLcDifference) && (
-                              <div className="ml-12 mt-2 pl-3 border-l-2 border-muted">
-                                {renderFieldChange(item, 'wip', 'WIP')}
-                                {renderFieldChange(item, 'accountsReceivable', 'AR')}
-                                {renderFieldChange(item, 'totalBilled', 'Billed')}
-                                {renderFieldChange(item, 'totalPaid', 'Paid')}
-                                {item.hasMinorLcDifference && (
-                                  <div className="text-xs text-muted-foreground mt-1 italic">
-                                    Note: Disbursements match existing LC fees (minor ≤2% variance)
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
 
                   {filteredData.length === 0 && (
                     <div className="p-8 text-center text-muted-foreground">

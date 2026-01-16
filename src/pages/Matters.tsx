@@ -43,7 +43,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { BilledAmountCell } from '@/components/matters/BilledAmountCell';
-import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload, History, Eye } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload, History, Eye, Lightbulb } from 'lucide-react';
 import { MasterWipUpdateDialog } from '@/components/matters/MasterWipUpdateDialog';
 import { DisbursementReviewResult } from '@/components/matters/DisbursementReviewDialog';
 import { MasterWipHistoryDialog } from '@/components/matters/MasterWipHistoryDialog';
@@ -1289,10 +1289,21 @@ export default function Matters() {
                                 {(matter as any).matter_display_name || matter.matter_name}
                               </p>
                             </Link>
+                            {(matter as any).show_shaping_proposal && (matter as any).selected_proposal && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <span className="text-[10px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                  <Lightbulb className="h-3 w-3" />
+                                  Showing Proposal
+                                </span>
+                              </div>
+                            )}
                           </TableCell>
                           {isLive && (
                             <>
-                              <TableCell className="p-1">
+                              <TableCell className={cn(
+                                "p-1",
+                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20 ring-1 ring-inset ring-amber-300 dark:ring-amber-700"
+                              )}>
                                 {(() => {
                                   const changeData = masterChangesMap.get(matter.id);
                                   const currency = (matter as any).effective_currency ?? matter.fee_currency;
@@ -1359,7 +1370,10 @@ export default function Matters() {
                                   );
                                 })()}
                               </TableCell>
-                              <TableCell className="text-right">
+                              <TableCell className={cn(
+                                "text-right",
+                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20 ring-1 ring-inset ring-amber-300 dark:ring-amber-700"
+                              )}>
                                 <div className="flex flex-col items-end">
                                   <span className="text-muted-foreground">
                                     {formatCurrency(budgetBurn, (matter as any).effective_currency ?? matter.fee_currency)}
@@ -1373,7 +1387,10 @@ export default function Matters() {
                                   </span>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-right">
+                              <TableCell className={cn(
+                                "text-right",
+                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20 ring-1 ring-inset ring-amber-300 dark:ring-amber-700"
+                              )}>
                                 {matter.local_counsel_billing === 'Disb' && matter.local_counsel_fee > 0 ? (
                                   <div className="flex flex-col items-end">
                                     <span className="text-muted-foreground">
@@ -1391,7 +1408,10 @@ export default function Matters() {
                                   <span className="text-muted-foreground/50">-</span>
                                 )}
                               </TableCell>
-                              <TableCell className="text-right">
+                              <TableCell className={cn(
+                                "text-right",
+                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20 ring-1 ring-inset ring-amber-300 dark:ring-amber-700"
+                              )}>
                                 {(matter as any).pay_full_time_costs ? (
                                   <span className="text-muted-foreground">N/A</span>
                                 ) : (

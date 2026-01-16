@@ -1654,6 +1654,23 @@ export function QuickToDoButton() {
     return sorted;
   }, [rawPersonalTasks, optimisticPersonalOrder]);
 
+  // Filter out must-do-today tasks for the "Today" section
+  const todayTasks = useMemo(() => {
+    const workToday = orderedSlateTasks.filter(t => t.must_do_today);
+    const personalToday = orderedPersonalTasks.filter(t => t.must_do_today);
+    return [...workToday, ...personalToday];
+  }, [orderedSlateTasks, orderedPersonalTasks]);
+
+  // Remaining tasks (not marked as must-do-today)
+  const remainingWorkTasks = useMemo(() => 
+    orderedSlateTasks.filter(t => !t.must_do_today), 
+    [orderedSlateTasks]
+  );
+
+  const remainingPersonalTasks = useMemo(() => 
+    orderedPersonalTasks.filter(t => !t.must_do_today), 
+    [orderedPersonalTasks]
+  );
   // Clear optimistic order when raw data changes (after refetch)
   useEffect(() => {
     setOptimisticSlateOrder(null);
@@ -2634,7 +2651,7 @@ export function QuickToDoButton() {
           <div className="flex-1 min-h-0 overflow-hidden">
             <ScrollArea className="h-full [&>[data-radix-scroll-area-viewport]]:max-h-full">
               <div className="p-3 pb-4 space-y-4">
-                {/* Work Tasks Section */}
+                {/* Empty state */}
                 {orderedSlateTasks.length === 0 && orderedPersonalTasks.length === 0 ? (
                   <p className="text-center text-muted-foreground text-sm py-8">
                     No tasks on your Slate yet.<br />
@@ -2642,13 +2659,120 @@ export function QuickToDoButton() {
                   </p>
                 ) : (
                   <>
+                    {/* TODAY Section - Must Do Today tasks */}
+                    {todayTasks.length > 0 && (
+                      <div className="bg-orange-50 dark:bg-orange-950/30 -mx-3 px-3 py-2 border-b border-orange-200 dark:border-orange-800/50">
+                        <div className="flex items-center gap-2 mb-2 px-1">
+                          <span className="text-orange-600 dark:text-orange-400 font-bold text-[10px]">!</span>
+                          <span className="text-xs font-semibold text-orange-700 dark:text-orange-300">Today</span>
+                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-orange-200 text-orange-700 dark:bg-orange-900 dark:text-orange-300">{todayTasks.length}</Badge>
+                        </div>
+                        <div className="space-y-2">
+                          {todayTasks.map((task, index) => {
+                            const isPersonal = personalSlateItems.some(p => p.id === task.id);
+                            
+                            if (isPersonal) {
+                              return (
+                                <SortablePersonalTask
+                                  key={task.id}
+                                  task={task}
+                                  index={index}
+                                  onComplete={() => completeSlateItem.mutate({ id: task.id, isCompleted: true })}
+                                  onDelete={() => deleteSlateItem.mutate(task.id)}
+                                  onToggleMustDoToday={() => {
+                                    toggleMustDoToday.mutate({ id: task.id, mustDoToday: false });
+                                  }}
+                                />
+                              );
+                            }
+                            
+                            return (
+                              <SortableSlateItem
+                                key={task.id}
+                                task={task}
+                                index={index}
+                                onCompleteWithNotes={() => {
+                                  if (task.source === 'slate-only') {
+                                    completeSlateItem.mutate({ id: task.id, isCompleted: true });
+                                    return;
+                                  }
+                                  const unified: UnifiedTask = { ...task, source: task.source };
+                                  setTaskToComplete(unified);
+                                  setCompletionNotes("");
+                                  setCompleteDialogOpen(true);
+                                }}
+                                onQuickComplete={async () => {
+                                  if (task.source === 'slate-only') {
+                                    completeSlateItem.mutate({ id: task.id, isCompleted: true });
+                                    return;
+                                  }
+                                  if (task.source === 'growth') {
+                                    const realId = task.id.replace('growth-', '');
+                                    const { error } = await supabase
+                                      .from('growth_tasks')
+                                      .update({
+                                        is_completed: true,
+                                        completed_at: new Date().toISOString(),
+                                      })
+                                      .eq('id', realId);
+                                    if (error) {
+                                      toast.error('Failed to complete task');
+                                    } else {
+                                      refetchGrowthTasks();
+                                    }
+                                  } else {
+                                    const { error } = await supabase
+                                      .from('quick_tasks')
+                                      .update({
+                                        is_completed: true,
+                                        completed_at: new Date().toISOString(),
+                                      })
+                                      .eq('id', task.id);
+                                    if (error) {
+                                      toast.error('Failed to complete task');
+                                    } else {
+                                      fetchTasks();
+                                    }
+                                  }
+                                }}
+                                onRemoveFromSlate={() => toggleSlate(task.id, true, task.source)}
+                                onPromoteToTaskList={task.source === 'slate-only' ? () => {
+                                  const slateItem = workSlateItems.find(i => i.id === task.id);
+                                  if (slateItem) promoteSlateOnlyToTaskList(slateItem);
+                                } : undefined}
+                                onSnapToTop={() => handleSnapToTop(task.id)}
+                                onToggleMustDoToday={async () => {
+                                  if (task.source === 'slate-only') {
+                                    toggleMustDoToday.mutate({ id: task.id, mustDoToday: false });
+                                  } else if (task.source === 'growth') {
+                                    const realId = task.id.replace('growth-', '');
+                                    const { error } = await supabase
+                                      .from('growth_tasks')
+                                      .update({ must_do_today: false })
+                                      .eq('id', realId);
+                                    if (!error) refetchGrowthTasks();
+                                  } else {
+                                    const { error } = await supabase
+                                      .from('quick_tasks')
+                                      .update({ must_do_today: false })
+                                      .eq('id', task.id);
+                                    if (!error) fetchTasks();
+                                  }
+                                }}
+                              />
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Work Tasks */}
-                    {orderedSlateTasks.length > 0 && (
+                    {remainingWorkTasks.length > 0 && (
                       <div>
                         <div className="flex items-center gap-2 mb-2 px-1">
                           <Briefcase className="h-3.5 w-3.5 text-blue-500" />
                           <span className="text-xs font-medium text-muted-foreground">Work Tasks</span>
-                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{orderedSlateTasks.length}</Badge>
+                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{remainingWorkTasks.length}</Badge>
                         </div>
                         <DndContext
                           sensors={slateSensors}
@@ -2656,18 +2780,17 @@ export function QuickToDoButton() {
                           onDragEnd={handleSlateDragEnd}
                         >
                           <SortableContext 
-                            items={orderedSlateTasks.map(t => t.id)} 
+                            items={remainingWorkTasks.map(t => t.id)} 
                             strategy={verticalListSortingStrategy}
                           >
                             <div className="space-y-2">
-                              {orderedSlateTasks.map((task, index) => (
+                              {remainingWorkTasks.map((task, index) => (
                                 <SortableSlateItem
                                   key={task.id}
                                   task={task}
                                   index={index}
                                   onCompleteWithNotes={() => {
                                     if (task.source === 'slate-only') {
-                                      // Complete slate-only item via database
                                       completeSlateItem.mutate({ id: task.id, isCompleted: true });
                                       return;
                                     }
@@ -2678,7 +2801,6 @@ export function QuickToDoButton() {
                                   }}
                                   onQuickComplete={async () => {
                                     if (task.source === 'slate-only') {
-                                      // Complete slate-only item via database
                                       completeSlateItem.mutate({ id: task.id, isCompleted: true });
                                       return;
                                     }
@@ -2753,12 +2875,12 @@ export function QuickToDoButton() {
                     )}
 
                     {/* Personal Tasks Section */}
-                    {orderedPersonalTasks.length > 0 && (
+                    {remainingPersonalTasks.length > 0 && (
                       <div className="pt-2">
                         <div className="flex items-center gap-2 mb-2 px-1">
                           <Home className="h-3.5 w-3.5 text-rose-500" />
                           <span className="text-xs font-medium text-muted-foreground">Personal</span>
-                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">{orderedPersonalTasks.length}</Badge>
+                          <Badge variant="secondary" className="text-[10px] h-4 px-1.5 bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300">{remainingPersonalTasks.length}</Badge>
                         </div>
                         <DndContext
                           sensors={slateSensors}
@@ -2766,11 +2888,11 @@ export function QuickToDoButton() {
                           onDragEnd={handlePersonalDragEnd}
                         >
                           <SortableContext 
-                            items={orderedPersonalTasks.map(t => t.id)} 
+                            items={remainingPersonalTasks.map(t => t.id)} 
                             strategy={verticalListSortingStrategy}
                           >
                             <div className="space-y-2">
-                              {orderedPersonalTasks.map((task, index) => {
+                              {remainingPersonalTasks.map((task, index) => {
                                 return (
                                   <SortablePersonalTask
                                     key={task.id}

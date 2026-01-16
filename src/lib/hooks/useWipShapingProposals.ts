@@ -71,16 +71,25 @@ export function useWipShapingProposals(matterId?: string) {
   // Get the currently selected proposal
   const selectedProposal = proposalsQuery.data?.find(p => p.is_selected) || null;
 
-  // Create a new proposal
+  // Create a new proposal (auto-selects as active)
   const createProposal = useMutation({
     mutationFn: async (input: CreateProposalInput) => {
       if (!user?.id) throw new Error('User not authenticated');
+      
+      // First, deselect all existing proposals for this matter
+      await supabase
+        .from('wip_shaping_proposals')
+        .update({ is_selected: false })
+        .eq('matter_id', input.matter_id);
+      
+      // Create the new proposal and auto-select it
       const { data, error } = await supabase
         .from('wip_shaping_proposals')
         .insert({
           ...input,
           user_id: user.id,
           proposal_date: new Date().toISOString().split('T')[0],
+          is_selected: true,
         })
         .select()
         .single();

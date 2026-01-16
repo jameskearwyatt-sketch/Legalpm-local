@@ -612,14 +612,14 @@ const SortableSlateItem = ({
           type="button"
           onClick={onToggleMustDoToday}
           className={cn(
-            "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+            "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors text-[10px] font-bold",
             task.must_do_today 
               ? "bg-orange-500 border-orange-500 text-white" 
-              : "border-orange-300 hover:border-orange-400 hover:bg-orange-50 dark:border-orange-700 dark:hover:bg-orange-950/30"
+              : "border-orange-300 hover:border-orange-400 hover:bg-orange-50 dark:border-orange-700 dark:hover:bg-orange-950/30 text-orange-400"
           )}
           title={task.must_do_today ? "Remove from today's must-do" : "Mark as must-do today"}
         >
-          {task.must_do_today && <Flame className="h-2.5 w-2.5" />}
+          !
         </button>
       )}
       
@@ -741,14 +741,14 @@ const SortablePersonalTask = ({
           type="button"
           onClick={onToggleMustDoToday}
           className={cn(
-            "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+            "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors text-[10px] font-bold",
             task.must_do_today 
               ? "bg-orange-500 border-orange-500 text-white" 
-              : "border-orange-300 hover:border-orange-400 hover:bg-orange-50 dark:border-orange-700 dark:hover:bg-orange-950/30"
+              : "border-orange-300 hover:border-orange-400 hover:bg-orange-50 dark:border-orange-700 dark:hover:bg-orange-950/30 text-orange-400"
           )}
           title={task.must_do_today ? "Remove from today's must-do" : "Mark as must-do today"}
         >
-          {task.must_do_today && <Flame className="h-2.5 w-2.5" />}
+          !
         </button>
       )}
       

@@ -4,7 +4,7 @@ import {
   Briefcase, GraduationCap, Lightbulb, Maximize2, Minimize2,
   ListTodo, LayoutGrid, Filter, Check, ChevronDown, ChevronRight,
   Zap, Target, CalendarClock, Feather, Flame, MessageSquare, Pin, PinOff,
-  Clipboard, ClipboardCheck, GripHorizontal, GripVertical, Search, Home, ArrowUp
+  Clipboard, ClipboardCheck, GripHorizontal, GripVertical, Search, Home, ArrowUp, Mail
 } from "lucide-react";
 import { 
   DndContext, 
@@ -1677,6 +1677,65 @@ export function QuickToDoButton() {
     orderedPersonalTasks.filter(t => !t.must_do_today), 
     [orderedPersonalTasks]
   );
+
+  // Generate email content for the slate
+  const handleEmailSlate = useCallback(() => {
+    const today = format(new Date(), 'EEEE, MMMM d, yyyy');
+    let emailBody = `My Task Slate for ${today}\n\n`;
+    
+    // Today section
+    if (hasTodayTasks) {
+      emailBody += '=== MUST DO TODAY ===\n\n';
+      
+      if (todayWorkTasks.length > 0) {
+        emailBody += 'Work:\n';
+        todayWorkTasks.forEach((task, idx) => {
+          const projectInfo = task.projectName ? ` (${task.projectName})` : '';
+          emailBody += `  ${idx + 1}. ${task.title}${projectInfo}\n`;
+        });
+        emailBody += '\n';
+      }
+      
+      if (todayPersonalTasks.length > 0) {
+        emailBody += 'Personal:\n';
+        todayPersonalTasks.forEach((task, idx) => {
+          emailBody += `  ${idx + 1}. ${task.title}\n`;
+        });
+        emailBody += '\n';
+      }
+    }
+    
+    // Remaining section
+    const hasRemainingTasks = remainingWorkTasks.length > 0 || remainingPersonalTasks.length > 0;
+    if (hasRemainingTasks) {
+      emailBody += '=== OTHER TASKS ===\n\n';
+      
+      if (remainingWorkTasks.length > 0) {
+        emailBody += 'Work:\n';
+        remainingWorkTasks.forEach((task, idx) => {
+          const projectInfo = task.projectName ? ` (${task.projectName})` : '';
+          emailBody += `  ${idx + 1}. ${task.title}${projectInfo}\n`;
+        });
+        emailBody += '\n';
+      }
+      
+      if (remainingPersonalTasks.length > 0) {
+        emailBody += 'Personal:\n';
+        remainingPersonalTasks.forEach((task, idx) => {
+          emailBody += `  ${idx + 1}. ${task.title}\n`;
+        });
+        emailBody += '\n';
+      }
+    }
+    
+    const totalTasks = orderedSlateTasks.length + orderedPersonalTasks.length;
+    emailBody += `---\nTotal: ${totalTasks} task${totalTasks !== 1 ? 's' : ''} on slate`;
+    
+    const subject = `Task Slate - ${today}`;
+    const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+    
+    window.open(mailtoUrl, '_blank');
+  }, [hasTodayTasks, todayWorkTasks, todayPersonalTasks, remainingWorkTasks, remainingPersonalTasks, orderedSlateTasks, orderedPersonalTasks]);
   // Clear optimistic order when raw data changes (after refetch)
   useEffect(() => {
     setOptimisticSlateOrder(null);
@@ -2640,6 +2699,16 @@ export function QuickToDoButton() {
                   </p>
                 </div>
               </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleEmailSlate();
+                }}
+                className="h-7 w-7 flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+                title="Email Slate"
+              >
+                <Mail className="h-3.5 w-3.5" />
+              </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();

@@ -562,6 +562,7 @@ export type Database = {
           id: string
           importance: Database["public"]["Enums"]["task_importance"]
           is_completed: boolean
+          must_do_today: boolean
           on_slate: boolean
           pinned_to_tasklist: boolean
           project_id: string
@@ -584,6 +585,7 @@ export type Database = {
           id?: string
           importance?: Database["public"]["Enums"]["task_importance"]
           is_completed?: boolean
+          must_do_today?: boolean
           on_slate?: boolean
           pinned_to_tasklist?: boolean
           project_id: string
@@ -606,6 +608,7 @@ export type Database = {
           id?: string
           importance?: Database["public"]["Enums"]["task_importance"]
           is_completed?: boolean
+          must_do_today?: boolean
           on_slate?: boolean
           pinned_to_tasklist?: boolean
           project_id?: string
@@ -1665,6 +1668,7 @@ export type Database = {
           importance: Database["public"]["Enums"]["task_importance"]
           is_completed: boolean
           is_urgent: boolean
+          must_do_today: boolean
           on_slate: boolean
           slate_sort_order: number
           title: string
@@ -1680,6 +1684,7 @@ export type Database = {
           importance?: Database["public"]["Enums"]["task_importance"]
           is_completed?: boolean
           is_urgent?: boolean
+          must_do_today?: boolean
           on_slate?: boolean
           slate_sort_order?: number
           title: string
@@ -1695,6 +1700,7 @@ export type Database = {
           importance?: Database["public"]["Enums"]["task_importance"]
           is_completed?: boolean
           is_urgent?: boolean
+          must_do_today?: boolean
           on_slate?: boolean
           slate_sort_order?: number
           title?: string

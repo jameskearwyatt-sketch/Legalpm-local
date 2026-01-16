@@ -502,8 +502,20 @@ export default function Matters() {
   const [tabFilter, setTabFilter] = useState<TabFilter>('Live');
   const [clientFilter, setClientFilter] = useState<string>('all');
   const [practiceAreaFilter, setPracticeAreaFilter] = useState<string[]>([]);
-  const [sortField, setSortField] = useState<SortField>('matter_name');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+  const [sortField, setSortField] = useState<SortField>(() => {
+    const saved = localStorage.getItem('matters-sort-field');
+    return (saved as SortField) || 'matter_name';
+  });
+  const [sortDirection, setSortDirection] = useState<SortDirection>(() => {
+    const saved = localStorage.getItem('matters-sort-direction');
+    return (saved as SortDirection) || 'asc';
+  });
+
+  // Persist sort preferences to localStorage
+  useEffect(() => {
+    localStorage.setItem('matters-sort-field', sortField);
+    localStorage.setItem('matters-sort-direction', sortDirection);
+  }, [sortField, sortDirection]);
   const [showMasterWipDialog, setShowMasterWipDialog] = useState(false);
   const [showMasterWipHistoryDialog, setShowMasterWipHistoryDialog] = useState(false);
   const { createMasterUpdate, lastMasterChanges, lastMasterUpdateDate } = useMasterWipUpdates();

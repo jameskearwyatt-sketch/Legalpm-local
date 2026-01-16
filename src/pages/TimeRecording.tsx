@@ -34,7 +34,8 @@ import {
   ChevronDown,
   Save,
   Trash2,
-  FolderOpen
+  FolderOpen,
+  Mail
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -48,6 +49,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -162,6 +170,10 @@ export default function TimeRecording() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [processedOutput, setProcessedOutput] = useState<DayOutput[] | null>(null);
   const [copied, setCopied] = useState(false);
+  
+  // Email dialog state
+  const [emailDialogOpen, setEmailDialogOpen] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState("");
 
   // Filter only live matters
   const liveMatters = useMemo(() => 
@@ -959,6 +971,97 @@ export default function TimeRecording() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Format output for email (enhanced plain text with emojis)
+  const formatOutputForEmail = (): string => {
+    if (!processedOutput) return '';
+
+    const totalHours = processedOutput.reduce(
+      (sum, day) => sum + day.entries.reduce((s, e) => s + e.hours, 0), 
+      0
+    );
+    const totalEntries = processedOutput.reduce((sum, day) => sum + day.entries.length, 0);
+    
+    let output = `📋 TIME RECORDING SUMMARY\n`;
+    output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    output += `⏱️ Total Hours: ${totalHours.toFixed(2)}\n`;
+    output += `📊 Total Entries: ${totalEntries}\n`;
+    output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    for (const day of processedOutput) {
+      const dayHours = day.entries.reduce((s, e) => s + e.hours, 0);
+      output += `📅 ${format(day.date, 'EEEE, d MMMM yyyy')}\n`;
+      output += `─────────────────────────────────────────────\n`;
+      output += `   ⏱️ ${dayHours.toFixed(2)} hours • ${day.entries.length} entries\n\n`;
+
+      if (day.entries.length === 0) {
+        output += `   No time recorded\n\n`;
+        continue;
+      }
+
+      let lastMatterId: string | null = null;
+
+      for (const entry of day.entries) {
+        if (entry.type === 'matter') {
+          const isNewMatter = entry.matterId !== lastMatterId;
+
+          if (isNewMatter) {
+            if (lastMatterId !== null) {
+              output += `\n`;
+            }
+            output += `   💼 CLIENT: ${entry.clientName || 'N/A'}\n`;
+            output += `   📁 MATTER: ${entry.matterName || 'N/A'}\n`;
+            output += `   🔢 NUMBER: ${entry.cmNumber || 'N/A'}\n`;
+            lastMatterId = entry.matterId || null;
+          }
+
+          if (entry.workItemName) {
+            output += `      • ${entry.workItemName}\n`;
+          }
+          output += `        ⏱️ ${entry.hours} hrs\n`;
+          output += `        📝 ${(entry.polishedNarrative || entry.narrative).replace(/\n/g, '\n           ')}\n\n`;
+        } else {
+          lastMatterId = null;
+          const code = entry.nonChargeableCode ? ` (${entry.nonChargeableCode})` : '';
+          output += `   🔸 NON-CHARGEABLE: ${entry.nonChargeableName}${code}\n`;
+          if (entry.otherDescription) {
+            output += `      Description: ${entry.otherDescription}\n`;
+          }
+          output += `      ⏱️ ${entry.hours} hrs\n`;
+          output += `      📝 ${entry.polishedNarrative || entry.narrative}\n\n`;
+        }
+      }
+      output += `\n`;
+    }
+
+    output += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+    output += `✨ Generated from Time Recording`;
+
+    return output;
+  };
+
+  // Open email dialog
+  const handleEmailTimeRecording = () => {
+    setRecipientEmail("");
+    setEmailDialogOpen(true);
+  };
+
+  // Send time recording via email
+  const sendTimeRecordingEmail = () => {
+    const emailBody = formatOutputForEmail();
+    const dateRange = processedOutput && processedOutput.length > 0 
+      ? processedOutput.length === 1 
+        ? format(processedOutput[0].date, 'EEEE, d MMM')
+        : `${format(processedOutput[0].date, 'd MMM')} - ${format(processedOutput[processedOutput.length - 1].date, 'd MMM yyyy')}`
+      : format(new Date(), 'd MMM yyyy');
+    
+    const subject = `📋 Time Recording - ${dateRange}`;
+    const toEmail = recipientEmail.trim() || '';
+    const mailtoUrl = `mailto:${encodeURIComponent(toEmail)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(emailBody)}`;
+    
+    window.open(mailtoUrl, '_blank');
+    setEmailDialogOpen(false);
+  };
+
   const startOver = () => {
     setStep('mode-select');
     setMode(null);
@@ -1730,6 +1833,10 @@ export default function TimeRecording() {
               </>
             )}
           </Button>
+          <Button variant="secondary" onClick={handleEmailTimeRecording}>
+            <Mail className="mr-2 h-4 w-4" />
+            Email
+          </Button>
         </div>
       </div>
 
@@ -1827,6 +1934,55 @@ export default function TimeRecording() {
         {step === 'grid-input' && renderGridInput()}
         {step === 'output' && renderOutput()}
       </div>
+
+      {/* Email Time Recording Dialog */}
+      <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Email Time Recording
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label htmlFor="tr-recipient-email" className="text-sm font-medium">
+                Send to (e.g., your PA)
+              </label>
+              <Input
+                id="tr-recipient-email"
+                type="email"
+                placeholder="pa@example.com"
+                value={recipientEmail}
+                onChange={(e) => setRecipientEmail(e.target.value)}
+                className="w-full"
+              />
+              <p className="text-xs text-muted-foreground">
+                Leave blank to choose the recipient in your email client
+              </p>
+            </div>
+            {processedOutput && (
+              <div className="bg-muted/50 rounded-lg p-3 text-xs space-y-1">
+                <p className="font-medium text-foreground">Email will include:</p>
+                <div className="text-muted-foreground space-y-0.5">
+                  <p>📅 {processedOutput.length} day(s) of time entries</p>
+                  <p>📊 {processedOutput.reduce((sum, day) => sum + day.entries.length, 0)} total entries</p>
+                  <p>⏱️ {processedOutput.reduce((sum, day) => sum + day.entries.reduce((s, e) => s + e.hours, 0), 0).toFixed(2)} total hours</p>
+                </div>
+              </div>
+            )}
+          </div>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setEmailDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={sendTimeRecordingEmail} className="gap-2">
+              <Mail className="h-4 w-4" />
+              Open in Email Client
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

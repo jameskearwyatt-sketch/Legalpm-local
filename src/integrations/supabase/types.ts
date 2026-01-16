@@ -1247,6 +1247,7 @@ export type Database = {
             | null
           practice_area: string | null
           quote_currency: string | null
+          show_shaping_proposal: boolean
           source: Database["public"]["Enums"]["matter_source"] | null
           start_date: string | null
           status: Database["public"]["Enums"]["matter_status"]
@@ -1304,6 +1305,7 @@ export type Database = {
             | null
           practice_area?: string | null
           quote_currency?: string | null
+          show_shaping_proposal?: boolean
           source?: Database["public"]["Enums"]["matter_source"] | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["matter_status"]
@@ -1361,6 +1363,7 @@ export type Database = {
             | null
           practice_area?: string | null
           quote_currency?: string | null
+          show_shaping_proposal?: boolean
           source?: Database["public"]["Enums"]["matter_source"] | null
           start_date?: string | null
           status?: Database["public"]["Enums"]["matter_status"]
@@ -1985,6 +1988,65 @@ export type Database = {
           wip_warning_threshold?: number
         }
         Relationships: []
+      }
+      wip_shaping_proposals: {
+        Row: {
+          accounts_receivable: number
+          billed_amount: number
+          created_at: string
+          id: string
+          is_selected: boolean
+          matter_id: string
+          notes: string
+          paid_amount: number
+          proposal_date: string
+          status: string
+          updated_at: string
+          user_id: string
+          wip_amount: number
+          wip_write_off_amount: number
+        }
+        Insert: {
+          accounts_receivable?: number
+          billed_amount?: number
+          created_at?: string
+          id?: string
+          is_selected?: boolean
+          matter_id: string
+          notes: string
+          paid_amount?: number
+          proposal_date?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+          wip_amount?: number
+          wip_write_off_amount?: number
+        }
+        Update: {
+          accounts_receivable?: number
+          billed_amount?: number
+          created_at?: string
+          id?: string
+          is_selected?: boolean
+          matter_id?: string
+          notes?: string
+          paid_amount?: number
+          proposal_date?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+          wip_amount?: number
+          wip_write_off_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wip_shaping_proposals_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

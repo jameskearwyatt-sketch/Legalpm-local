@@ -679,7 +679,33 @@ export default function MatterDetail() {
 
         {/* Budget Overview & Financial Summary - only for non-pipeline matters */}
         {!isPipeline && (
-          <div className="grid md:grid-cols-2 gap-6">
+          <>
+            {/* Info icon explaining difference between Budget Overview and Financial Summary */}
+            <div className="flex justify-center mb-2">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-primary/80 hover:text-primary hover:bg-primary/10 border border-primary/30 transition-colors">
+                    <HelpCircle className="h-4 w-4" />
+                    <span className="text-xs font-medium">Understanding the difference</span>
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80 text-sm" side="bottom">
+                  <div className="space-y-2">
+                    <p className="font-semibold text-foreground">Why might these figures differ?</p>
+                    <p className="text-muted-foreground">
+                      <strong>BM Financial Summary</strong> shows a top-down snapshot directly from the firm's billing system — it's always accurate to what's on the system.
+                    </p>
+                    <p className="text-muted-foreground">
+                      <strong>Budget Overview</strong> is built bottom-up from your budget utilisation updates. It's only as accurate as the WIP you've allocated to individual work streams.
+                    </p>
+                    <p className="text-muted-foreground">
+                      In a perfect world, these match. If they don't, some WIP may be unallocated or misallocated in your budget utilisation.
+                    </p>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="grid md:grid-cols-2 gap-6">
             {/* Budget overview */}
             <Card className="shadow-card">
               <CardHeader className="flex flex-row items-start justify-between">
@@ -910,31 +936,6 @@ export default function MatterDetail() {
                 )}
               </CardContent>
             </Card>
-
-            {/* Info icon explaining difference between Budget Overview and Financial Summary */}
-            <div className="flex justify-center -mb-2 -mt-1">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <button className="p-1 rounded-full text-muted-foreground/60 hover:text-muted-foreground hover:bg-muted/50 transition-colors">
-                    <HelpCircle className="h-4 w-4" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent className="w-80 text-sm" side="bottom">
-                  <div className="space-y-2">
-                    <p className="font-semibold text-foreground">Why might these figures differ?</p>
-                    <p className="text-muted-foreground">
-                      <strong>BM Financial Summary</strong> shows a top-down snapshot directly from the firm's billing system — it's always accurate to what's on the system.
-                    </p>
-                    <p className="text-muted-foreground">
-                      <strong>Budget Overview</strong> is built bottom-up from your budget utilisation updates. It's only as accurate as the WIP you've allocated to individual work streams.
-                    </p>
-                    <p className="text-muted-foreground">
-                      In a perfect world, these match. If they don't, some WIP may be unallocated or misallocated in your budget utilisation.
-                    </p>
-                  </div>
-                </PopoverContent>
-              </Popover>
-            </div>
 
             {/* BM Financial Summary */}
             <Card className="shadow-card">
@@ -1174,7 +1175,8 @@ export default function MatterDetail() {
                 </div>
               </CardContent>
             </Card>
-          </div>
+            </div>
+          </>
         )}
 
         {/* Financial Snapshot Update Dialog - outside the conditional grid but still checks for non-pipeline */}

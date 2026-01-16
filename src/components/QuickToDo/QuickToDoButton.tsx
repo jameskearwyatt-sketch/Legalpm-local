@@ -102,6 +102,7 @@ interface UnifiedTask {
   on_slate?: boolean;
   completion_notes?: string | null;
   slate_sort_order?: number;
+  must_do_today?: boolean;
 }
 
 // SlateOnlyItem type is now deprecated - we use SlateItem from useSlateItems hook
@@ -528,6 +529,7 @@ interface SortableSlateItemProps {
   onRemoveFromSlate: () => void;
   onPromoteToTaskList?: () => void;
   onSnapToTop: () => void;
+  onToggleMustDoToday?: () => void;
 }
 
 const SortableSlateItem = ({ 
@@ -538,6 +540,7 @@ const SortableSlateItem = ({
   onRemoveFromSlate,
   onPromoteToTaskList,
   onSnapToTop,
+  onToggleMustDoToday,
 }: SortableSlateItemProps) => {
   const {
     attributes,
@@ -564,9 +567,10 @@ const SortableSlateItem = ({
       className={cn(
         "flex items-start gap-2 p-2 rounded-lg group min-w-0",
         isDragging && "shadow-lg ring-2 ring-primary/20",
-        isSlateOnly 
+        task.must_do_today && "ring-2 ring-orange-400/50 bg-orange-50/30 dark:bg-orange-950/20",
+        isSlateOnly && !task.must_do_today
           ? "bg-amber-50/50 dark:bg-amber-950/20 border border-dashed border-amber-300/50 dark:border-amber-700/30" 
-          : "bg-muted/50"
+          : !task.must_do_today && "bg-muted/50"
       )}
     >
       {/* Drag handle with number and snap to top */}
@@ -578,9 +582,11 @@ const SortableSlateItem = ({
         >
           <div className={cn(
             "flex items-center justify-center w-5 h-5 rounded text-xs font-bold",
-            isSlateOnly 
-              ? "bg-amber-200/50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
-              : "bg-primary/10 text-primary"
+            task.must_do_today 
+              ? "bg-orange-200 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300"
+              : isSlateOnly 
+                ? "bg-amber-200/50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                : "bg-primary/10 text-primary"
           )}>
             {index + 1}
           </div>
@@ -598,6 +604,23 @@ const SortableSlateItem = ({
           </Button>
         )}
       </div>
+      
+      {/* Must do today checkbox - only for slate-only items */}
+      {isSlateOnly && onToggleMustDoToday && (
+        <button
+          type="button"
+          onClick={onToggleMustDoToday}
+          className={cn(
+            "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+            task.must_do_today 
+              ? "bg-orange-500 border-orange-500 text-white" 
+              : "border-orange-300 hover:border-orange-400 hover:bg-orange-50 dark:border-orange-700 dark:hover:bg-orange-950/30"
+          )}
+          title={task.must_do_today ? "Remove from today's must-do" : "Mark as must-do today"}
+        >
+          {task.must_do_today && <Flame className="h-2.5 w-2.5" />}
+        </button>
+      )}
       
       {/* Dual checkbox */}
       <div className="flex items-center gap-1 shrink-0">
@@ -618,7 +641,8 @@ const SortableSlateItem = ({
       </div>
       <span className={cn(
         "flex-1 text-sm min-w-0 break-words",
-        isSlateOnly && "italic text-muted-foreground"
+        isSlateOnly && "italic text-muted-foreground",
+        task.must_do_today && "font-medium text-orange-700 dark:text-orange-300"
       )}>
         {task.title}
       </span>
@@ -651,10 +675,11 @@ const SortableSlateItem = ({
 
 // Sortable wrapper for personal tasks
 interface SortablePersonalTaskProps {
-  task: { id: string; title: string };
+  task: { id: string; title: string; must_do_today?: boolean };
   index: number;
   onComplete: () => void;
   onDelete: () => void;
+  onToggleMustDoToday?: () => void;
 }
 
 const SortablePersonalTask = ({ 
@@ -662,6 +687,7 @@ const SortablePersonalTask = ({
   index, 
   onComplete, 
   onDelete,
+  onToggleMustDoToday,
 }: SortablePersonalTaskProps) => {
   const {
     attributes,
@@ -684,8 +710,11 @@ const SortablePersonalTask = ({
       ref={setNodeRef} 
       style={style}
       className={cn(
-        "flex items-start gap-2 p-2 rounded-lg group min-w-0 bg-rose-50/50 dark:bg-rose-950/20 border border-dashed border-rose-300/50 dark:border-rose-700/30",
-        isDragging && "shadow-lg ring-2 ring-rose-300/50"
+        "flex items-start gap-2 p-2 rounded-lg group min-w-0 border border-dashed",
+        isDragging && "shadow-lg ring-2 ring-rose-300/50",
+        task.must_do_today 
+          ? "ring-2 ring-orange-400/50 bg-orange-50/30 dark:bg-orange-950/20 border-orange-300/50 dark:border-orange-700/30"
+          : "bg-rose-50/50 dark:bg-rose-950/20 border-rose-300/50 dark:border-rose-700/30"
       )}
     >
       {/* Drag handle with number */}
@@ -694,11 +723,33 @@ const SortablePersonalTask = ({
         {...listeners}
         className="flex items-center gap-1 shrink-0 cursor-grab active:cursor-grabbing touch-none"
       >
-        <div className="flex items-center justify-center w-5 h-5 rounded text-xs font-bold bg-rose-200/50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400">
+        <div className={cn(
+          "flex items-center justify-center w-5 h-5 rounded text-xs font-bold",
+          task.must_do_today 
+            ? "bg-orange-200 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300"
+            : "bg-rose-200/50 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400"
+        )}>
           {index + 1}
         </div>
         <GripVertical className="h-3.5 w-3.5 text-muted-foreground/50" />
       </div>
+      
+      {/* Must do today checkbox */}
+      {onToggleMustDoToday && (
+        <button
+          type="button"
+          onClick={onToggleMustDoToday}
+          className={cn(
+            "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+            task.must_do_today 
+              ? "bg-orange-500 border-orange-500 text-white" 
+              : "border-orange-300 hover:border-orange-400 hover:bg-orange-50 dark:border-orange-700 dark:hover:bg-orange-950/30"
+          )}
+          title={task.must_do_today ? "Remove from today's must-do" : "Mark as must-do today"}
+        >
+          {task.must_do_today && <Flame className="h-2.5 w-2.5" />}
+        </button>
+      )}
       
       {/* Checkbox */}
       <Checkbox
@@ -708,7 +759,12 @@ const SortablePersonalTask = ({
         title="Complete"
       />
       
-      <span className="flex-1 text-sm min-w-0 break-words italic text-muted-foreground">
+      <span className={cn(
+        "flex-1 text-sm min-w-0 break-words italic",
+        task.must_do_today 
+          ? "font-medium text-orange-700 dark:text-orange-300"
+          : "text-muted-foreground"
+      )}>
         {task.title}
       </span>
       
@@ -741,6 +797,7 @@ export function QuickToDoButton() {
     completeSlateItem,
     reorderSlateItems,
     promoteToQuickTask,
+    toggleMustDoToday,
   } = useSlateItems();
   const { batchUpdateSlateOrder } = useSlateOrder();
   
@@ -1520,6 +1577,7 @@ export function QuickToDoButton() {
       source: 'slate-only' as const,
       on_slate: true,
       slate_sort_order: item.sort_order,
+      must_do_today: item.must_do_today,
     }));
   }, [workSlateItems]);
 
@@ -1535,6 +1593,7 @@ export function QuickToDoButton() {
       source: 'slate-only' as const,
       on_slate: true,
       slate_sort_order: item.sort_order,
+      must_do_today: item.must_do_today,
     }));
   }, [personalSlateItems]);
 
@@ -2655,6 +2714,9 @@ export function QuickToDoButton() {
                                     if (slateItem) promoteSlateOnlyToTaskList(slateItem);
                                   } : undefined}
                                   onSnapToTop={() => handleSnapToTop(task.id)}
+                                  onToggleMustDoToday={task.source === 'slate-only' ? () => {
+                                    toggleMustDoToday.mutate({ id: task.id, mustDoToday: !task.must_do_today });
+                                  } : undefined}
                                 />
                               ))}
                             </div>
@@ -2689,6 +2751,9 @@ export function QuickToDoButton() {
                                     index={index}
                                     onComplete={() => completeSlateItem.mutate({ id: task.id, isCompleted: true })}
                                     onDelete={() => deleteSlateItem.mutate(task.id)}
+                                    onToggleMustDoToday={() => {
+                                      toggleMustDoToday.mutate({ id: task.id, mustDoToday: !task.must_do_today });
+                                    }}
                                   />
                                 );
                               })}

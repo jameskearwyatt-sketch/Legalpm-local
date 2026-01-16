@@ -1751,6 +1751,7 @@ export type Database = {
           id: string
           is_completed: boolean
           is_personal: boolean
+          must_do_today: boolean
           sort_order: number
           title: string
           updated_at: string
@@ -1762,6 +1763,7 @@ export type Database = {
           id?: string
           is_completed?: boolean
           is_personal?: boolean
+          must_do_today?: boolean
           sort_order?: number
           title: string
           updated_at?: string
@@ -1773,6 +1775,7 @@ export type Database = {
           id?: string
           is_completed?: boolean
           is_personal?: boolean
+          must_do_today?: boolean
           sort_order?: number
           title?: string
           updated_at?: string

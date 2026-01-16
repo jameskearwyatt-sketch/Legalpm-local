@@ -519,8 +519,39 @@ export default function Matters() {
   }, [sortField, sortDirection]);
   const [showMasterWipDialog, setShowMasterWipDialog] = useState(false);
   const [showMasterWipHistoryDialog, setShowMasterWipHistoryDialog] = useState(false);
+  const [isTogglingProposals, setIsTogglingProposals] = useState(false);
   const { createMasterUpdate, lastMasterChanges, lastMasterUpdateDate } = useMasterWipUpdates();
   const { masterHighlightEnabled, toggleMasterHighlight } = useHighlightMovements();
+  
+  // Compute matters that have selected WIP proposals
+  const mattersWithProposals = useMemo(() => {
+    return matters.filter(m => (m as any).selected_proposal);
+  }, [matters]);
+  
+  // Check if all matters with proposals have show_shaping_proposal enabled
+  const allProposalsApplied = useMemo(() => {
+    if (mattersWithProposals.length === 0) return false;
+    return mattersWithProposals.every(m => (m as any).show_shaping_proposal);
+  }, [mattersWithProposals]);
+  
+  // Toggle all WIP proposals on/off
+  const toggleAllProposals = async (apply: boolean) => {
+    if (mattersWithProposals.length === 0) return;
+    setIsTogglingProposals(true);
+    try {
+      const matterIds = mattersWithProposals.map(m => m.id);
+      await supabase
+        .from('matters')
+        .update({ show_shaping_proposal: apply })
+        .in('id', matterIds);
+      queryClient.invalidateQueries({ queryKey: ['matters'] });
+      toast.success(apply ? 'All WIP proposals applied' : 'All WIP proposals disabled');
+    } catch (error) {
+      toast.error('Failed to toggle proposals');
+    } finally {
+      setIsTogglingProposals(false);
+    }
+  };
 
   // Build a map of matter_id -> change data for quick lookup when highlighting
   const masterChangesMap = useMemo(() => {
@@ -1101,6 +1132,27 @@ export default function Matters() {
           </Card>
         )}
 
+        {/* Global WIP Proposal Toggle - only for Live tab when there are proposals */}
+        {categoryFilter === 'Live' && mattersWithProposals.length > 0 && (
+          <div className="flex items-center gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
+            <Checkbox
+              id="toggle-all-proposals"
+              checked={allProposalsApplied}
+              onCheckedChange={(checked) => toggleAllProposals(!!checked)}
+              disabled={isTogglingProposals}
+              className="h-5 w-5"
+            />
+            <label 
+              htmlFor="toggle-all-proposals" 
+              className="text-sm font-medium text-amber-800 dark:text-amber-200 cursor-pointer flex items-center gap-2"
+            >
+              <Lightbulb className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              Apply All WIP Proposals ({mattersWithProposals.length} matter{mattersWithProposals.length !== 1 ? 's' : ''})
+              {isTogglingProposals && <Loader2 className="h-4 w-4 animate-spin" />}
+            </label>
+          </div>
+        )}
+
         {/* Clients Tab Content */}
         {isClientsTab && (
           <ClientsTabContent 
@@ -1183,7 +1235,6 @@ export default function Matters() {
                 {/* Health warning for Live tab - financial data source notice */}
                 {isLive && (
                   <div className="mb-4 flex items-start gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-                    <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
                     <div className="text-sm">
                       <p className="font-medium text-amber-800 dark:text-amber-200">
                         Budget burn figures use Financial Snapshot data only
@@ -1293,7 +1344,7 @@ export default function Matters() {
                               <div className="flex items-center gap-1 mt-1">
                                 <span className="text-[10px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded flex items-center gap-1">
                                   <Lightbulb className="h-3 w-3" />
-                                  Showing with proposal
+                                  Showing WIP Proposal
                                 </span>
                               </div>
                             )}

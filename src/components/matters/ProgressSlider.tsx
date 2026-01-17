@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { formatCurrency } from '@/lib/currencyUtils';
 import { ChevronUp, ChevronDown } from 'lucide-react';
 
@@ -21,17 +21,29 @@ export function ProgressSlider({
   onSave,
   compact = true,
 }: ProgressSliderProps) {
-  // Local state for smooth dragging
+  // Local state for smooth interaction
   const [localProgress, setLocalProgress] = useState(initialProgress);
   const [isDragging, setIsDragging] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedValueRef = useRef(initialProgress);
 
-  // Sync with external changes when not dragging
+  // Sync with external changes when not actively interacting
   useEffect(() => {
-    if (!isDragging && !isSaving) {
+    if (!isDragging && !isSaving && saveTimeoutRef.current === null) {
       setLocalProgress(initialProgress);
+      lastSavedValueRef.current = initialProgress;
     }
   }, [initialProgress, isDragging, isSaving]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Calculate estimated budget to close
   const estimatedToClose = localProgress > 0 && localProgress < 100
@@ -44,56 +56,70 @@ export function ProgressSlider({
   // Budget shortfall = total required - BM budget (only if positive)
   const budgetShortfall = totalBudgetRequired > bmBudget ? totalBudgetRequired - bmBudget : 0;
 
+  // Debounced save function
+  const scheduleSave = useCallback((newProgress: number) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    saveTimeoutRef.current = setTimeout(async () => {
+      saveTimeoutRef.current = null;
+      if (newProgress !== lastSavedValueRef.current) {
+        setIsSaving(true);
+        try {
+          await onSave(matterId, newProgress);
+          lastSavedValueRef.current = newProgress;
+        } finally {
+          setIsSaving(false);
+        }
+      }
+    }, 500);
+  }, [matterId, onSave]);
+
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalProgress(parseInt(e.target.value));
   }, []);
 
   const handleDragStart = useCallback(() => {
     setIsDragging(true);
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
   }, []);
 
   const handleDragEnd = useCallback(async () => {
     setIsDragging(false);
     
     // Only save if value actually changed
-    if (localProgress !== initialProgress) {
+    if (localProgress !== lastSavedValueRef.current) {
       setIsSaving(true);
       try {
         await onSave(matterId, localProgress);
+        lastSavedValueRef.current = localProgress;
       } finally {
         setIsSaving(false);
       }
     }
-  }, [matterId, localProgress, initialProgress, onSave]);
+  }, [matterId, localProgress, onSave]);
 
-  const handleIncrement = useCallback(async () => {
+  const handleIncrement = useCallback(() => {
     if (localProgress >= 100) return;
     const newProgress = Math.min(100, localProgress + 1);
     setLocalProgress(newProgress);
-    setIsSaving(true);
-    try {
-      await onSave(matterId, newProgress);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [matterId, localProgress, onSave]);
+    scheduleSave(newProgress);
+  }, [localProgress, scheduleSave]);
 
-  const handleDecrement = useCallback(async () => {
+  const handleDecrement = useCallback(() => {
     if (localProgress <= 0) return;
     const newProgress = Math.max(0, localProgress - 1);
     setLocalProgress(newProgress);
-    setIsSaving(true);
-    try {
-      await onSave(matterId, newProgress);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [matterId, localProgress, onSave]);
+    scheduleSave(newProgress);
+  }, [localProgress, scheduleSave]);
 
   if (compact) {
     return (
       <div className="space-y-1 min-w-[160px]">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <input
             type="range"
             min="0"
@@ -108,12 +134,11 @@ export function ProgressSlider({
             onPointerUp={handleDragEnd}
             className="w-24 h-2 bg-secondary rounded-full appearance-none cursor-pointer transition-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:shadow-md"
           />
-          <span className="text-xs font-medium min-w-[32px] tabular-nums">{localProgress}%</span>
           <div className="flex flex-col">
             <button
               type="button"
               onClick={handleIncrement}
-              disabled={localProgress >= 100 || isSaving}
+              disabled={localProgress >= 100}
               className="p-0 h-3 w-4 flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label="Increase progress"
             >
@@ -122,13 +147,14 @@ export function ProgressSlider({
             <button
               type="button"
               onClick={handleDecrement}
-              disabled={localProgress <= 0 || isSaving}
+              disabled={localProgress <= 0}
               className="p-0 h-3 w-4 flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label="Decrease progress"
             >
               <ChevronDown className="h-3 w-3" />
             </button>
           </div>
+          <span className="text-xs font-medium min-w-[32px] tabular-nums">{localProgress}%</span>
         </div>
         {localProgress > 0 && localProgress < 100 && (
           <>
@@ -153,7 +179,7 @@ export function ProgressSlider({
   // Full-size version for detail pages
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
         <input
           type="range"
           min="0"
@@ -168,12 +194,11 @@ export function ProgressSlider({
           onPointerUp={handleDragEnd}
           className="flex-1 h-2 bg-secondary rounded-full appearance-none cursor-pointer transition-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:shadow-md"
         />
-        <span className="text-sm font-medium min-w-[40px] tabular-nums">{localProgress}%</span>
         <div className="flex flex-col">
           <button
             type="button"
             onClick={handleIncrement}
-            disabled={localProgress >= 100 || isSaving}
+            disabled={localProgress >= 100}
             className="p-0 h-4 w-5 flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Increase progress"
           >
@@ -182,13 +207,14 @@ export function ProgressSlider({
           <button
             type="button"
             onClick={handleDecrement}
-            disabled={localProgress <= 0 || isSaving}
+            disabled={localProgress <= 0}
             className="p-0 h-4 w-5 flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
             aria-label="Decrease progress"
           >
             <ChevronDown className="h-4 w-4" />
           </button>
         </div>
+        <span className="text-sm font-medium min-w-[40px] tabular-nums">{localProgress}%</span>
       </div>
       {localProgress > 0 && localProgress < 100 && (
         <div className="space-y-1">

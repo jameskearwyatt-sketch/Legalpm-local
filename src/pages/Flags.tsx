@@ -53,8 +53,9 @@ import {
   Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { JurisdictionsMultiSelect } from '@/components/matters/JurisdictionsMultiSelect';
 
 type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split' | 'no_cm_number' | 'no_mma' | 'no_billing_partner' | 'no_lc_billing' | 'no_jurisdictions';
 
@@ -291,8 +292,76 @@ function PersonInlineEditor({
   );
 }
 
+// Inline jurisdictions editor
+function JurisdictionsInlineEditor({ 
+  matterId, 
+  matterName,
+  currentJurisdictions,
+  onUpdate 
+}: { 
+  matterId: string; 
+  matterName: string;
+  currentJurisdictions: string[];
+  onUpdate: (id: string, data: any) => Promise<void>;
+}) {
+  const [jurisdictions, setJurisdictions] = useState<string[]>(currentJurisdictions);
+  const [isSaving, setIsSaving] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
+  const { toast } = useToast();
+
+  const handleChange = (newJurisdictions: string[]) => {
+    setJurisdictions(newJurisdictions);
+    setHasChanges(true);
+  };
+
+  const handleSave = async () => {
+    if (jurisdictions.length === 0) return;
+    setIsSaving(true);
+    try {
+      await onUpdate(matterId, { jurisdictions });
+      toast({
+        title: "Updated",
+        description: `Jurisdictions set for ${matterName}`,
+      });
+      setHasChanges(false);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 flex-shrink-0 min-w-[280px]" onClick={(e) => e.stopPropagation()}>
+      <div className="flex-1">
+        <JurisdictionsMultiSelect
+          value={jurisdictions}
+          onChange={handleChange}
+          placeholder="Add jurisdictions..."
+          className="w-full"
+        />
+      </div>
+      {hasChanges && jurisdictions.length > 0 && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-7 w-7 p-0 flex-shrink-0"
+          disabled={isSaving}
+          onClick={handleSave}
+        >
+          {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 // Inline date picker for start date flag
-function DateInlineEditor({ 
+function DateInlineEditor({
   matterId, 
   matterName,
   onUpdate 
@@ -565,7 +634,7 @@ export default function Flags() {
 
   // Check if flag type has inline editor
   const hasInlineEditor = (type: FlagType) => {
-    return type === 'no_mma' || type === 'no_billing_partner' || type === 'no_start_date';
+    return type === 'no_mma' || type === 'no_billing_partner' || type === 'no_start_date' || type === 'no_jurisdictions';
   };
 
   // Render inline editor based on flag type
@@ -597,6 +666,19 @@ export default function Flags() {
         <DateInlineEditor
           matterId={matter.id}
           matterName={matter.matter_name}
+          onUpdate={handleInlineUpdate}
+        />
+      );
+    }
+    if (type === 'no_jurisdictions') {
+      // Get current jurisdictions from the matter
+      const matterData = liveMatters.find(m => m.id === matter.id);
+      const currentJurisdictions = (matterData as any)?.jurisdictions || [];
+      return (
+        <JurisdictionsInlineEditor
+          matterId={matter.id}
+          matterName={matter.matter_name}
+          currentJurisdictions={currentJurisdictions}
           onUpdate={handleInlineUpdate}
         />
       );

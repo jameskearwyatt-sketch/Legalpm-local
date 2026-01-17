@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { formatCurrency } from '@/lib/currencyUtils';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 
 interface ProgressSliderProps {
   matterId: string;
@@ -65,6 +66,30 @@ export function ProgressSlider({
     }
   }, [matterId, localProgress, initialProgress, onSave]);
 
+  const handleIncrement = useCallback(async () => {
+    if (localProgress >= 100) return;
+    const newProgress = Math.min(100, localProgress + 1);
+    setLocalProgress(newProgress);
+    setIsSaving(true);
+    try {
+      await onSave(matterId, newProgress);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [matterId, localProgress, onSave]);
+
+  const handleDecrement = useCallback(async () => {
+    if (localProgress <= 0) return;
+    const newProgress = Math.max(0, localProgress - 1);
+    setLocalProgress(newProgress);
+    setIsSaving(true);
+    try {
+      await onSave(matterId, newProgress);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [matterId, localProgress, onSave]);
+
   if (compact) {
     return (
       <div className="space-y-1 min-w-[160px]">
@@ -84,6 +109,26 @@ export function ProgressSlider({
             className="w-24 h-2 bg-secondary rounded-full appearance-none cursor-pointer transition-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:shadow-md"
           />
           <span className="text-xs font-medium min-w-[32px] tabular-nums">{localProgress}%</span>
+          <div className="flex flex-col">
+            <button
+              type="button"
+              onClick={handleIncrement}
+              disabled={localProgress >= 100 || isSaving}
+              className="p-0 h-3 w-4 flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Increase progress"
+            >
+              <ChevronUp className="h-3 w-3" />
+            </button>
+            <button
+              type="button"
+              onClick={handleDecrement}
+              disabled={localProgress <= 0 || isSaving}
+              className="p-0 h-3 w-4 flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Decrease progress"
+            >
+              <ChevronDown className="h-3 w-3" />
+            </button>
+          </div>
         </div>
         {localProgress > 0 && localProgress < 100 && (
           <>
@@ -124,6 +169,26 @@ export function ProgressSlider({
           className="flex-1 h-2 bg-secondary rounded-full appearance-none cursor-pointer transition-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:shadow-md"
         />
         <span className="text-sm font-medium min-w-[40px] tabular-nums">{localProgress}%</span>
+        <div className="flex flex-col">
+          <button
+            type="button"
+            onClick={handleIncrement}
+            disabled={localProgress >= 100 || isSaving}
+            className="p-0 h-4 w-5 flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Increase progress"
+          >
+            <ChevronUp className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleDecrement}
+            disabled={localProgress <= 0 || isSaving}
+            className="p-0 h-4 w-5 flex items-center justify-center text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+            aria-label="Decrease progress"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </div>
       </div>
       {localProgress > 0 && localProgress < 100 && (
         <div className="space-y-1">

@@ -44,6 +44,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { BilledAmountCell } from '@/components/matters/BilledAmountCell';
 import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload, History, Eye, Lightbulb } from 'lucide-react';
+import { ProgressSlider } from '@/components/matters/ProgressSlider';
 import { MasterWipUpdateDialog } from '@/components/matters/MasterWipUpdateDialog';
 import { DisbursementReviewResult } from '@/components/matters/DisbursementReviewDialog';
 import { MasterWipHistoryDialog } from '@/components/matters/MasterWipHistoryDialog';
@@ -1739,49 +1740,19 @@ export default function Matters() {
                           )}
                           {isLive && (
                             <TableCell>
-                              {(() => {
-                                const progress = (matter as any).progress || 0;
-                                const currency = (matter as any).effective_currency ?? matter.fee_currency;
-                                // Calculate estimated budget to close based on burn and progress
-                                const currentBurn = budgetBurn;
-                                const estimatedToClose = progress > 0 && progress < 100
-                                  ? Math.round((currentBurn / progress) * (100 - progress))
-                                  : 0;
-                                
-                                return (
-                                  <div className="space-y-1 min-w-[160px]">
-                                    <div className="flex items-center gap-2">
-                                      <input
-                                        type="range"
-                                        min="0"
-                                        max="100"
-                                        value={progress}
-                                        onChange={async (e) => {
-                                          const newProgress = parseInt(e.target.value);
-                                          try {
-                                            await updateMatter.mutateAsync({
-                                              id: matter.id,
-                                              progress: newProgress,
-                                            } as any);
-                                          } catch (error) {
-                                            toast.error('Failed to update progress');
-                                          }
-                                        }}
-                                        className="w-24 h-2 bg-secondary rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
-                                      />
-                                      <span className="text-xs font-medium min-w-[32px]">{progress}%</span>
-                                    </div>
-                                    {progress > 0 && progress < 100 && estimatedToClose > 0 && (
-                                      <p className="text-[10px] text-muted-foreground leading-tight">
-                                        Est. to close: {formatCurrency(estimatedToClose, currency)}
-                                      </p>
-                                    )}
-                                    {progress === 100 && (
-                                      <p className="text-[10px] text-green-600 font-medium leading-tight">Complete</p>
-                                    )}
-                                  </div>
-                                );
-                              })()}
+                              <ProgressSlider
+                                matterId={matter.id}
+                                initialProgress={(matter as any).progress || 0}
+                                currency={(matter as any).effective_currency ?? matter.fee_currency}
+                                currentBurn={budgetBurn}
+                                onSave={async (id, progress) => {
+                                  await updateMatter.mutateAsync({
+                                    id,
+                                    progress,
+                                  } as any);
+                                }}
+                                compact={true}
+                              />
                             </TableCell>
                           )}
                           <TableCell className="text-muted-foreground text-sm">

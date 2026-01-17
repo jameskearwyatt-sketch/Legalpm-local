@@ -49,13 +49,14 @@ import {
   Hash,
   UserX,
   Briefcase,
-  Check
+  Check,
+  Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState, useRef, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 
-type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split' | 'no_cm_number' | 'no_mma' | 'no_billing_partner' | 'no_lc_billing';
+type FlagType = 'engagement_letter' | 'aml_kyc' | 'matter_open' | 'conflicts' | 'no_budget_finalized' | 'no_assumptions' | 'no_start_date' | 'invalid_client_split' | 'no_cm_number' | 'no_mma' | 'no_billing_partner' | 'no_lc_billing' | 'no_jurisdictions';
 
 interface FlaggedMatter {
   id: string;
@@ -140,6 +141,12 @@ const flagConfig: Record<FlagType, { label: string; icon: React.ReactNode; descr
     description: 'Local counsel fee exists but billing method not specified',
     field: 'local_counsel_billing'
   },
+  no_jurisdictions: {
+    label: 'No Jurisdictions',
+    icon: <Globe className="h-4 w-4" />,
+    description: 'No jurisdictions specified for this matter',
+    field: null
+  },
 };
 
 const flagTypeOrder: FlagType[] = [
@@ -154,7 +161,8 @@ const flagTypeOrder: FlagType[] = [
   'no_budget_finalized', 
   'no_assumptions', 
   'no_start_date', 
-  'invalid_client_split'
+  'invalid_client_split',
+  'no_jurisdictions'
 ];
 
 // Inline editor component for MMA and Billing Partner flags
@@ -526,6 +534,11 @@ export default function Flags() {
         : localCounselFee > 0; // Flag if fee exists but no LC records
       if (hasLcWithMissingBilling) {
         flags.push('no_lc_billing');
+      }
+      // Check for missing jurisdictions
+      const jurisdictions = (matter as any).jurisdictions || [];
+      if (!jurisdictions || jurisdictions.length === 0) {
+        flags.push('no_jurisdictions');
       }
       
       return {

@@ -1228,6 +1228,7 @@ export type Database = {
           fee_type: Database["public"]["Enums"]["fee_type"] | null
           id: string
           is_multi_client: boolean
+          jurisdictions: string[] | null
           lc_billed: number
           lc_last_updated: string | null
           lc_wip: number
@@ -1286,6 +1287,7 @@ export type Database = {
           fee_type?: Database["public"]["Enums"]["fee_type"] | null
           id?: string
           is_multi_client?: boolean
+          jurisdictions?: string[] | null
           lc_billed?: number
           lc_last_updated?: string | null
           lc_wip?: number
@@ -1344,6 +1346,7 @@ export type Database = {
           fee_type?: Database["public"]["Enums"]["fee_type"] | null
           id?: string
           is_multi_client?: boolean
+          jurisdictions?: string[] | null
           lc_billed?: number
           lc_last_updated?: string | null
           lc_wip?: number

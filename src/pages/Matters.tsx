@@ -766,7 +766,7 @@ export default function Matters() {
       result = result.filter((m) => m.category === categoryFilter);
     }
 
-    // Search filter
+    // Search filter - includes jurisdictions
     if (search) {
       const searchLower = search.toLowerCase();
       result = result.filter(
@@ -777,7 +777,9 @@ export default function Matters() {
           m.clients?.display_name?.toLowerCase().includes(searchLower) ||
           m.lead_partner?.toLowerCase().includes(searchLower) ||
           m.originator?.toLowerCase().includes(searchLower) ||
-          m.practice_area?.toLowerCase().includes(searchLower)
+          m.practice_area?.toLowerCase().includes(searchLower) ||
+          // Search jurisdictions
+          (m.jurisdictions && m.jurisdictions.some(j => j.toLowerCase().includes(searchLower)))
       );
     }
 
@@ -1041,7 +1043,7 @@ export default function Matters() {
                   <div className="relative flex-1 max-w-md">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search matters, clients, partners..."
+                      placeholder="Search matters, clients, partners, jurisdictions..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       className="pl-9"

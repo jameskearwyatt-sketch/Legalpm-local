@@ -28,11 +28,15 @@ export function ProgressSlider({
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSavedValueRef = useRef(initialProgress);
 
-  // Sync with external changes when not actively interacting
+  // Sync with external changes only when props catch up to our saved value
+  // This prevents the "bounce back" when query refreshes with stale data
   useEffect(() => {
     if (!isDragging && !isSaving && saveTimeoutRef.current === null) {
-      setLocalProgress(initialProgress);
-      lastSavedValueRef.current = initialProgress;
+      // Only sync if the incoming value matches what we last saved
+      // OR if we haven't made any local changes yet
+      if (initialProgress === lastSavedValueRef.current) {
+        setLocalProgress(initialProgress);
+      }
     }
   }, [initialProgress, isDragging, isSaving]);
 

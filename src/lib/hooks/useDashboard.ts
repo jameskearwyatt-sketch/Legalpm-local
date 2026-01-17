@@ -423,10 +423,11 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
 
       const avgCollectionRate = totalBilledUsd > 0 ? (totalPaidUsd / totalBilledUsd) * 100 : 100;
       
-      // Realization rate = Paid / (Paid + WIP Write-offs)
-      // This shows what percentage of worked time was actually realized as revenue
-      const totalWorkedValue = totalPaidUsd + totalWipWriteOffUsd;
-      const realizationRate = totalWorkedValue > 0 ? (totalPaidUsd / totalWorkedValue) * 100 : 100;
+      // Realization rate = Paid / (Billed + Write-offs)
+      // This shows what percentage of resolved WIP (billed + written off) was collected
+      // It can never exceed collection rate - at best they're equal (if no write-offs)
+      const totalResolvedWip = totalBilledUsd + totalWipWriteOffUsd;
+      const realizationRate = totalResolvedWip > 0 ? (totalPaidUsd / totalResolvedWip) * 100 : 100;
 
       // Build historical trend data from all snapshots
       // Create a map of matter_id to matter data for currency conversion

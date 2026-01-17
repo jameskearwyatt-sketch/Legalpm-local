@@ -1247,6 +1247,7 @@ export type Database = {
             | Database["public"]["Enums"]["pipeline_outcome"]
             | null
           practice_area: string | null
+          progress: number
           quote_currency: string | null
           show_shaping_proposal: boolean
           source: Database["public"]["Enums"]["matter_source"] | null
@@ -1306,6 +1307,7 @@ export type Database = {
             | Database["public"]["Enums"]["pipeline_outcome"]
             | null
           practice_area?: string | null
+          progress?: number
           quote_currency?: string | null
           show_shaping_proposal?: boolean
           source?: Database["public"]["Enums"]["matter_source"] | null
@@ -1365,6 +1367,7 @@ export type Database = {
             | Database["public"]["Enums"]["pipeline_outcome"]
             | null
           practice_area?: string | null
+          progress?: number
           quote_currency?: string | null
           show_shaping_proposal?: boolean
           source?: Database["public"]["Enums"]["matter_source"] | null

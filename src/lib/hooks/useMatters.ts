@@ -60,6 +60,8 @@ export interface Matter {
   is_multi_client: boolean;
   // Full time costs mode (no estimate/headroom tracking)
   pay_full_time_costs: boolean;
+  // Progress - percentage through the deal (0-100)
+  progress: number;
   // Jurisdictions - countries where the project is located
   jurisdictions: string[];
   created_at: string;

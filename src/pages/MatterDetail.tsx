@@ -376,6 +376,8 @@ export default function MatterDetail() {
         lc_last_updated: (matter as any).lc_last_updated || '',
         // Jurisdictions
         jurisdictions: (matter as any).jurisdictions || [],
+        // Progress
+        progress: (matter as any).progress || 0,
       });
       setHasChanges(false);
     }
@@ -1737,15 +1739,43 @@ export default function MatterDetail() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Current Stage</Label>
-                <Select value={formData.current_stage || ''} onValueChange={(v) => updateField('current_stage', v || null)}>
-                  <SelectTrigger><SelectValue placeholder="Select stage" /></SelectTrigger>
-                  <SelectContent>
-                    {relevantStages.map((stage) => (
-                      <SelectItem key={stage} value={stage}>{stage}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Progress</Label>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={formData.progress || 0}
+                      onChange={(e) => updateField('progress', parseInt(e.target.value))}
+                      className="flex-1 h-2 bg-secondary rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+                    />
+                    <span className="text-sm font-medium min-w-[40px]">{formData.progress || 0}%</span>
+                  </div>
+                  {(() => {
+                    const progress = formData.progress || 0;
+                    const currentBurn = (latestSnapshot?.wip_amount || 0) + (latestSnapshot?.accounts_receivable || 0) + (latestSnapshot?.paid_amount || 0);
+                    const estimatedToClose = progress > 0 && progress < 100
+                      ? Math.round((currentBurn / progress) * (100 - progress))
+                      : 0;
+                    const currency = formData.fee_currency || 'GBP';
+                    
+                    if (progress > 0 && progress < 100 && estimatedToClose > 0) {
+                      return (
+                        <p className="text-sm text-muted-foreground">
+                          Estimated budget to close: <span className="font-medium text-foreground">{formatCurrency(estimatedToClose, currency)}</span>
+                        </p>
+                      );
+                    }
+                    if (progress === 100) {
+                      return <p className="text-sm text-green-600 font-medium">Deal complete</p>;
+                    }
+                    if (progress === 0 && currentBurn > 0) {
+                      return <p className="text-sm text-muted-foreground">Set progress to estimate budget to close</p>;
+                    }
+                    return null;
+                  })()}
+                </div>
               </div>
               {/* Hide C/M Number for pipeline matters */}
               {!isPipeline && (

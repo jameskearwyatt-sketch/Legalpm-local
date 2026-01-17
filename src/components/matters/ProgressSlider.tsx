@@ -5,7 +5,8 @@ interface ProgressSliderProps {
   matterId: string;
   initialProgress: number;
   currency: string;
-  currentBurn: number;
+  currentBurn: number; // BM burn only
+  bmBudget: number; // BM budget (bm_fee_component)
   onSave: (matterId: string, progress: number) => Promise<void>;
   compact?: boolean;
 }
@@ -15,6 +16,7 @@ export function ProgressSlider({
   initialProgress,
   currency,
   currentBurn,
+  bmBudget,
   onSave,
   compact = true,
 }: ProgressSliderProps) {
@@ -34,6 +36,12 @@ export function ProgressSlider({
   const estimatedToClose = localProgress > 0 && localProgress < 100
     ? Math.round((currentBurn / localProgress) * (100 - localProgress))
     : 0;
+
+  // Total budget required = current burn + estimated to close
+  const totalBudgetRequired = currentBurn + estimatedToClose;
+
+  // Budget shortfall = total required - BM budget (only if positive)
+  const budgetShortfall = totalBudgetRequired > bmBudget ? totalBudgetRequired - bmBudget : 0;
 
   const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setLocalProgress(parseInt(e.target.value));
@@ -77,10 +85,18 @@ export function ProgressSlider({
           />
           <span className="text-xs font-medium min-w-[32px] tabular-nums">{localProgress}%</span>
         </div>
-        {localProgress > 0 && localProgress < 100 && estimatedToClose > 0 && (
-          <p className="text-[10px] text-muted-foreground leading-tight">
-            Est. to close: {formatCurrency(estimatedToClose, currency)}
-          </p>
+        {localProgress > 0 && localProgress < 100 && (
+          <>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Est. to close: {formatCurrency(estimatedToClose, currency)}
+            </p>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Total required: {formatCurrency(totalBudgetRequired, currency)}
+            </p>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              Shortfall: <span className={budgetShortfall > 0 ? 'text-destructive font-medium' : ''}>{formatCurrency(budgetShortfall, currency)}</span>
+            </p>
+          </>
         )}
         {localProgress === 100 && (
           <p className="text-[10px] text-green-600 font-medium leading-tight">Complete</p>
@@ -109,16 +125,24 @@ export function ProgressSlider({
         />
         <span className="text-sm font-medium min-w-[40px] tabular-nums">{localProgress}%</span>
       </div>
-      {localProgress > 0 && localProgress < 100 && estimatedToClose > 0 && (
-        <p className="text-sm text-muted-foreground">
-          Estimated budget to close: <span className="font-medium text-foreground">{formatCurrency(estimatedToClose, currency)}</span>
-        </p>
+      {localProgress > 0 && localProgress < 100 && (
+        <div className="space-y-1">
+          <p className="text-sm text-muted-foreground">
+            Estimated to close: <span className="font-medium text-foreground">{formatCurrency(estimatedToClose, currency)}</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Total budget required: <span className="font-medium text-foreground">{formatCurrency(totalBudgetRequired, currency)}</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Budget shortfall: <span className={budgetShortfall > 0 ? 'font-medium text-destructive' : 'text-foreground'}>{formatCurrency(budgetShortfall, currency)}</span>
+          </p>
+        </div>
       )}
       {localProgress === 100 && (
         <p className="text-sm text-green-600 font-medium">Deal complete</p>
       )}
       {localProgress === 0 && currentBurn > 0 && (
-        <p className="text-sm text-muted-foreground">Set progress to estimate budget to close</p>
+        <p className="text-sm text-muted-foreground">Set progress to estimate budget requirements</p>
       )}
     </div>
   );

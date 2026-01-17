@@ -1745,6 +1745,7 @@ export default function Matters() {
                                 initialProgress={(matter as any).progress || 0}
                                 currency={(matter as any).effective_currency ?? matter.fee_currency}
                                 currentBurn={budgetBurn}
+                                bmBudget={matter.bm_fee_component || 0}
                                 onSave={async (id, progress) => {
                                   await updateMatter.mutateAsync({
                                     id,

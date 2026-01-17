@@ -1758,20 +1758,31 @@ export default function MatterDetail() {
                     const estimatedToClose = progress > 0 && progress < 100
                       ? Math.round((currentBurn / progress) * (100 - progress))
                       : 0;
+                    const totalBudgetRequired = currentBurn + estimatedToClose;
+                    const bmBudget = formData.bm_fee_component || 0;
+                    const budgetShortfall = totalBudgetRequired > bmBudget ? totalBudgetRequired - bmBudget : 0;
                     const currency = formData.fee_currency || 'GBP';
                     
-                    if (progress > 0 && progress < 100 && estimatedToClose > 0) {
+                    if (progress > 0 && progress < 100) {
                       return (
-                        <p className="text-sm text-muted-foreground">
-                          Estimated budget to close: <span className="font-medium text-foreground">{formatCurrency(estimatedToClose, currency)}</span>
-                        </p>
+                        <div className="space-y-1">
+                          <p className="text-sm text-muted-foreground">
+                            Estimated to close: <span className="font-medium text-foreground">{formatCurrency(estimatedToClose, currency)}</span>
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Total budget required: <span className="font-medium text-foreground">{formatCurrency(totalBudgetRequired, currency)}</span>
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Budget shortfall: <span className={budgetShortfall > 0 ? 'font-medium text-destructive' : 'text-foreground'}>{formatCurrency(budgetShortfall, currency)}</span>
+                          </p>
+                        </div>
                       );
                     }
                     if (progress === 100) {
                       return <p className="text-sm text-green-600 font-medium">Deal complete</p>;
                     }
                     if (progress === 0 && currentBurn > 0) {
-                      return <p className="text-sm text-muted-foreground">Set progress to estimate budget to close</p>;
+                      return <p className="text-sm text-muted-foreground">Set progress to estimate budget requirements</p>;
                     }
                     return null;
                   })()}

@@ -1430,6 +1430,11 @@ export default function Matters() {
                                   <span className="text-muted-foreground">
                                     {formatCurrency(budgetBurn, (matter as any).effective_currency ?? matter.fee_currency)}
                                   </span>
+                                  {((matter as any).effective_currency ?? matter.fee_currency) !== 'USD' && (
+                                    <span className="text-[10px] text-muted-foreground/70">
+                                      ≈ {formatCurrency(convertToUsd(budgetBurn, (matter as any).effective_currency ?? matter.fee_currency, matter.exchange_rate, gbpToUsdRate, liveRates), 'USD')}
+                                    </span>
+                                  )}
                                   <span className={cn(
                                     "text-[10px]",
                                     (100 - ((matter as any).bm_headroom_percent || 0)) > 100 ? "text-danger" :

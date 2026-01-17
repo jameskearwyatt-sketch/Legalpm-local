@@ -57,7 +57,7 @@ import { formatCurrency, convertToUsd } from '@/lib/currencyUtils';
 import { useExchangeRates } from '@/lib/hooks/useExchangeRates';
 import { getClientDisplayName } from '@/lib/clientUtils';
 
-type SortField = 'matter_name' | 'fee_amount' | 'bm_fee' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'budget_burn_pct' | 'local_burn_pct' | 'local_counsel' | 'stage';
+type SortField = 'matter_name' | 'fee_amount' | 'bm_fee' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'budget_burn_pct' | 'local_burn_pct' | 'local_counsel' | 'progress';
 type SortDirection = 'asc' | 'desc';
 type TabFilter = MatterCategory | 'MMA/BP' | 'Clients';
 
@@ -868,9 +868,9 @@ export default function Matters() {
           aVal = convertToUsd(aBmFee, aFeeCurrency, aExchangeRate, gbpToUsdRate, liveRates);
           bVal = convertToUsd(bBmFee, bFeeCurrency, bExchangeRate, gbpToUsdRate, liveRates);
           break;
-        case 'stage':
-          aVal = a.current_stage || '';
-          bVal = b.current_stage || '';
+        case 'progress':
+          aVal = (a as any).progress || 0;
+          bVal = (b as any).progress || 0;
           break;
         default:
           return 0;
@@ -1300,8 +1300,8 @@ export default function Matters() {
                         </>
                       )}
                       {isLive && (
-                        <TableHead className="min-w-[90px]">
-                          <SortableHeader field="stage">Stage</SortableHeader>
+                        <TableHead className="min-w-[180px]">
+                          <SortableHeader field="progress">Progress</SortableHeader>
                         </TableHead>
                       )}
                       <TableHead className="min-w-[70px]">Practice</TableHead>
@@ -1739,31 +1739,49 @@ export default function Matters() {
                           )}
                           {isLive && (
                             <TableCell>
-                              <Select
-                                value={matter.current_stage || ''}
-                                onValueChange={async (value) => {
-                                  try {
-                                    await updateMatter.mutateAsync({
-                                      id: matter.id,
-                                      current_stage: value as MatterStage,
-                                    });
-                                    toast.success('Stage updated');
-                                  } catch (error) {
-                                    toast.error('Failed to update stage');
-                                  }
-                                }}
-                              >
-                                <SelectTrigger className="h-8 w-[160px] text-sm">
-                                  <SelectValue placeholder="Select stage" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {liveStages.map((stage) => (
-                                    <SelectItem key={stage} value={stage}>
-                                      {stage}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                              {(() => {
+                                const progress = (matter as any).progress || 0;
+                                const currency = (matter as any).effective_currency ?? matter.fee_currency;
+                                // Calculate estimated budget to close based on burn and progress
+                                const currentBurn = budgetBurn;
+                                const estimatedToClose = progress > 0 && progress < 100
+                                  ? Math.round((currentBurn / progress) * (100 - progress))
+                                  : 0;
+                                
+                                return (
+                                  <div className="space-y-1 min-w-[160px]">
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="range"
+                                        min="0"
+                                        max="100"
+                                        value={progress}
+                                        onChange={async (e) => {
+                                          const newProgress = parseInt(e.target.value);
+                                          try {
+                                            await updateMatter.mutateAsync({
+                                              id: matter.id,
+                                              progress: newProgress,
+                                            } as any);
+                                          } catch (error) {
+                                            toast.error('Failed to update progress');
+                                          }
+                                        }}
+                                        className="w-24 h-2 bg-secondary rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+                                      />
+                                      <span className="text-xs font-medium min-w-[32px]">{progress}%</span>
+                                    </div>
+                                    {progress > 0 && progress < 100 && estimatedToClose > 0 && (
+                                      <p className="text-[10px] text-muted-foreground leading-tight">
+                                        Est. to close: {formatCurrency(estimatedToClose, currency)}
+                                      </p>
+                                    )}
+                                    {progress === 100 && (
+                                      <p className="text-[10px] text-green-600 font-medium leading-tight">Complete</p>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </TableCell>
                           )}
                           <TableCell className="text-muted-foreground text-sm">

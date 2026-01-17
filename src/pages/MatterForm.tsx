@@ -477,23 +477,22 @@ export default function MatterForm() {
                 )}
               </div>
 
-              {/* Current Stage - only show when editing */}
+              {/* Progress - only show when editing */}
               {isEditing && (
                 <div className="space-y-2">
-                  <Label htmlFor="current_stage">Current Stage</Label>
-                  <Select
-                    value={formData.current_stage || ''}
-                    onValueChange={(v) => updateField('current_stage', v || null)}
-                  >
-                    <SelectTrigger className="max-w-xs">
-                      <SelectValue placeholder="Select stage" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(formData.category === 'Pipeline' ? pipelineStages : formData.category === 'Live' ? liveStages : allStages).map((stage) => (
-                        <SelectItem key={stage} value={stage}>{stage}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Label htmlFor="progress">Progress</Label>
+                  <div className="flex items-center gap-4 max-w-xs">
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={(formData as any).progress || 0}
+                      onChange={(e) => updateField('progress', parseInt(e.target.value))}
+                      className="flex-1 h-2 bg-secondary rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
+                    />
+                    <span className="text-sm font-medium min-w-[40px]">{(formData as any).progress || 0}%</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">Drag to indicate how far through the deal you are</p>
                 </div>
               )}
 

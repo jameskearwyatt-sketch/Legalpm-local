@@ -1,7 +1,13 @@
 import { ReactNode } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, HelpCircle } from 'lucide-react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface StatCardProps {
   title: string;
@@ -13,9 +19,10 @@ interface StatCardProps {
   };
   variant?: 'default' | 'success' | 'warning' | 'danger';
   className?: string;
+  infoTooltip?: string;
 }
 
-export function StatCard({ title, value, icon, trend, variant = 'default', className }: StatCardProps) {
+export function StatCard({ title, value, icon, trend, variant = 'default', className, infoTooltip }: StatCardProps) {
   const variantStyles = {
     default: 'bg-card',
     success: 'bg-success/5 border-success/20',
@@ -35,7 +42,21 @@ export function StatCard({ title, value, icon, trend, variant = 'default', class
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-medium text-muted-foreground">{title}</p>
+              {infoTooltip && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 hover:text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs">
+                      <p>{infoTooltip}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
             <p className="text-2xl font-heading font-bold text-foreground">{value}</p>
             {trend && (
               <div className="flex items-center gap-1 text-sm">

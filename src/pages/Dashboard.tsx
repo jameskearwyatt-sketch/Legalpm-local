@@ -25,7 +25,8 @@ import {
   Rocket,
   CalendarClock,
   ListChecks,
-  Trash2
+  Trash2,
+  Percent
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import {
@@ -355,12 +356,14 @@ export default function Dashboard() {
       value: `${(stats?.avgCollectionRate || 0).toFixed(1)}%`,
       icon: <TrendingUp className="h-5 w-5" />,
       variant: (stats?.avgCollectionRate || 0) >= 80 ? 'success' as const : (stats?.avgCollectionRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
+      infoTooltip: 'Collection Rate measures the percentage of billed amounts that have been collected. WIP write-offs do not affect this rate — it only looks at bills issued vs. payments received.',
     },
     {
-      title: 'Live Matters',
-      value: stats?.openMattersCount || 0,
-      icon: <Briefcase className="h-5 w-5" />,
-      variant: 'default' as const,
+      title: 'Realization Rate',
+      value: `${(stats?.realizationRate || 0).toFixed(1)}%`,
+      icon: <Percent className="h-5 w-5" />,
+      variant: (stats?.realizationRate || 0) >= 80 ? 'success' as const : (stats?.realizationRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
+      infoTooltip: 'Realization Rate measures the percentage of worked time that was actually collected as revenue. WIP write-offs hurt this rate. E.g., if you bill £100k, write off £50k, and collect £50k, your collection rate is 100% but realization rate is 50%.',
     },
   ];
 
@@ -399,6 +402,7 @@ export default function Dashboard() {
               value={card.value}
               icon={card.icon}
               variant={card.variant}
+              infoTooltip={'infoTooltip' in card ? card.infoTooltip : undefined}
             />
           ))}
         </div>

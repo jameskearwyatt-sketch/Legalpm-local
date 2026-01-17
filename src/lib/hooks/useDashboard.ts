@@ -31,7 +31,9 @@ export interface DashboardStats {
   totalWip: number;
   totalBilled: number;
   totalPaid: number;
+  totalWipWriteOff: number;
   avgCollectionRate: number;
+  realizationRate: number;
   openMattersCount: number;
   pipelineMattersCount: number;
   totalPipelineValueUsd: number;
@@ -157,6 +159,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       let totalWipUsd = 0;
       let totalBilledUsd = 0;
       let totalPaidUsd = 0;
+      let totalWipWriteOffUsd = 0;
       let totalPipelineValueUsd = 0;
       const alerts: Alert[] = [];
       const pipelineAlerts: PipelineAlert[] = [];
@@ -187,6 +190,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         const wipAmount = Number(snapshot?.wip_amount) || 0;
         const billedAmount = Number(snapshot?.billed_amount) || 0;
         const paidAmount = Number(snapshot?.paid_amount) || 0;
+        const wipWriteOffAmount = Number(snapshot?.wip_write_off_amount) || 0;
         
         // Calculate effective BM fee - accounts for billing currency conversion
         const differentBillingCurrency = matter.different_billing_currency || false;
@@ -207,6 +211,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           totalWipUsd += convertToUsd(wipAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
           totalBilledUsd += convertToUsd(billedAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
           totalPaidUsd += convertToUsd(paidAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          totalWipWriteOffUsd += convertToUsd(wipWriteOffAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
         }
 
         // Budget burn = WIP + AR + Paid (each value is mutually exclusive)
@@ -417,6 +422,11 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       });
 
       const avgCollectionRate = totalBilledUsd > 0 ? (totalPaidUsd / totalBilledUsd) * 100 : 100;
+      
+      // Realization rate = Paid / (Paid + WIP Write-offs)
+      // This shows what percentage of worked time was actually realized as revenue
+      const totalWorkedValue = totalPaidUsd + totalWipWriteOffUsd;
+      const realizationRate = totalWorkedValue > 0 ? (totalPaidUsd / totalWorkedValue) * 100 : 100;
 
       // Build historical trend data from all snapshots
       // Create a map of matter_id to matter data for currency conversion
@@ -464,7 +474,9 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         totalWip: totalWipUsd,
         totalBilled: totalBilledUsd,
         totalPaid: totalPaidUsd,
+        totalWipWriteOff: totalWipWriteOffUsd,
         avgCollectionRate,
+        realizationRate,
         openMattersCount: liveMatters?.length || 0,
         pipelineMattersCount: includedPipelineCount,
         totalPipelineValueUsd,

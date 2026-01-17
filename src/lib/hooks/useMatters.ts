@@ -60,6 +60,8 @@ export interface Matter {
   is_multi_client: boolean;
   // Full time costs mode (no estimate/headroom tracking)
   pay_full_time_costs: boolean;
+  // Jurisdictions - countries where the project is located
+  jurisdictions: string[];
   created_at: string;
   updated_at: string;
   clients?: {
@@ -149,6 +151,7 @@ export interface CreateMatterInput {
   submitted?: boolean;
   decision_date?: string;
   pipeline_outcome?: PipelineOutcome | null;
+  jurisdictions?: string[];
 }
 
 export function useMatters() {

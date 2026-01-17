@@ -20,6 +20,7 @@ import { useClients } from '@/lib/hooks/useClients';
 import { useExchangeRates, getExchangeRate } from '@/lib/hooks/useExchangeRates';
 import { useMatterClients } from '@/lib/hooks/useMatterClients';
 import { MultiClientSection, ClientAllocation } from '@/components/matters/MultiClientSection';
+import { JurisdictionsMultiSelect } from '@/components/matters/JurisdictionsMultiSelect';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
@@ -66,6 +67,7 @@ const matterSchema = z.object({
   submitted: z.boolean().default(false),
   decision_date: z.string().optional(),
   pipeline_outcome: z.enum(['Won', 'Lost', 'Pending']).nullable().optional(),
+  jurisdictions: z.array(z.string()).default([]),
 });
 
 const practiceAreas = [
@@ -167,6 +169,7 @@ export default function MatterForm() {
     submitted: false,
     decision_date: '',
     pipeline_outcome: null,
+    jurisdictions: [],
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -211,6 +214,7 @@ export default function MatterForm() {
         submitted: existingMatter.submitted || false,
         decision_date: existingMatter.decision_date || '',
         pipeline_outcome: existingMatter.pipeline_outcome || null,
+        jurisdictions: (existingMatter as any).jurisdictions || [],
       });
       // Set multi-client flag from matter
       setIsMultiClient((existingMatter as any).is_multi_client || false);
@@ -603,6 +607,18 @@ export default function MatterForm() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="jurisdictions">Jurisdictions of Project</Label>
+                <JurisdictionsMultiSelect
+                  value={formData.jurisdictions || []}
+                  onChange={(value) => updateField('jurisdictions', value)}
+                  placeholder="Select countries..."
+                />
+                <p className="text-xs text-muted-foreground">
+                  Select one or more countries where this project is located
+                </p>
               </div>
 
               <div className="grid sm:grid-cols-3 gap-4">

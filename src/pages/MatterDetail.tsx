@@ -84,6 +84,7 @@ import { useMatterHighlightMovements } from '@/lib/hooks/useHighlightMovements';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { JurisdictionsMultiSelect } from '@/components/matters/JurisdictionsMultiSelect';
 import { exportBudgetToExcel } from '@/lib/exportBudgetToExcel';
 
 const practiceAreas = [
@@ -373,6 +374,8 @@ export default function MatterDetail() {
         lc_wip: (matter as any).lc_wip || 0,
         lc_billed: (matter as any).lc_billed || 0,
         lc_last_updated: (matter as any).lc_last_updated || '',
+        // Jurisdictions
+        jurisdictions: (matter as any).jurisdictions || [],
       });
       setHasChanges(false);
     }
@@ -1907,6 +1910,17 @@ export default function MatterDetail() {
                 </div>
               </div>
             )}
+            <div className="space-y-2">
+              <Label>Jurisdictions of Project</Label>
+              <JurisdictionsMultiSelect
+                value={formData.jurisdictions || []}
+                onChange={(value) => updateField('jurisdictions', value)}
+                placeholder="Select countries..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Select one or more countries where this project is located
+              </p>
+            </div>
           </CardContent>
         </Card>
 

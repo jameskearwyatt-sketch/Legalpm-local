@@ -1297,10 +1297,10 @@ export default function Matters() {
                             <SortableHeader field="local_burn_pct">Local Burn</SortableHeader>
                           </TableHead>
                           <TableHead className="text-right min-w-[100px]">
-                            <SortableHeader field="burn_rate_usd">Burn Rate (USD)</SortableHeader>
+                            <SortableHeader field="burn_rate_usd">BM Burn Rate</SortableHeader>
                           </TableHead>
                           <TableHead className="text-right min-w-[80px]">
-                            <SortableHeader field="headroom">Headroom (BM + Local)</SortableHeader>
+                            <SortableHeader field="headroom">BM Headroom</SortableHeader>
                           </TableHead>
                         </>
                       )}
@@ -1553,22 +1553,29 @@ export default function Matters() {
                                 {(matter as any).pay_full_time_costs ? (
                                   <span className="text-muted-foreground">N/A</span>
                                 ) : (
-                                  <div className="flex flex-col items-end">
-                                    <span className={cn(
-                                      "font-medium",
-                                      matter.headroom < 0 ? "text-danger" : "text-foreground"
-                                    )}>
-                                      {formatCurrency(matter.headroom, (matter as any).effective_currency ?? matter.fee_currency)}
-                                    </span>
-                                    <span className={cn(
-                                      "text-[10px]",
-                                      headroomStatus === 'danger' && 'text-danger',
-                                      headroomStatus === 'warning' && 'text-warning',
-                                      headroomStatus === 'success' && 'text-success'
-                                    )}>
-                                      {matter.headroom_percent.toFixed(0)}%
-                                    </span>
-                                  </div>
+                                  (() => {
+                                    const bmHeadroom = matter.bm_headroom ?? 0;
+                                    const bmHeadroomPercent = matter.bm_headroom_percent ?? 0;
+                                    const bmHeadroomStatus = bmHeadroomPercent < 0 ? 'danger' : bmHeadroomPercent < 20 ? 'warning' : 'success';
+                                    return (
+                                      <div className="flex flex-col items-end">
+                                        <span className={cn(
+                                          "font-medium",
+                                          bmHeadroom < 0 ? "text-danger" : "text-foreground"
+                                        )}>
+                                          {formatCurrency(bmHeadroom, (matter as any).effective_currency ?? matter.fee_currency)}
+                                        </span>
+                                        <span className={cn(
+                                          "text-[10px]",
+                                          bmHeadroomStatus === 'danger' && 'text-danger',
+                                          bmHeadroomStatus === 'warning' && 'text-warning',
+                                          bmHeadroomStatus === 'success' && 'text-success'
+                                        )}>
+                                          {bmHeadroomPercent.toFixed(0)}%
+                                        </span>
+                                      </div>
+                                    );
+                                  })()
                                 )}
                               </TableCell>
                             </>

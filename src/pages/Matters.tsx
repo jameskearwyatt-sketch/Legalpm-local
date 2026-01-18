@@ -1532,6 +1532,19 @@ export default function Matters() {
                                   const currency = (matter as any).effective_currency ?? matter.fee_currency;
                                   const burnRateUsd = convertToUsd(burnRateLocal, currency, matter.exchange_rate, gbpToUsdRate, liveRates);
                                   
+                                  // Calculate months to budget exhaustion
+                                  const bmHeadroom = matter.bm_headroom ?? 0;
+                                  const monthsToExhaustion = burnRateLocal > 0 ? bmHeadroom / burnRateLocal : Infinity;
+                                  
+                                  // Color coding for months to exhaustion
+                                  const getExhaustionColor = (months: number) => {
+                                    if (months <= 0) return 'text-destructive'; // Already over budget
+                                    if (months <= 2) return 'text-destructive'; // Critical - less than 2 months
+                                    if (months <= 4) return 'text-warning'; // Warning - 2-4 months
+                                    if (months <= 6) return 'text-amber-500'; // Caution - 4-6 months
+                                    return 'text-success'; // Good - more than 6 months
+                                  };
+                                  
                                   return (
                                     <div className="flex flex-col items-end">
                                       <span className="font-medium text-foreground">
@@ -1540,6 +1553,15 @@ export default function Matters() {
                                       {currency !== 'USD' && (
                                         <span className="text-[10px] text-muted-foreground">
                                           {formatCurrency(burnRateLocal, currency)}
+                                        </span>
+                                      )}
+                                      {burnRateLocal > 0 && (
+                                        <span className={cn("text-[10px] font-medium", getExhaustionColor(monthsToExhaustion))}>
+                                          {monthsToExhaustion <= 0 
+                                            ? 'Over' 
+                                            : monthsToExhaustion === Infinity 
+                                              ? '-' 
+                                              : `${monthsToExhaustion.toFixed(1)}m left`}
                                         </span>
                                       )}
                                     </div>

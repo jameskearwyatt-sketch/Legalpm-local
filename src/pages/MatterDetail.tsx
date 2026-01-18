@@ -1218,14 +1218,36 @@ export default function MatterDetail() {
                           const totalBurn = wipAmount + accountsReceivable + paidAmount;
                           const burnRatePerMonth = totalBurn / monthsElapsed;
                           
+                          // Calculate months to budget exhaustion
+                          const bmHeadroom = bmFee - totalBurn;
+                          const monthsToExhaustion = burnRatePerMonth > 0 ? bmHeadroom / burnRatePerMonth : Infinity;
+                          
+                          // Color coding for months to exhaustion
+                          const getExhaustionColor = (months: number) => {
+                            if (months <= 0) return 'text-destructive'; // Already over budget
+                            if (months <= 2) return 'text-destructive'; // Critical - less than 2 months
+                            if (months <= 4) return 'text-warning'; // Warning - 2-4 months
+                            if (months <= 6) return 'text-amber-500'; // Caution - 4-6 months
+                            return 'text-success'; // Good - more than 6 months
+                          };
+                          
                           return (
                             <div className="text-right flex flex-col items-end">
                               <span className="text-lg font-semibold text-foreground">
                                 {formatCurrency(burnRatePerMonth, currency)}
                               </span>
                               <span className="text-xs text-muted-foreground">
-                                ({monthsElapsed.toFixed(1)} months)
+                                ({monthsElapsed.toFixed(1)} months elapsed)
                               </span>
+                              {burnRatePerMonth > 0 && (
+                                <span className={cn("text-xs font-medium", getExhaustionColor(monthsToExhaustion))}>
+                                  {monthsToExhaustion <= 0 
+                                    ? 'Over budget' 
+                                    : monthsToExhaustion === Infinity 
+                                      ? 'No burn' 
+                                      : `${monthsToExhaustion.toFixed(1)}m to exhaust`}
+                                </span>
+                              )}
                             </div>
                           );
                         })()}

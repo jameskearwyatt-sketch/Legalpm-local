@@ -322,10 +322,12 @@ export default function MatterDetail() {
   
   // Form state
   const [formData, setFormData] = useState<Record<string, any>>({});
+  const [isFormInitialized, setIsFormInitialized] = useState(false);
 
-  // Initialize form data when matter loads
+  // Initialize form data ONLY ONCE when matter first loads
+  // This prevents React Query refetches from wiping out unsaved changes
   useEffect(() => {
-    if (matter) {
+    if (matter && !isFormInitialized) {
       setFormData({
         client_id: matter.client_id,
         matter_name: matter.matter_name,
@@ -380,8 +382,9 @@ export default function MatterDetail() {
         progress: (matter as any).progress || 0,
       });
       setHasChanges(false);
+      setIsFormInitialized(true);
     }
-  }, [matter]);
+  }, [matter, isFormInitialized]);
 
   // Auto-calculate BM fee component
   useEffect(() => {
@@ -1216,11 +1219,11 @@ export default function MatterDetail() {
                           const burnRatePerMonth = totalBurn / monthsElapsed;
                           
                           return (
-                            <div className="text-right">
+                            <div className="text-right flex flex-col items-end">
                               <span className="text-lg font-semibold text-foreground">
                                 {formatCurrency(burnRatePerMonth, currency)}
                               </span>
-                              <span className="text-xs text-muted-foreground ml-2">
+                              <span className="text-xs text-muted-foreground">
                                 ({monthsElapsed.toFixed(1)} months)
                               </span>
                             </div>

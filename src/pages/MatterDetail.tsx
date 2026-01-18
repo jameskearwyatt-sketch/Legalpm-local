@@ -1182,6 +1182,50 @@ export default function MatterDetail() {
                             </span>
                           );
                         })()}
+                        </div>
+                      {/* BM Burn Rate Per Month Average */}
+                      <div className="flex justify-between items-center py-3 border-b">
+                        <span className="text-muted-foreground">BM Burn Rate / Month (Avg)</span>
+                        {(() => {
+                          if (!formData.start_date) {
+                            return (
+                              <span className="text-destructive text-sm">No start date set</span>
+                            );
+                          }
+                          
+                          // Calculate months from start date to today (including partial months)
+                          const startDate = new Date(formData.start_date);
+                          const today = new Date();
+                          
+                          // Calculate difference in months with partial month precision
+                          const yearDiff = today.getFullYear() - startDate.getFullYear();
+                          const monthDiff = today.getMonth() - startDate.getMonth();
+                          const dayDiff = today.getDate() - startDate.getDate();
+                          
+                          // Total months including partial
+                          let totalMonths = yearDiff * 12 + monthDiff;
+                          // Add partial month based on day difference
+                          const daysInStartMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+                          totalMonths += dayDiff / daysInStartMonth;
+                          
+                          // Ensure at least a minimum value to avoid division by zero
+                          const monthsElapsed = Math.max(totalMonths, 0.1);
+                          
+                          // Total burn = WIP + AR + Paid (from financial snapshots)
+                          const totalBurn = wipAmount + accountsReceivable + paidAmount;
+                          const burnRatePerMonth = totalBurn / monthsElapsed;
+                          
+                          return (
+                            <div className="text-right">
+                              <span className="text-lg font-semibold text-foreground">
+                                {formatCurrency(burnRatePerMonth, currency)}
+                              </span>
+                              <span className="text-xs text-muted-foreground ml-2">
+                                ({monthsElapsed.toFixed(1)} months)
+                              </span>
+                            </div>
+                          );
+                        })()}
                       </div>
                       <div className="flex justify-between items-center py-3 border-b">
                         <div>

@@ -169,7 +169,10 @@ export function useMasterWipUpdates() {
         .from('master_wip_snapshot_changes')
         .insert(changes);
 
-      if (changesError) throw changesError;
+      if (changesError) {
+        console.error('Failed to insert master_wip_snapshot_changes:', changesError);
+        throw changesError;
+      }
 
       // Insert local counsel changes if provided
       if (lcChanges && lcChanges.length > 0) {

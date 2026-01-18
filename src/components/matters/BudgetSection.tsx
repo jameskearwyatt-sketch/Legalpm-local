@@ -343,10 +343,16 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         const formData = new FormData();
         formData.append('file', file);
 
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
+
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-document-text`,
           {
             method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+            },
             body: formData,
           }
         );

@@ -1832,7 +1832,9 @@ export default function Matters() {
                             </>
                           )}
                           {isLive && (
-                            <TableCell>
+                            <TableCell className={cn(
+                              (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
+                            )}>
                               <ProgressSlider
                                 matterId={matter.id}
                                 initialProgress={(matter as any).progress || 0}

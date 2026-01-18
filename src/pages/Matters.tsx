@@ -500,10 +500,19 @@ export default function Matters() {
   const { clients, updateClient, deleteClient, isLoading: clientsLoading } = useClients();
   const { upsertTodaySnapshot } = useSnapshots();
   const { data: exchangeRatesData } = useExchangeRates();
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => {
+    const saved = localStorage.getItem('matters-search');
+    return saved || '';
+  });
   const [tabFilter, setTabFilter] = useState<TabFilter>('Live');
-  const [clientFilter, setClientFilter] = useState<string>('all');
-  const [practiceAreaFilter, setPracticeAreaFilter] = useState<string[]>([]);
+  const [clientFilter, setClientFilter] = useState<string>(() => {
+    const saved = localStorage.getItem('matters-client-filter');
+    return saved || 'all';
+  });
+  const [practiceAreaFilter, setPracticeAreaFilter] = useState<string[]>(() => {
+    const saved = localStorage.getItem('matters-practice-area-filter');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [sortField, setSortField] = useState<SortField>(() => {
     const saved = localStorage.getItem('matters-sort-field');
     return (saved as SortField) || 'matter_name';
@@ -513,11 +522,26 @@ export default function Matters() {
     return (saved as SortDirection) || 'asc';
   });
 
-  // Persist sort preferences to localStorage
+  // Persist filter and sort preferences to localStorage
   useEffect(() => {
     localStorage.setItem('matters-sort-field', sortField);
     localStorage.setItem('matters-sort-direction', sortDirection);
-  }, [sortField, sortDirection]);
+    localStorage.setItem('matters-search', search);
+    localStorage.setItem('matters-client-filter', clientFilter);
+    localStorage.setItem('matters-practice-area-filter', JSON.stringify(practiceAreaFilter));
+  }, [sortField, sortDirection, search, clientFilter, practiceAreaFilter]);
+
+  // Check if any filters are active
+  const hasActiveFilters = search.trim() !== '' || clientFilter !== 'all' || practiceAreaFilter.length > 0;
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setSearch('');
+    setClientFilter('all');
+    setPracticeAreaFilter([]);
+    setSortField('matter_name');
+    setSortDirection('asc');
+  };
   const [showMasterWipDialog, setShowMasterWipDialog] = useState(false);
   const [showMasterWipHistoryDialog, setShowMasterWipHistoryDialog] = useState(false);
   const [isTogglingProposals, setIsTogglingProposals] = useState(false);
@@ -1066,10 +1090,13 @@ export default function Matters() {
 
         {/* Summary & Filters - Hide for Clients tab */}
         {!isClientsTab && (
-          <Card className="shadow-card">
+          <Card className={cn(
+            "shadow-card transition-all",
+            hasActiveFilters && "ring-2 ring-destructive"
+          )}>
             <CardContent className="pt-6">
               <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
-                <div className="flex flex-col sm:flex-row gap-4 flex-1">
+                <div className="flex flex-col sm:flex-row gap-4 flex-1 items-start sm:items-center flex-wrap">
                   <div className="relative flex-1 max-w-md">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -1157,6 +1184,19 @@ export default function Matters() {
                         </div>
                       </PopoverContent>
                     </Popover>
+                  )}
+                  
+                  {/* Clear All Filters Button */}
+                  {hasActiveFilters && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={clearAllFilters}
+                      className="h-9 px-3 text-destructive border-destructive hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <X className="h-4 w-4 mr-1.5" />
+                      Clear all filters
+                    </Button>
                   )}
                 </div>
               </div>

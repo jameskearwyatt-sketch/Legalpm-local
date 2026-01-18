@@ -57,6 +57,8 @@ import { toast } from 'sonner';
 import { formatCurrency, convertToUsd } from '@/lib/currencyUtils';
 import { useExchangeRates } from '@/lib/hooks/useExchangeRates';
 import { getClientDisplayName } from '@/lib/clientUtils';
+import { useColumnSettings } from '@/hooks/useColumnSettings';
+import { ColumnSettingsPopover } from '@/components/matters/ColumnSettingsPopover';
 
 type SortField = 'matter_name' | 'fee_amount' | 'bm_fee' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'budget_burn_pct' | 'local_burn_pct' | 'local_counsel' | 'progress' | 'burn_rate_usd';
 type SortDirection = 'asc' | 'desc';
@@ -542,6 +544,11 @@ export default function Matters() {
     setSortField('matter_name');
     setSortDirection('asc');
   };
+
+  // Column settings per category
+  const columnCategory = (tabFilter === 'MMA/BP' || tabFilter === 'Clients') ? 'Live' : tabFilter;
+  const { columns, setColumns, resetColumns, isColumnVisible } = useColumnSettings(columnCategory);
+
   const [showMasterWipDialog, setShowMasterWipDialog] = useState(false);
   const [showMasterWipHistoryDialog, setShowMasterWipHistoryDialog] = useState(false);
   const [isTogglingProposals, setIsTogglingProposals] = useState(false);
@@ -1198,6 +1205,13 @@ export default function Matters() {
                       Clear all filters
                     </Button>
                   )}
+                  
+                  {/* Column Settings */}
+                  <ColumnSettingsPopover
+                    columns={columns}
+                    onColumnsChange={setColumns}
+                    onReset={resetColumns}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -1327,61 +1341,91 @@ export default function Matters() {
                       </TableHead>
                       {isLive && (
                         <>
-                          <TableHead className="text-right min-w-[110px]">
-                            Financials
-                          </TableHead>
-                          <TableHead className="text-right min-w-[75px]">
-                            <SortableHeader field="budget_burn_pct">BM Burn</SortableHeader>
-                          </TableHead>
-                          <TableHead className="text-right min-w-[75px]">
-                            <SortableHeader field="local_burn_pct">Local Burn</SortableHeader>
-                          </TableHead>
-                          <TableHead className="text-right min-w-[100px]">
-                            <SortableHeader field="burn_rate_usd">BM Burn Rate</SortableHeader>
-                          </TableHead>
-                          <TableHead className="text-right min-w-[80px]">
-                            <SortableHeader field="headroom">BM Headroom</SortableHeader>
-                          </TableHead>
+                          {isColumnVisible('financials') && (
+                            <TableHead className="text-right min-w-[110px]">
+                              Financials
+                            </TableHead>
+                          )}
+                          {isColumnVisible('bm_burn') && (
+                            <TableHead className="text-right min-w-[75px]">
+                              <SortableHeader field="budget_burn_pct">BM Burn</SortableHeader>
+                            </TableHead>
+                          )}
+                          {isColumnVisible('local_burn') && (
+                            <TableHead className="text-right min-w-[75px]">
+                              <SortableHeader field="local_burn_pct">Local Burn</SortableHeader>
+                            </TableHead>
+                          )}
+                          {isColumnVisible('burn_rate') && (
+                            <TableHead className="text-right min-w-[100px]">
+                              <SortableHeader field="burn_rate_usd">BM Burn Rate</SortableHeader>
+                            </TableHead>
+                          )}
+                          {isColumnVisible('bm_headroom') && (
+                            <TableHead className="text-right min-w-[80px]">
+                              <SortableHeader field="headroom">BM Headroom</SortableHeader>
+                            </TableHead>
+                          )}
                         </>
                       )}
-                      <TableHead className="text-right min-w-[90px]">
-                        <SortableHeader field="fee_amount">Budget</SortableHeader>
-                      </TableHead>
-                      {isPipelineOrLost && (
+                      {isColumnVisible('budget') && (
+                        <TableHead className="text-right min-w-[90px]">
+                          <SortableHeader field="fee_amount">Budget</SortableHeader>
+                        </TableHead>
+                      )}
+                      {isPipelineOrLost && isColumnVisible('usd_value') && (
                         <TableHead className="text-right min-w-[80px]">USD</TableHead>
                       )}
                       {isLive && (
                         <>
-                          <TableHead className="text-right min-w-[85px]">
-                            <SortableHeader field="bm_fee">BM Budget</SortableHeader>
-                          </TableHead>
-                          <TableHead className="text-right min-w-[95px]">
-                            <SortableHeader field="local_counsel">Local Budget</SortableHeader>
-                          </TableHead>
+                          {isColumnVisible('bm_budget') && (
+                            <TableHead className="text-right min-w-[85px]">
+                              <SortableHeader field="bm_fee">BM Budget</SortableHeader>
+                            </TableHead>
+                          )}
+                          {isColumnVisible('local_budget') && (
+                            <TableHead className="text-right min-w-[95px]">
+                              <SortableHeader field="local_counsel">Local Budget</SortableHeader>
+                            </TableHead>
+                          )}
                         </>
                       )}
-                      {isPipelineOrLost && (
+                      {isPipelineOrLost && isColumnVisible('source') && (
                         <TableHead className="min-w-[70px]">Source</TableHead>
                       )}
                       {isPipeline && (
                         <>
-                          <TableHead className="min-w-[75px]">Clarif.</TableHead>
-                          <TableHead className="min-w-[75px]">Submit</TableHead>
-                          <TableHead className="min-w-[70px]">Decision</TableHead>
-                          <TableHead className="min-w-[60px]">Sent</TableHead>
-                          <TableHead className="min-w-[65px]">Outcome</TableHead>
+                          {isColumnVisible('clarif_date') && (
+                            <TableHead className="min-w-[75px]">Clarif.</TableHead>
+                          )}
+                          {isColumnVisible('submit_date') && (
+                            <TableHead className="min-w-[75px]">Submit</TableHead>
+                          )}
+                          {isColumnVisible('decision_date') && (
+                            <TableHead className="min-w-[70px]">Decision</TableHead>
+                          )}
+                          {isColumnVisible('submitted') && (
+                            <TableHead className="min-w-[60px]">Sent</TableHead>
+                          )}
+                          {isColumnVisible('outcome') && (
+                            <TableHead className="min-w-[65px]">Outcome</TableHead>
+                          )}
                         </>
                       )}
-                      {isLive && (
+                      {isLive && isColumnVisible('progress') && (
                         <TableHead className="min-w-[180px]">
                           <SortableHeader field="progress">Progress</SortableHeader>
                         </TableHead>
                       )}
-                      <TableHead className="min-w-[70px]">Practice</TableHead>
-                      {!isPipelineOrLost && (
+                      {isColumnVisible('practice') && (
+                        <TableHead className="min-w-[70px]">Practice</TableHead>
+                      )}
+                      {!isPipelineOrLost && isColumnVisible('status') && (
                         <TableHead className="w-16">Status</TableHead>
                       )}
-                      <TableHead className="w-12 min-w-[48px]">Actions</TableHead>
+                      {isColumnVisible('actions') && (
+                        <TableHead className="w-12 min-w-[48px]">Actions</TableHead>
+                      )}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1424,246 +1468,258 @@ export default function Matters() {
                           </TableCell>
                           {isLive && (
                             <>
-                              <TableCell className={cn(
-                                "p-1",
-                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
-                              )}>
-                                {(() => {
-                                  const changeData = masterChangesMap.get(matter.id);
-                                  const currency = (matter as any).effective_currency ?? matter.fee_currency;
-                                  const currentWip = matter.latest_snapshot?.wip_amount || 0;
-                                  const currentAr = matter.latest_snapshot?.accounts_receivable || 0;
-                                  const currentPaid = matter.latest_snapshot?.paid_amount || 0;
-                                  const currentWriteOff = matter.latest_snapshot?.wip_write_off_amount || 0;
-                                  
-                                  // Check if values changed (only if highlighting is enabled and we have change data)
-                                  const wipChanged = masterHighlightEnabled && changeData && currentWip !== changeData.before_wip_amount;
-                                  const arChanged = masterHighlightEnabled && changeData && currentAr !== changeData.before_accounts_receivable;
-                                  const paidChanged = masterHighlightEnabled && changeData && currentPaid !== changeData.before_paid_amount;
-                                  const writeOffChanged = masterHighlightEnabled && changeData && currentWriteOff !== changeData.before_wip_write_off_amount;
-                                  
-                                  return (
-                                    <div className="flex flex-col gap-0.5 text-right">
-                                      <div className="flex items-center justify-end gap-1">
-                                        <span className="text-[10px] text-muted-foreground leading-tight">BM WIP:</span>
-                                        <HighlightedFinancialValue
-                                          currentValue={formatCurrency(currentWip, currency)}
-                                          previousValue={changeData?.before_wip_amount}
-                                          previousDate={changeData?.created_at}
-                                          isHighlighted={!!wipChanged}
-                                          className="text-xs font-medium"
-                                          formatFn={(v) => formatCurrency(v, currency)}
-                                        />
-                                      </div>
-                                      {/* Show write-off amount in red if present */}
-                                      {currentWriteOff > 0 && (
+                              {isColumnVisible('financials') && (
+                                <TableCell className={cn(
+                                  "p-1",
+                                  (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
+                                )}>
+                                  {(() => {
+                                    const changeData = masterChangesMap.get(matter.id);
+                                    const currency = (matter as any).effective_currency ?? matter.fee_currency;
+                                    const currentWip = matter.latest_snapshot?.wip_amount || 0;
+                                    const currentAr = matter.latest_snapshot?.accounts_receivable || 0;
+                                    const currentPaid = matter.latest_snapshot?.paid_amount || 0;
+                                    const currentWriteOff = matter.latest_snapshot?.wip_write_off_amount || 0;
+                                    
+                                    // Check if values changed (only if highlighting is enabled and we have change data)
+                                    const wipChanged = masterHighlightEnabled && changeData && currentWip !== changeData.before_wip_amount;
+                                    const arChanged = masterHighlightEnabled && changeData && currentAr !== changeData.before_accounts_receivable;
+                                    const paidChanged = masterHighlightEnabled && changeData && currentPaid !== changeData.before_paid_amount;
+                                    const writeOffChanged = masterHighlightEnabled && changeData && currentWriteOff !== changeData.before_wip_write_off_amount;
+                                    
+                                    return (
+                                      <div className="flex flex-col gap-0.5 text-right">
                                         <div className="flex items-center justify-end gap-1">
+                                          <span className="text-[10px] text-muted-foreground leading-tight">BM WIP:</span>
                                           <HighlightedFinancialValue
-                                            currentValue={`W/O: ${formatCurrency(currentWriteOff, currency)}`}
-                                            previousValue={changeData?.before_wip_write_off_amount}
+                                            currentValue={formatCurrency(currentWip, currency)}
+                                            previousValue={changeData?.before_wip_amount}
                                             previousDate={changeData?.created_at}
-                                            isHighlighted={!!writeOffChanged}
-                                            className="text-[9px] text-destructive leading-tight"
+                                            isHighlighted={!!wipChanged}
+                                            className="text-xs font-medium"
                                             formatFn={(v) => formatCurrency(v, currency)}
                                           />
                                         </div>
-                                      )}
-                                      <div className="flex items-center justify-end gap-1">
-                                        <span className="text-[10px] text-muted-foreground leading-tight">AR:</span>
-                                        <HighlightedFinancialValue
-                                          currentValue={formatCurrency(currentAr, currency)}
-                                          previousValue={changeData?.before_accounts_receivable}
-                                          previousDate={changeData?.created_at}
-                                          isHighlighted={!!arChanged}
-                                          className="text-xs font-medium"
-                                          formatFn={(v) => formatCurrency(v, currency)}
-                                        />
+                                        {/* Show write-off amount in red if present */}
+                                        {currentWriteOff > 0 && (
+                                          <div className="flex items-center justify-end gap-1">
+                                            <HighlightedFinancialValue
+                                              currentValue={`W/O: ${formatCurrency(currentWriteOff, currency)}`}
+                                              previousValue={changeData?.before_wip_write_off_amount}
+                                              previousDate={changeData?.created_at}
+                                              isHighlighted={!!writeOffChanged}
+                                              className="text-[9px] text-destructive leading-tight"
+                                              formatFn={(v) => formatCurrency(v, currency)}
+                                            />
+                                          </div>
+                                        )}
+                                        <div className="flex items-center justify-end gap-1">
+                                          <span className="text-[10px] text-muted-foreground leading-tight">AR:</span>
+                                          <HighlightedFinancialValue
+                                            currentValue={formatCurrency(currentAr, currency)}
+                                            previousValue={changeData?.before_accounts_receivable}
+                                            previousDate={changeData?.created_at}
+                                            isHighlighted={!!arChanged}
+                                            className="text-xs font-medium"
+                                            formatFn={(v) => formatCurrency(v, currency)}
+                                          />
+                                        </div>
+                                        <div className="flex items-center justify-end gap-1">
+                                          <span className="text-[10px] text-muted-foreground leading-tight">Paid:</span>
+                                          <HighlightedFinancialValue
+                                            currentValue={formatCurrency(currentPaid, currency)}
+                                            previousValue={changeData?.before_paid_amount}
+                                            previousDate={changeData?.created_at}
+                                            isHighlighted={!!paidChanged}
+                                            className="text-xs font-medium text-success"
+                                            formatFn={(v) => formatCurrency(v, currency)}
+                                          />
+                                        </div>
                                       </div>
-                                      <div className="flex items-center justify-end gap-1">
-                                        <span className="text-[10px] text-muted-foreground leading-tight">Paid:</span>
-                                        <HighlightedFinancialValue
-                                          currentValue={formatCurrency(currentPaid, currency)}
-                                          previousValue={changeData?.before_paid_amount}
-                                          previousDate={changeData?.created_at}
-                                          isHighlighted={!!paidChanged}
-                                          className="text-xs font-medium text-success"
-                                          formatFn={(v) => formatCurrency(v, currency)}
-                                        />
-                                      </div>
-                                    </div>
-                                  );
-                                })()}
-                              </TableCell>
-                              <TableCell className={cn(
-                                "text-right",
-                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
-                              )}>
-                                <div className="flex flex-col items-end">
-                                  <span className="text-muted-foreground">
-                                    {formatCurrency(budgetBurn, (matter as any).effective_currency ?? matter.fee_currency)}
-                                  </span>
-                                  {((matter as any).effective_currency ?? matter.fee_currency) !== 'USD' && (
-                                    <span className="text-[10px] text-muted-foreground/70">
-                                      ≈ {formatCurrency(convertToUsd(budgetBurn, (matter as any).effective_currency ?? matter.fee_currency, matter.exchange_rate, gbpToUsdRate, liveRates), 'USD')}
-                                    </span>
-                                  )}
-                                  <span className={cn(
-                                    "text-[10px]",
-                                    (100 - ((matter as any).bm_headroom_percent || 0)) > 100 ? "text-danger" :
-                                    (100 - ((matter as any).bm_headroom_percent || 0)) > 80 ? "text-warning" : "text-success"
-                                  )}>
-                                    {(100 - ((matter as any).bm_headroom_percent || 0)).toFixed(0)}%
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell className={cn(
-                                "text-right",
-                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
-                              )}>
-                                {matter.local_counsel_billing === 'Disb' && matter.local_counsel_fee > 0 ? (
+                                    );
+                                  })()}
+                                </TableCell>
+                              )}
+                              {isColumnVisible('bm_burn') && (
+                                <TableCell className={cn(
+                                  "text-right",
+                                  (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
+                                )}>
                                   <div className="flex flex-col items-end">
                                     <span className="text-muted-foreground">
-                                      {formatCurrency(((matter as any).lc_wip || 0) + ((matter as any).lc_billed || 0), (matter as any).effective_currency ?? matter.fee_currency)}
+                                      {formatCurrency(budgetBurn, (matter as any).effective_currency ?? matter.fee_currency)}
                                     </span>
+                                    {((matter as any).effective_currency ?? matter.fee_currency) !== 'USD' && (
+                                      <span className="text-[10px] text-muted-foreground/70">
+                                        ≈ {formatCurrency(convertToUsd(budgetBurn, (matter as any).effective_currency ?? matter.fee_currency, matter.exchange_rate, gbpToUsdRate, liveRates), 'USD')}
+                                      </span>
+                                    )}
                                     <span className={cn(
                                       "text-[10px]",
-                                      (100 - ((matter as any).lc_headroom_percent || 0)) > 100 ? "text-danger" :
-                                      (100 - ((matter as any).lc_headroom_percent || 0)) > 80 ? "text-warning" : "text-success"
+                                      (100 - ((matter as any).bm_headroom_percent || 0)) > 100 ? "text-danger" :
+                                      (100 - ((matter as any).bm_headroom_percent || 0)) > 80 ? "text-warning" : "text-success"
                                     )}>
-                                      {(100 - ((matter as any).lc_headroom_percent || 0)).toFixed(0)}%
+                                      {(100 - ((matter as any).bm_headroom_percent || 0)).toFixed(0)}%
                                     </span>
                                   </div>
-                                ) : (
-                                  <span className="text-muted-foreground/50">-</span>
-                                )}
-                              </TableCell>
-                              {/* Burn Rate (USD) Column */}
-                              <TableCell className={cn(
-                                "text-right",
-                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
-                              )}>
-                                {(() => {
-                                  if (!matter.start_date) {
-                                    return (
-                                      <span className="text-destructive text-xs">N/A</span>
-                                    );
-                                  }
-                                  const startDate = parseISO(matter.start_date);
-                                  const now = new Date();
-                                  
-                                  // Calculate months elapsed same way as MatterDetail.tsx
-                                  const yearDiff = now.getFullYear() - startDate.getFullYear();
-                                  const monthDiff = now.getMonth() - startDate.getMonth();
-                                  const dayDiff = now.getDate() - startDate.getDate();
-                                  let totalMonths = yearDiff * 12 + monthDiff;
-                                  const daysInCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-                                  totalMonths += dayDiff / daysInCurrentMonth;
-                                  const monthsElapsed = Math.max(totalMonths, 0.1);
-                                  
-                                  if (monthsElapsed <= 0) {
-                                    return (
-                                      <span className="text-muted-foreground text-xs">-</span>
-                                    );
-                                  }
-                                  const totalBurn = (matter.latest_snapshot?.wip_amount || 0) + 
-                                    (matter.latest_snapshot?.accounts_receivable || 0) + 
-                                    (matter.latest_snapshot?.paid_amount || 0);
-                                  const burnRateLocal = totalBurn / monthsElapsed;
-                                  const currency = (matter as any).effective_currency ?? matter.fee_currency;
-                                  const burnRateUsd = convertToUsd(burnRateLocal, currency, matter.exchange_rate, gbpToUsdRate, liveRates);
-                                  
-                                  // Calculate months to budget exhaustion
-                                  const bmHeadroom = matter.bm_headroom ?? 0;
-                                  const monthsToExhaustion = burnRateLocal > 0 ? bmHeadroom / burnRateLocal : Infinity;
-                                  
-                                  // Color coding for months to exhaustion
-                                  const getExhaustionColor = (months: number) => {
-                                    if (months <= 0) return 'text-destructive'; // Already over budget
-                                    if (months <= 2) return 'text-destructive'; // Critical - less than 2 months
-                                    if (months <= 4) return 'text-warning'; // Warning - 2-4 months
-                                    if (months <= 6) return 'text-amber-500'; // Caution - 4-6 months
-                                    return 'text-success'; // Good - more than 6 months
-                                  };
-                                  
-                                  return (
+                                </TableCell>
+                              )}
+                              {isColumnVisible('local_burn') && (
+                                <TableCell className={cn(
+                                  "text-right",
+                                  (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
+                                )}>
+                                  {matter.local_counsel_billing === 'Disb' && matter.local_counsel_fee > 0 ? (
                                     <div className="flex flex-col items-end">
-                                      <span className="font-medium text-foreground">
-                                        {formatCurrency(burnRateUsd, 'USD')}
+                                      <span className="text-muted-foreground">
+                                        {formatCurrency(((matter as any).lc_wip || 0) + ((matter as any).lc_billed || 0), (matter as any).effective_currency ?? matter.fee_currency)}
                                       </span>
-                                      {currency !== 'USD' && (
-                                        <span className="text-[10px] text-muted-foreground">
-                                          {formatCurrency(burnRateLocal, currency)}
-                                        </span>
-                                      )}
-                                      {burnRateLocal > 0 && (
-                                        <span className={cn("text-[10px] font-medium", getExhaustionColor(monthsToExhaustion))}>
-                                          {monthsToExhaustion <= 0 
-                                            ? 'Over' 
-                                            : monthsToExhaustion === Infinity 
-                                              ? '-' 
-                                              : `${monthsToExhaustion.toFixed(1)}m left`}
-                                        </span>
-                                      )}
+                                      <span className={cn(
+                                        "text-[10px]",
+                                        (100 - ((matter as any).lc_headroom_percent || 0)) > 100 ? "text-danger" :
+                                        (100 - ((matter as any).lc_headroom_percent || 0)) > 80 ? "text-warning" : "text-success"
+                                      )}>
+                                        {(100 - ((matter as any).lc_headroom_percent || 0)).toFixed(0)}%
+                                      </span>
                                     </div>
-                                  );
-                                })()}
-                              </TableCell>
-                              <TableCell className={cn(
-                                "text-right",
-                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
-                              )}>
-                                {(matter as any).pay_full_time_costs ? (
-                                  <span className="text-muted-foreground">N/A</span>
-                                ) : (
-                                  (() => {
+                                  ) : (
+                                    <span className="text-muted-foreground/50">-</span>
+                                  )}
+                                </TableCell>
+                              )}
+                              {/* Burn Rate (USD) Column */}
+                              {isColumnVisible('burn_rate') && (
+                                <TableCell className={cn(
+                                  "text-right",
+                                  (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
+                                )}>
+                                  {(() => {
+                                    if (!matter.start_date) {
+                                      return (
+                                        <span className="text-destructive text-xs">N/A</span>
+                                      );
+                                    }
+                                    const startDate = parseISO(matter.start_date);
+                                    const now = new Date();
+                                    
+                                    // Calculate months elapsed same way as MatterDetail.tsx
+                                    const yearDiff = now.getFullYear() - startDate.getFullYear();
+                                    const monthDiff = now.getMonth() - startDate.getMonth();
+                                    const dayDiff = now.getDate() - startDate.getDate();
+                                    let totalMonths = yearDiff * 12 + monthDiff;
+                                    const daysInCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                                    totalMonths += dayDiff / daysInCurrentMonth;
+                                    const monthsElapsed = Math.max(totalMonths, 0.1);
+                                    
+                                    if (monthsElapsed <= 0) {
+                                      return (
+                                        <span className="text-muted-foreground text-xs">-</span>
+                                      );
+                                    }
+                                    const totalBurn = (matter.latest_snapshot?.wip_amount || 0) + 
+                                      (matter.latest_snapshot?.accounts_receivable || 0) + 
+                                      (matter.latest_snapshot?.paid_amount || 0);
+                                    const burnRateLocal = totalBurn / monthsElapsed;
+                                    const currency = (matter as any).effective_currency ?? matter.fee_currency;
+                                    const burnRateUsd = convertToUsd(burnRateLocal, currency, matter.exchange_rate, gbpToUsdRate, liveRates);
+                                    
+                                    // Calculate months to budget exhaustion
                                     const bmHeadroom = matter.bm_headroom ?? 0;
-                                    const bmHeadroomPercent = matter.bm_headroom_percent ?? 0;
-                                    const bmHeadroomStatus = bmHeadroomPercent < 0 ? 'danger' : bmHeadroomPercent < 20 ? 'warning' : 'success';
+                                    const monthsToExhaustion = burnRateLocal > 0 ? bmHeadroom / burnRateLocal : Infinity;
+                                    
+                                    // Color coding for months to exhaustion
+                                    const getExhaustionColor = (months: number) => {
+                                      if (months <= 0) return 'text-destructive'; // Already over budget
+                                      if (months <= 2) return 'text-destructive'; // Critical - less than 2 months
+                                      if (months <= 4) return 'text-warning'; // Warning - 2-4 months
+                                      if (months <= 6) return 'text-amber-500'; // Caution - 4-6 months
+                                      return 'text-success'; // Good - more than 6 months
+                                    };
+                                    
                                     return (
                                       <div className="flex flex-col items-end">
-                                        <span className={cn(
-                                          "font-medium",
-                                          bmHeadroom < 0 ? "text-danger" : "text-foreground"
-                                        )}>
-                                          {formatCurrency(bmHeadroom, (matter as any).effective_currency ?? matter.fee_currency)}
+                                        <span className="font-medium text-foreground">
+                                          {formatCurrency(burnRateUsd, 'USD')}
                                         </span>
-                                        <span className={cn(
-                                          "text-[10px]",
-                                          bmHeadroomStatus === 'danger' && 'text-danger',
-                                          bmHeadroomStatus === 'warning' && 'text-warning',
-                                          bmHeadroomStatus === 'success' && 'text-success'
-                                        )}>
-                                          {bmHeadroomPercent.toFixed(0)}%
-                                        </span>
+                                        {currency !== 'USD' && (
+                                          <span className="text-[10px] text-muted-foreground">
+                                            {formatCurrency(burnRateLocal, currency)}
+                                          </span>
+                                        )}
+                                        {burnRateLocal > 0 && (
+                                          <span className={cn("text-[10px] font-medium", getExhaustionColor(monthsToExhaustion))}>
+                                            {monthsToExhaustion <= 0 
+                                              ? 'Over' 
+                                              : monthsToExhaustion === Infinity 
+                                                ? '-' 
+                                                : `${monthsToExhaustion.toFixed(1)}m left`}
+                                          </span>
+                                        )}
                                       </div>
                                     );
-                                  })()
-                                )}
-                              </TableCell>
+                                  })()}
+                                </TableCell>
+                              )}
+                              {isColumnVisible('bm_headroom') && (
+                                <TableCell className={cn(
+                                  "text-right",
+                                  (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
+                                )}>
+                                  {(matter as any).pay_full_time_costs ? (
+                                    <span className="text-muted-foreground">N/A</span>
+                                  ) : (
+                                    (() => {
+                                      const bmHeadroom = matter.bm_headroom ?? 0;
+                                      const bmHeadroomPercent = matter.bm_headroom_percent ?? 0;
+                                      const bmHeadroomStatus = bmHeadroomPercent < 0 ? 'danger' : bmHeadroomPercent < 20 ? 'warning' : 'success';
+                                      return (
+                                        <div className="flex flex-col items-end">
+                                          <span className={cn(
+                                            "font-medium",
+                                            bmHeadroom < 0 ? "text-danger" : "text-foreground"
+                                          )}>
+                                            {formatCurrency(bmHeadroom, (matter as any).effective_currency ?? matter.fee_currency)}
+                                          </span>
+                                          <span className={cn(
+                                            "text-[10px]",
+                                            bmHeadroomStatus === 'danger' && 'text-danger',
+                                            bmHeadroomStatus === 'warning' && 'text-warning',
+                                            bmHeadroomStatus === 'success' && 'text-success'
+                                          )}>
+                                            {bmHeadroomPercent.toFixed(0)}%
+                                          </span>
+                                        </div>
+                                      );
+                                    })()
+                                  )}
+                                </TableCell>
+                              )}
                             </>
                           )}
-                          <TableCell className="text-right">
-                            {(matter as any).pay_full_time_costs ? (
-                              <span className="text-muted-foreground">N/A</span>
-                            ) : (
-                              <div className="flex flex-col items-end gap-0.5">
-                                {matter.fee_type && (
-                                  <span className="text-[10px] text-muted-foreground">
-                                    {getFeeTypeLabel(matter.fee_type)}
+                          {isColumnVisible('budget') && (
+                            <TableCell className="text-right">
+                              {(matter as any).pay_full_time_costs ? (
+                                <span className="text-muted-foreground">N/A</span>
+                              ) : (
+                                <div className="flex flex-col items-end gap-0.5">
+                                  {matter.fee_type && (
+                                    <span className="text-[10px] text-muted-foreground">
+                                      {getFeeTypeLabel(matter.fee_type)}
+                                    </span>
+                                  )}
+                                  <span className="font-medium">
+                                    {formatCurrency((matter as any).effective_fee_upper_end ?? matter.fee_amount_upper_end, (matter as any).effective_currency ?? matter.fee_currency)}
                                   </span>
-                                )}
-                                <span className="font-medium">
-                                  {formatCurrency((matter as any).effective_fee_upper_end ?? matter.fee_amount_upper_end, (matter as any).effective_currency ?? matter.fee_currency)}
-                                </span>
-                                {(matter as any).different_billing_currency && (matter as any).agreed_billing_amount > 0 && (
-                                  <span className="text-[10px] text-muted-foreground/70">
-                                    (quoted: {formatCurrency(matter.fee_amount_upper_end, (matter as any).quote_currency)})
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </TableCell>
-                          {isPipelineOrLost && (
+                                  {(matter as any).different_billing_currency && (matter as any).agreed_billing_amount > 0 && (
+                                    <span className="text-[10px] text-muted-foreground/70">
+                                      (quoted: {formatCurrency(matter.fee_amount_upper_end, (matter as any).quote_currency)})
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </TableCell>
+                          )}
+                          {isPipelineOrLost && isColumnVisible('usd_value') && (
                             <TableCell className="text-right">
                               <div className="flex flex-col items-end">
                                 <span className="text-muted-foreground">
@@ -1679,21 +1735,23 @@ export default function Matters() {
                           )}
                           {isLive && (
                             <>
-                              <TableCell className="text-right font-medium">
-                                {(matter as any).pay_full_time_costs ? (
-                                  <span className="text-muted-foreground font-normal">N/A</span>
-                                ) : (
-                                  <div className="flex flex-col items-end">
-                                    <span>{formatCurrency((matter as any).effective_bm_fee ?? matter.bm_fee_component, (matter as any).effective_currency ?? matter.fee_currency)}</span>
-                                    {/* Always show USD equivalent for non-USD currencies */}
-                                    {((matter as any).effective_currency ?? matter.fee_currency) !== 'USD' && (
-                                      <span className="text-[10px] text-muted-foreground/70 font-normal">
-                                        ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(convertToUsd((matter as any).effective_bm_fee ?? matter.bm_fee_component, (matter as any).effective_currency ?? matter.fee_currency ?? 'GBP', matter.exchange_rate || 1, gbpToUsdRate, liveRates))}
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
-                              </TableCell>
+                              {isColumnVisible('bm_budget') && (
+                                <TableCell className="text-right font-medium">
+                                  {(matter as any).pay_full_time_costs ? (
+                                    <span className="text-muted-foreground font-normal">N/A</span>
+                                  ) : (
+                                    <div className="flex flex-col items-end">
+                                      <span>{formatCurrency((matter as any).effective_bm_fee ?? matter.bm_fee_component, (matter as any).effective_currency ?? matter.fee_currency)}</span>
+                                      {/* Always show USD equivalent for non-USD currencies */}
+                                      {((matter as any).effective_currency ?? matter.fee_currency) !== 'USD' && (
+                                        <span className="text-[10px] text-muted-foreground/70 font-normal">
+                                          ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(convertToUsd((matter as any).effective_bm_fee ?? matter.bm_fee_component, (matter as any).effective_currency ?? matter.fee_currency ?? 'GBP', matter.exchange_rate || 1, gbpToUsdRate, liveRates))}
+                                        </span>
+                                      )}
+                                    </div>
+                                  )}
+                                </TableCell>
+                              )}
                               <TableCell className="text-right">
                                 {(matter as any).pay_full_time_costs ? (
                                   <span className="text-muted-foreground">N/A</span>

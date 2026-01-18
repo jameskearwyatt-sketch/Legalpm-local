@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, forwardRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -38,60 +38,62 @@ interface SortableColumnItemProps {
   onToggle: (id: string) => void;
 }
 
-function SortableColumnItem({ column, onToggle }: SortableColumnItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: column.id, disabled: column.locked });
+const SortableColumnItem = forwardRef<HTMLDivElement, SortableColumnItemProps>(
+  function SortableColumnItem({ column, onToggle }, _ref) {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: column.id, disabled: column.locked });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+    };
 
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        "flex items-center gap-2 px-2 py-1.5 rounded-md",
-        isDragging && "bg-muted shadow-md z-50",
-        column.locked && "opacity-60"
-      )}
-    >
+    return (
       <div
-        {...attributes}
-        {...listeners}
+        ref={setNodeRef}
+        style={style}
         className={cn(
-          "cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-muted",
-          column.locked && "cursor-not-allowed opacity-50"
+          "flex items-center gap-2 px-2 py-1.5 rounded-md",
+          isDragging && "bg-muted shadow-md z-50",
+          column.locked && "opacity-60"
         )}
       >
-        <GripVertical className="h-4 w-4 text-muted-foreground" />
+        <div
+          {...attributes}
+          {...listeners}
+          className={cn(
+            "cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-muted",
+            column.locked && "cursor-not-allowed opacity-50"
+          )}
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+        <Checkbox
+          id={`col-${column.id}`}
+          checked={column.visible}
+          onCheckedChange={() => onToggle(column.id)}
+          disabled={column.locked}
+        />
+        <label
+          htmlFor={`col-${column.id}`}
+          className={cn(
+            "text-sm flex-1 cursor-pointer",
+            column.locked && "cursor-not-allowed"
+          )}
+        >
+          {column.label}
+          {column.locked && <span className="text-xs text-muted-foreground ml-1">(locked)</span>}
+        </label>
       </div>
-      <Checkbox
-        id={`col-${column.id}`}
-        checked={column.visible}
-        onCheckedChange={() => onToggle(column.id)}
-        disabled={column.locked}
-      />
-      <label
-        htmlFor={`col-${column.id}`}
-        className={cn(
-          "text-sm flex-1 cursor-pointer",
-          column.locked && "cursor-not-allowed"
-        )}
-      >
-        {column.label}
-        {column.locked && <span className="text-xs text-muted-foreground ml-1">(locked)</span>}
-      </label>
-    </div>
-  );
-}
+    );
+  }
+);
 
 interface ColumnSettingsPopoverProps {
   columns: ColumnConfig[];

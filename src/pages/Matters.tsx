@@ -51,14 +51,14 @@ import { MasterWipHistoryDialog } from '@/components/matters/MasterWipHistoryDia
 import { useMasterWipUpdates } from '@/lib/hooks/useMasterWipUpdates';
 import { useHighlightMovements } from '@/lib/hooks/useHighlightMovements';
 import { HighlightedFinancialValue } from '@/components/matters/HighlightedFinancialValue';
-import { format, differenceInDays, parseISO, isPast, isToday } from 'date-fns';
+import { format, differenceInDays, differenceInMonths, parseISO, isPast, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { formatCurrency, convertToUsd } from '@/lib/currencyUtils';
 import { useExchangeRates } from '@/lib/hooks/useExchangeRates';
 import { getClientDisplayName } from '@/lib/clientUtils';
 
-type SortField = 'matter_name' | 'fee_amount' | 'bm_fee' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'budget_burn_pct' | 'local_burn_pct' | 'local_counsel' | 'progress';
+type SortField = 'matter_name' | 'fee_amount' | 'bm_fee' | 'headroom' | 'headroom_pct' | 'wip' | 'ar' | 'paid' | 'budget_burn' | 'budget_burn_pct' | 'local_burn_pct' | 'local_counsel' | 'progress' | 'burn_rate_usd';
 type SortDirection = 'asc' | 'desc';
 type TabFilter = MatterCategory | 'MMA/BP' | 'Clients';
 
@@ -873,6 +873,27 @@ export default function Matters() {
           aVal = (a as any).progress || 0;
           bVal = (b as any).progress || 0;
           break;
+        case 'burn_rate_usd':
+          // Calculate burn rate per month in USD for sorting
+          // Burn rate = (WIP + AR + Paid) / months elapsed since start_date
+          const calcBurnRateUsd = (m: typeof a) => {
+            if (!m.start_date) return -1; // No start date = sort to end
+            const startDate = parseISO(m.start_date);
+            const now = new Date();
+            const monthsElapsed = differenceInMonths(now, startDate) + 
+              ((now.getDate() - startDate.getDate()) / 30); // Include partial month
+            if (monthsElapsed <= 0) return 0;
+            const totalBurn = (m.latest_snapshot?.wip_amount || 0) + 
+              (m.latest_snapshot?.accounts_receivable || 0) + 
+              (m.latest_snapshot?.paid_amount || 0);
+            const burnRateLocal = totalBurn / monthsElapsed;
+            const feeCurrency = m.fee_currency || 'GBP';
+            const exchangeRate = m.exchange_rate || 1;
+            return convertToUsd(burnRateLocal, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          };
+          aVal = calcBurnRateUsd(a);
+          bVal = calcBurnRateUsd(b);
+          break;
         default:
           return 0;
       }
@@ -1267,6 +1288,9 @@ export default function Matters() {
                           <TableHead className="text-right min-w-[75px]">
                             <SortableHeader field="local_burn_pct">Local Burn</SortableHeader>
                           </TableHead>
+                          <TableHead className="text-right min-w-[100px]">
+                            <SortableHeader field="burn_rate_usd">Burn Rate (USD)</SortableHeader>
+                          </TableHead>
                           <TableHead className="text-right min-w-[80px]">
                             <SortableHeader field="headroom">Headroom (BM + Local)</SortableHeader>
                           </TableHead>
@@ -1464,6 +1488,47 @@ export default function Matters() {
                                 ) : (
                                   <span className="text-muted-foreground/50">-</span>
                                 )}
+                              </TableCell>
+                              {/* Burn Rate (USD) Column */}
+                              <TableCell className={cn(
+                                "text-right",
+                                (matter as any).show_shaping_proposal && (matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
+                              )}>
+                                {(() => {
+                                  if (!matter.start_date) {
+                                    return (
+                                      <span className="text-destructive text-xs">N/A</span>
+                                    );
+                                  }
+                                  const startDate = parseISO(matter.start_date);
+                                  const now = new Date();
+                                  const monthsElapsed = differenceInMonths(now, startDate) + 
+                                    ((now.getDate() - startDate.getDate()) / 30);
+                                  if (monthsElapsed <= 0) {
+                                    return (
+                                      <span className="text-muted-foreground text-xs">-</span>
+                                    );
+                                  }
+                                  const totalBurn = (matter.latest_snapshot?.wip_amount || 0) + 
+                                    (matter.latest_snapshot?.accounts_receivable || 0) + 
+                                    (matter.latest_snapshot?.paid_amount || 0);
+                                  const burnRateLocal = totalBurn / monthsElapsed;
+                                  const currency = (matter as any).effective_currency ?? matter.fee_currency;
+                                  const burnRateUsd = convertToUsd(burnRateLocal, currency, matter.exchange_rate, gbpToUsdRate, liveRates);
+                                  
+                                  return (
+                                    <div className="flex flex-col items-end">
+                                      <span className="font-medium text-foreground">
+                                        {formatCurrency(burnRateUsd, 'USD')}
+                                      </span>
+                                      {currency !== 'USD' && (
+                                        <span className="text-[10px] text-muted-foreground">
+                                          {formatCurrency(burnRateLocal, currency)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </TableCell>
                               <TableCell className={cn(
                                 "text-right",

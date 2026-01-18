@@ -575,15 +575,16 @@ export default function MatterDetail() {
     ? budgetLineItemTotals.lc.rawWip * mandatedRate
     : budgetLineItemTotals.lc.rawWip;
   
-  // BM Budget Burn = BM Adjusted WIP + AR + Total Paid
-  // Each value is mutually exclusive: WIP → AR (when billed) → Paid (when collected)
-  const bmTotalUsed = bmWipFromBudget + accountsReceivable + paidAmount;
+  // BM Budget Burn = ONLY from detailed budget utilization updates (budget line items)
+  // This is completely separate from financial snapshots (WIP, Billed, Paid, AR)
+  // Budget Overview tracks time costs allocation to work streams, agnostic of billing status
+  const bmTotalUsed = bmWipFromBudget;
   const bmHeadroom = bmFee - bmTotalUsed;
   const bmBudgetUsedPercent = bmFee > 0 ? (bmTotalUsed / bmFee) * 100 : 0;
   
-  // LC Budget Burn = LC Adjusted WIP + LC Paid (using lcBilled as proxy for paid)
-  // Note: LC tracking may need separate paid tracking in the future
-  const lcTotalUsed = lcWipFromBudget + lcBilled;
+  // LC Budget Burn = ONLY from detailed budget utilization updates (budget line items)
+  // Separate from LC financial tracking (lcBilled, lcWip from matter)
+  const lcTotalUsed = lcWipFromBudget;
   const lcHeadroom = localCounsel - lcTotalUsed;
   const lcBudgetUsedPercent = localCounsel > 0 ? (lcTotalUsed / localCounsel) * 100 : 0;
   

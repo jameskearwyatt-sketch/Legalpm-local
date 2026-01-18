@@ -108,6 +108,9 @@ export interface MatterWithFinancials extends Matter {
   collection_rate: number;
   headroom: number;
   headroom_percent: number;
+  bm_headroom: number;
+  bm_headroom_percent: number;
+  lc_headroom_percent: number;
   total_paid_ar_wip: number;
   local_counsels?: LocalCounselBrief[];
 }
@@ -350,6 +353,7 @@ export function useMatters() {
           collection_rate: collectionRate,
           headroom,
           headroom_percent: headroomPercent,
+          bm_headroom: bmHeadroom,
           bm_headroom_percent: bmHeadroomPercent,
           lc_headroom_percent: lcHeadroomPercent,
           total_paid_ar_wip: totalUsed, // Budget burn = WIP only (WIP stays until paid)

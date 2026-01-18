@@ -880,8 +880,16 @@ export default function Matters() {
             if (!m.start_date) return -1; // No start date = sort to end
             const startDate = parseISO(m.start_date);
             const now = new Date();
-            const monthsElapsed = differenceInMonths(now, startDate) + 
-              ((now.getDate() - startDate.getDate()) / 30); // Include partial month
+            
+            // Calculate months elapsed same way as MatterDetail.tsx
+            const yearDiff = now.getFullYear() - startDate.getFullYear();
+            const monthDiff = now.getMonth() - startDate.getMonth();
+            const dayDiff = now.getDate() - startDate.getDate();
+            let totalMonths = yearDiff * 12 + monthDiff;
+            const daysInCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+            totalMonths += dayDiff / daysInCurrentMonth;
+            const monthsElapsed = Math.max(totalMonths, 0.1);
+            
             if (monthsElapsed <= 0) return 0;
             const totalBurn = (m.latest_snapshot?.wip_amount || 0) + 
               (m.latest_snapshot?.accounts_receivable || 0) + 
@@ -1502,8 +1510,16 @@ export default function Matters() {
                                   }
                                   const startDate = parseISO(matter.start_date);
                                   const now = new Date();
-                                  const monthsElapsed = differenceInMonths(now, startDate) + 
-                                    ((now.getDate() - startDate.getDate()) / 30);
+                                  
+                                  // Calculate months elapsed same way as MatterDetail.tsx
+                                  const yearDiff = now.getFullYear() - startDate.getFullYear();
+                                  const monthDiff = now.getMonth() - startDate.getMonth();
+                                  const dayDiff = now.getDate() - startDate.getDate();
+                                  let totalMonths = yearDiff * 12 + monthDiff;
+                                  const daysInCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                                  totalMonths += dayDiff / daysInCurrentMonth;
+                                  const monthsElapsed = Math.max(totalMonths, 0.1);
+                                  
                                   if (monthsElapsed <= 0) {
                                     return (
                                       <span className="text-muted-foreground text-xs">-</span>

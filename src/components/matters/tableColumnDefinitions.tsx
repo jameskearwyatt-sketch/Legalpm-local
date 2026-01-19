@@ -160,10 +160,20 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     renderCell: (ctx) => {
       const changeData = ctx.masterChangesMap.get(ctx.matter.id);
       const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
+      
+      // Check if proposal is active
+      const hasActiveProposal = (ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal;
+      const proposal = (ctx.matter as any).selected_proposal;
+      
+      // Get current values - may be from proposal or snapshot
       const currentWip = ctx.matter.latest_snapshot?.wip_amount || 0;
       const currentAr = ctx.matter.latest_snapshot?.accounts_receivable || 0;
       const currentPaid = ctx.matter.latest_snapshot?.paid_amount || 0;
       const currentWriteOff = ctx.matter.latest_snapshot?.wip_write_off_amount || 0;
+      
+      // Get proposal-specific write-offs (separate WIP and AR write-offs)
+      const proposalWipWriteOff = hasActiveProposal ? (proposal.wip_write_off_amount || 0) : 0;
+      const proposalArWriteOff = hasActiveProposal ? (proposal.ar_write_off_amount || 0) : 0;
       
       const wipChanged = ctx.masterHighlightEnabled && changeData && currentWip !== changeData.before_wip_amount;
       const arChanged = ctx.masterHighlightEnabled && changeData && currentAr !== changeData.before_accounts_receivable;
@@ -183,7 +193,35 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
               formatFn={(v) => formatCurrency(v, currency)}
             />
           </div>
-          {currentWriteOff > 0 && (
+          {/* Show proposal write-offs separately when active */}
+          {hasActiveProposal && (proposalWipWriteOff !== 0 || proposalArWriteOff !== 0) ? (
+            <>
+              {proposalWipWriteOff !== 0 && (
+                <div className="flex items-center justify-end gap-1">
+                  <span className={cn(
+                    "text-[9px] leading-tight",
+                    proposalWipWriteOff < 0 ? "text-green-600" : "text-destructive"
+                  )}>
+                    {proposalWipWriteOff < 0 
+                      ? `WIP+: +${formatCurrency(Math.abs(proposalWipWriteOff), currency)}`
+                      : `WIP W/O: ${formatCurrency(proposalWipWriteOff, currency)}`}
+                  </span>
+                </div>
+              )}
+              {proposalArWriteOff !== 0 && (
+                <div className="flex items-center justify-end gap-1">
+                  <span className={cn(
+                    "text-[9px] leading-tight",
+                    proposalArWriteOff < 0 ? "text-green-600" : "text-destructive"
+                  )}>
+                    {proposalArWriteOff < 0 
+                      ? `AR+: +${formatCurrency(Math.abs(proposalArWriteOff), currency)}`
+                      : `AR W/O: ${formatCurrency(proposalArWriteOff, currency)}`}
+                  </span>
+                </div>
+              )}
+            </>
+          ) : currentWriteOff > 0 ? (
             <div className="flex items-center justify-end gap-1">
               <HighlightedFinancialValue
                 currentValue={`W/O: ${formatCurrency(currentWriteOff, currency)}`}
@@ -194,7 +232,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
                 formatFn={(v) => formatCurrency(v, currency)}
               />
             </div>
-          )}
+          ) : null}
           <div className="flex items-center justify-end gap-1">
             <span className="text-[10px] text-muted-foreground leading-tight">AR:</span>
             <HighlightedFinancialValue

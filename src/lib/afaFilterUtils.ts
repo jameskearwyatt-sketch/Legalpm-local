@@ -178,12 +178,63 @@ export function applyAFAFilters(
     fee_amount: getItemFeeByFigureType(item, baseFigure),
   }));
 
+  // Helper function to apply largest remainder rounding to a group of items
+  // This ensures line items sum exactly to the rounded aggregate
+  const applyReconciliationRounding = (
+    items: typeof itemsWithBaseFee,
+    getExactValue: (item: typeof itemsWithBaseFee[0]) => number,
+    targetAggregate: number,
+    filterFn: (item: typeof itemsWithBaseFee[0]) => boolean
+  ): Map<number, number> => {
+    const filteredWithIndices = items
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => filterFn(item) && (item.is_included !== false || !item.is_optional));
+    
+    const roundedValues = applyLargestRemainderRounding(
+      filteredWithIndices,
+      ({ item }) => getExactValue(item),
+      targetAggregate
+    );
+    
+    const indexToRoundedFee = new Map<number, number>();
+    filteredWithIndices.forEach(({ index }, i) => {
+      const rounded = roundedValues.get(i);
+      if (rounded !== undefined) {
+        indexToRoundedFee.set(index, rounded);
+      }
+    });
+    
+    return indexToRoundedFee;
+  };
+
   if (enabledAFAs.length === 0) {
-    // No AFAs enabled - return items with selected figure type fee
+    // No AFAs enabled - return items with selected figure type fee, properly rounded
+    // Apply largest remainder rounding to ensure totals reconcile
+    const targetBmTotal = roundToNearest1000(itemsWithBaseFee
+      .filter(item => item.provider === 'Baker McKenzie' && (item.is_included !== false || !item.is_optional))
+      .reduce((sum, item) => sum + (item.fee_amount || 0), 0));
+    const targetLcTotal = roundToNearest1000(itemsWithBaseFee
+      .filter(item => item.provider === 'Local Counsel' && (item.is_included !== false || !item.is_optional))
+      .reduce((sum, item) => sum + (item.fee_amount || 0), 0));
+    
+    const bmRounded = applyReconciliationRounding(
+      itemsWithBaseFee,
+      item => item.fee_amount || 0,
+      targetBmTotal,
+      item => item.provider === 'Baker McKenzie'
+    );
+    const lcRounded = applyReconciliationRounding(
+      itemsWithBaseFee,
+      item => item.fee_amount || 0,
+      targetLcTotal,
+      item => item.provider === 'Local Counsel'
+    );
+    
     return {
-      items: itemsWithBaseFee.map(item => ({
+      items: itemsWithBaseFee.map((item, index) => ({
         ...item,
         original_fee_amount: item.fee_amount,
+        fee_amount: bmRounded.get(index) ?? lcRounded.get(index) ?? roundToNearest1000(item.fee_amount || 0),
         afa_adjusted: false,
       })),
       totalAdjustment: 0,
@@ -206,6 +257,16 @@ export function applyAFAFilters(
   const originalLcTotal = itemsWithBaseFee
     .filter(item => item.provider === 'Local Counsel' && (item.is_included !== false || !item.is_optional))
     .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+  
+  // Pre-calculate rounded LC values using largest remainder method
+  // This ensures LC items always sum to the rounded aggregate
+  const targetLcAggregate = roundToNearest1000(originalLcTotal);
+  const lcRoundedMap = applyReconciliationRounding(
+    itemsWithBaseFee,
+    item => item.fee_amount || 0,
+    targetLcAggregate,
+    item => item.provider === 'Local Counsel'
+  );
 
   // STEP 1: Apply discounted rates FIRST if enabled (this forms the baseline for client-facing line items)
   // Discounted rates always apply to line items regardless of other AFAs
@@ -221,32 +282,18 @@ export function applyAFAFilters(
     // Calculate the target aggregate (rounded to nearest 1000)
     const targetBmAggregate = roundToNearest1000(discountedBmTotal);
     
-    // Get BM items with their indices for largest remainder rounding (using itemsWithBaseFee)
-    const bmItemsWithIndices = itemsWithBaseFee
-      .map((item, index) => ({ item, index }))
-      .filter(({ item }) => item.provider === 'Baker McKenzie' && (item.is_included !== false || !item.is_optional));
-    
     // Apply largest remainder rounding to BM items
-    const roundedValues = applyLargestRemainderRounding(
-      bmItemsWithIndices,
-      ({ item }) => (item.fee_amount || 0) * discountMultiplier,
-      targetBmAggregate
+    const bmRoundedMap = applyReconciliationRounding(
+      itemsWithBaseFee,
+      item => (item.fee_amount || 0) * discountMultiplier,
+      targetBmAggregate,
+      item => item.provider === 'Baker McKenzie'
     );
     
-    // Build a map from original index to rounded value
-    const indexToRoundedFee = new Map<number, number>();
-    bmItemsWithIndices.forEach(({ index }, i) => {
-      const rounded = roundedValues.get(i);
-      if (rounded !== undefined) {
-        indexToRoundedFee.set(index, rounded);
-      }
-    });
-    
-    // Initialize filtered items with intelligently rounded discounted amounts (using itemsWithBaseFee)
+    // Initialize filtered items with intelligently rounded amounts
     filteredItems = itemsWithBaseFee.map((item, index) => {
       if (item.provider === 'Baker McKenzie') {
-        // Use the intelligently rounded value if available, otherwise simple round
-        const roundedFee = indexToRoundedFee.get(index) ?? roundToNearest1000((item.fee_amount || 0) * discountMultiplier);
+        const roundedFee = bmRoundedMap.get(index) ?? roundToNearest1000((item.fee_amount || 0) * discountMultiplier);
         return {
           ...item,
           original_fee_amount: item.fee_amount,
@@ -255,9 +302,12 @@ export function applyAFAFilters(
           afa_comment: `${config.discountPercent}% discount applied`,
         };
       }
+      // LC items get reconciled rounding too
+      const lcRoundedFee = lcRoundedMap.get(index) ?? roundToNearest1000(item.fee_amount || 0);
       return {
         ...item,
         original_fee_amount: item.fee_amount,
+        fee_amount: lcRoundedFee,
         afa_adjusted: false,
       };
     });
@@ -266,7 +316,7 @@ export function applyAFAFilters(
       type: 'discounted_rates',
       label: AFA_TYPE_LABELS['discounted_rates'],
       description: `${config.discountPercent}% discount on standard rates`,
-      clientPrice: targetBmAggregate + roundToNearest1000(originalLcTotal),
+      clientPrice: targetBmAggregate + targetLcAggregate,
     });
     
     globalComment = `${config.discountPercent}% discount applied to standard rates`;
@@ -401,30 +451,17 @@ export function applyAFAFilters(
         const exactDiscountedBm = originalBmTotal * multiplier;
         const targetBmAggregate = roundToNearest1000(exactDiscountedBm);
         
-        // Get BM items with their indices for largest remainder rounding
-        const bmItemsWithIndices = itemsWithBaseFee
-          .map((item, index) => ({ item, index }))
-          .filter(({ item }) => item.provider === 'Baker McKenzie' && (item.is_included !== false || !item.is_optional));
-        
-        // Apply largest remainder rounding to BM items
-        const roundedValues = applyLargestRemainderRounding(
-          bmItemsWithIndices,
-          ({ item }) => (item.fee_amount || 0) * multiplier,
-          targetBmAggregate
+        // Apply largest remainder rounding to BM items using helper
+        const bmRoundedMap = applyReconciliationRounding(
+          itemsWithBaseFee,
+          item => (item.fee_amount || 0) * multiplier,
+          targetBmAggregate,
+          item => item.provider === 'Baker McKenzie'
         );
-        
-        // Build a map from original index to rounded value
-        const indexToRoundedFee = new Map<number, number>();
-        bmItemsWithIndices.forEach(({ index }, i) => {
-          const rounded = roundedValues.get(i);
-          if (rounded !== undefined) {
-            indexToRoundedFee.set(index, rounded);
-          }
-        });
         
         filteredItems = itemsWithBaseFee.map((item, index) => {
           if (item.provider === 'Baker McKenzie') {
-            const roundedFee = indexToRoundedFee.get(index) ?? roundToNearest1000((item.fee_amount || 0) * multiplier);
+            const roundedFee = bmRoundedMap.get(index) ?? roundToNearest1000((item.fee_amount || 0) * multiplier);
             return {
               ...item,
               original_fee_amount: item.fee_amount,
@@ -433,9 +470,12 @@ export function applyAFAFilters(
               afa_comment: `${config.discountPercent}% discount applied`,
             };
           }
+          // LC items use reconciled rounding
+          const lcRoundedFee = lcRoundedMap.get(index) ?? roundToNearest1000(item.fee_amount || 0);
           return {
             ...item,
             original_fee_amount: item.fee_amount,
+            fee_amount: lcRoundedFee,
             afa_adjusted: false,
           };
         });
@@ -448,21 +488,38 @@ export function applyAFAFilters(
         globalComment = globalComment ? `${globalComment}. ${defaultComment}` : defaultComment;
         
         if (!discountAFA) {
-          filteredItems = itemsWithBaseFee.map(item => ({
+          // Apply reconciled rounding for both BM and LC items
+          const targetBmTotal = roundToNearest1000(originalBmTotal);
+          const bmRoundedMap = applyReconciliationRounding(
+            itemsWithBaseFee,
+            item => item.fee_amount || 0,
+            targetBmTotal,
+            item => item.provider === 'Baker McKenzie'
+          );
+          
+          filteredItems = itemsWithBaseFee.map((item, index) => ({
             ...item,
             original_fee_amount: item.fee_amount,
-            fee_amount: roundToNearest1000(item.fee_amount || 0),
+            fee_amount: bmRoundedMap.get(index) ?? lcRoundedMap.get(index) ?? roundToNearest1000(item.fee_amount || 0),
             afa_adjusted: false,
           }));
         }
         // If discountAFA was applied, filteredItems already has discounted values
     }
   } else if (!discountAFA) {
-    // No primary AFA and no discount, just copy items with rounding
-    filteredItems = itemsWithBaseFee.map(item => ({
+    // No primary AFA and no discount, apply reconciled rounding
+    const targetBmTotal = roundToNearest1000(originalBmTotal);
+    const bmRoundedMap = applyReconciliationRounding(
+      itemsWithBaseFee,
+      item => item.fee_amount || 0,
+      targetBmTotal,
+      item => item.provider === 'Baker McKenzie'
+    );
+    
+    filteredItems = itemsWithBaseFee.map((item, index) => ({
       ...item,
       original_fee_amount: item.fee_amount,
-      fee_amount: roundToNearest1000(item.fee_amount || 0),
+      fee_amount: bmRoundedMap.get(index) ?? lcRoundedMap.get(index) ?? roundToNearest1000(item.fee_amount || 0),
       afa_adjusted: false,
     }));
   }

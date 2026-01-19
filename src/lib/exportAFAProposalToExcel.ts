@@ -278,9 +278,10 @@ export async function exportAFAProposalToExcel({
 
     let categoryTotal = 0;
 
-    // Add items - round each item to nearest $1,000 for client-facing output
+    // Add items - fee_amount is already properly rounded via largest remainder method in applyAFAFilters
+    // Do NOT re-round, as this would break the reconciliation
     for (const item of categoryItems) {
-      const feeAmount = roundToNearest1000(item.fee_amount || 0);
+      const feeAmount = item.fee_amount || 0;
       categoryTotal += feeAmount;
       
       if (item.provider === 'Baker McKenzie') {

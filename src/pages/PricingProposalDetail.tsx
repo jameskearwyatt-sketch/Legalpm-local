@@ -1464,28 +1464,30 @@ export default function PricingProposalDetail() {
             />
           </TabsContent>
 
-          {/* AFA TAB */}
-          <TabsContent value="afa" className="space-y-4">
-            <AFATab
-              proposalId={proposalId!}
-              draftItems={draftItems}
-              rateCard={rateCard}
-              assumptions={assumptions}
-              currencySymbol={currencySymbol}
-              formatCurrency={formatCurrency}
-              baselineTotals={{
-                bmTotal: workItemTotals.bmTotal,
-                localCounselTotal: workItemTotals.localCounselTotal,
-                total: workItemTotals.total,
-                totalHours: summary.totalHours,
-                blendedRate: summary.blendedRate,
-                margin: summary.margin,
-                marginPercent: summary.marginPercent,
-                totalCost: summary.totalCost,
-              }}
-              customCategories={customCategories}
-              onDiscountChange={setAfaDiscountPercent}
-            />
+          {/* AFA TAB - forceMount keeps AFATab mounted so it can react to baseline changes from other tabs */}
+          <TabsContent value="afa" className="space-y-4" forceMount>
+            <div className="hidden data-[state=active]:block" data-state={activeTab === 'afa' ? 'active' : 'inactive'}>
+              <AFATab
+                proposalId={proposalId!}
+                draftItems={draftItems}
+                rateCard={rateCard}
+                assumptions={assumptions}
+                currencySymbol={currencySymbol}
+                formatCurrency={formatCurrency}
+                baselineTotals={{
+                  bmTotal: workItemTotals.bmTotal,
+                  localCounselTotal: workItemTotals.localCounselTotal,
+                  total: workItemTotals.total,
+                  totalHours: summary.totalHours,
+                  blendedRate: summary.blendedRate,
+                  margin: summary.margin,
+                  marginPercent: summary.marginPercent,
+                  totalCost: summary.totalCost,
+                }}
+                customCategories={customCategories}
+                onDiscountChange={setAfaDiscountPercent}
+              />
+            </div>
           </TabsContent>
 
           {/* SUMMARY TAB */}

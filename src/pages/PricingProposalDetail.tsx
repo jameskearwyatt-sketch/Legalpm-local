@@ -153,15 +153,21 @@ export default function PricingProposalDetail() {
     }
   }, [proposal]);
 
+  // Track if we've initialized from saved items to prevent re-initialization
+  const [isInitialized, setIsInitialized] = useState(false);
+
   // Initialize draft items from saved items and extract custom categories
+  // Only initialize once when savedItems first arrive, not on every re-render
   useEffect(() => {
-    if (savedItems.length > 0 && draftItems.length === 0 && !hasUnsavedChanges) {
-      // Map saved items to draft items
+    if (savedItems.length > 0 && !isInitialized) {
+      // Map saved items to draft items - MUST preserve all fields including fee_lower/fee_upper
       setDraftItems(savedItems.map(item => ({
         id: item.id,
         work_item: item.work_item,
         provider: item.provider,
         fee_amount: item.fee_amount,
+        fee_lower: item.fee_lower,  // Preserve saved fee range
+        fee_upper: item.fee_upper,  // Preserve saved fee range
         pricing_method: item.pricing_method,
         category: item.category,
         lc_firm_name: item.lc_firm_name || undefined,
@@ -189,8 +195,10 @@ export default function PricingProposalDetail() {
       if (uniqueCustomCategories.length > 0) {
         setCustomCategories(uniqueCustomCategories);
       }
+      
+      setIsInitialized(true);
     }
-  }, [savedItems]);
+  }, [savedItems, isInitialized]);
 
   // Calculate work items totals (baseline - no discount applied here, discount is handled in AFA)
   const workItemTotals = useMemo(() => {
@@ -857,9 +865,14 @@ export default function PricingProposalDetail() {
       work_item: item.work_item,
       provider: item.provider,
       fee_amount: item.fee_amount,
+      fee_lower: item.fee_lower,  // Preserve fee range
+      fee_upper: item.fee_upper,  // Preserve fee range
       pricing_method: item.pricing_method,
       category: item.category,
       lc_firm_name: item.lc_firm_name || undefined,
+      lc_country: item.lc_country || undefined,
+      lc_library_id: item.lc_library_id || undefined,
+      lc_currency: item.lc_currency || undefined,
       is_optional: item.is_optional,
       is_included: item.is_included,
       ai_rationale: item.ai_rationale,
@@ -884,9 +897,14 @@ export default function PricingProposalDetail() {
       work_item: item.work_item,
       provider: item.provider,
       fee_amount: item.fee_amount,
+      fee_lower: item.fee_lower,  // Preserve fee range
+      fee_upper: item.fee_upper,  // Preserve fee range
       pricing_method: item.pricing_method,
       category: item.category,
       lc_firm_name: item.lc_firm_name || undefined,
+      lc_country: item.lc_country || undefined,
+      lc_library_id: item.lc_library_id || undefined,
+      lc_currency: item.lc_currency || undefined,
       is_optional: item.is_optional,
       is_included: item.is_included,
       ai_rationale: item.ai_rationale,

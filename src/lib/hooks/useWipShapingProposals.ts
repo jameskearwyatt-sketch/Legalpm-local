@@ -11,6 +11,7 @@ export interface WipShapingProposal {
   notes: string;
   wip_amount: number;
   wip_write_off_amount: number;
+  ar_write_off_amount: number;
   billed_amount: number;
   paid_amount: number;
   accounts_receivable: number;
@@ -27,6 +28,7 @@ export interface CreateProposalInput {
   notes: string;
   wip_amount: number;
   wip_write_off_amount: number;
+  ar_write_off_amount: number;
   billed_amount: number;
   paid_amount: number;
   accounts_receivable: number;
@@ -39,6 +41,7 @@ export interface UpdateProposalInput {
   notes?: string;
   wip_amount?: number;
   wip_write_off_amount?: number;
+  ar_write_off_amount?: number;
   billed_amount?: number;
   paid_amount?: number;
   accounts_receivable?: number;

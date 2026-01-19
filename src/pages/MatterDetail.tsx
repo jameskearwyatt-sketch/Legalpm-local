@@ -548,17 +548,25 @@ export default function MatterDetail() {
   
   // Financial snapshots are stored in BILLING currency - no conversion needed
   // If showing proposal, use proposal values; otherwise use snapshot values
+  // WIP write-off applies to raw WIP only
   const rawWipAmount = showProposalValues 
     ? selectedProposal.wip_amount 
     : (latestSnapshot?.wip_amount || 0);
   const wipWriteOffAmount = showProposalValues 
     ? selectedProposal.wip_write_off_amount 
     : (latestSnapshot?.wip_write_off_amount || 0);
-  // Net WIP = raw WIP minus write-offs (write-offs reduce actual WIP)
+  // Net WIP = raw WIP minus WIP-specific write-offs only
   const wipAmount = rawWipAmount - wipWriteOffAmount;
+  
+  // AR write-off is separate - applies to accounts receivable
+  const arWriteOffAmount = showProposalValues 
+    ? (selectedProposal as any).ar_write_off_amount || 0
+    : 0; // Snapshots don't have separate AR write-offs
+  
   const billedAmount = showProposalValues 
     ? selectedProposal.billed_amount 
     : (latestSnapshot?.billed_amount || 0);
+  // For proposals, accounts_receivable is already the adjusted value (raw AR - AR write-off)
   const accountsReceivable = showProposalValues 
     ? selectedProposal.accounts_receivable 
     : (latestSnapshot?.accounts_receivable || 0);
@@ -1305,16 +1313,9 @@ export default function MatterDetail() {
                       <div className="flex justify-between items-center py-3 border-b">
                         <div>
                           <span className="text-muted-foreground">BM Work in Progress</span>
-                          {wipWriteOffAmount > 0 && (
-                            <div className="text-xs text-destructive">
-                              (Write-off: <HighlightedFinancialValue
-                                currentValue={formatCurrency(wipWriteOffAmount, currency)}
-                                previousValue={prevWriteOffDisplay}
-                                previousDate={prevDate}
-                                isHighlighted={!!writeOffChanged}
-                                className=""
-                                formatFn={(v) => formatCurrency(v, currency)}
-                              />)
+                          {wipWriteOffAmount !== 0 && (
+                            <div className={`text-xs ${wipWriteOffAmount < 0 ? 'text-green-600' : 'text-destructive'}`}>
+                              ({wipWriteOffAmount < 0 ? 'Increase' : 'Write-off'}: {wipWriteOffAmount < 0 ? '+' : ''}{formatCurrency(Math.abs(wipWriteOffAmount), currency)})
                             </div>
                           )}
                         </div>
@@ -1328,7 +1329,14 @@ export default function MatterDetail() {
                         />
                       </div>
                       <div className="flex justify-between items-center py-3 border-b">
-                        <span className="text-muted-foreground">Accounts Receivable</span>
+                        <div>
+                          <span className="text-muted-foreground">Accounts Receivable</span>
+                          {arWriteOffAmount !== 0 && (
+                            <div className={`text-xs ${arWriteOffAmount < 0 ? 'text-green-600' : 'text-destructive'}`}>
+                              ({arWriteOffAmount < 0 ? 'Increase' : 'Write-off'}: {arWriteOffAmount < 0 ? '+' : ''}{formatCurrency(Math.abs(arWriteOffAmount), currency)})
+                            </div>
+                          )}
+                        </div>
                         <HighlightedFinancialValue
                           currentValue={formatCurrency(accountsReceivable, currency)}
                           previousValue={prevArDisplay}

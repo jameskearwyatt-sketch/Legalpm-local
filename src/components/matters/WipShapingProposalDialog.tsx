@@ -26,6 +26,7 @@ interface WipShapingProposalDialogProps {
   onSave: (data: {
     wip_amount: number;
     wip_write_off_amount: number;
+    ar_write_off_amount: number;
     billed_amount: number;
     accounts_receivable: number;
     paid_amount: number;
@@ -227,15 +228,17 @@ export function WipShapingProposalDialog({
     
     setIsSubmitting(true);
     try {
-      // Map to the expected save format
+      // Save with separate WIP and AR write-offs
       // wip_amount = raw WIP (unchanged)
-      // wip_write_off_amount = TOTAL write-off (WIP + AR combined)
-      // billed_amount = raw AR (original billed amount before any AR write-off)
+      // wip_write_off_amount = WIP-specific write-off (can be negative for increase)
+      // ar_write_off_amount = AR-specific write-off (can be negative for increase)
+      // billed_amount = raw AR (original billed amount)
       // accounts_receivable = adjusted AR after write-off
       await onSave({
         wip_amount: formData.raw_wip,
-        wip_write_off_amount: calculatedValues.totalWriteOff, // Combined write-off
-        billed_amount: formData.raw_ar, // Store raw AR as billed_amount
+        wip_write_off_amount: calculatedValues.wipWriteOff,
+        ar_write_off_amount: calculatedValues.arWriteOff,
+        billed_amount: formData.raw_ar,
         accounts_receivable: calculatedValues.adjustedAr,
         paid_amount: formData.paid_amount,
         lc_wip_amount: formData.lc_wip_amount,

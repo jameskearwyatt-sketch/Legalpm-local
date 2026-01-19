@@ -246,11 +246,13 @@ export function useMatters() {
         const showProposalData = (matter as any).show_shaping_proposal && selectedProposal;
         
         // Use proposal data if enabled, otherwise use snapshot
+        // WIP write-off applies to raw WIP only (separate from AR write-off)
         const rawWipAmount = showProposalData ? selectedProposal.wip_amount : (snapshot?.wip_amount || 0);
         const wipWriteOffAmount = showProposalData ? selectedProposal.wip_write_off_amount : (snapshot?.wip_write_off_amount || 0);
-        // Net WIP = raw WIP minus write-offs (write-offs reduce actual WIP)
+        // Net WIP = raw WIP minus WIP-specific write-offs only
         const wipAmount = rawWipAmount - wipWriteOffAmount;
         const billedAmount = showProposalData ? selectedProposal.billed_amount : (snapshot?.billed_amount || 0);
+        // For proposals, accounts_receivable is already the adjusted value (raw AR - AR write-off)
         const accountsReceivable = showProposalData ? selectedProposal.accounts_receivable : (snapshot?.accounts_receivable || 0);
         const paidAmount = showProposalData ? selectedProposal.paid_amount : (snapshot?.paid_amount || 0);
         const budget = matter.agreed_budget_amount || 0;

@@ -285,8 +285,15 @@ export function useMatters() {
         const effectiveFeeUpperEnd = differentBillingCurrency && agreedBillingAmount > 0 
           ? agreedBillingAmount 
           : feeUpperEnd;
+        
+        // Check for manual budget override
+        const useManualBudget = matterAny.use_manual_budget ?? false;
+        const manualBudgetAmount = matterAny.manual_budget_amount ?? 0;
+        
         // BM and LC fees are already stored in billing currency
-        const effectiveBmFee = matter.bm_fee_component;
+        // Use manual budget if enabled, otherwise use calculated from line items
+        const calculatedBmFee = matter.bm_fee_component;
+        const effectiveBmFee = useManualBudget ? manualBudgetAmount : calculatedBmFee;
         const effectiveLocalCounselFee = matter.local_counsel_fee;
         const effectiveCurrency = differentBillingCurrency && agreedBillingAmount > 0
           ? billingCurrency

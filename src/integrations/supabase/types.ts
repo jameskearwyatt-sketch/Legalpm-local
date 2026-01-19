@@ -1235,6 +1235,7 @@ export type Database = {
           lead_partner: string | null
           local_counsel_billing: string | null
           local_counsel_fee: number
+          manual_budget_amount: number
           matter_display_name: string | null
           matter_managing_attorney: string | null
           matter_name: string
@@ -1258,6 +1259,7 @@ export type Database = {
           submitted: boolean
           target_close_date: string | null
           updated_at: string
+          use_manual_budget: boolean
           user_id: string
         }
         Insert: {
@@ -1296,6 +1298,7 @@ export type Database = {
           lead_partner?: string | null
           local_counsel_billing?: string | null
           local_counsel_fee?: number
+          manual_budget_amount?: number
           matter_display_name?: string | null
           matter_managing_attorney?: string | null
           matter_name: string
@@ -1319,6 +1322,7 @@ export type Database = {
           submitted?: boolean
           target_close_date?: string | null
           updated_at?: string
+          use_manual_budget?: boolean
           user_id: string
         }
         Update: {
@@ -1357,6 +1361,7 @@ export type Database = {
           lead_partner?: string | null
           local_counsel_billing?: string | null
           local_counsel_fee?: number
+          manual_budget_amount?: number
           matter_display_name?: string | null
           matter_managing_attorney?: string | null
           matter_name?: string
@@ -1380,6 +1385,7 @@ export type Database = {
           submitted?: boolean
           target_close_date?: string | null
           updated_at?: string
+          use_manual_budget?: boolean
           user_id?: string
         }
         Relationships: [

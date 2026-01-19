@@ -1,12 +1,22 @@
 /**
  * Export pricing proposal to Excel with AFA (Alternative Fee Arrangement) filters applied.
  * This generates client-facing proposals with adjusted figures and explanatory comments.
+ * 
+ * IMPORTANT: All figures are rounded to the nearest $1,000 for client-facing output.
  */
 
 import ExcelJS from 'exceljs';
 import { DraftProposalItem, BUDGET_CATEGORIES } from '@/lib/hooks/usePricingProposals';
 import { ProposalAFA, AFA_TYPE_LABELS } from '@/lib/hooks/useProposalAFAs';
 import { applyAFAFilters, AFAFilteredItem } from '@/lib/afaFilterUtils';
+
+/**
+ * Round a number to the nearest 1000.
+ * E.g., 1499 -> 1000, 1500 -> 2000, 12345 -> 12000
+ */
+function roundToNearest1000(value: number): number {
+  return Math.round(value / 1000) * 1000;
+}
 
 interface ExportAFAProposalOptions {
   items: DraftProposalItem[];
@@ -229,9 +239,9 @@ export async function exportAFAProposalToExcel({
 
     let categoryTotal = 0;
 
-    // Add items
+    // Add items - round each item to nearest $1,000 for client-facing output
     for (const item of categoryItems) {
-      const feeAmount = item.fee_amount || 0;
+      const feeAmount = roundToNearest1000(item.fee_amount || 0);
       categoryTotal += feeAmount;
       
       if (item.provider === 'Baker McKenzie') {
@@ -336,7 +346,7 @@ export async function exportAFAProposalToExcel({
   breakdownHeaderRow.height = 24;
   currentRow++;
 
-  // Baker McKenzie fees
+  // Baker McKenzie fees (already accumulated from rounded line items)
   const bmRow = worksheet.getRow(currentRow);
   bmRow.values = ['Baker McKenzie Fees', '', '', bmTotal, ''];
   bmRow.getCell(4).numFmt = '#,##0';
@@ -344,7 +354,7 @@ export async function exportAFAProposalToExcel({
   bmRow.getCell(1).font = { size: 11 };
   currentRow++;
 
-  // Local Counsel fees
+  // Local Counsel fees (already accumulated from rounded line items)
   if (lcTotal > 0) {
     const lcRow = worksheet.getRow(currentRow);
     lcRow.values = ['Local Counsel Fees', '', '', lcTotal, ''];

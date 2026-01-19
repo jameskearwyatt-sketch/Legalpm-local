@@ -578,16 +578,33 @@ export function usePricingProposal(proposalId?: string) {
       if (matterId && latestVersion) {
         const items = await fetchVersionItems(latestVersion.id);
         
-        // Create budget version for the matter
+        // Helper: Round to nearest 1000 for client-facing budget figures
+        const roundToNearest1000 = (value: number): number => Math.round(value / 1000) * 1000;
+        
+        // Calculate rounded totals from individual rounded items
+        let roundedBmTotal = 0;
+        let roundedLcTotal = 0;
+        const roundedItems = items.map(item => {
+          const roundedFee = roundToNearest1000(item.fee_amount || 0);
+          if (item.provider === 'Baker McKenzie') {
+            roundedBmTotal += roundedFee;
+          } else {
+            roundedLcTotal += roundedFee;
+          }
+          return { ...item, fee_amount: roundedFee };
+        });
+        const roundedTotal = roundedBmTotal + roundedLcTotal;
+        
+        // Create budget version for the matter with rounded figures
         const { data: budgetVersion, error: budgetVersionError } = await supabase
           .from('budget_versions')
           .insert({
             matter_id: matterId,
             user_id: user!.id,
             version_number: 1,
-            total_amount: latestVersion.total_amount,
-            bm_total: latestVersion.bm_total,
-            local_counsel_total: latestVersion.local_counsel_total,
+            total_amount: roundedTotal,
+            bm_total: roundedBmTotal,
+            local_counsel_total: roundedLcTotal,
             notes: `Imported from pricing proposal: ${proposalQuery.data?.name}`,
           })
           .select()
@@ -595,15 +612,15 @@ export function usePricingProposal(proposalId?: string) {
 
         if (budgetVersionError) throw budgetVersionError;
 
-        // Create budget line items
-        if (items.length > 0) {
-          const lineItems = items.map((item, index) => ({
+        // Create budget line items with rounded fee amounts
+        if (roundedItems.length > 0) {
+          const lineItems = roundedItems.map((item, index) => ({
             budget_version_id: budgetVersion.id,
             matter_id: matterId,
             user_id: user!.id,
             work_item: item.work_item,
             provider: item.provider,
-            fee_amount: item.fee_amount,
+            fee_amount: item.fee_amount, // Already rounded
             category: item.category,
             lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
             lc_country: item.provider === 'Local Counsel' ? (item.lc_country || null) : null,
@@ -626,11 +643,11 @@ export function usePricingProposal(proposalId?: string) {
           .eq('id', matterId)
           .single();
 
-        // Build update object
+        // Build update object with rounded totals
         const matterUpdate: Record<string, number> = {
-          fee_amount_upper_end: latestVersion.total_amount,
-          bm_fee_component: latestVersion.bm_total,
-          local_counsel_fee: latestVersion.local_counsel_total,
+          fee_amount_upper_end: roundedTotal,
+          bm_fee_component: roundedBmTotal,
+          local_counsel_fee: roundedLcTotal,
         };
 
         // Update agreed_billing_amount proportionally if different billing currency

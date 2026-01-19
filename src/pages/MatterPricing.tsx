@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Plus, FileText, Trash2, Calendar, Building, DollarSign } from "lucide-react";
 import { usePricingProposals } from "@/lib/hooks/usePricingProposals";
 import { useClients } from "@/lib/hooks/useClients";
+import { useUserSettings } from "@/lib/hooks/useUserSettings";
 import { format } from "date-fns";
 import { getClientDisplayName } from "@/lib/clientUtils";
 
@@ -20,26 +21,29 @@ export default function MatterPricing() {
   const navigate = useNavigate();
   const { proposals, isLoading, createProposal, deleteProposal } = usePricingProposals();
   const { clients } = useClients();
+  const { defaultCurrency, defaultRateCard } = useUserSettings();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [newProposal, setNewProposal] = useState({
     name: "",
     description: "",
     client_id: "",
-    currency: "GBP",
   });
 
   const handleCreate = async () => {
     if (!newProposal.name || !newProposal.client_id) return;
     
+    // Use user's default currency for both team rate and fee currency
     await createProposal.mutateAsync({
       name: newProposal.name,
       description: newProposal.description,
       client_id: newProposal.client_id,
-      currency: newProposal.currency,
+      currency: defaultCurrency,
+      team_rate_currency: defaultCurrency,
+      rate_card: defaultRateCard,
     });
     
     setIsCreateOpen(false);
-    setNewProposal({ name: "", description: "", client_id: "", currency: "GBP" });
+    setNewProposal({ name: "", description: "", client_id: "" });
   };
 
   const handleDelete = async (e: React.MouseEvent, proposalId: string) => {
@@ -112,22 +116,6 @@ export default function MatterPricing() {
                     onChange={(e) => setNewProposal(prev => ({ ...prev, description: e.target.value }))}
                     placeholder="Brief description of the proposal..."
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="currency">Currency</Label>
-                  <Select 
-                    value={newProposal.currency} 
-                    onValueChange={(value) => setNewProposal(prev => ({ ...prev, currency: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="GBP">GBP (£)</SelectItem>
-                      <SelectItem value="USD">USD ($)</SelectItem>
-                      <SelectItem value="EUR">EUR (€)</SelectItem>
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
               <DialogFooter>

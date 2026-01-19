@@ -322,7 +322,6 @@ export function AFATab({
   useEffect(() => {
     // Skip if loading or currently recalculating (to prevent loops)
     if (isLoading || isRecalculatingRef.current) {
-      console.log('[AFA Recalc] Skipping - loading:', isLoading, 'recalculating:', isRecalculatingRef.current);
       return;
     }
 
@@ -331,7 +330,6 @@ export function AFATab({
     
     // Initialize on first render
     if (prevTotal === null) {
-      console.log('[AFA Recalc] Initializing with total:', currentTotal);
       prevBaselineTotalRef.current = currentTotal;
       return;
     }
@@ -339,16 +337,13 @@ export function AFATab({
     // Only recalculate if total has meaningfully changed (more than $1 difference)
     const diff = Math.abs(currentTotal - prevTotal);
     if (diff < 1) {
-      console.log('[AFA Recalc] No significant change:', diff);
       return;
     }
 
-    console.log('[AFA Recalc] Baseline changed from', prevTotal, 'to', currentTotal, '- diff:', diff);
     prevBaselineTotalRef.current = currentTotal;
 
     // Find all enabled AFAs and recalculate their client prices
     const enabledAfas = afas.filter(a => a.is_enabled);
-    console.log('[AFA Recalc] Enabled AFAs:', enabledAfas.map(a => a.afa_type));
     if (enabledAfas.length === 0) return;
 
     // Capture current values to avoid stale closures in async function
@@ -380,8 +375,6 @@ export function AFATab({
         }
       }
     }
-    
-    console.log('[AFA Recalc] Adjusted baseline total:', currentAdjustedBaseline.total);
 
     // Recalculate each enabled AFA with updated baseline
     const recalculateEnabledAFAs = async () => {
@@ -398,11 +391,8 @@ export function AFATab({
           const newEffectiveRate = calculateEffectiveRate(newClientPrice, currentBaselineTotals.totalHours);
           const newMarginImpact = calculateMarginImpact(newClientPrice, currentBaselineTotals.totalCost);
 
-          console.log('[AFA Recalc]', afa.afa_type, '- old price:', afa.client_price, 'new price:', newClientPrice);
-
           // Only update if the price has changed meaningfully
           if (Math.abs(newClientPrice - afa.client_price) > 1) {
-            console.log('[AFA Recalc] Updating', afa.afa_type);
             await upsertAFA.mutateAsync({
               afa_type: afa.afa_type,
               is_enabled: true,

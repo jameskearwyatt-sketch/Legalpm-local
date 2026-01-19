@@ -516,7 +516,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {assumptions.map(def => {
-                    const assumption = state.simpleAssumptions.find(a => a.assumptionId === def.id);
+                    const assumption = (state.simpleAssumptions || []).find(a => a.assumptionId === def.id);
                     const isEnabled = assumption?.enabled || false;
                     const inputValue = assumption?.inputValue;
 
@@ -584,7 +584,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                 <div className="flex items-start space-x-3">
                   <Checkbox 
                     id="doc-turns"
-                    checked={state.documentAssumptions.turnsEnabled}
+                    checked={documentAssumptions.turnsEnabled}
                     onCheckedChange={(checked) => toggleDocumentAssumptionType('turns', !!checked)}
                     className="mt-0.5"
                   />
@@ -599,7 +599,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                 <div className="flex items-start space-x-3">
                   <Checkbox 
                     id="doc-drafts"
-                    checked={state.documentAssumptions.whoDraftsEnabled}
+                    checked={documentAssumptions.whoDraftsEnabled}
                     onCheckedChange={(checked) => toggleDocumentAssumptionType('who_drafts', !!checked)}
                     className="mt-0.5"
                   />
@@ -614,7 +614,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                 <div className="flex items-start space-x-3">
                   <Checkbox 
                     id="doc-client-form"
-                    checked={state.documentAssumptions.clientFormEnabled}
+                    checked={documentAssumptions.clientFormEnabled}
                     onCheckedChange={(checked) => toggleDocumentAssumptionType('client_form', !!checked)}
                     className="mt-0.5"
                   />
@@ -634,7 +634,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                     <Button variant="outline" size="sm" className="w-full justify-between">
                       <span className="flex items-center gap-2">
                         <File className="h-4 w-4" />
-                        Configure Documents ({state.documentAssumptions.configs.length} selected)
+                        Configure Documents ({(documentAssumptions.configs || []).length} selected)
                       </span>
                       {docSectionOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                     </Button>
@@ -642,7 +642,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                   <CollapsibleContent className="mt-3">
                     <div className="space-y-2 max-h-[400px] overflow-y-auto border rounded-lg p-3 bg-muted/20">
                       {documentWorkItems.map(item => {
-                        const config = state.documentAssumptions.configs.find(c => c.workItemName === item.work_item);
+                        const config = (documentAssumptions.configs || []).find(c => c.workItemName === item.work_item);
                         const isSelected = !!config;
 
                         return (
@@ -667,7 +667,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
 
                             {isSelected && (
                               <div className="ml-7 grid gap-3 sm:grid-cols-3 mt-2">
-                                {state.documentAssumptions.turnsEnabled && (
+                                {documentAssumptions.turnsEnabled && (
                                   <div>
                                     <Label className="text-xs text-muted-foreground">Turns</Label>
                                     <Select
@@ -689,7 +689,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                                   </div>
                                 )}
 
-                                {state.documentAssumptions.whoDraftsEnabled && (
+                                {documentAssumptions.whoDraftsEnabled && (
                                   <div>
                                     <Label className="text-xs text-muted-foreground">Who drafts</Label>
                                     <Select
@@ -707,7 +707,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                                   </div>
                                 )}
 
-                                {state.documentAssumptions.clientFormEnabled && (
+                                {documentAssumptions.clientFormEnabled && (
                                   <div className="flex items-end">
                                     <div className="flex items-center space-x-2 h-8">
                                       <Checkbox 
@@ -843,7 +843,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                 })}
 
                 {/* Document narratives */}
-                {state.documentNarratives.map((narrative, index) => {
+                {(state.documentNarratives || []).map((narrative, index) => {
                   const isEditing = editingNarrative === `doc-${index}`;
 
                   return (

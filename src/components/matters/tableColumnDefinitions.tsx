@@ -126,25 +126,54 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     renderHeader: (ctx) => (
       <SortableHeader field="matter_name" {...ctx}>Client / Matter</SortableHeader>
     ),
-    renderCell: (ctx) => (
-      <>
-        <Link 
-          to={`/matters/${ctx.matter.id}`}
-          className="block hover:text-primary transition-colors"
-        >
-          <p className="font-medium text-foreground">{getClientDisplayName(ctx.matter.clients)}</p>
-          <p className="text-sm text-muted-foreground group-hover:text-primary transition-colors line-clamp-2" title={ctx.matter.matter_name}>
-            {(ctx.matter as any).matter_display_name || ctx.matter.matter_name}
-          </p>
-        </Link>
-        {(ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal && (
-          <span className="text-[10px] bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 px-1.5 py-0.5 rounded flex items-center gap-1 whitespace-nowrap">
-            <Lightbulb className="h-3 w-3" />
-            WIP Proposal
-          </span>
-        )}
-      </>
-    ),
+    renderCell: (ctx) => {
+      const hasProposal = !!(ctx.matter as any).selected_proposal;
+      const isProposalActive = (ctx.matter as any).show_shaping_proposal && hasProposal;
+      
+      const handleToggleProposal = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        await ctx.updateMatter.mutateAsync({
+          id: ctx.matter.id,
+          show_shaping_proposal: !isProposalActive,
+        });
+      };
+      
+      return (
+        <div className="flex items-start gap-1.5">
+          {/* Individual WIP proposal toggle - only show if matter has a proposal */}
+          {hasProposal && (
+            <button
+              type="button"
+              onClick={handleToggleProposal}
+              className={cn(
+                "flex-shrink-0 mt-0.5 w-5 h-5 rounded border flex items-center justify-center transition-colors",
+                isProposalActive 
+                  ? "bg-amber-100 dark:bg-amber-900/40 border-amber-400 dark:border-amber-600" 
+                  : "bg-muted/30 border-muted-foreground/20 hover:border-amber-400"
+              )}
+              title={isProposalActive ? "Click to disable WIP proposal" : "Click to enable WIP proposal"}
+            >
+              <Lightbulb className={cn(
+                "h-3 w-3",
+                isProposalActive ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground/40"
+              )} />
+            </button>
+          )}
+          <div className="flex-1 min-w-0">
+            <Link 
+              to={`/matters/${ctx.matter.id}`}
+              className="block hover:text-primary transition-colors"
+            >
+              <p className="font-medium text-foreground">{getClientDisplayName(ctx.matter.clients)}</p>
+              <p className="text-sm text-muted-foreground group-hover:text-primary transition-colors line-clamp-2" title={ctx.matter.matter_name}>
+                {(ctx.matter as any).matter_display_name || ctx.matter.matter_name}
+              </p>
+            </Link>
+          </div>
+        </div>
+      );
+    },
   },
 
   // Financials - Live only

@@ -68,6 +68,73 @@ function roundToNearest1000(value: number): number {
 }
 
 /**
+ * Apply intelligent rounding using the largest remainder method.
+ * This ensures the sum of rounded values exactly equals the rounded target.
+ * 
+ * Algorithm:
+ * 1. Floor each value to nearest 1000
+ * 2. Calculate remainder (fractional part) for each
+ * 3. Calculate shortfall between floored sum and target
+ * 4. Distribute shortfall (in 1000 increments) to items with largest remainders
+ * 
+ * @param items Array of objects with fee values to round
+ * @param getExactValue Function to get the exact (unrounded) value from each item
+ * @param targetAggregate The rounded aggregate that line items must sum to
+ * @returns Map of item index to rounded value
+ */
+function applyLargestRemainderRounding<T>(
+  items: T[],
+  getExactValue: (item: T) => number,
+  targetAggregate: number
+): Map<number, number> {
+  const result = new Map<number, number>();
+  
+  if (items.length === 0) return result;
+  
+  // Calculate floored values and remainders
+  const itemData = items.map((item, index) => {
+    const exactValue = getExactValue(item);
+    const floored = Math.floor(exactValue / 1000) * 1000;
+    const remainder = exactValue - floored; // Fractional part (0-999.99...)
+    return { index, exactValue, floored, remainder };
+  });
+  
+  // Sum of floored values
+  const flooredSum = itemData.reduce((sum, d) => sum + d.floored, 0);
+  
+  // How many extra 1000s do we need to reach the target?
+  const shortfall = targetAggregate - flooredSum;
+  const incrementsNeeded = Math.round(shortfall / 1000);
+  
+  if (incrementsNeeded > 0) {
+    // Sort by remainder descending - items with largest remainders get rounded up
+    const sortedByRemainder = [...itemData].sort((a, b) => b.remainder - a.remainder);
+    
+    // Give extra 1000 to top N items
+    for (let i = 0; i < Math.min(incrementsNeeded, sortedByRemainder.length); i++) {
+      sortedByRemainder[i].floored += 1000;
+    }
+  } else if (incrementsNeeded < 0) {
+    // Rare case: need to subtract (shouldn't happen with normal rounding but handle it)
+    const sortedByRemainder = [...itemData].sort((a, b) => a.remainder - b.remainder);
+    const decrementsNeeded = Math.abs(incrementsNeeded);
+    
+    for (let i = 0; i < Math.min(decrementsNeeded, sortedByRemainder.length); i++) {
+      if (sortedByRemainder[i].floored >= 1000) {
+        sortedByRemainder[i].floored -= 1000;
+      }
+    }
+  }
+  
+  // Build result map
+  for (const d of itemData) {
+    result.set(d.index, d.floored);
+  }
+  
+  return result;
+}
+
+/**
  * Apply AFA filters to work items and return adjusted items with comments.
  * All monetary values are rounded to nearest $1,000 for client-facing output.
  */
@@ -108,6 +175,7 @@ export function applyAFAFilters(
 
   // STEP 1: Apply discounted rates FIRST if enabled (this forms the baseline for client-facing line items)
   // Discounted rates always apply to line items regardless of other AFAs
+  // Uses largest remainder method to ensure line items sum exactly to the rounded aggregate
   let discountMultiplier = 1;
   let discountedBmTotal = originalBmTotal;
   
@@ -116,14 +184,39 @@ export function applyAFAFilters(
     discountMultiplier = 1 - config.discountPercent / 100;
     discountedBmTotal = originalBmTotal * discountMultiplier;
     
-    // Initialize filtered items with discounted amounts
-    filteredItems = draftItems.map(item => {
+    // Calculate the target aggregate (rounded to nearest 1000)
+    const targetBmAggregate = roundToNearest1000(discountedBmTotal);
+    
+    // Get BM items with their indices for largest remainder rounding
+    const bmItemsWithIndices = draftItems
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => item.provider === 'Baker McKenzie' && (item.is_included !== false || !item.is_optional));
+    
+    // Apply largest remainder rounding to BM items
+    const roundedValues = applyLargestRemainderRounding(
+      bmItemsWithIndices,
+      ({ item }) => (item.fee_amount || 0) * discountMultiplier,
+      targetBmAggregate
+    );
+    
+    // Build a map from original index to rounded value
+    const indexToRoundedFee = new Map<number, number>();
+    bmItemsWithIndices.forEach(({ index }, i) => {
+      const rounded = roundedValues.get(i);
+      if (rounded !== undefined) {
+        indexToRoundedFee.set(index, rounded);
+      }
+    });
+    
+    // Initialize filtered items with intelligently rounded discounted amounts
+    filteredItems = draftItems.map((item, index) => {
       if (item.provider === 'Baker McKenzie') {
-        const discountedFee = roundToNearest1000((item.fee_amount || 0) * discountMultiplier);
+        // Use the intelligently rounded value if available, otherwise simple round
+        const roundedFee = indexToRoundedFee.get(index) ?? roundToNearest1000((item.fee_amount || 0) * discountMultiplier);
         return {
           ...item,
           original_fee_amount: item.fee_amount,
-          fee_amount: discountedFee,
+          fee_amount: roundedFee,
           afa_adjusted: true,
           afa_comment: `${config.discountPercent}% discount applied`,
         };
@@ -139,7 +232,7 @@ export function applyAFAFilters(
       type: 'discounted_rates',
       label: AFA_TYPE_LABELS['discounted_rates'],
       description: `${config.discountPercent}% discount on standard rates`,
-      clientPrice: roundToNearest1000(discountedBmTotal + originalLcTotal),
+      clientPrice: targetBmAggregate + roundToNearest1000(originalLcTotal),
     });
     
     globalComment = `${config.discountPercent}% discount applied to standard rates`;
@@ -269,13 +362,38 @@ export function applyAFAFilters(
         globalComment = `${config.discountPercent}% discount applied to standard rates`;
         const multiplier = 1 - config.discountPercent / 100;
         
-        filteredItems = draftItems.map(item => {
+        // Calculate exact discounted BM total and round to get target
+        const exactDiscountedBm = originalBmTotal * multiplier;
+        const targetBmAggregate = roundToNearest1000(exactDiscountedBm);
+        
+        // Get BM items with their indices for largest remainder rounding
+        const bmItemsWithIndices = draftItems
+          .map((item, index) => ({ item, index }))
+          .filter(({ item }) => item.provider === 'Baker McKenzie' && (item.is_included !== false || !item.is_optional));
+        
+        // Apply largest remainder rounding to BM items
+        const roundedValues = applyLargestRemainderRounding(
+          bmItemsWithIndices,
+          ({ item }) => (item.fee_amount || 0) * multiplier,
+          targetBmAggregate
+        );
+        
+        // Build a map from original index to rounded value
+        const indexToRoundedFee = new Map<number, number>();
+        bmItemsWithIndices.forEach(({ index }, i) => {
+          const rounded = roundedValues.get(i);
+          if (rounded !== undefined) {
+            indexToRoundedFee.set(index, rounded);
+          }
+        });
+        
+        filteredItems = draftItems.map((item, index) => {
           if (item.provider === 'Baker McKenzie') {
-            const adjustedFee = roundToNearest1000((item.fee_amount || 0) * multiplier);
+            const roundedFee = indexToRoundedFee.get(index) ?? roundToNearest1000((item.fee_amount || 0) * multiplier);
             return {
               ...item,
               original_fee_amount: item.fee_amount,
-              fee_amount: adjustedFee,
+              fee_amount: roundedFee,
               afa_adjusted: true,
               afa_comment: `${config.discountPercent}% discount applied`,
             };

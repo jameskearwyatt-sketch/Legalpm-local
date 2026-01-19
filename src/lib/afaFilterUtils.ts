@@ -3,7 +3,7 @@
  * and generating filtered exports with explanatory comments.
  */
 
-import { DraftProposalItem } from '@/lib/hooks/usePricingProposals';
+import { DraftProposalItem, FigureType } from '@/lib/hooks/usePricingProposals';
 import { 
   ProposalAFA, 
   AFAType, 
@@ -32,6 +32,27 @@ export interface AFAFilterResult {
     description: string;
     clientPrice: number;
   }>;
+}
+
+/**
+ * Get the appropriate fee value based on the figure type selection.
+ * For local counsel items, always use fee_amount (single figure).
+ */
+export function getItemFeeByFigureType(item: DraftProposalItem, figureType: FigureType): number {
+  // Local counsel items always use single fee_amount
+  if (item.provider === 'Local Counsel') {
+    return item.fee_amount || 0;
+  }
+  
+  switch (figureType) {
+    case 'lower':
+      return item.fee_lower ?? item.fee_amount ?? 0;
+    case 'upper':
+      return item.fee_upper ?? item.fee_amount ?? 0;
+    case 'midpoint':
+    default:
+      return item.fee_amount ?? 0;
+  }
 }
 
 /**
@@ -137,17 +158,30 @@ function applyLargestRemainderRounding<T>(
 /**
  * Apply AFA filters to work items and return adjusted items with comments.
  * All monetary values are rounded to nearest $1,000 for client-facing output.
+ * 
+ * @param draftItems - The draft proposal items
+ * @param enabledAFAs - List of enabled AFAs
+ * @param baselineTotal - The baseline total (sum of selected figure type)
+ * @param currencySymbol - Currency symbol for formatting
+ * @param baseFigure - Which figure to use as baseline (lower/midpoint/upper)
  */
 export function applyAFAFilters(
   draftItems: DraftProposalItem[],
   enabledAFAs: ProposalAFA[],
   baselineTotal: number,
-  currencySymbol: string = '£'
+  currencySymbol: string = '£',
+  baseFigure: FigureType = 'midpoint'
 ): AFAFilterResult {
+  // Get fee amounts based on selected figure type
+  const itemsWithBaseFee = draftItems.map(item => ({
+    ...item,
+    fee_amount: getItemFeeByFigureType(item, baseFigure),
+  }));
+
   if (enabledAFAs.length === 0) {
-    // No AFAs enabled - return items unchanged
+    // No AFAs enabled - return items with selected figure type fee
     return {
-      items: draftItems.map(item => ({
+      items: itemsWithBaseFee.map(item => ({
         ...item,
         original_fee_amount: item.fee_amount,
         afa_adjusted: false,
@@ -165,11 +199,11 @@ export function applyAFAFilters(
   let globalComment: string | undefined;
   const appliedAFAs: AFAFilterResult['appliedAFAs'] = [];
 
-  // Calculate original totals
-  const originalBmTotal = draftItems
+  // Calculate original totals using the selected figure type
+  const originalBmTotal = itemsWithBaseFee
     .filter(item => item.provider === 'Baker McKenzie' && (item.is_included !== false || !item.is_optional))
     .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
-  const originalLcTotal = draftItems
+  const originalLcTotal = itemsWithBaseFee
     .filter(item => item.provider === 'Local Counsel' && (item.is_included !== false || !item.is_optional))
     .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
 
@@ -187,8 +221,8 @@ export function applyAFAFilters(
     // Calculate the target aggregate (rounded to nearest 1000)
     const targetBmAggregate = roundToNearest1000(discountedBmTotal);
     
-    // Get BM items with their indices for largest remainder rounding
-    const bmItemsWithIndices = draftItems
+    // Get BM items with their indices for largest remainder rounding (using itemsWithBaseFee)
+    const bmItemsWithIndices = itemsWithBaseFee
       .map((item, index) => ({ item, index }))
       .filter(({ item }) => item.provider === 'Baker McKenzie' && (item.is_included !== false || !item.is_optional));
     
@@ -208,8 +242,8 @@ export function applyAFAFilters(
       }
     });
     
-    // Initialize filtered items with intelligently rounded discounted amounts
-    filteredItems = draftItems.map((item, index) => {
+    // Initialize filtered items with intelligently rounded discounted amounts (using itemsWithBaseFee)
+    filteredItems = itemsWithBaseFee.map((item, index) => {
       if (item.provider === 'Baker McKenzie') {
         // Use the intelligently rounded value if available, otherwise simple round
         const roundedFee = indexToRoundedFee.get(index) ?? roundToNearest1000((item.fee_amount || 0) * discountMultiplier);
@@ -260,7 +294,7 @@ export function applyAFAFilters(
         
         // If no discount was applied, initialize filtered items (unchanged)
         if (!discountAFA) {
-          filteredItems = draftItems.map(item => ({
+          filteredItems = itemsWithBaseFee.map(item => ({
             ...item,
             original_fee_amount: item.fee_amount,
             fee_amount: roundToNearest1000(item.fee_amount || 0),
@@ -288,8 +322,9 @@ export function applyAFAFilters(
           : phaseComment;
         
         // If no discount was applied, initialize filtered items (unchanged, just rounded)
+        // If no discount was applied, initialize filtered items (unchanged, just rounded)
         if (!discountAFA) {
-          filteredItems = draftItems.map(item => ({
+          filteredItems = itemsWithBaseFee.map(item => ({
             ...item,
             original_fee_amount: item.fee_amount,
             fee_amount: roundToNearest1000(item.fee_amount || 0),
@@ -308,7 +343,7 @@ export function applyAFAFilters(
         // Proportionally adjust items based on the blended rate total
         // Use original baseline for ratio calculation
         const adjustmentRatio = roundedClientPrice / originalBmTotal;
-        filteredItems = draftItems.map(item => {
+        filteredItems = itemsWithBaseFee.map(item => {
           if (item.provider === 'Baker McKenzie') {
             const adjustedFee = roundToNearest1000((item.fee_amount || 0) * adjustmentRatio);
             return {
@@ -338,7 +373,7 @@ export function applyAFAFilters(
         
         // If discount already applied, keep those items; otherwise initialize
         if (!discountAFA) {
-          filteredItems = draftItems.map(item => ({
+          filteredItems = itemsWithBaseFee.map(item => ({
             ...item,
             original_fee_amount: item.fee_amount,
             fee_amount: roundToNearest1000(item.fee_amount || 0),
@@ -367,7 +402,7 @@ export function applyAFAFilters(
         const targetBmAggregate = roundToNearest1000(exactDiscountedBm);
         
         // Get BM items with their indices for largest remainder rounding
-        const bmItemsWithIndices = draftItems
+        const bmItemsWithIndices = itemsWithBaseFee
           .map((item, index) => ({ item, index }))
           .filter(({ item }) => item.provider === 'Baker McKenzie' && (item.is_included !== false || !item.is_optional));
         
@@ -387,7 +422,7 @@ export function applyAFAFilters(
           }
         });
         
-        filteredItems = draftItems.map((item, index) => {
+        filteredItems = itemsWithBaseFee.map((item, index) => {
           if (item.provider === 'Baker McKenzie') {
             const roundedFee = indexToRoundedFee.get(index) ?? roundToNearest1000((item.fee_amount || 0) * multiplier);
             return {
@@ -413,7 +448,7 @@ export function applyAFAFilters(
         globalComment = globalComment ? `${globalComment}. ${defaultComment}` : defaultComment;
         
         if (!discountAFA) {
-          filteredItems = draftItems.map(item => ({
+          filteredItems = itemsWithBaseFee.map(item => ({
             ...item,
             original_fee_amount: item.fee_amount,
             fee_amount: roundToNearest1000(item.fee_amount || 0),
@@ -424,7 +459,7 @@ export function applyAFAFilters(
     }
   } else if (!discountAFA) {
     // No primary AFA and no discount, just copy items with rounding
-    filteredItems = draftItems.map(item => ({
+    filteredItems = itemsWithBaseFee.map(item => ({
       ...item,
       original_fee_amount: item.fee_amount,
       fee_amount: roundToNearest1000(item.fee_amount || 0),

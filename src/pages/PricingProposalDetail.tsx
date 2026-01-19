@@ -839,6 +839,8 @@ export default function PricingProposalDetail() {
       currency: proposal?.currency || 'GBP',
       baselineTotal: workItemTotals.total,
       notes: versionNotes || undefined,
+      excelExportFigures: assumptions.excelExportFigures,
+      afaBaseFigure: assumptions.afaBaseFigure,
     });
     
     toast({ 

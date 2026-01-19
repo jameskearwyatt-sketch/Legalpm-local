@@ -242,6 +242,21 @@ export async function exportAFAProposalToExcel({
   const validItems = filterResult.items.filter(item => 
     item.work_item.trim() !== '' && (item.is_included !== false || !item.is_optional)
   );
+  
+  // Debug: Check for items that were in the reconciliation but excluded from export
+  const reconciledItems = filterResult.items.filter(item => 
+    (item.is_included !== false || !item.is_optional)
+  );
+  const reconciledBmTotal = reconciledItems.filter(i => i.provider === 'Baker McKenzie').reduce((s, i) => s + i.fee_amount, 0);
+  const validBmTotal = validItems.filter(i => i.provider === 'Baker McKenzie').reduce((s, i) => s + i.fee_amount, 0);
+  console.log('[Excel Export Debug]', {
+    reconciledItemCount: reconciledItems.length,
+    validItemCount: validItems.length,
+    reconciledBmTotal,
+    validBmTotal,
+    difference: reconciledBmTotal - validBmTotal,
+  });
+  
   validItems.forEach((item) => {
     const category = item.category || 'Other';
     if (!groupedItems[category]) {

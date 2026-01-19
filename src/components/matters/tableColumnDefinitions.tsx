@@ -141,8 +141,8 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
       
       return (
         <div className="flex items-start gap-1.5">
-          {/* Individual WIP proposal toggle - only show if matter has a proposal */}
-          {hasProposal && (
+          {/* Individual WIP proposal toggle or spacer for alignment */}
+          {hasProposal ? (
             <button
               type="button"
               onClick={handleToggleProposal}
@@ -159,6 +159,8 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
                 isProposalActive ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground/40"
               )} />
             </button>
+          ) : (
+            <div className="flex-shrink-0 w-5 h-5" /> 
           )}
           <div className="flex-1 min-w-0">
             <Link 

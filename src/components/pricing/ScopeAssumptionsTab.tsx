@@ -199,10 +199,59 @@ const categoryLabels: Record<string, string> = {
   documentation: 'Documentation',
 };
 
+// Extract the actual document name from a work item name
+// e.g., "Negotiation of the VPPA" → "VPPA"
+// e.g., "Draft VPPA" → "VPPA"
+// e.g., "VPPA review and markup" → "VPPA"
+function extractDocumentName(workItemName: string): string {
+  const name = workItemName.trim();
+  
+  // Common patterns to strip out
+  const prefixPatterns = [
+    /^(negotiation\s+of\s+(the\s+)?)/i,
+    /^(negotiate\s+(the\s+)?)/i,
+    /^(drafting\s+of\s+(the\s+)?)/i,
+    /^(draft(ing)?\s+(the\s+)?)/i,
+    /^(review\s+(of\s+)?(the\s+)?)/i,
+    /^(preparation\s+of\s+(the\s+)?)/i,
+    /^(prepare\s+(the\s+)?)/i,
+    /^(finalise?\s+(the\s+)?)/i,
+    /^(execute?\s+(the\s+)?)/i,
+  ];
+  
+  const suffixPatterns = [
+    /(\s+review\s+and\s+markup)$/i,
+    /(\s+review)$/i,
+    /(\s+drafting)$/i,
+    /(\s+negotiation)$/i,
+    /(\s+preparation)$/i,
+    /(\s+finalisation)$/i,
+  ];
+  
+  let result = name;
+  
+  // Remove prefixes
+  for (const pattern of prefixPatterns) {
+    result = result.replace(pattern, '');
+  }
+  
+  // Remove suffixes
+  for (const pattern of suffixPatterns) {
+    result = result.replace(pattern, '');
+  }
+  
+  // If we stripped everything or nothing, return the original
+  if (!result.trim() || result === name) {
+    return name;
+  }
+  
+  return result.trim();
+}
+
 // Generate amalgamated narrative for a document
 function generateDocumentNarrative(config: DocumentConfig): string {
   const parts: string[] = [];
-  const docName = config.workItemName;
+  const docName = extractDocumentName(config.workItemName);
   
   // Who drafts
   if (config.whoDrafts === 'we_draft') {
@@ -239,6 +288,54 @@ function generateDocumentNarrative(config: DocumentConfig): string {
   
   if (parts.length === 0) return '';
   return parts.join('. ') + '.';
+}
+
+// Generate a combined process assumption narrative from enabled process assumptions
+function generateProcessNarrative(enabledProcessAssumptions: SimpleAssumptionValue[]): string {
+  if (enabledProcessAssumptions.length === 0) return '';
+  
+  const parts: string[] = [];
+  
+  const hasSingleCounterparty = enabledProcessAssumptions.some(a => a.assumptionId === 'single_counterparty');
+  const hasSingleSigning = enabledProcessAssumptions.some(a => a.assumptionId === 'single_signing');
+  const hasVirtualCompletion = enabledProcessAssumptions.some(a => a.assumptionId === 'virtual_completion');
+  
+  // Build a cohesive sentence
+  if (hasSingleCounterparty && hasSingleSigning && hasVirtualCompletion) {
+    return 'This is a bilateral transaction with a single counterparty, completing in a single virtual signing without staggered completions or physical attendance requirements.';
+  }
+  
+  if (hasSingleCounterparty && hasSingleSigning) {
+    return 'This is a bilateral transaction with a single counterparty, completing in a single signing and closing without staggered completions or deferred conditions.';
+  }
+  
+  if (hasSingleCounterparty && hasVirtualCompletion) {
+    return 'This is a bilateral transaction with a single counterparty. Completion will be conducted virtually, with no requirement for physical attendance.';
+  }
+  
+  if (hasSingleSigning && hasVirtualCompletion) {
+    return 'The transaction will complete in a single virtual signing, without staggered completions or physical attendance requirements.';
+  }
+  
+  // Individual assumptions
+  if (hasSingleCounterparty) {
+    parts.push('This is a bilateral transaction with a single counterparty');
+  }
+  if (hasSingleSigning) {
+    parts.push('the transaction will complete in a single signing and closing');
+  }
+  if (hasVirtualCompletion) {
+    parts.push('completion will be conducted virtually');
+  }
+  
+  if (parts.length === 1) {
+    return parts[0].charAt(0).toUpperCase() + parts[0].slice(1) + '.';
+  }
+  
+  // Join with proper capitalization
+  const first = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+  const rest = parts.slice(1);
+  return first + ', ' + rest.join(', and ') + '.';
 }
 
 export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] }: ScopeAssumptionsTabProps) {
@@ -478,6 +575,18 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
   const hasDocumentAssumptions = documentAssumptions.turnsEnabled || 
     documentAssumptions.whoDraftsEnabled || 
     documentAssumptions.clientFormEnabled;
+  
+  // Split process assumptions from others for combined narrative
+  const enabledProcessAssumptions = enabledSimpleAssumptions.filter(a => {
+    const def = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
+    return def?.category === 'process';
+  });
+  const enabledNonProcessAssumptions = enabledSimpleAssumptions.filter(a => {
+    const def = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
+    return def?.category !== 'process';
+  });
+  const combinedProcessNarrative = generateProcessNarrative(enabledProcessAssumptions);
+  
   const hasAnyEnabled = enabledSimpleAssumptions.length > 0 || 
     hasDocumentAssumptions ||
     (state.documentNarratives || []).length > 0;
@@ -772,8 +881,8 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Simple assumption narratives */}
-                {enabledSimpleAssumptions.map(assumption => {
+                {/* Non-process assumption narratives (individual) */}
+                {enabledNonProcessAssumptions.map(assumption => {
                   const def = SIMPLE_ASSUMPTIONS.find(a => a.id === assumption.assumptionId);
                   if (!def) return null;
 
@@ -855,6 +964,30 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                     </div>
                   );
                 })}
+
+                {/* Combined Process narrative */}
+                {combinedProcessNarrative && (
+                  <div className="p-3 bg-muted/30 rounded-lg border border-border/50">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="text-xs">
+                            Process
+                          </Badge>
+                          {enabledProcessAssumptions.map(a => {
+                            const def = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
+                            return def ? (
+                              <Badge key={a.assumptionId} variant="secondary" className="text-xs">
+                                {def.label}
+                              </Badge>
+                            ) : null;
+                          })}
+                        </div>
+                        <p className="text-sm text-foreground">{combinedProcessNarrative}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {/* Document narratives */}
                 {(state.documentNarratives || []).map((narrative, index) => {

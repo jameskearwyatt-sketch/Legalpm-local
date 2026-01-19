@@ -186,21 +186,24 @@ export function applyAFAFilters(
     targetAggregate: number,
     filterFn: (item: typeof itemsWithBaseFee[0]) => boolean
   ): Map<number, number> => {
+    // Build list of items with their ORIGINAL indices preserved
     const filteredWithIndices = items
-      .map((item, index) => ({ item, index }))
+      .map((item, index) => ({ item, originalIndex: index }))
       .filter(({ item }) => filterFn(item) && (item.is_included !== false || !item.is_optional));
     
+    // applyLargestRemainderRounding returns a Map keyed by index in the filtered array
     const roundedValues = applyLargestRemainderRounding(
       filteredWithIndices,
       ({ item }) => getExactValue(item),
       targetAggregate
     );
     
+    // Map back from filtered array index to ORIGINAL array index
     const indexToRoundedFee = new Map<number, number>();
-    filteredWithIndices.forEach(({ index }, i) => {
-      const rounded = roundedValues.get(i);
+    filteredWithIndices.forEach((entry, filteredIdx) => {
+      const rounded = roundedValues.get(filteredIdx);
       if (rounded !== undefined) {
-        indexToRoundedFee.set(index, rounded);
+        indexToRoundedFee.set(entry.originalIndex, rounded);
       }
     });
     

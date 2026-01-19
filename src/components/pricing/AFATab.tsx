@@ -1473,13 +1473,13 @@ export function AFATab({
                                   />
                                 </div>
                                 
-                                {/* Select for Export */}
+                                {/* Select for Export - controls whether narrative is included */}
                                 <div className="mt-4 flex items-center gap-2">
                                   <Checkbox
                                     checked={afa?.is_selected_for_export ?? false}
                                     onCheckedChange={(v) => afa && selectForExport.mutateAsync({ afaId: afa.id, selected: !!v })}
                                   />
-                                  <Label>Include in Excel export</Label>
+                                  <Label className="text-muted-foreground text-sm">Include narrative in Excel export</Label>
                                 </div>
                               </>
                             )}

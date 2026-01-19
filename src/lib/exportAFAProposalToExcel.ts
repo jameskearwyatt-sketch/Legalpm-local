@@ -11,10 +11,14 @@ import { ProposalAFA, AFA_TYPE_LABELS } from '@/lib/hooks/useProposalAFAs';
 import { applyAFAFilters, AFAFilteredItem, getItemFeeByFigureType } from '@/lib/afaFilterUtils';
 
 /**
- * Round a number to the nearest 1000.
- * E.g., 1499 -> 1000, 1500 -> 2000, 12345 -> 12000
+ * Dynamic rounding based on value size:
+ * - Values < 10,000: round to nearest 100
+ * - Values >= 10,000: round to nearest 1,000
  */
-function roundToNearest1000(value: number): number {
+function smartRound(value: number): number {
+  if (Math.abs(value) < 10000) {
+    return Math.round(value / 100) * 100;
+  }
   return Math.round(value / 1000) * 1000;
 }
 
@@ -166,7 +170,7 @@ export async function exportAFAProposalToExcel({
     worksheet.getRow(currentRow).height = 28;
     currentRow++;
 
-    // Add each AFA as a prominent line
+    // Add each AFA as a prominent line (always show the AFA type + description)
     for (const afa of filterResult.appliedAFAs) {
       worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
       const afaCell = worksheet.getCell(`A${currentRow}`);
@@ -183,6 +187,27 @@ export async function exportAFAProposalToExcel({
       };
       worksheet.getRow(currentRow).height = 24;
       currentRow++;
+      
+      // Check if user has opted to include client narrative for this AFA
+      // Find the original AFA object to check is_selected_for_export
+      const originalAfa = enabledAFAs.find(a => a.afa_type === afa.type);
+      if (originalAfa?.is_selected_for_export && originalAfa?.client_narrative?.trim()) {
+        worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+        const narrativeCell = worksheet.getCell(`A${currentRow}`);
+        narrativeCell.value = originalAfa.client_narrative.trim();
+        narrativeCell.font = { size: 10, italic: true, color: { argb: 'FF374151' } };
+        narrativeCell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF0F9FF' }, // Very light blue
+        };
+        narrativeCell.alignment = { wrapText: true, vertical: 'middle' };
+        narrativeCell.border = {
+          left: { style: 'thick', color: { argb: 'FF2563EB' } },
+        };
+        worksheet.getRow(currentRow).height = 24;
+        currentRow++;
+      }
     }
     currentRow++;
   }

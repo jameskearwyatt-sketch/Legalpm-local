@@ -50,6 +50,8 @@ interface WipShapingProposalDialogProps {
   hasLocalCounsel?: boolean;
 }
 
+type EntryMode = 'writeoff' | 'adjusted';
+
 export function WipShapingProposalDialog({
   isOpen,
   onClose,
@@ -67,13 +69,19 @@ export function WipShapingProposalDialog({
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [showAiHelper, setShowAiHelper] = useState(false);
   const [pastedText, setPastedText] = useState('');
-  const [wipEntryMode, setWipEntryMode] = useState<'writeoff' | 'adjusted'>('writeoff');
+  const [entryMode, setEntryMode] = useState<EntryMode>('writeoff');
+  
   const [formData, setFormData] = useState({
-    wip_amount: 0,
-    wip_write_off_amount: 0,
+    // Raw values (starting points)
+    raw_wip: 0,
+    raw_ar: 0,
+    // Write-off amounts (used when entryMode === 'writeoff')
+    wip_write_off: 0,
+    ar_write_off: 0,
+    // Adjusted amounts (used when entryMode === 'adjusted')
     adjusted_wip: 0,
-    billed_amount: 0,
-    accounts_receivable: 0,
+    adjusted_ar: 0,
+    // Other fields
     paid_amount: 0,
     lc_wip_amount: 0,
     lc_billed_amount: 0,
@@ -85,16 +93,22 @@ export function WipShapingProposalDialog({
   // Reset form when dialog opens
   useEffect(() => {
     if (isOpen) {
-      // If editing an existing proposal, use its values
       if (existingProposal) {
+        // Editing existing proposal
         const rawWip = roundTo2(existingProposal.wip_amount);
-        const writeOff = roundTo2(existingProposal.wip_write_off_amount);
+        const wipWriteOff = roundTo2(existingProposal.wip_write_off_amount);
+        // For AR, we need to calculate from billed - AR (where billed = raw AR before write-off)
+        // If billed_amount exists and is > accounts_receivable, the difference is the AR write-off
+        const rawAr = roundTo2(existingProposal.billed_amount || existingProposal.accounts_receivable);
+        const arWriteOff = roundTo2(Math.max(0, rawAr - existingProposal.accounts_receivable));
+        
         setFormData({
-          wip_amount: rawWip,
-          wip_write_off_amount: writeOff,
-          adjusted_wip: roundTo2(rawWip - writeOff),
-          billed_amount: roundTo2(existingProposal.billed_amount),
-          accounts_receivable: roundTo2(existingProposal.accounts_receivable),
+          raw_wip: rawWip,
+          raw_ar: rawAr,
+          wip_write_off: wipWriteOff,
+          ar_write_off: arWriteOff,
+          adjusted_wip: roundTo2(rawWip - wipWriteOff),
+          adjusted_ar: roundTo2(existingProposal.accounts_receivable),
           paid_amount: roundTo2(existingProposal.paid_amount),
           lc_wip_amount: roundTo2(existingProposal.lc_wip_amount || 0),
           lc_billed_amount: roundTo2(existingProposal.lc_billed_amount || 0),
@@ -103,20 +117,26 @@ export function WipShapingProposalDialog({
       } else {
         // New proposal - pre-fill with current snapshot values
         const rawWip = roundTo2(currentValues?.wip_amount || 0);
-        const writeOff = roundTo2(currentValues?.wip_write_off_amount || 0);
+        const wipWriteOff = roundTo2(currentValues?.wip_write_off_amount || 0);
+        // For AR, use billed_amount as raw AR (bills issued) and accounts_receivable as current AR
+        const rawAr = roundTo2(currentValues?.billed_amount || currentValues?.accounts_receivable || 0);
+        const currentAr = roundTo2(currentValues?.accounts_receivable || 0);
+        const arWriteOff = roundTo2(Math.max(0, rawAr - currentAr));
+        
         setFormData({
-          wip_amount: rawWip,
-          wip_write_off_amount: writeOff,
-          adjusted_wip: roundTo2(rawWip - writeOff),
-          billed_amount: roundTo2(currentValues?.billed_amount || 0),
-          accounts_receivable: roundTo2(currentValues?.accounts_receivable || 0),
+          raw_wip: rawWip,
+          raw_ar: rawAr,
+          wip_write_off: wipWriteOff,
+          ar_write_off: arWriteOff,
+          adjusted_wip: roundTo2(rawWip - wipWriteOff),
+          adjusted_ar: currentAr,
           paid_amount: roundTo2(currentValues?.paid_amount || 0),
           lc_wip_amount: roundTo2(currentValues?.lc_wip_amount || 0),
           lc_billed_amount: roundTo2(currentValues?.lc_billed_amount || 0),
           notes: '',
         });
       }
-      setWipEntryMode('writeoff');
+      setEntryMode('writeoff');
       setPastedText('');
       setShowAiHelper(false);
     }
@@ -156,15 +176,37 @@ export function WipShapingProposalDialog({
     }
   };
 
+  // Calculate derived values based on entry mode
   const calculatedValues = useMemo(() => {
-    if (wipEntryMode === 'writeoff') {
-      const netWip = Math.max(0, formData.wip_amount - formData.wip_write_off_amount);
-      return { netWip, writeOff: formData.wip_write_off_amount };
+    let finalWipWriteOff: number;
+    let finalArWriteOff: number;
+    let finalAdjustedWip: number;
+    let finalAdjustedAr: number;
+
+    if (entryMode === 'writeoff') {
+      // User entered write-offs, calculate adjusted values
+      finalWipWriteOff = formData.wip_write_off;
+      finalArWriteOff = formData.ar_write_off;
+      finalAdjustedWip = Math.max(0, formData.raw_wip - formData.wip_write_off);
+      finalAdjustedAr = Math.max(0, formData.raw_ar - formData.ar_write_off);
     } else {
-      const writeOff = Math.max(0, formData.wip_amount - formData.adjusted_wip);
-      return { netWip: formData.adjusted_wip, writeOff };
+      // User entered adjusted values, calculate write-offs
+      finalAdjustedWip = formData.adjusted_wip;
+      finalAdjustedAr = formData.adjusted_ar;
+      finalWipWriteOff = Math.max(0, formData.raw_wip - formData.adjusted_wip);
+      finalArWriteOff = Math.max(0, formData.raw_ar - formData.adjusted_ar);
     }
-  }, [wipEntryMode, formData.wip_amount, formData.wip_write_off_amount, formData.adjusted_wip]);
+
+    const totalWriteOff = roundTo2(finalWipWriteOff + finalArWriteOff);
+
+    return {
+      wipWriteOff: roundTo2(finalWipWriteOff),
+      arWriteOff: roundTo2(finalArWriteOff),
+      adjustedWip: roundTo2(finalAdjustedWip),
+      adjustedAr: roundTo2(finalAdjustedAr),
+      totalWriteOff,
+    };
+  }, [entryMode, formData.raw_wip, formData.raw_ar, formData.wip_write_off, formData.ar_write_off, formData.adjusted_wip, formData.adjusted_ar]);
 
   const updateField = (field: string, value: number | string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -179,11 +221,16 @@ export function WipShapingProposalDialog({
     
     setIsSubmitting(true);
     try {
+      // Map to the expected save format
+      // wip_amount = raw WIP (unchanged)
+      // wip_write_off_amount = TOTAL write-off (WIP + AR combined)
+      // billed_amount = raw AR (original billed amount before any AR write-off)
+      // accounts_receivable = adjusted AR after write-off
       await onSave({
-        wip_amount: formData.wip_amount,
-        wip_write_off_amount: calculatedValues.writeOff,
-        billed_amount: formData.billed_amount,
-        accounts_receivable: formData.accounts_receivable,
+        wip_amount: formData.raw_wip,
+        wip_write_off_amount: calculatedValues.totalWriteOff, // Combined write-off
+        billed_amount: formData.raw_ar, // Store raw AR as billed_amount
+        accounts_receivable: calculatedValues.adjustedAr,
         paid_amount: formData.paid_amount,
         lc_wip_amount: formData.lc_wip_amount,
         lc_billed_amount: formData.lc_billed_amount,
@@ -207,8 +254,8 @@ export function WipShapingProposalDialog({
           </DialogTitle>
           <DialogDescription>
             {matterName 
-              ? `Propose how WIP could be shaped for ${matterName}` 
-              : 'Create a proposal for how WIP could be reshaped'}
+              ? `Propose how WIP and AR could be shaped for ${matterName}` 
+              : 'Create a proposal for how WIP and AR could be reshaped'}
           </DialogDescription>
         </DialogHeader>
 
@@ -217,7 +264,7 @@ export function WipShapingProposalDialog({
           <Alert className="bg-amber-500/10 border-amber-500/30">
             <Lightbulb className="h-4 w-4 text-amber-500" />
             <AlertDescription className="text-sm">
-              This is a <strong>proposal</strong> for how you might reshape WIP — it won't affect the actual financial snapshot until you explicitly apply it.
+              This is a <strong>proposal</strong> — it won't affect the actual financial snapshot until you explicitly apply it.
             </AlertDescription>
           </Alert>
 
@@ -302,74 +349,77 @@ export function WipShapingProposalDialog({
             </p>
           </div>
 
+          {/* Entry Mode Toggle */}
+          <div className="flex items-center justify-between p-3 bg-muted/30 rounded-lg border">
+            <span className="text-sm font-medium">Entry Method</span>
+            <RadioGroup
+              value={entryMode}
+              onValueChange={(value) => setEntryMode(value as EntryMode)}
+              className="flex items-center gap-4"
+            >
+              <div className="flex items-center space-x-1.5">
+                <RadioGroupItem value="writeoff" id="mode-writeoff" className="h-3 w-3" />
+                <Label htmlFor="mode-writeoff" className="text-xs cursor-pointer">Enter Write-offs</Label>
+              </div>
+              <div className="flex items-center space-x-1.5">
+                <RadioGroupItem value="adjusted" id="mode-adjusted" className="h-3 w-3" />
+                <Label htmlFor="mode-adjusted" className="text-xs cursor-pointer">Enter Revised Amounts</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
           {/* Baker McKenzie Section */}
-          <div className="space-y-3 p-4 bg-muted/30 rounded-lg border">
+          <div className="space-y-4 p-4 bg-muted/30 rounded-lg border">
             <h4 className="text-sm font-medium">Baker McKenzie</h4>
             
-            {/* WIP Section with Write-offs */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">Work in Progress</p>
-                <RadioGroup
-                  value={wipEntryMode}
-                  onValueChange={(value) => setWipEntryMode(value as 'writeoff' | 'adjusted')}
-                  className="flex items-center gap-4"
-                >
-                  <div className="flex items-center space-x-1.5">
-                    <RadioGroupItem value="writeoff" id="mode-writeoff-proposal" className="h-3 w-3" />
-                    <Label htmlFor="mode-writeoff-proposal" className="text-xs cursor-pointer">Enter Write-off</Label>
-                  </div>
-                  <div className="flex items-center space-x-1.5">
-                    <RadioGroupItem value="adjusted" id="mode-adjusted-proposal" className="h-3 w-3" />
-                    <Label htmlFor="mode-adjusted-proposal" className="text-xs cursor-pointer">Enter Adjusted WIP</Label>
-                  </div>
-                </RadioGroup>
-              </div>
-              
+            {/* WIP Row */}
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground font-medium">Work in Progress (Time Costs)</p>
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="wip_amount_proposal" className="text-xs">Raw WIP ({currencySymbol.trim()})</Label>
+                  <Label htmlFor="raw_wip" className="text-xs">Raw WIP ({currencySymbol.trim()})</Label>
                   <Input
-                    id="wip_amount_proposal"
+                    id="raw_wip"
                     type="number"
                     min="0"
                     step="0.01"
-                    value={formData.wip_amount}
-                    onChange={(e) => updateField('wip_amount', parseFloat(e.target.value) || 0)}
+                    value={formData.raw_wip}
+                    onChange={(e) => updateField('raw_wip', parseFloat(e.target.value) || 0)}
                     className="h-9"
                   />
                 </div>
 
-                {wipEntryMode === 'writeoff' ? (
+                {entryMode === 'writeoff' ? (
                   <>
                     <div className="space-y-1.5">
-                      <Label htmlFor="wip_write_off_amount_proposal" className="text-xs text-destructive">Write-offs ({currencySymbol.trim()})</Label>
+                      <Label htmlFor="wip_write_off" className="text-xs text-destructive">WIP Write-off ({currencySymbol.trim()})</Label>
                       <Input
-                        id="wip_write_off_amount_proposal"
+                        id="wip_write_off"
                         type="number"
                         min="0"
+                        max={formData.raw_wip}
                         step="0.01"
-                        value={formData.wip_write_off_amount}
-                        onChange={(e) => updateField('wip_write_off_amount', parseFloat(e.target.value) || 0)}
+                        value={formData.wip_write_off}
+                        onChange={(e) => updateField('wip_write_off', parseFloat(e.target.value) || 0)}
                         className="h-9"
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Net WIP (calculated)</Label>
+                      <Label className="text-xs text-muted-foreground">Revised WIP</Label>
                       <div className="h-9 px-3 py-2 bg-muted rounded-md border flex items-center font-medium text-sm">
-                        {formatCurrency(calculatedValues.netWip, currency)}
+                        {formatCurrency(calculatedValues.adjustedWip, currency)}
                       </div>
                     </div>
                   </>
                 ) : (
                   <>
                     <div className="space-y-1.5">
-                      <Label htmlFor="adjusted_wip_proposal" className="text-xs text-primary">Adjusted WIP ({currencySymbol.trim()})</Label>
+                      <Label htmlFor="adjusted_wip" className="text-xs text-primary">Revised WIP ({currencySymbol.trim()})</Label>
                       <Input
-                        id="adjusted_wip_proposal"
+                        id="adjusted_wip"
                         type="number"
                         min="0"
-                        max={formData.wip_amount}
+                        max={formData.raw_wip}
                         step="0.01"
                         value={formData.adjusted_wip}
                         onChange={(e) => updateField('adjusted_wip', parseFloat(e.target.value) || 0)}
@@ -377,9 +427,9 @@ export function WipShapingProposalDialog({
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground text-destructive">Write-off (calculated)</Label>
+                      <Label className="text-xs text-destructive">WIP Write-off</Label>
                       <div className="h-9 px-3 py-2 bg-muted rounded-md border flex items-center font-medium text-sm text-destructive">
-                        {formatCurrency(calculatedValues.writeOff, currency)}
+                        {formatCurrency(calculatedValues.wipWriteOff, currency)}
                       </div>
                     </div>
                   </>
@@ -387,44 +437,96 @@ export function WipShapingProposalDialog({
               </div>
             </div>
 
-            {/* Total Billed, Accounts Receivable, and Total Paid */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="billed_amount_proposal" className="text-xs">Total Billed ({currencySymbol.trim()})</Label>
-                <Input
-                  id="billed_amount_proposal"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.billed_amount}
-                  onChange={(e) => updateField('billed_amount', parseFloat(e.target.value) || 0)}
-                  className="h-9"
-                />
-              </div>
+            {/* AR Row */}
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground font-medium">Accounts Receivable (Bills Issued)</p>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="raw_ar" className="text-xs">Bills Issued ({currencySymbol.trim()})</Label>
+                  <Input
+                    id="raw_ar"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.raw_ar}
+                    onChange={(e) => updateField('raw_ar', parseFloat(e.target.value) || 0)}
+                    className="h-9"
+                  />
+                </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="accounts_receivable_proposal" className="text-xs">Accounts Receivable ({currencySymbol.trim()})</Label>
-                <Input
-                  id="accounts_receivable_proposal"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.accounts_receivable}
-                  onChange={(e) => updateField('accounts_receivable', parseFloat(e.target.value) || 0)}
-                  className="h-9"
-                />
+                {entryMode === 'writeoff' ? (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="ar_write_off" className="text-xs text-destructive">AR Write-off ({currencySymbol.trim()})</Label>
+                      <Input
+                        id="ar_write_off"
+                        type="number"
+                        min="0"
+                        max={formData.raw_ar}
+                        step="0.01"
+                        value={formData.ar_write_off}
+                        onChange={(e) => updateField('ar_write_off', parseFloat(e.target.value) || 0)}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Revised AR</Label>
+                      <div className="h-9 px-3 py-2 bg-muted rounded-md border flex items-center font-medium text-sm">
+                        {formatCurrency(calculatedValues.adjustedAr, currency)}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="adjusted_ar" className="text-xs text-primary">Revised AR ({currencySymbol.trim()})</Label>
+                      <Input
+                        id="adjusted_ar"
+                        type="number"
+                        min="0"
+                        max={formData.raw_ar}
+                        step="0.01"
+                        value={formData.adjusted_ar}
+                        onChange={(e) => updateField('adjusted_ar', parseFloat(e.target.value) || 0)}
+                        className="h-9"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-destructive">AR Write-off</Label>
+                      <div className="h-9 px-3 py-2 bg-muted rounded-md border flex items-center font-medium text-sm text-destructive">
+                        {formatCurrency(calculatedValues.arWriteOff, currency)}
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
+            </div>
 
+            {/* Total Write-off Summary */}
+            <div className="pt-3 border-t border-border">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Total Write-off (WIP + AR)</span>
+                <span className="text-lg font-bold text-destructive">
+                  {formatCurrency(calculatedValues.totalWriteOff, currency)}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                WIP write-offs are time cost adjustments. AR write-offs require cancelling and reissuing bills.
+              </p>
+            </div>
+
+            {/* Paid Amount */}
+            <div className="pt-3 border-t border-border">
               <div className="space-y-1.5">
-                <Label htmlFor="paid_amount_proposal" className="text-xs">Total Paid ({currencySymbol.trim()})</Label>
+                <Label htmlFor="paid_amount" className="text-xs">Total Paid ({currencySymbol.trim()})</Label>
                 <Input
-                  id="paid_amount_proposal"
+                  id="paid_amount"
                   type="number"
                   min="0"
                   step="0.01"
                   value={formData.paid_amount}
                   onChange={(e) => updateField('paid_amount', parseFloat(e.target.value) || 0)}
-                  className="h-9"
+                  className="h-9 max-w-[200px]"
                 />
               </div>
             </div>
@@ -436,9 +538,9 @@ export function WipShapingProposalDialog({
               <h4 className="text-sm font-medium">Local Counsel</h4>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="lc_wip_amount_proposal" className="text-xs">LC WIP ({currencySymbol.trim()})</Label>
+                  <Label htmlFor="lc_wip_amount" className="text-xs">LC WIP ({currencySymbol.trim()})</Label>
                   <Input
-                    id="lc_wip_amount_proposal"
+                    id="lc_wip_amount"
                     type="number"
                     min="0"
                     step="0.01"
@@ -448,9 +550,9 @@ export function WipShapingProposalDialog({
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="lc_billed_amount_proposal" className="text-xs">LC Billed ({currencySymbol.trim()})</Label>
+                  <Label htmlFor="lc_billed_amount" className="text-xs">LC Billed ({currencySymbol.trim()})</Label>
                   <Input
-                    id="lc_billed_amount_proposal"
+                    id="lc_billed_amount"
                     type="number"
                     min="0"
                     step="0.01"

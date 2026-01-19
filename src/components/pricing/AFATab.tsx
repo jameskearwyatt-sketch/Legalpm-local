@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -303,23 +303,29 @@ export function AFATab({
     return (newMargin / clientPrice) * 100;
   };
 
-  // Track previous baseline to detect changes
-  const [prevBaselineTotal, setPrevBaselineTotal] = useState<number | null>(null);
+  // Track previous baseline to detect changes using ref to avoid stale closure issues
+  const prevBaselineTotalRef = useRef<number | null>(null);
+  const isRecalculatingRef = useRef(false);
 
   // Auto-recalculate all enabled AFAs when baseline totals change
   useEffect(() => {
-    // Skip initial render or if loading
-    if (isLoading || prevBaselineTotal === null) {
-      setPrevBaselineTotal(baselineTotals.total);
+    // Skip if loading or currently recalculating (to prevent loops)
+    if (isLoading || isRecalculatingRef.current) {
+      return;
+    }
+
+    // Initialize on first render
+    if (prevBaselineTotalRef.current === null) {
+      prevBaselineTotalRef.current = baselineTotals.total;
       return;
     }
 
     // Only recalculate if total has meaningfully changed (more than $1 difference)
-    if (Math.abs(baselineTotals.total - prevBaselineTotal) < 1) {
+    if (Math.abs(baselineTotals.total - prevBaselineTotalRef.current) < 1) {
       return;
     }
 
-    setPrevBaselineTotal(baselineTotals.total);
+    prevBaselineTotalRef.current = baselineTotals.total;
 
     // Find all enabled AFAs and recalculate their client prices
     const enabledAfas = afas.filter(a => a.is_enabled);
@@ -327,27 +333,33 @@ export function AFATab({
 
     // Recalculate each enabled AFA with updated baseline
     const recalculateEnabledAFAs = async () => {
-      for (const afa of enabledAfas) {
-        const newClientPrice = calculateClientPrice(afa.afa_type, afa.config);
-        const newEffectiveRate = calculateEffectiveRate(newClientPrice);
-        const newMarginImpact = calculateMarginImpact(newClientPrice);
+      isRecalculatingRef.current = true;
+      try {
+        for (const afa of enabledAfas) {
+          // Recalculate using current baseline values (not stale closures)
+          const newClientPrice = calculateClientPrice(afa.afa_type, afa.config);
+          const newEffectiveRate = calculateEffectiveRate(newClientPrice);
+          const newMarginImpact = calculateMarginImpact(newClientPrice);
 
-        // Only update if the price has changed
-        if (Math.abs(newClientPrice - afa.client_price) > 1) {
-          await upsertAFA.mutateAsync({
-            afa_type: afa.afa_type,
-            is_enabled: true,
-            config: afa.config,
-            client_price: newClientPrice,
-            effective_rate: newEffectiveRate,
-            margin_impact_percent: newMarginImpact,
-          });
+          // Only update if the price has changed meaningfully
+          if (Math.abs(newClientPrice - afa.client_price) > 1) {
+            await upsertAFA.mutateAsync({
+              afa_type: afa.afa_type,
+              is_enabled: true,
+              config: afa.config,
+              client_price: newClientPrice,
+              effective_rate: newEffectiveRate,
+              margin_impact_percent: newMarginImpact,
+            });
+          }
         }
+      } finally {
+        isRecalculatingRef.current = false;
       }
     };
 
     recalculateEnabledAFAs();
-  }, [baselineTotals.total, baselineTotals.bmTotal, baselineTotals.totalHours]);
+  }, [baselineTotals.total, baselineTotals.bmTotal, baselineTotals.totalHours, afas, isLoading, adjustedBaseline.total]);
 
   // Handle config change
   const handleConfigChange = async (type: AFAType, config: any) => {

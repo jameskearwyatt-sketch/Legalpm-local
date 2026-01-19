@@ -382,6 +382,8 @@ export default function MatterDetail() {
         jurisdictions: (matter as any).jurisdictions || [],
         // Progress
         progress: (matter as any).progress || 0,
+        // On hold months for burn rate calculation
+        on_hold_months: (matter as any).on_hold_months || 0,
       });
       setHasChanges(false);
       setIsFormInitialized(true);
@@ -1255,8 +1257,12 @@ export default function MatterDetail() {
                           const daysInStartMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
                           totalMonths += dayDiff / daysInStartMonth;
                           
+                          // Subtract on-hold months from total months
+                          const onHoldMonths = formData.on_hold_months || 0;
+                          const activeMonths = totalMonths - onHoldMonths;
+                          
                           // Ensure at least a minimum value to avoid division by zero
-                          const monthsElapsed = Math.max(totalMonths, 0.1);
+                          const monthsElapsed = Math.max(activeMonths, 0.1);
                           
                           // Total burn = WIP + AR + Paid (from financial snapshots)
                           const totalBurn = wipAmount + accountsReceivable + paidAmount;
@@ -1281,7 +1287,7 @@ export default function MatterDetail() {
                                 {formatCurrency(burnRatePerMonth, currency)}
                               </span>
                               <span className="text-xs text-muted-foreground">
-                                ({monthsElapsed.toFixed(1)} months elapsed)
+                                ({monthsElapsed.toFixed(1)} active months{onHoldMonths > 0 ? `, ${onHoldMonths} on hold` : ''})
                               </span>
                               {burnRatePerMonth > 0 && (
                                 <span className={cn("text-xs font-medium", getExhaustionColor(monthsToExhaustion))}>
@@ -1901,6 +1907,24 @@ export default function MatterDetail() {
                     return null;
                   })()}
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="on_hold_months">Months On Hold</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="on_hold_months"
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={formData.on_hold_months || 0}
+                    onChange={(e) => updateField('on_hold_months', parseFloat(e.target.value) || 0)}
+                    className="w-24"
+                  />
+                  <span className="text-sm text-muted-foreground">months</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Deducted from elapsed time when calculating burn rate
+                </p>
               </div>
               {/* Hide C/M Number for pipeline matters */}
               {!isPipeline && (

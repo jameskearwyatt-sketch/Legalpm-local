@@ -2001,6 +2001,7 @@ export type Database = {
       wip_shaping_proposals: {
         Row: {
           accounts_receivable: number
+          ar_write_off_amount: number
           billed_amount: number
           created_at: string
           id: string
@@ -2019,6 +2020,7 @@ export type Database = {
         }
         Insert: {
           accounts_receivable?: number
+          ar_write_off_amount?: number
           billed_amount?: number
           created_at?: string
           id?: string
@@ -2037,6 +2039,7 @@ export type Database = {
         }
         Update: {
           accounts_receivable?: number
+          ar_write_off_amount?: number
           billed_amount?: number
           created_at?: string
           id?: string

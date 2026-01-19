@@ -199,6 +199,8 @@ export interface CreateProposalInput {
   name: string;
   description?: string;
   currency?: string;
+  team_rate_currency?: string;
+  rate_card?: RateCard;
 }
 
 export interface DraftProposalItem {
@@ -272,7 +274,7 @@ export function usePricingProposals() {
   // Create new proposal
   const createProposal = useMutation({
     mutationFn: async (input: CreateProposalInput) => {
-      // Create proposal
+      // Create proposal with user's defaults
       const { data: proposal, error: proposalError } = await supabase
         .from('pricing_proposals')
         .insert({
@@ -281,7 +283,9 @@ export function usePricingProposals() {
           name: input.name,
           description: input.description || null,
           currency: input.currency || 'GBP',
-        })
+          team_rate_currency: input.team_rate_currency || input.currency || 'GBP',
+          rate_card: (input.rate_card || null) as any,
+        } as any)
         .select()
         .single();
 

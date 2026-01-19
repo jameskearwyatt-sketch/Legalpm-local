@@ -104,7 +104,9 @@ interface EditableRateCardProps {
   teamRateCurrency: string;
   exchangeRate: number; // team currency to fee currency (e.g., 1.25 for GBP->USD)
   onSave: (rateCard: RateCard) => Promise<void>;
+  onSaveAsDefault?: (rateCard: RateCard) => Promise<void>;
   isSaving?: boolean;
+  isSavingDefault?: boolean;
   afaDiscount?: number;
 }
 
@@ -114,7 +116,9 @@ export function EditableRateCard({
   teamRateCurrency,
   exchangeRate,
   onSave,
+  onSaveAsDefault,
   isSaving = false,
+  isSavingDefault = false,
   afaDiscount = 0,
 }: EditableRateCardProps) {
   const [feeEarners, setFeeEarners] = useState<FeeEarner[]>(() => rateCardToArray(rateCard));
@@ -244,20 +248,20 @@ export function EditableRateCard({
               <span className="text-xs font-medium text-muted-foreground">Label</span>
               <span></span>
               <span className="text-xs font-medium text-muted-foreground text-right">
-                {showTwoColumns ? `(${teamRateCurrency}) Rate` : 'Rate'}
+                {showTwoColumns ? `Team Rate (${teamRateCurrency})` : 'Rate'}
               </span>
               {showTwoColumns && (
                 <>
                   <span></span>
                   <span className="text-xs font-medium text-muted-foreground text-right">
-                    ({feeCurrency}) Rate
+                    Fee Rate ({feeCurrency})
                   </span>
                 </>
               )}
               {hasAfaDiscount && (
                 <>
                   <span></span>
-                  <span className="text-xs font-medium text-red-600 text-right">AFA Rate</span>
+                  <span className="text-xs font-medium text-destructive text-right">AFA Rate</span>
                 </>
               )}
               <span></span>
@@ -302,7 +306,7 @@ export function EditableRateCard({
                 {hasAfaDiscount && (
                   <>
                     <span className="text-xs text-muted-foreground w-4 text-right">{feeCurrencySymbol}</span>
-                    <span className="text-sm font-medium text-red-600 text-right bg-red-50 px-2 py-1 rounded h-7 flex items-center justify-end">
+                    <span className="text-sm font-medium text-destructive text-right bg-destructive/10 px-2 py-1 rounded h-7 flex items-center justify-end">
                       {formatRate(Math.round(earner.rate * afaDiscountMultiplier))}
                     </span>
                   </>
@@ -324,7 +328,25 @@ export function EditableRateCard({
             )}
           </div>
 
-          <div className="flex justify-end pt-3 border-t mt-3">
+          <div className="flex justify-end gap-2 pt-3 border-t mt-3">
+            {onSaveAsDefault && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="h-7 text-xs" 
+                onClick={async () => {
+                  await onSaveAsDefault(arrayToRateCard(feeEarners));
+                }}
+                disabled={isSavingDefault}
+              >
+                {isSavingDefault ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <Save className="h-3 w-3 mr-1" />
+                )}
+                Save as default
+              </Button>
+            )}
             <Button size="sm" className="h-7 text-xs" onClick={handleSave} disabled={isSaving}>
               {isSaving ? (
                 <Loader2 className="h-3 w-3 mr-1 animate-spin" />

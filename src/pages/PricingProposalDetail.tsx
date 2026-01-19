@@ -63,6 +63,7 @@ import { getItemFeeByFigureType } from "@/lib/afaFilterUtils";
 import { useMatters } from "@/lib/hooks/useMatters";
 import { useProposalAFAs, AFA_TYPE_LABELS } from "@/lib/hooks/useProposalAFAs";
 import { useExchangeRates } from "@/lib/hooks/useExchangeRates";
+import { useUserSettings } from "@/lib/hooks/useUserSettings";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
@@ -120,6 +121,7 @@ export default function PricingProposalDetail() {
   const { matters } = useMatters();
   const { afas: proposalAFAs } = useProposalAFAs(proposalId);
   const { data: exchangeRatesData } = useExchangeRates();
+  const { saveDefaultRateCard } = useUserSettings();
 
   // Local state for editing work items
   const [draftItems, setDraftItems] = useState<DraftProposalItem[]>([]);
@@ -1960,7 +1962,11 @@ export default function PricingProposalDetail() {
                 await updateProposal.mutateAsync({ rate_card: newRateCard });
                 toast({ title: 'Rate card saved' });
               }}
+              onSaveAsDefault={async (newRateCard) => {
+                await saveDefaultRateCard.mutateAsync(newRateCard);
+              }}
               isSaving={updateProposal.isPending}
+              isSavingDefault={saveDefaultRateCard.isPending}
               afaDiscount={afaDiscountPercent}
             />
           </TabsContent>

@@ -1978,6 +1978,7 @@ export type Database = {
         Row: {
           created_at: string
           default_currency: string
+          default_rate_card: Json | null
           id: string
           near_budget_threshold: number
           poor_collection_threshold: number
@@ -1989,6 +1990,7 @@ export type Database = {
         Insert: {
           created_at?: string
           default_currency?: string
+          default_rate_card?: Json | null
           id?: string
           near_budget_threshold?: number
           poor_collection_threshold?: number
@@ -2000,6 +2002,7 @@ export type Database = {
         Update: {
           created_at?: string
           default_currency?: string
+          default_rate_card?: Json | null
           id?: string
           near_budget_threshold?: number
           poor_collection_threshold?: number

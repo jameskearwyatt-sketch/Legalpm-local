@@ -14,9 +14,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, Info, Lightbulb, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Loader2, Info, Lightbulb, Sparkles, ChevronDown, ChevronUp, Building2 } from 'lucide-react';
 import { formatCurrency, getCurrencySymbol } from '@/lib/currencyUtils';
 import { WipShapingProposal } from '@/lib/hooks/useWipShapingProposals';
+import { LocalCounsel } from '@/lib/hooks/useLocalCounsels';
+import { LocalCounselProposalData, initializeProposalLcData, proposalLcToFormData, ProposalLocalCounsel } from '@/lib/hooks/useProposalLocalCounsels';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -33,7 +35,7 @@ interface WipShapingProposalDialogProps {
     lc_wip_amount: number;
     lc_billed_amount: number;
     notes: string;
-  }) => Promise<void>;
+  }, localCounselData: LocalCounselProposalData[]) => Promise<void>;
   currency: string;
   currentValues?: {
     wip_amount: number;
@@ -49,6 +51,8 @@ interface WipShapingProposalDialogProps {
   quoteCurrency?: string;
   existingProposal?: WipShapingProposal | null;
   hasLocalCounsel?: boolean;
+  localCounsels?: LocalCounsel[];
+  existingProposalLocalCounsels?: ProposalLocalCounsel[];
 }
 
 type EntryMode = 'writeoff' | 'adjusted';
@@ -64,6 +68,8 @@ export function WipShapingProposalDialog({
   quoteCurrency,
   existingProposal,
   hasLocalCounsel = false,
+  localCounsels = [],
+  existingProposalLocalCounsels = [],
 }: WipShapingProposalDialogProps) {
   const currencySymbol = getCurrencySymbol(currency);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -84,10 +90,11 @@ export function WipShapingProposalDialog({
     adjusted_ar: 0,
     // Other fields
     paid_amount: 0,
-    lc_wip_amount: 0,
-    lc_billed_amount: 0,
     notes: '',
   });
+
+  // Local counsel form data - per-firm adjustments
+  const [lcFormData, setLcFormData] = useState<LocalCounselProposalData[]>([]);
 
   const roundTo2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -98,8 +105,6 @@ export function WipShapingProposalDialog({
         // Editing existing proposal
         const rawWip = roundTo2(existingProposal.wip_amount);
         const wipWriteOff = roundTo2(existingProposal.wip_write_off_amount);
-        // For AR, we need to calculate from billed - AR (where billed = raw AR before write-off)
-        // If billed_amount exists and is > accounts_receivable, the difference is the AR write-off
         const rawAr = roundTo2(existingProposal.billed_amount || existingProposal.accounts_receivable);
         const arWriteOff = roundTo2(Math.max(0, rawAr - existingProposal.accounts_receivable));
         
@@ -111,15 +116,20 @@ export function WipShapingProposalDialog({
           adjusted_wip: roundTo2(rawWip - wipWriteOff),
           adjusted_ar: roundTo2(existingProposal.accounts_receivable),
           paid_amount: roundTo2(existingProposal.paid_amount),
-          lc_wip_amount: roundTo2(existingProposal.lc_wip_amount || 0),
-          lc_billed_amount: roundTo2(existingProposal.lc_billed_amount || 0),
           notes: existingProposal.notes || '',
         });
+
+        // Load existing local counsel proposal data if available
+        if (existingProposalLocalCounsels.length > 0) {
+          setLcFormData(proposalLcToFormData(existingProposalLocalCounsels));
+        } else {
+          // Initialize from current local counsels
+          setLcFormData(initializeProposalLcData(localCounsels));
+        }
       } else {
         // New proposal - pre-fill with current snapshot values
         const rawWip = roundTo2(currentValues?.wip_amount || 0);
         const wipWriteOff = roundTo2(currentValues?.wip_write_off_amount || 0);
-        // For AR, use billed_amount as raw AR (bills issued) and accounts_receivable as current AR
         const rawAr = roundTo2(currentValues?.billed_amount || currentValues?.accounts_receivable || 0);
         const currentAr = roundTo2(currentValues?.accounts_receivable || 0);
         const arWriteOff = roundTo2(Math.max(0, rawAr - currentAr));
@@ -132,16 +142,17 @@ export function WipShapingProposalDialog({
           adjusted_wip: roundTo2(rawWip - wipWriteOff),
           adjusted_ar: currentAr,
           paid_amount: roundTo2(currentValues?.paid_amount || 0),
-          lc_wip_amount: roundTo2(currentValues?.lc_wip_amount || 0),
-          lc_billed_amount: roundTo2(currentValues?.lc_billed_amount || 0),
           notes: '',
         });
+
+        // Initialize local counsel data from current values
+        setLcFormData(initializeProposalLcData(localCounsels));
       }
       setEntryMode('writeoff');
       setPastedText('');
       setShowAiHelper(false);
     }
-  }, [isOpen, currentValues, existingProposal]);
+  }, [isOpen, currentValues, existingProposal, localCounsels, existingProposalLocalCounsels]);
 
   const handleAiSummarize = async () => {
     if (!pastedText.trim()) {
@@ -178,13 +189,6 @@ export function WipShapingProposalDialog({
   };
 
   // Calculate derived values based on entry mode
-  // Note: Write-offs can be negative (meaning an increase from raw value)
-  // e.g., WIP 3000 → 5000 = -2000 write-off (increase)
-  //       AR 10000 → 5000 = +5000 write-off (decrease)
-  //       Total = 3000 net write-off
-  // 
-  // IMPORTANT: Total Billed = Paid Amount + Accounts Receivable
-  // When user changes AR, Total Billed is auto-calculated
   const calculatedValues = useMemo(() => {
     let finalWipWriteOff: number;
     let finalArWriteOff: number;
@@ -192,15 +196,11 @@ export function WipShapingProposalDialog({
     let finalAdjustedAr: number;
 
     if (entryMode === 'writeoff') {
-      // User entered write-offs, calculate adjusted values
-      // Write-offs can be negative (meaning an increase)
       finalWipWriteOff = formData.wip_write_off;
       finalArWriteOff = formData.ar_write_off;
       finalAdjustedWip = formData.raw_wip - formData.wip_write_off;
       finalAdjustedAr = formData.raw_ar - formData.ar_write_off;
     } else {
-      // User entered adjusted values, calculate write-offs
-      // Write-off = raw - adjusted (can be negative if adjusted > raw)
       finalAdjustedWip = formData.adjusted_wip;
       finalAdjustedAr = formData.adjusted_ar;
       finalWipWriteOff = formData.raw_wip - formData.adjusted_wip;
@@ -208,9 +208,6 @@ export function WipShapingProposalDialog({
     }
 
     const totalWriteOff = roundTo2(finalWipWriteOff + finalArWriteOff);
-    
-    // Total Billed = Paid Amount + Accounts Receivable (adjusted AR)
-    // This is auto-calculated - user controls AR, and billed amount follows
     const calculatedBilledAmount = roundTo2(formData.paid_amount + finalAdjustedAr);
 
     return {
@@ -223,8 +220,29 @@ export function WipShapingProposalDialog({
     };
   }, [entryMode, formData.raw_wip, formData.raw_ar, formData.wip_write_off, formData.ar_write_off, formData.adjusted_wip, formData.adjusted_ar, formData.paid_amount]);
 
+  // Calculate LC totals from individual LC form data
+  const lcTotals = useMemo(() => {
+    const totalProposedWip = lcFormData.reduce((sum, lc) => sum + lc.proposed_wip_amount, 0);
+    const totalProposedBilled = lcFormData.reduce((sum, lc) => sum + lc.proposed_billed_amount, 0);
+    const totalWipWriteOff = lcFormData.reduce((sum, lc) => sum + (lc.raw_wip_amount - lc.proposed_wip_amount), 0);
+    const totalBilledWriteOff = lcFormData.reduce((sum, lc) => sum + (lc.raw_billed_amount - lc.proposed_billed_amount), 0);
+    return {
+      totalProposedWip: roundTo2(totalProposedWip),
+      totalProposedBilled: roundTo2(totalProposedBilled),
+      totalWipWriteOff: roundTo2(totalWipWriteOff),
+      totalBilledWriteOff: roundTo2(totalBilledWriteOff),
+      totalWriteOff: roundTo2(totalWipWriteOff + totalBilledWriteOff),
+    };
+  }, [lcFormData]);
+
   const updateField = (field: string, value: number | string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const updateLcField = (lcId: string, field: 'proposed_wip_amount' | 'proposed_billed_amount', value: number) => {
+    setLcFormData(prev => prev.map(lc => 
+      lc.local_counsel_id === lcId ? { ...lc, [field]: value } : lc
+    ));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -236,12 +254,6 @@ export function WipShapingProposalDialog({
     
     setIsSubmitting(true);
     try {
-      // Save with separate WIP and AR write-offs
-      // wip_amount = raw WIP (unchanged)
-      // wip_write_off_amount = WIP-specific write-off (can be negative for increase)
-      // ar_write_off_amount = AR-specific write-off (can be negative for increase)
-      // billed_amount = paid_amount + adjusted_ar (auto-calculated from AR)
-      // accounts_receivable = adjusted AR after write-off
       await onSave({
         wip_amount: formData.raw_wip,
         wip_write_off_amount: calculatedValues.wipWriteOff,
@@ -249,10 +261,10 @@ export function WipShapingProposalDialog({
         billed_amount: calculatedValues.billedAmount,
         accounts_receivable: calculatedValues.adjustedAr,
         paid_amount: formData.paid_amount,
-        lc_wip_amount: formData.lc_wip_amount,
-        lc_billed_amount: formData.lc_billed_amount,
+        lc_wip_amount: lcTotals.totalProposedWip,
+        lc_billed_amount: lcTotals.totalProposedBilled,
         notes: formData.notes.trim(),
-      });
+      }, lcFormData);
       onClose();
     } catch (error) {
       console.error('Failed to save proposal:', error);
@@ -263,7 +275,7 @@ export function WipShapingProposalDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Lightbulb className="h-5 w-5 text-amber-500" />
@@ -572,37 +584,99 @@ export function WipShapingProposalDialog({
             </div>
           </div>
 
-          {/* Local Counsel Section - only show if matter has local counsel */}
-          {hasLocalCounsel && (
+          {/* Local Counsel Section - Individual firms */}
+          {hasLocalCounsel && localCounsels.length > 0 && (
             <div className="space-y-3 p-4 bg-primary/5 rounded-lg border border-primary/20">
-              <h4 className="text-sm font-medium">Local Counsel</h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="lc_wip_amount" className="text-xs">LC WIP ({currencySymbol.trim()})</Label>
-                  <Input
-                    id="lc_wip_amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.lc_wip_amount}
-                    onChange={(e) => updateField('lc_wip_amount', parseFloat(e.target.value) || 0)}
-                    className="h-9"
-                  />
+              <div className="flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary" />
+                <h4 className="text-sm font-medium">Local Counsel</h4>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Adjust WIP and Billed amounts for each local counsel firm. These are proposals only and won't change actual figures.
+              </p>
+              
+              <div className="space-y-3">
+                {lcFormData.map((lc) => (
+                  <div key={lc.local_counsel_id} className="p-3 bg-background rounded-md border">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">{lc.firm_name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Raw: WIP {formatCurrency(lc.raw_wip_amount, currency)} | Billed {formatCurrency(lc.raw_billed_amount, currency)}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Proposed WIP ({currencySymbol.trim()})</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={lc.proposed_wip_amount}
+                          onChange={(e) => updateLcField(lc.local_counsel_id, 'proposed_wip_amount', parseFloat(e.target.value) || 0)}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Proposed Billed ({currencySymbol.trim()})</Label>
+                        <Input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={lc.proposed_billed_amount}
+                          onChange={(e) => updateLcField(lc.local_counsel_id, 'proposed_billed_amount', parseFloat(e.target.value) || 0)}
+                          className="h-8 text-sm"
+                        />
+                      </div>
+                    </div>
+                    {/* Show write-off for this LC */}
+                    {(lc.raw_wip_amount !== lc.proposed_wip_amount || lc.raw_billed_amount !== lc.proposed_billed_amount) && (
+                      <div className="mt-2 pt-2 border-t border-border/50 flex justify-between text-xs">
+                        <span className="text-muted-foreground">Write-off:</span>
+                        <span className="text-destructive font-medium">
+                          WIP: {formatCurrency(lc.raw_wip_amount - lc.proposed_wip_amount, currency)} | 
+                          Billed: {formatCurrency(lc.raw_billed_amount - lc.proposed_billed_amount, currency)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* LC Totals */}
+              <div className="pt-3 border-t border-primary/20">
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total LC WIP:</span>
+                    <span className="font-medium">{formatCurrency(lcTotals.totalProposedWip, currency)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total LC Billed:</span>
+                    <span className="font-medium">{formatCurrency(lcTotals.totalProposedBilled, currency)}</span>
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="lc_billed_amount" className="text-xs">LC Billed ({currencySymbol.trim()})</Label>
-                  <Input
-                    id="lc_billed_amount"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={formData.lc_billed_amount}
-                    onChange={(e) => updateField('lc_billed_amount', parseFloat(e.target.value) || 0)}
-                    className="h-9"
-                  />
-                </div>
+                {lcTotals.totalWriteOff !== 0 && (
+                  <div className="flex justify-between mt-2 pt-2 border-t border-primary/20">
+                    <span className="text-sm font-medium">Total LC Write-off:</span>
+                    <span className={`font-bold ${lcTotals.totalWriteOff < 0 ? 'text-green-600' : 'text-destructive'}`}>
+                      {lcTotals.totalWriteOff < 0 
+                        ? `+${formatCurrency(Math.abs(lcTotals.totalWriteOff), currency)}`
+                        : formatCurrency(lcTotals.totalWriteOff, currency)}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
+          )}
+
+          {/* Fallback for matters with LC flag but no individual LC records */}
+          {hasLocalCounsel && localCounsels.length === 0 && (
+            <Alert className="bg-muted/50">
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-sm">
+                This matter has a local counsel budget but no individual local counsel firms have been configured yet. 
+                Add local counsel firms in the matter details to enable per-firm WIP shaping proposals.
+              </AlertDescription>
+            </Alert>
           )}
 
           <DialogFooter className="pt-4">

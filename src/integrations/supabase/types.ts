@@ -1998,6 +1998,66 @@ export type Database = {
         }
         Relationships: []
       }
+      wip_proposal_local_counsels: {
+        Row: {
+          billed_write_off_amount: number
+          created_at: string
+          firm_name: string
+          id: string
+          local_counsel_id: string
+          proposal_id: string
+          proposed_billed_amount: number
+          proposed_wip_amount: number
+          raw_billed_amount: number
+          raw_wip_amount: number
+          updated_at: string
+          wip_write_off_amount: number
+        }
+        Insert: {
+          billed_write_off_amount?: number
+          created_at?: string
+          firm_name: string
+          id?: string
+          local_counsel_id: string
+          proposal_id: string
+          proposed_billed_amount?: number
+          proposed_wip_amount?: number
+          raw_billed_amount?: number
+          raw_wip_amount?: number
+          updated_at?: string
+          wip_write_off_amount?: number
+        }
+        Update: {
+          billed_write_off_amount?: number
+          created_at?: string
+          firm_name?: string
+          id?: string
+          local_counsel_id?: string
+          proposal_id?: string
+          proposed_billed_amount?: number
+          proposed_wip_amount?: number
+          raw_billed_amount?: number
+          raw_wip_amount?: number
+          updated_at?: string
+          wip_write_off_amount?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wip_proposal_local_counsels_local_counsel_id_fkey"
+            columns: ["local_counsel_id"]
+            isOneToOne: false
+            referencedRelation: "matter_local_counsels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wip_proposal_local_counsels_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "wip_shaping_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       wip_shaping_proposals: {
         Row: {
           accounts_receivable: number

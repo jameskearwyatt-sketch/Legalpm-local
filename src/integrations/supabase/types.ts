@@ -1659,6 +1659,7 @@ export type Database = {
           rate_card: Json | null
           scope_assumptions: Json | null
           status: string
+          team_rate_currency: string | null
           updated_at: string
           user_id: string
           work_phases: Json | null
@@ -1676,6 +1677,7 @@ export type Database = {
           rate_card?: Json | null
           scope_assumptions?: Json | null
           status?: string
+          team_rate_currency?: string | null
           updated_at?: string
           user_id: string
           work_phases?: Json | null
@@ -1693,6 +1695,7 @@ export type Database = {
           rate_card?: Json | null
           scope_assumptions?: Json | null
           status?: string
+          team_rate_currency?: string | null
           updated_at?: string
           user_id?: string
           work_phases?: Json | null

@@ -138,6 +138,7 @@ export interface PricingProposal {
   name: string;
   description: string | null;
   currency: string;
+  team_rate_currency: string | null;
   status: 'Draft' | 'Agreed';
   current_version: number;
   rate_card: RateCard | null;
@@ -416,7 +417,7 @@ export function usePricingProposal(proposalId?: string) {
 
   // Update proposal details
   const updateProposal = useMutation({
-    mutationFn: async (updates: Partial<Pick<PricingProposal, 'name' | 'description' | 'currency' | 'status' | 'rate_card' | 'work_phases' | 'assumptions'>>) => {
+    mutationFn: async (updates: Partial<Pick<PricingProposal, 'name' | 'description' | 'currency' | 'team_rate_currency' | 'status' | 'rate_card' | 'work_phases' | 'assumptions'>>) => {
       const { error } = await supabase
         .from('pricing_proposals')
         .update(updates as any)

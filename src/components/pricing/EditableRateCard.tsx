@@ -24,7 +24,7 @@ interface FeeEarner {
   key: string;
   level: LevelValue;
   label: string;
-  rate: number;
+  rate: number; // This is always stored in FEE CURRENCY
 }
 
 // Default labels with numbered suffix
@@ -100,7 +100,9 @@ function arrayToRateCard(feeEarners: FeeEarner[]): RateCard {
 
 interface EditableRateCardProps {
   rateCard: RateCard;
-  currencySymbol: string;
+  feeCurrency: string;
+  teamRateCurrency: string;
+  exchangeRate: number; // team currency to fee currency (e.g., 1.25 for GBP->USD)
   onSave: (rateCard: RateCard) => Promise<void>;
   isSaving?: boolean;
   afaDiscount?: number;
@@ -108,7 +110,9 @@ interface EditableRateCardProps {
 
 export function EditableRateCard({
   rateCard,
-  currencySymbol,
+  feeCurrency,
+  teamRateCurrency,
+  exchangeRate,
   onSave,
   isSaving = false,
   afaDiscount = 0,
@@ -117,17 +121,42 @@ export function EditableRateCard({
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newEarnerLevel, setNewEarnerLevel] = useState<LevelValue>("associate");
   const [newEarnerLabel, setNewEarnerLabel] = useState("");
-  const [newEarnerRate, setNewEarnerRate] = useState(0);
+  const [newEarnerRate, setNewEarnerRate] = useState(0); // Rate entered in TEAM currency
 
-  // Sort by rate descending
+  const feeCurrencySymbol = getCurrencySymbol(feeCurrency);
+  const teamCurrencySymbol = getCurrencySymbol(teamRateCurrency);
+  const showTwoColumns = teamRateCurrency !== feeCurrency;
+
+  // Sort by rate descending (by fee currency rate)
   const sortedEarners = useMemo(() => 
     [...feeEarners].sort((a, b) => b.rate - a.rate),
     [feeEarners]
   );
 
-  const updateFeeEarner = (key: string, value: number) => {
+  // Convert fee currency rate to team currency for display
+  const feeToTeamRate = (feeRate: number): number => {
+    if (!showTwoColumns || exchangeRate === 0) return feeRate;
+    return feeRate / exchangeRate;
+  };
+
+  // Convert team currency rate to fee currency for storage
+  const teamToFeeRate = (teamRate: number): number => {
+    if (!showTwoColumns) return teamRate;
+    return teamRate * exchangeRate;
+  };
+
+  // Update rate - user enters team rate, we store fee rate
+  const updateFeeEarner = (key: string, teamRate: number) => {
+    const feeRate = teamToFeeRate(teamRate);
     setFeeEarners(prev => prev.map(earner => 
-      earner.key === key ? { ...earner, rate: value } : earner
+      earner.key === key ? { ...earner, rate: feeRate } : earner
+    ));
+  };
+
+  // For single-currency mode, update directly
+  const updateFeeEarnerDirect = (key: string, rate: number) => {
+    setFeeEarners(prev => prev.map(earner => 
+      earner.key === key ? { ...earner, rate } : earner
     ));
   };
 
@@ -145,12 +174,14 @@ export function EditableRateCard({
     if (!newEarnerLabel.trim()) return;
     
     const key = generateKey(newEarnerLevel, newEarnerLabel);
+    // Convert entered team rate to fee rate for storage
+    const feeRate = teamToFeeRate(newEarnerRate);
 
     setFeeEarners(prev => [...prev, {
       key,
       level: newEarnerLevel,
       label: newEarnerLabel.trim(),
-      rate: newEarnerRate,
+      rate: feeRate,
     }]);
 
     setNewEarnerLevel("associate");
@@ -172,12 +203,27 @@ export function EditableRateCard({
   const hasAfaDiscount = afaDiscount > 0;
 
   const formatRate = (rate: number) => {
-    return `${currencySymbol}${new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(rate)}`;
+    return new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(rate);
+  };
+
+  // Calculate column count based on what's shown
+  // Base: Level, Label, Rate input, delete button
+  // + Fee Currency column if two currencies
+  // + AFA Rate column if discount
+  const getGridCols = () => {
+    if (showTwoColumns && hasAfaDiscount) {
+      return 'grid-cols-[100px_1fr_auto_80px_auto_80px_auto_80px_28px]';
+    } else if (showTwoColumns) {
+      return 'grid-cols-[100px_1fr_auto_80px_auto_80px_28px]';
+    } else if (hasAfaDiscount) {
+      return 'grid-cols-[100px_1fr_auto_80px_auto_80px_28px]';
+    }
+    return 'grid-cols-[100px_1fr_auto_80px_28px]';
   };
 
   return (
     <>
-      <Card className={hasAfaDiscount ? "max-w-xl" : "max-w-md"}>
+      <Card className="max-w-2xl">
         <CardHeader className="pb-2 px-4">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-sm font-medium">
@@ -191,21 +237,35 @@ export function EditableRateCard({
           </div>
         </CardHeader>
         <CardContent className="px-4 pb-3 pt-0">
-          {/* Header row when AFA discount is applied */}
-          {hasAfaDiscount && (
-            <div className={`grid ${hasAfaDiscount ? 'grid-cols-[100px_1fr_auto_80px_auto_80px_28px]' : 'grid-cols-[100px_1fr_auto_80px_28px]'} items-center gap-2 py-1 border-b mb-1`}>
+          {/* Header row */}
+          {(showTwoColumns || hasAfaDiscount) && (
+            <div className={`grid ${getGridCols()} items-center gap-2 py-1 border-b mb-1`}>
               <span className="text-xs font-medium text-muted-foreground">Level</span>
               <span className="text-xs font-medium text-muted-foreground">Label</span>
               <span></span>
-              <span className="text-xs font-medium text-muted-foreground text-right">Rate</span>
-              <span></span>
-              <span className="text-xs font-medium text-red-600 text-right">AFA Rate</span>
+              <span className="text-xs font-medium text-muted-foreground text-right">
+                {showTwoColumns ? `(${teamRateCurrency}) Rate` : 'Rate'}
+              </span>
+              {showTwoColumns && (
+                <>
+                  <span></span>
+                  <span className="text-xs font-medium text-muted-foreground text-right">
+                    ({feeCurrency}) Rate
+                  </span>
+                </>
+              )}
+              {hasAfaDiscount && (
+                <>
+                  <span></span>
+                  <span className="text-xs font-medium text-red-600 text-right">AFA Rate</span>
+                </>
+              )}
               <span></span>
             </div>
           )}
           <div className="space-y-1">
             {sortedEarners.map((earner) => (
-              <div key={earner.key} className={`grid ${hasAfaDiscount ? 'grid-cols-[100px_1fr_auto_80px_auto_80px_28px]' : 'grid-cols-[100px_1fr_auto_80px_28px]'} items-center gap-2 py-1`}>
+              <div key={earner.key} className={`grid ${getGridCols()} items-center gap-2 py-1`}>
                 <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded text-center truncate">
                   {getLevelBadge(earner.level)}
                 </span>
@@ -215,20 +275,35 @@ export function EditableRateCard({
                   className="text-sm font-medium h-7 px-2"
                   placeholder="Label"
                 />
-                <span className="text-xs text-muted-foreground w-4 text-right">{currencySymbol}</span>
+                <span className="text-xs text-muted-foreground w-4 text-right">{showTwoColumns ? teamCurrencySymbol : feeCurrencySymbol}</span>
                 <Input
                   type="number"
                   step="0.01"
                   min="0"
-                  value={earner.rate}
-                  onChange={(e) => updateFeeEarner(earner.key, parseFloat(e.target.value) || 0)}
+                  value={showTwoColumns ? Math.round(feeToTeamRate(earner.rate)) : earner.rate}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    if (showTwoColumns) {
+                      updateFeeEarner(earner.key, val);
+                    } else {
+                      updateFeeEarnerDirect(earner.key, val);
+                    }
+                  }}
                   className="h-7 text-right text-sm px-2"
                 />
+                {showTwoColumns && (
+                  <>
+                    <span className="text-xs text-muted-foreground w-4 text-right">{feeCurrencySymbol}</span>
+                    <span className="text-sm font-medium text-right bg-muted/50 px-2 py-1 rounded h-7 flex items-center justify-end">
+                      {formatRate(Math.round(earner.rate))}
+                    </span>
+                  </>
+                )}
                 {hasAfaDiscount && (
                   <>
-                    <span className="text-xs text-muted-foreground w-4 text-right">{currencySymbol}</span>
+                    <span className="text-xs text-muted-foreground w-4 text-right">{feeCurrencySymbol}</span>
                     <span className="text-sm font-medium text-red-600 text-right bg-red-50 px-2 py-1 rounded h-7 flex items-center justify-end">
-                      {new Intl.NumberFormat('en-GB').format(Math.round(earner.rate * afaDiscountMultiplier))}
+                      {formatRate(Math.round(earner.rate * afaDiscountMultiplier))}
                     </span>
                   </>
                 )}
@@ -293,9 +368,9 @@ export function EditableRateCard({
               />
             </div>
             <div className="space-y-2">
-              <Label>Billing Rate</Label>
+              <Label>Billing Rate ({teamRateCurrency})</Label>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-muted-foreground">{currencySymbol}</span>
+                <span className="text-sm text-muted-foreground">{teamCurrencySymbol}</span>
                 <Input
                   type="number"
                   step="0.01"
@@ -304,6 +379,11 @@ export function EditableRateCard({
                   onChange={(e) => setNewEarnerRate(parseFloat(e.target.value) || 0)}
                 />
               </div>
+              {showTwoColumns && newEarnerRate > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  = {feeCurrencySymbol}{formatRate(Math.round(teamToFeeRate(newEarnerRate)))} ({feeCurrency})
+                </p>
+              )}
             </div>
           </div>
           <DialogFooter>

@@ -62,6 +62,7 @@ import {
 import { getItemFeeByFigureType } from "@/lib/afaFilterUtils";
 import { useMatters } from "@/lib/hooks/useMatters";
 import { useProposalAFAs, AFA_TYPE_LABELS } from "@/lib/hooks/useProposalAFAs";
+import { useExchangeRates } from "@/lib/hooks/useExchangeRates";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
@@ -118,6 +119,7 @@ export default function PricingProposalDetail() {
   
   const { matters } = useMatters();
   const { afas: proposalAFAs } = useProposalAFAs(proposalId);
+  const { data: exchangeRatesData } = useExchangeRates();
 
   // Local state for editing work items
   const [draftItems, setDraftItems] = useState<DraftProposalItem[]>([]);
@@ -436,6 +438,30 @@ export default function PricingProposalDetail() {
   }, [draftItems, rateCard, assumptions]);
 
   const currencySymbol = getCurrencySymbol(proposal?.currency || 'GBP');
+  
+  // Get the team rate currency (defaults to fee currency if not set)
+  const teamRateCurrency = proposal?.team_rate_currency || proposal?.currency || 'GBP';
+  const feeCurrency = proposal?.currency || 'GBP';
+  
+  // Calculate exchange rate from team currency to fee currency
+  // If currencies are the same, rate is 1
+  // Otherwise, we need to convert: team rate * exchangeRate = fee rate
+  const teamToFeeExchangeRate = useMemo(() => {
+    if (teamRateCurrency === feeCurrency) return 1;
+    const rates = exchangeRatesData?.rates;
+    if (!rates) return 1;
+    
+    // Rates are expressed as "1 USD = X units of currency"
+    // To convert teamCurrency to feeCurrency:
+    // If team is GBP and fee is USD: we need (1 USD / 0.79 GBP) = 1.266 USD per GBP
+    const teamRate = rates[teamRateCurrency];
+    const feeRate = rates[feeCurrency];
+    
+    if (!teamRate || teamRate === 0 || !feeRate || feeRate === 0) return 1;
+    
+    // fee_amount = team_amount * (feeRate / teamRate)
+    return feeRate / teamRate;
+  }, [teamRateCurrency, feeCurrency, exchangeRatesData?.rates]);
 
   const formatCurrency = (value: number) => {
     return `${currencySymbol}${new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)}`;
@@ -1636,6 +1662,26 @@ export default function PricingProposalDetail() {
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="grid gap-2 max-w-md">
+                  <Label>Team Rate Currency</Label>
+                  <Select
+                    value={proposal?.team_rate_currency || proposal?.currency || 'GBP'}
+                    onValueChange={(value) => updateProposal.mutate({ team_rate_currency: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="GBP">GBP (£)</SelectItem>
+                      <SelectItem value="USD">USD ($)</SelectItem>
+                      <SelectItem value="EUR">EUR (€)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    The currency in which your team's rates are expressed
+                  </p>
+                </div>
+
+                <div className="grid gap-2 max-w-md">
                   <Label>Fee Currency</Label>
                   <Select
                     value={proposal?.currency || 'GBP'}
@@ -1650,6 +1696,9 @@ export default function PricingProposalDetail() {
                       <SelectItem value="EUR">EUR (€)</SelectItem>
                     </SelectContent>
                   </Select>
+                  <p className="text-xs text-muted-foreground">
+                    The currency used for pricing and client quotes
+                  </p>
                 </div>
 
                 <div className="grid gap-2 max-w-md">
@@ -1903,7 +1952,9 @@ export default function PricingProposalDetail() {
           <TabsContent value="rates" className="space-y-4">
             <EditableRateCard
               rateCard={rateCard}
-              currencySymbol={currencySymbol}
+              feeCurrency={feeCurrency}
+              teamRateCurrency={teamRateCurrency}
+              exchangeRate={teamToFeeExchangeRate}
               onSave={async (newRateCard) => {
                 setRateCard(newRateCard);
                 await updateProposal.mutateAsync({ rate_card: newRateCard });

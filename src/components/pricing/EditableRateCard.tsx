@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +24,9 @@ interface FeeEarner {
   key: string;
   level: LevelValue;
   label: string;
-  rate: number; // This is always stored in FEE CURRENCY
+  teamRate: number; // Base rate in TEAM CURRENCY (from settings)
+  feeRate: number;  // Rate in FEE CURRENCY (used for calculations)
+  feeRateOverridden: boolean; // Whether user has manually edited fee rate
 }
 
 // Default labels with numbered suffix
@@ -36,17 +38,9 @@ const DEFAULT_LABELS: Record<string, string> = {
   trainee: "Trainee 1",
 };
 
-// Level order for sorting (after rate)
-const LEVEL_ORDER: Record<LevelValue, number> = {
-  partner: 0,
-  counsel: 1,
-  seniorAssociate: 2,
-  associate: 3,
-  trainee: 4,
-};
-
 // Convert RateCard to array format for dynamic editing
-function rateCardToArray(rateCard: RateCard): FeeEarner[] {
+// rateCard stores rates in TEAM CURRENCY
+function rateCardToArray(rateCard: RateCard, exchangeRate: number): FeeEarner[] {
   return Object.entries(rateCard).map(([key, value]) => {
     // Try to determine level from key
     let level: LevelValue = "associate";
@@ -56,11 +50,16 @@ function rateCardToArray(rateCard: RateCard): FeeEarner[] {
     else if (key.includes("trainee") || key.startsWith("trainee")) level = "trainee";
     else if (key.includes("associate") || key.startsWith("associate")) level = "associate";
     
+    const teamRate = value.rate;
+    const feeRate = Math.round(teamRate * exchangeRate);
+    
     return {
       key,
       level,
       label: DEFAULT_LABELS[key] || formatLabel(key),
-      rate: value.rate,
+      teamRate,
+      feeRate,
+      feeRateOverridden: false,
     };
   });
 }
@@ -80,7 +79,8 @@ function generateKey(level: string, label: string): string {
   return `${level}_${baseKey}_${Date.now()}`;
 }
 
-// Convert array back to RateCard format (with required defaults)
+// Convert array back to RateCard format
+// We store the TEAM RATE in the rate card (the user's base rates)
 function arrayToRateCard(feeEarners: FeeEarner[]): RateCard {
   const result: RateCard = {
     partner: { rate: 0, cost: 0 },
@@ -89,21 +89,34 @@ function arrayToRateCard(feeEarners: FeeEarner[]): RateCard {
     trainee: { rate: 0, cost: 0 },
   };
   feeEarners.forEach(earner => {
-    if (earner.key in result) {
-      (result as any)[earner.key] = { rate: earner.rate, cost: 0 };
-    } else {
-      (result as any)[earner.key] = { rate: earner.rate, cost: 0 };
-    }
+    // Store teamRate as the base rate
+    (result as any)[earner.key] = { rate: earner.teamRate, cost: 0 };
+  });
+  return result;
+}
+
+// NEW: Build a rate card with FEE RATES for use in pricing calculations
+// This is what actually gets used downstream
+function arrayToFeeRateCard(feeEarners: FeeEarner[]): RateCard {
+  const result: RateCard = {
+    partner: { rate: 0, cost: 0 },
+    seniorAssociate: { rate: 0, cost: 0 },
+    associate: { rate: 0, cost: 0 },
+    trainee: { rate: 0, cost: 0 },
+  };
+  feeEarners.forEach(earner => {
+    // Store feeRate for calculations
+    (result as any)[earner.key] = { rate: earner.feeRate, cost: 0 };
   });
   return result;
 }
 
 interface EditableRateCardProps {
-  rateCard: RateCard;
+  rateCard: RateCard; // This stores TEAM RATES
   feeCurrency: string;
   teamRateCurrency: string;
   exchangeRate: number; // team currency to fee currency (e.g., 1.25 for GBP->USD)
-  onSave: (rateCard: RateCard) => Promise<void>;
+  onSave: (teamRateCard: RateCard, feeRateCard: RateCard) => Promise<void>;
   onSaveAsDefault?: (rateCard: RateCard) => Promise<void>;
   isSaving?: boolean;
   isSavingDefault?: boolean;
@@ -121,7 +134,9 @@ export function EditableRateCard({
   isSavingDefault = false,
   afaDiscount = 0,
 }: EditableRateCardProps) {
-  const [feeEarners, setFeeEarners] = useState<FeeEarner[]>(() => rateCardToArray(rateCard));
+  const [feeEarners, setFeeEarners] = useState<FeeEarner[]>(() => 
+    rateCardToArray(rateCard, exchangeRate)
+  );
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newEarnerLevel, setNewEarnerLevel] = useState<LevelValue>("associate");
   const [newEarnerLabel, setNewEarnerLabel] = useState("");
@@ -131,36 +146,61 @@ export function EditableRateCard({
   const teamCurrencySymbol = getCurrencySymbol(teamRateCurrency);
   const showTwoColumns = teamRateCurrency !== feeCurrency;
 
-  // Sort by rate descending (by fee currency rate)
+  // Recalculate fee rates when exchange rate changes (for non-overridden rates)
+  useEffect(() => {
+    setFeeEarners(prev => prev.map(earner => {
+      if (earner.feeRateOverridden) {
+        // Keep manually set fee rate
+        return earner;
+      }
+      // Recalculate from team rate
+      return {
+        ...earner,
+        feeRate: Math.round(earner.teamRate * exchangeRate),
+      };
+    }));
+  }, [exchangeRate]);
+
+  // Sort by fee rate descending
   const sortedEarners = useMemo(() => 
-    [...feeEarners].sort((a, b) => b.rate - a.rate),
+    [...feeEarners].sort((a, b) => b.feeRate - a.feeRate),
     [feeEarners]
   );
 
-  // Convert fee currency rate to team currency for display
-  const feeToTeamRate = (feeRate: number): number => {
-    if (!showTwoColumns || exchangeRate === 0) return feeRate;
-    return feeRate / exchangeRate;
+  // Update team rate - recalculates fee rate unless overridden
+  const updateTeamRate = (key: string, newTeamRate: number) => {
+    setFeeEarners(prev => prev.map(earner => {
+      if (earner.key !== key) return earner;
+      
+      // If fee rate was overridden, keep it
+      if (earner.feeRateOverridden) {
+        return { ...earner, teamRate: newTeamRate };
+      }
+      
+      // Otherwise, recalculate fee rate from new team rate
+      return {
+        ...earner,
+        teamRate: newTeamRate,
+        feeRate: Math.round(newTeamRate * exchangeRate),
+      };
+    }));
   };
 
-  // Convert team currency rate to fee currency for storage
-  const teamToFeeRate = (teamRate: number): number => {
-    if (!showTwoColumns) return teamRate;
-    return teamRate * exchangeRate;
-  };
-
-  // Update rate - user enters team rate, we store fee rate
-  const updateFeeEarner = (key: string, teamRate: number) => {
-    const feeRate = teamToFeeRate(teamRate);
+  // Update fee rate directly - marks as overridden
+  const updateFeeRate = (key: string, newFeeRate: number) => {
     setFeeEarners(prev => prev.map(earner => 
-      earner.key === key ? { ...earner, rate: feeRate } : earner
+      earner.key === key 
+        ? { ...earner, feeRate: newFeeRate, feeRateOverridden: true } 
+        : earner
     ));
   };
 
-  // For single-currency mode, update directly
-  const updateFeeEarnerDirect = (key: string, rate: number) => {
+  // For single-currency mode, update both team and fee rate together
+  const updateRate = (key: string, rate: number) => {
     setFeeEarners(prev => prev.map(earner => 
-      earner.key === key ? { ...earner, rate } : earner
+      earner.key === key 
+        ? { ...earner, teamRate: rate, feeRate: rate, feeRateOverridden: false } 
+        : earner
     ));
   };
 
@@ -178,14 +218,15 @@ export function EditableRateCard({
     if (!newEarnerLabel.trim()) return;
     
     const key = generateKey(newEarnerLevel, newEarnerLabel);
-    // Convert entered team rate to fee rate for storage
-    const feeRate = teamToFeeRate(newEarnerRate);
+    const feeRate = Math.round(newEarnerRate * exchangeRate);
 
     setFeeEarners(prev => [...prev, {
       key,
       level: newEarnerLevel,
       label: newEarnerLabel.trim(),
-      rate: feeRate,
+      teamRate: newEarnerRate,
+      feeRate: showTwoColumns ? feeRate : newEarnerRate,
+      feeRateOverridden: false,
     }]);
 
     setNewEarnerLevel("associate");
@@ -195,7 +236,9 @@ export function EditableRateCard({
   };
 
   const handleSave = async () => {
-    await onSave(arrayToRateCard(feeEarners));
+    const teamRateCard = arrayToRateCard(feeEarners);
+    const feeRateCard = arrayToFeeRateCard(feeEarners);
+    await onSave(teamRateCard, feeRateCard);
   };
 
   const getLevelBadge = (level: LevelValue) => {
@@ -211,9 +254,6 @@ export function EditableRateCard({
   };
 
   // Calculate column count based on what's shown
-  // Base: Level, Label, Rate input, delete button
-  // + Fee Currency column if two currencies
-  // + AFA Rate column if discount
   const getGridCols = () => {
     if (showTwoColumns && hasAfaDiscount) {
       return 'grid-cols-[100px_1fr_auto_80px_auto_80px_auto_80px_28px]';
@@ -279,18 +319,20 @@ export function EditableRateCard({
                   className="text-sm font-medium h-7 px-2"
                   placeholder="Label"
                 />
-                <span className="text-xs text-muted-foreground w-4 text-right">{showTwoColumns ? teamCurrencySymbol : feeCurrencySymbol}</span>
+                <span className="text-xs text-muted-foreground w-4 text-right">
+                  {showTwoColumns ? teamCurrencySymbol : feeCurrencySymbol}
+                </span>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="1"
                   min="0"
-                  value={showTwoColumns ? Math.round(feeToTeamRate(earner.rate)) : earner.rate}
+                  value={showTwoColumns ? earner.teamRate : earner.feeRate}
                   onChange={(e) => {
                     const val = parseFloat(e.target.value) || 0;
                     if (showTwoColumns) {
-                      updateFeeEarner(earner.key, val);
+                      updateTeamRate(earner.key, val);
                     } else {
-                      updateFeeEarnerDirect(earner.key, val);
+                      updateRate(earner.key, val);
                     }
                   }}
                   className="h-7 text-right text-sm px-2"
@@ -298,16 +340,24 @@ export function EditableRateCard({
                 {showTwoColumns && (
                   <>
                     <span className="text-xs text-muted-foreground w-4 text-right">{feeCurrencySymbol}</span>
-                    <span className="text-sm font-medium text-right bg-muted/50 px-2 py-1 rounded h-7 flex items-center justify-end">
-                      {formatRate(Math.round(earner.rate))}
-                    </span>
+                    <Input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={earner.feeRate}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value) || 0;
+                        updateFeeRate(earner.key, val);
+                      }}
+                      className={`h-7 text-right text-sm px-2 ${earner.feeRateOverridden ? 'border-primary' : ''}`}
+                    />
                   </>
                 )}
                 {hasAfaDiscount && (
                   <>
                     <span className="text-xs text-muted-foreground w-4 text-right">{feeCurrencySymbol}</span>
                     <span className="text-sm font-medium text-destructive text-right bg-destructive/10 px-2 py-1 rounded h-7 flex items-center justify-end">
-                      {formatRate(Math.round(earner.rate * afaDiscountMultiplier))}
+                      {formatRate(Math.round(earner.feeRate * afaDiscountMultiplier))}
                     </span>
                   </>
                 )}
@@ -335,6 +385,7 @@ export function EditableRateCard({
                 variant="outline" 
                 className="h-7 text-xs" 
                 onClick={async () => {
+                  // Save TEAM rates as default (not fee rates)
                   await onSaveAsDefault(arrayToRateCard(feeEarners));
                 }}
                 disabled={isSavingDefault}
@@ -395,7 +446,7 @@ export function EditableRateCard({
                 <span className="text-sm text-muted-foreground">{teamCurrencySymbol}</span>
                 <Input
                   type="number"
-                  step="0.01"
+                  step="1"
                   min={0}
                   value={newEarnerRate}
                   onChange={(e) => setNewEarnerRate(parseFloat(e.target.value) || 0)}
@@ -403,7 +454,7 @@ export function EditableRateCard({
               </div>
               {showTwoColumns && newEarnerRate > 0 && (
                 <p className="text-xs text-muted-foreground">
-                  = {feeCurrencySymbol}{formatRate(Math.round(teamToFeeRate(newEarnerRate)))} ({feeCurrency})
+                  = {feeCurrencySymbol}{formatRate(Math.round(newEarnerRate * exchangeRate))} ({feeCurrency})
                 </p>
               )}
             </div>

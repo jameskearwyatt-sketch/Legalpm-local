@@ -257,8 +257,11 @@ export async function exportAFAProposalToExcel({
     difference: reconciledBmTotal - validBmTotal,
   });
   
+  // Debug: log each item's category
   validItems.forEach((item) => {
     const category = item.category || 'Other';
+    const isKnownCategory = BUDGET_CATEGORIES.includes(category as typeof BUDGET_CATEGORIES[number]);
+    console.log('[Category Debug]', item.work_item.substring(0, 30), 'category:', JSON.stringify(category), 'isKnown:', isKnownCategory, 'fee:', item.fee_amount);
     if (!groupedItems[category]) {
       groupedItems[category] = [];
     }

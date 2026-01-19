@@ -13,7 +13,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { TableScrollControls } from "@/components/ui/table-scroll-controls";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   ArrowLeft, 
   Save, 
@@ -37,7 +39,9 @@ import {
   DollarSign,
   HelpCircle,
   RotateCcw,
-  Layers
+  Layers,
+  AlertCircle,
+  Settings2
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
@@ -48,7 +52,11 @@ import {
   ProposalAssumptions,
   DEFAULT_RATE_CARD,
   DEFAULT_ASSUMPTIONS,
-  EstimationMethod
+  EstimationMethod,
+  ExportFigureSettings,
+  FigureType,
+  SendToMatterFigure,
+  areFigureSettingsComplete
 } from "@/lib/hooks/usePricingProposals";
 import { useMatters } from "@/lib/hooks/useMatters";
 import { useProposalAFAs, AFA_TYPE_LABELS } from "@/lib/hooks/useProposalAFAs";
@@ -808,7 +816,21 @@ export default function PricingProposalDetail() {
   };
 
   // Export to Excel with AFA filters applied
+  // Check if figure settings are complete
+  const figureSettingsComplete = areFigureSettingsComplete(assumptions);
+
   const exportToExcel = async () => {
+    // Validate figure settings are complete
+    if (!figureSettingsComplete) {
+      toast({ 
+        title: 'Figure settings required', 
+        description: 'Please complete the Figure Settings in the Assumptions tab before exporting.',
+        variant: 'destructive'
+      });
+      setActiveTab('assumptions');
+      return;
+    }
+
     await exportAFAProposalToExcel({
       items: draftItems,
       enabledAFAs,
@@ -829,6 +851,18 @@ export default function PricingProposalDetail() {
 
   // Send to matter (uses raw items - AFA info stored in notes)
   const handleSendToMatter = async () => {
+    // Validate figure settings are complete
+    if (!figureSettingsComplete) {
+      toast({ 
+        title: 'Figure settings required', 
+        description: 'Please complete the Figure Settings in the Assumptions tab before sending to a matter.',
+        variant: 'destructive'
+      });
+      setIsSendToMatterOpen(false);
+      setActiveTab('assumptions');
+      return;
+    }
+
     if (!selectedMatterId) {
       toast({ title: 'Please select a matter', variant: 'destructive' });
       return;
@@ -1644,6 +1678,191 @@ export default function PricingProposalDetail() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Figure Settings Card - REQUIRED */}
+            <Card className={cn(
+              "border-2",
+              areFigureSettingsComplete(assumptions) 
+                ? "border-green-500/50 bg-green-50/30" 
+                : "border-amber-500 bg-amber-50/50"
+            )}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings2 className="h-5 w-5" />
+                  Figure Settings
+                  {areFigureSettingsComplete(assumptions) ? (
+                    <Badge variant="outline" className="ml-2 text-green-600 border-green-500">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Complete
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="ml-2 text-amber-600 border-amber-500">
+                      <AlertCircle className="h-3 w-3 mr-1" />
+                      Required
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  These settings must be completed before exporting to Excel or sending to a matter.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {/* Excel Export Figures */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-base font-medium">Which figures should be included in Excel exports?</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-sm">
+                            Select which fee columns to include in exported Excel files. 
+                            You can select multiple options.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <div className="flex flex-wrap gap-6">
+                    <div className="flex items-center gap-2">
+                      <Checkbox 
+                        id="export-lower"
+                        checked={assumptions.excelExportFigures?.lower || false}
+                        onCheckedChange={(checked) => setAssumptions(prev => ({
+                          ...prev,
+                          excelExportFigures: {
+                            lower: !!checked,
+                            midpoint: prev.excelExportFigures?.midpoint || false,
+                            upper: prev.excelExportFigures?.upper || false,
+                          }
+                        }))}
+                      />
+                      <Label htmlFor="export-lower" className="cursor-pointer">Lower Estimates</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox 
+                        id="export-midpoint"
+                        checked={assumptions.excelExportFigures?.midpoint || false}
+                        onCheckedChange={(checked) => setAssumptions(prev => ({
+                          ...prev,
+                          excelExportFigures: {
+                            lower: prev.excelExportFigures?.lower || false,
+                            midpoint: !!checked,
+                            upper: prev.excelExportFigures?.upper || false,
+                          }
+                        }))}
+                      />
+                      <Label htmlFor="export-midpoint" className="cursor-pointer">Midpoint</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox 
+                        id="export-upper"
+                        checked={assumptions.excelExportFigures?.upper || false}
+                        onCheckedChange={(checked) => setAssumptions(prev => ({
+                          ...prev,
+                          excelExportFigures: {
+                            lower: prev.excelExportFigures?.lower || false,
+                            midpoint: prev.excelExportFigures?.midpoint || false,
+                            upper: !!checked,
+                          }
+                        }))}
+                      />
+                      <Label htmlFor="export-upper" className="cursor-pointer">Upper Estimates</Label>
+                    </div>
+                  </div>
+                  {!assumptions.excelExportFigures?.lower && 
+                   !assumptions.excelExportFigures?.midpoint && 
+                   !assumptions.excelExportFigures?.upper && (
+                    <p className="text-sm text-amber-600">Please select at least one figure type</p>
+                  )}
+                </div>
+
+                {/* AFA Base Figure */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-base font-medium">Which figure should be used for AFA calculations?</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-sm">
+                            This determines the baseline figure used when calculating discounts, 
+                            fixed fees, blended rates, and other Alternative Fee Arrangements.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <RadioGroup 
+                    value={assumptions.afaBaseFigure || ''} 
+                    onValueChange={(value: FigureType) => setAssumptions(prev => ({ ...prev, afaBaseFigure: value }))}
+                    className="flex flex-wrap gap-6"
+                  >
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="lower" id="afa-lower" />
+                      <Label htmlFor="afa-lower" className="cursor-pointer">Lower Estimates</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="midpoint" id="afa-midpoint" />
+                      <Label htmlFor="afa-midpoint" className="cursor-pointer">Midpoint</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="upper" id="afa-upper" />
+                      <Label htmlFor="afa-upper" className="cursor-pointer">Upper Estimates</Label>
+                    </div>
+                  </RadioGroup>
+                  {!assumptions.afaBaseFigure && (
+                    <p className="text-sm text-amber-600">Please select a figure type</p>
+                  )}
+                </div>
+
+                {/* Send to Matter Figure */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-base font-medium">Which figure should be used when sending to a matter?</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-sm">
+                            This determines what figures become the matter's budget when you 
+                            send this proposal to a matter. "AFA Figure" uses the calculated 
+                            AFA client price with appropriate line item scaling.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <RadioGroup 
+                    value={assumptions.sendToMatterFigure || ''} 
+                    onValueChange={(value: SendToMatterFigure) => setAssumptions(prev => ({ ...prev, sendToMatterFigure: value }))}
+                    className="flex flex-wrap gap-6"
+                  >
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="midpoint" id="matter-midpoint" />
+                      <Label htmlFor="matter-midpoint" className="cursor-pointer">Midpoint</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="upper" id="matter-upper" />
+                      <Label htmlFor="matter-upper" className="cursor-pointer">Upper Estimate</Label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <RadioGroupItem value="afa" id="matter-afa" />
+                      <Label htmlFor="matter-afa" className="cursor-pointer">AFA Figure</Label>
+                    </div>
+                  </RadioGroup>
+                  {!assumptions.sendToMatterFigure && (
+                    <p className="text-sm text-amber-600">Please select a figure type</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

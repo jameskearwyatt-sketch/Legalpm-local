@@ -4,6 +4,8 @@ import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 import { BUDGET_CATEGORIES } from './useBudgetVersions';
 import { Json } from '@/integrations/supabase/types';
+import { applyAFAFilters } from '@/lib/afaFilterUtils';
+import { ProposalAFA } from './useProposalAFAs';
 
 export interface RateCard {
   partner: { rate: number; cost: number };
@@ -578,13 +580,43 @@ export function usePricingProposal(proposalId?: string) {
       if (matterId && latestVersion) {
         const items = await fetchVersionItems(latestVersion.id);
         
+        // Fetch enabled AFAs for this proposal
+        const { data: afasData } = await supabase
+          .from('pricing_proposal_afas')
+          .select('*')
+          .eq('proposal_id', proposalId!)
+          .eq('is_enabled', true);
+        
+        const enabledAFAs: ProposalAFA[] = (afasData || []).map(afa => ({
+          ...afa,
+          afa_type: afa.afa_type as ProposalAFA['afa_type'],
+          config: afa.config as unknown as ProposalAFA['config'],
+          is_enabled: afa.is_enabled ?? false,
+          client_price: afa.client_price ?? 0,
+          effective_rate: afa.effective_rate ?? null,
+          margin_impact_percent: afa.margin_impact_percent ?? null,
+          client_narrative: afa.client_narrative ?? null,
+          is_selected_for_export: afa.is_selected_for_export ?? false,
+        }));
+        
+        // Get currency symbol for AFA filter (used in comments)
+        const currency = proposalQuery.data?.currency || 'GBP';
+        const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency;
+        
+        // Calculate baseline total from items
+        const baselineTotal = items.reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+        
+        // Apply AFA filters to get adjusted items (with discounts, etc. applied)
+        const filterResult = applyAFAFilters(items, enabledAFAs, baselineTotal, currencySymbol);
+        
         // Helper: Round to nearest 1000 for client-facing budget figures
         const roundToNearest1000 = (value: number): number => Math.round(value / 1000) * 1000;
         
-        // Calculate rounded totals from individual rounded items
+        // Use AFA-filtered items and calculate rounded totals
         let roundedBmTotal = 0;
         let roundedLcTotal = 0;
-        const roundedItems = items.map(item => {
+        const roundedItems = filterResult.items.map(item => {
+          // AFA filter already rounds to nearest 1000, but ensure it's done
           const roundedFee = roundToNearest1000(item.fee_amount || 0);
           if (item.provider === 'Baker McKenzie') {
             roundedBmTotal += roundedFee;
@@ -612,7 +644,7 @@ export function usePricingProposal(proposalId?: string) {
 
         if (budgetVersionError) throw budgetVersionError;
 
-        // Create budget line items with rounded fee amounts
+        // Create budget line items with rounded fee amounts (AFA-adjusted)
         if (roundedItems.length > 0) {
           const lineItems = roundedItems.map((item, index) => ({
             budget_version_id: budgetVersion.id,
@@ -620,7 +652,7 @@ export function usePricingProposal(proposalId?: string) {
             user_id: user!.id,
             work_item: item.work_item,
             provider: item.provider,
-            fee_amount: item.fee_amount, // Already rounded
+            fee_amount: item.fee_amount, // Already AFA-adjusted and rounded
             category: item.category,
             lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
             lc_country: item.provider === 'Local Counsel' ? (item.lc_country || null) : null,
@@ -655,7 +687,7 @@ export function usePricingProposal(proposalId?: string) {
             currentMatter.agreed_billing_amount > 0 && 
             currentMatter.fee_amount_upper_end > 0) {
           const mandatedRate = currentMatter.agreed_billing_amount / currentMatter.fee_amount_upper_end;
-          matterUpdate.agreed_billing_amount = latestVersion.total_amount * mandatedRate;
+          matterUpdate.agreed_billing_amount = roundedTotal * mandatedRate;
         }
 
         // Update matter totals

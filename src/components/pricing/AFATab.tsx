@@ -303,6 +303,52 @@ export function AFATab({
     return (newMargin / clientPrice) * 100;
   };
 
+  // Track previous baseline to detect changes
+  const [prevBaselineTotal, setPrevBaselineTotal] = useState<number | null>(null);
+
+  // Auto-recalculate all enabled AFAs when baseline totals change
+  useEffect(() => {
+    // Skip initial render or if loading
+    if (isLoading || prevBaselineTotal === null) {
+      setPrevBaselineTotal(baselineTotals.total);
+      return;
+    }
+
+    // Only recalculate if total has meaningfully changed (more than $1 difference)
+    if (Math.abs(baselineTotals.total - prevBaselineTotal) < 1) {
+      return;
+    }
+
+    setPrevBaselineTotal(baselineTotals.total);
+
+    // Find all enabled AFAs and recalculate their client prices
+    const enabledAfas = afas.filter(a => a.is_enabled);
+    if (enabledAfas.length === 0) return;
+
+    // Recalculate each enabled AFA with updated baseline
+    const recalculateEnabledAFAs = async () => {
+      for (const afa of enabledAfas) {
+        const newClientPrice = calculateClientPrice(afa.afa_type, afa.config);
+        const newEffectiveRate = calculateEffectiveRate(newClientPrice);
+        const newMarginImpact = calculateMarginImpact(newClientPrice);
+
+        // Only update if the price has changed
+        if (Math.abs(newClientPrice - afa.client_price) > 1) {
+          await upsertAFA.mutateAsync({
+            afa_type: afa.afa_type,
+            is_enabled: true,
+            config: afa.config,
+            client_price: newClientPrice,
+            effective_rate: newEffectiveRate,
+            margin_impact_percent: newMarginImpact,
+          });
+        }
+      }
+    };
+
+    recalculateEnabledAFAs();
+  }, [baselineTotals.total, baselineTotals.bmTotal, baselineTotals.totalHours]);
+
   // Handle config change
   const handleConfigChange = async (type: AFAType, config: any) => {
     const clientPrice = calculateClientPrice(type, config);

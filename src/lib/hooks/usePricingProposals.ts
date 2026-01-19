@@ -101,6 +101,18 @@ export const DEFAULT_ASSUMPTIONS: ProposalAssumptions = {
   sendToMatterFigure: null,
 };
 
+export interface ScopeAssumptionValue {
+  assumptionId: string;
+  enabled: boolean;
+  inputValue?: string;
+  narrative: string;
+}
+
+export interface ScopeAssumptionsState {
+  noAssumptionsApply: boolean;
+  assumptions: ScopeAssumptionValue[];
+}
+
 export interface PricingProposal {
   id: string;
   user_id: string;
@@ -113,6 +125,7 @@ export interface PricingProposal {
   rate_card: RateCard | null;
   work_phases: WorkPhase[] | null;
   assumptions: ProposalAssumptions | null;
+  scope_assumptions: ScopeAssumptionsState | null;
   linked_matter_id: string | null;
   created_at: string;
   updated_at: string;
@@ -231,6 +244,7 @@ export function usePricingProposals() {
         rate_card: parseJsonColumn<RateCard>(d.rate_card, DEFAULT_RATE_CARD),
         work_phases: parseJsonColumn<WorkPhase[]>(d.work_phases, DEFAULT_WORK_PHASES),
         assumptions: parseJsonColumn<ProposalAssumptions>(d.assumptions, DEFAULT_ASSUMPTIONS),
+        scope_assumptions: parseJsonColumn<ScopeAssumptionsState | null>(d.scope_assumptions, null),
       })) as PricingProposal[];
     },
     enabled: !!user,
@@ -330,6 +344,7 @@ export function usePricingProposal(proposalId?: string) {
         rate_card: parseJsonColumn<RateCard>(data.rate_card, DEFAULT_RATE_CARD),
         work_phases: parseJsonColumn<WorkPhase[]>(data.work_phases, DEFAULT_WORK_PHASES),
         assumptions: parseJsonColumn<ProposalAssumptions>(data.assumptions, DEFAULT_ASSUMPTIONS),
+        scope_assumptions: parseJsonColumn<ScopeAssumptionsState | null>(data.scope_assumptions, null),
       } as PricingProposal;
     },
     enabled: !!user && !!proposalId,
@@ -732,6 +747,35 @@ export function usePricingProposal(proposalId?: string) {
           .from('matters')
           .update(matterUpdate)
           .eq('id', matterId);
+
+        // Sync scope assumptions to matter_assumptions table
+        const scopeAssumptions = proposalQuery.data?.scope_assumptions;
+        if (scopeAssumptions && !scopeAssumptions.noAssumptionsApply && scopeAssumptions.assumptions) {
+          const enabledAssumptions = scopeAssumptions.assumptions.filter(a => a.enabled && a.narrative);
+
+          if (enabledAssumptions.length > 0) {
+            // First, delete any existing assumptions from this pricing proposal source
+            await supabase
+              .from('matter_assumptions')
+              .delete()
+              .eq('matter_id', matterId)
+              .eq('source_document', `Pricing Proposal: ${proposalQuery.data?.name}`);
+
+            // Insert new assumptions
+            const assumptionRecords = enabledAssumptions.map(a => ({
+              matter_id: matterId,
+              user_id: user!.id,
+              label: a.assumptionId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+              assumption_text: a.narrative,
+              is_standard: false,
+              source_document: `Pricing Proposal: ${proposalQuery.data?.name}`,
+            }));
+
+            await supabase
+              .from('matter_assumptions')
+              .insert(assumptionRecords);
+          }
+        }
       }
 
       return { matterId };

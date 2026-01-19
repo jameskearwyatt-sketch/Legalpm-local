@@ -259,8 +259,8 @@ export async function exportAFAProposalToExcel({
   });
   headerRow.height = 28;
   
-  // Freeze pane at header row
-  worksheet.views = [{ state: 'frozen', ySplit: currentRow }];
+  // Freeze pane at header row - freeze just this row so data scrolls below it
+  worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: currentRow, topLeftCell: `A${currentRow + 1}` }];
   currentRow++;
 
   // Category colors

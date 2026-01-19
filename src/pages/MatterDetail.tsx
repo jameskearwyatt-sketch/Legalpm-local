@@ -1867,7 +1867,7 @@ export default function MatterDetail() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Progress</Label>
+                <Label>BM Progress</Label>
                 <div className="space-y-3">
                   <div className="flex items-center gap-4">
                     <input
@@ -1882,7 +1882,9 @@ export default function MatterDetail() {
                   </div>
                   {(() => {
                     const progress = formData.progress || 0;
-                    const currentBurn = (latestSnapshot?.wip_amount || 0) + (latestSnapshot?.accounts_receivable || 0) + (latestSnapshot?.paid_amount || 0);
+                    // Use proposal values if engaged, otherwise use snapshot
+                    // wipAmount, accountsReceivable, paidAmount are already calculated correctly based on showProposalValues
+                    const currentBurn = wipAmount + accountsReceivable + paidAmount;
                     const estimatedToClose = progress > 0 && progress < 100
                       ? Math.round((currentBurn / progress) * (100 - progress))
                       : 0;

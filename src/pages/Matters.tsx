@@ -1364,7 +1364,22 @@ export default function Matters() {
                   </TableHeader>
                   <TableBody>
                     {filteredMatters.map((matter) => {
-                      const budgetBurn = (matter.latest_snapshot?.wip_amount || 0) + (matter.latest_snapshot?.accounts_receivable || 0) + (matter.latest_snapshot?.paid_amount || 0);
+                      // Use proposal values for budgetBurn if engaged, otherwise use snapshot
+                      const hasActiveProposal = (matter as any).show_shaping_proposal && (matter as any).selected_proposal;
+                      const proposal = (matter as any).selected_proposal;
+                      
+                      let budgetBurn: number;
+                      if (hasActiveProposal && proposal) {
+                        // Proposal values: rawWip - wipWriteOff + adjustedAR + paid
+                        const rawWip = proposal.wip_amount || 0;
+                        const wipWriteOff = proposal.wip_write_off_amount || 0;
+                        const netWip = rawWip - wipWriteOff;
+                        const ar = proposal.accounts_receivable || 0;
+                        const paid = proposal.paid_amount || 0;
+                        budgetBurn = netWip + ar + paid;
+                      } else {
+                        budgetBurn = (matter.latest_snapshot?.wip_amount || 0) + (matter.latest_snapshot?.accounts_receivable || 0) + (matter.latest_snapshot?.paid_amount || 0);
+                      }
                       
                       const currentCategory = categoryFilter as 'Live' | 'Pipeline' | 'Closed' | 'Lost';
                       const orderedColumns = getOrderedColumns(currentCategory, columns);

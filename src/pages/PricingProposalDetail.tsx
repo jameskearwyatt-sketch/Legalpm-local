@@ -41,7 +41,8 @@ import {
   RotateCcw,
   Layers,
   AlertCircle,
-  Settings2
+  Settings2,
+  Scale
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
@@ -72,6 +73,7 @@ import { EditableRateCard } from "@/components/pricing/EditableRateCard";
 import { CategorizedProposalView, categoryBgColors, categoryTextColors, categoryBorderColors } from "@/components/pricing/CategorizedProposalView";
 import { LocalCounselPanel } from "@/components/pricing/LocalCounselPanel";
 import { AFATab } from "@/components/pricing/AFATab";
+import { ScopeAssumptionsTab, ScopeAssumptionsState, getAssumptionNarratives } from "@/components/pricing/ScopeAssumptionsTab";
 import { exportAFAProposalToExcel } from "@/lib/exportAFAProposalToExcel";
 import { applyAFAFilters, getAFASummary } from "@/lib/afaFilterUtils";
 import {
@@ -139,6 +141,7 @@ export default function PricingProposalDetail() {
   // Local state for proposal-specific settings
   const [rateCard, setRateCard] = useState<RateCard>(DEFAULT_RATE_CARD);
   const [assumptions, setAssumptions] = useState<ProposalAssumptions>(DEFAULT_ASSUMPTIONS);
+  const [scopeAssumptions, setScopeAssumptions] = useState<ScopeAssumptionsState | null>(null);
 
   // Iterative pricing dialog state
   const [iterativeDialogOpen, setIterativeDialogOpen] = useState(false);
@@ -159,6 +162,11 @@ export default function PricingProposalDetail() {
     if (proposal) {
       setRateCard(proposal.rate_card || DEFAULT_RATE_CARD);
       setAssumptions(proposal.assumptions || DEFAULT_ASSUMPTIONS);
+      // Load scope assumptions from proposal (stored in scope_assumptions field)
+      const rawScopeAssumptions = (proposal as any).scope_assumptions;
+      if (rawScopeAssumptions) {
+        setScopeAssumptions(rawScopeAssumptions as ScopeAssumptionsState);
+      }
     }
   }, [proposal]);
 
@@ -847,6 +855,7 @@ export default function PricingProposalDetail() {
       notes: versionNotes || undefined,
       excelExportFigures: assumptions.excelExportFigures,
       afaBaseFigure: assumptions.afaBaseFigure,
+      scopeAssumptionNarratives: getAssumptionNarratives(scopeAssumptions),
     });
     
     toast({ 
@@ -1171,14 +1180,18 @@ export default function PricingProposalDetail() {
 
         {/* Main Content with Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid w-full grid-cols-7 max-w-5xl">
-            <TabsTrigger value="assumptions">
+          <TabsList className="grid w-full grid-cols-8 max-w-6xl">
+            <TabsTrigger value="parameters">
               <Calculator className="h-4 w-4 mr-2" />
-              Assumptions
+              Parameters
             </TabsTrigger>
             <TabsTrigger value="rates">
               <Users className="h-4 w-4 mr-2" />
               Team & Rates
+            </TabsTrigger>
+            <TabsTrigger value="scope-assumptions">
+              <Scale className="h-4 w-4 mr-2" />
+              Assumptions
             </TabsTrigger>
             <TabsTrigger value="items">
               <FileText className="h-4 w-4 mr-2" />
@@ -1613,8 +1626,8 @@ export default function PricingProposalDetail() {
             </Card>
           </TabsContent>
 
-          {/* ASSUMPTIONS TAB */}
-          <TabsContent value="assumptions" className="space-y-6">
+          {/* PRICING PARAMETERS TAB */}
+          <TabsContent value="parameters" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1899,6 +1912,22 @@ export default function PricingProposalDetail() {
               }}
               isSaving={updateProposal.isPending}
               afaDiscount={afaDiscountPercent}
+            />
+          </TabsContent>
+
+          {/* SCOPE ASSUMPTIONS TAB */}
+          <TabsContent value="scope-assumptions" className="space-y-4">
+            <ScopeAssumptionsTab
+              value={scopeAssumptions}
+              onChange={async (newState) => {
+                setScopeAssumptions(newState);
+                // Auto-save scope assumptions
+                await supabase
+                  .from('pricing_proposals')
+                  .update({ scope_assumptions: newState as any })
+                  .eq('id', proposalId);
+              }}
+              currency={proposal?.currency || 'GBP'}
             />
           </TabsContent>
 

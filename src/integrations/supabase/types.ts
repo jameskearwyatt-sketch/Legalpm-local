@@ -1657,6 +1657,7 @@ export type Database = {
           linked_matter_id: string | null
           name: string
           rate_card: Json | null
+          scope_assumptions: Json | null
           status: string
           updated_at: string
           user_id: string
@@ -1673,6 +1674,7 @@ export type Database = {
           linked_matter_id?: string | null
           name: string
           rate_card?: Json | null
+          scope_assumptions?: Json | null
           status?: string
           updated_at?: string
           user_id: string
@@ -1689,6 +1691,7 @@ export type Database = {
           linked_matter_id?: string | null
           name?: string
           rate_card?: Json | null
+          scope_assumptions?: Json | null
           status?: string
           updated_at?: string
           user_id?: string

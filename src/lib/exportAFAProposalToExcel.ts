@@ -29,6 +29,8 @@ interface ExportAFAProposalOptions {
   // New figure settings
   excelExportFigures?: ExportFigureSettings | null;
   afaBaseFigure?: FigureType | null;
+  // Scope assumptions narratives
+  scopeAssumptionNarratives?: string[];
 }
 
 export async function exportAFAProposalToExcel({
@@ -41,6 +43,7 @@ export async function exportAFAProposalToExcel({
   notes,
   excelExportFigures,
   afaBaseFigure,
+  scopeAssumptionNarratives,
 }: ExportAFAProposalOptions): Promise<void> {
   const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency;
   
@@ -194,6 +197,32 @@ export async function exportAFAProposalToExcel({
         fgColor: { argb: 'FFF0F9FF' },
       };
       globalCommentCell.alignment = { wrapText: true };
+      currentRow++;
+    }
+    currentRow++;
+  }
+
+  // Scope Assumptions section
+  if (scopeAssumptionNarratives && scopeAssumptionNarratives.length > 0) {
+    worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+    const assumptionsHeader = worksheet.getCell(`A${currentRow}`);
+    assumptionsHeader.value = '📋 Key Assumptions';
+    assumptionsHeader.font = { bold: true, size: 12, color: { argb: 'FF374151' } };
+    assumptionsHeader.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFF3F4F6' },
+    };
+    worksheet.getRow(currentRow).height = 24;
+    currentRow++;
+
+    for (const narrative of scopeAssumptionNarratives) {
+      worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+      const narrativeCell = worksheet.getCell(`A${currentRow}`);
+      narrativeCell.value = `• ${narrative}`;
+      narrativeCell.font = { size: 10, color: { argb: 'FF4B5563' } };
+      narrativeCell.alignment = { wrapText: true, vertical: 'top' };
+      worksheet.getRow(currentRow).height = 20;
       currentRow++;
     }
     currentRow++;

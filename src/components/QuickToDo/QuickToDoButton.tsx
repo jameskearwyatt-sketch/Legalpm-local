@@ -2770,81 +2770,92 @@ export function QuickToDoButton() {
                               <Briefcase className="h-3 w-3 text-orange-600/70 dark:text-orange-400/70" />
                               <span className="text-[10px] font-medium text-orange-600/70 dark:text-orange-400/70">Work</span>
                             </div>
-                            {todayWorkTasks.map((task, index) => (
-                              <SortableSlateItem
-                                key={task.id}
-                                task={task}
-                                index={index}
-                                onCompleteWithNotes={() => {
-                                  if (task.source === 'slate-only') {
-                                    completeSlateItem.mutate({ id: task.id, isCompleted: true });
-                                    return;
-                                  }
-                                  const unified: UnifiedTask = { ...task, source: task.source };
-                                  setTaskToComplete(unified);
-                                  setCompletionNotes("");
-                                  setCompleteDialogOpen(true);
-                                }}
-                                onQuickComplete={async () => {
-                                  if (task.source === 'slate-only') {
-                                    completeSlateItem.mutate({ id: task.id, isCompleted: true });
-                                    return;
-                                  }
-                                  if (task.source === 'growth') {
-                                    const realId = task.id.replace('growth-', '');
-                                    const { error } = await supabase
-                                      .from('growth_tasks')
-                                      .update({
-                                        is_completed: true,
-                                        completed_at: new Date().toISOString(),
-                                      })
-                                      .eq('id', realId);
-                                    if (error) {
-                                      toast.error('Failed to complete task');
-                                    } else {
-                                      refetchGrowthTasks();
-                                    }
-                                  } else {
-                                    const { error } = await supabase
-                                      .from('quick_tasks')
-                                      .update({
-                                        is_completed: true,
-                                        completed_at: new Date().toISOString(),
-                                      })
-                                      .eq('id', task.id);
-                                    if (error) {
-                                      toast.error('Failed to complete task');
-                                    } else {
-                                      fetchTasks();
-                                    }
-                                  }
-                                }}
-                                onRemoveFromSlate={() => toggleSlate(task.id, true, task.source)}
-                                onPromoteToTaskList={task.source === 'slate-only' ? () => {
-                                  const slateItem = workSlateItems.find(i => i.id === task.id);
-                                  if (slateItem) promoteSlateOnlyToTaskList(slateItem);
-                                } : undefined}
-                                onSnapToTop={() => handleSnapToTop(task.id)}
-                                onToggleMustDoToday={async () => {
-                                  if (task.source === 'slate-only') {
-                                    toggleMustDoToday.mutate({ id: task.id, mustDoToday: false });
-                                  } else if (task.source === 'growth') {
-                                    const realId = task.id.replace('growth-', '');
-                                    const { error } = await supabase
-                                      .from('growth_tasks')
-                                      .update({ must_do_today: false })
-                                      .eq('id', realId);
-                                    if (!error) refetchGrowthTasks();
-                                  } else {
-                                    const { error } = await supabase
-                                      .from('quick_tasks')
-                                      .update({ must_do_today: false })
-                                      .eq('id', task.id);
-                                    if (!error) fetchTasks();
-                                  }
-                                }}
-                              />
-                            ))}
+                            <DndContext
+                              sensors={slateSensors}
+                              collisionDetection={closestCenter}
+                              onDragEnd={handleSlateDragEnd}
+                            >
+                              <SortableContext 
+                                items={todayWorkTasks.map(t => t.id)} 
+                                strategy={verticalListSortingStrategy}
+                              >
+                                {todayWorkTasks.map((task, index) => (
+                                  <SortableSlateItem
+                                    key={task.id}
+                                    task={task}
+                                    index={index}
+                                    onCompleteWithNotes={() => {
+                                      if (task.source === 'slate-only') {
+                                        completeSlateItem.mutate({ id: task.id, isCompleted: true });
+                                        return;
+                                      }
+                                      const unified: UnifiedTask = { ...task, source: task.source };
+                                      setTaskToComplete(unified);
+                                      setCompletionNotes("");
+                                      setCompleteDialogOpen(true);
+                                    }}
+                                    onQuickComplete={async () => {
+                                      if (task.source === 'slate-only') {
+                                        completeSlateItem.mutate({ id: task.id, isCompleted: true });
+                                        return;
+                                      }
+                                      if (task.source === 'growth') {
+                                        const realId = task.id.replace('growth-', '');
+                                        const { error } = await supabase
+                                          .from('growth_tasks')
+                                          .update({
+                                            is_completed: true,
+                                            completed_at: new Date().toISOString(),
+                                          })
+                                          .eq('id', realId);
+                                        if (error) {
+                                          toast.error('Failed to complete task');
+                                        } else {
+                                          refetchGrowthTasks();
+                                        }
+                                      } else {
+                                        const { error } = await supabase
+                                          .from('quick_tasks')
+                                          .update({
+                                            is_completed: true,
+                                            completed_at: new Date().toISOString(),
+                                          })
+                                          .eq('id', task.id);
+                                        if (error) {
+                                          toast.error('Failed to complete task');
+                                        } else {
+                                          fetchTasks();
+                                        }
+                                      }
+                                    }}
+                                    onRemoveFromSlate={() => toggleSlate(task.id, true, task.source)}
+                                    onPromoteToTaskList={task.source === 'slate-only' ? () => {
+                                      const slateItem = workSlateItems.find(i => i.id === task.id);
+                                      if (slateItem) promoteSlateOnlyToTaskList(slateItem);
+                                    } : undefined}
+                                    onSnapToTop={() => handleSnapToTop(task.id)}
+                                    onToggleMustDoToday={async () => {
+                                      if (task.source === 'slate-only') {
+                                        toggleMustDoToday.mutate({ id: task.id, mustDoToday: false });
+                                      } else if (task.source === 'growth') {
+                                        const realId = task.id.replace('growth-', '');
+                                        const { error } = await supabase
+                                          .from('growth_tasks')
+                                          .update({ must_do_today: false })
+                                          .eq('id', realId);
+                                        if (!error) refetchGrowthTasks();
+                                      } else {
+                                        const { error } = await supabase
+                                          .from('quick_tasks')
+                                          .update({ must_do_today: false })
+                                          .eq('id', task.id);
+                                        if (!error) fetchTasks();
+                                      }
+                                    }}
+                                  />
+                                ))}
+                              </SortableContext>
+                            </DndContext>
                           </div>
                         )}
 
@@ -2855,18 +2866,29 @@ export function QuickToDoButton() {
                               <Home className="h-3 w-3 text-orange-600/70 dark:text-orange-400/70" />
                               <span className="text-[10px] font-medium text-orange-600/70 dark:text-orange-400/70">Personal</span>
                             </div>
-                            {todayPersonalTasks.map((task, index) => (
-                              <SortablePersonalTask
-                                key={task.id}
-                                task={task}
-                                index={index}
-                                onComplete={() => completeSlateItem.mutate({ id: task.id, isCompleted: true })}
-                                onDelete={() => deleteSlateItem.mutate(task.id)}
-                                onToggleMustDoToday={() => {
-                                  toggleMustDoToday.mutate({ id: task.id, mustDoToday: false });
-                                }}
-                              />
-                            ))}
+                            <DndContext
+                              sensors={slateSensors}
+                              collisionDetection={closestCenter}
+                              onDragEnd={handlePersonalDragEnd}
+                            >
+                              <SortableContext 
+                                items={todayPersonalTasks.map(t => t.id)} 
+                                strategy={verticalListSortingStrategy}
+                              >
+                                {todayPersonalTasks.map((task, index) => (
+                                  <SortablePersonalTask
+                                    key={task.id}
+                                    task={task}
+                                    index={index}
+                                    onComplete={() => completeSlateItem.mutate({ id: task.id, isCompleted: true })}
+                                    onDelete={() => deleteSlateItem.mutate(task.id)}
+                                    onToggleMustDoToday={() => {
+                                      toggleMustDoToday.mutate({ id: task.id, mustDoToday: false });
+                                    }}
+                                  />
+                                ))}
+                              </SortableContext>
+                            </DndContext>
                           </div>
                         )}
                       </div>

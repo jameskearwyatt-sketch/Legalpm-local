@@ -268,22 +268,23 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
 
   // Regenerate document narratives when configs change
   useEffect(() => {
-    if (!state.documentAssumptions.configs.length) return;
+    const docAssumptions = state.documentAssumptions || DEFAULT_DOCUMENT_STATE;
+    if (!docAssumptions.configs?.length) return;
     
     const hasAnyDocAssumption = 
-      state.documentAssumptions.turnsEnabled ||
-      state.documentAssumptions.whoDraftsEnabled ||
-      state.documentAssumptions.clientFormEnabled;
+      docAssumptions.turnsEnabled ||
+      docAssumptions.whoDraftsEnabled ||
+      docAssumptions.clientFormEnabled;
     
     if (!hasAnyDocAssumption) return;
 
     // Only regenerate if narratives are empty or configs changed
-    const newNarratives = state.documentAssumptions.configs
+    const newNarratives = docAssumptions.configs
       .filter(c => c.turns !== undefined || c.whoDrafts !== undefined || c.clientForm)
       .map(generateDocumentNarrative)
       .filter(n => n.length > 0);
     
-    if (JSON.stringify(newNarratives) !== JSON.stringify(state.documentNarratives)) {
+    if (JSON.stringify(newNarratives) !== JSON.stringify(state.documentNarratives || [])) {
       const newState = { ...state, documentNarratives: newNarratives };
       setState(newState);
       onChange(newState);
@@ -308,7 +309,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
     const def = SIMPLE_ASSUMPTIONS.find(a => a.id === assumptionId);
     if (!def) return;
 
-    const newAssumptions = state.simpleAssumptions.map(a => {
+    const newAssumptions = (state.simpleAssumptions || []).map(a => {
       if (a.assumptionId === assumptionId) {
         const narrative = enabled && !def.requiresInput 
           ? def.narrativeTemplate() 
@@ -329,7 +330,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
     const def = SIMPLE_ASSUMPTIONS.find(a => a.id === assumptionId);
     if (!def) return;
 
-    const newAssumptions = state.simpleAssumptions.map(a => {
+    const newAssumptions = (state.simpleAssumptions || []).map(a => {
       if (a.assumptionId === assumptionId) {
         return { 
           ...a, 
@@ -348,7 +349,8 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
 
   // Document assumption toggles
   const toggleDocumentAssumptionType = (type: DocumentAssumptionType, enabled: boolean) => {
-    const newDocState = { ...state.documentAssumptions };
+    const currentDocState = state.documentAssumptions || DEFAULT_DOCUMENT_STATE;
+    const newDocState = { ...currentDocState };
     
     if (type === 'turns') newDocState.turnsEnabled = enabled;
     if (type === 'who_drafts') newDocState.whoDraftsEnabled = enabled;
@@ -365,7 +367,8 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
 
   // Toggle a work item for document assumptions
   const toggleWorkItemSelected = (workItemName: string, selected: boolean) => {
-    let configs = [...state.documentAssumptions.configs];
+    const currentDocState = state.documentAssumptions || DEFAULT_DOCUMENT_STATE;
+    let configs = [...(currentDocState.configs || [])];
     
     if (selected) {
       // Add if not exists
@@ -379,13 +382,14 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
 
     updateState({
       ...state,
-      documentAssumptions: { ...state.documentAssumptions, configs },
+      documentAssumptions: { ...currentDocState, configs },
     });
   };
 
   // Update document config
   const updateDocumentConfig = (workItemName: string, updates: Partial<DocumentConfig>) => {
-    const configs = state.documentAssumptions.configs.map(c => {
+    const currentDocState = state.documentAssumptions || DEFAULT_DOCUMENT_STATE;
+    const configs = (currentDocState.configs || []).map(c => {
       if (c.workItemName === workItemName) {
         return { ...c, ...updates };
       }
@@ -394,7 +398,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
 
     updateState({
       ...state,
-      documentAssumptions: { ...state.documentAssumptions, configs },
+      documentAssumptions: { ...currentDocState, configs },
     });
   };
 
@@ -420,7 +424,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
   };
 
   const saveDocNarrative = (index: number) => {
-    const newNarratives = [...state.documentNarratives];
+    const newNarratives = [...(state.documentNarratives || [])];
     newNarratives[index] = editedText;
     updateState({
       ...state,
@@ -436,10 +440,10 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
 
   const regenerateSimpleNarrative = (assumptionId: string) => {
     const def = SIMPLE_ASSUMPTIONS.find(a => a.id === assumptionId);
-    const assumption = state.simpleAssumptions.find(a => a.assumptionId === assumptionId);
+    const assumption = (state.simpleAssumptions || []).find(a => a.assumptionId === assumptionId);
     if (!def || !assumption) return;
 
-    const newAssumptions = state.simpleAssumptions.map(a => {
+    const newAssumptions = (state.simpleAssumptions || []).map(a => {
       if (a.assumptionId === assumptionId) {
         return { 
           ...a, 
@@ -455,13 +459,14 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
     });
   };
 
-  const enabledSimpleAssumptions = state.simpleAssumptions.filter(a => a.enabled);
-  const hasDocumentAssumptions = state.documentAssumptions.turnsEnabled || 
-    state.documentAssumptions.whoDraftsEnabled || 
-    state.documentAssumptions.clientFormEnabled;
+  const enabledSimpleAssumptions = (state.simpleAssumptions || []).filter(a => a.enabled);
+  const documentAssumptions = state.documentAssumptions || DEFAULT_DOCUMENT_STATE;
+  const hasDocumentAssumptions = documentAssumptions.turnsEnabled || 
+    documentAssumptions.whoDraftsEnabled || 
+    documentAssumptions.clientFormEnabled;
   const hasAnyEnabled = enabledSimpleAssumptions.length > 0 || 
     hasDocumentAssumptions ||
-    state.documentNarratives.length > 0;
+    (state.documentNarratives || []).length > 0;
 
   const groupedSimple = SIMPLE_ASSUMPTIONS.reduce((acc, def) => {
     if (!acc[def.category]) acc[def.category] = [];

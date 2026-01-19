@@ -81,22 +81,37 @@ function getPrimaryAFA(enabledAFAs: ProposalAFA[]): ProposalAFA | null {
 }
 
 /**
- * Round a number to the nearest 1000.
- * E.g., 1499 -> 1000, 1500 -> 2000, 12345 -> 12000
+ * Dynamic rounding based on value size:
+ * - Values < 10,000: round to nearest 100
+ * - Values >= 10,000: round to nearest 1,000
  */
-function roundToNearest1000(value: number): number {
+function smartRound(value: number): number {
+  if (Math.abs(value) < 10000) {
+    return Math.round(value / 100) * 100;
+  }
   return Math.round(value / 1000) * 1000;
+}
+
+/**
+ * Get the rounding increment for a value (100 or 1000).
+ */
+function getRoundingIncrement(value: number): number {
+  return Math.abs(value) < 10000 ? 100 : 1000;
 }
 
 /**
  * Apply intelligent rounding using the largest remainder method.
  * This ensures the sum of rounded values exactly equals the rounded target.
  * 
+ * Uses dynamic rounding increments:
+ * - Items < 10,000: floor/round to nearest 100
+ * - Items >= 10,000: floor/round to nearest 1,000
+ * 
  * Algorithm:
- * 1. Floor each value to nearest 1000
+ * 1. Floor each value to appropriate increment (100 or 1000)
  * 2. Calculate remainder (fractional part) for each
  * 3. Calculate shortfall between floored sum and target
- * 4. Distribute shortfall (in 1000 increments) to items with largest remainders
+ * 4. Distribute shortfall in appropriate increments to items with largest remainders
  * 
  * @param items Array of objects with fee values to round
  * @param getExactValue Function to get the exact (unrounded) value from each item
@@ -112,37 +127,44 @@ function applyLargestRemainderRounding<T>(
   
   if (items.length === 0) return result;
   
-  // Calculate floored values and remainders
+  // Calculate floored values and remainders using dynamic increments
   const itemData = items.map((item, index) => {
     const exactValue = getExactValue(item);
-    const floored = Math.floor(exactValue / 1000) * 1000;
-    const remainder = exactValue - floored; // Fractional part (0-999.99...)
-    return { index, exactValue, floored, remainder };
+    const increment = getRoundingIncrement(exactValue);
+    const floored = Math.floor(exactValue / increment) * increment;
+    const remainder = exactValue - floored; // Fractional part
+    return { index, exactValue, floored, remainder, increment };
   });
   
   // Sum of floored values
   const flooredSum = itemData.reduce((sum, d) => sum + d.floored, 0);
   
-  // How many extra 1000s do we need to reach the target?
+  // How much shortfall do we have?
   const shortfall = targetAggregate - flooredSum;
-  const incrementsNeeded = Math.round(shortfall / 1000);
   
-  if (incrementsNeeded > 0) {
+  if (shortfall > 0) {
     // Sort by remainder descending - items with largest remainders get rounded up
     const sortedByRemainder = [...itemData].sort((a, b) => b.remainder - a.remainder);
     
-    // Give extra 1000 to top N items
-    for (let i = 0; i < Math.min(incrementsNeeded, sortedByRemainder.length); i++) {
-      sortedByRemainder[i].floored += 1000;
+    // Distribute shortfall, respecting each item's increment size
+    let remaining = shortfall;
+    for (const item of sortedByRemainder) {
+      if (remaining <= 0) break;
+      const add = Math.min(item.increment, remaining);
+      item.floored += add;
+      remaining -= add;
     }
-  } else if (incrementsNeeded < 0) {
-    // Rare case: need to subtract (shouldn't happen with normal rounding but handle it)
+  } else if (shortfall < 0) {
+    // Rare case: need to subtract
     const sortedByRemainder = [...itemData].sort((a, b) => a.remainder - b.remainder);
-    const decrementsNeeded = Math.abs(incrementsNeeded);
+    let remaining = Math.abs(shortfall);
     
-    for (let i = 0; i < Math.min(decrementsNeeded, sortedByRemainder.length); i++) {
-      if (sortedByRemainder[i].floored >= 1000) {
-        sortedByRemainder[i].floored -= 1000;
+    for (const item of sortedByRemainder) {
+      if (remaining <= 0) break;
+      const subtract = Math.min(item.increment, remaining, item.floored);
+      if (subtract > 0) {
+        item.floored -= subtract;
+        remaining -= subtract;
       }
     }
   }
@@ -213,10 +235,10 @@ export function applyAFAFilters(
   if (enabledAFAs.length === 0) {
     // No AFAs enabled - return items with selected figure type fee, properly rounded
     // Apply largest remainder rounding to ensure totals reconcile
-    const targetBmTotal = roundToNearest1000(itemsWithBaseFee
+    const targetBmTotal = smartRound(itemsWithBaseFee
       .filter(item => item.provider === 'Baker McKenzie' && (item.is_included !== false || !item.is_optional))
       .reduce((sum, item) => sum + (item.fee_amount || 0), 0));
-    const targetLcTotal = roundToNearest1000(itemsWithBaseFee
+    const targetLcTotal = smartRound(itemsWithBaseFee
       .filter(item => item.provider === 'Local Counsel' && (item.is_included !== false || !item.is_optional))
       .reduce((sum, item) => sum + (item.fee_amount || 0), 0));
     
@@ -237,7 +259,7 @@ export function applyAFAFilters(
       items: itemsWithBaseFee.map((item, index) => ({
         ...item,
         original_fee_amount: item.fee_amount,
-        fee_amount: bmRounded.get(index) ?? lcRounded.get(index) ?? roundToNearest1000(item.fee_amount || 0),
+        fee_amount: bmRounded.get(index) ?? lcRounded.get(index) ?? smartRound(item.fee_amount || 0),
         afa_adjusted: false,
       })),
       totalAdjustment: 0,
@@ -263,7 +285,7 @@ export function applyAFAFilters(
   
   // Pre-calculate rounded LC values using largest remainder method
   // This ensures LC items always sum to the rounded aggregate
-  const targetLcAggregate = roundToNearest1000(originalLcTotal);
+  const targetLcAggregate = smartRound(originalLcTotal);
   const lcRoundedMap = applyReconciliationRounding(
     itemsWithBaseFee,
     item => item.fee_amount || 0,
@@ -282,8 +304,8 @@ export function applyAFAFilters(
     discountMultiplier = 1 - config.discountPercent / 100;
     discountedBmTotal = originalBmTotal * discountMultiplier;
     
-    // Calculate the target aggregate (rounded to nearest 1000)
-    const targetBmAggregate = roundToNearest1000(discountedBmTotal);
+    // Calculate the target aggregate (rounded using smart rounding)
+    const targetBmAggregate = smartRound(discountedBmTotal);
     
     // Apply largest remainder rounding to BM items
     const bmRoundedMap = applyReconciliationRounding(
@@ -296,7 +318,7 @@ export function applyAFAFilters(
     // Initialize filtered items with intelligently rounded amounts
     filteredItems = itemsWithBaseFee.map((item, index) => {
       if (item.provider === 'Baker McKenzie') {
-        const roundedFee = bmRoundedMap.get(index) ?? roundToNearest1000((item.fee_amount || 0) * discountMultiplier);
+        const roundedFee = bmRoundedMap.get(index) ?? smartRound((item.fee_amount || 0) * discountMultiplier);
         return {
           ...item,
           original_fee_amount: item.fee_amount,
@@ -306,7 +328,7 @@ export function applyAFAFilters(
         };
       }
       // LC items get reconciled rounding too
-      const lcRoundedFee = lcRoundedMap.get(index) ?? roundToNearest1000(item.fee_amount || 0);
+      const lcRoundedFee = lcRoundedMap.get(index) ?? smartRound(item.fee_amount || 0);
       return {
         ...item,
         original_fee_amount: item.fee_amount,
@@ -327,7 +349,7 @@ export function applyAFAFilters(
 
   // STEP 2: Apply primary AFA (but don't modify line items for fixed fees - they already show discounted baseline)
   if (primaryAFA) {
-    const roundedClientPrice = roundToNearest1000(primaryAFA.client_price);
+    const roundedClientPrice = smartRound(primaryAFA.client_price);
     
     appliedAFAs.push({
       type: primaryAFA.afa_type,
@@ -350,7 +372,7 @@ export function applyAFAFilters(
           filteredItems = itemsWithBaseFee.map(item => ({
             ...item,
             original_fee_amount: item.fee_amount,
-            fee_amount: roundToNearest1000(item.fee_amount || 0),
+            fee_amount: smartRound(item.fee_amount || 0),
             afa_adjusted: false,
           }));
         }
@@ -366,7 +388,7 @@ export function applyAFAFilters(
         // Helper to calculate adjusted amount for a phase - always round to nearest 1000
         const getPhaseAdjustedAmount = (phase: typeof config.phases[0]) => {
           const adjusted = phase.baseAmount * (1 + phase.adjustmentPercent / 100);
-          return roundToNearest1000(adjusted);
+          return smartRound(adjusted);
         };
         
         const phaseComment = `Fixed fees by phase: ${includedPhases.map(p => `${p.category} (${currencySymbol}${getPhaseAdjustedAmount(p).toLocaleString()})`).join(', ')}`;
@@ -380,7 +402,7 @@ export function applyAFAFilters(
           filteredItems = itemsWithBaseFee.map(item => ({
             ...item,
             original_fee_amount: item.fee_amount,
-            fee_amount: roundToNearest1000(item.fee_amount || 0),
+            fee_amount: smartRound(item.fee_amount || 0),
             afa_adjusted: false,
           }));
         }
@@ -398,7 +420,7 @@ export function applyAFAFilters(
         const adjustmentRatio = roundedClientPrice / originalBmTotal;
         filteredItems = itemsWithBaseFee.map(item => {
           if (item.provider === 'Baker McKenzie') {
-            const adjustedFee = roundToNearest1000((item.fee_amount || 0) * adjustmentRatio);
+            const adjustedFee = smartRound((item.fee_amount || 0) * adjustmentRatio);
             return {
               ...item,
               original_fee_amount: item.fee_amount,
@@ -418,7 +440,7 @@ export function applyAFAFilters(
 
       case 'fee_cap': {
         const config = primaryAFA.config as FeeCapConfig;
-        const roundedCapAmount = roundToNearest1000(config.capAmount);
+        const roundedCapAmount = smartRound(config.capAmount);
         const capComment = config.capType === 'amount' 
           ? `Fee cap: ${currencySymbol}${roundedCapAmount.toLocaleString()} - time-based billing up to this maximum`
           : `Fee cap: ${config.capPercentageAbove}% above estimate (cap at ${currencySymbol}${roundedClientPrice.toLocaleString()})`;
@@ -429,7 +451,7 @@ export function applyAFAFilters(
           filteredItems = itemsWithBaseFee.map(item => ({
             ...item,
             original_fee_amount: item.fee_amount,
-            fee_amount: roundToNearest1000(item.fee_amount || 0),
+            fee_amount: smartRound(item.fee_amount || 0),
             afa_adjusted: false,
             afa_comment: item.provider === 'Baker McKenzie' ? 'Subject to fee cap' : undefined,
           }));
@@ -452,7 +474,7 @@ export function applyAFAFilters(
         
         // Calculate exact discounted BM total and round to get target
         const exactDiscountedBm = originalBmTotal * multiplier;
-        const targetBmAggregate = roundToNearest1000(exactDiscountedBm);
+        const targetBmAggregate = smartRound(exactDiscountedBm);
         
         // Apply largest remainder rounding to BM items using helper
         const bmRoundedMap = applyReconciliationRounding(
@@ -464,7 +486,7 @@ export function applyAFAFilters(
         
         filteredItems = itemsWithBaseFee.map((item, index) => {
           if (item.provider === 'Baker McKenzie') {
-            const roundedFee = bmRoundedMap.get(index) ?? roundToNearest1000((item.fee_amount || 0) * multiplier);
+            const roundedFee = bmRoundedMap.get(index) ?? smartRound((item.fee_amount || 0) * multiplier);
             return {
               ...item,
               original_fee_amount: item.fee_amount,
@@ -474,7 +496,7 @@ export function applyAFAFilters(
             };
           }
           // LC items use reconciled rounding
-          const lcRoundedFee = lcRoundedMap.get(index) ?? roundToNearest1000(item.fee_amount || 0);
+          const lcRoundedFee = lcRoundedMap.get(index) ?? smartRound(item.fee_amount || 0);
           return {
             ...item,
             original_fee_amount: item.fee_amount,
@@ -492,7 +514,7 @@ export function applyAFAFilters(
         
         if (!discountAFA) {
           // Apply reconciled rounding for both BM and LC items
-          const targetBmTotal = roundToNearest1000(originalBmTotal);
+          const targetBmTotal = smartRound(originalBmTotal);
           const bmRoundedMap = applyReconciliationRounding(
             itemsWithBaseFee,
             item => item.fee_amount || 0,
@@ -503,7 +525,7 @@ export function applyAFAFilters(
           filteredItems = itemsWithBaseFee.map((item, index) => ({
             ...item,
             original_fee_amount: item.fee_amount,
-            fee_amount: bmRoundedMap.get(index) ?? lcRoundedMap.get(index) ?? roundToNearest1000(item.fee_amount || 0),
+            fee_amount: bmRoundedMap.get(index) ?? lcRoundedMap.get(index) ?? smartRound(item.fee_amount || 0),
             afa_adjusted: false,
           }));
         }
@@ -511,7 +533,7 @@ export function applyAFAFilters(
     }
   } else if (!discountAFA) {
     // No primary AFA and no discount, apply reconciled rounding
-    const targetBmTotal = roundToNearest1000(originalBmTotal);
+    const targetBmTotal = smartRound(originalBmTotal);
     const bmRoundedMap = applyReconciliationRounding(
       itemsWithBaseFee,
       item => item.fee_amount || 0,
@@ -522,7 +544,7 @@ export function applyAFAFilters(
     filteredItems = itemsWithBaseFee.map((item, index) => ({
       ...item,
       original_fee_amount: item.fee_amount,
-      fee_amount: bmRoundedMap.get(index) ?? lcRoundedMap.get(index) ?? roundToNearest1000(item.fee_amount || 0),
+      fee_amount: bmRoundedMap.get(index) ?? lcRoundedMap.get(index) ?? smartRound(item.fee_amount || 0),
       afa_adjusted: false,
     }));
   }
@@ -534,7 +556,7 @@ export function applyAFAFilters(
   // Handle success fee (add-on)
   if (successFeeAFA) {
     const config = successFeeAFA.config as SuccessFeeConfig;
-    const roundedUpliftAmount = roundToNearest1000(config.upliftAmount);
+    const roundedUpliftAmount = smartRound(config.upliftAmount);
     appliedAFAs.push({
       type: 'success_fee',
       label: AFA_TYPE_LABELS['success_fee'],
@@ -563,10 +585,10 @@ export function applyAFAFilters(
 
 /**
  * Generate a human-readable description of the AFA for comments.
- * All monetary values are rounded to nearest $1,000 for client-facing output.
+ * Uses smart rounding: nearest 100 for <10k, nearest 1000 for >=10k.
  */
 function generateAFADescription(afa: ProposalAFA, currencySymbol: string): string {
-  const roundedClientPrice = roundToNearest1000(afa.client_price);
+  const roundedClientPrice = smartRound(afa.client_price);
   
   switch (afa.afa_type) {
     case 'fixed_fee_whole':
@@ -584,7 +606,7 @@ function generateAFADescription(afa: ProposalAFA, currencySymbol: string): strin
     case 'fee_cap': {
       const config = afa.config as FeeCapConfig;
       return config.capType === 'amount'
-        ? `Fee cap of ${currencySymbol}${roundToNearest1000(config.capAmount).toLocaleString()}`
+        ? `Fee cap of ${currencySymbol}${smartRound(config.capAmount).toLocaleString()}`
         : `Fee cap at ${config.capPercentageAbove}% above estimate`;
     }
     case 'discounted_rates': {
@@ -593,7 +615,7 @@ function generateAFADescription(afa: ProposalAFA, currencySymbol: string): strin
     }
     case 'success_fee': {
       const config = afa.config as SuccessFeeConfig;
-      return `${config.upliftPercent}% success fee (${currencySymbol}${roundToNearest1000(config.upliftAmount).toLocaleString()})`;
+      return `${config.upliftPercent}% success fee (${currencySymbol}${smartRound(config.upliftAmount).toLocaleString()})`;
     }
     default:
       return `${AFA_TYPE_LABELS[afa.afa_type]}: ${currencySymbol}${roundedClientPrice.toLocaleString()}`;

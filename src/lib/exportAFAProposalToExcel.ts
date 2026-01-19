@@ -184,21 +184,6 @@ export async function exportAFAProposalToExcel({
       worksheet.getRow(currentRow).height = 24;
       currentRow++;
     }
-
-    // Add global comment if present
-    if (filterResult.globalComment) {
-      worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
-      const globalCommentCell = worksheet.getCell(`A${currentRow}`);
-      globalCommentCell.value = filterResult.globalComment;
-      globalCommentCell.font = { size: 10, color: { argb: 'FF1E40AF' }, italic: true };
-      globalCommentCell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFF0F9FF' },
-      };
-      globalCommentCell.alignment = { wrapText: true };
-      currentRow++;
-    }
     currentRow++;
   }
 

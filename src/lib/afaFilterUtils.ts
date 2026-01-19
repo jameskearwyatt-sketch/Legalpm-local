@@ -60,7 +60,16 @@ function getPrimaryAFA(enabledAFAs: ProposalAFA[]): ProposalAFA | null {
 }
 
 /**
+ * Round a number to the nearest 1000.
+ * E.g., 1499 -> 1000, 1500 -> 2000, 12345 -> 12000
+ */
+function roundToNearest1000(value: number): number {
+  return Math.round(value / 1000) * 1000;
+}
+
+/**
  * Apply AFA filters to work items and return adjusted items with comments.
+ * All monetary values are rounded to nearest $1,000 for client-facing output.
  */
 export function applyAFAFilters(
   draftItems: DraftProposalItem[],
@@ -99,22 +108,24 @@ export function applyAFAFilters(
 
   // Apply primary AFA
   if (primaryAFA) {
+    const roundedClientPrice = roundToNearest1000(primaryAFA.client_price);
+    
     appliedAFAs.push({
       type: primaryAFA.afa_type,
       label: AFA_TYPE_LABELS[primaryAFA.afa_type],
       description: generateAFADescription(primaryAFA, currencySymbol),
-      clientPrice: primaryAFA.client_price,
+      clientPrice: roundedClientPrice,
     });
 
     switch (primaryAFA.afa_type) {
       case 'fixed_fee_whole': {
         // All BM items become a single fixed fee - keep structure but mark as fixed
-        globalComment = `Fixed Fee: ${currencySymbol}${primaryAFA.client_price.toLocaleString()} for the entire scope of work`;
-        const adjustmentRatio = primaryAFA.client_price / originalBmTotal;
+        globalComment = `Fixed Fee: ${currencySymbol}${roundedClientPrice.toLocaleString()} for the entire scope of work`;
+        const adjustmentRatio = roundedClientPrice / originalBmTotal;
         
         filteredItems = draftItems.map(item => {
           if (item.provider === 'Baker McKenzie') {
-            const adjustedFee = Math.round((item.fee_amount || 0) * adjustmentRatio);
+            const adjustedFee = roundToNearest1000((item.fee_amount || 0) * adjustmentRatio);
             return {
               ...item,
               original_fee_amount: item.fee_amount,
@@ -136,13 +147,10 @@ export function applyAFAFilters(
         const config = primaryAFA.config as FixedFeePhaseConfig;
         const phaseMap = new Map(config.phases.map(p => [p.category, p]));
         
-        // Helper to calculate adjusted amount for a phase
+        // Helper to calculate adjusted amount for a phase - always round to nearest 1000
         const getPhaseAdjustedAmount = (phase: typeof config.phases[0]) => {
           const adjusted = phase.baseAmount * (1 + phase.adjustmentPercent / 100);
-          if (config.roundToNearest1000) {
-            return Math.round(adjusted / 1000) * 1000;
-          }
-          return Math.round(adjusted);
+          return roundToNearest1000(adjusted);
         };
         
         filteredItems = draftItems.map(item => {
@@ -155,7 +163,7 @@ export function applyAFAFilters(
             const categoryTotal = categoryItems.reduce((sum, i) => sum + (i.fee_amount || 0), 0);
             const ratio = categoryTotal > 0 ? (item.fee_amount || 0) / categoryTotal : 0;
             const phaseAdjustedAmount = getPhaseAdjustedAmount(phase);
-            const adjustedFee = Math.round(phaseAdjustedAmount * ratio);
+            const adjustedFee = roundToNearest1000(phaseAdjustedAmount * ratio);
             
             return {
               ...item,
@@ -183,10 +191,10 @@ export function applyAFAFilters(
         globalComment = `Blended hourly rate: ${currencySymbol}${Math.round(rate)}/hour applied across all timekeepers`;
         
         // Proportionally adjust items based on the blended rate total
-        const adjustmentRatio = primaryAFA.client_price / originalBmTotal;
+        const adjustmentRatio = roundedClientPrice / originalBmTotal;
         filteredItems = draftItems.map(item => {
           if (item.provider === 'Baker McKenzie') {
-            const adjustedFee = Math.round((item.fee_amount || 0) * adjustmentRatio);
+            const adjustedFee = roundToNearest1000((item.fee_amount || 0) * adjustmentRatio);
             return {
               ...item,
               original_fee_amount: item.fee_amount,
@@ -206,10 +214,11 @@ export function applyAFAFilters(
 
       case 'fee_cap': {
         const config = primaryAFA.config as FeeCapConfig;
+        const roundedCapAmount = roundToNearest1000(config.capAmount);
         if (config.capType === 'amount') {
-          globalComment = `Fee cap: ${currencySymbol}${config.capAmount.toLocaleString()} - time-based billing up to this maximum`;
+          globalComment = `Fee cap: ${currencySymbol}${roundedCapAmount.toLocaleString()} - time-based billing up to this maximum`;
         } else {
-          globalComment = `Fee cap: ${config.capPercentageAbove}% above estimate (cap at ${currencySymbol}${primaryAFA.client_price.toLocaleString()})`;
+          globalComment = `Fee cap: ${config.capPercentageAbove}% above estimate (cap at ${currencySymbol}${roundedClientPrice.toLocaleString()})`;
         }
         
         // Items remain at estimate but note the cap
@@ -229,7 +238,7 @@ export function applyAFAFilters(
         
         filteredItems = draftItems.map(item => {
           if (item.provider === 'Baker McKenzie') {
-            const adjustedFee = Math.round((item.fee_amount || 0) * multiplier);
+            const adjustedFee = roundToNearest1000((item.fee_amount || 0) * multiplier);
             return {
               ...item,
               original_fee_amount: item.fee_amount,
@@ -249,7 +258,7 @@ export function applyAFAFilters(
 
       default:
         // For other AFA types, just note the arrangement
-        globalComment = `${AFA_TYPE_LABELS[primaryAFA.afa_type]}: ${currencySymbol}${primaryAFA.client_price.toLocaleString()}`;
+        globalComment = `${AFA_TYPE_LABELS[primaryAFA.afa_type]}: ${currencySymbol}${roundedClientPrice.toLocaleString()}`;
         filteredItems = draftItems.map(item => ({
           ...item,
           original_fee_amount: item.fee_amount,
@@ -274,7 +283,7 @@ export function applyAFAFilters(
       const multiplier = 1 - config.discountPercent / 100;
       filteredItems = filteredItems.map(item => {
         if (item.provider === 'Baker McKenzie') {
-          const adjustedFee = Math.round(item.fee_amount * multiplier);
+          const adjustedFee = roundToNearest1000(item.fee_amount * multiplier);
           return {
             ...item,
             fee_amount: adjustedFee,
@@ -291,7 +300,7 @@ export function applyAFAFilters(
         type: 'discounted_rates',
         label: AFA_TYPE_LABELS['discounted_rates'],
         description: `${config.discountPercent}% discount on standard rates`,
-        clientPrice: discountAFA.client_price,
+        clientPrice: roundToNearest1000(discountAFA.client_price),
       });
       
       globalComment = globalComment 
@@ -303,16 +312,17 @@ export function applyAFAFilters(
   // Handle success fee (add-on)
   if (successFeeAFA) {
     const config = successFeeAFA.config as SuccessFeeConfig;
+    const roundedUpliftAmount = roundToNearest1000(config.upliftAmount);
     appliedAFAs.push({
       type: 'success_fee',
       label: AFA_TYPE_LABELS['success_fee'],
-      description: `Success fee: ${currencySymbol}${config.upliftAmount.toLocaleString()} (${config.upliftPercent}% uplift) on successful completion${config.successCondition ? ` - ${config.successCondition}` : ''}`,
-      clientPrice: config.upliftAmount,
+      description: `Success fee: ${currencySymbol}${roundedUpliftAmount.toLocaleString()} (${config.upliftPercent}% uplift) on successful completion${config.successCondition ? ` - ${config.successCondition}` : ''}`,
+      clientPrice: roundedUpliftAmount,
     });
     
     globalComment = globalComment 
-      ? `${globalComment}. Success fee of ${currencySymbol}${config.upliftAmount.toLocaleString()} payable on completion.`
-      : `Success fee: ${currencySymbol}${config.upliftAmount.toLocaleString()} on successful completion`;
+      ? `${globalComment}. Success fee of ${currencySymbol}${roundedUpliftAmount.toLocaleString()} payable on completion.`
+      : `Success fee: ${currencySymbol}${roundedUpliftAmount.toLocaleString()} on successful completion`;
   }
 
   // Calculate total adjustment
@@ -330,16 +340,19 @@ export function applyAFAFilters(
 }
 
 /**
- * Generate a human-readable description of the AFA for comments
+ * Generate a human-readable description of the AFA for comments.
+ * All monetary values are rounded to nearest $1,000 for client-facing output.
  */
 function generateAFADescription(afa: ProposalAFA, currencySymbol: string): string {
+  const roundedClientPrice = roundToNearest1000(afa.client_price);
+  
   switch (afa.afa_type) {
     case 'fixed_fee_whole':
-      return `Fixed fee of ${currencySymbol}${afa.client_price.toLocaleString()} for the entire matter`;
+      return `Fixed fee of ${currencySymbol}${roundedClientPrice.toLocaleString()} for the entire matter`;
     case 'fixed_fee_phase': {
       const config = afa.config as FixedFeePhaseConfig;
       const phases = config.phases.filter(p => p.isIncluded);
-      return `Fixed fees by phase: ${phases.length} phases totaling ${currencySymbol}${afa.client_price.toLocaleString()}`;
+      return `Fixed fees by phase: ${phases.length} phases totaling ${currencySymbol}${roundedClientPrice.toLocaleString()}`;
     }
     case 'blended_rate': {
       const config = afa.config as BlendedRateConfig;
@@ -349,7 +362,7 @@ function generateAFADescription(afa: ProposalAFA, currencySymbol: string): strin
     case 'fee_cap': {
       const config = afa.config as FeeCapConfig;
       return config.capType === 'amount'
-        ? `Fee cap of ${currencySymbol}${config.capAmount.toLocaleString()}`
+        ? `Fee cap of ${currencySymbol}${roundToNearest1000(config.capAmount).toLocaleString()}`
         : `Fee cap at ${config.capPercentageAbove}% above estimate`;
     }
     case 'discounted_rates': {
@@ -358,10 +371,10 @@ function generateAFADescription(afa: ProposalAFA, currencySymbol: string): strin
     }
     case 'success_fee': {
       const config = afa.config as SuccessFeeConfig;
-      return `${config.upliftPercent}% success fee (${currencySymbol}${config.upliftAmount.toLocaleString()})`;
+      return `${config.upliftPercent}% success fee (${currencySymbol}${roundToNearest1000(config.upliftAmount).toLocaleString()})`;
     }
     default:
-      return `${AFA_TYPE_LABELS[afa.afa_type]}: ${currencySymbol}${afa.client_price.toLocaleString()}`;
+      return `${AFA_TYPE_LABELS[afa.afa_type]}: ${currencySymbol}${roundedClientPrice.toLocaleString()}`;
   }
 }
 

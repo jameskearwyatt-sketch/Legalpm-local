@@ -81,8 +81,8 @@ serve(async (req) => {
       console.error("Error fetching matters:", mattersError);
     }
 
-    // Get budget versions with line items
-    const { data: budgetVersions, error: budgetError } = await supabase
+    // Get budget versions with line items - fetch all, then dedupe to most recent per matter
+    const { data: allBudgetVersions, error: budgetError } = await supabase
       .from("budget_versions")
       .select(`
         id,
@@ -92,18 +92,29 @@ serve(async (req) => {
         bm_total,
         local_counsel_total,
         notes,
-        finalized_at
+        finalized_at,
+        created_at
       `)
       .eq("user_id", userId)
       .order("created_at", { ascending: false })
-      .limit(200);
+      .limit(500);
 
     if (budgetError) {
       console.error("Error fetching budget versions:", budgetError);
     }
 
-    // Get budget line items
-    const { data: lineItems, error: lineItemsError } = await supabase
+    // Keep only the most recent budget version per matter
+    const latestBudgetVersionMap = new Map<string, any>();
+    for (const bv of allBudgetVersions || []) {
+      if (!latestBudgetVersionMap.has(bv.matter_id)) {
+        latestBudgetVersionMap.set(bv.matter_id, bv);
+      }
+    }
+    const budgetVersions = Array.from(latestBudgetVersionMap.values());
+    const latestBudgetVersionIds = new Set(budgetVersions.map((bv: any) => bv.id));
+
+    // Get budget line items - only for the most recent budget versions
+    const { data: allLineItems, error: lineItemsError } = await supabase
       .from("budget_line_items")
       .select(`
         id,
@@ -117,11 +128,14 @@ serve(async (req) => {
         is_included
       `)
       .eq("user_id", userId)
-      .limit(500);
+      .limit(1000);
 
     if (lineItemsError) {
       console.error("Error fetching line items:", lineItemsError);
     }
+
+    // Filter line items to only include those from the most recent budget versions
+    const lineItems = (allLineItems || []).filter((li: any) => latestBudgetVersionIds.has(li.budget_version_id));
 
     // Get invoices for financial context
     const { data: invoices, error: invoicesError } = await supabase
@@ -698,10 +712,23 @@ serve(async (req) => {
 
 Your role is to provide helpful, accurate answers based on ALL available data. You can answer questions about ANY aspect of the user's practice.
 
+=== ANSWERING APPROACH ===
+1. When the user asks about typical pricing, averages, or patterns - ALWAYS analyze ALL relevant matters/budgets automatically. Do NOT ask "which matters" - just analyze everything and give a synthesized answer.
+2. Be proactive and helpful. If asked "what do we charge for X", look across all budgets and give ranges, averages, and examples.
+3. Give concise, actionable insights. Don't just list data - synthesize it.
+4. For pricing questions: calculate min, max, average, and mention notable outliers or patterns.
+5. When showing figures, round to reasonable amounts (nearest £1,000 for larger amounts).
+
 === CURRENCY RULES ===
 1. Each matter and budget has its OWN CURRENCY - check the currency field
 2. NEVER mix currencies - convert using provided GBP values for comparisons
 3. Default to reporting in GBP unless the user asks for another currency
+4. When comparing across currencies, use the GBP equivalents for fair comparison
+
+=== DATA QUALITY ===
+1. ONLY the MOST RECENT budget version per matter is included - no duplicates
+2. Each matter appears ONCE with its current budget breakdown
+3. Line items are from the current/active budget only
 
 === GROWTH PROJECTS ===
 For BD, professional development, or learning questions:
@@ -715,6 +742,7 @@ For pricing questions:
 - Reference similar matters and proposals
 - Use rate cards and work phase breakdowns
 - Consider assumptions and exclusions
+- Look at ALL relevant data and synthesize
 
 === TIME RECORDING ===
 For time-related questions:

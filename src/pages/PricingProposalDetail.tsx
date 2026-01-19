@@ -162,10 +162,9 @@ export default function PricingProposalDetail() {
     if (proposal) {
       setRateCard(proposal.rate_card || DEFAULT_RATE_CARD);
       setAssumptions(proposal.assumptions || DEFAULT_ASSUMPTIONS);
-      // Load scope assumptions from proposal (stored in scope_assumptions field)
-      const rawScopeAssumptions = (proposal as any).scope_assumptions;
-      if (rawScopeAssumptions) {
-        setScopeAssumptions(rawScopeAssumptions as ScopeAssumptionsState);
+      // Load scope assumptions from proposal (now properly typed)
+      if (proposal.scope_assumptions) {
+        setScopeAssumptions(proposal.scope_assumptions);
       }
     }
   }, [proposal]);

@@ -177,6 +177,10 @@ export function WipShapingProposalDialog({
   };
 
   // Calculate derived values based on entry mode
+  // Note: Write-offs can be negative (meaning an increase from raw value)
+  // e.g., WIP 3000 → 5000 = -2000 write-off (increase)
+  //       AR 10000 → 5000 = +5000 write-off (decrease)
+  //       Total = 3000 net write-off
   const calculatedValues = useMemo(() => {
     let finalWipWriteOff: number;
     let finalArWriteOff: number;
@@ -185,16 +189,18 @@ export function WipShapingProposalDialog({
 
     if (entryMode === 'writeoff') {
       // User entered write-offs, calculate adjusted values
+      // Write-offs can be negative (meaning an increase)
       finalWipWriteOff = formData.wip_write_off;
       finalArWriteOff = formData.ar_write_off;
-      finalAdjustedWip = Math.max(0, formData.raw_wip - formData.wip_write_off);
-      finalAdjustedAr = Math.max(0, formData.raw_ar - formData.ar_write_off);
+      finalAdjustedWip = formData.raw_wip - formData.wip_write_off;
+      finalAdjustedAr = formData.raw_ar - formData.ar_write_off;
     } else {
       // User entered adjusted values, calculate write-offs
+      // Write-off = raw - adjusted (can be negative if adjusted > raw)
       finalAdjustedWip = formData.adjusted_wip;
       finalAdjustedAr = formData.adjusted_ar;
-      finalWipWriteOff = Math.max(0, formData.raw_wip - formData.adjusted_wip);
-      finalArWriteOff = Math.max(0, formData.raw_ar - formData.adjusted_ar);
+      finalWipWriteOff = formData.raw_wip - formData.adjusted_wip;
+      finalArWriteOff = formData.raw_ar - formData.adjusted_ar;
     }
 
     const totalWriteOff = roundTo2(finalWipWriteOff + finalArWriteOff);
@@ -419,7 +425,6 @@ export function WipShapingProposalDialog({
                         id="adjusted_wip"
                         type="number"
                         min="0"
-                        max={formData.raw_wip}
                         step="0.01"
                         value={formData.adjusted_wip}
                         onChange={(e) => updateField('adjusted_wip', parseFloat(e.target.value) || 0)}
@@ -427,9 +432,13 @@ export function WipShapingProposalDialog({
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-destructive">WIP Write-off</Label>
-                      <div className="h-9 px-3 py-2 bg-muted rounded-md border flex items-center font-medium text-sm text-destructive">
-                        {formatCurrency(calculatedValues.wipWriteOff, currency)}
+                      <Label className={`text-xs ${calculatedValues.wipWriteOff < 0 ? 'text-green-600' : 'text-destructive'}`}>
+                        {calculatedValues.wipWriteOff < 0 ? 'WIP Increase' : 'WIP Write-off'}
+                      </Label>
+                      <div className={`h-9 px-3 py-2 bg-muted rounded-md border flex items-center font-medium text-sm ${calculatedValues.wipWriteOff < 0 ? 'text-green-600' : 'text-destructive'}`}>
+                        {calculatedValues.wipWriteOff < 0 
+                          ? `+${formatCurrency(Math.abs(calculatedValues.wipWriteOff), currency)}`
+                          : formatCurrency(calculatedValues.wipWriteOff, currency)}
                       </div>
                     </div>
                   </>
@@ -484,7 +493,6 @@ export function WipShapingProposalDialog({
                         id="adjusted_ar"
                         type="number"
                         min="0"
-                        max={formData.raw_ar}
                         step="0.01"
                         value={formData.adjusted_ar}
                         onChange={(e) => updateField('adjusted_ar', parseFloat(e.target.value) || 0)}
@@ -492,9 +500,13 @@ export function WipShapingProposalDialog({
                       />
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-xs text-destructive">AR Write-off</Label>
-                      <div className="h-9 px-3 py-2 bg-muted rounded-md border flex items-center font-medium text-sm text-destructive">
-                        {formatCurrency(calculatedValues.arWriteOff, currency)}
+                      <Label className={`text-xs ${calculatedValues.arWriteOff < 0 ? 'text-green-600' : 'text-destructive'}`}>
+                        {calculatedValues.arWriteOff < 0 ? 'AR Increase' : 'AR Write-off'}
+                      </Label>
+                      <div className={`h-9 px-3 py-2 bg-muted rounded-md border flex items-center font-medium text-sm ${calculatedValues.arWriteOff < 0 ? 'text-green-600' : 'text-destructive'}`}>
+                        {calculatedValues.arWriteOff < 0 
+                          ? `+${formatCurrency(Math.abs(calculatedValues.arWriteOff), currency)}`
+                          : formatCurrency(calculatedValues.arWriteOff, currency)}
                       </div>
                     </div>
                   </>
@@ -505,13 +517,19 @@ export function WipShapingProposalDialog({
             {/* Total Write-off Summary */}
             <div className="pt-3 border-t border-border">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Total Write-off (WIP + AR)</span>
-                <span className="text-lg font-bold text-destructive">
-                  {formatCurrency(calculatedValues.totalWriteOff, currency)}
+                <span className="text-sm font-medium">
+                  {calculatedValues.totalWriteOff < 0 ? 'Net Value Increase' : 'Net Write-off'} (WIP + AR)
+                </span>
+                <span className={`text-lg font-bold ${calculatedValues.totalWriteOff < 0 ? 'text-green-600' : 'text-destructive'}`}>
+                  {calculatedValues.totalWriteOff < 0 
+                    ? `+${formatCurrency(Math.abs(calculatedValues.totalWriteOff), currency)}`
+                    : formatCurrency(calculatedValues.totalWriteOff, currency)}
                 </span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                WIP write-offs are time cost adjustments. AR write-offs require cancelling and reissuing bills.
+                {calculatedValues.totalWriteOff < 0 
+                  ? 'Net increase in value (WIP increase exceeds AR write-off)'
+                  : 'WIP write-offs are time cost adjustments. AR write-offs require cancelling and reissuing bills.'}
               </p>
             </div>
 

@@ -6,9 +6,9 @@
  */
 
 import ExcelJS from 'exceljs';
-import { DraftProposalItem, BUDGET_CATEGORIES } from '@/lib/hooks/usePricingProposals';
+import { DraftProposalItem, BUDGET_CATEGORIES, ExportFigureSettings, FigureType } from '@/lib/hooks/usePricingProposals';
 import { ProposalAFA, AFA_TYPE_LABELS } from '@/lib/hooks/useProposalAFAs';
-import { applyAFAFilters, AFAFilteredItem } from '@/lib/afaFilterUtils';
+import { applyAFAFilters, AFAFilteredItem, getItemFeeByFigureType } from '@/lib/afaFilterUtils';
 
 /**
  * Round a number to the nearest 1000.
@@ -26,6 +26,9 @@ interface ExportAFAProposalOptions {
   currency: string;
   baselineTotal: number;
   notes?: string;
+  // New figure settings
+  excelExportFigures?: ExportFigureSettings | null;
+  afaBaseFigure?: FigureType | null;
 }
 
 export async function exportAFAProposalToExcel({
@@ -36,11 +39,29 @@ export async function exportAFAProposalToExcel({
   currency,
   baselineTotal,
   notes,
+  excelExportFigures,
+  afaBaseFigure,
 }: ExportAFAProposalOptions): Promise<void> {
   const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency;
   
-  // Apply AFA filters to get adjusted items
-  const filterResult = applyAFAFilters(items, enabledAFAs, baselineTotal, currencySymbol);
+  // Determine which columns to export
+  const exportLower = excelExportFigures?.lower ?? false;
+  const exportMidpoint = excelExportFigures?.midpoint ?? true; // Default to midpoint if no settings
+  const exportUpper = excelExportFigures?.upper ?? false;
+  
+  // Calculate how many fee columns we need
+  const feeColumnCount = [exportLower, exportMidpoint, exportUpper].filter(Boolean).length;
+  
+  // Use afaBaseFigure for AFA calculations, default to midpoint
+  const baseFigure: FigureType = afaBaseFigure || 'midpoint';
+  
+  // Calculate baseline total using the selected figure type
+  const calculatedBaselineTotal = items.reduce((sum, item) => 
+    sum + getItemFeeByFigureType(item, baseFigure), 0
+  );
+  
+  // Apply AFA filters to get adjusted items (using the base figure)
+  const filterResult = applyAFAFilters(items, enabledAFAs, calculatedBaselineTotal, currencySymbol, baseFigure);
   
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Baker McKenzie';
@@ -55,14 +76,20 @@ export async function exportAFAProposalToExcel({
   const borderColor = 'FFE5E7EB';
   const afaHighlightColor = 'FFF0F9FF'; // Light blue for AFA-adjusted items
 
-  // Column widths
-  worksheet.columns = [
+  // Build column definitions dynamically based on selected figures
+  const columns: { key: string; width: number }[] = [
     { key: 'workItem', width: 45 },
     { key: 'provider', width: 18 },
     { key: 'lcFirmName', width: 20 },
-    { key: 'feeAmount', width: 16 },
-    { key: 'comments', width: 40 },
   ];
+  
+  if (exportLower) columns.push({ key: 'feeLower', width: 16 });
+  if (exportMidpoint) columns.push({ key: 'feeMidpoint', width: 16 });
+  if (exportUpper) columns.push({ key: 'feeUpper', width: 16 });
+  
+  columns.push({ key: 'comments', width: 40 });
+  
+  worksheet.columns = columns;
 
   // Header styling
   const headerFill: ExcelJS.Fill = {
@@ -88,8 +115,12 @@ export async function exportAFAProposalToExcel({
     name: 'Calibri',
   };
 
+  // Calculate last column letter for merge cells
+  const totalColumns = columns.length;
+  const lastColLetter = String.fromCharCode(64 + totalColumns); // A=65, so 64+n gives nth letter
+  
   // Title section
-  worksheet.mergeCells('A1:E1');
+  worksheet.mergeCells(`A1:${lastColLetter}1`);
   const titleCell = worksheet.getCell('A1');
   titleCell.value = 'Fee Proposal';
   titleCell.font = titleFont;
@@ -97,13 +128,13 @@ export async function exportAFAProposalToExcel({
   worksheet.getRow(1).height = 36;
 
   // Client info
-  worksheet.mergeCells('A2:E2');
+  worksheet.mergeCells(`A2:${lastColLetter}2`);
   const clientCell = worksheet.getCell('A2');
   clientCell.value = clientName;
   clientCell.font = { ...subtitleFont, bold: true, size: 14 };
 
   // Proposal info
-  worksheet.mergeCells('A3:E3');
+  worksheet.mergeCells(`A3:${lastColLetter}3`);
   const proposalCell = worksheet.getCell('A3');
   proposalCell.value = `${proposalName} | ${new Date().toLocaleDateString('en-GB', { 
     day: 'numeric', 
@@ -117,7 +148,7 @@ export async function exportAFAProposalToExcel({
   // Add AFA summary if any AFAs are applied
   if (filterResult.appliedAFAs.length > 0) {
     currentRow++;
-    worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+    worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
     const afaSummaryHeader = worksheet.getCell(`A${currentRow}`);
     afaSummaryHeader.value = 'Fee Arrangement';
     afaSummaryHeader.font = { bold: true, size: 11, color: { argb: primaryColor } };
@@ -125,7 +156,7 @@ export async function exportAFAProposalToExcel({
 
     // Add global comment if present
     if (filterResult.globalComment) {
-      worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+      worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
       const globalCommentCell = worksheet.getCell(`A${currentRow}`);
       globalCommentCell.value = filterResult.globalComment;
       globalCommentCell.font = { size: 10, color: { argb: 'FF2563EB' }, italic: true };
@@ -142,7 +173,7 @@ export async function exportAFAProposalToExcel({
 
   // Notes if provided
   if (notes) {
-    worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+    worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
     const notesCell = worksheet.getCell(`A${currentRow}`);
     notesCell.value = notes;
     notesCell.font = { size: 10, color: { argb: 'FF6B7280' }, italic: true };
@@ -151,26 +182,34 @@ export async function exportAFAProposalToExcel({
   }
 
   // Draft watermark
-  worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+  worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
   const disclaimerCell = worksheet.getCell(`A${currentRow}`);
   disclaimerCell.value = 'DRAFT - FOR DISCUSSION PURPOSES ONLY';
   disclaimerCell.font = { bold: true, size: 10, color: { argb: accentColor } };
   disclaimerCell.alignment = { horizontal: 'center' };
   currentRow += 2;
 
+  // Build dynamic header values
+  const headerValues: string[] = ['Scope of Work', 'Provider', 'Local Counsel'];
+  if (exportLower) headerValues.push(`Lower Range (${currency})`);
+  if (exportMidpoint) headerValues.push(`Midpoint (${currency})`);
+  if (exportUpper) headerValues.push(`Upper Range (${currency})`);
+  headerValues.push('Notes');
+  
+  // Track which column indices are fee columns (for right-alignment)
+  const feeColumnIndices: number[] = [];
+  let colIdx = 4; // Fee columns start at column 4
+  if (exportLower) feeColumnIndices.push(colIdx++);
+  if (exportMidpoint) feeColumnIndices.push(colIdx++);
+  if (exportUpper) feeColumnIndices.push(colIdx++);
+
   // Column headers
   const headerRow = worksheet.getRow(currentRow);
-  headerRow.values = [
-    'Scope of Work',
-    'Provider',
-    'Local Counsel',
-    `Fee (${currency})`,
-    'Notes',
-  ];
+  headerRow.values = headerValues;
   headerRow.eachCell((cell, colNumber) => {
     cell.fill = headerFill;
     cell.font = headerFont;
-    cell.alignment = { horizontal: colNumber === 4 ? 'right' : 'left', vertical: 'middle' };
+    cell.alignment = { horizontal: feeColumnIndices.includes(colNumber) ? 'right' : 'left', vertical: 'middle' };
     cell.border = {
       bottom: { style: 'medium', color: { argb: primaryColor } },
     };
@@ -222,7 +261,7 @@ export async function exportAFAProposalToExcel({
 
     // Category header
     const catHeaderRow = worksheet.getRow(currentRow);
-    worksheet.mergeCells(`A${currentRow}:E${currentRow}`);
+    worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
     catHeaderRow.getCell(1).value = category.toUpperCase();
     catHeaderRow.getCell(1).font = { bold: true, size: 10, color: { argb: primaryColor } };
     catHeaderRow.getCell(1).fill = {

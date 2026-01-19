@@ -58,6 +58,7 @@ import {
   SendToMatterFigure,
   areFigureSettingsComplete
 } from "@/lib/hooks/usePricingProposals";
+import { getItemFeeByFigureType } from "@/lib/afaFilterUtils";
 import { useMatters } from "@/lib/hooks/useMatters";
 import { useProposalAFAs, AFA_TYPE_LABELS } from "@/lib/hooks/useProposalAFAs";
 import { supabase } from "@/integrations/supabase/client";
@@ -208,26 +209,31 @@ export default function PricingProposalDetail() {
     }
   }, [savedItems, isInitialized]);
 
-  // Calculate work items totals (baseline - no discount applied here, discount is handled in AFA)
+  // Calculate work items totals using the afaBaseFigure setting
+  // This ensures AFA calculations use the user-selected baseline (lower/midpoint/upper)
   const workItemTotals = useMemo(() => {
     const includedItems = draftItems.filter(item => 
       !item.is_optional || (item.is_optional && item.is_included !== false)
     );
     
+    // Use the afaBaseFigure setting to determine which fee to use for BM items
+    const baseFigure: FigureType = assumptions.afaBaseFigure || 'midpoint';
+    
     const bmTotal = includedItems
       .filter(item => item.provider === 'Baker McKenzie')
-      .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+      .reduce((sum, item) => sum + getItemFeeByFigureType(item, baseFigure), 0);
+    
+    // Local counsel always uses fee_amount (handled by getItemFeeByFigureType)
     const localCounselTotal = includedItems
       .filter(item => item.provider === 'Local Counsel')
-      .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+      .reduce((sum, item) => sum + getItemFeeByFigureType(item, baseFigure), 0);
     
+    // Also calculate the explicit lower/upper totals for reference
     const lowerTotal = includedItems.reduce((sum, item) => {
-      const baseFee = item.fee_lower ?? item.fee_amount ?? 0;
-      return sum + baseFee;
+      return sum + getItemFeeByFigureType(item, 'lower');
     }, 0);
     const upperTotal = includedItems.reduce((sum, item) => {
-      const baseFee = item.fee_upper ?? item.fee_amount ?? 0;
-      return sum + baseFee;
+      return sum + getItemFeeByFigureType(item, 'upper');
     }, 0);
     
     return {
@@ -237,7 +243,7 @@ export default function PricingProposalDetail() {
       lowerTotal,
       upperTotal,
     };
-  }, [draftItems]);
+  }, [draftItems, assumptions.afaBaseFigure]);
 
   const enabledAFAs = useMemo(() => {
     return proposalAFAs.filter(a => a.is_enabled);

@@ -384,6 +384,9 @@ export default function MatterDetail() {
         progress: (matter as any).progress || 0,
         // On hold months for burn rate calculation
         on_hold_months: (matter as any).on_hold_months || 0,
+        // Manual budget override
+        use_manual_budget: (matter as any).use_manual_budget || false,
+        manual_budget_amount: (matter as any).manual_budget_amount || 0,
       });
       setHasChanges(false);
       setIsFormInitialized(true);
@@ -599,9 +602,17 @@ export default function MatterDetail() {
   const totalBudget = differentBillingCurrency && agreedBillingAmount > 0 
     ? agreedBillingAmount 
     : feeUpperEnd;
-  const bmFee = differentBillingCurrency && agreedBillingAmount > 0
+  
+  // Check for manual budget override
+  const useManualBudget = formData.use_manual_budget ?? (matter as any).use_manual_budget ?? false;
+  const manualBudgetAmount = formData.manual_budget_amount ?? (matter as any).manual_budget_amount ?? 0;
+  
+  // BM Fee - use manual budget if enabled, otherwise calculated from detailed budget
+  const calculatedBmFee = differentBillingCurrency && agreedBillingAmount > 0
     ? (formData.bm_fee_component || matter.bm_fee_component || 0) * mandatedRate
     : (formData.bm_fee_component || matter.bm_fee_component || 0);
+  const bmFee = useManualBudget ? manualBudgetAmount : calculatedBmFee;
+  
   const localCounsel = differentBillingCurrency && agreedBillingAmount > 0
     ? (formData.local_counsel_fee || matter.local_counsel_fee || 0) * mandatedRate
     : (formData.local_counsel_fee || matter.local_counsel_fee || 0);
@@ -1912,21 +1923,22 @@ export default function MatterDetail() {
                       ? Math.round((currentBurn / progress) * (100 - progress))
                       : 0;
                     const totalBudgetRequired = currentBurn + estimatedToClose;
-                    const bmBudget = formData.bm_fee_component || 0;
-                    const budgetShortfall = totalBudgetRequired > bmBudget ? totalBudgetRequired - bmBudget : 0;
-                    const currency = formData.fee_currency || 'GBP';
+                    // Use bmFee which respects manual budget override
+                    const effectiveBmBudget = bmFee;
+                    const budgetShortfall = totalBudgetRequired > effectiveBmBudget ? totalBudgetRequired - effectiveBmBudget : 0;
+                    const progressCurrency = formData.fee_currency || 'GBP';
                     
                     if (progress > 0 && progress < 100) {
                       return (
                         <div className="space-y-1">
                           <p className="text-sm text-muted-foreground">
-                            Estimated to close: <span className="font-medium text-foreground">{formatCurrency(estimatedToClose, currency)}</span>
+                            Estimated to close: <span className="font-medium text-foreground">{formatCurrency(estimatedToClose, progressCurrency)}</span>
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            Total budget required: <span className="font-medium text-foreground">{formatCurrency(totalBudgetRequired, currency)}</span>
+                            Total budget required: <span className="font-medium text-foreground">{formatCurrency(totalBudgetRequired, progressCurrency)}</span>
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            Budget shortfall: <span className={budgetShortfall > 0 ? 'font-medium text-destructive' : 'text-foreground'}>{formatCurrency(budgetShortfall, currency)}</span>
+                            Budget shortfall: <span className={budgetShortfall > 0 ? 'font-medium text-destructive' : 'text-foreground'}>{formatCurrency(budgetShortfall, progressCurrency)}</span>
                           </p>
                         </div>
                       );
@@ -2182,6 +2194,54 @@ export default function MatterDetail() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Manual Budget Override - only for non-pipeline matters */}
+        {!isPipeline && (
+          <Card className="shadow-card">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-heading">Budget Source</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <Checkbox 
+                  id="use_manual_budget" 
+                  checked={formData.use_manual_budget || false} 
+                  onCheckedChange={(checked) => updateField('use_manual_budget', checked === true)} 
+                />
+                <Label htmlFor="use_manual_budget" className="font-normal cursor-pointer">
+                  Set budget manually?
+                </Label>
+              </div>
+              
+              {formData.use_manual_budget ? (
+                <div className="space-y-2">
+                  <Label htmlFor="manual_budget_amount">Manual BM Budget</Label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{formData.fee_currency || 'GBP'}</span>
+                    <Input
+                      id="manual_budget_amount"
+                      type="number"
+                      min="0"
+                      step="100"
+                      value={formData.manual_budget_amount || 0}
+                      onChange={(e) => updateField('manual_budget_amount', parseFloat(e.target.value) || 0)}
+                      className="w-40"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This value will be used as the BM budget for calculations instead of the detailed budget line items.
+                  </p>
+                </div>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  <p>Budget is calculated from detailed budget line items: <span className="font-medium text-foreground">{formatCurrency(calculatedBmFee, formData.fee_currency || 'GBP')}</span></p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Budget Section - only for non-pipeline matters */}
         {!isPipeline && (

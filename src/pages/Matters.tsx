@@ -925,7 +925,11 @@ export default function Matters() {
             let totalMonths = yearDiff * 12 + monthDiff;
             const daysInCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
             totalMonths += dayDiff / daysInCurrentMonth;
-            const monthsElapsed = Math.max(totalMonths, 0.1);
+            
+            // Subtract on-hold months from total months
+            const onHoldMonths = (m as any).on_hold_months || 0;
+            const activeMonths = totalMonths - onHoldMonths;
+            const monthsElapsed = Math.max(activeMonths, 0.1);
             
             if (monthsElapsed <= 0) return 0;
             const totalBurn = (m.latest_snapshot?.wip_amount || 0) + 

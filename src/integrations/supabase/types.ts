@@ -1240,6 +1240,7 @@ export type Database = {
           matter_name: string
           matter_number: string
           matter_open: boolean
+          on_hold_months: number
           opportunity_receipt_date: string | null
           originator: string | null
           pay_full_time_costs: boolean
@@ -1300,6 +1301,7 @@ export type Database = {
           matter_name: string
           matter_number: string
           matter_open?: boolean
+          on_hold_months?: number
           opportunity_receipt_date?: string | null
           originator?: string | null
           pay_full_time_costs?: boolean
@@ -1360,6 +1362,7 @@ export type Database = {
           matter_name?: string
           matter_number?: string
           matter_open?: boolean
+          on_hold_months?: number
           opportunity_receipt_date?: string | null
           originator?: string | null
           pay_full_time_costs?: boolean

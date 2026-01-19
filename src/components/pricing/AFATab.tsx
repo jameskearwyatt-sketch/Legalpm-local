@@ -229,10 +229,19 @@ export function AFATab({
 
   // Calculate client price for each AFA type
   // For fixed fee variants, use the adjusted baseline when a rate modifier is active
-  const calculateClientPrice = (type: AFAType, config: any): number => {
+  // Accept optional override baselines for use in effects where closures might be stale
+  const calculateClientPrice = useCallback((
+    type: AFAType, 
+    config: any,
+    overrideBaselineTotals?: typeof baselineTotals,
+    overrideAdjustedBaseline?: typeof adjustedBaseline
+  ): number => {
+    const currentBaselineTotals = overrideBaselineTotals ?? baselineTotals;
+    const currentAdjustedBaseline = overrideAdjustedBaseline ?? adjustedBaseline;
+    
     // Fixed fees should use adjusted baseline if rate modifier is active
-    const useAdjustedBaseline = ['fixed_fee_whole', 'fixed_fee_phase'].includes(type);
-    const baseline = useAdjustedBaseline ? adjustedBaseline.total : baselineTotals.total;
+    const useAdjustedBaselineValue = ['fixed_fee_whole', 'fixed_fee_phase'].includes(type);
+    const baseline = useAdjustedBaselineValue ? currentAdjustedBaseline.total : currentBaselineTotals.total;
     
     switch (type) {
       case 'fee_cap': {
@@ -245,7 +254,7 @@ export function AFATab({
       case 'blended_rate': {
         const cfg = config as BlendedRateConfig;
         const rate = cfg.useManual && cfg.manualRate ? cfg.manualRate : cfg.calculatedRate;
-        return rate * baselineTotals.totalHours;
+        return rate * currentBaselineTotals.totalHours;
       }
       case 'fixed_fee_whole': {
         const cfg = config as FixedFeeWholeConfig;
@@ -276,32 +285,34 @@ export function AFATab({
       }
       case 'discounted_rates': {
         const cfg = config as DiscountedRatesConfig;
-        return baselineTotals.total * (1 - cfg.discountPercent / 100);
+        return currentBaselineTotals.total * (1 - cfg.discountPercent / 100);
       }
       case 'success_fee': {
         const cfg = config as SuccessFeeConfig;
         // Success fee uses the final client price from the primary pricing model
-        const basePrice = adjustedBaseline.total;
+        const basePrice = currentAdjustedBaseline.total;
         const uplift = cfg.upliftAmount || Math.round(basePrice * (cfg.upliftPercent / 100));
         return basePrice + uplift;
       }
       default:
         return baseline;
     }
-  };
+  }, [baselineTotals, adjustedBaseline]);
 
   // Calculate effective rate
-  const calculateEffectiveRate = (clientPrice: number): number => {
-    if (baselineTotals.totalHours === 0) return 0;
-    return clientPrice / baselineTotals.totalHours;
-  };
+  const calculateEffectiveRate = useCallback((clientPrice: number, overrideTotalHours?: number): number => {
+    const totalHours = overrideTotalHours ?? baselineTotals.totalHours;
+    if (totalHours === 0) return 0;
+    return clientPrice / totalHours;
+  }, [baselineTotals.totalHours]);
 
   // Calculate margin impact
-  const calculateMarginImpact = (clientPrice: number): number => {
+  const calculateMarginImpact = useCallback((clientPrice: number, overrideTotalCost?: number): number => {
+    const totalCost = overrideTotalCost ?? baselineTotals.totalCost;
     if (clientPrice === 0) return 0;
-    const newMargin = clientPrice - baselineTotals.totalCost;
+    const newMargin = clientPrice - totalCost;
     return (newMargin / clientPrice) * 100;
-  };
+  }, [baselineTotals.totalCost]);
 
   // Track previous baseline to detect changes using ref to avoid stale closure issues
   const prevBaselineTotalRef = useRef<number | null>(null);
@@ -331,15 +342,24 @@ export function AFATab({
     const enabledAfas = afas.filter(a => a.is_enabled);
     if (enabledAfas.length === 0) return;
 
+    // Capture current values to avoid stale closures in async function
+    const currentBaselineTotals = { ...baselineTotals };
+    const currentAdjustedBaseline = { ...adjustedBaseline };
+
     // Recalculate each enabled AFA with updated baseline
     const recalculateEnabledAFAs = async () => {
       isRecalculatingRef.current = true;
       try {
         for (const afa of enabledAfas) {
-          // Recalculate using current baseline values (not stale closures)
-          const newClientPrice = calculateClientPrice(afa.afa_type, afa.config);
-          const newEffectiveRate = calculateEffectiveRate(newClientPrice);
-          const newMarginImpact = calculateMarginImpact(newClientPrice);
+          // Recalculate using captured current baseline values
+          const newClientPrice = calculateClientPrice(
+            afa.afa_type, 
+            afa.config,
+            currentBaselineTotals,
+            currentAdjustedBaseline
+          );
+          const newEffectiveRate = calculateEffectiveRate(newClientPrice, currentBaselineTotals.totalHours);
+          const newMarginImpact = calculateMarginImpact(newClientPrice, currentBaselineTotals.totalCost);
 
           // Only update if the price has changed meaningfully
           if (Math.abs(newClientPrice - afa.client_price) > 1) {
@@ -359,7 +379,7 @@ export function AFATab({
     };
 
     recalculateEnabledAFAs();
-  }, [baselineTotals.total, baselineTotals.bmTotal, baselineTotals.totalHours, afas, isLoading, adjustedBaseline.total]);
+  }, [baselineTotals, adjustedBaseline, afas, isLoading, calculateClientPrice, calculateEffectiveRate, calculateMarginImpact, upsertAFA]);
 
   // Handle config change
   const handleConfigChange = async (type: AFAType, config: any) => {

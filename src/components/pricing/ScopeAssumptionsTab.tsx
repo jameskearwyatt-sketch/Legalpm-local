@@ -36,31 +36,45 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
   {
     id: 'time_to_completion',
     label: 'Time to completion',
-    description: 'Expected deal timeline',
+    description: 'Expected deal timeline from substantial commencement',
     category: 'timeline',
     requiresInput: true,
     inputType: 'select',
     inputLabel: 'Expected timeline',
     inputOptions: [
+      { value: '0.5_months', label: '2 weeks' },
       { value: '1_month', label: '1 month' },
+      { value: '1.5_months', label: '1.5 months' },
       { value: '2_months', label: '2 months' },
+      { value: '2.5_months', label: '2.5 months' },
       { value: '3_months', label: '3 months' },
+      { value: '3.5_months', label: '3.5 months' },
       { value: '4_months', label: '4 months' },
+      { value: '4.5_months', label: '4.5 months' },
+      { value: '5_months', label: '5 months' },
+      { value: '5.5_months', label: '5.5 months' },
       { value: '6_months', label: '6 months' },
       { value: '9_months', label: '9 months' },
       { value: '12_months', label: '12 months' },
     ],
     narrativeTemplate: (value) => {
       const labels: Record<string, string> = {
+        '0.5_months': 'two weeks',
         '1_month': 'one month',
+        '1.5_months': 'one and a half months',
         '2_months': 'two months',
+        '2.5_months': 'two and a half months',
         '3_months': 'three months',
+        '3.5_months': 'three and a half months',
         '4_months': 'four months',
+        '4.5_months': 'four and a half months',
+        '5_months': 'five months',
+        '5.5_months': 'five and a half months',
         '6_months': 'six months',
         '9_months': 'nine months',
         '12_months': 'twelve months',
       };
-      return `The transaction is expected to complete within ${labels[value || '3_months'] || 'three months'} from the date of instruction.`;
+      return `The transaction is expected to complete within ${labels[value || '3_months'] || 'three months'} from the date of substantial commencement of our work.`;
     },
   },
   {

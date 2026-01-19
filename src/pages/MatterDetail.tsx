@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
@@ -304,6 +304,8 @@ export default function MatterDetail() {
   
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isAutoSavingRef = useRef(false);
   const [showFinancialUpdateDialog, setShowFinancialUpdateDialog] = useState(false);
   const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
   const [showProposalDialog, setShowProposalDialog] = useState(false);
@@ -429,8 +431,11 @@ export default function MatterDetail() {
     return format(new Date(date), 'dd MMM yyyy');
   };
 
-  const handleSave = async () => {
-    if (!matter) return;
+  // Auto-save function
+  const performAutoSave = useCallback(async () => {
+    if (!matter || isAutoSavingRef.current) return;
+    
+    isAutoSavingRef.current = true;
     setIsSaving(true);
     
     try {
@@ -457,13 +462,52 @@ export default function MatterDetail() {
       });
       
       setHasChanges(false);
-      toast.success('Matter saved successfully');
     } catch (error) {
-      toast.error('Failed to save matter');
+      toast.error('Failed to auto-save changes');
       console.error(error);
     } finally {
       setIsSaving(false);
+      isAutoSavingRef.current = false;
     }
+  }, [matter, formData, updateMatter]);
+
+  // Debounced auto-save effect - triggers 1 second after changes stop
+  useEffect(() => {
+    if (!hasChanges || !isFormInitialized) return;
+    
+    // Clear any existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
+    // Set new timeout for auto-save
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      performAutoSave();
+    }, 1000);
+    
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [hasChanges, isFormInitialized, performAutoSave]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Legacy manual save function (kept for any explicit save buttons in nested components)
+  const handleSave = async () => {
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    await performAutoSave();
   };
 
   const handleDeleteMatter = async () => {
@@ -2199,13 +2243,22 @@ export default function MatterDetail() {
           </CardContent>
         </Card>
 
-        {/* Save Button at Bottom */}
-        {hasChanges && (
+        {/* Auto-save indicator */}
+        {(hasChanges || isSaving) && (
           <div className="sticky bottom-6 flex justify-end">
-            <Button onClick={handleSave} disabled={isSaving} size="lg" className="shadow-lg">
-              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Save Changes
-            </Button>
+            <div className="bg-card border border-border rounded-lg px-4 py-2 shadow-lg flex items-center gap-2 text-sm text-muted-foreground">
+              {isSaving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Saving...</span>
+                </>
+              ) : (
+                <>
+                  <div className="h-2 w-2 bg-amber-500 rounded-full animate-pulse" />
+                  <span>Unsaved changes</span>
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>

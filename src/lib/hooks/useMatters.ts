@@ -157,6 +157,9 @@ export interface CreateMatterInput {
   decision_date?: string;
   pipeline_outcome?: PipelineOutcome | null;
   jurisdictions?: string[];
+  // Manual budget override
+  use_manual_budget?: boolean;
+  manual_budget_amount?: number;
 }
 
 export function useMatters() {

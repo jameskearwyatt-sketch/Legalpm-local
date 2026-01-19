@@ -259,12 +259,15 @@ export async function exportAFAProposalToExcel({
   
   // Debug: log each item's category
   validItems.forEach((item) => {
-    const category = item.category || 'Other';
+    let category = item.category || 'Other';
     const isKnownCategory = BUDGET_CATEGORIES.includes(category as typeof BUDGET_CATEGORIES[number]);
-    console.log('[Category Debug]', item.work_item.substring(0, 30), 'category:', JSON.stringify(category), 'isKnown:', isKnownCategory, 'fee:', item.fee_amount);
-    if (!groupedItems[category]) {
-      groupedItems[category] = [];
+    
+    // Map unknown categories to "Other" to prevent items from being dropped
+    if (!isKnownCategory) {
+      console.log('[Category Debug] Mapping unknown category to Other:', category, 'for item:', item.work_item.substring(0, 30));
+      category = 'Other';
     }
+    
     groupedItems[category].push(item);
   });
 

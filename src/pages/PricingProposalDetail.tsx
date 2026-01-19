@@ -386,10 +386,6 @@ export default function PricingProposalDetail() {
     const traineeCost = totalTraineeHours * rates.trainee.cost;
     const totalCost = partnerCost + seniorAssociateCost + associateCost + traineeCost;
 
-    // Margin
-    const margin = totalRevenue - totalCost;
-    const marginPercent = totalRevenue > 0 ? (margin / totalRevenue) * 100 : 0;
-
     // Blended rate
     const totalHours = totalPartnerHours + totalSeniorAssociateHours + totalAssociateHours + totalTraineeHours;
     const blendedRate = totalHours > 0 ? totalRevenue / totalHours : 0;
@@ -414,8 +410,6 @@ export default function PricingProposalDetail() {
       associateCost,
       traineeCost,
       totalCost,
-      margin,
-      marginPercent,
       blendedRate,
     };
   }, [draftItems, rateCard, assumptions]);
@@ -1480,8 +1474,6 @@ export default function PricingProposalDetail() {
                   total: workItemTotals.total,
                   totalHours: summary.totalHours,
                   blendedRate: summary.blendedRate,
-                  margin: summary.margin,
-                  marginPercent: summary.marginPercent,
                   totalCost: summary.totalCost,
                 }}
                 customCategories={customCategories}

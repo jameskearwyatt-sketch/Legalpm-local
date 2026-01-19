@@ -71,8 +71,6 @@ interface AFATabProps {
     total: number;
     totalHours: number;
     blendedRate: number;
-    margin: number;
-    marginPercent: number;
     totalCost: number;
   };
   customCategories?: string[];
@@ -471,9 +469,9 @@ export function AFATab({
   };
 
 
-  // Render risk indicator badge
-  const RiskBadge = ({ clientPrice, marginPercent }: { clientPrice: number; marginPercent: number }) => {
-    const risk = calculateRiskIndicator(baselineTotals.total, clientPrice, marginPercent);
+  // Render risk indicator badge based on discount from baseline
+  const RiskBadge = ({ clientPrice }: { clientPrice: number }) => {
+    const risk = calculateRiskIndicator(baselineTotals.total, clientPrice);
     
     return (
       <TooltipProvider>
@@ -1414,7 +1412,7 @@ export function AFATab({
                           {isEnabled && (
                             <div className="flex items-center gap-3 mr-4">
                               <span className="font-medium">{formatCurrency(clientPrice)}</span>
-                              <RiskBadge clientPrice={clientPrice} marginPercent={marginPercent} />
+                              <RiskBadge clientPrice={clientPrice} />
                             </div>
                           )}
                         </div>
@@ -1456,10 +1454,6 @@ export function AFATab({
                                       )}>
                                         {clientPrice >= baselineTotals.total ? '+' : ''}{formatCurrency(clientPrice - baselineTotals.total)}
                                       </p>
-                                    </div>
-                                    <div>
-                                      <p className="text-muted-foreground">Margin</p>
-                                      <p className="font-medium">{marginPercent.toFixed(1)}%</p>
                                     </div>
                                   </div>
                                 </div>
@@ -1517,7 +1511,6 @@ export function AFATab({
                     <th className="text-right py-2 px-4">Client Price</th>
                     <th className="text-right py-2 px-4">vs Baseline</th>
                     <th className="text-right py-2 px-4">Eff. Rate</th>
-                    <th className="text-right py-2 px-4">Margin</th>
                     <th className="text-center py-2 pl-4">Risk</th>
                   </tr>
                 </thead>
@@ -1527,9 +1520,8 @@ export function AFATab({
                     <td className="text-right py-2 px-4">{formatCurrency(baselineTotals.total)}</td>
                     <td className="text-right py-2 px-4 text-muted-foreground">—</td>
                     <td className="text-right py-2 px-4">{currencySymbol}{Math.round(baselineTotals.blendedRate)}/hr</td>
-                    <td className="text-right py-2 px-4">{baselineTotals.marginPercent.toFixed(1)}%</td>
                     <td className="text-center py-2 pl-4">
-                      <RiskBadge clientPrice={baselineTotals.total} marginPercent={baselineTotals.marginPercent} />
+                      <RiskBadge clientPrice={baselineTotals.total} />
                     </td>
                   </tr>
                   {enabledAFAs.map(afa => {
@@ -1545,9 +1537,8 @@ export function AFATab({
                           {diff >= 0 ? '+' : ''}{formatCurrency(diff)}
                         </td>
                         <td className="text-right py-2 px-4">{currencySymbol}{Math.round(afa.effective_rate)}/hr</td>
-                        <td className="text-right py-2 px-4">{afa.margin_impact_percent.toFixed(1)}%</td>
                         <td className="text-center py-2 pl-4">
-                          <RiskBadge clientPrice={afa.client_price} marginPercent={afa.margin_impact_percent} />
+                          <RiskBadge clientPrice={afa.client_price} />
                         </td>
                       </tr>
                     );

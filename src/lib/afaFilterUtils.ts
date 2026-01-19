@@ -285,15 +285,6 @@ export function applyAFAFilters(
     // Calculate the target aggregate (rounded to nearest 1000)
     const targetBmAggregate = roundToNearest1000(discountedBmTotal);
     
-    console.log('[AFA Debug] Discount applied:', {
-      baseFigure,
-      originalBmTotal,
-      discountPercent: config.discountPercent,
-      discountMultiplier,
-      discountedBmTotal,
-      targetBmAggregate,
-    });
-    
     // Apply largest remainder rounding to BM items
     const bmRoundedMap = applyReconciliationRounding(
       itemsWithBaseFee,
@@ -301,8 +292,6 @@ export function applyAFAFilters(
       targetBmAggregate,
       item => item.provider === 'Baker McKenzie'
     );
-    
-    console.log('[AFA Debug] bmRoundedMap size:', bmRoundedMap.size, 'entries:', Array.from(bmRoundedMap.entries()));
     
     // Initialize filtered items with intelligently rounded amounts
     filteredItems = itemsWithBaseFee.map((item, index) => {
@@ -325,10 +314,6 @@ export function applyAFAFilters(
         afa_adjusted: false,
       };
     });
-    
-    // Debug: verify the sum
-    const bmSum = filteredItems.filter(i => i.provider === 'Baker McKenzie').reduce((s, i) => s + i.fee_amount, 0);
-    console.log('[AFA Debug] Final BM sum after reconciliation:', bmSum, 'target was:', targetBmAggregate);
     
     appliedAFAs.push({
       type: 'discounted_rates',

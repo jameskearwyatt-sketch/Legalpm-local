@@ -182,6 +182,9 @@ export function WipShapingProposalDialog({
   // e.g., WIP 3000 → 5000 = -2000 write-off (increase)
   //       AR 10000 → 5000 = +5000 write-off (decrease)
   //       Total = 3000 net write-off
+  // 
+  // IMPORTANT: Total Billed = Paid Amount + Accounts Receivable
+  // When user changes AR, Total Billed is auto-calculated
   const calculatedValues = useMemo(() => {
     let finalWipWriteOff: number;
     let finalArWriteOff: number;
@@ -205,6 +208,10 @@ export function WipShapingProposalDialog({
     }
 
     const totalWriteOff = roundTo2(finalWipWriteOff + finalArWriteOff);
+    
+    // Total Billed = Paid Amount + Accounts Receivable (adjusted AR)
+    // This is auto-calculated - user controls AR, and billed amount follows
+    const calculatedBilledAmount = roundTo2(formData.paid_amount + finalAdjustedAr);
 
     return {
       wipWriteOff: roundTo2(finalWipWriteOff),
@@ -212,8 +219,9 @@ export function WipShapingProposalDialog({
       adjustedWip: roundTo2(finalAdjustedWip),
       adjustedAr: roundTo2(finalAdjustedAr),
       totalWriteOff,
+      billedAmount: calculatedBilledAmount,
     };
-  }, [entryMode, formData.raw_wip, formData.raw_ar, formData.wip_write_off, formData.ar_write_off, formData.adjusted_wip, formData.adjusted_ar]);
+  }, [entryMode, formData.raw_wip, formData.raw_ar, formData.wip_write_off, formData.ar_write_off, formData.adjusted_wip, formData.adjusted_ar, formData.paid_amount]);
 
   const updateField = (field: string, value: number | string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -232,13 +240,13 @@ export function WipShapingProposalDialog({
       // wip_amount = raw WIP (unchanged)
       // wip_write_off_amount = WIP-specific write-off (can be negative for increase)
       // ar_write_off_amount = AR-specific write-off (can be negative for increase)
-      // billed_amount = raw AR (original billed amount)
+      // billed_amount = paid_amount + adjusted_ar (auto-calculated from AR)
       // accounts_receivable = adjusted AR after write-off
       await onSave({
         wip_amount: formData.raw_wip,
         wip_write_off_amount: calculatedValues.wipWriteOff,
         ar_write_off_amount: calculatedValues.arWriteOff,
-        billed_amount: formData.raw_ar,
+        billed_amount: calculatedValues.billedAmount,
         accounts_receivable: calculatedValues.adjustedAr,
         paid_amount: formData.paid_amount,
         lc_wip_amount: formData.lc_wip_amount,
@@ -536,19 +544,30 @@ export function WipShapingProposalDialog({
               </p>
             </div>
 
-            {/* Paid Amount */}
+            {/* Paid Amount & Total Billed */}
             <div className="pt-3 border-t border-border">
-              <div className="space-y-1.5">
-                <Label htmlFor="paid_amount" className="text-xs">Total Paid ({currencySymbol.trim()})</Label>
-                <Input
-                  id="paid_amount"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.paid_amount}
-                  onChange={(e) => updateField('paid_amount', parseFloat(e.target.value) || 0)}
-                  className="h-9 max-w-[200px]"
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="paid_amount" className="text-xs">Total Paid ({currencySymbol.trim()})</Label>
+                  <Input
+                    id="paid_amount"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={formData.paid_amount}
+                    onChange={(e) => updateField('paid_amount', parseFloat(e.target.value) || 0)}
+                    className="h-9"
+                    disabled
+                  />
+                  <p className="text-xs text-muted-foreground">Fixed from financial records</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Total Billed (Auto-calculated)</Label>
+                  <div className="h-9 px-3 py-2 bg-muted rounded-md border flex items-center font-medium text-sm">
+                    {formatCurrency(calculatedValues.billedAmount, currency)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">= Paid + Adjusted AR</p>
+                </div>
               </div>
             </div>
           </div>

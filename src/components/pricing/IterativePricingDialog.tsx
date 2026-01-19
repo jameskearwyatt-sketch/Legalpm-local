@@ -189,8 +189,6 @@ export function IterativePricingDialog({
       totalFee: Math.round(totalFee),
       totalHours,
       totalCost,
-      margin: totalFee - totalCost,
-      marginPercent: totalFee > 0 ? ((totalFee - totalCost) / totalFee) * 100 : 0,
       decay,
     };
   }, [feeOwnerHours, numTurns, decayPercent, rateCard, assumptions]);

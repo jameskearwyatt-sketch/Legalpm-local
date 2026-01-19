@@ -138,26 +138,21 @@ export interface RiskIndicator {
 
 export function calculateRiskIndicator(
   baselineEstimate: number,
-  clientPrice: number,
-  marginPercent: number
+  clientPrice: number
 ): RiskIndicator {
   const discount = ((baselineEstimate - clientPrice) / baselineEstimate) * 100;
   
-  if (marginPercent < 20 || discount > 25) {
+  if (discount > 25) {
     return {
       level: 'red',
-      message: marginPercent < 20 
-        ? `Margin below 20% (${marginPercent.toFixed(1)}%)` 
-        : `Discount exceeds 25% (${discount.toFixed(1)}%)`
+      message: `Discount exceeds 25% (${discount.toFixed(1)}%)`
     };
   }
   
-  if (marginPercent < 30 || discount > 15) {
+  if (discount > 15) {
     return {
       level: 'amber',
-      message: marginPercent < 30 
-        ? `Margin below 30% (${marginPercent.toFixed(1)}%)` 
-        : `Discount exceeds 15% (${discount.toFixed(1)}%)`
+      message: `Discount exceeds 15% (${discount.toFixed(1)}%)`
     };
   }
   

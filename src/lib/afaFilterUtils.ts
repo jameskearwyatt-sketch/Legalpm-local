@@ -106,7 +106,46 @@ export function applyAFAFilters(
     .filter(item => item.provider === 'Local Counsel' && (item.is_included !== false || !item.is_optional))
     .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
 
-  // Apply primary AFA
+  // STEP 1: Apply discounted rates FIRST if enabled (this forms the baseline for client-facing line items)
+  // Discounted rates always apply to line items regardless of other AFAs
+  let discountMultiplier = 1;
+  let discountedBmTotal = originalBmTotal;
+  
+  if (discountAFA && primaryAFA?.afa_type !== 'discounted_rates') {
+    const config = discountAFA.config as DiscountedRatesConfig;
+    discountMultiplier = 1 - config.discountPercent / 100;
+    discountedBmTotal = originalBmTotal * discountMultiplier;
+    
+    // Initialize filtered items with discounted amounts
+    filteredItems = draftItems.map(item => {
+      if (item.provider === 'Baker McKenzie') {
+        const discountedFee = roundToNearest1000((item.fee_amount || 0) * discountMultiplier);
+        return {
+          ...item,
+          original_fee_amount: item.fee_amount,
+          fee_amount: discountedFee,
+          afa_adjusted: true,
+          afa_comment: `${config.discountPercent}% discount applied`,
+        };
+      }
+      return {
+        ...item,
+        original_fee_amount: item.fee_amount,
+        afa_adjusted: false,
+      };
+    });
+    
+    appliedAFAs.push({
+      type: 'discounted_rates',
+      label: AFA_TYPE_LABELS['discounted_rates'],
+      description: `${config.discountPercent}% discount on standard rates`,
+      clientPrice: roundToNearest1000(discountedBmTotal + originalLcTotal),
+    });
+    
+    globalComment = `${config.discountPercent}% discount applied to standard rates`;
+  }
+
+  // STEP 2: Apply primary AFA (but don't modify line items for fixed fees - they already show discounted baseline)
   if (primaryAFA) {
     const roundedClientPrice = roundToNearest1000(primaryAFA.client_price);
     
@@ -119,33 +158,30 @@ export function applyAFAFilters(
 
     switch (primaryAFA.afa_type) {
       case 'fixed_fee_whole': {
-        // All BM items become a single fixed fee - keep structure but mark as fixed
-        globalComment = `Fixed Fee: ${currencySymbol}${roundedClientPrice.toLocaleString()} for the entire scope of work`;
-        const adjustmentRatio = roundedClientPrice / originalBmTotal;
+        // For fixed fee, line items show the discounted baseline (already applied above)
+        // The fixed fee total is the agreed price, not used to scale line items
+        const baselineForComment = discountAFA ? discountedBmTotal : originalBmTotal;
+        globalComment = globalComment 
+          ? `${globalComment}. Fixed Fee: ${currencySymbol}${roundedClientPrice.toLocaleString()} agreed for the entire scope.`
+          : `Fixed Fee: ${currencySymbol}${roundedClientPrice.toLocaleString()} for the entire scope of work`;
         
-        filteredItems = draftItems.map(item => {
-          if (item.provider === 'Baker McKenzie') {
-            const adjustedFee = roundToNearest1000((item.fee_amount || 0) * adjustmentRatio);
-            return {
-              ...item,
-              original_fee_amount: item.fee_amount,
-              fee_amount: adjustedFee,
-              afa_adjusted: true,
-              afa_comment: 'Included in fixed fee',
-            };
-          }
-          return {
+        // If no discount was applied, initialize filtered items (unchanged)
+        if (!discountAFA) {
+          filteredItems = draftItems.map(item => ({
             ...item,
             original_fee_amount: item.fee_amount,
+            fee_amount: roundToNearest1000(item.fee_amount || 0),
             afa_adjusted: false,
-          };
-        });
+          }));
+        }
         break;
       }
 
       case 'fixed_fee_phase': {
+        // For fixed fee by phase, line items show the discounted baseline (already applied above)
+        // The fixed fee phases are the agreed prices
         const config = primaryAFA.config as FixedFeePhaseConfig;
-        const phaseMap = new Map(config.phases.map(p => [p.category, p]));
+        const includedPhases = config.phases.filter(p => p.isIncluded);
         
         // Helper to calculate adjusted amount for a phase - always round to nearest 1000
         const getPhaseAdjustedAmount = (phase: typeof config.phases[0]) => {
@@ -153,44 +189,31 @@ export function applyAFAFilters(
           return roundToNearest1000(adjusted);
         };
         
-        filteredItems = draftItems.map(item => {
-          const phase = phaseMap.get(item.category || '');
-          if (phase && phase.isIncluded && item.provider === 'Baker McKenzie') {
-            // Calculate proportional share of the fixed phase fee
-            const categoryItems = draftItems.filter(
-              i => i.category === item.category && i.provider === 'Baker McKenzie'
-            );
-            const categoryTotal = categoryItems.reduce((sum, i) => sum + (i.fee_amount || 0), 0);
-            const ratio = categoryTotal > 0 ? (item.fee_amount || 0) / categoryTotal : 0;
-            const phaseAdjustedAmount = getPhaseAdjustedAmount(phase);
-            const adjustedFee = roundToNearest1000(phaseAdjustedAmount * ratio);
-            
-            return {
-              ...item,
-              original_fee_amount: item.fee_amount,
-              fee_amount: adjustedFee,
-              afa_adjusted: true,
-              afa_comment: `Fixed fee for ${item.category}: ${currencySymbol}${phaseAdjustedAmount.toLocaleString()}`,
-            };
-          }
-          return {
+        const phaseComment = `Fixed fees by phase: ${includedPhases.map(p => `${p.category} (${currencySymbol}${getPhaseAdjustedAmount(p).toLocaleString()})`).join(', ')}`;
+        globalComment = globalComment 
+          ? `${globalComment}. ${phaseComment}`
+          : phaseComment;
+        
+        // If no discount was applied, initialize filtered items (unchanged, just rounded)
+        if (!discountAFA) {
+          filteredItems = draftItems.map(item => ({
             ...item,
             original_fee_amount: item.fee_amount,
+            fee_amount: roundToNearest1000(item.fee_amount || 0),
             afa_adjusted: false,
-          };
-        });
-        
-        const includedPhases = config.phases.filter(p => p.isIncluded);
-        globalComment = `Fixed fees by phase: ${includedPhases.map(p => `${p.category} (${currencySymbol}${getPhaseAdjustedAmount(p).toLocaleString()})`).join(', ')}`;
+          }));
+        }
         break;
       }
 
       case 'blended_rate': {
         const config = primaryAFA.config as BlendedRateConfig;
         const rate = config.useManual && config.manualRate ? config.manualRate : config.calculatedRate;
-        globalComment = `Blended hourly rate: ${currencySymbol}${Math.round(rate)}/hour applied across all timekeepers`;
+        const blendedComment = `Blended hourly rate: ${currencySymbol}${Math.round(rate)}/hour applied across all timekeepers`;
+        globalComment = globalComment ? `${globalComment}. ${blendedComment}` : blendedComment;
         
         // Proportionally adjust items based on the blended rate total
+        // Use original baseline for ratio calculation
         const adjustmentRatio = roundedClientPrice / originalBmTotal;
         filteredItems = draftItems.map(item => {
           if (item.provider === 'Baker McKenzie') {
@@ -215,19 +238,29 @@ export function applyAFAFilters(
       case 'fee_cap': {
         const config = primaryAFA.config as FeeCapConfig;
         const roundedCapAmount = roundToNearest1000(config.capAmount);
-        if (config.capType === 'amount') {
-          globalComment = `Fee cap: ${currencySymbol}${roundedCapAmount.toLocaleString()} - time-based billing up to this maximum`;
-        } else {
-          globalComment = `Fee cap: ${config.capPercentageAbove}% above estimate (cap at ${currencySymbol}${roundedClientPrice.toLocaleString()})`;
-        }
+        const capComment = config.capType === 'amount' 
+          ? `Fee cap: ${currencySymbol}${roundedCapAmount.toLocaleString()} - time-based billing up to this maximum`
+          : `Fee cap: ${config.capPercentageAbove}% above estimate (cap at ${currencySymbol}${roundedClientPrice.toLocaleString()})`;
+        globalComment = globalComment ? `${globalComment}. ${capComment}` : capComment;
         
-        // Items remain at estimate but note the cap
-        filteredItems = draftItems.map(item => ({
-          ...item,
-          original_fee_amount: item.fee_amount,
-          afa_adjusted: false, // Fee cap doesn't change line items, just sets a ceiling
-          afa_comment: item.provider === 'Baker McKenzie' ? 'Subject to fee cap' : undefined,
-        }));
+        // If discount already applied, keep those items; otherwise initialize
+        if (!discountAFA) {
+          filteredItems = draftItems.map(item => ({
+            ...item,
+            original_fee_amount: item.fee_amount,
+            fee_amount: roundToNearest1000(item.fee_amount || 0),
+            afa_adjusted: false,
+            afa_comment: item.provider === 'Baker McKenzie' ? 'Subject to fee cap' : undefined,
+          }));
+        } else {
+          // Add fee cap comment to already discounted items
+          filteredItems = filteredItems.map(item => ({
+            ...item,
+            afa_comment: item.provider === 'Baker McKenzie' 
+              ? `${item.afa_comment || ''}; Subject to fee cap`.replace(/^; /, '')
+              : item.afa_comment,
+          }));
+        }
         break;
       }
 
@@ -258,56 +291,32 @@ export function applyAFAFilters(
 
       default:
         // For other AFA types, just note the arrangement
-        globalComment = `${AFA_TYPE_LABELS[primaryAFA.afa_type]}: ${currencySymbol}${roundedClientPrice.toLocaleString()}`;
-        filteredItems = draftItems.map(item => ({
-          ...item,
-          original_fee_amount: item.fee_amount,
-          afa_adjusted: false,
-        }));
+        const defaultComment = `${AFA_TYPE_LABELS[primaryAFA.afa_type]}: ${currencySymbol}${roundedClientPrice.toLocaleString()}`;
+        globalComment = globalComment ? `${globalComment}. ${defaultComment}` : defaultComment;
+        
+        if (!discountAFA) {
+          filteredItems = draftItems.map(item => ({
+            ...item,
+            original_fee_amount: item.fee_amount,
+            fee_amount: roundToNearest1000(item.fee_amount || 0),
+            afa_adjusted: false,
+          }));
+        }
+        // If discountAFA was applied, filteredItems already has discounted values
     }
-  } else {
-    // No primary AFA, just copy items
+  } else if (!discountAFA) {
+    // No primary AFA and no discount, just copy items with rounding
     filteredItems = draftItems.map(item => ({
       ...item,
       original_fee_amount: item.fee_amount,
+      fee_amount: roundToNearest1000(item.fee_amount || 0),
       afa_adjusted: false,
     }));
   }
+  // If no primary AFA but discountAFA exists, filteredItems was already set above
 
-  // Apply discount AFA if not the primary (it can compound with some AFAs)
-  if (discountAFA && (!primaryAFA || primaryAFA.afa_type !== 'discounted_rates')) {
-    const config = discountAFA.config as DiscountedRatesConfig;
-    const canCompound = primaryAFA?.afa_type === 'fee_cap' || !primaryAFA;
-    
-    if (canCompound) {
-      const multiplier = 1 - config.discountPercent / 100;
-      filteredItems = filteredItems.map(item => {
-        if (item.provider === 'Baker McKenzie') {
-          const adjustedFee = roundToNearest1000(item.fee_amount * multiplier);
-          return {
-            ...item,
-            fee_amount: adjustedFee,
-            afa_adjusted: true,
-            afa_comment: item.afa_comment 
-              ? `${item.afa_comment}; ${config.discountPercent}% discount` 
-              : `${config.discountPercent}% discount applied`,
-          };
-        }
-        return item;
-      });
-      
-      appliedAFAs.push({
-        type: 'discounted_rates',
-        label: AFA_TYPE_LABELS['discounted_rates'],
-        description: `${config.discountPercent}% discount on standard rates`,
-        clientPrice: roundToNearest1000(discountAFA.client_price),
-      });
-      
-      globalComment = globalComment 
-        ? `${globalComment}. Additional ${config.discountPercent}% discount applied.`
-        : `${config.discountPercent}% discount applied to standard rates`;
-    }
-  }
+  // NOTE: Discounted rates are now applied at the START of this function (before primary AFA)
+  // This ensures line items show the discounted baseline for fixed fee arrangements
 
   // Handle success fee (add-on)
   if (successFeeAFA) {

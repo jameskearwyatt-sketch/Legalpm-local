@@ -143,7 +143,10 @@ export default function PricingProposalDetail() {
   const [afaDiscountPercent, setAfaDiscountPercent] = useState(0);
 
   // Local state for proposal-specific settings
+  // rateCard stores TEAM RATES (base rates in user's default currency)
   const [rateCard, setRateCard] = useState<RateCard>(DEFAULT_RATE_CARD);
+  // feeRateCard stores FEE RATES (rates in proposal's fee currency, used for calculations)
+  const [feeRateCard, setFeeRateCard] = useState<RateCard>(DEFAULT_RATE_CARD);
   const [assumptions, setAssumptions] = useState<ProposalAssumptions>(DEFAULT_ASSUMPTIONS);
   const [scopeAssumptions, setScopeAssumptions] = useState<ScopeAssumptionsState | null>(null);
 
@@ -344,7 +347,7 @@ export default function PricingProposalDetail() {
   };
 
   const summary = useMemo(() => {
-    const rates = rateCard;
+    const rates = feeRateCard; // Use fee currency rates for calculations
     const ass = assumptions;
     // No discount applied to baseline - AFA tab handles discounts separately
 
@@ -437,7 +440,7 @@ export default function PricingProposalDetail() {
       totalCost,
       blendedRate,
     };
-  }, [draftItems, rateCard, assumptions]);
+  }, [draftItems, feeRateCard, assumptions]);
 
   const currencySymbol = getCurrencySymbol(proposal?.currency || 'GBP');
   
@@ -464,6 +467,39 @@ export default function PricingProposalDetail() {
     // fee_amount = team_amount * (feeRate / teamRate)
     return feeRate / teamRate;
   }, [teamRateCurrency, feeCurrency, exchangeRatesData?.rates]);
+
+  // Derive feeRateCard from rateCard when exchange rate or rateCard changes
+  useEffect(() => {
+    // Convert team rates to fee rates
+    const convertedRateCard: RateCard = {
+      partner: { 
+        rate: Math.round(rateCard.partner.rate * teamToFeeExchangeRate), 
+        cost: rateCard.partner.cost 
+      },
+      seniorAssociate: { 
+        rate: Math.round(rateCard.seniorAssociate.rate * teamToFeeExchangeRate), 
+        cost: rateCard.seniorAssociate.cost 
+      },
+      associate: { 
+        rate: Math.round(rateCard.associate.rate * teamToFeeExchangeRate), 
+        cost: rateCard.associate.cost 
+      },
+      trainee: { 
+        rate: Math.round(rateCard.trainee.rate * teamToFeeExchangeRate), 
+        cost: rateCard.trainee.cost 
+      },
+    };
+    // Also convert any custom earners
+    Object.keys(rateCard).forEach(key => {
+      if (!['partner', 'seniorAssociate', 'associate', 'trainee'].includes(key)) {
+        (convertedRateCard as any)[key] = {
+          rate: Math.round((rateCard as any)[key].rate * teamToFeeExchangeRate),
+          cost: (rateCard as any)[key].cost || 0,
+        };
+      }
+    });
+    setFeeRateCard(convertedRateCard);
+  }, [rateCard, teamToFeeExchangeRate]);
 
   const formatCurrency = (value: number) => {
     return `${currencySymbol}${new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)}`;
@@ -1546,7 +1582,7 @@ export default function PricingProposalDetail() {
               <AFATab
                 proposalId={proposalId!}
                 draftItems={draftItems}
-                rateCard={rateCard}
+                rateCard={feeRateCard}
                 assumptions={assumptions}
                 currencySymbol={currencySymbol}
                 formatCurrency={formatCurrency}
@@ -1957,9 +1993,10 @@ export default function PricingProposalDetail() {
               feeCurrency={feeCurrency}
               teamRateCurrency={teamRateCurrency}
               exchangeRate={teamToFeeExchangeRate}
-              onSave={async (newRateCard) => {
-                setRateCard(newRateCard);
-                await updateProposal.mutateAsync({ rate_card: newRateCard });
+              onSave={async (newTeamRateCard, newFeeRateCard) => {
+                setRateCard(newTeamRateCard);
+                setFeeRateCard(newFeeRateCard);
+                await updateProposal.mutateAsync({ rate_card: newTeamRateCard });
                 toast({ title: 'Rate card saved' });
               }}
               onSaveAsDefault={async (newRateCard) => {
@@ -2145,7 +2182,7 @@ export default function PricingProposalDetail() {
           open={iterativeDialogOpen}
           onOpenChange={setIterativeDialogOpen}
           workItemName={currentIterativeItem?.work_item || ''}
-          rateCard={rateCard}
+          rateCard={feeRateCard}
           assumptions={assumptions}
           currencySymbol={currencySymbol}
           initialHours={{

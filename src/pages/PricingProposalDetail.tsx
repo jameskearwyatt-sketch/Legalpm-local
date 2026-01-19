@@ -1927,6 +1927,7 @@ export default function PricingProposalDetail() {
                   .eq('id', proposalId);
               }}
               currency={proposal?.currency || 'GBP'}
+              workItems={draftItems}
             />
           </TabsContent>
 

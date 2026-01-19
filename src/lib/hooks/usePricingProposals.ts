@@ -101,16 +101,34 @@ export const DEFAULT_ASSUMPTIONS: ProposalAssumptions = {
   sendToMatterFigure: null,
 };
 
-export interface ScopeAssumptionValue {
+// Simple assumption value
+export interface SimpleAssumptionValue {
   assumptionId: string;
   enabled: boolean;
   inputValue?: string;
   narrative: string;
 }
 
+// Document-specific config
+export interface DocumentConfig {
+  workItemName: string;
+  turns?: number;
+  whoDrafts?: 'we_draft' | 'they_draft';
+  clientForm?: boolean;
+}
+
+export interface DocumentAssumptionsState {
+  turnsEnabled: boolean;
+  whoDraftsEnabled: boolean;
+  clientFormEnabled: boolean;
+  configs: DocumentConfig[];
+}
+
 export interface ScopeAssumptionsState {
   noAssumptionsApply: boolean;
-  assumptions: ScopeAssumptionValue[];
+  simpleAssumptions: SimpleAssumptionValue[];
+  documentAssumptions: DocumentAssumptionsState;
+  documentNarratives: string[];
 }
 
 export interface PricingProposal {
@@ -750,10 +768,35 @@ export function usePricingProposal(proposalId?: string) {
 
         // Sync scope assumptions to matter_assumptions table
         const scopeAssumptions = proposalQuery.data?.scope_assumptions;
-        if (scopeAssumptions && !scopeAssumptions.noAssumptionsApply && scopeAssumptions.assumptions) {
-          const enabledAssumptions = scopeAssumptions.assumptions.filter(a => a.enabled && a.narrative);
+        if (scopeAssumptions && !scopeAssumptions.noAssumptionsApply) {
+          // Collect all narratives: simple assumptions + document narratives
+          const allNarratives: { label: string; narrative: string }[] = [];
+          
+          // Simple assumptions
+          if (scopeAssumptions.simpleAssumptions) {
+            scopeAssumptions.simpleAssumptions
+              .filter(a => a.enabled && a.narrative)
+              .forEach(a => {
+                allNarratives.push({
+                  label: a.assumptionId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                  narrative: a.narrative,
+                });
+              });
+          }
+          
+          // Document narratives
+          if (scopeAssumptions.documentNarratives) {
+            scopeAssumptions.documentNarratives
+              .filter(n => n && n.length > 0)
+              .forEach((n, i) => {
+                allNarratives.push({
+                  label: `Documentation Assumption ${i + 1}`,
+                  narrative: n,
+                });
+              });
+          }
 
-          if (enabledAssumptions.length > 0) {
+          if (allNarratives.length > 0) {
             // First, delete any existing assumptions from this pricing proposal source
             await supabase
               .from('matter_assumptions')
@@ -762,10 +805,10 @@ export function usePricingProposal(proposalId?: string) {
               .eq('source_document', `Pricing Proposal: ${proposalQuery.data?.name}`);
 
             // Insert new assumptions
-            const assumptionRecords = enabledAssumptions.map(a => ({
+            const assumptionRecords = allNarratives.map(a => ({
               matter_id: matterId,
               user_id: user!.id,
-              label: a.assumptionId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+              label: a.label,
               assumption_text: a.narrative,
               is_standard: false,
               source_document: `Pricing Proposal: ${proposalQuery.data?.name}`,

@@ -295,8 +295,10 @@ export async function exportAFAProposalToExcel({
 
     // Add items - fee_amount is already properly rounded via largest remainder method in applyAFAFilters
     // Do NOT re-round, as this would break the reconciliation
+    const rowFees: number[] = [];
     for (const item of categoryItems) {
       const feeAmount = item.fee_amount || 0;
+      rowFees.push(feeAmount);
       categoryTotal += feeAmount;
       
       if (item.provider === 'Baker McKenzie') {
@@ -304,6 +306,7 @@ export async function exportAFAProposalToExcel({
       } else {
         lcTotal += feeAmount;
       }
+    console.log('[Excel Row]', item.work_item.substring(0, 30), 'fee:', feeAmount, 'provider:', item.provider);
 
       const dataRow = worksheet.getRow(currentRow);
       
@@ -393,6 +396,7 @@ export async function exportAFAProposalToExcel({
   }
 
   // Provider breakdown
+  console.log('[Excel Final Totals]', { bmTotal, lcTotal, grandTotal });
   currentRow++;
   const breakdownHeaderRow = worksheet.getRow(currentRow);
   worksheet.mergeCells(`A${currentRow}:C${currentRow}`);

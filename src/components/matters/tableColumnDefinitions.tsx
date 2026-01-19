@@ -756,7 +756,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
       (ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: (ctx) => (
-      <SortableHeader field="progress" {...ctx}>Progress</SortableHeader>
+      <SortableHeader field="progress" {...ctx}>BM Progress</SortableHeader>
     ),
     renderCell: (ctx) => (
       <ProgressSlider

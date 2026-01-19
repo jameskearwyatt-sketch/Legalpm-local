@@ -322,29 +322,66 @@ export function AFATab({
   useEffect(() => {
     // Skip if loading or currently recalculating (to prevent loops)
     if (isLoading || isRecalculatingRef.current) {
+      console.log('[AFA Recalc] Skipping - loading:', isLoading, 'recalculating:', isRecalculatingRef.current);
       return;
     }
 
+    const currentTotal = baselineTotals.total;
+    const prevTotal = prevBaselineTotalRef.current;
+    
     // Initialize on first render
-    if (prevBaselineTotalRef.current === null) {
-      prevBaselineTotalRef.current = baselineTotals.total;
+    if (prevTotal === null) {
+      console.log('[AFA Recalc] Initializing with total:', currentTotal);
+      prevBaselineTotalRef.current = currentTotal;
       return;
     }
 
     // Only recalculate if total has meaningfully changed (more than $1 difference)
-    if (Math.abs(baselineTotals.total - prevBaselineTotalRef.current) < 1) {
+    const diff = Math.abs(currentTotal - prevTotal);
+    if (diff < 1) {
+      console.log('[AFA Recalc] No significant change:', diff);
       return;
     }
 
-    prevBaselineTotalRef.current = baselineTotals.total;
+    console.log('[AFA Recalc] Baseline changed from', prevTotal, 'to', currentTotal, '- diff:', diff);
+    prevBaselineTotalRef.current = currentTotal;
 
     // Find all enabled AFAs and recalculate their client prices
     const enabledAfas = afas.filter(a => a.is_enabled);
+    console.log('[AFA Recalc] Enabled AFAs:', enabledAfas.map(a => a.afa_type));
     if (enabledAfas.length === 0) return;
 
     // Capture current values to avoid stale closures in async function
     const currentBaselineTotals = { ...baselineTotals };
-    const currentAdjustedBaseline = { ...adjustedBaseline };
+    
+    // Recalculate adjusted baseline inline to ensure it uses current values
+    let currentAdjustedBaseline = { ...currentBaselineTotals };
+    if (activeRateModifier) {
+      const rateModifierAFA = enabledAfas.find(a => a.afa_type === activeRateModifier);
+      if (rateModifierAFA) {
+        if (activeRateModifier === 'discounted_rates') {
+          const config = rateModifierAFA.config as DiscountedRatesConfig;
+          const multiplier = 1 - config.discountPercent / 100;
+          currentAdjustedBaseline = {
+            ...currentBaselineTotals,
+            bmTotal: currentBaselineTotals.bmTotal * multiplier,
+            total: currentBaselineTotals.bmTotal * multiplier + currentBaselineTotals.localCounselTotal,
+          };
+        } else if (activeRateModifier === 'blended_rate') {
+          const config = rateModifierAFA.config as BlendedRateConfig;
+          const rate = config.useManual && config.manualRate ? config.manualRate : config.calculatedRate;
+          const adjustedBmTotal = rate * currentBaselineTotals.totalHours;
+          currentAdjustedBaseline = {
+            ...currentBaselineTotals,
+            bmTotal: adjustedBmTotal,
+            total: adjustedBmTotal + currentBaselineTotals.localCounselTotal,
+            blendedRate: rate,
+          };
+        }
+      }
+    }
+    
+    console.log('[AFA Recalc] Adjusted baseline total:', currentAdjustedBaseline.total);
 
     // Recalculate each enabled AFA with updated baseline
     const recalculateEnabledAFAs = async () => {
@@ -361,8 +398,11 @@ export function AFATab({
           const newEffectiveRate = calculateEffectiveRate(newClientPrice, currentBaselineTotals.totalHours);
           const newMarginImpact = calculateMarginImpact(newClientPrice, currentBaselineTotals.totalCost);
 
+          console.log('[AFA Recalc]', afa.afa_type, '- old price:', afa.client_price, 'new price:', newClientPrice);
+
           // Only update if the price has changed meaningfully
           if (Math.abs(newClientPrice - afa.client_price) > 1) {
+            console.log('[AFA Recalc] Updating', afa.afa_type);
             await upsertAFA.mutateAsync({
               afa_type: afa.afa_type,
               is_enabled: true,
@@ -379,7 +419,7 @@ export function AFATab({
     };
 
     recalculateEnabledAFAs();
-  }, [baselineTotals, adjustedBaseline, afas, isLoading, calculateClientPrice, calculateEffectiveRate, calculateMarginImpact, upsertAFA]);
+  }, [baselineTotals, afas, isLoading, calculateClientPrice, calculateEffectiveRate, calculateMarginImpact, upsertAFA, activeRateModifier]);
 
   // Handle config change
   const handleConfigChange = async (type: AFAType, config: any) => {

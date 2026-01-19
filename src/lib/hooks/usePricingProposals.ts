@@ -26,6 +26,16 @@ export interface WorkPhase {
 
 export type EstimationMethod = 'pyramid' | 'partner-heavy' | 'junior-heavy';
 
+// New types for figure selection settings
+export type FigureType = 'lower' | 'midpoint' | 'upper';
+export type SendToMatterFigure = 'midpoint' | 'upper' | 'afa';
+
+export interface ExportFigureSettings {
+  lower: boolean;
+  midpoint: boolean;
+  upper: boolean;
+}
+
 export interface ProposalAssumptions {
   negotiatedDocsDecay: number;
   ddDecay: number;
@@ -35,6 +45,29 @@ export interface ProposalAssumptions {
   numNegotiationTurns: number;
   afaDiscount: number;
   estimationMethod: EstimationMethod;
+  // New figure selection settings
+  excelExportFigures?: ExportFigureSettings | null;
+  afaBaseFigure?: FigureType | null;
+  sendToMatterFigure?: SendToMatterFigure | null;
+}
+
+// Check if figure settings are complete (all three must be set)
+export function areFigureSettingsComplete(assumptions: ProposalAssumptions | null): boolean {
+  if (!assumptions) return false;
+  
+  const { excelExportFigures, afaBaseFigure, sendToMatterFigure } = assumptions;
+  
+  // Excel export: at least one figure must be selected
+  const excelValid = excelExportFigures && 
+    (excelExportFigures.lower || excelExportFigures.midpoint || excelExportFigures.upper);
+  
+  // AFA base: must be set
+  const afaValid = afaBaseFigure !== null && afaBaseFigure !== undefined;
+  
+  // Send to matter: must be set
+  const sendValid = sendToMatterFigure !== null && sendToMatterFigure !== undefined;
+  
+  return Boolean(excelValid && afaValid && sendValid);
 }
 
 export const DEFAULT_RATE_CARD: RateCard = {
@@ -53,6 +86,7 @@ export const DEFAULT_WORK_PHASES: WorkPhase[] = [
   { id: "6", name: "Project Management", description: "Ongoing project management and coordination", partnerHours: 5, seniorAssociateHours: 8, associateHours: 5, traineeHours: 2 },
 ];
 
+// Default assumptions - figure settings are null (must be explicitly set)
 export const DEFAULT_ASSUMPTIONS: ProposalAssumptions = {
   negotiatedDocsDecay: 0.5,
   ddDecay: 0.35,
@@ -62,6 +96,9 @@ export const DEFAULT_ASSUMPTIONS: ProposalAssumptions = {
   numNegotiationTurns: 3,
   afaDiscount: 0,
   estimationMethod: 'pyramid',
+  excelExportFigures: null,
+  afaBaseFigure: null,
+  sendToMatterFigure: null,
 };
 
 export interface PricingProposal {

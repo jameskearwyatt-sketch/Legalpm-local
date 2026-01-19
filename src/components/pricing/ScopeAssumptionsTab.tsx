@@ -54,8 +54,15 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
       { value: '5_months', label: '5 months' },
       { value: '5.5_months', label: '5.5 months' },
       { value: '6_months', label: '6 months' },
+      { value: '7_months', label: '7 months' },
+      { value: '8_months', label: '8 months' },
       { value: '9_months', label: '9 months' },
+      { value: '10_months', label: '10 months' },
+      { value: '11_months', label: '11 months' },
       { value: '12_months', label: '12 months' },
+      { value: '15_months', label: '15 months' },
+      { value: '18_months', label: '18 months' },
+      { value: '24_months', label: '24 months' },
     ],
     narrativeTemplate: (value) => {
       const labels: Record<string, string> = {
@@ -71,8 +78,15 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
         '5_months': 'five months',
         '5.5_months': 'five and a half months',
         '6_months': 'six months',
+        '7_months': 'seven months',
+        '8_months': 'eight months',
         '9_months': 'nine months',
+        '10_months': 'ten months',
+        '11_months': 'eleven months',
         '12_months': 'twelve months',
+        '15_months': 'fifteen months',
+        '18_months': 'eighteen months',
+        '24_months': 'twenty-four months',
       };
       return `The transaction is expected to complete within ${labels[value || '3_months'] || 'three months'} from the date of substantial commencement of our work.`;
     },
@@ -792,23 +806,27 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                               <div className="ml-7 grid gap-3 sm:grid-cols-3 mt-2">
                                 {documentAssumptions.turnsEnabled && (
                                   <div>
-                                    <Label className="text-xs text-muted-foreground">Turns</Label>
-                                    <Select
-                                      value={config?.turns?.toString() || ''}
-                                      onValueChange={(val) => updateDocumentConfig(item.work_item, { turns: parseInt(val) })}
-                                    >
-                                      <SelectTrigger className="h-8 text-sm mt-1">
-                                        <SelectValue placeholder="Select..." />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="1">1 (draft/review only)</SelectItem>
-                                        <SelectItem value="2">2 turns</SelectItem>
-                                        <SelectItem value="3">3 turns</SelectItem>
-                                        <SelectItem value="4">4 turns</SelectItem>
-                                        <SelectItem value="5">5 turns</SelectItem>
-                                        <SelectItem value="6">6+ turns</SelectItem>
-                                      </SelectContent>
-                                    </Select>
+                                    <Label className="text-xs text-muted-foreground">Number of turns</Label>
+                                    <Input
+                                      type="number"
+                                      min="1"
+                                      max="99"
+                                      placeholder="e.g. 3"
+                                      className="h-8 text-sm mt-1 w-24"
+                                      value={config?.turns || ''}
+                                      onChange={(e) => {
+                                        const val = e.target.value.replace(/[^0-9]/g, '');
+                                        const num = val ? parseInt(val) : undefined;
+                                        updateDocumentConfig(item.work_item, { turns: num });
+                                      }}
+                                      onKeyDown={(e) => {
+                                        // Prevent non-numeric input
+                                        if (!/[0-9]/.test(e.key) && 
+                                            !['Backspace', 'Delete', 'Tab', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                                          e.preventDefault();
+                                        }
+                                      }}
+                                    />
                                   </div>
                                 )}
 

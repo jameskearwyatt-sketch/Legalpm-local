@@ -1534,6 +1534,7 @@ export default function MatterDetail() {
             quoteCurrency={quoteCurrency}
             existingProposal={editingProposal}
             hasLocalCounsel={localCounsel > 0}
+            localCounsels={localCounsels}
             currentValues={{
               wip_amount: latestSnapshot?.wip_amount || 0,
               wip_write_off_amount: latestSnapshot?.wip_write_off_amount || 0,
@@ -1543,17 +1544,39 @@ export default function MatterDetail() {
               lc_wip_amount: lcTotalWip || 0,
               lc_billed_amount: lcTotalBilled || 0,
             }}
-            onSave={async (data) => {
+            onSave={async (data, localCounselData) => {
+              let proposalId: string;
               if (editingProposal) {
                 await updateProposal.mutateAsync({
                   id: editingProposal.id,
                   ...data,
                 });
+                proposalId = editingProposal.id;
               } else {
-                await createProposal.mutateAsync({
+                const newProposal = await createProposal.mutateAsync({
                   matter_id: id!,
                   ...data,
                 });
+                proposalId = newProposal.id;
+              }
+              // Save individual local counsel proposal data
+              if (localCounselData && localCounselData.length > 0) {
+                const { supabase } = await import('@/integrations/supabase/client');
+                // Delete existing LC entries for this proposal
+                await supabase.from('wip_proposal_local_counsels').delete().eq('proposal_id', proposalId);
+                // Insert new LC entries
+                const insertData = localCounselData.map(lc => ({
+                  proposal_id: proposalId,
+                  local_counsel_id: lc.local_counsel_id,
+                  firm_name: lc.firm_name,
+                  raw_wip_amount: lc.raw_wip_amount,
+                  raw_billed_amount: lc.raw_billed_amount,
+                  proposed_wip_amount: lc.proposed_wip_amount,
+                  proposed_billed_amount: lc.proposed_billed_amount,
+                  wip_write_off_amount: lc.raw_wip_amount - lc.proposed_wip_amount,
+                  billed_write_off_amount: lc.raw_billed_amount - lc.proposed_billed_amount,
+                }));
+                await supabase.from('wip_proposal_local_counsels').insert(insertData);
               }
             }}
           />

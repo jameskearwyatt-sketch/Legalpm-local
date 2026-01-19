@@ -167,21 +167,17 @@ export function EditableRateCard({
     [feeEarners]
   );
 
-  // Update team rate - recalculates fee rate unless overridden
+  // Update team rate - ALWAYS clears override and recalculates fee rate
   const updateTeamRate = (key: string, newTeamRate: number) => {
     setFeeEarners(prev => prev.map(earner => {
       if (earner.key !== key) return earner;
       
-      // If fee rate was overridden, keep it
-      if (earner.feeRateOverridden) {
-        return { ...earner, teamRate: newTeamRate };
-      }
-      
-      // Otherwise, recalculate fee rate from new team rate
+      // Always clear override and recalculate fee rate from team rate
       return {
         ...earner,
         teamRate: newTeamRate,
         feeRate: Math.round(newTeamRate * exchangeRate),
+        feeRateOverridden: false,
       };
     }));
   };
@@ -335,7 +331,7 @@ export function EditableRateCard({
                       updateRate(earner.key, val);
                     }
                   }}
-                  className="h-7 text-right text-sm px-2"
+                  className={`h-7 text-right text-sm px-2 ${showTwoColumns && earner.feeRateOverridden ? 'bg-muted/50 border-muted-foreground/30' : ''}`}
                 />
                 {showTwoColumns && (
                   <>
@@ -349,7 +345,7 @@ export function EditableRateCard({
                         const val = parseFloat(e.target.value) || 0;
                         updateFeeRate(earner.key, val);
                       }}
-                      className={`h-7 text-right text-sm px-2 ${earner.feeRateOverridden ? 'border-primary' : ''}`}
+                      className={`h-7 text-right text-sm px-2 ${earner.feeRateOverridden ? 'bg-amber-50 border-amber-300 dark:bg-amber-950/30 dark:border-amber-700' : ''}`}
                     />
                   </>
                 )}

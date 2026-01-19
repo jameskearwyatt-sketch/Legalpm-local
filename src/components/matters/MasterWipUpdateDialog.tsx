@@ -1405,7 +1405,7 @@ export function MasterWipUpdateDialog({
                 <div className="divide-y">
                   {/* Material Changes Section Header */}
                   {filteredMaterialData.length > 0 && (
-                    <div className="p-3 bg-primary/5 border-b-2 border-primary/20 sticky top-0 z-10">
+                    <div className="p-3 bg-background border-b-2 border-primary/20 sticky top-0 z-10 before:absolute before:inset-0 before:bg-primary/5 before:-z-10 relative">
                       <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                         <span>Material Changes ({filteredMaterialData.length})</span>
                         <span className="text-xs font-normal text-muted-foreground">— significant updates requiring review</span>
@@ -1573,7 +1573,7 @@ export function MasterWipUpdateDialog({
 
                   {/* Immaterial Changes Section - Always show header for visual separation */}
                   <div className="border-t-4 border-dashed border-muted-foreground/20 mt-2">
-                    <div className="p-3 bg-muted/40 sticky top-0 z-10">
+                    <div className="p-3 bg-background sticky top-0 z-10 before:absolute before:inset-0 before:bg-muted/40 before:-z-10 relative">
                       <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                         <span>Immaterial Changes ({filteredImmaterialData.length})</span>
                         <span className="text-xs font-normal">— small corrections (≤2%) to ensure data accuracy</span>

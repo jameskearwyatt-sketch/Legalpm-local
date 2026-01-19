@@ -331,7 +331,7 @@ export function EditableRateCard({
                       updateRate(earner.key, val);
                     }
                   }}
-                  className={`h-7 text-right text-sm px-2 ${showTwoColumns && earner.feeRateOverridden ? 'bg-muted/50 border-muted-foreground/30' : ''}`}
+                  className={`h-7 text-right text-sm px-2 ${showTwoColumns && earner.feeRateOverridden ? 'bg-slate-200 border-slate-400 dark:bg-slate-700 dark:border-slate-500' : ''}`}
                 />
                 {showTwoColumns && (
                   <>

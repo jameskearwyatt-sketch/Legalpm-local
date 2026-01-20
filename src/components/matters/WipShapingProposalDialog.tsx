@@ -102,11 +102,14 @@ export function WipShapingProposalDialog({
   useEffect(() => {
     if (isOpen) {
       if (existingProposal) {
-        // Editing existing proposal
+        // Editing existing proposal - use stored values directly
         const rawWip = roundTo2(existingProposal.wip_amount);
         const wipWriteOff = roundTo2(existingProposal.wip_write_off_amount);
-        const rawAr = roundTo2(existingProposal.billed_amount || existingProposal.accounts_receivable);
-        const arWriteOff = roundTo2(Math.max(0, rawAr - existingProposal.accounts_receivable));
+        // Use the stored ar_write_off_amount directly instead of recalculating
+        const arWriteOff = roundTo2(existingProposal.ar_write_off_amount || 0);
+        // Raw AR = adjusted AR + AR write-off (reverse calculation to get raw)
+        const adjustedAr = roundTo2(existingProposal.accounts_receivable);
+        const rawAr = roundTo2(adjustedAr + arWriteOff);
         
         setFormData({
           raw_wip: rawWip,
@@ -114,7 +117,7 @@ export function WipShapingProposalDialog({
           wip_write_off: wipWriteOff,
           ar_write_off: arWriteOff,
           adjusted_wip: roundTo2(rawWip - wipWriteOff),
-          adjusted_ar: roundTo2(existingProposal.accounts_receivable),
+          adjusted_ar: adjustedAr,
           paid_amount: roundTo2(existingProposal.paid_amount),
           notes: existingProposal.notes || '',
         });

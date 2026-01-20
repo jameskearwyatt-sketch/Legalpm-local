@@ -664,14 +664,21 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
                     ({groupedAssumptions[label].length})
                   </span>
                 </div>
-                <div className="space-y-1 ml-2">
+                <div className="ml-2">
+                  {/* Column header row */}
+                  <div className="flex items-center gap-2 px-2 py-1 border-b text-xs text-muted-foreground font-medium">
+                    <div className="w-16 text-center shrink-0">Exceeded?</div>
+                    <div className="flex-1">Assumption</div>
+                    <div className="w-14"></div>
+                  </div>
+                  {/* Assumption rows */}
                   {groupedAssumptions[label].map((assumption) => (
                     <div 
                       key={assumption.id}
                       className="group flex items-start gap-2 p-2 rounded hover:bg-muted/50 transition-colors"
                     >
                       {editingId === assumption.id ? (
-                        <div className="flex-1 space-y-2">
+                        <div className="flex-1 space-y-2 ml-18">
                           <Select value={editLabel} onValueChange={(v) => setEditLabel(v as AssumptionLabel)}>
                             <SelectTrigger className="h-8">
                               <SelectValue />
@@ -699,20 +706,21 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
                         </div>
                       ) : (
                         <>
-                          <Checkbox
-                            checked={assumption.is_exceeded}
-                            onCheckedChange={(checked) => {
-                              updateAssumption.mutate({
-                                id: assumption.id,
-                                is_exceeded: checked === true,
-                              });
-                            }}
-                            className="mt-0.5"
-                          />
+                          <div className="w-16 flex justify-center shrink-0">
+                            <Checkbox
+                              checked={assumption.is_exceeded}
+                              onCheckedChange={(checked) => {
+                                updateAssumption.mutate({
+                                  id: assumption.id,
+                                  is_exceeded: checked === true,
+                                });
+                              }}
+                            />
+                          </div>
                           <span className={`flex-1 text-sm ${assumption.is_exceeded ? 'text-red-600 dark:text-red-400' : ''}`}>
                             {assumption.assumption_text}
                           </span>
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                          <div className="w-14 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 justify-end">
                             <Button
                               variant="ghost"
                               size="icon"

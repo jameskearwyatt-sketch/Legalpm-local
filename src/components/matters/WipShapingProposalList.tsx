@@ -74,6 +74,8 @@ export function WipShapingProposalList({
 
   const renderProposalCard = (proposal: WipShapingProposal, isArchived = false) => {
     const netWip = proposal.wip_amount - proposal.wip_write_off_amount;
+    const rawAr = proposal.accounts_receivable + proposal.ar_write_off_amount;
+    const netAr = proposal.accounts_receivable;
     const isSelected = selectedProposal?.id === proposal.id;
 
     return (
@@ -109,7 +111,7 @@ export function WipShapingProposalList({
               {proposal.notes}
             </p>
             
-            {/* Financial Summary - WIP on left, AR/Billed on right */}
+            {/* Financial Summary - WIP on left, AR on right */}
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
               {/* Left column: WIP figures */}
               <div className="space-y-1">
@@ -127,34 +129,36 @@ export function WipShapingProposalList({
                 </div>
               </div>
               
-              {/* Right column: AR/Billed figures */}
+              {/* Right column: AR figures */}
               <div className="space-y-1">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Billed:</span>
-                  <span>{formatCurrency(proposal.billed_amount, currency)}</span>
-                </div>
-                {proposal.ar_write_off_amount !== 0 && (
-                  <div className="flex justify-between">
-                    <span className={proposal.ar_write_off_amount > 0 ? 'text-destructive' : 'text-green-600'}>
-                      {proposal.ar_write_off_amount > 0 ? 'AR W/O:' : 'AR Inc:'}
-                    </span>
-                    <span className={proposal.ar_write_off_amount > 0 ? 'text-destructive' : 'text-green-600'}>
-                      {proposal.ar_write_off_amount > 0 
-                        ? `(${formatCurrency(proposal.ar_write_off_amount, currency)})`
-                        : `+${formatCurrency(Math.abs(proposal.ar_write_off_amount), currency)}`
-                      }
-                    </span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">AR:</span>
-                  <span>{formatCurrency(proposal.accounts_receivable, currency)}</span>
+                  <span className="text-muted-foreground">Raw AR:</span>
+                  <span>{formatCurrency(rawAr, currency)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Paid:</span>
-                  <span className="text-success">{formatCurrency(proposal.paid_amount, currency)}</span>
+                  <span className={proposal.ar_write_off_amount > 0 ? 'text-destructive' : proposal.ar_write_off_amount < 0 ? 'text-green-600' : 'text-muted-foreground'}>
+                    {proposal.ar_write_off_amount < 0 ? 'AR Inc:' : 'AR W/O:'}
+                  </span>
+                  <span className={proposal.ar_write_off_amount > 0 ? 'text-destructive' : proposal.ar_write_off_amount < 0 ? 'text-green-600' : 'text-muted-foreground'}>
+                    {proposal.ar_write_off_amount > 0 
+                      ? `(${formatCurrency(proposal.ar_write_off_amount, currency)})`
+                      : proposal.ar_write_off_amount < 0
+                        ? `+${formatCurrency(Math.abs(proposal.ar_write_off_amount), currency)}`
+                        : formatCurrency(0, currency)
+                    }
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground font-medium">Net AR:</span>
+                  <span className="font-medium">{formatCurrency(netAr, currency)}</span>
                 </div>
               </div>
+            </div>
+            
+            {/* Paid amount */}
+            <div className="flex justify-between text-xs mt-2 pt-2 border-t border-border/50">
+              <span className="text-muted-foreground">Paid:</span>
+              <span className="text-success font-medium">{formatCurrency(proposal.paid_amount, currency)}</span>
             </div>
           </div>
           

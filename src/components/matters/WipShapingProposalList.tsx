@@ -109,44 +109,51 @@ export function WipShapingProposalList({
               {proposal.notes}
             </p>
             
-            {/* Financial Summary */}
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Raw WIP:</span>
-                <span>{formatCurrency(proposal.wip_amount, currency)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Billed:</span>
-                <span>{formatCurrency(proposal.billed_amount, currency)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-destructive">WIP W/O:</span>
-                <span className="text-destructive">({formatCurrency(proposal.wip_write_off_amount, currency)})</span>
-              </div>
-              {proposal.ar_write_off_amount !== 0 && (
+            {/* Financial Summary - WIP on left, AR/Billed on right */}
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+              {/* Left column: WIP figures */}
+              <div className="space-y-1">
                 <div className="flex justify-between">
-                  <span className={proposal.ar_write_off_amount > 0 ? 'text-destructive' : 'text-green-600'}>
-                    {proposal.ar_write_off_amount > 0 ? 'AR W/O:' : 'AR Increase:'}
-                  </span>
-                  <span className={proposal.ar_write_off_amount > 0 ? 'text-destructive' : 'text-green-600'}>
-                    {proposal.ar_write_off_amount > 0 
-                      ? `(${formatCurrency(proposal.ar_write_off_amount, currency)})`
-                      : `+${formatCurrency(Math.abs(proposal.ar_write_off_amount), currency)}`
-                    }
-                  </span>
+                  <span className="text-muted-foreground">Raw WIP:</span>
+                  <span>{formatCurrency(proposal.wip_amount, currency)}</span>
                 </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">AR:</span>
-                <span>{formatCurrency(proposal.accounts_receivable, currency)}</span>
+                <div className="flex justify-between">
+                  <span className="text-destructive">WIP W/O:</span>
+                  <span className="text-destructive">({formatCurrency(proposal.wip_write_off_amount, currency)})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground font-medium">Net WIP:</span>
+                  <span className="font-medium">{formatCurrency(netWip, currency)}</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Net WIP:</span>
-                <span className="font-medium">{formatCurrency(netWip, currency)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Paid:</span>
-                <span className="text-success">{formatCurrency(proposal.paid_amount, currency)}</span>
+              
+              {/* Right column: AR/Billed figures */}
+              <div className="space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Billed:</span>
+                  <span>{formatCurrency(proposal.billed_amount, currency)}</span>
+                </div>
+                {proposal.ar_write_off_amount !== 0 && (
+                  <div className="flex justify-between">
+                    <span className={proposal.ar_write_off_amount > 0 ? 'text-destructive' : 'text-green-600'}>
+                      {proposal.ar_write_off_amount > 0 ? 'AR W/O:' : 'AR Inc:'}
+                    </span>
+                    <span className={proposal.ar_write_off_amount > 0 ? 'text-destructive' : 'text-green-600'}>
+                      {proposal.ar_write_off_amount > 0 
+                        ? `(${formatCurrency(proposal.ar_write_off_amount, currency)})`
+                        : `+${formatCurrency(Math.abs(proposal.ar_write_off_amount), currency)}`
+                      }
+                    </span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">AR:</span>
+                  <span>{formatCurrency(proposal.accounts_receivable, currency)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Paid:</span>
+                  <span className="text-success">{formatCurrency(proposal.paid_amount, currency)}</span>
+                </div>
               </div>
             </div>
           </div>

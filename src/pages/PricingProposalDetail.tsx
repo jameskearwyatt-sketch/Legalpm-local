@@ -1449,7 +1449,7 @@ export default function PricingProposalDetail() {
             {draftItems.length > 0 && !viewingHistoricalVersion && (
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Category Breakdown</CardTitle>
+                  <CardTitle className="text-base">Category Breakdown (Midpoint Pricing)</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <CategorizedProposalView

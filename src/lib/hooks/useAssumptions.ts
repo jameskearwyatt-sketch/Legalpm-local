@@ -11,6 +11,7 @@ export interface Assumption {
   assumption_text: string;
   source_document: string | null;
   is_standard: boolean;
+  is_exceeded: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -28,6 +29,7 @@ export interface UpdateAssumptionInput {
   label?: string;
   assumption_text?: string;
   is_standard?: boolean;
+  is_exceeded?: boolean;
 }
 
 // Refined assumption categories with clear, non-overlapping definitions

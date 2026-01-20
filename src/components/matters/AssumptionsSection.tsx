@@ -699,8 +699,19 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
                         </div>
                       ) : (
                         <>
-                          <span className="text-muted-foreground">•</span>
-                          <span className="flex-1 text-sm">{assumption.assumption_text}</span>
+                          <Checkbox
+                            checked={assumption.is_exceeded}
+                            onCheckedChange={(checked) => {
+                              updateAssumption.mutate({
+                                id: assumption.id,
+                                is_exceeded: checked === true,
+                              });
+                            }}
+                            className="mt-0.5"
+                          />
+                          <span className={`flex-1 text-sm ${assumption.is_exceeded ? 'text-red-600 dark:text-red-400' : ''}`}>
+                            {assumption.assumption_text}
+                          </span>
                           <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                             <Button
                               variant="ghost"

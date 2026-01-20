@@ -1017,6 +1017,7 @@ export type Database = {
           assumption_text: string
           created_at: string
           id: string
+          is_exceeded: boolean
           is_standard: boolean
           label: string
           matter_id: string
@@ -1028,6 +1029,7 @@ export type Database = {
           assumption_text: string
           created_at?: string
           id?: string
+          is_exceeded?: boolean
           is_standard?: boolean
           label: string
           matter_id: string
@@ -1039,6 +1041,7 @@ export type Database = {
           assumption_text?: string
           created_at?: string
           id?: string
+          is_exceeded?: boolean
           is_standard?: boolean
           label?: string
           matter_id?: string

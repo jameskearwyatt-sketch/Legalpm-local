@@ -120,9 +120,22 @@ export function WipShapingProposalList({
                 <span>{formatCurrency(proposal.billed_amount, currency)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-destructive">Write-off:</span>
+                <span className="text-destructive">WIP W/O:</span>
                 <span className="text-destructive">({formatCurrency(proposal.wip_write_off_amount, currency)})</span>
               </div>
+              {proposal.ar_write_off_amount !== 0 && (
+                <div className="flex justify-between">
+                  <span className={proposal.ar_write_off_amount > 0 ? 'text-destructive' : 'text-green-600'}>
+                    {proposal.ar_write_off_amount > 0 ? 'AR W/O:' : 'AR Increase:'}
+                  </span>
+                  <span className={proposal.ar_write_off_amount > 0 ? 'text-destructive' : 'text-green-600'}>
+                    {proposal.ar_write_off_amount > 0 
+                      ? `(${formatCurrency(proposal.ar_write_off_amount, currency)})`
+                      : `+${formatCurrency(Math.abs(proposal.ar_write_off_amount), currency)}`
+                    }
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-muted-foreground">AR:</span>
                 <span>{formatCurrency(proposal.accounts_receivable, currency)}</span>

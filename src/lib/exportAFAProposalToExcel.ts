@@ -485,28 +485,81 @@ export async function exportAFAProposalToExcel({
     currentRow++;
   }
 
-  // Grand total
+  // Aggregate Line Item Estimate (sum of all line items)
   currentRow++;
-  const totalRow = worksheet.getRow(currentRow);
-  totalRow.values = ['TOTAL FEE PROPOSAL', '', grandTotal, ''];
-  totalRow.getCell(3).numFmt = '#,##0';
-  totalRow.getCell(3).alignment = { horizontal: 'right' };
-  totalRow.getCell(3).font = { bold: true, size: 13, color: { argb: primaryColor } };
-  totalRow.getCell(3).fill = {
+  const aggregateRow = worksheet.getRow(currentRow);
+  aggregateRow.values = ['AGGREGATE LINE ITEM ESTIMATE', '', grandTotal, ''];
+  aggregateRow.getCell(3).numFmt = '#,##0';
+  aggregateRow.getCell(3).alignment = { horizontal: 'right' };
+  aggregateRow.getCell(3).font = { bold: true, size: 12, color: { argb: primaryColor } };
+  aggregateRow.getCell(3).fill = {
     type: 'pattern',
     pattern: 'solid',
     fgColor: { argb: 'FFF3F4F6' },
   };
-  totalRow.getCell(1).font = { bold: true, size: 13, color: { argb: primaryColor } };
-  totalRow.eachCell((cell) => {
+  aggregateRow.getCell(1).font = { bold: true, size: 12, color: { argb: primaryColor } };
+  aggregateRow.eachCell((cell) => {
     cell.border = {
       top: { style: 'medium', color: { argb: primaryColor } },
-      bottom: { style: 'double', color: { argb: primaryColor } },
+      bottom: { style: 'thin', color: { argb: borderColor } },
     };
   });
-  totalRow.height = 28;
+  aggregateRow.height = 26;
+  currentRow++;
 
-  // Footer notes (AFA details already shown prominently at top)
+  // If AFAs are applied, show the fee arrangement summary below
+  if (filterResult.appliedAFAs.length > 0) {
+    // Determine the final proposed fee
+    // For fixed fees, caps, collars, the client_price from the first primary AFA is the fee proposal
+    // For discounts, the grandTotal is already discounted
+    const primaryAFA = enabledAFAs.find(afa => 
+      afa.is_enabled && ['fixed_fee_whole', 'fixed_fee_phase', 'fee_cap', 'collar', 'blended_rate'].includes(afa.afa_type)
+    );
+    
+    // Add each applied AFA
+    for (const afa of filterResult.appliedAFAs) {
+      const afaDetailRow = worksheet.getRow(currentRow);
+      afaDetailRow.values = [`  ${afa.label}`, '', '', afa.description];
+      afaDetailRow.getCell(1).font = { size: 10, color: { argb: 'FF2563EB' }, italic: true };
+      afaDetailRow.getCell(4).font = { size: 10, color: { argb: 'FF6B7280' }, italic: true };
+      afaDetailRow.getCell(4).alignment = { wrapText: true };
+      currentRow++;
+    }
+    
+    // If there's a primary AFA with a client price, show the fee proposal amount
+    if (primaryAFA?.client_price && primaryAFA.client_price !== grandTotal) {
+      currentRow++;
+      const feeProposalRow = worksheet.getRow(currentRow);
+      feeProposalRow.values = ['FEE PROPOSAL', '', smartRound(primaryAFA.client_price), ''];
+      feeProposalRow.getCell(3).numFmt = '#,##0';
+      feeProposalRow.getCell(3).alignment = { horizontal: 'right' };
+      feeProposalRow.getCell(3).font = { bold: true, size: 13, color: { argb: 'FF2563EB' } };
+      feeProposalRow.getCell(3).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFDBEAFE' },
+      };
+      feeProposalRow.getCell(1).font = { bold: true, size: 13, color: { argb: 'FF2563EB' } };
+      feeProposalRow.eachCell((cell) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF2563EB' } },
+          bottom: { style: 'double', color: { argb: 'FF2563EB' } },
+        };
+      });
+      feeProposalRow.height = 28;
+      currentRow++;
+    }
+  } else {
+    // No AFA - the aggregate is the fee proposal, add emphasis
+    aggregateRow.eachCell((cell) => {
+      cell.border = {
+        top: { style: 'medium', color: { argb: primaryColor } },
+        bottom: { style: 'double', color: { argb: primaryColor } },
+      };
+    });
+  }
+
+  // Footer notes
   currentRow += 3;
 
   // Standard notes

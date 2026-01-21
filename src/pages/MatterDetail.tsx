@@ -355,6 +355,9 @@ export default function MatterDetail() {
         exchange_rate: matter.exchange_rate || 1.0,
         fee_currency: matter.fee_currency || 'GBP',
         fee_type: matter.fee_type || null,
+        rate_modifier: (matter as any).rate_modifier || null,
+        rate_modifier_value: (matter as any).rate_modifier_value || null,
+        pricing_model: (matter as any).pricing_model || null,
         source: matter.source || null,
         originator: matter.originator || '',
         matter_managing_attorney: (matter as any).matter_managing_attorney || '',
@@ -2154,18 +2157,80 @@ export default function MatterDetail() {
             <CardTitle className="text-lg font-heading">Fee Structure</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid sm:grid-cols-3 gap-4">
+            {/* Rate Modifier */}
+            <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Fee Type</Label>
-                <Select value={formData.fee_type || ''} onValueChange={(v) => updateField('fee_type', v || null)}>
-                  <SelectTrigger><SelectValue placeholder="Select fee type" /></SelectTrigger>
+                <Label>Rate Modifier</Label>
+                <Select 
+                  value={formData.rate_modifier || ''} 
+                  onValueChange={(v) => {
+                    updateField('rate_modifier', v || null);
+                    // Clear the value when switching types
+                    if (v !== 'discounted_rates' && v !== 'blended_hourly_rate') {
+                      updateField('rate_modifier_value', null);
+                    }
+                  }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select rate modifier" /></SelectTrigger>
                   <SelectContent>
-                    {feeTypes.map((ft) => (
-                      <SelectItem key={ft} value={ft}>{ft}</SelectItem>
-                    ))}
+                    <SelectItem value="rack_rates">Rack rates</SelectItem>
+                    <SelectItem value="discounted_rates">Discounted rates</SelectItem>
+                    <SelectItem value="blended_hourly_rate">Blended hourly rate</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              {formData.rate_modifier === 'discounted_rates' && (
+                <div className="space-y-2">
+                  <Label>Discount Percentage</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      value={formData.rate_modifier_value || ''}
+                      onChange={(e) => updateField('rate_modifier_value', e.target.value ? parseFloat(e.target.value) : null)}
+                      placeholder="e.g., 15"
+                    />
+                    <span className="text-muted-foreground">%</span>
+                  </div>
+                </div>
+              )}
+
+              {formData.rate_modifier === 'blended_hourly_rate' && (
+                <div className="space-y-2">
+                  <Label>Blended Rate</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={formData.rate_modifier_value || ''}
+                    onChange={(e) => updateField('rate_modifier_value', e.target.value ? parseFloat(e.target.value) : null)}
+                    placeholder="e.g., 850"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Pricing Model */}
+            <div className="space-y-2">
+              <Label>Pricing Model</Label>
+              <Select value={formData.pricing_model || ''} onValueChange={(v) => updateField('pricing_model', v || null)}>
+                <SelectTrigger><SelectValue placeholder="Select pricing model" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="fixed_fee">Fixed fee</SelectItem>
+                  <SelectItem value="fixed_fee_by_phase">Fixed fee by phase</SelectItem>
+                  <SelectItem value="fee_cap">Fee cap</SelectItem>
+                  <SelectItem value="fee_collar">Fee collar</SelectItem>
+                  <SelectItem value="milestone_based">Milestone-based fees</SelectItem>
+                  <SelectItem value="monthly_retainer">Monthly retainer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Fee Currency & Exchange Rate */}
+            <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Fee Currency</Label>
                 <Select value={formData.fee_currency} onValueChange={(v) => updateField('fee_currency', v)}>

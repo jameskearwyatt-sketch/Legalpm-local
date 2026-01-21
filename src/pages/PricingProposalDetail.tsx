@@ -346,16 +346,26 @@ export default function PricingProposalDetail() {
     };
   };
 
+  // State for user-overridden hours (when user manually edits estimated hours in Summary tab)
+  const [hourOverrides, setHourOverrides] = useState<{
+    partner?: number;
+    seniorAssociate?: number;
+    associate?: number;
+    trainee?: number;
+  }>({});
+
   const summary = useMemo(() => {
     const rates = feeRateCard; // Use fee currency rates for calculations
     const ass = assumptions;
-    // No discount applied to baseline - AFA tab handles discounts separately
 
-    // Sum hours from all Baker McKenzie items
-    let totalPartnerHours = 0;
-    let totalSeniorAssociateHours = 0;
-    let totalAssociateHours = 0;
-    let totalTraineeHours = 0;
+    // Track hours from items with actual hour data (iterative pricing) vs estimated
+    let confirmedPartnerHours = 0;
+    let confirmedAssociateHours = 0;
+    let estimatedPartnerHours = 0;
+    let estimatedSeniorAssociateHours = 0;
+    let estimatedAssociateHours = 0;
+    let estimatedTraineeHours = 0;
+    let hasEstimatedHours = false;
     
     draftItems
       .filter(item => item.provider === 'Baker McKenzie' && (item.is_included !== false || !item.is_optional))
@@ -363,7 +373,7 @@ export default function PricingProposalDetail() {
         const isIterative = item.pricing_method === 'pricing_tool';
         
         if (isIterative) {
-          // Use actual hours data from iterative pricing
+          // Use actual hours data from iterative pricing - these are CONFIRMED
           const partnerHours = item.partner_hours || 0;
           const associateHours = item.associate_hours || 0;
           const numTurns = item.num_turns || 1;
@@ -373,57 +383,74 @@ export default function PricingProposalDetail() {
           if (itemType === 'negotiation') decayFactor = ass.negotiatedDocsDecay;
           else if (itemType === 'due_diligence') decayFactor = ass.ddDecay;
           
-          totalPartnerHours += calculateNegotiationHours(partnerHours, decayFactor, numTurns);
-          totalAssociateHours += calculateNegotiationHours(associateHours, decayFactor, numTurns);
+          confirmedPartnerHours += calculateNegotiationHours(partnerHours, decayFactor, numTurns);
+          confirmedAssociateHours += calculateNegotiationHours(associateHours, decayFactor, numTurns);
         } else {
-          // Estimate hours using pyramid structure for manual/AI items
+          // For manual/AI items, we DON'T estimate by default - mark as needing estimation
           const feeAmount = item.fee_amount || 0;
           if (feeAmount > 0) {
-            const estimated = estimateHoursFromFee(feeAmount, 1); // No discount multiplier
-            totalPartnerHours += estimated.partnerHours;
-            totalSeniorAssociateHours += estimated.seniorAssociateHours;
-            totalAssociateHours += estimated.associateHours;
-            totalTraineeHours += estimated.traineeHours;
+            hasEstimatedHours = true;
+            const estimated = estimateHoursFromFee(feeAmount, 1);
+            estimatedPartnerHours += estimated.partnerHours;
+            estimatedSeniorAssociateHours += estimated.seniorAssociateHours;
+            estimatedAssociateHours += estimated.associateHours;
+            estimatedTraineeHours += estimated.traineeHours;
           }
         }
       });
 
-    // Add meeting hours
+    // Add meeting hours (these are configured, so considered "confirmed")
     const meetingPartnerHours = ass.numMeetings * ass.meetingHoursPartner;
     const meetingAssociateHours = ass.numMeetings * ass.meetingHoursAssociate;
-    totalPartnerHours += meetingPartnerHours;
-    totalAssociateHours += meetingAssociateHours;
+    confirmedPartnerHours += meetingPartnerHours;
+    confirmedAssociateHours += meetingAssociateHours;
 
-    // Standard rates (no discount - AFA handles discounts)
+    // Apply user overrides if they've manually edited estimated hours
+    // If user has overridden a grade, use their value instead of the system estimate
+    const finalPartnerHours = confirmedPartnerHours + (hourOverrides.partner !== undefined ? hourOverrides.partner : estimatedPartnerHours);
+    const finalSeniorAssociateHours = hourOverrides.seniorAssociate !== undefined ? hourOverrides.seniorAssociate : estimatedSeniorAssociateHours;
+    const finalAssociateHours = confirmedAssociateHours + (hourOverrides.associate !== undefined ? hourOverrides.associate : estimatedAssociateHours);
+    const finalTraineeHours = hourOverrides.trainee !== undefined ? hourOverrides.trainee : estimatedTraineeHours;
+
+    // Standard rates from user's rate card (NEVER modified automatically)
     const afaPartnerRate = rates.partner.rate;
     const afaSeniorAssociateRate = rates.seniorAssociate.rate;
     const afaAssociateRate = rates.associate.rate;
     const afaTraineeRate = rates.trainee.rate;
 
     // Revenue by grade
-    const partnerRevenue = totalPartnerHours * afaPartnerRate;
-    const seniorAssociateRevenue = totalSeniorAssociateHours * afaSeniorAssociateRate;
-    const associateRevenue = totalAssociateHours * afaAssociateRate;
-    const traineeRevenue = totalTraineeHours * afaTraineeRate;
+    const partnerRevenue = finalPartnerHours * afaPartnerRate;
+    const seniorAssociateRevenue = finalSeniorAssociateHours * afaSeniorAssociateRate;
+    const associateRevenue = finalAssociateHours * afaAssociateRate;
+    const traineeRevenue = finalTraineeHours * afaTraineeRate;
     const totalRevenue = partnerRevenue + seniorAssociateRevenue + associateRevenue + traineeRevenue;
 
     // Cost by grade
-    const partnerCost = totalPartnerHours * rates.partner.cost;
-    const seniorAssociateCost = totalSeniorAssociateHours * rates.seniorAssociate.cost;
-    const associateCost = totalAssociateHours * rates.associate.cost;
-    const traineeCost = totalTraineeHours * rates.trainee.cost;
+    const partnerCost = finalPartnerHours * rates.partner.cost;
+    const seniorAssociateCost = finalSeniorAssociateHours * rates.seniorAssociate.cost;
+    const associateCost = finalAssociateHours * rates.associate.cost;
+    const traineeCost = finalTraineeHours * rates.trainee.cost;
     const totalCost = partnerCost + seniorAssociateCost + associateCost + traineeCost;
 
     // Blended rate
-    const totalHours = totalPartnerHours + totalSeniorAssociateHours + totalAssociateHours + totalTraineeHours;
+    const totalHours = finalPartnerHours + finalSeniorAssociateHours + finalAssociateHours + finalTraineeHours;
     const blendedRate = totalHours > 0 ? totalRevenue / totalHours : 0;
 
     return {
-      totalPartnerHours,
-      totalSeniorAssociateHours,
-      totalAssociateHours,
-      totalTraineeHours,
+      totalPartnerHours: finalPartnerHours,
+      totalSeniorAssociateHours: finalSeniorAssociateHours,
+      totalAssociateHours: finalAssociateHours,
+      totalTraineeHours: finalTraineeHours,
       totalHours,
+      // Breakdown of confirmed vs estimated (for display purposes)
+      confirmedPartnerHours,
+      confirmedAssociateHours,
+      estimatedPartnerHours: hourOverrides.partner !== undefined ? hourOverrides.partner : estimatedPartnerHours,
+      estimatedSeniorAssociateHours: hourOverrides.seniorAssociate !== undefined ? hourOverrides.seniorAssociate : estimatedSeniorAssociateHours,
+      estimatedAssociateHours: hourOverrides.associate !== undefined ? hourOverrides.associate : estimatedAssociateHours,
+      estimatedTraineeHours: hourOverrides.trainee !== undefined ? hourOverrides.trainee : estimatedTraineeHours,
+      hasEstimatedHours,
+      hasUserOverrides: Object.keys(hourOverrides).length > 0,
       afaPartnerRate,
       afaSeniorAssociateRate,
       afaAssociateRate,
@@ -440,7 +467,7 @@ export default function PricingProposalDetail() {
       totalCost,
       blendedRate,
     };
-  }, [draftItems, feeRateCard, assumptions]);
+  }, [draftItems, feeRateCard, assumptions, hourOverrides]);
 
   const currencySymbol = getCurrencySymbol(proposal?.currency || 'GBP');
   
@@ -1602,6 +1629,21 @@ export default function PricingProposalDetail() {
 
           {/* SUMMARY TAB */}
           <TabsContent value="summary" className="space-y-6">
+            {/* Warning when hours are estimated */}
+            {summary.hasEstimatedHours && (
+              <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+                <AlertDescription className="text-amber-800 dark:text-amber-200">
+                  <strong>Estimated hours:</strong> Some work items use manual fee estimates without specific hour inputs. 
+                  The hours shown below are <em>estimated</em> based on your selected "{assumptions.estimationMethod || 'pyramid'}" distribution and your fee rates. 
+                  You can edit the estimated hours directly in the table below.
+                  {summary.hasUserOverrides && (
+                    <span className="ml-2 font-medium">(You have edited the estimated hours)</span>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="grid gap-4 md:grid-cols-3">
               <Card>
                 <CardContent className="pt-6">
@@ -1614,22 +1656,28 @@ export default function PricingProposalDetail() {
                   </div>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className={summary.hasEstimatedHours ? "border-amber-300 dark:border-amber-700" : ""}>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Total Hours</p>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Total Hours
+                        {summary.hasEstimatedHours && <span className="text-amber-600 ml-1">(incl. estimated)</span>}
+                      </p>
                       <p className="text-2xl font-bold">{formatHours(summary.totalHours)}</p>
                     </div>
                     <Clock className="h-8 w-8 text-muted-foreground/30" />
                   </div>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className={summary.hasEstimatedHours ? "border-amber-300 dark:border-amber-700" : ""}>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-muted-foreground">Blended Rate</p>
+                      <p className="text-sm font-medium text-muted-foreground">
+                        Blended Rate
+                        {summary.hasEstimatedHours && <span className="text-amber-600 ml-1">(indicative)</span>}
+                      </p>
                       <p className="text-2xl font-bold">{formatCurrency(summary.blendedRate)}</p>
                     </div>
                     <TrendingUp className="h-8 w-8 text-muted-foreground/30" />
@@ -1640,7 +1688,25 @@ export default function PricingProposalDetail() {
 
             <Card>
               <CardHeader>
-                <CardTitle>Fee Breakdown by Grade</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>Fee Breakdown by Grade</CardTitle>
+                  {summary.hasUserOverrides && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setHourOverrides({})}
+                      className="text-xs"
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Reset to estimates
+                    </Button>
+                  )}
+                </div>
+                {summary.hasEstimatedHours && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Hours marked with * are estimated. Click on any hour value to edit.
+                  </p>
+                )}
               </CardHeader>
               <CardContent>
                 <Table>
@@ -1655,25 +1721,102 @@ export default function PricingProposalDetail() {
                   <TableBody>
                     <TableRow>
                       <TableCell className="font-medium">Partner</TableCell>
-                      <TableCell className="text-right">{formatHours(summary.totalPartnerHours)}</TableCell>
+                      <TableCell className="text-right">
+                        {summary.hasEstimatedHours ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              value={summary.totalPartnerHours.toFixed(1)}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                // Subtract confirmed hours to get the estimated portion that user is overriding
+                                setHourOverrides(prev => ({ ...prev, partner: Math.max(0, val - summary.confirmedPartnerHours) }));
+                              }}
+                              className="w-20 h-7 text-right text-sm bg-amber-50 dark:bg-amber-950/20 border-amber-300"
+                            />
+                            <span className="text-amber-600 text-xs">*</span>
+                          </div>
+                        ) : (
+                          formatHours(summary.totalPartnerHours)
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.afaPartnerRate)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.partnerRevenue)}</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell className="font-medium">Senior Associate</TableCell>
-                      <TableCell className="text-right">{formatHours(summary.totalSeniorAssociateHours)}</TableCell>
+                      <TableCell className="text-right">
+                        {summary.hasEstimatedHours ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              value={summary.totalSeniorAssociateHours.toFixed(1)}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setHourOverrides(prev => ({ ...prev, seniorAssociate: val }));
+                              }}
+                              className="w-20 h-7 text-right text-sm bg-amber-50 dark:bg-amber-950/20 border-amber-300"
+                            />
+                            <span className="text-amber-600 text-xs">*</span>
+                          </div>
+                        ) : (
+                          formatHours(summary.totalSeniorAssociateHours)
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.afaSeniorAssociateRate)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.seniorAssociateRevenue)}</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell className="font-medium">Associate</TableCell>
-                      <TableCell className="text-right">{formatHours(summary.totalAssociateHours)}</TableCell>
+                      <TableCell className="text-right">
+                        {summary.hasEstimatedHours ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              value={summary.totalAssociateHours.toFixed(1)}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setHourOverrides(prev => ({ ...prev, associate: Math.max(0, val - summary.confirmedAssociateHours) }));
+                              }}
+                              className="w-20 h-7 text-right text-sm bg-amber-50 dark:bg-amber-950/20 border-amber-300"
+                            />
+                            <span className="text-amber-600 text-xs">*</span>
+                          </div>
+                        ) : (
+                          formatHours(summary.totalAssociateHours)
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.afaAssociateRate)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.associateRevenue)}</TableCell>
                     </TableRow>
                     <TableRow>
                       <TableCell className="font-medium">Trainee</TableCell>
-                      <TableCell className="text-right">{formatHours(summary.totalTraineeHours)}</TableCell>
+                      <TableCell className="text-right">
+                        {summary.hasEstimatedHours ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              value={summary.totalTraineeHours.toFixed(1)}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                setHourOverrides(prev => ({ ...prev, trainee: val }));
+                              }}
+                              className="w-20 h-7 text-right text-sm bg-amber-50 dark:bg-amber-950/20 border-amber-300"
+                            />
+                            <span className="text-amber-600 text-xs">*</span>
+                          </div>
+                        ) : (
+                          formatHours(summary.totalTraineeHours)
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.afaTraineeRate)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.traineeRevenue)}</TableCell>
                     </TableRow>

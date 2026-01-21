@@ -319,32 +319,37 @@ export default function PricingProposalDetail() {
     }
   };
 
-  const estimateHoursFromFee = (feeAmount: number, discountMultiplier: number) => {
-    const dist = getEstimationDistribution(assumptions.estimationMethod || 'pyramid');
-    
-    // Discounted rates
-    const partnerRate = rateCard.partner.rate * discountMultiplier;
-    const seniorAssocRate = rateCard.seniorAssociate.rate * discountMultiplier;
-    const associateRate = rateCard.associate.rate * discountMultiplier;
-    const traineeRate = rateCard.trainee.rate * discountMultiplier;
-    
-    // Weighted average rate based on distribution
-    const blendedRateFromDist = 
-      (dist.partner * partnerRate) + 
-      (dist.seniorAssoc * seniorAssocRate) + 
-      (dist.associate * associateRate) + 
-      (dist.trainee * traineeRate);
-    
-    // Total estimated hours
-    const totalEstimatedHours = blendedRateFromDist > 0 ? feeAmount / blendedRateFromDist : 0;
-    
-    return {
-      partnerHours: totalEstimatedHours * dist.partner,
-      seniorAssociateHours: totalEstimatedHours * dist.seniorAssoc,
-      associateHours: totalEstimatedHours * dist.associate,
-      traineeHours: totalEstimatedHours * dist.trainee,
+  // Use feeRateCard (fee currency rates) for consistent back-calculation
+  // This ensures hours × fee rates = the original fee amount
+  const estimateHoursFromFee = useMemo(() => {
+    return (feeAmount: number, discountMultiplier: number) => {
+      const dist = getEstimationDistribution(assumptions.estimationMethod || 'pyramid');
+      
+      // Use FEE RATES (not team rates) to back-calculate hours
+      // This ensures: estimated hours × fee rate = original fee amount
+      const partnerRate = feeRateCard.partner.rate * discountMultiplier;
+      const seniorAssocRate = feeRateCard.seniorAssociate.rate * discountMultiplier;
+      const associateRate = feeRateCard.associate.rate * discountMultiplier;
+      const traineeRate = feeRateCard.trainee.rate * discountMultiplier;
+      
+      // Weighted average rate based on distribution
+      const blendedRateFromDist = 
+        (dist.partner * partnerRate) + 
+        (dist.seniorAssoc * seniorAssocRate) + 
+        (dist.associate * associateRate) + 
+        (dist.trainee * traineeRate);
+      
+      // Total estimated hours
+      const totalEstimatedHours = blendedRateFromDist > 0 ? feeAmount / blendedRateFromDist : 0;
+      
+      return {
+        partnerHours: totalEstimatedHours * dist.partner,
+        seniorAssociateHours: totalEstimatedHours * dist.seniorAssoc,
+        associateHours: totalEstimatedHours * dist.associate,
+        traineeHours: totalEstimatedHours * dist.trainee,
+      };
     };
-  };
+  }, [feeRateCard, assumptions.estimationMethod]);
 
   // State for user-overridden hours (when user manually edits estimated hours in Summary tab)
   const [hourOverrides, setHourOverrides] = useState<{

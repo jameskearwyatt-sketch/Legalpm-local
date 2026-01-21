@@ -1481,7 +1481,29 @@ export default function PricingProposalDetail() {
             {draftItems.length > 0 && !viewingHistoricalVersion && (
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Category Breakdown (Midpoint Pricing)</CardTitle>
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <CardTitle className="text-base">Category Breakdown (Midpoint Pricing)</CardTitle>
+                    {enabledAFAs.length > 0 && (
+                      <div className="flex gap-1.5 flex-wrap">
+                        {enabledAFAs.map(afa => (
+                          <Badge 
+                            key={afa.id} 
+                            variant="secondary" 
+                            className="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 text-xs font-normal"
+                          >
+                            {AFA_TYPE_LABELS[afa.afa_type as keyof typeof AFA_TYPE_LABELS] || afa.afa_type}
+                            {afa.afa_type === 'discounted_rates' && afa.config && (
+                              <span className="ml-1">({(afa.config as any).discountPercent || 0}%)</span>
+                            )}
+                            {afa.afa_type === 'blended_rate' && afa.config && (
+                              <span className="ml-1">({currencySymbol}{(afa.config as any).blendedRatePerHour || 0}/hr)</span>
+                            )}
+                          </Badge>
+                        ))}
+                        <span className="text-xs text-muted-foreground self-center">applied</span>
+                      </div>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <CategorizedProposalView
@@ -1829,7 +1851,12 @@ export default function PricingProposalDetail() {
                       <TableCell>Total</TableCell>
                       <TableCell className="text-right">{formatHours(summary.totalHours)}</TableCell>
                       <TableCell className="text-right">{formatCurrency(summary.blendedRate)} (blended)</TableCell>
-                      <TableCell className="text-right">{formatCurrency(summary.totalRevenue)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end">
+                          <span>{formatCurrency(summary.totalRevenue)}</span>
+                          <span className="text-xs font-normal text-muted-foreground">(Midpoint Pricing)</span>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   </TableBody>
                 </Table>

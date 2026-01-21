@@ -408,24 +408,31 @@ export default function MatterDetail() {
     }
   }, [formData.fee_amount_upper_end, formData.local_counsel_fee]);
 
+  // Track previous fee currency to detect changes
+  const previousFeeCurrencyRef = useRef<string | null>(null);
+  
   // Auto-populate exchange rate when fee currency changes
   useEffect(() => {
-    if (exchangeRatesData?.rates && formData.fee_currency && matter) {
-      // Always force rate to 1 for same-currency (e.g., GBP to GBP)
-      if (formData.fee_currency === 'GBP' && formData.exchange_rate !== 1) {
-        setFormData(prev => ({ ...prev, exchange_rate: 1 }));
+    if (exchangeRatesData?.rates && formData.fee_currency) {
+      const currentCurrency = formData.fee_currency;
+      const previousCurrency = previousFeeCurrencyRef.current;
+      
+      // Calculate the correct rate for this currency
+      const correctRate = currentCurrency === 'GBP' 
+        ? 1 
+        : getExchangeRate(exchangeRatesData.rates, currentCurrency);
+      
+      // Update if currency just changed OR if rate doesn't match expected value
+      if (previousCurrency !== null && previousCurrency !== currentCurrency) {
+        // Currency was just changed - always update the rate
+        setFormData(prev => ({ ...prev, exchange_rate: correctRate }));
         setHasChanges(true);
-        return;
       }
       
-      // Only auto-update rate when currency changes
-      const rate = getExchangeRate(exchangeRatesData.rates, formData.fee_currency);
-      if (rate !== formData.exchange_rate && formData.fee_currency !== matter.fee_currency) {
-        setFormData(prev => ({ ...prev, exchange_rate: rate }));
-        setHasChanges(true);
-      }
+      // Update the ref to track this currency for next change
+      previousFeeCurrencyRef.current = currentCurrency;
     }
-  }, [formData.fee_currency, formData.exchange_rate, exchangeRatesData?.rates]);
+  }, [formData.fee_currency, exchangeRatesData?.rates]);
 
   const updateField = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));

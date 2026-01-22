@@ -357,6 +357,7 @@ export default function MatterDetail() {
         fee_type: matter.fee_type || null,
         rate_modifier: (matter as any).rate_modifier || null,
         rate_modifier_value: (matter as any).rate_modifier_value || null,
+        rate_modifier_scope: (matter as any).rate_modifier_scope || null,
         pricing_model: (matter as any).pricing_model || null,
         source: matter.source || null,
         originator: matter.originator || '',
@@ -2172,9 +2173,10 @@ export default function MatterDetail() {
                   value={formData.rate_modifier || ''} 
                   onValueChange={(v) => {
                     updateField('rate_modifier', v || null);
-                    // Clear the value when switching types
+                    // Clear the value and scope when switching to rack rates
                     if (v !== 'discounted_rates' && v !== 'blended_hourly_rate') {
                       updateField('rate_modifier_value', null);
+                      updateField('rate_modifier_scope', null);
                     }
                   }}
                 >
@@ -2219,6 +2221,23 @@ export default function MatterDetail() {
                 </div>
               )}
             </div>
+
+            {/* Modifier Scope - only show when discounted rates or blended rate is selected */}
+            {(formData.rate_modifier === 'discounted_rates' || formData.rate_modifier === 'blended_hourly_rate') && (
+              <div className="space-y-2">
+                <Label>Modifier Scope</Label>
+                <Select 
+                  value={formData.rate_modifier_scope || ''} 
+                  onValueChange={(v) => updateField('rate_modifier_scope', v || null)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Does this apply to this matter only or all client matters?" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="this_matter_only">This matter only</SelectItem>
+                    <SelectItem value="all_client_matters">Applies to all matters for this client</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Pricing Model */}
             <div className="space-y-2">

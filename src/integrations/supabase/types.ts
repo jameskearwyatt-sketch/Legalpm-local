@@ -1256,6 +1256,7 @@ export type Database = {
           progress: number
           quote_currency: string | null
           rate_modifier: string | null
+          rate_modifier_scope: string | null
           rate_modifier_value: number | null
           show_shaping_proposal: boolean
           source: Database["public"]["Enums"]["matter_source"] | null
@@ -1322,6 +1323,7 @@ export type Database = {
           progress?: number
           quote_currency?: string | null
           rate_modifier?: string | null
+          rate_modifier_scope?: string | null
           rate_modifier_value?: number | null
           show_shaping_proposal?: boolean
           source?: Database["public"]["Enums"]["matter_source"] | null
@@ -1388,6 +1390,7 @@ export type Database = {
           progress?: number
           quote_currency?: string | null
           rate_modifier?: string | null
+          rate_modifier_scope?: string | null
           rate_modifier_value?: number | null
           show_shaping_proposal?: boolean
           source?: Database["public"]["Enums"]["matter_source"] | null

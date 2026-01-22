@@ -210,8 +210,8 @@ Deno.serve(async (req) => {
         }
       }
       
-      // Email - update if Apollo found a different/verified email
-      if (person.email && person.email_status === 'verified') {
+      // Email - update if Apollo found an email (any status, not just verified)
+      if (person.email) {
         result.email = person.email;
       }
       

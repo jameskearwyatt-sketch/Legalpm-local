@@ -12,13 +12,28 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { useBulkCreateDistributionContacts, type DistributionContactInsert } from "@/lib/hooks/useDistributionContacts";
 import { useDistributionSectors } from "@/lib/hooks/useDistributionSectors";
+import { useDistributionRelationshipOwners, useEnsureRelationshipOwner } from "@/lib/hooks/useDistributionRelationshipOwners";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, FileText, Loader2, FileSpreadsheet, X, Sparkles, AlertTriangle } from "lucide-react";
+import { Upload, FileText, Loader2, FileSpreadsheet, X, Sparkles, AlertTriangle, ChevronsUpDown, Check, User } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
+import { cn } from "@/lib/utils";
 
 interface ContactImportDialogProps {
   open: boolean;
@@ -46,11 +61,20 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
   const [aiMapping, setAiMapping] = useState<AIParseResult | null>(null);
   const [parsedData, setParsedData] = useState<Record<string, string>[]>([]);
   const [parseStep, setParseStep] = useState<"select" | "review" | "importing">("select");
+  const [defaultOwner, setDefaultOwner] = useState<string>("");
+  const [ownerSearch, setOwnerSearch] = useState("");
+  const [ownerPopoverOpen, setOwnerPopoverOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const bulkCreate = useBulkCreateDistributionContacts();
   const logActivity = useLogDistributionActivity();
   const { data: sectors = [] } = useDistributionSectors();
+  const { data: relationshipOwners = [] } = useDistributionRelationshipOwners();
+  const ensureOwner = useEnsureRelationshipOwner();
+
+  const filteredOwners = relationshipOwners.filter(o =>
+    o.name.toLowerCase().includes(ownerSearch.toLowerCase())
+  );
 
   const normaliseGender = (value: string | undefined): 'male' | 'female' | 'unknown' => {
     if (!value) return 'unknown';
@@ -60,12 +84,13 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
     return 'unknown';
   };
 
-  const applyMappingToRow = (row: Record<string, string>, mapping: ColumnMapping): DistributionContactInsert | null => {
+  const applyMappingToRow = (row: Record<string, string>, mapping: ColumnMapping, fallbackOwner?: string): DistributionContactInsert | null => {
     const contact: Partial<DistributionContactInsert> = {
       sectors: [],
       sectors_ai_assigned: false,
       do_not_contact: false,
       provenance: selectedFile ? `File import: ${selectedFile.name}` : "Pasted import",
+      relationship_owner: fallbackOwner || null,
     };
 
     // Track first/last name for combining
@@ -108,7 +133,10 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
           contact.linkedin_url = value;
           break;
         case "relationship_owner":
-          contact.relationship_owner = value;
+          // Only override if the row has a value
+          if (value) {
+            contact.relationship_owner = value;
+          }
           break;
         case "sectors":
           // AI should have mapped to valid sectors
@@ -220,8 +248,13 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
     setIsProcessing(true);
 
     try {
+      // Ensure the default owner exists in the database
+      if (defaultOwner) {
+        await ensureOwner.mutateAsync(defaultOwner);
+      }
+
       const contacts = parsedData
-        .map(row => applyMappingToRow(row, aiMapping.mapping))
+        .map(row => applyMappingToRow(row, aiMapping.mapping, defaultOwner))
         .filter((c): c is DistributionContactInsert => c !== null);
 
       if (contacts.length === 0) {
@@ -234,7 +267,7 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
       await logActivity.mutateAsync({
         activity_type: "import_completed",
         description: `Imported ${contacts.length} contacts from ${selectedFile?.name || "file"} (AI-assisted)`,
-        metadata: { count: contacts.length, source: "file", ai_confidence: aiMapping.confidence },
+        metadata: { count: contacts.length, source: "file", ai_confidence: aiMapping.confidence, owner: defaultOwner || null },
       });
 
       resetDialog();
@@ -248,7 +281,7 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
     }
   };
 
-  const parsePastedText = (text: string): DistributionContactInsert[] => {
+  const parsePastedText = (text: string, owner?: string): DistributionContactInsert[] => {
     const lines = text.trim().split("\n").filter(l => l.trim());
     const firstLine = lines[0]?.toLowerCase() || '';
     const hasHeaders = firstLine.includes('name') || firstLine.includes('email');
@@ -271,7 +304,7 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
         sectors_ai_assigned: false,
         linkedin_url: null,
         notes: null,
-        relationship_owner: null,
+        relationship_owner: owner || null,
         do_not_contact: false,
         provenance: "Pasted import",
       };
@@ -286,7 +319,12 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
 
     setIsProcessing(true);
     try {
-      const contacts = parsePastedText(pastedText);
+      // Ensure the default owner exists in the database
+      if (defaultOwner) {
+        await ensureOwner.mutateAsync(defaultOwner);
+      }
+
+      const contacts = parsePastedText(pastedText, defaultOwner);
       if (contacts.length === 0) {
         toast.error("No valid contacts found.");
         return;
@@ -296,7 +334,7 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
       await logActivity.mutateAsync({
         activity_type: "import_completed",
         description: `Imported ${contacts.length} contacts from pasted text`,
-        metadata: { count: contacts.length, source: "paste" },
+        metadata: { count: contacts.length, source: "paste", owner: defaultOwner || null },
       });
 
       resetDialog();
@@ -330,6 +368,8 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
     setAiMapping(null);
     setParsedData([]);
     setParseStep("select");
+    setDefaultOwner("");
+    setOwnerSearch("");
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -395,11 +435,79 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
                   Paste names and emails, one per line. Supports CSV format.
                 </p>
                 <Textarea
-                  rows={10}
+                  rows={8}
                   placeholder="John Smith, john@example.com&#10;Jane Doe, jane@example.com"
                   value={pastedText}
                   onChange={(e) => setPastedText(e.target.value)}
                 />
+              </div>
+              
+              {/* Owner selector for paste */}
+              <div>
+                <Label className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Contact Owner
+                </Label>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Assign a relationship owner to all imported contacts.
+                </p>
+                <Popover open={ownerPopoverOpen} onOpenChange={setOwnerPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      {defaultOwner || "Select or type owner name..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0">
+                    <Command>
+                      <CommandInput
+                        placeholder="Search or add owner..."
+                        value={ownerSearch}
+                        onValueChange={setOwnerSearch}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {ownerSearch && (
+                            <button
+                              type="button"
+                              className="w-full p-2 text-left hover:bg-accent text-sm"
+                              onClick={() => {
+                                setDefaultOwner(ownerSearch);
+                                setOwnerPopoverOpen(false);
+                              }}
+                            >
+                              Add "{ownerSearch}" as new owner
+                            </button>
+                          )}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {filteredOwners.map((owner) => (
+                            <CommandItem
+                              key={owner.id}
+                              value={owner.name}
+                              onSelect={() => {
+                                setDefaultOwner(owner.name);
+                                setOwnerPopoverOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  defaultOwner === owner.name ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {owner.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </TabsContent>
 
@@ -435,7 +543,7 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="w-full p-8 border-2 border-dashed rounded-lg hover:bg-muted/50 transition-colors text-center"
+                    className="w-full p-6 border-2 border-dashed rounded-lg hover:bg-muted/50 transition-colors text-center"
                   >
                     <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
                     <p className="text-sm font-medium">Click to select file</p>
@@ -444,6 +552,74 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
                     </p>
                   </button>
                 )}
+              </div>
+              
+              {/* Owner selector for file upload */}
+              <div>
+                <Label className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Default Contact Owner
+                </Label>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Assign an owner to contacts without one in the file.
+                </p>
+                <Popover open={ownerPopoverOpen} onOpenChange={setOwnerPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      className="w-full justify-between"
+                    >
+                      {defaultOwner || "Select or type owner name..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-0">
+                    <Command>
+                      <CommandInput
+                        placeholder="Search or add owner..."
+                        value={ownerSearch}
+                        onValueChange={setOwnerSearch}
+                      />
+                      <CommandList>
+                        <CommandEmpty>
+                          {ownerSearch && (
+                            <button
+                              type="button"
+                              className="w-full p-2 text-left hover:bg-accent text-sm"
+                              onClick={() => {
+                                setDefaultOwner(ownerSearch);
+                                setOwnerPopoverOpen(false);
+                              }}
+                            >
+                              Add "{ownerSearch}" as new owner
+                            </button>
+                          )}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {filteredOwners.map((owner) => (
+                            <CommandItem
+                              key={owner.id}
+                              value={owner.name}
+                              onSelect={() => {
+                                setDefaultOwner(owner.name);
+                                setOwnerPopoverOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  defaultOwner === owner.name ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {owner.name}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </TabsContent>
           </Tabs>

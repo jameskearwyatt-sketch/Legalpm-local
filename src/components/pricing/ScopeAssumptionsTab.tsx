@@ -91,15 +91,6 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
     narrativeTemplate: () => 'Negotiation of the transaction will take place by conference call or videoconference and there will be no traveling required. If travel is required, travel expenses and time will be quoted separately.',
   },
   {
-    id: 'virtual_competition',
-    label: 'Virtual competition process (no travel)',
-    description: 'Competition/pitch process conducted virtually',
-    category: 'process',
-    sectionType: 'general',
-    requiresInput: false,
-    narrativeTemplate: () => 'The competition process, including any presentations, Q&A sessions, or clarification meetings, will be conducted by conference call or videoconference. If physical attendance is required, travel expenses and time will be quoted separately.',
-  },
-  {
     id: 'excludes_ancillary_contracts',
     label: 'Excludes ancillary contracts',
     description: 'No ancillary agreements in scope',

@@ -62,3 +62,9 @@ verify_jwt = false
 
 [functions.infer-genders]
 verify_jwt = false
+
+[functions.analyze-focus-areas]
+verify_jwt = false
+
+[functions.assign-focus-areas]
+verify_jwt = false

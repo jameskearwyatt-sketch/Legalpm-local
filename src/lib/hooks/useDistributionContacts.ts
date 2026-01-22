@@ -29,14 +29,19 @@ export interface DistributionContact {
   sic_codes: string[] | null;
   naics_codes: string[] | null;
   company_keywords: string[] | null;
+  // EMI Focus Areas
+  emi_focus_areas: string[];
+  emi_focus_areas_assigned_at: string | null;
 }
 
-export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'last_enriched_at' | 'email_status' | 'sic_codes' | 'naics_codes' | 'company_keywords'> & {
+export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'last_enriched_at' | 'email_status' | 'sic_codes' | 'naics_codes' | 'company_keywords' | 'emi_focus_areas' | 'emi_focus_areas_assigned_at'> & {
   email_status?: string | null;
   sic_codes?: string[] | null;
   naics_codes?: string[] | null;
   company_keywords?: string[] | null;
   last_enriched_at?: string | null;
+  emi_focus_areas?: string[];
+  emi_focus_areas_assigned_at?: string | null;
 };
 export type DistributionContactUpdate = Partial<DistributionContactInsert>;
 
@@ -45,6 +50,7 @@ export type UpdatedTimePeriod = 'week' | 'month' | '3months' | '6months' | 'year
 export interface ContactFilters {
   sectors?: string[];
   naicsSector?: string;
+  emiFocusArea?: string;
   country?: string;
   gender?: 'male' | 'female' | 'unknown';
   company?: string;
@@ -146,6 +152,13 @@ export function useDistributionContacts(filters?: ContactFilters) {
           const sector = getPrimaryNaicsSector(c.naics_codes);
           return sector === filters.naicsSector;
         });
+      }
+      
+      // Filter by EMI Focus Area in JS
+      if (filters?.emiFocusArea) {
+        contacts = contacts.filter(c => 
+          c.emi_focus_areas?.includes(filters.emiFocusArea!)
+        );
       }
 
       return contacts;

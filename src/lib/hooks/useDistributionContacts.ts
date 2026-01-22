@@ -200,6 +200,33 @@ export function useDeleteDistributionContact() {
   });
 }
 
+export function useBulkDeleteDistributionContacts() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      if (!user) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("distribution_contacts")
+        .delete()
+        .in("id", ids)
+        .eq("user_id", user.id);
+
+      if (error) throw error;
+      return ids.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ["distribution-contacts"] });
+      toast.success(`${count} contact${count !== 1 ? 's' : ''} deleted`);
+    },
+    onError: () => {
+      toast.error("Failed to delete contacts");
+    },
+  });
+}
+
 export function useBulkCreateDistributionContacts() {
   const queryClient = useQueryClient();
   const { user } = useAuth();

@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import {
   useDistributionContacts,
+  useBulkDeleteDistributionContacts,
   type ContactFilters,
   type DistributionContact,
 } from "@/lib/hooks/useDistributionContacts";
@@ -48,9 +49,20 @@ import {
   X,
   AlertTriangle,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function ContactsListView() {
   const [filters, setFilters] = useState<ContactFilters>({});
@@ -59,6 +71,7 @@ export function ContactsListView() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedContact, setSelectedContact] = useState<DistributionContact | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -73,6 +86,7 @@ export function ContactsListView() {
   const { data: companies = [] } = useDistinctCompanies();
   const { data: relationshipOwners = [] } = useDistributionRelationshipOwners();
   const logActivity = useLogDistributionActivity();
+  const bulkDelete = useBulkDeleteDistributionContacts();
 
   const eligibleContacts = useMemo(() => 
     contacts.filter(c => !c.do_not_contact),
@@ -151,6 +165,13 @@ export function ContactsListView() {
       return;
     }
     setShowEmailDialog(true);
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds);
+    await bulkDelete.mutateAsync(ids);
+    setSelectedIds(new Set());
+    setShowDeleteConfirm(false);
   };
 
   const clearFilters = () => {
@@ -298,6 +319,16 @@ export function ContactsListView() {
           )}
 
           <div className="flex-1" />
+
+          <Button 
+            variant="destructive" 
+            size="sm" 
+            onClick={() => setShowDeleteConfirm(true)}
+            className="gap-2"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </Button>
 
           <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
             <Download className="h-4 w-4" />
@@ -462,6 +493,26 @@ export function ContactsListView() {
           onOpenChange={(open) => !open && setSelectedContact(null)}
         />
       )}
+
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} Contact{selectedIds.size !== 1 ? 's' : ''}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the selected contact{selectedIds.size !== 1 ? 's' : ''}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

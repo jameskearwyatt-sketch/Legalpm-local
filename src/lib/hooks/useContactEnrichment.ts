@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/lib/auth";
 
 interface EnrichmentResult {
   gender?: 'male' | 'female' | 'unknown';
@@ -29,13 +30,40 @@ interface EnrichContactParams {
   email: string;
   linkedinUrl?: string | null;
   company?: string | null;
+  // Current values for history tracking
+  currentJobTitle?: string | null;
+  currentCompany?: string | null;
+  currentCountry?: string | null;
+  currentCity?: string | null;
+}
+
+// Helper to log history entries
+async function logHistoryChanges(
+  userId: string,
+  contactId: string,
+  changes: { fieldName: string; oldValue: string | null; newValue: string | null }[],
+  changeSource: 'manual' | 'enrichment' | 'import' = 'enrichment'
+) {
+  if (changes.length === 0) return;
+
+  const records = changes.map((c) => ({
+    contact_id: contactId,
+    user_id: userId,
+    field_name: c.fieldName,
+    old_value: c.oldValue,
+    new_value: c.newValue,
+    change_source: changeSource,
+  }));
+
+  await supabase.from("distribution_contact_history").insert(records);
 }
 
 export function useEnrichContact() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (params: EnrichContactParams): Promise<EnrichmentResult> => {
+    mutationFn: async (params: EnrichContactParams): Promise<EnrichmentResult & { params: EnrichContactParams }> => {
       const { data, error } = await supabase.functions.invoke('enrich-contact', {
         body: params,
       });
@@ -48,25 +76,54 @@ export function useEnrichContact() {
         throw new Error(data.error || 'Enrichment failed');
       }
 
-      return data.data;
+      return { ...data.data, params };
     },
-    onSuccess: async (result, params) => {
+    onSuccess: async (result) => {
+      if (!user) return;
+      
+      const params = result.params;
+      
       // Update the contact with enriched data
-      const updates: Record<string, unknown> = {};
+      const updates: Record<string, unknown> = {
+        last_enriched_at: new Date().toISOString(),
+      };
+      
+      // Track changes for history
+      const historyChanges: { fieldName: string; oldValue: string | null; newValue: string | null }[] = [];
       
       if (result.gender && result.gender !== 'unknown') {
         updates.gender = result.gender;
       }
-      if (result.company) {
+      if (result.company && result.company !== params.currentCompany) {
+        historyChanges.push({
+          fieldName: 'company',
+          oldValue: params.currentCompany || null,
+          newValue: result.company,
+        });
         updates.company = result.company;
       }
-      if (result.country) {
+      if (result.country && result.country !== params.currentCountry) {
+        historyChanges.push({
+          fieldName: 'country',
+          oldValue: params.currentCountry || null,
+          newValue: result.country,
+        });
         updates.country = result.country;
       }
-      if (result.city) {
+      if (result.city && result.city !== params.currentCity) {
+        historyChanges.push({
+          fieldName: 'city',
+          oldValue: params.currentCity || null,
+          newValue: result.city,
+        });
         updates.city = result.city;
       }
-      if (result.job_title) {
+      if (result.job_title && result.job_title !== params.currentJobTitle) {
+        historyChanges.push({
+          fieldName: 'job_title',
+          oldValue: params.currentJobTitle || null,
+          newValue: result.job_title,
+        });
         updates.job_title = result.job_title;
       }
       if (result.sectors && result.sectors.length > 0) {
@@ -92,22 +149,29 @@ export function useEnrichContact() {
         updates.company_keywords = result.company_keywords;
       }
 
-      if (Object.keys(updates).length > 0) {
-        const { error } = await supabase
-          .from('distribution_contacts')
-          .update(updates)
-          .eq('id', params.contactId);
+      // Always update (at least last_enriched_at)
+      const { error } = await supabase
+        .from('distribution_contacts')
+        .update(updates)
+        .eq('id', params.contactId);
 
-        if (error) {
-          console.error('Failed to update contact:', error);
-          toast.error('Enrichment data found but failed to save');
-          return;
-        }
+      if (error) {
+        console.error('Failed to update contact:', error);
+        toast.error('Enrichment data found but failed to save');
+        return;
+      }
 
-        // Invalidate queries to refresh the data
-        queryClient.invalidateQueries({ queryKey: ['distribution-contacts'] });
-        
-        const fieldsUpdated = Object.keys(updates).filter(k => k !== 'sectors_ai_assigned');
+      // Log history changes
+      if (historyChanges.length > 0) {
+        await logHistoryChanges(user.id, params.contactId, historyChanges, 'enrichment');
+      }
+
+      // Invalidate queries to refresh the data
+      queryClient.invalidateQueries({ queryKey: ['distribution-contacts'] });
+      queryClient.invalidateQueries({ queryKey: ['contact-history', params.contactId] });
+      
+      const fieldsUpdated = Object.keys(updates).filter(k => k !== 'sectors_ai_assigned' && k !== 'last_enriched_at');
+      if (fieldsUpdated.length > 0) {
         toast.success(`Enriched: ${fieldsUpdated.join(', ')}`, {
           description: `Sources: ${result.sources.join(', ')}`,
         });
@@ -115,7 +179,7 @@ export function useEnrichContact() {
         toast.info('No new data found to enrich');
       }
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error(error.message || 'Failed to enrich contact');
     },
   });

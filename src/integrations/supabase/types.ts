@@ -441,6 +441,47 @@ export type Database = {
         }
         Relationships: []
       }
+      distribution_contact_history: {
+        Row: {
+          change_source: string
+          changed_at: string
+          contact_id: string
+          field_name: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          user_id: string
+        }
+        Insert: {
+          change_source?: string
+          changed_at?: string
+          contact_id: string
+          field_name: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id: string
+        }
+        Update: {
+          change_source?: string
+          changed_at?: string
+          contact_id?: string
+          field_name?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distribution_contact_history_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "distribution_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       distribution_contacts: {
         Row: {
           city: string | null
@@ -455,6 +496,7 @@ export type Database = {
           gender: Database["public"]["Enums"]["contact_gender"]
           id: string
           job_title: string | null
+          last_enriched_at: string | null
           linkedin_url: string | null
           naics_codes: string[] | null
           notes: string | null
@@ -479,6 +521,7 @@ export type Database = {
           gender?: Database["public"]["Enums"]["contact_gender"]
           id?: string
           job_title?: string | null
+          last_enriched_at?: string | null
           linkedin_url?: string | null
           naics_codes?: string[] | null
           notes?: string | null
@@ -503,6 +546,7 @@ export type Database = {
           gender?: Database["public"]["Enums"]["contact_gender"]
           id?: string
           job_title?: string | null
+          last_enriched_at?: string | null
           linkedin_url?: string | null
           naics_codes?: string[] | null
           notes?: string | null

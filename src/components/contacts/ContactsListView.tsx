@@ -30,6 +30,7 @@ import {
   useBulkDeleteDistributionContacts,
   type ContactFilters,
   type DistributionContact,
+  type UpdatedTimePeriod,
 } from "@/lib/hooks/useDistributionContacts";
 import { useDistributionSectors } from "@/lib/hooks/useDistributionSectors";
 import { useDistinctCountries, useDistinctCompanies } from "@/lib/hooks/useDistributionContacts";
@@ -38,6 +39,7 @@ import { ContactFormDialog } from "./ContactFormDialog";
 import { ContactImportDialog } from "./ContactImportDialog";
 import { EmailDraftDialog } from "./EmailDraftDialog";
 import { ContactDetailDialog } from "./ContactDetailDialog";
+import { ContactHistoryDialog } from "./ContactHistoryDialog";
 import { SortableFilterableHeader, SortDirection } from "./SortableFilterableHeader";
 import { StickyTableHeader } from "@/components/ui/sticky-table-header";
 import { TableScrollControls } from "@/components/ui/table-scroll-controls";
@@ -55,6 +57,8 @@ import {
   Trash2,
   Wand2,
   Loader2,
+  History,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
@@ -70,6 +74,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { format } from "date-fns";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type ColumnFilterState = Record<string, string>;
 
@@ -83,6 +94,7 @@ export function ContactsListView() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedContact, setSelectedContact] = useState<DistributionContact | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [historyContact, setHistoryContact] = useState<{ id: string; name: string } | null>(null);
 
   // Sorting state
   const [sortKey, setSortKey] = useState<string | null>("full_name");
@@ -380,7 +392,7 @@ export function ContactsListView() {
               value={filters.sectors?.[0] || ""}
               onValueChange={(v) => setFilters(f => ({ ...f, sectors: v ? [v] : undefined }))}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[150px]">
                 <SelectValue placeholder="Sector" />
               </SelectTrigger>
               <SelectContent>
@@ -394,7 +406,7 @@ export function ContactsListView() {
               value={filters.country || ""}
               onValueChange={(v) => setFilters(f => ({ ...f, country: v || undefined }))}
             >
-              <SelectTrigger className="w-[180px]">
+              <SelectTrigger className="w-[140px]">
                 <SelectValue placeholder="Country" />
               </SelectTrigger>
               <SelectContent>
@@ -408,7 +420,7 @@ export function ContactsListView() {
               value={filters.gender || ""}
               onValueChange={(v) => setFilters(f => ({ ...f, gender: v as ContactFilters['gender'] || undefined }))}
             >
-              <SelectTrigger className="w-[140px]">
+              <SelectTrigger className="w-[110px]">
                 <SelectValue placeholder="Gender" />
               </SelectTrigger>
               <SelectContent>
@@ -422,8 +434,8 @@ export function ContactsListView() {
               value={filters.relationship_owner || ""}
               onValueChange={(v) => setFilters(f => ({ ...f, relationship_owner: v || undefined }))}
             >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Relationship Owner" />
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Owner" />
               </SelectTrigger>
               <SelectContent>
                 {relationshipOwners.map(r => (
@@ -436,7 +448,7 @@ export function ContactsListView() {
               value={filters.do_not_contact === undefined ? "" : filters.do_not_contact ? "true" : "false"}
               onValueChange={(v) => setFilters(f => ({ ...f, do_not_contact: v === "" ? undefined : v === "true" }))}
             >
-              <SelectTrigger className="w-[160px]">
+              <SelectTrigger className="w-[130px]">
                 <SelectValue placeholder="DNC Status" />
               </SelectTrigger>
               <SelectContent>
@@ -444,6 +456,40 @@ export function ContactsListView() {
                 <SelectItem value="true">Do Not Contact</SelectItem>
               </SelectContent>
             </Select>
+
+            <div className="h-6 w-px bg-border" />
+
+            {/* Time period filter */}
+            <Select
+              value={filters.updatedPeriod || ""}
+              onValueChange={(v) => setFilters(f => ({ 
+                ...f, 
+                updatedPeriod: v as UpdatedTimePeriod || undefined 
+              }))}
+            >
+              <SelectTrigger className="w-[160px]">
+                <Clock className="h-3 w-3 mr-1" />
+                <SelectValue placeholder="Updated in..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">Last Week</SelectItem>
+                <SelectItem value="month">Last Month</SelectItem>
+                <SelectItem value="6months">Last 6 Months</SelectItem>
+                <SelectItem value="year">Last Year</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Recently enriched checkbox */}
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox
+                checked={filters.recentlyEnriched || false}
+                onCheckedChange={(checked) => 
+                  setFilters(f => ({ ...f, recentlyEnriched: checked ? true : undefined }))
+                }
+              />
+              <Sparkles className="h-3 w-3 text-primary" />
+              <span>Enriched</span>
+            </label>
 
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
@@ -541,16 +587,16 @@ export function ContactsListView() {
       <StickyTableHeader>
         <TableScrollControls>
           <div className="border rounded-lg overflow-x-auto">
-            <Table>
+            <Table className="table-fixed">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12 min-w-[48px]">
+                  <TableHead className="w-10">
                     <Checkbox
                       checked={filteredAndSortedContacts.length > 0 && selectedIds.size === filteredAndSortedContacts.length}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
-                  <TableHead className="min-w-[180px]">
+                  <TableHead className="w-[140px]">
                     <SortableFilterableHeader
                       label="Name"
                       columnKey="full_name"
@@ -561,7 +607,7 @@ export function ContactsListView() {
                       onFilterChange={handleColumnFilter}
                     />
                   </TableHead>
-                  <TableHead className="min-w-[200px]">
+                  <TableHead className="w-[180px]">
                     <SortableFilterableHeader
                       label="Email"
                       columnKey="email"
@@ -572,7 +618,7 @@ export function ContactsListView() {
                       onFilterChange={handleColumnFilter}
                     />
                   </TableHead>
-                  <TableHead className="min-w-[150px]">
+                  <TableHead className="w-[120px]">
                     <SortableFilterableHeader
                       label="Company"
                       columnKey="company"
@@ -584,9 +630,9 @@ export function ContactsListView() {
                       filterOptions={uniqueCompanies}
                     />
                   </TableHead>
-                  <TableHead className="min-w-[150px]">
+                  <TableHead className="w-[120px]">
                     <SortableFilterableHeader
-                      label="Job Title"
+                      label="Title"
                       columnKey="job_title"
                       sortKey={sortKey}
                       sortDirection={sortDirection}
@@ -596,7 +642,7 @@ export function ContactsListView() {
                       filterOptions={uniqueJobTitles}
                     />
                   </TableHead>
-                  <TableHead className="min-w-[120px]">
+                  <TableHead className="w-[100px]">
                     <SortableFilterableHeader
                       label="Owner"
                       columnKey="relationship_owner"
@@ -608,8 +654,7 @@ export function ContactsListView() {
                       filterOptions={uniqueOwners}
                     />
                   </TableHead>
-                  <TableHead className="min-w-[140px]">Sectors</TableHead>
-                  <TableHead className="min-w-[100px]">
+                  <TableHead className="w-[80px]">
                     <SortableFilterableHeader
                       label="Country"
                       columnKey="country"
@@ -621,31 +666,20 @@ export function ContactsListView() {
                       filterOptions={uniqueCountries}
                     />
                   </TableHead>
-                  <TableHead className="min-w-[90px]">
-                    <SortableFilterableHeader
-                      label="Gender"
-                      columnKey="gender"
-                      sortKey={sortKey}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                      filterValue={columnFilters.gender || ""}
-                      onFilterChange={handleColumnFilter}
-                      filterOptions={["male", "female", "unknown"]}
-                    />
-                  </TableHead>
-                  <TableHead className="w-10 min-w-[40px]"></TableHead>
+                  <TableHead className="w-[80px] text-center">Updated</TableHead>
+                  <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       Loading contacts...
                     </TableCell>
                   </TableRow>
                 ) : filteredAndSortedContacts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                       {hasColumnFilters ? "No contacts match the current filters." : "No contacts found. Add your first contact or import from a file."}
                     </TableCell>
                   </TableRow>
@@ -655,69 +689,90 @@ export function ContactsListView() {
                       key={contact.id}
                       className={contact.do_not_contact ? "opacity-60 bg-muted/30" : ""}
                     >
-                      <TableCell>
+                      <TableCell className="w-10">
                         <Checkbox
                           checked={selectedIds.has(contact.id)}
                           onCheckedChange={(checked) => handleSelectOne(contact.id, !!checked)}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="truncate">
                         <button
                           onClick={() => setSelectedContact(contact)}
-                          className="font-medium hover:underline text-left"
+                          className="font-medium hover:underline text-left truncate max-w-full block"
                         >
                           {contact.full_name}
                         </button>
                         {contact.do_not_contact && (
-                          <Badge variant="destructive" className="ml-2 text-xs">DNC</Badge>
+                          <Badge variant="destructive" className="ml-1 text-xs">DNC</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">{contact.email}</TableCell>
-                      <TableCell>{contact.company || "-"}</TableCell>
-                      <TableCell>{contact.job_title || "-"}</TableCell>
-                      <TableCell className="text-muted-foreground">{contact.relationship_owner || "-"}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {contact.sectors.slice(0, 2).map(s => (
-                            <Badge key={s} variant="secondary" className="text-xs">
-                              {contact.sectors_ai_assigned && <Sparkles className="h-3 w-3 mr-1" />}
-                              {s}
-                            </Badge>
-                          ))}
-                          {contact.sectors.length > 2 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{contact.sectors.length - 2}
-                            </Badge>
-                          )}
-                        </div>
+                      <TableCell className="text-muted-foreground truncate text-sm">{contact.email}</TableCell>
+                      <TableCell className="truncate text-sm">{contact.company || "-"}</TableCell>
+                      <TableCell className="truncate text-sm">{contact.job_title || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground truncate text-sm">{contact.relationship_owner || "-"}</TableCell>
+                      <TableCell className="text-sm">{contact.country || "-"}</TableCell>
+                      <TableCell className="text-center">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
+                                {contact.last_enriched_at && (
+                                  <Sparkles className="h-3 w-3 text-primary" />
+                                )}
+                                <span>
+                                  {format(new Date(contact.updated_at), "d MMM")}
+                                </span>
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <div className="text-xs space-y-1">
+                                <div>Updated: {format(new Date(contact.updated_at), "d MMM yyyy HH:mm")}</div>
+                                {contact.last_enriched_at && (
+                                  <div className="flex items-center gap-1">
+                                    <Sparkles className="h-3 w-3" />
+                                    Enriched: {format(new Date(contact.last_enriched_at), "d MMM yyyy HH:mm")}
+                                  </div>
+                                )}
+                              </div>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableCell>
-                      <TableCell>{contact.country || "-"}</TableCell>
-                      <TableCell className="capitalize text-muted-foreground">{contact.gender}</TableCell>
                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="bg-popover">
-                            <DropdownMenuItem onClick={() => setSelectedContact(contact)}>
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem 
-                              onClick={() => {
-                                if (!contact.do_not_contact) {
-                                  setSelectedIds(new Set([contact.id]));
-                                  setShowEmailDialog(true);
-                                }
-                              }}
-                              disabled={contact.do_not_contact}
-                            >
-                              Draft Email
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => setHistoryContact({ id: contact.id, name: contact.full_name })}
+                          >
+                            <History className="h-3.5 w-3.5" />
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-7 w-7">
+                                <MoreVertical className="h-3.5 w-3.5" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-popover">
+                              <DropdownMenuItem onClick={() => setSelectedContact(contact)}>
+                                View Details
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                onClick={() => {
+                                  if (!contact.do_not_contact) {
+                                    setSelectedIds(new Set([contact.id]));
+                                    setShowEmailDialog(true);
+                                  }
+                                }}
+                                disabled={contact.do_not_contact}
+                              >
+                                Draft Email
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -791,6 +846,15 @@ export function ContactsListView() {
         onOpenChange={setShowGenderDialog}
         contacts={contacts}
       />
+
+      {historyContact && (
+        <ContactHistoryDialog
+          open={!!historyContact}
+          onOpenChange={(open) => !open && setHistoryContact(null)}
+          contactId={historyContact.id}
+          contactName={historyContact.name}
+        />
+      )}
     </div>
   );
 }

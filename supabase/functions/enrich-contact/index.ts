@@ -72,8 +72,10 @@ interface ApolloPersonResponse {
   };
 }
 
-// Common male/female name patterns for gender inference (fallback)
+// Comprehensive male/female name database for gender inference
+// Includes Western, Asian, Middle Eastern, South Asian, African, and Latin names
 const maleNames = new Set([
+  // Western - English
   'james', 'john', 'robert', 'michael', 'david', 'william', 'richard', 'joseph', 'thomas', 'charles',
   'christopher', 'daniel', 'matthew', 'anthony', 'mark', 'donald', 'steven', 'paul', 'andrew', 'joshua',
   'kenneth', 'kevin', 'brian', 'george', 'timothy', 'ronald', 'edward', 'jason', 'jeffrey', 'ryan',
@@ -83,49 +85,209 @@ const maleNames = new Set([
   'adam', 'harry', 'ralph', 'eugene', 'randy', 'philip', 'howard', 'vincent', 'russell', 'louis',
   'martin', 'oliver', 'leo', 'max', 'lucas', 'ethan', 'noah', 'liam', 'mason', 'logan',
   'tom', 'mike', 'chris', 'dan', 'matt', 'nick', 'alex', 'ben', 'sam', 'steve',
+  'ian', 'sean', 'connor', 'dylan', 'cole', 'luke', 'tyler', 'caleb', 'hunter', 'aaron',
+  'nathan', 'isaac', 'jordan', 'cameron', 'blake', 'austin', 'evan', 'gavin', 'chase', 'parker',
+  'miles', 'owen', 'eli', 'xavier', 'adrian', 'tristan', 'elliot', 'grant', 'spencer', 'trevor',
+  'derek', 'ross', 'neil', 'craig', 'doug', 'todd', 'chad', 'brad', 'troy', 'brett',
+  'gordon', 'stuart', 'graham', 'alan', 'keith', 'colin', 'barry', 'wayne', 'glenn', 'darren',
+  'simon', 'marcus', 'dominic', 'toby', 'rupert', 'nigel', 'clive', 'geoffrey', 'hugh', 'alistair',
+  // Middle Eastern & Arabic
   'mohammed', 'muhammad', 'ahmed', 'ali', 'omar', 'hassan', 'hussein', 'khalid', 'tariq', 'amir',
+  'yusuf', 'ibrahim', 'ismail', 'abdullah', 'abdul', 'mustafa', 'rashid', 'faisal', 'hamid', 'karim',
+  'samir', 'nasser', 'walid', 'ziad', 'adel', 'khaled', 'maher', 'hisham', 'bassam', 'wael',
+  'rami', 'sami', 'nabil', 'majid', 'jamal', 'salim', 'fahad', 'nawaf', 'sultan', 'badr',
+  'ehab', 'amr', 'sherif', 'tarek', 'hossam', 'ashraf', 'hazem', 'akram', 'essam', 'emad',
+  // South Asian - Indian, Pakistani, Bangladeshi
   'raj', 'amit', 'vijay', 'rahul', 'sanjay', 'suresh', 'ravi', 'kumar', 'arun', 'vikram',
+  'anand', 'ashok', 'deepak', 'dinesh', 'ganesh', 'girish', 'gopal', 'harish', 'kiran', 'krishna',
+  'mahesh', 'manoj', 'mohan', 'mukesh', 'naresh', 'nitin', 'pankaj', 'praveen', 'rajesh', 'rakesh',
+  'ramesh', 'rohit', 'sachin', 'sandeep', 'satish', 'shekhar', 'sunil', 'vinod', 'vivek', 'yogesh',
+  'aditya', 'akash', 'ankur', 'arjun', 'arnav', 'dhruv', 'gaurav', 'harsh', 'ishaan', 'kabir',
+  'manish', 'mayank', 'mohit', 'nikhil', 'nishant', 'pratik', 'prateek', 'rishabh', 'rohan', 'sahil',
+  'shivam', 'sidharth', 'siddharth', 'varun', 'vishal', 'yash', 'aarav', 'ayush', 'kartik', 'kunal',
+  'imran', 'asif', 'farhan', 'bilal', 'usman', 'zubair', 'adnan', 'nadeem', 'wasim', 'kamran',
+  // East Asian - Chinese
   'wei', 'chen', 'ming', 'jun', 'hong', 'lei', 'yong', 'feng', 'jian', 'xin',
-  'hiroshi', 'takeshi', 'kenji', 'yuki', 'ken', 'taro', 'akira', 'naoki', 'koji', 'daisuke',
-  'stefan', 'hans', 'klaus', 'wolfgang', 'andreas', 'thomas', 'markus', 'peter', 'jurgen', 'dieter',
+  'bo', 'chao', 'gang', 'hao', 'hui', 'kai', 'lin', 'peng', 'qiang', 'tao',
+  'wen', 'xiang', 'yang', 'yu', 'zhi', 'zhong', 'dong', 'guang', 'hai', 'jie',
+  'liang', 'long', 'nan', 'ping', 'qing', 'rong', 'shan', 'sheng', 'shi', 'song',
+  'chang', 'cheng', 'da', 'de', 'fu', 'guo', 'hua', 'jing', 'ke', 'kang',
+  'zheng', 'bin', 'biao', 'cong', 'deng', 'fei', 'heng', 'jianwei', 'jianjun', 'jianguo',
+  'shirvine', 'shawn', 'tony', 'jerry', 'andy', 'eric', 'kevin', 'david', 'jason', 'frank',
+  // East Asian - Japanese
+  'hiroshi', 'takeshi', 'kenji', 'ken', 'taro', 'akira', 'naoki', 'koji', 'daisuke', 'takahiro',
+  'yusuke', 'ryota', 'kenta', 'shota', 'kazuki', 'daiki', 'yuta', 'sho', 'ryo', 'masashi',
+  'tetsuya', 'kazuya', 'yuichi', 'shinichi', 'tomohiro', 'yoshihiro', 'masahiro', 'kazuhiro', 'nobuhiro', 'takuya',
+  'satoshi', 'atsushi', 'takashi', 'makoto', 'kenichi', 'koichi', 'yuji', 'shinji', 'junichi', 'shuji',
+  // East Asian - Korean
+  'minho', 'jinho', 'junho', 'jaehyun', 'seungho', 'donghoon', 'jungwoo', 'sangwoo', 'hyunwoo', 'taehyun',
+  'jihoon', 'sunghoon', 'kyungho', 'young', 'sung', 'joon', 'min', 'hyun', 'woo', 'seok',
+  'jinwoo', 'sungmin', 'youngho', 'dongwook', 'junhyuk', 'sangmin', 'hyunsoo', 'jinhyuk', 'seungjun', 'minwoo',
+  // European - German
+  'stefan', 'hans', 'klaus', 'wolfgang', 'andreas', 'markus', 'jurgen', 'dieter', 'jorg', 'uwe',
+  'ralf', 'bernd', 'frank', 'dirk', 'thorsten', 'matthias', 'christoph', 'florian', 'tobias', 'sebastian',
+  'johannes', 'jan', 'lars', 'sven', 'hendrik', 'till', 'moritz', 'felix', 'lukas', 'jonas',
+  // European - French
   'jean', 'pierre', 'michel', 'francois', 'jacques', 'philippe', 'marc', 'laurent', 'nicolas', 'antoine',
-  'carlos', 'jose', 'luis', 'miguel', 'antonio', 'francisco', 'pedro', 'manuel', 'rafael', 'jorge'
+  'guillaume', 'christophe', 'thierry', 'alain', 'pascal', 'olivier', 'bruno', 'serge', 'rene', 'yves',
+  'benoit', 'julien', 'cedric', 'fabien', 'maxime', 'romain', 'quentin', 'hugo', 'louis', 'baptiste',
+  // European - Spanish/Portuguese
+  'carlos', 'jose', 'luis', 'miguel', 'antonio', 'francisco', 'pedro', 'manuel', 'rafael', 'jorge',
+  'fernando', 'pablo', 'alejandro', 'javier', 'enrique', 'ricardo', 'andres', 'sergio', 'raul', 'alberto',
+  'diego', 'ruben', 'ivan', 'alvaro', 'guillermo', 'mario', 'victor', 'eduardo', 'alfonso', 'ramon',
+  'joao', 'bruno', 'tiago', 'andre', 'hugo', 'ricardo', 'nuno', 'rui', 'paulo', 'vitor',
+  // European - Italian
+  'marco', 'giuseppe', 'giovanni', 'luca', 'francesco', 'andrea', 'alessandro', 'matteo', 'davide', 'simone',
+  'fabio', 'stefano', 'roberto', 'massimo', 'maurizio', 'claudio', 'daniele', 'paolo', 'riccardo', 'nicola',
+  // European - Dutch/Scandinavian
+  'jan', 'pieter', 'henk', 'willem', 'gerrit', 'jeroen', 'bas', 'joost', 'wouter', 'maarten',
+  'erik', 'magnus', 'anders', 'johan', 'olof', 'soren', 'morten', 'bjorn', 'thor', 'leif',
+  // European - Polish/Eastern European
+  'piotr', 'pawel', 'tomasz', 'krzysztof', 'marcin', 'michal', 'jakub', 'maciej', 'adam', 'lukasz',
+  'andrzej', 'wojciech', 'grzegorz', 'rafal', 'mariusz', 'dariusz', 'artur', 'kamil', 'mateusz', 'bartosz',
+  'ivan', 'dmitri', 'sergei', 'mikhail', 'alexei', 'vladimir', 'boris', 'oleg', 'yuri', 'viktor',
+  // African
+  'kwame', 'kofi', 'ade', 'chidi', 'emeka', 'obinna', 'chibuzo', 'oluwole', 'babatunde', 'olumide',
+  'segun', 'tunde', 'femi', 'tobi', 'yemi', 'bola', 'kunle', 'wale', 'dele', 'jide',
+  'thabo', 'sipho', 'themba', 'mandla', 'bongani', 'sibusiso', 'sifiso', 'mthunzi', 'nkosinathi', 'kagiso',
+  // Hebrew/Israeli
+  'david', 'yosef', 'moshe', 'yakov', 'avraham', 'shlomo', 'itzhak', 'avi', 'eitan', 'alon',
+  'roi', 'guy', 'oren', 'tal', 'nadav', 'yuval', 'nir', 'gal', 'amit', 'idan',
+  // Turkish
+  'mehmet', 'mustafa', 'ahmet', 'ali', 'hasan', 'huseyin', 'murat', 'ismail', 'osman', 'yusuf',
+  'can', 'cem', 'emre', 'burak', 'baris', 'tolga', 'serkan', 'kerem', 'onur', 'arda'
 ]);
 
 const femaleNames = new Set([
+  // Western - English
   'mary', 'patricia', 'jennifer', 'linda', 'barbara', 'elizabeth', 'susan', 'jessica', 'sarah', 'karen',
   'lisa', 'nancy', 'betty', 'margaret', 'sandra', 'ashley', 'kimberly', 'emily', 'donna', 'michelle',
   'dorothy', 'carol', 'amanda', 'melissa', 'deborah', 'stephanie', 'rebecca', 'sharon', 'laura', 'cynthia',
   'kathleen', 'amy', 'angela', 'shirley', 'anna', 'brenda', 'pamela', 'emma', 'nicole', 'helen',
   'samantha', 'katherine', 'christine', 'debra', 'rachel', 'carolyn', 'janet', 'catherine', 'maria', 'heather',
   'diane', 'ruth', 'julie', 'olivia', 'joyce', 'virginia', 'victoria', 'kelly', 'lauren', 'christina',
-  'joan', 'evelyn', 'judith', 'megan', 'andrea', 'cheryl', 'hannah', 'jacqueline', 'martha', 'gloria',
-  'teresa', 'ann', 'sara', 'madison', 'frances', 'kathryn', 'janice', 'jean', 'abigail', 'alice',
-  'sophia', 'grace', 'chloe', 'isabella', 'charlotte', 'mia', 'amelia', 'harper', 'evelyn', 'aria',
-  'fatima', 'aisha', 'mariam', 'zahra', 'sara', 'layla', 'noor', 'hana', 'yasmin', 'amira',
+  'joan', 'evelyn', 'judith', 'megan', 'cheryl', 'hannah', 'jacqueline', 'martha', 'gloria', 'teresa',
+  'ann', 'sara', 'madison', 'frances', 'kathryn', 'janice', 'abigail', 'alice', 'judy', 'grace',
+  'sophia', 'chloe', 'isabella', 'charlotte', 'mia', 'amelia', 'harper', 'aria', 'ella', 'scarlett',
+  'natalie', 'zoey', 'lily', 'penelope', 'layla', 'riley', 'nora', 'eleanor', 'hazel', 'aurora',
+  'allison', 'audrey', 'claire', 'stella', 'bella', 'lucy', 'anna', 'leah', 'savannah', 'brooklyn',
+  'jill', 'wendy', 'kate', 'beth', 'anne', 'sue', 'kim', 'tina', 'gina', 'dana',
+  'molly', 'holly', 'sally', 'tracy', 'stacy', 'carrie', 'terri', 'jenny', 'vicky', 'cindy',
+  'bonnie', 'tammy', 'denise', 'renee', 'tiffany', 'brittany', 'crystal', 'brandy', 'amber', 'brooke',
+  'fiona', 'sienna', 'willow', 'ivy', 'piper', 'jade', 'maya', 'daisy', 'violet', 'ruby',
+  // Middle Eastern & Arabic
+  'fatima', 'aisha', 'mariam', 'zahra', 'layla', 'noor', 'hana', 'yasmin', 'amira', 'sara',
+  'leila', 'dina', 'mona', 'rania', 'dalal', 'huda', 'lubna', 'wafa', 'mai', 'dalia',
+  'rana', 'reem', 'noura', 'abeer', 'asma', 'hadeel', 'manal', 'lina', 'yara', 'ghadeer',
+  'maha', 'eman', 'heba', 'nesreen', 'sahar', 'sherine', 'ghada', 'samira', 'nawal', 'afaf',
+  // South Asian - Indian, Pakistani, Bangladeshi
   'priya', 'anita', 'sunita', 'rekha', 'meena', 'deepa', 'kavita', 'neha', 'pooja', 'divya',
-  'yan', 'li', 'fang', 'xia', 'ying', 'mei', 'juan', 'lan', 'ping', 'min',
+  'anjali', 'asha', 'geeta', 'indira', 'jaya', 'kamla', 'lata', 'mala', 'nandini', 'padma',
+  'radha', 'rani', 'ritu', 'seema', 'shanti', 'shobha', 'sudha', 'uma', 'usha', 'vidya',
+  'aditi', 'aishwarya', 'ananya', 'archana', 'bhavna', 'chitra', 'devika', 'dipti', 'garima', 'harini',
+  'isha', 'jyoti', 'kritika', 'madhuri', 'manisha', 'megha', 'mitali', 'namita', 'nidhi', 'pallavi',
+  'preeti', 'rashmi', 'ritu', 'sakshi', 'sangeeta', 'shruti', 'sneha', 'swati', 'tanvi', 'tanya',
+  'ayesha', 'sana', 'zainab', 'farzana', 'nadia', 'shabnam', 'shazia', 'tahira', 'uzma', 'fatema',
+  // East Asian - Chinese
+  'yan', 'li', 'fang', 'xia', 'ying', 'mei', 'lan', 'min', 'na', 'hua',
+  'jing', 'qian', 'ting', 'xue', 'yun', 'zhen', 'hong', 'chun', 'ling', 'rong',
+  'juan', 'ping', 'yan', 'fen', 'qin', 'shu', 'xiao', 'yu', 'yi', 'lei',
+  'lu', 'dan', 'ning', 'sha', 'yuan', 'lin', 'ai', 'bi', 'cui', 'fan',
+  'shirveen', 'shirley', 'tina', 'lily', 'jenny', 'grace', 'emily', 'kelly', 'vivian', 'connie',
+  'winnie', 'maggie', 'candy', 'ivy', 'cynthia', 'cindy', 'sunny', 'wendy', 'nancy', 'betty',
+  // East Asian - Japanese
   'yuki', 'sakura', 'akiko', 'yoko', 'keiko', 'hiroko', 'michiko', 'naomi', 'mari', 'emi',
-  'anna', 'maria', 'katrin', 'claudia', 'sabine', 'petra', 'stefanie', 'monika', 'andrea', 'nicole',
-  'marie', 'sophie', 'camille', 'claire', 'julie', 'nathalie', 'sylvie', 'isabelle', 'anne', 'valerie',
-  'carmen', 'lucia', 'rosa', 'elena', 'laura', 'isabel', 'ana', 'teresa', 'cristina', 'paula'
+  'haruka', 'ayumi', 'yui', 'miki', 'rika', 'nana', 'sayaka', 'mayumi', 'tomoko', 'yukiko',
+  'kazuko', 'kumiko', 'noriko', 'reiko', 'sachiko', 'satoko', 'shizuka', 'takako', 'yasuko', 'yumiko',
+  'aiko', 'asuka', 'chiaki', 'chika', 'eri', 'honoka', 'kaori', 'kayo', 'mai', 'mao',
+  'miho', 'misaki', 'momoko', 'nanami', 'rin', 'risa', 'saki', 'shiori', 'yuka', 'ayaka',
+  // East Asian - Korean
+  'minji', 'jiwon', 'soyeon', 'yuna', 'hyejin', 'eunbi', 'suji', 'haein', 'jiyeon', 'sujin',
+  'mina', 'hana', 'yuna', 'sora', 'yerin', 'jihye', 'jiwoo', 'seohyun', 'eunji', 'hayoung',
+  // European - German
+  'anna', 'katrin', 'claudia', 'sabine', 'petra', 'stefanie', 'monika', 'nicole', 'sandra', 'julia',
+  'sarah', 'lena', 'lisa', 'hannah', 'laura', 'marie', 'sophie', 'emma', 'mia', 'lea',
+  'heike', 'ute', 'birgit', 'gabi', 'karin', 'ingrid', 'renate', 'ursula', 'elisabeth', 'eva',
+  // European - French
+  'marie', 'sophie', 'camille', 'claire', 'nathalie', 'sylvie', 'isabelle', 'anne', 'valerie', 'celine',
+  'aurelie', 'emilie', 'pauline', 'manon', 'lea', 'chloe', 'julie', 'charlotte', 'margaux', 'clemence',
+  'lucie', 'marine', 'mathilde', 'alice', 'jeanne', 'louise', 'juliette', 'helene', 'sandrine', 'delphine',
+  // European - Spanish/Portuguese
+  'carmen', 'lucia', 'rosa', 'elena', 'laura', 'isabel', 'ana', 'teresa', 'cristina', 'paula',
+  'marta', 'patricia', 'beatriz', 'pilar', 'raquel', 'silvia', 'alicia', 'rocio', 'adriana', 'lorena',
+  'maria', 'julia', 'clara', 'alba', 'andrea', 'ines', 'irene', 'natalia', 'sara', 'diana',
+  'mariana', 'catarina', 'ines', 'rita', 'sofia', 'leonor', 'beatriz', 'joana', 'daniela', 'carolina',
+  // European - Italian
+  'giulia', 'francesca', 'valentina', 'chiara', 'elisa', 'sara', 'alessia', 'martina', 'federica', 'silvia',
+  'paola', 'claudia', 'elena', 'roberta', 'anna', 'lucia', 'monica', 'simona', 'barbara', 'patrizia',
+  // European - Dutch/Scandinavian
+  'anna', 'maria', 'emma', 'lisa', 'eva', 'sanne', 'lotte', 'julia', 'sophie', 'fleur',
+  'ingrid', 'astrid', 'karin', 'sigrid', 'birgit', 'annika', 'linnea', 'maja', 'frida', 'ebba',
+  // European - Polish/Eastern European
+  'anna', 'maria', 'katarzyna', 'malgorzata', 'agnieszka', 'barbara', 'krystyna', 'ewa', 'elzbieta', 'zofia',
+  'aleksandra', 'joanna', 'dorota', 'monika', 'beata', 'iwona', 'karolina', 'natalia', 'justyna', 'sylwia',
+  'olga', 'natasha', 'tatiana', 'irina', 'elena', 'svetlana', 'marina', 'yulia', 'ekaterina', 'anastasia',
+  // African
+  'adaeze', 'chioma', 'ngozi', 'nneka', 'obioma', 'chinwe', 'adanna', 'uju', 'amara', 'chiamaka',
+  'abena', 'akua', 'ama', 'efua', 'yaa', 'adwoa', 'afua', 'akosua', 'adjoa', 'nana',
+  'thandi', 'nomvula', 'zanele', 'lindiwe', 'palesa', 'lerato', 'dineo', 'mpho', 'thandiwe', 'sibongile',
+  // Hebrew/Israeli
+  'miriam', 'ruth', 'esther', 'leah', 'rivka', 'yael', 'tamar', 'noa', 'maya', 'shira',
+  'michal', 'inbar', 'talia', 'dana', 'keren', 'hila', 'liora', 'orly', 'ayelet', 'galit',
+  // Turkish
+  'elif', 'zeynep', 'ayse', 'fatma', 'emine', 'hatice', 'merve', 'busra', 'selin', 'esra',
+  'melis', 'derya', 'sibel', 'ceren', 'irem', 'gamze', 'tugba', 'ozge', 'ece', 'beren'
 ]);
 
 function inferGenderFromName(fullName: string): { gender: 'male' | 'female' | 'unknown'; confidence: number } {
   const firstName = fullName.trim().split(/\s+/)[0].toLowerCase();
   
+  // Direct match from name databases
   if (maleNames.has(firstName)) {
-    return { gender: 'male', confidence: 0.85 };
+    return { gender: 'male', confidence: 0.9 };
   }
   if (femaleNames.has(firstName)) {
-    return { gender: 'female', confidence: 0.85 };
+    return { gender: 'female', confidence: 0.9 };
   }
   
-  // Check name endings as heuristics
-  if (firstName.endsWith('a') || firstName.endsWith('ie') || firstName.endsWith('ine') || firstName.endsWith('elle')) {
-    return { gender: 'female', confidence: 0.6 };
+  // Try without accents/diacritics
+  const normalizedName = firstName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (normalizedName !== firstName) {
+    if (maleNames.has(normalizedName)) {
+      return { gender: 'male', confidence: 0.85 };
+    }
+    if (femaleNames.has(normalizedName)) {
+      return { gender: 'female', confidence: 0.85 };
+    }
   }
-  if (firstName.endsWith('o') || firstName.endsWith('us') || firstName.endsWith('er')) {
+  
+  // Check name endings as heuristics (culturally common patterns)
+  // Female endings
+  if (firstName.endsWith('a') && !['joshua', 'ezra', 'luca', 'elia', 'nikita'].includes(firstName)) {
+    return { gender: 'female', confidence: 0.65 };
+  }
+  if (firstName.endsWith('ie') || firstName.endsWith('y') && firstName.length > 3) {
+    // Many nicknames end in -ie/-y for both genders, lower confidence
+    return { gender: 'female', confidence: 0.5 };
+  }
+  if (firstName.endsWith('ine') || firstName.endsWith('elle') || firstName.endsWith('ette')) {
+    return { gender: 'female', confidence: 0.75 };
+  }
+  if (firstName.endsWith('lyn') || firstName.endsWith('een') || firstName.endsWith('leen')) {
+    return { gender: 'female', confidence: 0.7 };
+  }
+  
+  // Male endings
+  if (firstName.endsWith('o') && !['margo'].includes(firstName)) {
+    return { gender: 'male', confidence: 0.6 };
+  }
+  if (firstName.endsWith('us') || firstName.endsWith('os')) {
+    return { gender: 'male', confidence: 0.7 };
+  }
+  if (firstName.endsWith('er') || firstName.endsWith('or') || firstName.endsWith('ar')) {
+    return { gender: 'male', confidence: 0.55 };
+  }
+  if (firstName.endsWith('ew') || firstName.endsWith('ck') || firstName.endsWith('ld')) {
     return { gender: 'male', confidence: 0.6 };
   }
   

@@ -570,21 +570,23 @@ Deno.serve(async (req) => {
         result.job_title = person.title;
       }
       
-      // Location - prefer organization location (more current) over person location (often stale)
-      const orgCity = person.organization?.city;
-      const orgCountry = person.organization?.country;
+      // Location - ALWAYS prefer person location (where they actually are)
+      // Organization location is the company HQ which is often in a different country
       const personCity = person.city;
       const personCountry = person.country;
+      const orgCity = person.organization?.city;
+      const orgCountry = person.organization?.country;
       
-      // Use organization location if available, fall back to person location
-      if (orgCity || orgCountry) {
-        result.city = orgCity || undefined;
-        result.country = orgCountry || undefined;
-        result.confidence.location = 0.95; // Higher confidence for org location
-      } else if (personCity || personCountry) {
+      // Use person location first (this is where the individual actually is)
+      if (personCity || personCountry) {
         result.city = personCity || undefined;
         result.country = personCountry || undefined;
-        result.confidence.location = 0.7; // Lower confidence for person location (can be stale)
+        result.confidence.location = 0.9;
+      } else if (orgCity || orgCountry) {
+        // Only fall back to org location if no person location available
+        result.city = orgCity || undefined;
+        result.country = orgCountry || undefined;
+        result.confidence.location = 0.5; // Low confidence - this is company HQ, not person's location
       }
       
       // LinkedIn URL

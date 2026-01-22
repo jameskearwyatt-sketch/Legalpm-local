@@ -19,6 +19,7 @@ interface EnrichmentResult {
   job_title?: string;
   sectors?: string[];
   linkedin_url?: string;
+  email?: string;
   email_status?: string;
   sic_codes?: string[];
   naics_codes?: string[];
@@ -207,6 +208,11 @@ Deno.serve(async (req) => {
           result.sectors = [industry];
           result.confidence.sector = 0.85;
         }
+      }
+      
+      // Email - update if Apollo found a different/verified email
+      if (person.email && person.email_status === 'verified') {
+        result.email = person.email;
       }
       
       // Email status

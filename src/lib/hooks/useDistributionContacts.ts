@@ -22,6 +22,7 @@ export interface DistributionContact {
   provenance: string | null;
   created_at: string;
   updated_at: string;
+  last_enriched_at: string | null;
   // Apollo enrichment fields
   email_status: string | null;
   sic_codes: string[] | null;
@@ -29,13 +30,16 @@ export interface DistributionContact {
   company_keywords: string[] | null;
 }
 
-export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'email_status' | 'sic_codes' | 'naics_codes' | 'company_keywords'> & {
+export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'last_enriched_at' | 'email_status' | 'sic_codes' | 'naics_codes' | 'company_keywords'> & {
   email_status?: string | null;
   sic_codes?: string[] | null;
   naics_codes?: string[] | null;
   company_keywords?: string[] | null;
+  last_enriched_at?: string | null;
 };
 export type DistributionContactUpdate = Partial<DistributionContactInsert>;
+
+export type UpdatedTimePeriod = 'week' | 'month' | '6months' | 'year' | null;
 
 export interface ContactFilters {
   sectors?: string[];
@@ -45,6 +49,26 @@ export interface ContactFilters {
   relationship_owner?: string;
   do_not_contact?: boolean;
   search?: string;
+  recentlyEnriched?: boolean;
+  updatedPeriod?: UpdatedTimePeriod;
+}
+
+// Helper to get date cutoff for period filters
+function getPeriodCutoff(period: UpdatedTimePeriod): Date | null {
+  if (!period) return null;
+  const now = new Date();
+  switch (period) {
+    case 'week':
+      return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    case 'month':
+      return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    case '6months':
+      return new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+    case 'year':
+      return new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+    default:
+      return null;
+  }
 }
 
 export function useDistributionContacts(filters?: ContactFilters) {
@@ -79,6 +103,11 @@ export function useDistributionContacts(filters?: ContactFilters) {
       if (filters?.search) {
         query = query.or(`full_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,company.ilike.%${filters.search}%`);
       }
+      
+      // Filter by recently enriched (has last_enriched_at set)
+      if (filters?.recentlyEnriched) {
+        query = query.not("last_enriched_at", "is", null);
+      }
 
       const { data, error } = await query;
 
@@ -90,6 +119,19 @@ export function useDistributionContacts(filters?: ContactFilters) {
         contacts = contacts.filter(c => 
           c.sectors.some(s => filters.sectors!.includes(s))
         );
+      }
+      
+      // Filter by updated/enriched period in JS (more flexible)
+      if (filters?.updatedPeriod) {
+        const cutoff = getPeriodCutoff(filters.updatedPeriod);
+        if (cutoff) {
+          const cutoffStr = cutoff.toISOString();
+          contacts = contacts.filter(c => {
+            const updated = c.updated_at >= cutoffStr;
+            const enriched = c.last_enriched_at ? c.last_enriched_at >= cutoffStr : false;
+            return updated || enriched;
+          });
+        }
       }
 
       return contacts;

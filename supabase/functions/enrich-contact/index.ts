@@ -124,9 +124,9 @@ async function enrichWithApollo(email: string, fullName: string, apiKey: string)
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-cache',
+        'X-Api-Key': apiKey,
       },
       body: JSON.stringify({
-        api_key: apiKey,
         email: email,
         name: fullName,
       }),

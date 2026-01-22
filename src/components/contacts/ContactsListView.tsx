@@ -39,6 +39,8 @@ import { ContactImportDialog } from "./ContactImportDialog";
 import { EmailDraftDialog } from "./EmailDraftDialog";
 import { ContactDetailDialog } from "./ContactDetailDialog";
 import { SortableFilterableHeader, SortDirection } from "./SortableFilterableHeader";
+import { StickyTableHeader } from "@/components/ui/sticky-table-header";
+import { TableScrollControls } from "@/components/ui/table-scroll-controls";
 import {
   Plus,
   Search,
@@ -53,10 +55,11 @@ import {
   Trash2,
   Wand2,
   Loader2,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
-import { useBulkEnrichContacts } from "@/lib/hooks/useContactEnrichment";
+import { useBulkEnrichContacts, useAssignGenders } from "@/lib/hooks/useContactEnrichment";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -295,140 +298,167 @@ export function ContactsListView() {
 
   const hasColumnFilters = Object.values(columnFilters).some(v => v);
 
+  const assignGenders = useAssignGenders();
+
+  const unknownGenderCount = useMemo(() => 
+    contacts.filter(c => c.gender === 'unknown').length,
+    [contacts]
+  );
+
   return (
     <div className="space-y-4">
-      {/* Actions bar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search contacts..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+      {/* Sticky top section */}
+      <div className="sticky top-0 z-20 bg-background pb-2 pt-1 -mt-1 space-y-3">
+        {/* Actions bar */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search contacts..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
 
-        <Button
-          variant={showFilters ? "secondary" : "outline"}
-          size="sm"
-          onClick={() => setShowFilters(!showFilters)}
-          className="gap-2"
-        >
-          <Filter className="h-4 w-4" />
-          Filters
-          {hasActiveFilters && (
-            <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center">
-              !
-            </Badge>
-          )}
-        </Button>
-
-        {hasColumnFilters && (
           <Button
-            variant="ghost"
+            variant={showFilters ? "secondary" : "outline"}
             size="sm"
-            onClick={() => setColumnFilters({})}
-            className="gap-1 text-muted-foreground"
+            onClick={() => setShowFilters(!showFilters)}
+            className="gap-2"
           >
-            <X className="h-4 w-4" />
-            Clear column filters
+            <Filter className="h-4 w-4" />
+            Filters
+            {hasActiveFilters && (
+              <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center">
+                !
+              </Badge>
+            )}
           </Button>
-        )}
 
-        <div className="flex-1" />
-
-        <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)} className="gap-2">
-          <Upload className="h-4 w-4" />
-          Import
-        </Button>
-
-        <Button size="sm" onClick={() => setShowAddDialog(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Contact
-        </Button>
-      </div>
-
-      {/* Filters panel */}
-      {showFilters && (
-        <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border">
-          <Select
-            value={filters.sectors?.[0] || ""}
-            onValueChange={(v) => setFilters(f => ({ ...f, sectors: v ? [v] : undefined }))}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Sector" />
-            </SelectTrigger>
-            <SelectContent>
-              {sectors.map(s => (
-                <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.country || ""}
-            onValueChange={(v) => setFilters(f => ({ ...f, country: v || undefined }))}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Country" />
-            </SelectTrigger>
-            <SelectContent>
-              {countries.map(c => (
-                <SelectItem key={c} value={c}>{c}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.gender || ""}
-            onValueChange={(v) => setFilters(f => ({ ...f, gender: v as ContactFilters['gender'] || undefined }))}
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Gender" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="male">Male</SelectItem>
-              <SelectItem value="female">Female</SelectItem>
-              <SelectItem value="unknown">Unknown</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.relationship_owner || ""}
-            onValueChange={(v) => setFilters(f => ({ ...f, relationship_owner: v || undefined }))}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Relationship Owner" />
-            </SelectTrigger>
-            <SelectContent>
-              {relationshipOwners.map(r => (
-                <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select
-            value={filters.do_not_contact === undefined ? "" : filters.do_not_contact ? "true" : "false"}
-            onValueChange={(v) => setFilters(f => ({ ...f, do_not_contact: v === "" ? undefined : v === "true" }))}
-          >
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="DNC Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="false">Contactable</SelectItem>
-              <SelectItem value="true">Do Not Contact</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
+          {hasColumnFilters && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setColumnFilters({})}
+              className="gap-1 text-muted-foreground"
+            >
               <X className="h-4 w-4" />
-              Clear all
+              Clear column filters
             </Button>
           )}
+
+          <div className="flex-1" />
+
+          {unknownGenderCount > 0 && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => assignGenders.mutate(contacts.map(c => ({ id: c.id, full_name: c.full_name, gender: c.gender })))}
+              disabled={assignGenders.isPending}
+              className="gap-2"
+            >
+              {assignGenders.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Users className="h-4 w-4" />
+              )}
+              Assign Genders ({unknownGenderCount})
+            </Button>
+          )}
+
+          <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)} className="gap-2">
+            <Upload className="h-4 w-4" />
+            Import
+          </Button>
+
+          <Button size="sm" onClick={() => setShowAddDialog(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add Contact
+          </Button>
         </div>
-      )}
+
+        {/* Filters panel */}
+        {showFilters && (
+          <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border">
+            <Select
+              value={filters.sectors?.[0] || ""}
+              onValueChange={(v) => setFilters(f => ({ ...f, sectors: v ? [v] : undefined }))}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Sector" />
+              </SelectTrigger>
+              <SelectContent>
+                {sectors.map(s => (
+                  <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.country || ""}
+              onValueChange={(v) => setFilters(f => ({ ...f, country: v || undefined }))}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Country" />
+              </SelectTrigger>
+              <SelectContent>
+                {countries.map(c => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.gender || ""}
+              onValueChange={(v) => setFilters(f => ({ ...f, gender: v as ContactFilters['gender'] || undefined }))}
+            >
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Gender" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="male">Male</SelectItem>
+                <SelectItem value="female">Female</SelectItem>
+                <SelectItem value="unknown">Unknown</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.relationship_owner || ""}
+              onValueChange={(v) => setFilters(f => ({ ...f, relationship_owner: v || undefined }))}
+            >
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Relationship Owner" />
+              </SelectTrigger>
+              <SelectContent>
+                {relationshipOwners.map(r => (
+                  <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.do_not_contact === undefined ? "" : filters.do_not_contact ? "true" : "false"}
+              onValueChange={(v) => setFilters(f => ({ ...f, do_not_contact: v === "" ? undefined : v === "true" }))}
+            >
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="DNC Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="false">Contactable</SelectItem>
+                <SelectItem value="true">Do Not Contact</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
+                <X className="h-4 w-4" />
+                Clear all
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Selection actions */}
       {selectedIds.size > 0 && (
@@ -512,192 +542,196 @@ export function ContactsListView() {
         </div>
       )}
 
-      {/* Contacts table */}
-      <div className="border rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={filteredAndSortedContacts.length > 0 && selectedIds.size === filteredAndSortedContacts.length}
-                  onCheckedChange={handleSelectAll}
-                />
-              </TableHead>
-              <TableHead>
-                <SortableFilterableHeader
-                  label="Name"
-                  columnKey="full_name"
-                  sortKey={sortKey}
-                  sortDirection={sortDirection}
-                  onSort={handleSort}
-                  filterValue={columnFilters.full_name || ""}
-                  onFilterChange={handleColumnFilter}
-                />
-              </TableHead>
-              <TableHead>
-                <SortableFilterableHeader
-                  label="Email"
-                  columnKey="email"
-                  sortKey={sortKey}
-                  sortDirection={sortDirection}
-                  onSort={handleSort}
-                  filterValue={columnFilters.email || ""}
-                  onFilterChange={handleColumnFilter}
-                />
-              </TableHead>
-              <TableHead>
-                <SortableFilterableHeader
-                  label="Company"
-                  columnKey="company"
-                  sortKey={sortKey}
-                  sortDirection={sortDirection}
-                  onSort={handleSort}
-                  filterValue={columnFilters.company || ""}
-                  onFilterChange={handleColumnFilter}
-                  filterOptions={uniqueCompanies}
-                />
-              </TableHead>
-              <TableHead>
-                <SortableFilterableHeader
-                  label="Job Title"
-                  columnKey="job_title"
-                  sortKey={sortKey}
-                  sortDirection={sortDirection}
-                  onSort={handleSort}
-                  filterValue={columnFilters.job_title || ""}
-                  onFilterChange={handleColumnFilter}
-                  filterOptions={uniqueJobTitles}
-                />
-              </TableHead>
-              <TableHead>
-                <SortableFilterableHeader
-                  label="Owner"
-                  columnKey="relationship_owner"
-                  sortKey={sortKey}
-                  sortDirection={sortDirection}
-                  onSort={handleSort}
-                  filterValue={columnFilters.relationship_owner || ""}
-                  onFilterChange={handleColumnFilter}
-                  filterOptions={uniqueOwners}
-                />
-              </TableHead>
-              <TableHead>Sectors</TableHead>
-              <TableHead>
-                <SortableFilterableHeader
-                  label="Country"
-                  columnKey="country"
-                  sortKey={sortKey}
-                  sortDirection={sortDirection}
-                  onSort={handleSort}
-                  filterValue={columnFilters.country || ""}
-                  onFilterChange={handleColumnFilter}
-                  filterOptions={uniqueCountries}
-                />
-              </TableHead>
-              <TableHead>
-                <SortableFilterableHeader
-                  label="Gender"
-                  columnKey="gender"
-                  sortKey={sortKey}
-                  sortDirection={sortDirection}
-                  onSort={handleSort}
-                  filterValue={columnFilters.gender || ""}
-                  onFilterChange={handleColumnFilter}
-                  filterOptions={["male", "female", "unknown"]}
-                />
-              </TableHead>
-              <TableHead className="w-10"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                  Loading contacts...
-                </TableCell>
-              </TableRow>
-            ) : filteredAndSortedContacts.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
-                  {hasColumnFilters ? "No contacts match the current filters." : "No contacts found. Add your first contact or import from a file."}
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredAndSortedContacts.map((contact) => (
-                <TableRow 
-                  key={contact.id}
-                  className={contact.do_not_contact ? "opacity-60 bg-muted/30" : ""}
-                >
-                  <TableCell>
+      {/* Contacts table with sticky header and floating scroll bar */}
+      <StickyTableHeader>
+        <TableScrollControls>
+          <div className="border rounded-lg overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12 min-w-[48px]">
                     <Checkbox
-                      checked={selectedIds.has(contact.id)}
-                      onCheckedChange={(checked) => handleSelectOne(contact.id, !!checked)}
+                      checked={filteredAndSortedContacts.length > 0 && selectedIds.size === filteredAndSortedContacts.length}
+                      onCheckedChange={handleSelectAll}
                     />
-                  </TableCell>
-                  <TableCell>
-                    <button
-                      onClick={() => setSelectedContact(contact)}
-                      className="font-medium hover:underline text-left"
-                    >
-                      {contact.full_name}
-                    </button>
-                    {contact.do_not_contact && (
-                      <Badge variant="destructive" className="ml-2 text-xs">DNC</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{contact.email}</TableCell>
-                  <TableCell>{contact.company || "-"}</TableCell>
-                  <TableCell>{contact.job_title || "-"}</TableCell>
-                  <TableCell className="text-muted-foreground">{contact.relationship_owner || "-"}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {contact.sectors.slice(0, 2).map(s => (
-                        <Badge key={s} variant="secondary" className="text-xs">
-                          {contact.sectors_ai_assigned && <Sparkles className="h-3 w-3 mr-1" />}
-                          {s}
-                        </Badge>
-                      ))}
-                      {contact.sectors.length > 2 && (
-                        <Badge variant="outline" className="text-xs">
-                          +{contact.sectors.length - 2}
-                        </Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>{contact.country || "-"}</TableCell>
-                  <TableCell className="capitalize text-muted-foreground">{contact.gender}</TableCell>
-                  <TableCell>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-popover">
-                        <DropdownMenuItem onClick={() => setSelectedContact(contact)}>
-                          View Details
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem 
-                          onClick={() => {
-                            if (!contact.do_not_contact) {
-                              setSelectedIds(new Set([contact.id]));
-                              setShowEmailDialog(true);
-                            }
-                          }}
-                          disabled={contact.do_not_contact}
-                        >
-                          Draft Email
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+                  </TableHead>
+                  <TableHead className="min-w-[180px]">
+                    <SortableFilterableHeader
+                      label="Name"
+                      columnKey="full_name"
+                      sortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      filterValue={columnFilters.full_name || ""}
+                      onFilterChange={handleColumnFilter}
+                    />
+                  </TableHead>
+                  <TableHead className="min-w-[200px]">
+                    <SortableFilterableHeader
+                      label="Email"
+                      columnKey="email"
+                      sortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      filterValue={columnFilters.email || ""}
+                      onFilterChange={handleColumnFilter}
+                    />
+                  </TableHead>
+                  <TableHead className="min-w-[150px]">
+                    <SortableFilterableHeader
+                      label="Company"
+                      columnKey="company"
+                      sortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      filterValue={columnFilters.company || ""}
+                      onFilterChange={handleColumnFilter}
+                      filterOptions={uniqueCompanies}
+                    />
+                  </TableHead>
+                  <TableHead className="min-w-[150px]">
+                    <SortableFilterableHeader
+                      label="Job Title"
+                      columnKey="job_title"
+                      sortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      filterValue={columnFilters.job_title || ""}
+                      onFilterChange={handleColumnFilter}
+                      filterOptions={uniqueJobTitles}
+                    />
+                  </TableHead>
+                  <TableHead className="min-w-[120px]">
+                    <SortableFilterableHeader
+                      label="Owner"
+                      columnKey="relationship_owner"
+                      sortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      filterValue={columnFilters.relationship_owner || ""}
+                      onFilterChange={handleColumnFilter}
+                      filterOptions={uniqueOwners}
+                    />
+                  </TableHead>
+                  <TableHead className="min-w-[140px]">Sectors</TableHead>
+                  <TableHead className="min-w-[100px]">
+                    <SortableFilterableHeader
+                      label="Country"
+                      columnKey="country"
+                      sortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      filterValue={columnFilters.country || ""}
+                      onFilterChange={handleColumnFilter}
+                      filterOptions={uniqueCountries}
+                    />
+                  </TableHead>
+                  <TableHead className="min-w-[90px]">
+                    <SortableFilterableHeader
+                      label="Gender"
+                      columnKey="gender"
+                      sortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      filterValue={columnFilters.gender || ""}
+                      onFilterChange={handleColumnFilter}
+                      filterOptions={["male", "female", "unknown"]}
+                    />
+                  </TableHead>
+                  <TableHead className="w-10 min-w-[40px]"></TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      Loading contacts...
+                    </TableCell>
+                  </TableRow>
+                ) : filteredAndSortedContacts.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                      {hasColumnFilters ? "No contacts match the current filters." : "No contacts found. Add your first contact or import from a file."}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredAndSortedContacts.map((contact) => (
+                    <TableRow 
+                      key={contact.id}
+                      className={contact.do_not_contact ? "opacity-60 bg-muted/30" : ""}
+                    >
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(contact.id)}
+                          onCheckedChange={(checked) => handleSelectOne(contact.id, !!checked)}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          onClick={() => setSelectedContact(contact)}
+                          className="font-medium hover:underline text-left"
+                        >
+                          {contact.full_name}
+                        </button>
+                        {contact.do_not_contact && (
+                          <Badge variant="destructive" className="ml-2 text-xs">DNC</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{contact.email}</TableCell>
+                      <TableCell>{contact.company || "-"}</TableCell>
+                      <TableCell>{contact.job_title || "-"}</TableCell>
+                      <TableCell className="text-muted-foreground">{contact.relationship_owner || "-"}</TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {contact.sectors.slice(0, 2).map(s => (
+                            <Badge key={s} variant="secondary" className="text-xs">
+                              {contact.sectors_ai_assigned && <Sparkles className="h-3 w-3 mr-1" />}
+                              {s}
+                            </Badge>
+                          ))}
+                          {contact.sectors.length > 2 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{contact.sectors.length - 2}
+                            </Badge>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>{contact.country || "-"}</TableCell>
+                      <TableCell className="capitalize text-muted-foreground">{contact.gender}</TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="bg-popover">
+                            <DropdownMenuItem onClick={() => setSelectedContact(contact)}>
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => {
+                                if (!contact.do_not_contact) {
+                                  setSelectedIds(new Set([contact.id]));
+                                  setShowEmailDialog(true);
+                                }
+                              }}
+                              disabled={contact.do_not_contact}
+                            >
+                              Draft Email
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TableScrollControls>
+      </StickyTableHeader>
 
       {/* Summary */}
       <div className="text-sm text-muted-foreground">

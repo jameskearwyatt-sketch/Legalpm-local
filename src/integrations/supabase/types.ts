@@ -492,6 +492,8 @@ export type Database = {
           do_not_contact: boolean
           email: string
           email_status: string | null
+          emi_focus_areas: string[]
+          emi_focus_areas_assigned_at: string | null
           full_name: string
           gender: Database["public"]["Enums"]["contact_gender"]
           id: string
@@ -517,6 +519,8 @@ export type Database = {
           do_not_contact?: boolean
           email: string
           email_status?: string | null
+          emi_focus_areas?: string[]
+          emi_focus_areas_assigned_at?: string | null
           full_name: string
           gender?: Database["public"]["Enums"]["contact_gender"]
           id?: string
@@ -542,6 +546,8 @@ export type Database = {
           do_not_contact?: boolean
           email?: string
           email_status?: string | null
+          emi_focus_areas?: string[]
+          emi_focus_areas_assigned_at?: string | null
           full_name?: string
           gender?: Database["public"]["Enums"]["contact_gender"]
           id?: string

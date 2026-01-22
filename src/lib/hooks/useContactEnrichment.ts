@@ -10,6 +10,7 @@ interface EnrichmentResult {
   job_title?: string;
   sectors?: string[];
   linkedin_url?: string;
+  email?: string;
   email_status?: string;
   sic_codes?: string[];
   naics_codes?: string[];
@@ -74,6 +75,9 @@ export function useEnrichContact() {
       }
       if (result.linkedin_url) {
         updates.linkedin_url = result.linkedin_url;
+      }
+      if (result.email) {
+        updates.email = result.email;
       }
       if (result.email_status) {
         updates.email_status = result.email_status;

@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { getPrimaryNaicsSector } from "@/lib/naicsUtils";
 
 export interface DistributionContact {
   id: string;
@@ -43,6 +44,7 @@ export type UpdatedTimePeriod = 'week' | 'month' | '3months' | '6months' | 'year
 
 export interface ContactFilters {
   sectors?: string[];
+  naicsSector?: string;
   country?: string;
   gender?: 'male' | 'female' | 'unknown';
   company?: string;
@@ -136,6 +138,14 @@ export function useDistributionContacts(filters?: ContactFilters) {
             c.last_enriched_at && c.last_enriched_at >= cutoffStr
           );
         }
+      }
+      
+      // Filter by NAICS-derived sector in JS
+      if (filters?.naicsSector) {
+        contacts = contacts.filter(c => {
+          const sector = getPrimaryNaicsSector(c.naics_codes);
+          return sector === filters.naicsSector;
+        });
       }
 
       return contacts;

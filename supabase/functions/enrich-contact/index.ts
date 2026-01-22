@@ -55,6 +55,20 @@ interface ApolloPersonResponse {
       state?: string;
       country?: string;
     };
+    // Apollo often stores the CURRENT email in a nested contact object
+    contact?: {
+      email?: string;
+      email_status?: string;
+      organization_name?: string;
+      city?: string;
+      country?: string;
+    };
+    // Also check contact_emails array for the most current email
+    contact_emails?: Array<{
+      email?: string;
+      email_status?: string;
+      position?: number;
+    }>;
   };
 }
 
@@ -430,14 +444,42 @@ Deno.serve(async (req) => {
         }
       }
       
-      // Email - update if Apollo found an email (any status, not just verified)
-      if (person.email) {
-        result.email = person.email;
+      // EMAIL EXTRACTION - Apollo stores emails in multiple places, prioritize the most current:
+      // 1. contact.email (most current, updated when person changes jobs)
+      // 2. contact_emails[0].email (array of emails, first is usually most current)
+      // 3. person.email (can be stale/old job email)
+      let bestEmail: string | undefined;
+      let bestEmailStatus: string | undefined;
+      
+      // Priority 1: Check nested contact object (this is where Apollo puts the CURRENT email)
+      if (person.contact?.email) {
+        bestEmail = person.contact.email;
+        bestEmailStatus = person.contact.email_status;
+        console.log('Found email in contact object:', bestEmail);
       }
       
-      // Email status
-      if (person.email_status) {
-        result.email_status = person.email_status;
+      // Priority 2: Check contact_emails array
+      if (!bestEmail && person.contact_emails && person.contact_emails.length > 0) {
+        const primaryContactEmail = person.contact_emails.find(e => e.position === 0) || person.contact_emails[0];
+        if (primaryContactEmail?.email) {
+          bestEmail = primaryContactEmail.email;
+          bestEmailStatus = primaryContactEmail.email_status;
+          console.log('Found email in contact_emails array:', bestEmail);
+        }
+      }
+      
+      // Priority 3: Fall back to person.email (may be stale)
+      if (!bestEmail && person.email) {
+        bestEmail = person.email;
+        bestEmailStatus = person.email_status;
+        console.log('Using person.email (may be stale):', bestEmail);
+      }
+      
+      if (bestEmail) {
+        result.email = bestEmail;
+      }
+      if (bestEmailStatus) {
+        result.email_status = bestEmailStatus;
       }
       
       // SIC codes

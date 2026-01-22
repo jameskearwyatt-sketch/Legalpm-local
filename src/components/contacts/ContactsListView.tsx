@@ -594,19 +594,31 @@ export function ContactsListView() {
                   filterOptions={uniqueCountries}
                 />
               </TableHead>
+              <TableHead>
+                <SortableFilterableHeader
+                  label="Gender"
+                  columnKey="gender"
+                  sortKey={sortKey}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  filterValue={columnFilters.gender || ""}
+                  onFilterChange={handleColumnFilter}
+                  filterOptions={["male", "female", "unknown"]}
+                />
+              </TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   Loading contacts...
                 </TableCell>
               </TableRow>
             ) : filteredAndSortedContacts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                   {hasColumnFilters ? "No contacts match the current filters." : "No contacts found. Add your first contact or import from a file."}
                 </TableCell>
               </TableRow>
@@ -653,6 +665,7 @@ export function ContactsListView() {
                     </div>
                   </TableCell>
                   <TableCell>{contact.country || "-"}</TableCell>
+                  <TableCell className="capitalize text-muted-foreground">{contact.gender}</TableCell>
                   <TableCell>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

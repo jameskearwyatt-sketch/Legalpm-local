@@ -38,6 +38,10 @@ import {
   Sparkles,
   Wand2,
   Loader2,
+  CheckCircle,
+  XCircle,
+  Hash,
+  Tags,
 } from "lucide-react";
 
 interface ContactDetailDialogProps {
@@ -84,11 +88,25 @@ export function ContactDetailDialog({ contact, open, onOpenChange }: ContactDeta
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Email with verification status */}
             <div className="flex items-center gap-3 text-sm">
               <Mail className="h-4 w-4 text-muted-foreground" />
               <a href={`mailto:${contact.email}`} className="text-primary hover:underline">
                 {contact.email}
               </a>
+              {contact.email_status && (
+                <Badge 
+                  variant={contact.email_status === 'verified' ? 'default' : 'secondary'}
+                  className="gap-1 text-xs"
+                >
+                  {contact.email_status === 'verified' ? (
+                    <CheckCircle className="h-3 w-3" />
+                  ) : (
+                    <XCircle className="h-3 w-3" />
+                  )}
+                  {contact.email_status}
+                </Badge>
+              )}
             </div>
 
             {contact.company && (
@@ -143,6 +161,51 @@ export function ContactDetailDialog({ contact, open, onOpenChange }: ContactDeta
                 <div className="flex flex-wrap gap-1">
                   {contact.sectors.map(s => (
                     <Badge key={s} variant="secondary">{s}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* SIC Codes */}
+            {contact.sic_codes && contact.sic_codes.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium flex items-center gap-2">
+                  <Hash className="h-4 w-4 text-muted-foreground" />
+                  SIC Codes
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {contact.sic_codes.map(code => (
+                    <Badge key={code} variant="outline">{code}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* NAICS Codes */}
+            {contact.naics_codes && contact.naics_codes.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium flex items-center gap-2">
+                  <Hash className="h-4 w-4 text-muted-foreground" />
+                  NAICS Codes
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {contact.naics_codes.map(code => (
+                    <Badge key={code} variant="outline">{code}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Company Keywords */}
+            {contact.company_keywords && contact.company_keywords.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium flex items-center gap-2">
+                  <Tags className="h-4 w-4 text-muted-foreground" />
+                  Business Focus Areas
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {contact.company_keywords.map(keyword => (
+                    <Badge key={keyword} variant="secondary">{keyword}</Badge>
                   ))}
                 </div>
               </div>

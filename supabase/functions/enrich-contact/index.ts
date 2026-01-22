@@ -51,6 +51,9 @@ interface ApolloPersonResponse {
       keywords?: string[];
       sic_codes?: string[];
       naics_codes?: string[];
+      city?: string;
+      state?: string;
+      country?: string;
     };
   };
 }
@@ -184,11 +187,21 @@ Deno.serve(async (req) => {
         result.job_title = person.title;
       }
       
-      // Location
-      if (person.city || person.country) {
-        result.city = person.city || undefined;
-        result.country = person.country || undefined;
-        result.confidence.location = 0.9;
+      // Location - prefer organization location (more current) over person location (often stale)
+      const orgCity = person.organization?.city;
+      const orgCountry = person.organization?.country;
+      const personCity = person.city;
+      const personCountry = person.country;
+      
+      // Use organization location if available, fall back to person location
+      if (orgCity || orgCountry) {
+        result.city = orgCity || undefined;
+        result.country = orgCountry || undefined;
+        result.confidence.location = 0.95; // Higher confidence for org location
+      } else if (personCity || personCountry) {
+        result.city = personCity || undefined;
+        result.country = personCountry || undefined;
+        result.confidence.location = 0.7; // Lower confidence for person location (can be stale)
       }
       
       // LinkedIn URL

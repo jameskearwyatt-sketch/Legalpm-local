@@ -474,22 +474,32 @@ export function ContactsListView() {
               <SelectContent>
                 <SelectItem value="week">Last Week</SelectItem>
                 <SelectItem value="month">Last Month</SelectItem>
+                <SelectItem value="3months">Last 3 Months</SelectItem>
                 <SelectItem value="6months">Last 6 Months</SelectItem>
                 <SelectItem value="year">Last Year</SelectItem>
               </SelectContent>
             </Select>
 
-            {/* Recently enriched checkbox */}
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox
-                checked={filters.recentlyEnriched || false}
-                onCheckedChange={(checked) => 
-                  setFilters(f => ({ ...f, recentlyEnriched: checked ? true : undefined }))
-                }
-              />
-              <Sparkles className="h-3 w-3 text-primary" />
-              <span>Enriched</span>
-            </label>
+            {/* Enriched period filter */}
+            <Select
+              value={filters.enrichedPeriod || ""}
+              onValueChange={(v) => setFilters(f => ({ 
+                ...f, 
+                enrichedPeriod: v as UpdatedTimePeriod || undefined 
+              }))}
+            >
+              <SelectTrigger className="w-[160px]">
+                <Sparkles className="h-3 w-3 mr-1" />
+                <SelectValue placeholder="Enriched in..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">Last Week</SelectItem>
+                <SelectItem value="month">Last Month</SelectItem>
+                <SelectItem value="3months">Last 3 Months</SelectItem>
+                <SelectItem value="6months">Last 6 Months</SelectItem>
+                <SelectItem value="year">Last Year</SelectItem>
+              </SelectContent>
+            </Select>
 
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">

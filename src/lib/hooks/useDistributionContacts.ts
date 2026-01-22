@@ -39,7 +39,7 @@ export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_i
 };
 export type DistributionContactUpdate = Partial<DistributionContactInsert>;
 
-export type UpdatedTimePeriod = 'week' | 'month' | '6months' | 'year' | null;
+export type UpdatedTimePeriod = 'week' | 'month' | '3months' | '6months' | 'year' | null;
 
 export interface ContactFilters {
   sectors?: string[];
@@ -49,8 +49,8 @@ export interface ContactFilters {
   relationship_owner?: string;
   do_not_contact?: boolean;
   search?: string;
-  recentlyEnriched?: boolean;
   updatedPeriod?: UpdatedTimePeriod;
+  enrichedPeriod?: UpdatedTimePeriod;
 }
 
 // Helper to get date cutoff for period filters
@@ -62,6 +62,8 @@ function getPeriodCutoff(period: UpdatedTimePeriod): Date | null {
       return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     case 'month':
       return new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    case '3months':
+      return new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
     case '6months':
       return new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
     case 'year':
@@ -103,11 +105,6 @@ export function useDistributionContacts(filters?: ContactFilters) {
       if (filters?.search) {
         query = query.or(`full_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,company.ilike.%${filters.search}%`);
       }
-      
-      // Filter by recently enriched (has last_enriched_at set)
-      if (filters?.recentlyEnriched) {
-        query = query.not("last_enriched_at", "is", null);
-      }
 
       const { data, error } = await query;
 
@@ -121,16 +118,23 @@ export function useDistributionContacts(filters?: ContactFilters) {
         );
       }
       
-      // Filter by updated/enriched period in JS (more flexible)
+      // Filter by updated period in JS
       if (filters?.updatedPeriod) {
         const cutoff = getPeriodCutoff(filters.updatedPeriod);
         if (cutoff) {
           const cutoffStr = cutoff.toISOString();
-          contacts = contacts.filter(c => {
-            const updated = c.updated_at >= cutoffStr;
-            const enriched = c.last_enriched_at ? c.last_enriched_at >= cutoffStr : false;
-            return updated || enriched;
-          });
+          contacts = contacts.filter(c => c.updated_at >= cutoffStr);
+        }
+      }
+      
+      // Filter by enriched period in JS
+      if (filters?.enrichedPeriod) {
+        const cutoff = getPeriodCutoff(filters.enrichedPeriod);
+        if (cutoff) {
+          const cutoffStr = cutoff.toISOString();
+          contacts = contacts.filter(c => 
+            c.last_enriched_at && c.last_enriched_at >= cutoffStr
+          );
         }
       }
 

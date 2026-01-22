@@ -33,6 +33,7 @@ import {
   type UpdatedTimePeriod,
 } from "@/lib/hooks/useDistributionContacts";
 import { useDistributionSectors } from "@/lib/hooks/useDistributionSectors";
+import { getPrimaryNaicsSector } from "@/lib/naicsUtils";
 import { useDistinctCountries, useDistinctCompanies } from "@/lib/hooks/useDistributionContacts";
 import { useDistributionRelationshipOwners } from "@/lib/hooks/useDistributionRelationshipOwners";
 import { ContactFormDialog } from "./ContactFormDialog";
@@ -137,6 +138,16 @@ export function ContactsListView() {
     [...new Set(contacts.map(c => c.country).filter(Boolean) as string[])].sort(),
     [contacts]
   );
+
+  // Get unique NAICS-derived sectors for filtering
+  const uniqueNaicsSectors = useMemo(() => {
+    const sectors = new Set<string>();
+    contacts.forEach(c => {
+      const sector = getPrimaryNaicsSector(c.naics_codes);
+      if (sector) sectors.add(sector);
+    });
+    return Array.from(sectors).sort();
+  }, [contacts]);
 
   // Apply column filters and sorting
   const filteredAndSortedContacts = useMemo(() => {
@@ -389,15 +400,15 @@ export function ContactsListView() {
         {showFilters && (
           <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border">
             <Select
-              value={filters.sectors?.[0] || ""}
-              onValueChange={(v) => setFilters(f => ({ ...f, sectors: v ? [v] : undefined }))}
+              value={filters.naicsSector || ""}
+              onValueChange={(v) => setFilters(f => ({ ...f, naicsSector: v || undefined }))}
             >
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Sector" />
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Assigned Sector" />
               </SelectTrigger>
               <SelectContent>
-                {sectors.map(s => (
-                  <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>
+                {uniqueNaicsSectors.map(s => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -676,6 +687,9 @@ export function ContactsListView() {
                       filterOptions={uniqueCountries}
                     />
                   </TableHead>
+                  <TableHead className="w-[130px]">
+                    <span className="text-xs">Assigned Sector (NAICS)</span>
+                  </TableHead>
                   <TableHead className="w-[80px] text-center">Updated</TableHead>
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
@@ -683,13 +697,13 @@ export function ContactsListView() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Loading contacts...
                     </TableCell>
                   </TableRow>
                 ) : filteredAndSortedContacts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       {hasColumnFilters ? "No contacts match the current filters." : "No contacts found. Add your first contact or import from a file."}
                     </TableCell>
                   </TableRow>
@@ -721,6 +735,9 @@ export function ContactsListView() {
                       <TableCell className="truncate text-sm">{contact.job_title || "-"}</TableCell>
                       <TableCell className="text-muted-foreground truncate text-sm">{contact.relationship_owner || "-"}</TableCell>
                       <TableCell className="text-sm">{contact.country || "-"}</TableCell>
+                      <TableCell className="text-sm truncate">
+                        {getPrimaryNaicsSector(contact.naics_codes) || "-"}
+                      </TableCell>
                       <TableCell className="text-center">
                         <TooltipProvider>
                           <Tooltip>

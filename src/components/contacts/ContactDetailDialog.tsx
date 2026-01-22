@@ -29,6 +29,7 @@ import {
 } from "@/lib/hooks/useDistributionContacts";
 import { useEnrichContact } from "@/lib/hooks/useContactEnrichment";
 import { ContactFormDialog } from "./ContactFormDialog";
+import { getPrimaryNaicsSector } from "@/lib/naicsUtils";
 import {
   Building2,
   Mail,
@@ -40,14 +41,13 @@ import {
   AlertTriangle,
   Pencil,
   Trash2,
-  Sparkles,
   Wand2,
   Loader2,
   CheckCircle,
   XCircle,
-  Hash,
   Tags,
   ChevronDown,
+  Briefcase,
 } from "lucide-react";
 
 interface ContactDetailDialogProps {
@@ -153,51 +153,20 @@ export function ContactDetailDialog({ contact, open, onOpenChange }: ContactDeta
               </div>
             )}
 
-            {contact.sectors.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-sm font-medium flex items-center gap-2">
-                  Sectors
-                  {contact.sectors_ai_assigned && (
-                    <Badge variant="outline" className="gap-1 text-xs">
-                      <Sparkles className="h-3 w-3" />
-                      AI-assigned
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {contact.sectors.map(s => (
-                    <Badge key={s} variant="secondary">{s}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* SIC Codes */}
-            {contact.sic_codes && contact.sic_codes.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-sm font-medium flex items-center gap-2">
-                  <Hash className="h-4 w-4 text-muted-foreground" />
-                  SIC Codes
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {contact.sic_codes.map(code => (
-                    <Badge key={code} variant="outline">{code}</Badge>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* NAICS Codes */}
+            {/* Assigned Sector (NAICS) */}
             {contact.naics_codes && contact.naics_codes.length > 0 && (
               <div className="space-y-2">
                 <div className="text-sm font-medium flex items-center gap-2">
-                  <Hash className="h-4 w-4 text-muted-foreground" />
-                  NAICS Codes
+                  <Briefcase className="h-4 w-4 text-muted-foreground" />
+                  Assigned Sector (NAICS)
                 </div>
-                <div className="flex flex-wrap gap-1">
-                  {contact.naics_codes.map(code => (
-                    <Badge key={code} variant="outline">{code}</Badge>
-                  ))}
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary" className="text-sm">
+                    {getPrimaryNaicsSector(contact.naics_codes)}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground self-center">
+                    Code: {contact.naics_codes[0]}
+                  </span>
                 </div>
               </div>
             )}

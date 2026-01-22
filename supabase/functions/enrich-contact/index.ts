@@ -232,23 +232,47 @@ async function enrichWithApollo(
   linkedinUrl: string | null,
   apiKey: string
 ): Promise<ApolloPersonResponse | null> {
-  // Strategy (in order of accuracy for finding current data):
-  // 1. LinkedIn URL match - always finds current record regardless of job changes
-  // 2. Name + company search - good if company is current
-  // 3. Email match - fallback, may return stale data if email is old
+  // Strategy for maximum accuracy:
+  // 1. LinkedIn URL match - gets current company/job info (most reliable)
+  // 2. If LinkedIn found a company, search name + NEW company to get current email
+  // 3. Fall back to name + provided company, then email match
   
-  // 1. Try LinkedIn URL first (most reliable for current data)
+  let baseResult: ApolloPersonResponse | null = null;
+  let currentCompany: string | null = company;
+  
+  // 1. Try LinkedIn URL first (most reliable for current job/company data)
   if (linkedinUrl) {
     const linkedInResult = await matchApolloByLinkedIn(linkedinUrl, apiKey);
     if (linkedInResult?.person) {
-      console.log('Found person via LinkedIn URL match (most accurate)');
-      return linkedInResult;
+      console.log('Found person via LinkedIn URL match');
+      baseResult = linkedInResult;
+      
+      // Extract the CURRENT company from LinkedIn data
+      if (linkedInResult.person.organization?.name) {
+        currentCompany = linkedInResult.person.organization.name;
+        console.log('LinkedIn found current company:', currentCompany);
+      }
+      
+      // If LinkedIn result doesn't have email, try to find it via name + current company search
+      if (!linkedInResult.person.email && currentCompany) {
+        console.log('LinkedIn has no email, searching by name + current company for email...');
+        const emailSearchResult = await searchApolloByNameAndCompany(fullName, currentCompany, apiKey);
+        
+        if (emailSearchResult?.person?.email) {
+          console.log('Found email via name + company search:', emailSearchResult.person.email);
+          // Merge: keep LinkedIn data but add email from search
+          baseResult.person!.email = emailSearchResult.person.email;
+          baseResult.person!.email_status = emailSearchResult.person.email_status;
+        }
+      }
+      
+      return baseResult;
     }
   }
   
-  // 2. Try name + company search
-  if (company) {
-    const searchResult = await searchApolloByNameAndCompany(fullName, company, apiKey);
+  // 2. Try name + company search (use current company if we found one)
+  if (currentCompany) {
+    const searchResult = await searchApolloByNameAndCompany(fullName, currentCompany, apiKey);
     if (searchResult?.person) {
       console.log('Found person via name + company search');
       return searchResult;

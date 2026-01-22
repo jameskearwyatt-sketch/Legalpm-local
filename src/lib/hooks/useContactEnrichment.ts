@@ -9,6 +9,7 @@ interface EnrichmentResult {
   city?: string;
   job_title?: string;
   sectors?: string[];
+  linkedin_url?: string;
   confidence: {
     gender?: number;
     location?: number;
@@ -66,6 +67,9 @@ export function useEnrichContact() {
       if (result.sectors && result.sectors.length > 0) {
         updates.sectors = result.sectors;
         updates.sectors_ai_assigned = true;
+      }
+      if (result.linkedin_url) {
+        updates.linkedin_url = result.linkedin_url;
       }
 
       if (Object.keys(updates).length > 0) {

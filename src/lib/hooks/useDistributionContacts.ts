@@ -22,9 +22,19 @@ export interface DistributionContact {
   provenance: string | null;
   created_at: string;
   updated_at: string;
+  // Apollo enrichment fields
+  email_status: string | null;
+  sic_codes: string[] | null;
+  naics_codes: string[] | null;
+  company_keywords: string[] | null;
 }
 
-export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at'>;
+export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'email_status' | 'sic_codes' | 'naics_codes' | 'company_keywords'> & {
+  email_status?: string | null;
+  sic_codes?: string[] | null;
+  naics_codes?: string[] | null;
+  company_keywords?: string[] | null;
+};
 export type DistributionContactUpdate = Partial<DistributionContactInsert>;
 
 export interface ContactFilters {

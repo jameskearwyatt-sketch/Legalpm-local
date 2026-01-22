@@ -17,6 +17,7 @@ export interface SimpleAssumption {
   label: string;
   description: string;
   category: 'timeline' | 'scope' | 'process';
+  sectionType: 'general' | 'sector_specific';
   requiresInput: boolean;
   inputType?: 'text' | 'number' | 'select';
   inputLabel?: string;
@@ -25,19 +26,85 @@ export interface SimpleAssumption {
 }
 
 export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
+  // --- GENERAL ASSUMPTIONS ---
+  {
+    id: 'scope_limited_to_rfp',
+    label: 'Scope limited to RFP',
+    description: 'Work limited to matters described in the RFP',
+    category: 'scope',
+    sectionType: 'general',
+    requiresInput: false,
+    narrativeTemplate: () => 'Our Scope of Work is limited to the matters described and assumptions provided in the RFP, as revised.',
+  },
+  {
+    id: 'budget_flexibility',
+    label: 'Budget flexibility between steps',
+    description: 'Unused budget can cover overruns in other steps',
+    category: 'scope',
+    sectionType: 'general',
+    requiresInput: false,
+    narrativeTemplate: () => 'If the budget for a particular step of the work is not fully used, we can use the remaining budget for any cost overruns in other steps of the work.',
+  },
+  {
+    id: 'excludes_vat_expenses',
+    label: 'Excludes VAT & expenses',
+    description: 'Fee excludes VAT and disbursements',
+    category: 'scope',
+    sectionType: 'general',
+    requiresInput: false,
+    narrativeTemplate: () => 'Our fee proposal is exclusive of VAT and any expenses or disbursements associated with the performance of our legal services.',
+  },
   {
     id: 'no_renegotiation',
     label: 'No material renegotiation',
     description: 'Term sheet positions remain stable',
     category: 'scope',
+    sectionType: 'general',
     requiresInput: false,
-    narrativeTemplate: () => 'The parties will not materially renegotiate positions already agreed in the term sheet.',
+    narrativeTemplate: () => 'Key positions agreed in the Term Sheet will not be re-opened during the negotiation of the agreements.',
+  },
+  {
+    id: 'no_technical_meetings',
+    label: 'No technical/commercial meetings',
+    description: 'We will not participate in client-counterparty meetings',
+    category: 'process',
+    sectionType: 'general',
+    requiresInput: false,
+    narrativeTemplate: () => 'We will not participate in technical or commercial meetings between the client and its counterparties.',
+  },
+  {
+    id: 'client_provides_annexes',
+    label: 'Client provides commercial annexes',
+    description: 'Commercial annexes provided by client',
+    category: 'scope',
+    sectionType: 'general',
+    requiresInput: false,
+    narrativeTemplate: () => 'Commercial annexes to the agreements will be provided by the client.',
+  },
+  {
+    id: 'virtual_negotiations',
+    label: 'Virtual negotiations (no travel)',
+    description: 'Negotiation by video/conference call only',
+    category: 'process',
+    sectionType: 'general',
+    requiresInput: false,
+    narrativeTemplate: () => 'Negotiation of the transaction will take place by conference call or videoconference and there will be no traveling required. If travel is required, travel expenses and time will be quoted separately.',
+  },
+  {
+    id: 'excludes_ancillary_contracts',
+    label: 'Excludes ancillary contracts',
+    description: 'No ancillary agreements in scope',
+    category: 'scope',
+    sectionType: 'general',
+    requiresInput: false,
+    narrativeTemplate: () => 'Our scope of work does not include the preparation, review or negotiation of ancillary contracts or agreements.',
   },
   {
     id: 'time_to_completion',
     label: 'Time to completion',
     description: 'Expected deal timeline from substantial commencement',
     category: 'timeline',
+    sectionType: 'general',
     requiresInput: true,
     inputType: 'select',
     inputLabel: 'Expected timeline',
@@ -96,6 +163,7 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
     label: 'No regulatory filings',
     description: 'Excludes government/regulatory submissions',
     category: 'scope',
+    sectionType: 'general',
     requiresInput: false,
     narrativeTemplate: () => 'This fee estimate excludes any regulatory filings, government submissions, or antitrust/competition notifications.',
   },
@@ -104,6 +172,7 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
     label: 'No tax advice',
     description: 'Tax structuring excluded',
     category: 'scope',
+    sectionType: 'general',
     requiresInput: false,
     narrativeTemplate: () => 'Tax advice and structuring is excluded from this scope and will be provided separately if required.',
   },
@@ -112,6 +181,7 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
     label: 'Standard market terms',
     description: 'Assumes reasonable commercial positions',
     category: 'scope',
+    sectionType: 'general',
     requiresInput: false,
     narrativeTemplate: () => 'The transaction documents will reflect standard market terms and conditions, without unusual or heavily negotiated provisions.',
   },
@@ -120,6 +190,7 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
     label: 'Single counterparty',
     description: 'Not a multi-party transaction',
     category: 'process',
+    sectionType: 'general',
     requiresInput: false,
     narrativeTemplate: () => 'This is a bilateral transaction with a single counterparty. Multi-party negotiations or consortium arrangements are not included.',
   },
@@ -128,6 +199,7 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
     label: 'Single signing',
     description: 'One closing, not staggered',
     category: 'process',
+    sectionType: 'general',
     requiresInput: false,
     narrativeTemplate: () => 'The transaction will complete in a single signing and closing, without staggered completions or deferred conditions.',
   },
@@ -136,9 +208,11 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
     label: 'Virtual completion',
     description: 'No physical attendance required',
     category: 'process',
+    sectionType: 'general',
     requiresInput: false,
     narrativeTemplate: () => 'Completion will be conducted virtually, with no requirement for physical attendance at any signing meetings.',
   },
+  // --- SECTOR-SPECIFIC ASSUMPTIONS (placeholder for future) ---
 ];
 
 // Document-specific assumption types
@@ -605,11 +679,84 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
     hasDocumentAssumptions ||
     (state.documentNarratives || []).length > 0;
 
-  const groupedSimple = SIMPLE_ASSUMPTIONS.reduce((acc, def) => {
-    if (!acc[def.category]) acc[def.category] = [];
-    acc[def.category].push(def);
-    return acc;
-  }, {} as Record<string, SimpleAssumption[]>);
+  // Group by section type first, then by category
+  const generalAssumptions = SIMPLE_ASSUMPTIONS.filter(a => a.sectionType === 'general');
+  const sectorSpecificAssumptions = SIMPLE_ASSUMPTIONS.filter(a => a.sectionType === 'sector_specific');
+  
+  const groupByCategory = (assumptions: SimpleAssumption[]) => {
+    return assumptions.reduce((acc, def) => {
+      if (!acc[def.category]) acc[def.category] = [];
+      acc[def.category].push(def);
+      return acc;
+    }, {} as Record<string, SimpleAssumption[]>);
+  };
+  
+  const groupedGeneral = groupByCategory(generalAssumptions);
+  const groupedSectorSpecific = groupByCategory(sectorSpecificAssumptions);
+
+  const renderAssumptionGroup = (groupedAssumptions: Record<string, SimpleAssumption[]>) => (
+    <div className="grid gap-6 lg:grid-cols-2">
+      {Object.entries(groupedAssumptions).map(([category, assumptions]) => (
+        <Card key={category}>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              {categoryIcons[category]}
+              {categoryLabels[category]}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {assumptions.map(def => {
+              const assumption = (state.simpleAssumptions || []).find(a => a.assumptionId === def.id);
+              const isEnabled = assumption?.enabled || false;
+              const inputValue = assumption?.inputValue;
+
+              return (
+                <div key={def.id} className="space-y-2">
+                  <div className="flex items-start space-x-3">
+                    <Checkbox 
+                      id={def.id}
+                      checked={isEnabled}
+                      onCheckedChange={(checked) => toggleSimpleAssumption(def.id, !!checked)}
+                      className="mt-0.5"
+                    />
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor={def.id} className="text-sm font-medium cursor-pointer">
+                        {def.label}
+                      </Label>
+                      <p className="text-xs text-muted-foreground">{def.description}</p>
+                    </div>
+                  </div>
+
+                  {isEnabled && def.requiresInput && (
+                    <div className="ml-7 mt-2">
+                      <Label className="text-xs text-muted-foreground">{def.inputLabel}</Label>
+                      {def.inputType === 'select' && def.inputOptions && (
+                        <Select
+                          value={inputValue || ''}
+                          onValueChange={(val) => updateSimpleInputValue(def.id, val)}
+                        >
+                          <SelectTrigger className="h-8 text-sm mt-1">
+                            <SelectValue placeholder="Select..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {def.inputOptions.map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -641,68 +788,42 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
       {/* Main assumption selection - hidden when "no assumptions" is checked */}
       {!state.noAssumptionsApply && (
         <>
-          {/* Simple Assumptions by Category */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            {Object.entries(groupedSimple).map(([category, assumptions]) => (
-              <Card key={category}>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    {categoryIcons[category]}
-                    {categoryLabels[category]}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {assumptions.map(def => {
-                    const assumption = (state.simpleAssumptions || []).find(a => a.assumptionId === def.id);
-                    const isEnabled = assumption?.enabled || false;
-                    const inputValue = assumption?.inputValue;
-
-                    return (
-                      <div key={def.id} className="space-y-2">
-                        <div className="flex items-start space-x-3">
-                          <Checkbox 
-                            id={def.id}
-                            checked={isEnabled}
-                            onCheckedChange={(checked) => toggleSimpleAssumption(def.id, !!checked)}
-                            className="mt-0.5"
-                          />
-                          <div className="flex-1 space-y-1">
-                            <Label htmlFor={def.id} className="text-sm font-medium cursor-pointer">
-                              {def.label}
-                            </Label>
-                            <p className="text-xs text-muted-foreground">{def.description}</p>
-                          </div>
-                        </div>
-
-                        {isEnabled && def.requiresInput && (
-                          <div className="ml-7 mt-2">
-                            <Label className="text-xs text-muted-foreground">{def.inputLabel}</Label>
-                            {def.inputType === 'select' && def.inputOptions && (
-                              <Select
-                                value={inputValue || ''}
-                                onValueChange={(val) => updateSimpleInputValue(def.id, val)}
-                              >
-                                <SelectTrigger className="h-8 text-sm mt-1">
-                                  <SelectValue placeholder="Select..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {def.inputOptions.map(opt => (
-                                    <SelectItem key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            ))}
+          {/* General Assumptions Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <h3 className="text-lg font-semibold">General Assumptions</h3>
+              <Badge variant="secondary" className="text-xs">
+                {generalAssumptions.length} available
+              </Badge>
+            </div>
+            {renderAssumptionGroup(groupedGeneral)}
           </div>
+
+          {/* Sector-Specific Assumptions Section */}
+          {sectorSpecificAssumptions.length > 0 && (
+            <div className="space-y-4 pt-4 border-t">
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-semibold">Sector-Specific Assumptions</h3>
+                <Badge variant="outline" className="text-xs">
+                  {sectorSpecificAssumptions.length} available
+                </Badge>
+              </div>
+              {renderAssumptionGroup(groupedSectorSpecific)}
+            </div>
+          )}
+
+          {/* Placeholder when no sector-specific assumptions exist */}
+          {sectorSpecificAssumptions.length === 0 && (
+            <div className="pt-4 border-t">
+              <div className="flex items-center gap-2 mb-2">
+                <h3 className="text-lg font-semibold text-muted-foreground">Sector-Specific Assumptions</h3>
+              </div>
+              <p className="text-sm text-muted-foreground italic">
+                No sector-specific assumptions configured. Sector-specific assumptions can be added for specialized practice areas.
+              </p>
+            </div>
+          )}
+
 
           {/* Document-Specific Assumptions */}
           <Card>

@@ -10,6 +10,10 @@ interface EnrichmentResult {
   job_title?: string;
   sectors?: string[];
   linkedin_url?: string;
+  email_status?: string;
+  sic_codes?: string[];
+  naics_codes?: string[];
+  company_keywords?: string[];
   confidence: {
     gender?: number;
     location?: number;
@@ -70,6 +74,18 @@ export function useEnrichContact() {
       }
       if (result.linkedin_url) {
         updates.linkedin_url = result.linkedin_url;
+      }
+      if (result.email_status) {
+        updates.email_status = result.email_status;
+      }
+      if (result.sic_codes && result.sic_codes.length > 0) {
+        updates.sic_codes = result.sic_codes;
+      }
+      if (result.naics_codes && result.naics_codes.length > 0) {
+        updates.naics_codes = result.naics_codes;
+      }
+      if (result.company_keywords && result.company_keywords.length > 0) {
+        updates.company_keywords = result.company_keywords;
       }
 
       if (Object.keys(updates).length > 0) {

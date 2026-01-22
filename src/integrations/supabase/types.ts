@@ -445,60 +445,72 @@ export type Database = {
         Row: {
           city: string | null
           company: string | null
+          company_keywords: string[] | null
           country: string | null
           created_at: string
           do_not_contact: boolean
           email: string
+          email_status: string | null
           full_name: string
           gender: Database["public"]["Enums"]["contact_gender"]
           id: string
           job_title: string | null
           linkedin_url: string | null
+          naics_codes: string[] | null
           notes: string | null
           provenance: string | null
           relationship_owner: string | null
           sectors: string[]
           sectors_ai_assigned: boolean
+          sic_codes: string[] | null
           updated_at: string
           user_id: string
         }
         Insert: {
           city?: string | null
           company?: string | null
+          company_keywords?: string[] | null
           country?: string | null
           created_at?: string
           do_not_contact?: boolean
           email: string
+          email_status?: string | null
           full_name: string
           gender?: Database["public"]["Enums"]["contact_gender"]
           id?: string
           job_title?: string | null
           linkedin_url?: string | null
+          naics_codes?: string[] | null
           notes?: string | null
           provenance?: string | null
           relationship_owner?: string | null
           sectors?: string[]
           sectors_ai_assigned?: boolean
+          sic_codes?: string[] | null
           updated_at?: string
           user_id: string
         }
         Update: {
           city?: string | null
           company?: string | null
+          company_keywords?: string[] | null
           country?: string | null
           created_at?: string
           do_not_contact?: boolean
           email?: string
+          email_status?: string | null
           full_name?: string
           gender?: Database["public"]["Enums"]["contact_gender"]
           id?: string
           job_title?: string | null
           linkedin_url?: string | null
+          naics_codes?: string[] | null
           notes?: string | null
           provenance?: string | null
           relationship_owner?: string | null
           sectors?: string[]
           sectors_ai_assigned?: boolean
+          sic_codes?: string[] | null
           updated_at?: string
           user_id?: string
         }

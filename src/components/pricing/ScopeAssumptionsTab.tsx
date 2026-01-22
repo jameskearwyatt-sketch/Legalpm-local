@@ -82,15 +82,6 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
     narrativeTemplate: () => 'Commercial annexes to the agreements will be provided by the client.',
   },
   {
-    id: 'virtual_negotiations',
-    label: 'Virtual negotiations (no travel)',
-    description: 'Negotiation by video/conference call only',
-    category: 'process',
-    sectionType: 'general',
-    requiresInput: false,
-    narrativeTemplate: () => 'Negotiation of the transaction will take place by conference call or videoconference and there will be no traveling required. If travel is required, travel expenses and time will be quoted separately.',
-  },
-  {
     id: 'excludes_ancillary_contracts',
     label: 'Excludes ancillary contracts',
     description: 'No ancillary agreements in scope',

@@ -232,57 +232,127 @@ async function enrichWithApollo(
   linkedinUrl: string | null,
   apiKey: string
 ): Promise<ApolloPersonResponse | null> {
-  // Strategy for maximum accuracy:
-  // 1. LinkedIn URL match - gets current company/job info (most reliable)
-  // 2. If LinkedIn found a company, search name + NEW company to get current email
-  // 3. Fall back to name + provided company, then email match
+  // COMPLETE ENRICHMENT STRATEGY:
+  // 1. Try LinkedIn URL match first - this gives us the CURRENT company (most reliable for job changes)
+  // 2. ALWAYS do a secondary search with name + current company to get email + location from Apollo's database
+  // 3. Merge the results: LinkedIn for job/company, Apollo search for email/location
+  // 4. Fallback: name + provided company, then email match
   
-  let baseResult: ApolloPersonResponse | null = null;
   let currentCompany: string | null = company;
+  let linkedInData: ApolloPersonResponse | null = null;
+  let apolloSearchData: ApolloPersonResponse | null = null;
   
-  // 1. Try LinkedIn URL first (most reliable for current job/company data)
+  // STEP 1: Try LinkedIn URL first (most reliable for finding CURRENT company)
   if (linkedinUrl) {
-    const linkedInResult = await matchApolloByLinkedIn(linkedinUrl, apiKey);
-    if (linkedInResult?.person) {
-      console.log('Found person via LinkedIn URL match');
-      baseResult = linkedInResult;
+    console.log('STEP 1: Matching by LinkedIn URL to find current company...');
+    linkedInData = await matchApolloByLinkedIn(linkedinUrl, apiKey);
+    
+    if (linkedInData?.person) {
+      console.log('LinkedIn match found person');
       
       // Extract the CURRENT company from LinkedIn data
-      if (linkedInResult.person.organization?.name) {
-        currentCompany = linkedInResult.person.organization.name;
-        console.log('LinkedIn found current company:', currentCompany);
-      }
-      
-      // If LinkedIn result doesn't have email, try to find it via name + current company search
-      if (!linkedInResult.person.email && currentCompany) {
-        console.log('LinkedIn has no email, searching by name + current company for email...');
-        const emailSearchResult = await searchApolloByNameAndCompany(fullName, currentCompany, apiKey);
+      if (linkedInData.person.organization?.name) {
+        const linkedInCompany = linkedInData.person.organization.name;
+        console.log('LinkedIn found current company:', linkedInCompany);
         
-        if (emailSearchResult?.person?.email) {
-          console.log('Found email via name + company search:', emailSearchResult.person.email);
-          // Merge: keep LinkedIn data but add email from search
-          baseResult.person!.email = emailSearchResult.person.email;
-          baseResult.person!.email_status = emailSearchResult.person.email_status;
+        // Update to use the NEW company from LinkedIn
+        if (linkedInCompany !== company) {
+          console.log('Company has CHANGED from:', company, 'to:', linkedInCompany);
         }
+        currentCompany = linkedInCompany;
       }
-      
-      return baseResult;
     }
   }
   
-  // 2. Try name + company search (use current company if we found one)
+  // STEP 2: ALWAYS search by name + current company to get email and location from Apollo's database
+  // This is critical because LinkedIn match often doesn't have email, but Apollo's search does
   if (currentCompany) {
-    const searchResult = await searchApolloByNameAndCompany(fullName, currentCompany, apiKey);
-    if (searchResult?.person) {
-      console.log('Found person via name + company search');
-      return searchResult;
+    console.log('STEP 2: Searching Apollo database by name + current company for email/location...');
+    apolloSearchData = await searchApolloByNameAndCompany(fullName, currentCompany, apiKey);
+    
+    if (apolloSearchData?.person) {
+      console.log('Apollo search found person with email:', apolloSearchData.person.email || 'NO EMAIL');
+      console.log('Apollo search found location:', apolloSearchData.person.organization?.city, apolloSearchData.person.organization?.country);
+    } else {
+      console.log('Apollo search by name + company returned no results');
     }
   }
   
-  // 3. Fall back to email match
+  // STEP 3: Merge results - prioritize different sources for different data
+  // LinkedIn: best for current job title and company (job changes)
+  // Apollo search: best for email and location (their database has this)
+  
+  if (linkedInData?.person || apolloSearchData?.person) {
+    const mergedResult: ApolloPersonResponse = { person: {} };
+    const linkedIn = linkedInData?.person;
+    const apolloSearch = apolloSearchData?.person;
+    
+    // Job title: prefer LinkedIn (most current for job changes)
+    mergedResult.person!.title = linkedIn?.title || apolloSearch?.title;
+    
+    // Company/Organization: prefer LinkedIn (most current)
+    mergedResult.person!.organization = linkedIn?.organization || apolloSearch?.organization;
+    
+    // LinkedIn URL: prefer LinkedIn source
+    mergedResult.person!.linkedin_url = linkedIn?.linkedin_url || apolloSearch?.linkedin_url;
+    
+    // EMAIL: prefer Apollo search result (their database has emails, LinkedIn match often doesn't)
+    if (apolloSearch?.email) {
+      console.log('Using email from Apollo search:', apolloSearch.email);
+      mergedResult.person!.email = apolloSearch.email;
+      mergedResult.person!.email_status = apolloSearch.email_status;
+    } else if (linkedIn?.email) {
+      console.log('Falling back to email from LinkedIn match:', linkedIn.email);
+      mergedResult.person!.email = linkedIn.email;
+      mergedResult.person!.email_status = linkedIn.email_status;
+    }
+    
+    // LOCATION: prefer Apollo search organization location (most accurate for current role)
+    if (apolloSearch?.organization?.city || apolloSearch?.organization?.country) {
+      console.log('Using location from Apollo search org:', apolloSearch.organization?.city, apolloSearch.organization?.country);
+      // Ensure we have the org data with location
+      if (!mergedResult.person!.organization) {
+        mergedResult.person!.organization = {};
+      }
+      mergedResult.person!.organization.city = apolloSearch.organization?.city || mergedResult.person!.organization.city;
+      mergedResult.person!.organization.country = apolloSearch.organization?.country || mergedResult.person!.organization.country;
+    }
+    
+    // Person-level location (fallback)
+    mergedResult.person!.city = apolloSearch?.city || linkedIn?.city;
+    mergedResult.person!.country = apolloSearch?.country || linkedIn?.country;
+    
+    // Industry data: prefer Apollo search (richer data)
+    if (apolloSearch?.organization) {
+      if (!mergedResult.person!.organization) {
+        mergedResult.person!.organization = {};
+      }
+      mergedResult.person!.organization.industry = apolloSearch.organization.industry || mergedResult.person!.organization.industry;
+      mergedResult.person!.organization.primary_industry = apolloSearch.organization.primary_industry || mergedResult.person!.organization.primary_industry;
+      mergedResult.person!.organization.keywords = apolloSearch.organization.keywords || mergedResult.person!.organization.keywords;
+      mergedResult.person!.organization.sic_codes = apolloSearch.organization.sic_codes || mergedResult.person!.organization.sic_codes;
+      mergedResult.person!.organization.naics_codes = apolloSearch.organization.naics_codes || mergedResult.person!.organization.naics_codes;
+    }
+    
+    console.log('MERGED RESULT - email:', mergedResult.person!.email, 'company:', mergedResult.person!.organization?.name);
+    return mergedResult;
+  }
+  
+  // STEP 4: Fallback - try name + original company if we haven't tried it
+  if (company && company !== currentCompany) {
+    console.log('STEP 4: Fallback - trying name + original company:', company);
+    const fallbackResult = await searchApolloByNameAndCompany(fullName, company, apiKey);
+    if (fallbackResult?.person) {
+      console.log('Found person via fallback name + original company search');
+      return fallbackResult;
+    }
+  }
+  
+  // STEP 5: Last resort - email match (may return stale data)
+  console.log('STEP 5: Last resort - trying email match');
   const matchResult = await matchApolloByEmail(email, fullName, apiKey);
   if (matchResult?.person) {
-    console.log('Found person via email match');
+    console.log('Found person via email match (may be stale)');
     return matchResult;
   }
   

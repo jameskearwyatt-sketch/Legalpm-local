@@ -158,6 +158,39 @@ async function searchApolloByNameAndCompany(fullName: string, company: string, a
   }
 }
 
+async function matchApolloByLinkedIn(linkedinUrl: string, apiKey: string): Promise<ApolloPersonResponse | null> {
+  try {
+    console.log('Matching Apollo by LinkedIn URL:', { linkedinUrl });
+    
+    // Apollo People Match API - matches by LinkedIn URL (most accurate, always current)
+    const response = await fetch('https://api.apollo.io/v1/people/match', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'X-Api-Key': apiKey,
+      },
+      body: JSON.stringify({
+        linkedin_url: linkedinUrl,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Apollo LinkedIn Match API error:', response.status, errorText);
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log('Apollo LinkedIn Match response:', JSON.stringify(data, null, 2));
+    
+    return data;
+  } catch (error) {
+    console.error('Error calling Apollo LinkedIn Match API:', error);
+    return null;
+  }
+}
+
 async function matchApolloByEmail(email: string, fullName: string, apiKey: string): Promise<ApolloPersonResponse | null> {
   try {
     console.log('Matching Apollo by email:', { email, fullName });
@@ -192,10 +225,28 @@ async function matchApolloByEmail(email: string, fullName: string, apiKey: strin
   }
 }
 
-async function enrichWithApollo(email: string, fullName: string, company: string | null, apiKey: string): Promise<ApolloPersonResponse | null> {
-  // Strategy: If we have a company name, search by name + company first (more accurate for job changers)
-  // Then fall back to email match
+async function enrichWithApollo(
+  email: string, 
+  fullName: string, 
+  company: string | null, 
+  linkedinUrl: string | null,
+  apiKey: string
+): Promise<ApolloPersonResponse | null> {
+  // Strategy (in order of accuracy for finding current data):
+  // 1. LinkedIn URL match - always finds current record regardless of job changes
+  // 2. Name + company search - good if company is current
+  // 3. Email match - fallback, may return stale data if email is old
   
+  // 1. Try LinkedIn URL first (most reliable for current data)
+  if (linkedinUrl) {
+    const linkedInResult = await matchApolloByLinkedIn(linkedinUrl, apiKey);
+    if (linkedInResult?.person) {
+      console.log('Found person via LinkedIn URL match (most accurate)');
+      return linkedInResult;
+    }
+  }
+  
+  // 2. Try name + company search
   if (company) {
     const searchResult = await searchApolloByNameAndCompany(fullName, company, apiKey);
     if (searchResult?.person) {
@@ -204,7 +255,7 @@ async function enrichWithApollo(email: string, fullName: string, company: string
     }
   }
   
-  // Fall back to email match
+  // 3. Fall back to email match
   const matchResult = await matchApolloByEmail(email, fullName, apiKey);
   if (matchResult?.person) {
     console.log('Found person via email match');
@@ -237,8 +288,8 @@ Deno.serve(async (req) => {
       sources: [],
     };
     
-    // 1. Enrich with Apollo - prioritize name + company search over email match
-    const apolloData = await enrichWithApollo(email, fullName, company || null, apolloApiKey);
+    // 1. Enrich with Apollo - prioritize LinkedIn URL, then name + company, then email
+    const apolloData = await enrichWithApollo(email, fullName, company || null, linkedinUrl || null, apolloApiKey);
     
     if (apolloData?.person) {
       const person = apolloData.person;

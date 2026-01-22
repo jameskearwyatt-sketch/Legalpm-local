@@ -118,11 +118,51 @@ function inferGenderFromName(fullName: string): { gender: 'male' | 'female' | 'u
   return { gender: 'unknown', confidence: 0 };
 }
 
-async function enrichWithApollo(email: string, fullName: string, apiKey: string): Promise<ApolloPersonResponse | null> {
+async function searchApolloByNameAndCompany(fullName: string, company: string, apiKey: string): Promise<ApolloPersonResponse | null> {
   try {
-    console.log('Enriching with Apollo:', { email, fullName });
+    console.log('Searching Apollo by name + company:', { fullName, company });
     
-    // Apollo People Enrichment API
+    // Apollo People Search API - finds people by name and organization
+    const response = await fetch('https://api.apollo.io/v1/mixed_people/search', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'X-Api-Key': apiKey,
+      },
+      body: JSON.stringify({
+        q_person_name: fullName,
+        q_organization_name: company,
+        per_page: 1,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Apollo Search API error:', response.status, errorText);
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log('Apollo Search response:', JSON.stringify(data, null, 2));
+    
+    // Return first matching person
+    if (data.people && data.people.length > 0) {
+      return { person: data.people[0] };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error calling Apollo Search API:', error);
+    return null;
+  }
+}
+
+async function matchApolloByEmail(email: string, fullName: string, apiKey: string): Promise<ApolloPersonResponse | null> {
+  try {
+    console.log('Matching Apollo by email:', { email, fullName });
+    
+    // Apollo People Match API - matches by email
     const response = await fetch('https://api.apollo.io/v1/people/match', {
       method: 'POST',
       headers: {
@@ -138,18 +178,40 @@ async function enrichWithApollo(email: string, fullName: string, apiKey: string)
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Apollo API error:', response.status, errorText);
+      console.error('Apollo Match API error:', response.status, errorText);
       return null;
     }
     
     const data = await response.json();
-    console.log('Apollo response:', JSON.stringify(data, null, 2));
+    console.log('Apollo Match response:', JSON.stringify(data, null, 2));
     
     return data;
   } catch (error) {
-    console.error('Error calling Apollo API:', error);
+    console.error('Error calling Apollo Match API:', error);
     return null;
   }
+}
+
+async function enrichWithApollo(email: string, fullName: string, company: string | null, apiKey: string): Promise<ApolloPersonResponse | null> {
+  // Strategy: If we have a company name, search by name + company first (more accurate for job changers)
+  // Then fall back to email match
+  
+  if (company) {
+    const searchResult = await searchApolloByNameAndCompany(fullName, company, apiKey);
+    if (searchResult?.person) {
+      console.log('Found person via name + company search');
+      return searchResult;
+    }
+  }
+  
+  // Fall back to email match
+  const matchResult = await matchApolloByEmail(email, fullName, apiKey);
+  if (matchResult?.person) {
+    console.log('Found person via email match');
+    return matchResult;
+  }
+  
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -175,8 +237,8 @@ Deno.serve(async (req) => {
       sources: [],
     };
     
-    // 1. Enrich with Apollo
-    const apolloData = await enrichWithApollo(email, fullName, apolloApiKey);
+    // 1. Enrich with Apollo - prioritize name + company search over email match
+    const apolloData = await enrichWithApollo(email, fullName, company || null, apolloApiKey);
     
     if (apolloData?.person) {
       const person = apolloData.person;

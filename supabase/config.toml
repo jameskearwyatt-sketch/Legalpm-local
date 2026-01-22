@@ -59,3 +59,6 @@ verify_jwt = false
 
 [functions.enrich-contact]
 verify_jwt = false
+
+[functions.infer-genders]
+verify_jwt = false

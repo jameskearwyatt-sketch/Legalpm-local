@@ -354,6 +354,215 @@ export type Database = {
           },
         ]
       }
+      distribution_activity_log: {
+        Row: {
+          activity_type: string
+          created_at: string
+          description: string
+          id: string
+          metadata: Json | null
+          user_id: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string
+          description: string
+          id?: string
+          metadata?: Json | null
+          user_id: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string
+          description?: string
+          id?: string
+          metadata?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      distribution_campaigns: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          saved_filters: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          saved_filters?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          saved_filters?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      distribution_contacts: {
+        Row: {
+          city: string | null
+          company: string | null
+          country: string | null
+          created_at: string
+          do_not_contact: boolean
+          email: string
+          full_name: string
+          gender: Database["public"]["Enums"]["contact_gender"]
+          id: string
+          job_title: string | null
+          linkedin_url: string | null
+          notes: string | null
+          provenance: string | null
+          relationship_owner: string | null
+          sectors: string[]
+          sectors_ai_assigned: boolean
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          city?: string | null
+          company?: string | null
+          country?: string | null
+          created_at?: string
+          do_not_contact?: boolean
+          email: string
+          full_name: string
+          gender?: Database["public"]["Enums"]["contact_gender"]
+          id?: string
+          job_title?: string | null
+          linkedin_url?: string | null
+          notes?: string | null
+          provenance?: string | null
+          relationship_owner?: string | null
+          sectors?: string[]
+          sectors_ai_assigned?: boolean
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          city?: string | null
+          company?: string | null
+          country?: string | null
+          created_at?: string
+          do_not_contact?: boolean
+          email?: string
+          full_name?: string
+          gender?: Database["public"]["Enums"]["contact_gender"]
+          id?: string
+          job_title?: string | null
+          linkedin_url?: string | null
+          notes?: string | null
+          provenance?: string | null
+          relationship_owner?: string | null
+          sectors?: string[]
+          sectors_ai_assigned?: boolean
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      distribution_email_drafts: {
+        Row: {
+          body: string
+          campaign_id: string | null
+          created_at: string
+          delivery_mode: Database["public"]["Enums"]["email_delivery_mode"]
+          draft_type: Database["public"]["Enums"]["email_draft_type"]
+          id: string
+          recipient_count: number
+          recipient_emails: string[]
+          subject: string
+          user_id: string
+        }
+        Insert: {
+          body: string
+          campaign_id?: string | null
+          created_at?: string
+          delivery_mode: Database["public"]["Enums"]["email_delivery_mode"]
+          draft_type: Database["public"]["Enums"]["email_draft_type"]
+          id?: string
+          recipient_count?: number
+          recipient_emails?: string[]
+          subject: string
+          user_id: string
+        }
+        Update: {
+          body?: string
+          campaign_id?: string | null
+          created_at?: string
+          delivery_mode?: Database["public"]["Enums"]["email_delivery_mode"]
+          draft_type?: Database["public"]["Enums"]["email_draft_type"]
+          id?: string
+          recipient_count?: number
+          recipient_emails?: string[]
+          subject?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "distribution_email_drafts_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "distribution_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      distribution_relationship_owners: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      distribution_sectors: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          sort_order?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       financial_snapshot_history: {
         Row: {
           accounts_receivable: number
@@ -2172,6 +2381,9 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       budget_type: "Fixed" | "Cap" | "Estimate" | "Retainer" | "Hourly"
+      contact_gender: "male" | "female" | "unknown"
+      email_delivery_mode: "bcc_all" | "individual"
+      email_draft_type: "event_invitation" | "article_sharing" | "firm_update"
       fee_type:
         | "Discounted Rates with Cap"
         | "Discounted Rates with Estimate"
@@ -2338,6 +2550,9 @@ export const Constants = {
     Enums: {
       app_role: ["admin", "user"],
       budget_type: ["Fixed", "Cap", "Estimate", "Retainer", "Hourly"],
+      contact_gender: ["male", "female", "unknown"],
+      email_delivery_mode: ["bcc_all", "individual"],
+      email_draft_type: ["event_invitation", "article_sharing", "firm_update"],
       fee_type: [
         "Discounted Rates with Cap",
         "Discounted Rates with Estimate",

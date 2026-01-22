@@ -28,6 +28,7 @@ import {
   Rocket,
   Clock,
   Calculator,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -39,6 +40,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Matters', href: '/matters', icon: Briefcase },
   { name: 'Pricing & Assumptions', href: '/pricing', icon: Calculator },
+  { name: 'Contacts', href: '/contacts', icon: Users },
   { name: 'Growth', href: '/growth', icon: Rocket },
   { name: 'Time Recording', href: '/time-recording', icon: Clock },
   { name: 'Red Flags', href: '/red-flags', icon: AlertTriangle },

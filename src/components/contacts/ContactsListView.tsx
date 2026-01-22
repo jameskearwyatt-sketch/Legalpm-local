@@ -51,9 +51,12 @@ import {
   AlertTriangle,
   Sparkles,
   Trash2,
+  Wand2,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
+import { useBulkEnrichContacts } from "@/lib/hooks/useContactEnrichment";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -97,6 +100,7 @@ export function ContactsListView() {
   const { data: relationshipOwners = [] } = useDistributionRelationshipOwners();
   const logActivity = useLogDistributionActivity();
   const bulkDelete = useBulkDeleteDistributionContacts();
+  const bulkEnrich = useBulkEnrichContacts();
 
   // Get unique values for filter dropdowns
   const uniqueOwners = useMemo(() => 
@@ -450,6 +454,41 @@ export function ContactsListView() {
           >
             <Trash2 className="h-4 w-4" />
             Delete
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              const contactsToEnrich = selectedContacts.map(c => ({
+                contactId: c.id,
+                fullName: c.full_name,
+                email: c.email,
+                linkedinUrl: c.linkedin_url,
+                company: c.company,
+              }));
+              bulkEnrich.mutate(contactsToEnrich, {
+                onSuccess: (results) => {
+                  const success = results.filter(r => r.success).length;
+                  const failed = results.filter(r => !r.success).length;
+                  if (success > 0) {
+                    toast.success(`Enriched ${success} contact${success !== 1 ? 's' : ''}`);
+                  }
+                  if (failed > 0) {
+                    toast.error(`Failed to enrich ${failed} contact${failed !== 1 ? 's' : ''}`);
+                  }
+                },
+              });
+            }}
+            disabled={bulkEnrich.isPending}
+            className="gap-2"
+          >
+            {bulkEnrich.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Wand2 className="h-4 w-4" />
+            )}
+            Enrich
           </Button>
 
           <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">

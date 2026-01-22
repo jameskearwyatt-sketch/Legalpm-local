@@ -55,11 +55,11 @@ import {
   Trash2,
   Wand2,
   Loader2,
-  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
-import { useBulkEnrichContacts, useAssignGenders } from "@/lib/hooks/useContactEnrichment";
+import { useBulkEnrichContacts } from "@/lib/hooks/useContactEnrichment";
+import { GenderAssignmentDialog } from "./GenderAssignmentDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -298,7 +298,7 @@ export function ContactsListView() {
 
   const hasColumnFilters = Object.values(columnFilters).some(v => v);
 
-  const assignGenders = useAssignGenders();
+  const [showGenderDialog, setShowGenderDialog] = useState(false);
 
   const unknownGenderCount = useMemo(() => 
     contacts.filter(c => c.gender === 'unknown').length,
@@ -354,15 +354,10 @@ export function ContactsListView() {
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => assignGenders.mutate(contacts.map(c => ({ id: c.id, full_name: c.full_name, gender: c.gender })))}
-              disabled={assignGenders.isPending}
+              onClick={() => setShowGenderDialog(true)}
               className="gap-2"
             >
-              {assignGenders.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Users className="h-4 w-4" />
-              )}
+              <Sparkles className="h-4 w-4" />
               Assign Genders ({unknownGenderCount})
             </Button>
           )}
@@ -790,6 +785,12 @@ export function ContactsListView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <GenderAssignmentDialog
+        open={showGenderDialog}
+        onOpenChange={setShowGenderDialog}
+        contacts={contacts}
+      />
     </div>
   );
 }

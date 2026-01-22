@@ -171,6 +171,28 @@ export function ContactDetailDialog({ contact, open, onOpenChange }: ContactDeta
               </div>
             )}
 
+            {/* EMI Focus Areas */}
+            {contact.emi_focus_areas && contact.emi_focus_areas.length > 0 && (
+              <div className="space-y-2">
+                <div className="text-sm font-medium flex items-center gap-2">
+                  <Tags className="h-4 w-4 text-muted-foreground" />
+                  EMI Focus Areas
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {contact.emi_focus_areas.map(area => (
+                    <Badge key={area} variant="outline" className="text-sm">
+                      {area}
+                    </Badge>
+                  ))}
+                </div>
+                {contact.emi_focus_areas_assigned_at && (
+                  <p className="text-xs text-muted-foreground">
+                    Assigned: {format(new Date(contact.emi_focus_areas_assigned_at), "d MMM yyyy")}
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Company Keywords - Collapsible */}
             {contact.company_keywords && contact.company_keywords.length > 0 && (
               <Collapsible>

@@ -41,6 +41,7 @@ import { ContactImportDialog } from "./ContactImportDialog";
 import { EmailDraftDialog } from "./EmailDraftDialog";
 import { ContactDetailDialog } from "./ContactDetailDialog";
 import { ContactHistoryDialog } from "./ContactHistoryDialog";
+import { FocusAreaAssignmentDialog } from "./FocusAreaAssignmentDialog";
 import { SortableFilterableHeader, SortDirection } from "./SortableFilterableHeader";
 import { StickyTableHeader } from "@/components/ui/sticky-table-header";
 import { TableScrollControls } from "@/components/ui/table-scroll-controls";
@@ -60,6 +61,7 @@ import {
   Loader2,
   History,
   Clock,
+  Target,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
@@ -93,6 +95,7 @@ export function ContactsListView() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showFocusAreaDialog, setShowFocusAreaDialog] = useState(false);
   const [selectedContact, setSelectedContact] = useState<DistributionContact | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [historyContact, setHistoryContact] = useState<{ id: string; name: string } | null>(null);
@@ -147,6 +150,15 @@ export function ContactsListView() {
       if (sector) sectors.add(sector);
     });
     return Array.from(sectors).sort();
+  }, [contacts]);
+
+  // Get unique EMI Focus Areas for filtering
+  const uniqueEmiFocusAreas = useMemo(() => {
+    const areas = new Set<string>();
+    contacts.forEach(c => {
+      (c.emi_focus_areas || []).forEach(area => areas.add(area));
+    });
+    return Array.from(areas).sort();
   }, [contacts]);
 
   // Apply column filters and sorting
@@ -512,6 +524,27 @@ export function ContactsListView() {
               </SelectContent>
             </Select>
 
+            {/* EMI Focus Area filter */}
+            {uniqueEmiFocusAreas.length > 0 && (
+              <Select
+                value={filters.emiFocusArea || ""}
+                onValueChange={(v) => setFilters(f => ({ 
+                  ...f, 
+                  emiFocusArea: v || undefined 
+                }))}
+              >
+                <SelectTrigger className="w-[180px]">
+                  <Target className="h-3 w-3 mr-1" />
+                  <SelectValue placeholder="EMI Focus Area" />
+                </SelectTrigger>
+                <SelectContent>
+                  {uniqueEmiFocusAreas.map(area => (
+                    <SelectItem key={area} value={area}>{area}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
                 <X className="h-4 w-4" />
@@ -581,6 +614,16 @@ export function ContactsListView() {
               <Wand2 className="h-4 w-4" />
             )}
             Enrich
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowFocusAreaDialog(true)}
+            className="gap-2"
+          >
+            <Target className="h-4 w-4" />
+            Focus Areas
           </Button>
 
           <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
@@ -690,6 +733,9 @@ export function ContactsListView() {
                   <TableHead className="w-[130px]">
                     <span className="text-xs">Assigned Sector (NAICS)</span>
                   </TableHead>
+                  <TableHead className="w-[130px]">
+                    <span className="text-xs">EMI Focus Area</span>
+                  </TableHead>
                   <TableHead className="w-[80px] text-center">Updated</TableHead>
                   <TableHead className="w-[60px]"></TableHead>
                 </TableRow>
@@ -697,13 +743,13 @@ export function ContactsListView() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       Loading contacts...
                     </TableCell>
                   </TableRow>
                 ) : filteredAndSortedContacts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       {hasColumnFilters ? "No contacts match the current filters." : "No contacts found. Add your first contact or import from a file."}
                     </TableCell>
                   </TableRow>
@@ -737,6 +783,33 @@ export function ContactsListView() {
                       <TableCell className="text-sm">{contact.country || "-"}</TableCell>
                       <TableCell className="text-sm truncate">
                         {getPrimaryNaicsSector(contact.naics_codes) || "-"}
+                      </TableCell>
+                      <TableCell className="text-sm truncate">
+                        {contact.emi_focus_areas?.length > 0 ? (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <div className="flex items-center gap-1">
+                                  <Badge variant="secondary" className="text-xs truncate max-w-[100px]">
+                                    {contact.emi_focus_areas[0]}
+                                  </Badge>
+                                  {contact.emi_focus_areas.length > 1 && (
+                                    <span className="text-xs text-muted-foreground">
+                                      +{contact.emi_focus_areas.length - 1}
+                                    </span>
+                                  )}
+                                </div>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <div className="text-xs space-y-1">
+                                  {contact.emi_focus_areas.map(area => (
+                                    <div key={area}>{area}</div>
+                                  ))}
+                                </div>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        ) : "-"}
                       </TableCell>
                       <TableCell className="text-center">
                         <TooltipProvider>
@@ -882,6 +955,13 @@ export function ContactsListView() {
           contactName={historyContact.name}
         />
       )}
+
+      <FocusAreaAssignmentDialog
+        open={showFocusAreaDialog}
+        onOpenChange={setShowFocusAreaDialog}
+        selectedContactIds={Array.from(selectedIds)}
+        onComplete={() => setSelectedIds(new Set())}
+      />
     </div>
   );
 }

@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.parse-contact-columns]
 verify_jwt = false
+
+[functions.enrich-contact]
+verify_jwt = false

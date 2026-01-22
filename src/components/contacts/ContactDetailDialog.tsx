@@ -22,6 +22,7 @@ import {
   type DistributionContact,
   useDeleteDistributionContact,
 } from "@/lib/hooks/useDistributionContacts";
+import { useEnrichContact } from "@/lib/hooks/useContactEnrichment";
 import { ContactFormDialog } from "./ContactFormDialog";
 import {
   Building2,
@@ -35,6 +36,8 @@ import {
   Pencil,
   Trash2,
   Sparkles,
+  Wand2,
+  Loader2,
 } from "lucide-react";
 
 interface ContactDetailDialogProps {
@@ -47,6 +50,17 @@ export function ContactDetailDialog({ contact, open, onOpenChange }: ContactDeta
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const deleteContact = useDeleteDistributionContact();
+  const enrichContact = useEnrichContact();
+
+  const handleEnrich = () => {
+    enrichContact.mutate({
+      contactId: contact.id,
+      fullName: contact.full_name,
+      email: contact.email,
+      linkedinUrl: contact.linkedin_url,
+      company: contact.company,
+    });
+  };
 
   const handleDelete = async () => {
     await deleteContact.mutateAsync(contact.id);
@@ -170,6 +184,19 @@ export function ContactDetailDialog({ contact, open, onOpenChange }: ContactDeta
             </div>
 
             <div className="flex gap-2 pt-4">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={handleEnrich}
+                disabled={enrichContact.isPending}
+              >
+                {enrichContact.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Wand2 className="h-4 w-4 mr-2" />
+                )}
+                Enrich
+              </Button>
               <Button
                 variant="outline"
                 className="flex-1"

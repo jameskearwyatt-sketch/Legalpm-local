@@ -187,6 +187,13 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
           const data = e.target?.result;
           const workbook = XLSX.read(data, { type: 'binary' });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          
+          // Get the range to limit rows read
+          const range = XLSX.utils.decode_range(firstSheet['!ref'] || 'A1');
+          // Cap at 10000 rows maximum to prevent memory issues
+          range.e.r = Math.min(range.e.r, 10000);
+          firstSheet['!ref'] = XLSX.utils.encode_range(range);
+          
           const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(firstSheet, { 
             defval: '',
             raw: false,
@@ -197,8 +204,18 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
             return;
           }
 
-          const headers = Object.keys(jsonData[0]);
-          resolve({ headers, rows: jsonData });
+          // Filter out empty rows (rows where all values are empty)
+          const nonEmptyRows = jsonData.filter(row => {
+            return Object.values(row).some(val => val && val.toString().trim() !== '');
+          });
+
+          if (nonEmptyRows.length === 0) {
+            reject(new Error("No data found in file"));
+            return;
+          }
+
+          const headers = Object.keys(nonEmptyRows[0]);
+          resolve({ headers, rows: nonEmptyRows });
         } catch (err) {
           reject(err);
         }

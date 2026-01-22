@@ -20,48 +20,48 @@ serve(async (req) => {
 
     const systemPrompt = `You are an expert data parser for contact lists. Your task is to analyse Excel/CSV column headers and map them to contact fields.
 
-Available contact fields:
-- full_name (required) - can be combined from first_name + last_name columns
-- email (required)
-- company
-- job_title
-- country
-- city
-- gender (male/female/unknown)
-- linkedin_url
-- relationship_owner
-- sectors (array from allowed list only)
+Available contact fields to map TO:
+- full_name (required) - person's full name
+- first_name - if separate from surname, will be combined with last_name
+- last_name - if separate from first name, will be combined with first_name  
+- email (required) - email address
+- company - organisation/company name
+- job_title - role/position/title
+- country - country name
+- city - city name
+- gender - male/female/unknown
+- linkedin_url - LinkedIn profile URL
+- relationship_owner - who owns this contact relationship
+- sectors - industry sectors (array)
+- ignore - for columns that don't match any field
 
-IMPORTANT RULES:
-1. If you see separate "First Name"/"Firstname"/"Given Name" and "Last Name"/"Surname"/"Family Name" columns, map them BOTH to full_name with a note to combine them.
-2. Be flexible with column name variations (e.g., "Organisation" = company, "Position" = job_title)
-3. For sectors, ONLY use values from the allowed sector list. Map related terms:
-   - LNG, upstream, downstream, petroleum → Oil & Gas
-   - SMRs, atomic, fission → Nuclear  
-   - CCS, carbon capture → CCUS
-   - Solar, wind, hydro, green energy → Renewables
-4. If a column clearly doesn't map to any field, mark it as "ignore"
-5. Look at sample data to confirm your mapping is correct
+CRITICAL RULES:
+1. You MUST create a mapping entry for EVERY header column provided. Do not return an empty mapping.
+2. Common header variations:
+   - "Name", "Full Name", "Contact Name" → full_name
+   - "First Name", "Firstname", "Given Name", "Forename" → first_name
+   - "Last Name", "Surname", "Family Name" → last_name
+   - "Email", "E-mail", "Email Address" → email
+   - "Company", "Organisation", "Organization", "Org", "Employer" → company
+   - "Title", "Job Title", "Position", "Role" → job_title
+   - "Country", "Location" → country
+   - "City", "Town" → city
+   - "LinkedIn", "LinkedIn URL" → linkedin_url
+   - "Owner", "Relationship Owner", "Account Owner" → relationship_owner
+3. If you see BOTH first name AND last name columns, map first to "first_name" and surname to "last_name" - they will be combined automatically.
+4. If a column clearly doesn't match any field, set field to "ignore"
+5. Look at the sample data values to confirm your mapping is sensible.
 
-Available sectors for this user: ${availableSectors?.length > 0 ? availableSectors.join(", ") : "None defined yet"}`;
+Available sectors: ${availableSectors?.length > 0 ? availableSectors.join(", ") : "None defined"}`;
 
-    const userPrompt = `Analyse these Excel headers and sample data to create the best column mapping:
+    const userPrompt = `Map these Excel column headers to contact fields. You MUST provide a mapping for EACH header.
 
-HEADERS: ${JSON.stringify(headers)}
+HEADERS TO MAP: ${JSON.stringify(headers)}
 
-SAMPLE DATA (first 3 rows): ${JSON.stringify(sampleRows?.slice(0, 3) || [])}
+SAMPLE DATA (to help confirm mappings):
+${JSON.stringify(sampleRows?.slice(0, 3) || [], null, 2)}
 
-Return a JSON object with this structure:
-{
-  "mapping": {
-    "<original_header>": {
-      "field": "<contact_field_name>",
-      "combineWith": "<other_header_to_combine>" // only for first_name/last_name cases
-    }
-  },
-  "confidence": "high" | "medium" | "low",
-  "notes": "any important observations"
-}`;
+REMEMBER: Create a mapping entry for EVERY header in the list above. Do not skip any.`;
 
     console.log("Calling AI for column mapping...");
 

@@ -19,6 +19,10 @@ interface EnrichmentResult {
   job_title?: string;
   sectors?: string[];
   linkedin_url?: string;
+  email_status?: string;
+  sic_codes?: string[];
+  naics_codes?: string[];
+  company_keywords?: string[];
   confidence: {
     gender?: number;
     location?: number;
@@ -37,11 +41,15 @@ interface ApolloPersonResponse {
     state?: string;
     country?: string;
     linkedin_url?: string;
+    email?: string;
+    email_status?: string;
     organization?: {
       name?: string;
       industry?: string;
       primary_industry?: string;
       keywords?: string[];
+      sic_codes?: string[];
+      naics_codes?: string[];
     };
   };
 }
@@ -199,6 +207,26 @@ Deno.serve(async (req) => {
           result.sectors = [industry];
           result.confidence.sector = 0.85;
         }
+      }
+      
+      // Email status
+      if (person.email_status) {
+        result.email_status = person.email_status;
+      }
+      
+      // SIC codes
+      if (person.organization?.sic_codes && person.organization.sic_codes.length > 0) {
+        result.sic_codes = person.organization.sic_codes;
+      }
+      
+      // NAICS codes
+      if (person.organization?.naics_codes && person.organization.naics_codes.length > 0) {
+        result.naics_codes = person.organization.naics_codes;
+      }
+      
+      // Company keywords
+      if (person.organization?.keywords && person.organization.keywords.length > 0) {
+        result.company_keywords = person.organization.keywords;
       }
     }
     

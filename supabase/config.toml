@@ -53,3 +53,6 @@ verify_jwt = false
 
 [functions.parse-master-wip]
 verify_jwt = false
+
+[functions.parse-contact-columns]
+verify_jwt = false

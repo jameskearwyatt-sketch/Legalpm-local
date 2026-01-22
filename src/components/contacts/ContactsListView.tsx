@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -38,6 +38,7 @@ import { ContactFormDialog } from "./ContactFormDialog";
 import { ContactImportDialog } from "./ContactImportDialog";
 import { EmailDraftDialog } from "./EmailDraftDialog";
 import { ContactDetailDialog } from "./ContactDetailDialog";
+import { SortableFilterableHeader, SortDirection } from "./SortableFilterableHeader";
 import {
   Plus,
   Search,
@@ -64,6 +65,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+type ColumnFilterState = Record<string, string>;
+
 export function ContactsListView() {
   const [filters, setFilters] = useState<ContactFilters>({});
   const [searchQuery, setSearchQuery] = useState("");
@@ -74,6 +77,13 @@ export function ContactsListView() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [selectedContact, setSelectedContact] = useState<DistributionContact | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+
+  // Sorting state
+  const [sortKey, setSortKey] = useState<string | null>("full_name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
+
+  // Column filter state
+  const [columnFilters, setColumnFilters] = useState<ColumnFilterState>({});
 
   const effectiveFilters = useMemo(() => ({
     ...filters,
@@ -88,9 +98,80 @@ export function ContactsListView() {
   const logActivity = useLogDistributionActivity();
   const bulkDelete = useBulkDeleteDistributionContacts();
 
-  const eligibleContacts = useMemo(() => 
-    contacts.filter(c => !c.do_not_contact),
+  // Get unique values for filter dropdowns
+  const uniqueOwners = useMemo(() => 
+    [...new Set(contacts.map(c => c.relationship_owner).filter(Boolean) as string[])].sort(),
     [contacts]
+  );
+
+  const uniqueCompanies = useMemo(() => 
+    [...new Set(contacts.map(c => c.company).filter(Boolean) as string[])].sort(),
+    [contacts]
+  );
+
+  const uniqueJobTitles = useMemo(() => 
+    [...new Set(contacts.map(c => c.job_title).filter(Boolean) as string[])].sort(),
+    [contacts]
+  );
+
+  const uniqueCountries = useMemo(() => 
+    [...new Set(contacts.map(c => c.country).filter(Boolean) as string[])].sort(),
+    [contacts]
+  );
+
+  // Apply column filters and sorting
+  const filteredAndSortedContacts = useMemo(() => {
+    let result = [...contacts];
+
+    // Helper to get field value by key
+    const getFieldValue = (contact: DistributionContact, key: string): unknown => {
+      switch (key) {
+        case 'full_name': return contact.full_name;
+        case 'email': return contact.email;
+        case 'company': return contact.company;
+        case 'job_title': return contact.job_title;
+        case 'country': return contact.country;
+        case 'city': return contact.city;
+        case 'relationship_owner': return contact.relationship_owner;
+        case 'gender': return contact.gender;
+        default: return null;
+      }
+    };
+
+    // Apply column filters
+    Object.entries(columnFilters).forEach(([key, value]) => {
+      if (!value) return;
+      const lowerValue = value.toLowerCase();
+      
+      result = result.filter(contact => {
+        const fieldValue = getFieldValue(contact, key);
+        if (fieldValue === null || fieldValue === undefined) return false;
+        return String(fieldValue).toLowerCase().includes(lowerValue);
+      });
+    });
+
+    // Apply sorting
+    if (sortKey && sortDirection) {
+      result.sort((a, b) => {
+        const aVal = getFieldValue(a, sortKey);
+        const bVal = getFieldValue(b, sortKey);
+        
+        // Handle nulls
+        if (aVal === null || aVal === undefined) return sortDirection === "asc" ? 1 : -1;
+        if (bVal === null || bVal === undefined) return sortDirection === "asc" ? -1 : 1;
+        
+        // String comparison
+        const comparison = String(aVal).localeCompare(String(bVal), undefined, { sensitivity: 'base' });
+        return sortDirection === "asc" ? comparison : -comparison;
+      });
+    }
+
+    return result;
+  }, [contacts, columnFilters, sortKey, sortDirection]);
+
+  const eligibleContacts = useMemo(() => 
+    filteredAndSortedContacts.filter(c => !c.do_not_contact),
+    [filteredAndSortedContacts]
   );
 
   const selectedContacts = useMemo(() => 
@@ -103,9 +184,31 @@ export function ContactsListView() {
     [selectedContacts]
   );
 
+  const handleSort = useCallback((key: string) => {
+    if (sortKey === key) {
+      // Cycle: asc -> desc -> null
+      if (sortDirection === "asc") {
+        setSortDirection("desc");
+      } else if (sortDirection === "desc") {
+        setSortKey(null);
+        setSortDirection(null);
+      }
+    } else {
+      setSortKey(key);
+      setSortDirection("asc");
+    }
+  }, [sortKey, sortDirection]);
+
+  const handleColumnFilter = useCallback((key: string, value: string) => {
+    setColumnFilters(prev => ({
+      ...prev,
+      [key]: value,
+    }));
+  }, []);
+
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(new Set(contacts.map(c => c.id)));
+      setSelectedIds(new Set(filteredAndSortedContacts.map(c => c.id)));
     } else {
       setSelectedIds(new Set());
     }
@@ -124,7 +227,7 @@ export function ContactsListView() {
   const handleExport = async () => {
     const contactsToExport = selectedIds.size > 0 
       ? contacts.filter(c => selectedIds.has(c.id))
-      : contacts;
+      : filteredAndSortedContacts;
 
     const headers = ["Full Name", "Email", "Company", "Job Title", "Country", "City", "Gender", "Sectors", "LinkedIn", "Relationship Owner", "Do Not Contact"];
     const rows = contactsToExport.map(c => [
@@ -177,9 +280,16 @@ export function ContactsListView() {
   const clearFilters = () => {
     setFilters({});
     setSearchQuery("");
+    setColumnFilters({});
+    setSortKey("full_name");
+    setSortDirection("asc");
   };
 
-  const hasActiveFilters = Object.values(filters).some(v => v !== undefined && v !== "") || searchQuery;
+  const hasActiveFilters = Object.values(filters).some(v => v !== undefined && v !== "") || 
+    searchQuery || 
+    Object.values(columnFilters).some(v => v);
+
+  const hasColumnFilters = Object.values(columnFilters).some(v => v);
 
   return (
     <div className="space-y-4">
@@ -209,6 +319,18 @@ export function ContactsListView() {
             </Badge>
           )}
         </Button>
+
+        {hasColumnFilters && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setColumnFilters({})}
+            className="gap-1 text-muted-foreground"
+          >
+            <X className="h-4 w-4" />
+            Clear column filters
+          </Button>
+        )}
 
         <div className="flex-1" />
 
@@ -298,7 +420,7 @@ export function ContactsListView() {
           {hasActiveFilters && (
             <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
               <X className="h-4 w-4" />
-              Clear
+              Clear all
             </Button>
           )}
         </div>
@@ -358,17 +480,81 @@ export function ContactsListView() {
             <TableRow>
               <TableHead className="w-12">
                 <Checkbox
-                  checked={contacts.length > 0 && selectedIds.size === contacts.length}
+                  checked={filteredAndSortedContacts.length > 0 && selectedIds.size === filteredAndSortedContacts.length}
                   onCheckedChange={handleSelectAll}
                 />
               </TableHead>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Company</TableHead>
-              <TableHead>Job Title</TableHead>
-              <TableHead>Owner</TableHead>
+              <TableHead>
+                <SortableFilterableHeader
+                  label="Name"
+                  columnKey="full_name"
+                  sortKey={sortKey}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  filterValue={columnFilters.full_name || ""}
+                  onFilterChange={handleColumnFilter}
+                />
+              </TableHead>
+              <TableHead>
+                <SortableFilterableHeader
+                  label="Email"
+                  columnKey="email"
+                  sortKey={sortKey}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  filterValue={columnFilters.email || ""}
+                  onFilterChange={handleColumnFilter}
+                />
+              </TableHead>
+              <TableHead>
+                <SortableFilterableHeader
+                  label="Company"
+                  columnKey="company"
+                  sortKey={sortKey}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  filterValue={columnFilters.company || ""}
+                  onFilterChange={handleColumnFilter}
+                  filterOptions={uniqueCompanies}
+                />
+              </TableHead>
+              <TableHead>
+                <SortableFilterableHeader
+                  label="Job Title"
+                  columnKey="job_title"
+                  sortKey={sortKey}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  filterValue={columnFilters.job_title || ""}
+                  onFilterChange={handleColumnFilter}
+                  filterOptions={uniqueJobTitles}
+                />
+              </TableHead>
+              <TableHead>
+                <SortableFilterableHeader
+                  label="Owner"
+                  columnKey="relationship_owner"
+                  sortKey={sortKey}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  filterValue={columnFilters.relationship_owner || ""}
+                  onFilterChange={handleColumnFilter}
+                  filterOptions={uniqueOwners}
+                />
+              </TableHead>
               <TableHead>Sectors</TableHead>
-              <TableHead>Country</TableHead>
+              <TableHead>
+                <SortableFilterableHeader
+                  label="Country"
+                  columnKey="country"
+                  sortKey={sortKey}
+                  sortDirection={sortDirection}
+                  onSort={handleSort}
+                  filterValue={columnFilters.country || ""}
+                  onFilterChange={handleColumnFilter}
+                  filterOptions={uniqueCountries}
+                />
+              </TableHead>
               <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
@@ -379,14 +565,14 @@ export function ContactsListView() {
                   Loading contacts...
                 </TableCell>
               </TableRow>
-            ) : contacts.length === 0 ? (
+            ) : filteredAndSortedContacts.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  No contacts found. Add your first contact or import from a file.
+                  {hasColumnFilters ? "No contacts match the current filters." : "No contacts found. Add your first contact or import from a file."}
                 </TableCell>
               </TableRow>
             ) : (
-              contacts.map((contact) => (
+              filteredAndSortedContacts.map((contact) => (
                 <TableRow 
                   key={contact.id}
                   className={contact.do_not_contact ? "opacity-60 bg-muted/30" : ""}
@@ -435,7 +621,7 @@ export function ContactsListView() {
                           <MoreVertical className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
+                      <DropdownMenuContent align="end" className="bg-popover">
                         <DropdownMenuItem onClick={() => setSelectedContact(contact)}>
                           View Details
                         </DropdownMenuItem>
@@ -463,9 +649,12 @@ export function ContactsListView() {
 
       {/* Summary */}
       <div className="text-sm text-muted-foreground">
-        Showing {contacts.length} contact{contacts.length !== 1 ? 's' : ''} 
-        {eligibleContacts.length !== contacts.length && (
-          <> ({eligibleContacts.length} contactable)</>
+        Showing {filteredAndSortedContacts.length} contact{filteredAndSortedContacts.length !== 1 ? 's' : ''} 
+        {filteredAndSortedContacts.length !== contacts.length && (
+          <> (filtered from {contacts.length})</>
+        )}
+        {eligibleContacts.length !== filteredAndSortedContacts.length && (
+          <> • {eligibleContacts.length} contactable</>
         )}
       </div>
 

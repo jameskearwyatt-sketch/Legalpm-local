@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { format } from "date-fns";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -42,6 +47,7 @@ import {
   XCircle,
   Hash,
   Tags,
+  ChevronDown,
 } from "lucide-react";
 
 interface ContactDetailDialogProps {
@@ -196,19 +202,22 @@ export function ContactDetailDialog({ contact, open, onOpenChange }: ContactDeta
               </div>
             )}
 
-            {/* Company Keywords */}
+            {/* Company Keywords - Collapsible */}
             {contact.company_keywords && contact.company_keywords.length > 0 && (
-              <div className="space-y-2">
-                <div className="text-sm font-medium flex items-center gap-2">
+              <Collapsible>
+                <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium w-full hover:text-primary transition-colors">
                   <Tags className="h-4 w-4 text-muted-foreground" />
-                  Business Focus Areas
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {contact.company_keywords.map(keyword => (
-                    <Badge key={keyword} variant="secondary">{keyword}</Badge>
-                  ))}
-                </div>
-              </div>
+                  Business Focus Areas ({contact.company_keywords.length})
+                  <ChevronDown className="h-4 w-4 ml-auto transition-transform duration-200 [[data-state=open]>&]:rotate-180" />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="pt-2">
+                  <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                    {contact.company_keywords.map(keyword => (
+                      <Badge key={keyword} variant="secondary">{keyword}</Badge>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
             )}
 
             {contact.relationship_owner && (

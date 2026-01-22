@@ -266,6 +266,39 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_import_formats: {
+        Row: {
+          column_mappings: Json
+          created_at: string
+          format_name: string
+          header_signature: string | null
+          id: string
+          sample_headers: Json | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          column_mappings?: Json
+          created_at?: string
+          format_name: string
+          header_signature?: string | null
+          id?: string
+          sample_headers?: Json | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          column_mappings?: Json
+          created_at?: string
+          format_name?: string
+          header_signature?: string | null
+          id?: string
+          sample_headers?: Json | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       detailed_wip_update_items: {
         Row: {
           budget_line_item_id: string

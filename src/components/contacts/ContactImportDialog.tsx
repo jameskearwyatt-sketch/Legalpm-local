@@ -406,17 +406,20 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
                 <div>
                   <Label className="flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    Contact Owner
+                    Contact Owner <span className="text-destructive">*</span>
                   </Label>
                   <p className="text-sm text-muted-foreground mb-2">
-                    Assign a relationship owner to all imported contacts.
+                    Required. Assign a relationship owner to all imported contacts.
                   </p>
                   <Popover open={ownerPopoverOpen} onOpenChange={setOwnerPopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         role="combobox"
-                        className="w-full justify-between"
+                        className={cn(
+                          "w-full justify-between",
+                          !defaultOwner && "border-destructive/50"
+                        )}
                       >
                         {defaultOwner || "Select or type owner name..."}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -468,6 +471,9 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
                       </Command>
                     </PopoverContent>
                   </Popover>
+                  {!defaultOwner && (
+                    <p className="text-xs text-destructive mt-1">Contact owner is required</p>
+                  )}
                 </div>
               </TabsContent>
 
@@ -519,17 +525,20 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
                 <div>
                   <Label className="flex items-center gap-2">
                     <User className="h-4 w-4" />
-                    Default Contact Owner
+                    Contact Owner <span className="text-destructive">*</span>
                   </Label>
                   <p className="text-sm text-muted-foreground mb-2">
-                    Assign an owner to contacts without one in the file.
+                    Required. Assign an owner to contacts without one in the file.
                   </p>
                   <Popover open={ownerPopoverOpen} onOpenChange={setOwnerPopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         role="combobox"
-                        className="w-full justify-between"
+                        className={cn(
+                          "w-full justify-between",
+                          !defaultOwner && "border-destructive/50"
+                        )}
                       >
                         {defaultOwner || "Select or type owner name..."}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -581,6 +590,9 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
                       </Command>
                     </PopoverContent>
                   </Popover>
+                  {!defaultOwner && (
+                    <p className="text-xs text-destructive mt-1">Contact owner is required</p>
+                  )}
                 </div>
               </TabsContent>
             </Tabs>
@@ -598,13 +610,13 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
               Cancel
             </Button>
             {parseStep === "select" && activeTab === "paste" && (
-              <Button onClick={handlePasteImport} disabled={isProcessing || !pastedText.trim()}>
+              <Button onClick={handlePasteImport} disabled={isProcessing || !pastedText.trim() || !defaultOwner}>
                 {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Import
               </Button>
             )}
             {parseStep === "select" && activeTab === "file" && (
-              <Button onClick={handleFileAnalyse} disabled={isProcessing || !selectedFile}>
+              <Button onClick={handleFileAnalyse} disabled={isProcessing || !selectedFile || !defaultOwner}>
                 {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Analyse File
               </Button>

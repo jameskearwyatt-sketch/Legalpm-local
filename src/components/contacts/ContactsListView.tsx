@@ -366,6 +366,7 @@ export function ContactsListView() {
               <TableHead>Email</TableHead>
               <TableHead>Company</TableHead>
               <TableHead>Job Title</TableHead>
+              <TableHead>Owner</TableHead>
               <TableHead>Sectors</TableHead>
               <TableHead>Country</TableHead>
               <TableHead className="w-10"></TableHead>
@@ -374,13 +375,13 @@ export function ContactsListView() {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   Loading contacts...
                 </TableCell>
               </TableRow>
             ) : contacts.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                   No contacts found. Add your first contact or import from a file.
                 </TableCell>
               </TableRow>
@@ -410,6 +411,7 @@ export function ContactsListView() {
                   <TableCell className="text-muted-foreground">{contact.email}</TableCell>
                   <TableCell>{contact.company || "-"}</TableCell>
                   <TableCell>{contact.job_title || "-"}</TableCell>
+                  <TableCell className="text-muted-foreground">{contact.relationship_owner || "-"}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {contact.sectors.slice(0, 2).map(s => (

@@ -33,22 +33,25 @@ export function useAssignFocusAreas() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ contactIds, focusAreas }: { contactIds: string[]; focusAreas: string[] }) => {
+    mutationFn: async ({ contactIds, focusAreas, protectManualEdits = true }: { contactIds: string[]; focusAreas: string[]; protectManualEdits?: boolean }) => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
       const { data, error } = await supabase.functions.invoke('assign-focus-areas', {
-        body: { contactIds, focusAreas },
+        body: { contactIds, focusAreas, protectManualEdits },
       });
 
       if (error) throw error;
       if (!data.success) throw new Error(data.error || 'Assignment failed');
       
-      return data as { success: boolean; updated: number; errors: number };
+      return data as { success: boolean; updated: number; errors: number; skipped?: number };
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["distribution-contacts"] });
-      toast.success(`Assigned focus areas to ${data.updated} contacts`);
+      const message = data.skipped && data.skipped > 0
+        ? `Assigned focus areas to ${data.updated} contacts (${data.skipped} protected)`
+        : `Assigned focus areas to ${data.updated} contacts`;
+      toast.success(message);
     },
     onError: (error: Error) => {
       toast.error(`Assignment failed: ${error.message}`);

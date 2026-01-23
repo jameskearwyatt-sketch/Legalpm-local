@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,6 +39,17 @@ export function SmartSectorSearch({
 }: SmartSectorSearchProps) {
   const [inputValue, setInputValue] = useState("");
   const [showUnderstanding, setShowUnderstanding] = useState(false);
+
+  // Clear input when search becomes active (search completed successfully)
+  // This resets the input to placeholder state while showing results
+  const prevIsSearching = useRef(isSearching);
+  useEffect(() => {
+    // Search just finished (was searching, now not searching, and is active = successful)
+    if (prevIsSearching.current && !isSearching && isActive) {
+      setInputValue("");
+    }
+    prevIsSearching.current = isSearching;
+  }, [isSearching, isActive]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && inputValue.trim()) {

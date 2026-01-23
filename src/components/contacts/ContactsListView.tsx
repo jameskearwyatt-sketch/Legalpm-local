@@ -184,6 +184,7 @@ export function ContactsListView() {
         case 'city': return contact.city;
         case 'relationship_owner': return contact.relationship_owner;
         case 'gender': return contact.gender;
+        case 'naics_sector': return getPrimaryNaicsSector(contact.naics_codes);
         default: return null;
       }
     };
@@ -236,13 +237,8 @@ export function ContactsListView() {
 
   const handleSort = useCallback((key: string) => {
     if (sortKey === key) {
-      // Cycle: asc -> desc -> null
-      if (sortDirection === "asc") {
-        setSortDirection("desc");
-      } else if (sortDirection === "desc") {
-        setSortKey(null);
-        setSortDirection(null);
-      }
+      // Toggle between asc and desc only (don't reset to null)
+      setSortDirection(sortDirection === "asc" ? "desc" : "asc");
     } else {
       setSortKey(key);
       setSortDirection("asc");
@@ -755,9 +751,16 @@ export function ContactsListView() {
                       mode="dropdown-filter"
                     />
                   </TableHead>
-                  {/* Static headers for special columns */}
+                  {/* Sector: Sort only */}
                   <TableHead className="w-[120px] bg-muted/50">
-                    <span className="text-xs font-medium">Sector</span>
+                    <SortableFilterableHeader
+                      label="Sector"
+                      columnKey="naics_sector"
+                      sortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      mode="sort-only"
+                    />
                   </TableHead>
                   <TableHead className="w-[120px] bg-muted/50">
                     <span className="text-xs font-medium">Focus Area</span>

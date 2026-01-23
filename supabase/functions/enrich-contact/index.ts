@@ -454,9 +454,65 @@ async function enrichWithApollo(
     }
   }
   
+  // HELPER: Extract best email from Apollo person response
+  // Apollo stores emails in multiple nested locations - we need to check all of them
+  function extractBestEmail(person: ApolloPersonResponse['person']): { email?: string; email_status?: string } {
+    if (!person) return {};
+    
+    // Priority 1: contact.email (MOST CURRENT - updated when person changes jobs)
+    if (person.contact?.email) {
+      console.log('Found email in contact object:', person.contact.email);
+      return { email: person.contact.email, email_status: person.contact.email_status || undefined };
+    }
+    
+    // Priority 2: contact_emails array (first/position=0 is most current)
+    if (person.contact_emails && person.contact_emails.length > 0) {
+      const primaryEmail = person.contact_emails.find(e => e.position === 0) || person.contact_emails[0];
+      if (primaryEmail?.email) {
+        console.log('Found email in contact_emails array:', primaryEmail.email);
+        return { email: primaryEmail.email, email_status: primaryEmail.email_status || undefined };
+      }
+    }
+    
+    // Priority 3: person.email (may be stale/old job)
+    if (person.email) {
+      console.log('Using person.email (may be stale):', person.email);
+      return { email: person.email, email_status: person.email_status || undefined };
+    }
+    
+    return {};
+  }
+  
+  // HELPER: Extract best location from Apollo person response
+  // Apollo stores location in multiple places - person.contact is most accurate for individuals
+  function extractBestLocation(person: ApolloPersonResponse['person']): { city?: string; country?: string } {
+    if (!person) return {};
+    
+    // Priority 1: contact.city/country (MOST ACCURATE for individual's actual location)
+    if (person.contact?.city || person.contact?.country) {
+      console.log('Found location in contact object:', person.contact.city, person.contact.country);
+      return { city: person.contact.city || undefined, country: person.contact.country || undefined };
+    }
+    
+    // Priority 2: person.city/country (person-level location)
+    if (person.city || person.country) {
+      console.log('Found location at person level:', person.city, person.country);
+      return { city: person.city || undefined, country: person.country || undefined };
+    }
+    
+    // Priority 3: organization location (LEAST preferred - this is company HQ, not person's location!)
+    // Only use as absolute last resort and with low confidence
+    if (person.organization?.city || person.organization?.country) {
+      console.log('Falling back to organization location (company HQ, not person):', person.organization.city, person.organization.country);
+      return { city: person.organization.city || undefined, country: person.organization.country || undefined };
+    }
+    
+    return {};
+  }
+  
   // STEP 3: Merge results - prioritize different sources for different data
   // LinkedIn: best for current job title and company (job changes)
-  // Apollo search: best for email and location (their database has this)
+  // But LinkedIn response ALSO has contact.email and contact.city/country that we need to extract!
   
   if (linkedInData?.person || apolloSearchData?.person) {
     const mergedResult: ApolloPersonResponse = { person: {} };
@@ -472,45 +528,58 @@ async function enrichWithApollo(
     // LinkedIn URL: prefer LinkedIn source
     mergedResult.person!.linkedin_url = linkedIn?.linkedin_url || apolloSearch?.linkedin_url;
     
-    // EMAIL: prefer Apollo search result (their database has emails, LinkedIn match often doesn't)
-    if (apolloSearch?.email) {
-      console.log('Using email from Apollo search:', apolloSearch.email);
-      mergedResult.person!.email = apolloSearch.email;
-      mergedResult.person!.email_status = apolloSearch.email_status;
-    } else if (linkedIn?.email) {
-      console.log('Falling back to email from LinkedIn match:', linkedIn.email);
-      mergedResult.person!.email = linkedIn.email;
-      mergedResult.person!.email_status = linkedIn.email_status;
+    // EMAIL: Extract from ALL nested locations, prioritizing LinkedIn contact object
+    // The LinkedIn match response often has the email in contact.email even when person.email is null!
+    const linkedInEmail = extractBestEmail(linkedIn);
+    const apolloSearchEmail = extractBestEmail(apolloSearch);
+    
+    // Prefer LinkedIn contact email (most current), then Apollo search email
+    if (linkedInEmail.email) {
+      console.log('Using email from LinkedIn match (contact object):', linkedInEmail.email);
+      mergedResult.person!.email = linkedInEmail.email;
+      mergedResult.person!.email_status = linkedInEmail.email_status;
+    } else if (apolloSearchEmail.email) {
+      console.log('Using email from Apollo search:', apolloSearchEmail.email);
+      mergedResult.person!.email = apolloSearchEmail.email;
+      mergedResult.person!.email_status = apolloSearchEmail.email_status;
     }
     
-    // LOCATION: prefer Apollo search organization location (most accurate for current role)
-    if (apolloSearch?.organization?.city || apolloSearch?.organization?.country) {
-      console.log('Using location from Apollo search org:', apolloSearch.organization?.city, apolloSearch.organization?.country);
-      // Ensure we have the org data with location
-      if (!mergedResult.person!.organization) {
-        mergedResult.person!.organization = {};
-      }
-      mergedResult.person!.organization.city = apolloSearch.organization?.city || mergedResult.person!.organization.city;
-      mergedResult.person!.organization.country = apolloSearch.organization?.country || mergedResult.person!.organization.country;
-    }
+    // LOCATION: Extract from contact objects (person's actual location, not company HQ)
+    const linkedInLocation = extractBestLocation(linkedIn);
+    const apolloSearchLocation = extractBestLocation(apolloSearch);
     
-    // Person-level location (fallback)
-    mergedResult.person!.city = apolloSearch?.city || linkedIn?.city;
-    mergedResult.person!.country = apolloSearch?.country || linkedIn?.country;
+    // Prefer LinkedIn contact location (most current), then Apollo search location
+    if (linkedInLocation.city || linkedInLocation.country) {
+      console.log('Using location from LinkedIn match:', linkedInLocation.city, linkedInLocation.country);
+      mergedResult.person!.city = linkedInLocation.city;
+      mergedResult.person!.country = linkedInLocation.country;
+    } else if (apolloSearchLocation.city || apolloSearchLocation.country) {
+      console.log('Using location from Apollo search:', apolloSearchLocation.city, apolloSearchLocation.country);
+      mergedResult.person!.city = apolloSearchLocation.city;
+      mergedResult.person!.country = apolloSearchLocation.country;
+    }
     
     // Industry data: prefer Apollo search (richer data)
     if (apolloSearch?.organization) {
       if (!mergedResult.person!.organization) {
         mergedResult.person!.organization = {};
       }
-      mergedResult.person!.organization.industry = apolloSearch.organization.industry || mergedResult.person!.organization.industry;
-      mergedResult.person!.organization.primary_industry = apolloSearch.organization.primary_industry || mergedResult.person!.organization.primary_industry;
-      mergedResult.person!.organization.keywords = apolloSearch.organization.keywords || mergedResult.person!.organization.keywords;
-      mergedResult.person!.organization.sic_codes = apolloSearch.organization.sic_codes || mergedResult.person!.organization.sic_codes;
-      mergedResult.person!.organization.naics_codes = apolloSearch.organization.naics_codes || mergedResult.person!.organization.naics_codes;
+      mergedResult.person!.organization.industry = apolloSearch.organization.industry || mergedResult.person!.organization?.industry;
+      mergedResult.person!.organization.primary_industry = apolloSearch.organization.primary_industry || mergedResult.person!.organization?.primary_industry;
+      mergedResult.person!.organization.keywords = apolloSearch.organization.keywords || mergedResult.person!.organization?.keywords;
+      mergedResult.person!.organization.sic_codes = apolloSearch.organization.sic_codes || mergedResult.person!.organization?.sic_codes;
+      mergedResult.person!.organization.naics_codes = apolloSearch.organization.naics_codes || mergedResult.person!.organization?.naics_codes;
     }
     
-    console.log('MERGED RESULT - email:', mergedResult.person!.email, 'company:', mergedResult.person!.organization?.name);
+    // Copy contact object and contact_emails from LinkedIn if available (for downstream extraction)
+    if (linkedIn?.contact) {
+      mergedResult.person!.contact = linkedIn.contact;
+    }
+    if (linkedIn?.contact_emails) {
+      mergedResult.person!.contact_emails = linkedIn.contact_emails;
+    }
+    
+    console.log('MERGED RESULT - email:', mergedResult.person!.email, 'location:', mergedResult.person!.city, mergedResult.person!.country, 'company:', mergedResult.person!.organization?.name);
     return mergedResult;
   }
   
@@ -570,23 +639,37 @@ Deno.serve(async (req) => {
         result.job_title = person.title;
       }
       
-      // Location - ALWAYS prefer person location (where they actually are)
-      // Organization location is the company HQ which is often in a different country
+      // Location - Check all possible sources in priority order:
+      // 1. contact.city/country (person's actual current location - MOST ACCURATE)
+      // 2. person.city/country (person-level, set by merge step)
+      // 3. organization location (company HQ - LEAST preferred, often wrong for remote workers)
+      const contactCity = person.contact?.city;
+      const contactCountry = person.contact?.country;
       const personCity = person.city;
       const personCountry = person.country;
       const orgCity = person.organization?.city;
       const orgCountry = person.organization?.country;
       
-      // Use person location first (this is where the individual actually is)
-      if (personCity || personCountry) {
+      // Priority 1: Contact-level location (most accurate for individual)
+      if (contactCity || contactCountry) {
+        result.city = contactCity || undefined;
+        result.country = contactCountry || undefined;
+        result.confidence.location = 0.95;
+        console.log('Using contact location:', result.city, result.country);
+      }
+      // Priority 2: Person-level location 
+      else if (personCity || personCountry) {
         result.city = personCity || undefined;
         result.country = personCountry || undefined;
         result.confidence.location = 0.9;
-      } else if (orgCity || orgCountry) {
-        // Only fall back to org location if no person location available
+        console.log('Using person location:', result.city, result.country);
+      }
+      // Priority 3: Organization location (LAST RESORT - this is company HQ!)
+      else if (orgCity || orgCountry) {
         result.city = orgCity || undefined;
         result.country = orgCountry || undefined;
-        result.confidence.location = 0.5; // Low confidence - this is company HQ, not person's location
+        result.confidence.location = 0.4; // Very low confidence - company HQ != person's location
+        console.log('WARNING: Falling back to org location (company HQ, may be wrong):', result.city, result.country);
       }
       
       // LinkedIn URL
@@ -608,18 +691,18 @@ Deno.serve(async (req) => {
         }
       }
       
-      // EMAIL EXTRACTION - Apollo stores emails in multiple places, prioritize the most current:
+      // EMAIL EXTRACTION - Check all possible sources in priority order:
       // 1. contact.email (most current, updated when person changes jobs)
       // 2. contact_emails[0].email (array of emails, first is usually most current)
-      // 3. person.email (can be stale/old job email)
+      // 3. person.email (can be stale/old job email but still useful)
       let bestEmail: string | undefined;
       let bestEmailStatus: string | undefined;
       
-      // Priority 1: Check nested contact object (this is where Apollo puts the CURRENT email)
+      // Priority 1: Check nested contact object (MOST CURRENT email)
       if (person.contact?.email) {
         bestEmail = person.contact.email;
-        bestEmailStatus = person.contact.email_status;
-        console.log('Found email in contact object:', bestEmail);
+        bestEmailStatus = person.contact.email_status || undefined;
+        console.log('FINAL: Found email in contact object:', bestEmail);
       }
       
       // Priority 2: Check contact_emails array
@@ -627,16 +710,16 @@ Deno.serve(async (req) => {
         const primaryContactEmail = person.contact_emails.find(e => e.position === 0) || person.contact_emails[0];
         if (primaryContactEmail?.email) {
           bestEmail = primaryContactEmail.email;
-          bestEmailStatus = primaryContactEmail.email_status;
-          console.log('Found email in contact_emails array:', bestEmail);
+          bestEmailStatus = primaryContactEmail.email_status || undefined;
+          console.log('FINAL: Found email in contact_emails array:', bestEmail);
         }
       }
       
-      // Priority 3: Fall back to person.email (may be stale)
+      // Priority 3: Fall back to person.email (may be stale but still useful)
       if (!bestEmail && person.email) {
         bestEmail = person.email;
-        bestEmailStatus = person.email_status;
-        console.log('Using person.email (may be stale):', bestEmail);
+        bestEmailStatus = person.email_status || undefined;
+        console.log('FINAL: Using person.email (may be stale):', bestEmail);
       }
       
       if (bestEmail) {

@@ -2394,6 +2394,7 @@ export type Database = {
           created_at: string
           default_currency: string
           default_rate_card: Json | null
+          email_signature: string | null
           id: string
           near_budget_threshold: number
           poor_collection_threshold: number
@@ -2406,6 +2407,7 @@ export type Database = {
           created_at?: string
           default_currency?: string
           default_rate_card?: Json | null
+          email_signature?: string | null
           id?: string
           near_budget_threshold?: number
           poor_collection_threshold?: number
@@ -2418,6 +2420,7 @@ export type Database = {
           created_at?: string
           default_currency?: string
           default_rate_card?: Json | null
+          email_signature?: string | null
           id?: string
           near_budget_threshold?: number
           poor_collection_threshold?: number

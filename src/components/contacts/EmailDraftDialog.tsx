@@ -22,9 +22,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { type DistributionContact } from "@/lib/hooks/useDistributionContacts";
 import { useCreateDistributionEmailDraft } from "@/lib/hooks/useDistributionEmailDrafts";
+import { useUserSettings } from "@/lib/hooks/useUserSettings";
 import { supabase } from "@/integrations/supabase/client";
-import { Mail, ExternalLink, AlertCircle, Users, Loader2 } from "lucide-react";
+import { Mail, ExternalLink, AlertCircle, Users, Loader2, FileSignature, Save } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 interface EmailDraftDialogProps {
   open: boolean;
@@ -61,6 +63,11 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
   const [useJapaneseFormality, setUseJapaneseFormality] = useState(true);
 
   const createDraft = useCreateDistributionEmailDraft();
+  const { emailSignature, saveEmailSignature } = useUserSettings();
+  
+  // Signature editing state
+  const [isSignatureOpen, setIsSignatureOpen] = useState(false);
+  const [editingSignature, setEditingSignature] = useState("");
 
   // Reset selected contacts when dialog opens with new contacts
   useMemo(() => {
@@ -71,12 +78,23 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
   useEffect(() => {
     if (open && contacts.length > 0) {
       analyzeJapaneseContacts();
+      // Initialize signature editing with saved signature
+      setEditingSignature(emailSignature || "");
     } else if (!open) {
       // Reset state when dialog closes
       setJapaneseContacts([]);
       setUseJapaneseFormality(true);
+      setIsSignatureOpen(false);
     }
-  }, [open, contacts]);
+  }, [open, contacts, emailSignature]);
+
+  // Build full email body with signature
+  const getFullBody = (baseBody: string): string => {
+    if (emailSignature) {
+      return `${baseBody}\n\n${emailSignature}`;
+    }
+    return baseBody;
+  };
 
   const analyzeJapaneseContacts = async () => {
     setIsAnalyzingJapanese(true);
@@ -266,7 +284,8 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
       selectedContacts.forEach((contact, index) => {
         setTimeout(() => {
           const personalizedSalutation = getPersonalizedSalutation(contact);
-          const personalizedBody = `${personalizedSalutation},\n\n${body}`;
+          const fullBody = getFullBody(body);
+          const personalizedBody = `${personalizedSalutation},\n\n${fullBody}`;
           const mailtoUrl = `mailto:${encodeURIComponent(contact.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(personalizedBody)}`;
           window.open(mailtoUrl, "_blank");
         }, index * 100); // 100ms delay between each
@@ -282,13 +301,15 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
       
       const toList = orderedContacts.map(c => c.email).join("; ");
       const combinedSalutation = buildCombinedSalutation();
-      const personalizedBody = `${combinedSalutation},\n\n${body}`;
+      const fullBody = getFullBody(body);
+      const personalizedBody = `${combinedSalutation},\n\n${fullBody}`;
       const mailtoUrl = `mailto:${encodeURIComponent(toList)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(personalizedBody)}`;
       window.open(mailtoUrl, "_blank");
     } else {
       // BCC all - recipients in BCC field
       const bccList = emails.join("; ");
-      const mailtoUrl = `mailto:?bcc=${encodeURIComponent(bccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      const fullBody = getFullBody(body);
+      const mailtoUrl = `mailto:?bcc=${encodeURIComponent(bccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(fullBody)}`;
       window.open(mailtoUrl, "_blank");
     }
 
@@ -495,6 +516,59 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
               placeholder="Compose your email..."
             />
           </div>
+
+          {/* Signature Section */}
+          <Collapsible open={isSignatureOpen} onOpenChange={setIsSignatureOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground">
+                <FileSignature className="h-4 w-4" />
+                {emailSignature ? 'Edit Signature' : 'Add Signature'}
+                {emailSignature && (
+                  <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded ml-auto">
+                    Saved
+                  </span>
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-2 space-y-2">
+              <Textarea
+                rows={5}
+                value={editingSignature}
+                onChange={(e) => setEditingSignature(e.target.value)}
+                placeholder="Enter your signature (plain text)&#10;&#10;e.g.&#10;Best regards,&#10;John Smith&#10;Partner, Baker McKenzie&#10;+44 20 1234 5678"
+                className="text-sm"
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    saveEmailSignature.mutate(editingSignature);
+                  }}
+                  disabled={saveEmailSignature.isPending}
+                  className="gap-1"
+                >
+                  <Save className="h-3 w-3" />
+                  {saveEmailSignature.isPending ? 'Saving...' : 'Save Signature'}
+                </Button>
+                {emailSignature && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      saveEmailSignature.mutate("");
+                      setEditingSignature("");
+                    }}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Your signature will be appended to all emails. It's saved to your account and will be remembered.
+              </p>
+            </CollapsibleContent>
+          </Collapsible>
         </div>
 
         <DialogFooter className="flex-col sm:flex-row gap-2">

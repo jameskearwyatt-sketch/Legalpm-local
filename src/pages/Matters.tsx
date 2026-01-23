@@ -43,7 +43,8 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { BilledAmountCell } from '@/components/matters/BilledAmountCell';
-import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload, History, Eye, Lightbulb } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload, History, Eye, Lightbulb, Download } from 'lucide-react';
+import { ExportMattersDialog } from '@/components/matters/ExportMattersDialog';
 import { ProgressSlider } from '@/components/matters/ProgressSlider';
 import { MasterWipUpdateDialog } from '@/components/matters/MasterWipUpdateDialog';
 import { DisbursementReviewResult } from '@/components/matters/DisbursementReviewDialog';
@@ -557,6 +558,7 @@ export default function Matters() {
 
   const [showMasterWipDialog, setShowMasterWipDialog] = useState(false);
   const [showMasterWipHistoryDialog, setShowMasterWipHistoryDialog] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const [isTogglingProposals, setIsTogglingProposals] = useState(false);
   const { createMasterUpdate, lastMasterChanges, lastMasterUpdateDate } = useMasterWipUpdates();
   const { masterHighlightEnabled, toggleMasterHighlight } = useHighlightMovements();
@@ -1065,13 +1067,23 @@ export default function Matters() {
                 </div>
               </div>
             )}
-            {!isClosed && !isSpecialTab && (
-              <Button asChild>
-                <Link to="/matters/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Matter
-                </Link>
-              </Button>
+            {!isSpecialTab && (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" onClick={() => setShowExportDialog(true)}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export Matters
+                  </Button>
+                  {!isClosed && (
+                    <Button asChild>
+                      <Link to="/matters/new">
+                        <Plus className="mr-2 h-4 w-4" />
+                        New Matter
+                      </Link>
+                    </Button>
+                  )}
+                </div>
+              </div>
             )}
           </div>
         </div>
@@ -1585,6 +1597,14 @@ export default function Matters() {
         isOpen={showMasterWipHistoryDialog}
         onClose={() => setShowMasterWipHistoryDialog(false)}
         matters={matters.map(m => ({ id: m.id, matter_name: m.matter_name, fee_currency: m.fee_currency }))}
+      />
+
+      {/* Export Matters Dialog */}
+      <ExportMattersDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        matters={matters}
+        userName={userProfile?.full_name || ''}
       />
     </AppLayout>
   );

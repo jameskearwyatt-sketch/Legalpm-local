@@ -93,18 +93,20 @@ serve(async (req) => {
 
     console.log(`Processing ${contacts.length} contacts for smart sector search: "${query}"`);
 
-    // Step 1: Have AI understand the query and identify related terms
+    // Step 1: Have AI understand the query and identify related terms AND exclusions
     const understandingPrompt = `You are an expert in business sectors and industries. The user is searching for contacts related to: "${query}"
 
-First, explain what this sector/industry means and list related terms, sub-sectors, and keywords that would indicate someone works in or is connected to this area. Be comprehensive but focused.
+First, explain what this sector/industry means SPECIFICALLY - be precise about what distinguishes this sector from related but different industries.
 
-Consider:
-- Direct involvement (works in the sector)
-- Adjacent sectors (suppliers, customers, service providers)
-- Related technologies and innovations
-- Common company types and job titles in this space
+Then provide:
+1. INCLUDE KEYWORDS (max 15): Terms that strongly indicate genuine involvement in "${query}"
+2. EXCLUDE KEYWORDS (max 10): Terms that indicate a DIFFERENT industry that should NOT match, even if there's superficial overlap
 
-Provide a brief 2-3 sentence understanding followed by a bullet list of related keywords and terms (max 20).`;
+For example, if searching for "rare earth mining":
+- INCLUDE: rare earth elements, REE, lithium extraction, cobalt mining, critical minerals, mineral processing
+- EXCLUDE: waste-to-energy, renewable power, solar, wind farms, oil & gas production, pension fund
+
+Be specific and discriminating. Generic terms like "mining" alone are not enough - the company must actually be in the specific sector.`;
 
     const understandingResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -146,7 +148,7 @@ Provide a brief 2-3 sentence understanding followed by a bullet list of related 
     for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
       const batch = contacts.slice(i, i + BATCH_SIZE);
       
-      // Prepare contact summaries for AI analysis
+      // Prepare contact summaries for AI analysis with clear structure
       const contactSummaries = batch.map((c: Contact) => {
         const keywords = c.company_keywords?.join(", ") || "";
         const focusAreas = c.emi_focus_areas?.join(", ") || "";
@@ -154,23 +156,38 @@ Provide a brief 2-3 sentence understanding followed by a bullet list of related 
         
         return {
           id: c.id,
-          summary: `Name: ${c.full_name}, Company: ${c.company || "Unknown"}, Title: ${c.job_title || "Unknown"}, Business Focus: ${keywords || "Not specified"}, EMI Focus Areas: ${focusAreas || "None"}, Sectors: ${sectors || "None"}`
+          summary: `Name: ${c.full_name}
+  Company: ${c.company || "Unknown"}
+  Job Title: ${c.job_title || "Unknown"}
+  COMPANY BUSINESS FOCUS (most important): ${keywords || "Not specified"}
+  Person's Interest Areas: ${focusAreas || "None"}
+  Sectors: ${sectors || "None"}`
         };
       });
 
-      const matchPrompt = `Based on the user's search for "${query}" contacts (which relates to: ${queryUnderstanding.substring(0, 500)}), 
-      
-Analyze each contact and determine if they are relevant to the "${query}" sector.
+      const matchPrompt = `You are evaluating contacts for relevance to: "${query}"
+
+Context about this sector:
+${queryUnderstanding.substring(0, 800)}
+
+CRITICAL MATCHING RULES:
+1. The COMPANY'S actual business (shown in "COMPANY BUSINESS FOCUS") is the PRIMARY factor
+2. A person's "Interest Areas" are SECONDARY - they indicate what the person is interested in, NOT what their company does
+3. If the company's business focus clearly indicates a DIFFERENT industry (e.g., waste-to-energy, renewable power, oil & gas), DO NOT MATCH even if the person has a relevant interest area
+4. Only match if there's genuine evidence the COMPANY operates in or directly serves "${query}"
 
 Contacts to analyze:
-${contactSummaries.map(c => `[${c.id}]: ${c.summary}`).join("\n")}
+${contactSummaries.map(c => `[${c.id}]: ${c.summary}`).join("\n\n")}
 
-For each contact that matches, provide the match using the tool. Only include contacts with genuine relevance.
-- "high" confidence: Direct involvement in the sector (company name, title, or focus areas clearly indicate involvement)
-- "medium" confidence: Strong indirect connection (adjacent sector, likely customer/supplier, relevant technology)
-- "low" confidence: Possible connection worth including (tangential relationship, broad industry overlap)
+For each contact that GENUINELY matches, provide the match using the tool.
+- "high": Company clearly operates in "${query}" (company name or business focus directly indicates this)
+- "medium": Company directly serves or supplies "${query}" (e.g., equipment, services, financing specifically for this sector)
+- "low": Only use if company has tangential but real connection (NOT just because person has an interest area)
 
-Skip contacts with no meaningful connection.`;
+REJECT contacts where:
+- Company business focus indicates a different industry (even if person has relevant interest areas)
+- The only connection is a broad/generic term like "mining" without specific relevance to "${query}"
+- Company is in renewables/solar/wind but search is for mining (or vice versa)`;
 
       const matchResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -181,7 +198,7 @@ Skip contacts with no meaningful connection.`;
         body: JSON.stringify({
           model: "google/gemini-2.5-flash",
           messages: [
-            { role: "system", content: "You are a precise contact matching system. Only match contacts with genuine relevance to the search query." },
+            { role: "system", content: "You are a STRICT contact matching system. You ONLY match contacts whose COMPANY actually operates in or directly serves the target sector. A person having an 'interest area' or 'focus area' in a sector is NOT sufficient - the company's actual business must be relevant. Err on the side of rejecting false positives." },
             { role: "user", content: matchPrompt }
           ],
           tools: [

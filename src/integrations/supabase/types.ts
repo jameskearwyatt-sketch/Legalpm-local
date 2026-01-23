@@ -491,6 +491,8 @@ export type Database = {
           created_at: string
           do_not_contact: boolean
           email: string
+          email_company_mismatch: boolean
+          email_mismatch_dismissed: boolean
           email_status: string | null
           emi_focus_areas: string[]
           emi_focus_areas_assigned_at: string | null
@@ -518,6 +520,8 @@ export type Database = {
           created_at?: string
           do_not_contact?: boolean
           email: string
+          email_company_mismatch?: boolean
+          email_mismatch_dismissed?: boolean
           email_status?: string | null
           emi_focus_areas?: string[]
           emi_focus_areas_assigned_at?: string | null
@@ -545,6 +549,8 @@ export type Database = {
           created_at?: string
           do_not_contact?: boolean
           email?: string
+          email_company_mismatch?: boolean
+          email_mismatch_dismissed?: boolean
           email_status?: string | null
           emi_focus_areas?: string[]
           emi_focus_areas_assigned_at?: string | null

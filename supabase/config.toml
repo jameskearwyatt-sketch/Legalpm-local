@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.assign-focus-areas]
 verify_jwt = false
+
+[functions.detect-email-mismatch]
+verify_jwt = false

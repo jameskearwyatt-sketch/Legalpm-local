@@ -165,17 +165,17 @@ export default function BMExpertiseMap() {
     }
   };
 
-  const handleCopyEmails = () => {
-    const selectedEmails = contacts
-      .filter(c => selectedContacts.has(c.id) && c.email)
-      .map(c => c.email)
+  const handleCopyNames = () => {
+    const selectedNames = sortedContacts
+      .filter(c => selectedContacts.has(c.id))
+      .map(c => `${c.first_name} ${c.surname}`)
       .join('; ');
     
-    if (selectedEmails) {
-      navigator.clipboard.writeText(selectedEmails);
-      toast.success(`Copied ${selectedContacts.size} email${selectedContacts.size !== 1 ? 's' : ''}`);
+    if (selectedNames) {
+      navigator.clipboard.writeText(selectedNames);
+      toast.success(`Copied ${selectedContacts.size} name${selectedContacts.size !== 1 ? 's' : ''}`);
     } else {
-      toast.error('No emails to copy');
+      toast.error('No contacts selected');
     }
   };
 
@@ -356,9 +356,9 @@ export default function BMExpertiseMap() {
               {selectedContacts.size} contact{selectedContacts.size !== 1 ? 's' : ''} selected
             </span>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={handleCopyEmails}>
+              <Button size="sm" variant="outline" onClick={handleCopyNames}>
                 <Copy className="h-4 w-4 mr-2" />
-                Copy Emails
+                Copy for Outlook
               </Button>
               <Button size="sm" variant="outline" onClick={() => setShowShortlistDialog(true)}>
                 <ListPlus className="h-4 w-4 mr-2" />

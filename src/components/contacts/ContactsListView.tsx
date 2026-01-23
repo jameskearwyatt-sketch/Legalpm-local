@@ -48,6 +48,9 @@ import { SortableFilterableHeader, SortDirection } from "./SortableFilterableHea
 import { StickyTableHeader } from "@/components/ui/sticky-table-header";
 import { TableScrollControls } from "@/components/ui/table-scroll-controls";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
+import { SmartSectorSearch } from "./SmartSectorSearch";
+import { SmartMatchBadge } from "./SmartMatchBadge";
+import { useSmartSectorSearch } from "@/lib/hooks/useSmartSectorSearch";
 import {
   Plus,
   Search,
@@ -137,6 +140,18 @@ export function ContactsListView() {
   const detectMismatch = useDetectEmailMismatch();
   const dismissMismatch = useDismissEmailMismatch();
   const classifyContacts = useClassifyContacts();
+  
+  // Smart sector search
+  const {
+    searchState: smartSearchState,
+    isSearching: isSmartSearching,
+    isDeepSearching,
+    executeQuickSearch,
+    executeDeepSearch,
+    clearSearch: clearSmartSearch,
+    getMatchForContact,
+    isContactMatched,
+  } = useSmartSectorSearch();
 
   // Get unique values for filter dropdowns
   const uniqueOwners = useMemo(() => 
@@ -178,7 +193,7 @@ export function ContactsListView() {
     return Array.from(areas).sort();
   }, [allContacts]);
 
-  // Apply column filters and sorting
+  // Apply column filters, smart search, and sorting
   const filteredAndSortedContacts = useMemo(() => {
     let result = [...contacts];
 
@@ -197,6 +212,11 @@ export function ContactsListView() {
         default: return null;
       }
     };
+
+    // Apply smart sector search filter FIRST (if active)
+    if (smartSearchState.isActive) {
+      result = result.filter(contact => smartSearchState.matches.has(contact.id));
+    }
 
     // Apply column filters
     Object.entries(columnFilters).forEach(([key, value]) => {
@@ -227,7 +247,7 @@ export function ContactsListView() {
     }
 
     return result;
-  }, [contacts, columnFilters, sortKey, sortDirection]);
+  }, [contacts, columnFilters, sortKey, sortDirection, smartSearchState.isActive, smartSearchState.matches]);
 
   const eligibleContacts = useMemo(() => 
     filteredAndSortedContacts.filter(c => !c.do_not_contact),
@@ -338,12 +358,13 @@ export function ContactsListView() {
     setColumnFilters({});
     setSortKey("full_name");
     setSortDirection("asc");
+    clearSmartSearch();
   };
 
   const hasActiveFilters = Object.entries(filters).some(([_, v]) => {
     if (Array.isArray(v)) return v.length > 0;
     return v !== undefined && v !== "";
-  }) || searchQuery || Object.values(columnFilters).some(v => v);
+  }) || searchQuery || Object.values(columnFilters).some(v => v) || smartSearchState.isActive;
 
   const hasColumnFilters = Object.values(columnFilters).some(v => v);
 
@@ -482,6 +503,18 @@ export function ContactsListView() {
           )}
 
           <div className="flex-1" />
+
+          {/* Smart Sector Search */}
+          <SmartSectorSearch
+            onSearch={executeQuickSearch}
+            onDeepSearch={executeDeepSearch}
+            onClear={clearSmartSearch}
+            isSearching={isSmartSearching}
+            isDeepSearching={isDeepSearching}
+            isActive={smartSearchState.isActive}
+            matchCount={smartSearchState.matches.size}
+            queryUnderstanding={smartSearchState.queryUnderstanding}
+          />
 
           {unknownGenderCount > 0 && (
             <Button 
@@ -932,15 +965,20 @@ export function ContactsListView() {
                         />
                       </TableCell>
                       <TableCell className="truncate">
-                        <button
-                          onClick={() => setSelectedContact(contact)}
-                          className="font-medium hover:underline text-left truncate max-w-full block"
-                        >
-                          {contact.full_name}
-                        </button>
-                        {contact.do_not_contact && (
-                          <Badge variant="destructive" className="ml-1 text-xs">DNC</Badge>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => setSelectedContact(contact)}
+                            className="font-medium hover:underline text-left truncate max-w-full"
+                          >
+                            {contact.full_name}
+                          </button>
+                          {contact.do_not_contact && (
+                            <Badge variant="destructive" className="shrink-0 text-xs">DNC</Badge>
+                          )}
+                          {smartSearchState.isActive && getMatchForContact(contact.id) && (
+                            <SmartMatchBadge match={getMatchForContact(contact.id)!} compact />
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="truncate text-sm">
                         {contact.email_company_mismatch && !contact.email_mismatch_dismissed ? (

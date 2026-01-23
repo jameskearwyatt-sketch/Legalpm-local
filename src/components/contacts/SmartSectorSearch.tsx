@@ -13,6 +13,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, X, Loader2, Sparkles, Zap, HelpCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -140,13 +141,15 @@ export function SmartSectorSearch({
                   <HelpCircle className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80 text-sm max-h-[300px] overflow-y-auto" align="start">
-                <div className="space-y-2">
-                  <p className="font-medium">AI Understanding</p>
-                  <p className="text-muted-foreground whitespace-pre-wrap text-xs">
-                    {queryUnderstanding}
-                  </p>
-                </div>
+              <PopoverContent className="w-96 p-0" align="start">
+                <ScrollArea className="h-[280px] p-4">
+                  <div className="space-y-2">
+                    <p className="font-medium text-sm">AI Understanding</p>
+                    <p className="text-muted-foreground whitespace-pre-wrap text-xs leading-relaxed">
+                      {queryUnderstanding}
+                    </p>
+                  </div>
+                </ScrollArea>
               </PopoverContent>
             </Popover>
           )}

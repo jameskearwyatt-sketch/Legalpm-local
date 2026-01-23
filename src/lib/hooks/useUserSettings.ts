@@ -14,6 +14,7 @@ export interface UserSettings {
   wip_warning_threshold: number;
   use_billed_only_for_burn: boolean;
   default_rate_card: RateCard | null;
+  email_signature: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -61,7 +62,7 @@ export function useUserSettings() {
 
   // Update settings
   const updateSettings = useMutation({
-    mutationFn: async (updates: Partial<Pick<UserSettings, 'default_currency' | 'near_budget_threshold' | 'poor_collection_threshold' | 'wip_warning_threshold' | 'use_billed_only_for_burn' | 'default_rate_card'>>) => {
+    mutationFn: async (updates: Partial<Pick<UserSettings, 'default_currency' | 'near_budget_threshold' | 'poor_collection_threshold' | 'wip_warning_threshold' | 'use_billed_only_for_burn' | 'default_rate_card' | 'email_signature'>>) => {
       const { error } = await supabase
         .from('user_settings')
         .update(updates as any)
@@ -96,14 +97,35 @@ export function useUserSettings() {
     },
   });
 
+  // Save email signature
+  const saveEmailSignature = useMutation({
+    mutationFn: async (signature: string) => {
+      const { error } = await supabase
+        .from('user_settings')
+        .update({ email_signature: signature })
+        .eq('user_id', user!.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['user-settings', user?.id] });
+      toast({ title: 'Signature saved', description: 'Your email signature will be added to all drafted emails' });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to save signature', description: error.message, variant: 'destructive' });
+    },
+  });
+
   return {
     settings: settingsQuery.data,
     isLoading: settingsQuery.isLoading,
     error: settingsQuery.error,
     updateSettings,
     saveDefaultRateCard,
+    saveEmailSignature,
     // Convenience getters with fallbacks
     defaultCurrency: settingsQuery.data?.default_currency || 'GBP',
     defaultRateCard: settingsQuery.data?.default_rate_card || DEFAULT_RATE_CARD,
+    emailSignature: settingsQuery.data?.email_signature || null,
   };
 }

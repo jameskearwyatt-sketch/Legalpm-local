@@ -140,7 +140,7 @@ export function SmartSectorSearch({
                   <HelpCircle className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-80 text-sm" align="start">
+              <PopoverContent className="w-80 text-sm max-h-[300px] overflow-y-auto" align="start">
                 <div className="space-y-2">
                   <p className="font-medium">AI Understanding</p>
                   <p className="text-muted-foreground whitespace-pre-wrap text-xs">

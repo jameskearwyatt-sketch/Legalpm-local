@@ -336,33 +336,60 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
       if (error) throw new Error(error.message);
       if (!data.success) throw new Error(data.error || "Failed to parse business card");
 
-      const contact = data.contact;
+      const extractedContacts = data.contacts || [];
+      const totalDetected = data.total_cards_detected || extractedContacts.length;
       
-      const contactInsert: DistributionContactInsert = {
-        full_name: contact.full_name || "Unknown",
-        email: (contact.email || "").toLowerCase(),
-        company: contact.company || null,
-        job_title: contact.job_title || null,
-        country: contact.country || null,
-        city: contact.city || null,
-        gender: "unknown",
-        sectors: [],
-        sectors_ai_assigned: false,
-        linkedin_url: contact.linkedin_url || null,
-        notes: contact.phone ? `Phone: ${contact.phone}` : null,
-        relationship_owner: defaultOwner || null,
-        do_not_contact: false,
-        provenance: `Business card: ${selectedImage.name}`,
-      };
-
-      if (!contactInsert.email || !contactInsert.email.includes("@")) {
-        toast.error("Could not extract a valid email address from the business card");
+      if (extractedContacts.length === 0) {
+        toast.error("No business cards detected in the image");
         return;
       }
 
+      // Convert extracted contacts to DistributionContactInsert format
+      const contactInserts: DistributionContactInsert[] = extractedContacts
+        .filter((contact: { full_name?: string; email?: string }) => 
+          contact.full_name && contact.email && contact.email.includes("@")
+        )
+        .map((contact: { 
+          full_name: string; 
+          email: string; 
+          company?: string; 
+          job_title?: string; 
+          country?: string; 
+          city?: string; 
+          linkedin_url?: string; 
+          phone?: string 
+        }) => ({
+          full_name: contact.full_name || "Unknown",
+          email: (contact.email || "").toLowerCase(),
+          company: contact.company || null,
+          job_title: contact.job_title || null,
+          country: contact.country || null,
+          city: contact.city || null,
+          gender: "unknown" as const,
+          sectors: [],
+          sectors_ai_assigned: false,
+          linkedin_url: contact.linkedin_url || null,
+          notes: contact.phone ? `Phone: ${contact.phone}` : null,
+          relationship_owner: defaultOwner || null,
+          do_not_contact: false,
+          provenance: `Business card: ${selectedImage.name}`,
+        }));
+
+      if (contactInserts.length === 0) {
+        toast.error("Could not extract valid email addresses from the business card(s)");
+        return;
+      }
+
+      // Show info about extraction results
+      if (totalDetected > contactInserts.length) {
+        toast.info(`Extracted ${contactInserts.length} of ${totalDetected} detected cards (some missing email addresses)`);
+      } else if (contactInserts.length > 1) {
+        toast.success(`Found ${contactInserts.length} business cards in the image`);
+      }
+
       // Show preview dialog
-      setContactsToPreview([contactInsert]);
-      setImportSource(`business card: ${selectedImage.name}`);
+      setContactsToPreview(contactInserts);
+      setImportSource(`business card${contactInserts.length > 1 ? 's' : ''}: ${selectedImage.name}`);
       setParseStep("preview");
 
     } catch (error) {

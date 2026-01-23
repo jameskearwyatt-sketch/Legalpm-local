@@ -45,6 +45,7 @@ import { FocusAreaAssignmentDialog } from "./FocusAreaAssignmentDialog";
 import { SortableFilterableHeader, SortDirection } from "./SortableFilterableHeader";
 import { StickyTableHeader } from "@/components/ui/sticky-table-header";
 import { TableScrollControls } from "@/components/ui/table-scroll-controls";
+import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import {
   Plus,
   Search,
@@ -327,9 +328,10 @@ export function ContactsListView() {
     setSortDirection("asc");
   };
 
-  const hasActiveFilters = Object.values(filters).some(v => v !== undefined && v !== "") || 
-    searchQuery || 
-    Object.values(columnFilters).some(v => v);
+  const hasActiveFilters = Object.entries(filters).some(([_, v]) => {
+    if (Array.isArray(v)) return v.length > 0;
+    return v !== undefined && v !== "";
+  }) || searchQuery || Object.values(columnFilters).some(v => v);
 
   const hasColumnFilters = Object.values(columnFilters).some(v => v);
 
@@ -428,33 +430,23 @@ export function ContactsListView() {
         {/* Advanced filters panel - for bulk/category filters */}
         {showFilters && (
           <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/30 rounded-lg border">
-            <Select
-              value={filters.naicsSector || ""}
-              onValueChange={(v) => setFilters(f => ({ ...f, naicsSector: v || undefined }))}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Assigned Sector" />
-              </SelectTrigger>
-              <SelectContent>
-                {uniqueNaicsSectors.map(s => (
-                  <SelectItem key={s} value={s}>{s}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Multi-select: Assigned Sector (NAICS) */}
+            <MultiSelectFilter
+              options={uniqueNaicsSectors}
+              selected={filters.naicsSectors || []}
+              onChange={(v) => setFilters(f => ({ ...f, naicsSectors: v.length > 0 ? v : undefined }))}
+              placeholder="Assigned Sector"
+              className="w-[200px]"
+            />
 
-            <Select
-              value={filters.country || ""}
-              onValueChange={(v) => setFilters(f => ({ ...f, country: v || undefined }))}
-            >
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Country" />
-              </SelectTrigger>
-              <SelectContent>
-                {countries.map(c => (
-                  <SelectItem key={c} value={c}>{c}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Multi-select: Country */}
+            <MultiSelectFilter
+              options={countries}
+              selected={filters.countries || []}
+              onChange={(v) => setFilters(f => ({ ...f, countries: v.length > 0 ? v : undefined }))}
+              placeholder="Country"
+              className="w-[160px]"
+            />
 
             <Select
               value={filters.gender || ""}
@@ -470,19 +462,14 @@ export function ContactsListView() {
               </SelectContent>
             </Select>
 
-            <Select
-              value={filters.relationship_owner || ""}
-              onValueChange={(v) => setFilters(f => ({ ...f, relationship_owner: v || undefined }))}
-            >
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Owner" />
-              </SelectTrigger>
-              <SelectContent>
-                {relationshipOwners.map(r => (
-                  <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {/* Multi-select: Owner */}
+            <MultiSelectFilter
+              options={relationshipOwners.map(r => r.name)}
+              selected={filters.relationship_owners || []}
+              onChange={(v) => setFilters(f => ({ ...f, relationship_owners: v.length > 0 ? v : undefined }))}
+              placeholder="Owner"
+              className="w-[160px]"
+            />
 
             <Select
               value={filters.do_not_contact === undefined ? "" : filters.do_not_contact ? "true" : "false"}
@@ -541,25 +528,16 @@ export function ContactsListView() {
               </SelectContent>
             </Select>
 
-            {/* EMI Focus Area filter */}
+            {/* Multi-select: EMI Focus Area */}
             {uniqueEmiFocusAreas.length > 0 && (
-              <Select
-                value={filters.emiFocusArea || ""}
-                onValueChange={(v) => setFilters(f => ({ 
-                  ...f, 
-                  emiFocusArea: v || undefined 
-                }))}
-              >
-                <SelectTrigger className="w-[180px]">
-                  <Target className="h-3 w-3 mr-1" />
-                  <SelectValue placeholder="EMI Focus Area" />
-                </SelectTrigger>
-                <SelectContent>
-                  {uniqueEmiFocusAreas.map(area => (
-                    <SelectItem key={area} value={area}>{area}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <MultiSelectFilter
+                options={uniqueEmiFocusAreas}
+                selected={filters.emiFocusAreas || []}
+                onChange={(v) => setFilters(f => ({ ...f, emiFocusAreas: v.length > 0 ? v : undefined }))}
+                placeholder="EMI Focus Area"
+                icon={<Target className="h-3 w-3" />}
+                className="w-[180px]"
+              />
             )}
 
             {hasActiveFilters && (

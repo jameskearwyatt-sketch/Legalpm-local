@@ -50,6 +50,9 @@ import { TableScrollControls } from "@/components/ui/table-scroll-controls";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
 import { SmartSectorSearch } from "./SmartSectorSearch";
 import { SmartMatchBadge } from "./SmartMatchBadge";
+import { CustomDistributionListDropdown } from "./CustomDistributionListDropdown";
+import { AddToListDialog } from "./AddToListDialog";
+import { useCustomListContacts } from "@/lib/hooks/useCustomDistributionLists";
 import { useSmartSectorSearch } from "@/lib/hooks/useSmartSectorSearch";
 import {
   Plus,
@@ -73,6 +76,7 @@ import {
   Scale,
   Users,
   RotateCcw,
+  List,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
@@ -115,6 +119,10 @@ export function ContactsListView() {
   const [showReidentifyConfirm, setShowReidentifyConfirm] = useState(false);
   const [isReidentifying, setIsReidentifying] = useState(false);
 
+  // Custom distribution list state
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+  const [showAddToListDialog, setShowAddToListDialog] = useState(false);
+
   // Sorting state
   const [sortKey, setSortKey] = useState<string | null>("full_name");
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc");
@@ -153,7 +161,9 @@ export function ContactsListView() {
     isContactMatched,
   } = useSmartSectorSearch();
 
-  // Get unique values for filter dropdowns
+  // Custom distribution list contacts
+  const { contactIds: customListContactIds } = useCustomListContacts(selectedListId);
+
   const uniqueOwners = useMemo(() => 
     [...new Set(contacts.map(c => c.relationship_owner).filter(Boolean) as string[])].sort(),
     [contacts]
@@ -215,7 +225,13 @@ export function ContactsListView() {
       }
     };
 
-    // Apply smart sector search filter FIRST (if active)
+    // Apply custom distribution list filter FIRST (if a list is selected)
+    if (selectedListId && customListContactIds.length > 0) {
+      const customListSet = new Set(customListContactIds);
+      result = result.filter(contact => customListSet.has(contact.id));
+    }
+
+    // Apply smart sector search filter (if active)
     if (smartSearchState.isActive) {
       result = result.filter(contact => smartSearchState.matches.has(contact.id));
     }
@@ -249,7 +265,7 @@ export function ContactsListView() {
     }
 
     return result;
-  }, [contacts, columnFilters, sortKey, sortDirection, smartSearchState.isActive, smartSearchState.matches]);
+  }, [contacts, columnFilters, sortKey, sortDirection, smartSearchState.isActive, smartSearchState.matches, selectedListId, customListContactIds]);
 
   // Contacts BEFORE exclusion filters are applied - used for the exclusion filter popover lists
   const contactsBeforeExclusion = filteredAndSortedContacts;
@@ -522,6 +538,12 @@ export function ContactsListView() {
           )}
 
           <div className="flex-1" />
+
+          {/* Custom Distribution Lists Dropdown */}
+          <CustomDistributionListDropdown
+            selectedListId={selectedListId}
+            onSelectList={setSelectedListId}
+          />
 
           {/* Smart Sector Search */}
           <SmartSectorSearch
@@ -828,6 +850,15 @@ export function ContactsListView() {
             Enrich
           </Button>
 
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setShowAddToListDialog(true)}
+            className="gap-2"
+          >
+            <List className="h-4 w-4" />
+            Add to List
+          </Button>
 
           <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
             <Download className="h-4 w-4" />
@@ -1253,6 +1284,19 @@ export function ContactsListView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Add to Custom List Dialog */}
+      <AddToListDialog
+        open={showAddToListDialog}
+        onOpenChange={setShowAddToListDialog}
+        selectedContacts={selectedContacts.map(c => ({
+          id: c.id,
+          full_name: c.full_name,
+          email: c.email,
+          company: c.company,
+        }))}
+        onSuccess={() => setSelectedIds(new Set())}
+      />
     </div>
   );
 }

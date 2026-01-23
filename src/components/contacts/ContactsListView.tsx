@@ -803,7 +803,7 @@ export function ContactsListView() {
                 className="gap-2 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950"
               >
                 <RotateCcw className="h-3 w-3" />
-                Re-identify Protected ({protectedContacts.length})
+                Re-identify Excluded ({protectedContacts.length})
               </Button>
             )}
 
@@ -1311,7 +1311,7 @@ export function ContactsListView() {
       <AlertDialog open={showReidentifyConfirm} onOpenChange={setShowReidentifyConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Re-identify Protected Contacts?</AlertDialogTitle>
+            <AlertDialogTitle>Re-identify Excluded Contacts?</AlertDialogTitle>
             <AlertDialogDescription className="space-y-2">
               <p>
                 You have <strong>{protectedContacts.length}</strong> contact{protectedContacts.length !== 1 ? 's' : ''} that 

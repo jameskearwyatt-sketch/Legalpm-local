@@ -2010,12 +2010,15 @@ export function QuickToDoButton() {
         top: position.y,
         right: 'auto',
         bottom: 'auto',
+        zIndex: 9999,
       };
     }
+    // Default: bottom-left corner, above sidebar on desktop
     return {
       position: 'fixed',
-      left: 24,
+      left: 280,
       bottom: 24,
+      zIndex: 9999,
     };
   };
 
@@ -2606,7 +2609,7 @@ export function QuickToDoButton() {
       {!isOpen && !isSlateOpen && (
         <div
           ref={buttonRef}
-          className="z-50 flex items-center gap-1.5 group"
+          className="flex items-center gap-1.5 group"
           style={getButtonStyle()}
         >
           {/* Slate Circle - 1/4 surface area of main button */}

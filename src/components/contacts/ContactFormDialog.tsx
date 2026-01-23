@@ -236,7 +236,7 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
         <DialogHeader>
           <DialogTitle>
             {contact ? "Edit Contact" : "Add Contact"}
@@ -244,7 +244,8 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+            <div className="flex-1 overflow-y-auto space-y-4 pr-2">
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -621,8 +622,9 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
                 </FormItem>
               )}
             />
+            </div>
 
-            <DialogFooter>
+            <DialogFooter className="flex-shrink-0 pt-4 border-t mt-4 bg-background">
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>

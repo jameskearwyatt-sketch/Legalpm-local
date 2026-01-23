@@ -19,6 +19,7 @@ interface MultiSelectFilterProps {
   icon?: React.ReactNode;
   className?: string;
   maxDisplayItems?: number;
+  popoverWidth?: string;
 }
 
 export function MultiSelectFilter({
@@ -29,6 +30,7 @@ export function MultiSelectFilter({
   icon,
   className,
   maxDisplayItems = 2,
+  popoverWidth = "280px",
 }: MultiSelectFilterProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -84,7 +86,7 @@ export function MultiSelectFilter({
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[220px] p-0 z-50 bg-popover" align="start">
+      <PopoverContent className="p-0 z-50 bg-popover" style={{ width: popoverWidth }} align="start">
         <div className="p-2 border-b">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">{placeholder}</span>

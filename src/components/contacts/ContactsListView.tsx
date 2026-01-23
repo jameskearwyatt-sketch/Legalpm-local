@@ -117,6 +117,8 @@ export function ContactsListView() {
   }), [filters, searchQuery]);
 
   const { data: contacts = [], isLoading } = useDistributionContacts(effectiveFilters);
+  // Fetch ALL contacts (unfiltered) for populating dropdown options
+  const { data: allContacts = [] } = useDistributionContacts({});
   const { data: sectors = [] } = useDistributionSectors();
   const { data: countries = [] } = useDistinctCountries();
   const { data: companies = [] } = useDistinctCompanies();
@@ -148,24 +150,24 @@ export function ContactsListView() {
     [contacts]
   );
 
-  // Get unique NAICS-derived sectors for filtering
+  // Get unique NAICS-derived sectors for filtering (from ALL contacts, not filtered)
   const uniqueNaicsSectors = useMemo(() => {
     const sectors = new Set<string>();
-    contacts.forEach(c => {
+    allContacts.forEach(c => {
       const sector = getPrimaryNaicsSector(c.naics_codes);
       if (sector) sectors.add(sector);
     });
     return Array.from(sectors).sort();
-  }, [contacts]);
+  }, [allContacts]);
 
-  // Get unique EMI Focus Areas for filtering
+  // Get unique EMI Focus Areas for filtering (from ALL contacts, not filtered)
   const uniqueEmiFocusAreas = useMemo(() => {
     const areas = new Set<string>();
-    contacts.forEach(c => {
+    allContacts.forEach(c => {
       (c.emi_focus_areas || []).forEach(area => areas.add(area));
     });
     return Array.from(areas).sort();
-  }, [contacts]);
+  }, [allContacts]);
 
   // Apply column filters and sorting
   const filteredAndSortedContacts = useMemo(() => {
@@ -467,6 +469,7 @@ export function ContactsListView() {
               onChange={(v) => setFilters(f => ({ ...f, naicsSectors: v.length > 0 ? v : undefined }))}
               placeholder="Assigned Sector"
               className="w-[200px]"
+              popoverWidth="320px"
             />
 
             {/* Multi-select: Country */}
@@ -567,6 +570,7 @@ export function ContactsListView() {
                 placeholder="EMI Focus Area"
                 icon={<Target className="h-3 w-3" />}
                 className="w-[180px]"
+                popoverWidth="280px"
               />
             )}
 

@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -30,6 +32,9 @@ import {
   Briefcase,
   Filter,
   X,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 import {
   useBMInternalContacts,
@@ -38,6 +43,7 @@ import {
   useDistinctBMPracticeGroups,
   countExpertiseAreas,
   type BMContactFilters,
+  type ExpertiseFilterMode,
 } from "@/lib/hooks/useBMInternalContacts";
 import { BMContactImportDialog } from "@/components/bm-contacts/BMContactImportDialog";
 import { BMContactDetailRow } from "@/components/bm-contacts/BMContactDetailRow";
@@ -45,17 +51,23 @@ import { BMAddToShortlistDialog } from "@/components/bm-contacts/BMAddToShortlis
 import { BMExpertiseFilterPanel } from "@/components/bm-contacts/BMExpertiseFilterPanel";
 import { toast } from "sonner";
 
+type SortField = 'name' | 'title' | 'office' | 'practice_group';
+type SortDirection = 'asc' | 'desc';
+
 export default function BMExpertiseMap() {
   const [search, setSearch] = useState("");
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [selectedOffices, setSelectedOffices] = useState<string[]>([]);
   const [selectedPracticeGroups, setSelectedPracticeGroups] = useState<string[]>([]);
   const [selectedExpertise, setSelectedExpertise] = useState<string[]>([]);
+  const [expertiseMode, setExpertiseMode] = useState<ExpertiseFilterMode>('or');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showShortlistDialog, setShowShortlistDialog] = useState(false);
   const [showExpertiseFilter, setShowExpertiseFilter] = useState(false);
+  const [sortField, setSortField] = useState<SortField>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   const regions = useDistinctBMRegions();
   const offices = useDistinctBMOffices();
@@ -67,9 +79,59 @@ export default function BMExpertiseMap() {
     offices: selectedOffices.length > 0 ? selectedOffices : undefined,
     practiceGroups: selectedPracticeGroups.length > 0 ? selectedPracticeGroups : undefined,
     expertiseAreas: selectedExpertise.length > 0 ? selectedExpertise : undefined,
-  }), [search, selectedRegions, selectedOffices, selectedPracticeGroups, selectedExpertise]);
+    expertiseMode,
+  }), [search, selectedRegions, selectedOffices, selectedPracticeGroups, selectedExpertise, expertiseMode]);
 
   const { data: contacts = [], isLoading } = useBMInternalContacts(filters);
+
+  // Apply sorting
+  const sortedContacts = useMemo(() => {
+    return [...contacts].sort((a, b) => {
+      let aVal: string;
+      let bVal: string;
+
+      switch (sortField) {
+        case 'name':
+          aVal = `${a.surname} ${a.first_name}`.toLowerCase();
+          bVal = `${b.surname} ${b.first_name}`.toLowerCase();
+          break;
+        case 'title':
+          aVal = (a.title || '').toLowerCase();
+          bVal = (b.title || '').toLowerCase();
+          break;
+        case 'office':
+          aVal = (a.office || '').toLowerCase();
+          bVal = (b.office || '').toLowerCase();
+          break;
+        case 'practice_group':
+          aVal = (a.practice_group || '').toLowerCase();
+          bVal = (b.practice_group || '').toLowerCase();
+          break;
+        default:
+          return 0;
+      }
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+      return 0;
+    });
+  }, [contacts, sortField, sortDirection]);
+
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="h-4 w-4 ml-1 text-muted-foreground" />;
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="h-4 w-4 ml-1" /> 
+      : <ArrowDown className="h-4 w-4 ml-1" />;
+  };
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => {
@@ -181,6 +243,41 @@ export default function BMExpertiseMap() {
           </div>
         </div>
 
+        {/* AND/OR Toggle - Prominent position */}
+        {selectedExpertise.length > 1 && (
+          <div className="bg-accent/50 rounded-lg border border-accent p-4 mb-6">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <p className="font-medium text-foreground">Expertise Filter Logic</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {expertiseMode === 'and' 
+                    ? 'Show contacts who have ALL selected expertise areas' 
+                    : 'Show contacts who have ANY of the selected expertise areas'}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Label 
+                  htmlFor="expertise-mode" 
+                  className={`text-sm font-medium ${expertiseMode === 'or' ? 'text-foreground' : 'text-muted-foreground'}`}
+                >
+                  Any (OR)
+                </Label>
+                <Switch
+                  id="expertise-mode"
+                  checked={expertiseMode === 'and'}
+                  onCheckedChange={(checked) => setExpertiseMode(checked ? 'and' : 'or')}
+                />
+                <Label 
+                  htmlFor="expertise-mode" 
+                  className={`text-sm font-medium ${expertiseMode === 'and' ? 'text-foreground' : 'text-muted-foreground'}`}
+                >
+                  All (AND)
+                </Label>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Filters */}
         <div className="bg-card rounded-lg border p-4 mb-6 space-y-4">
           <div className="flex flex-wrap gap-3">
@@ -253,7 +350,6 @@ export default function BMExpertiseMap() {
           )}
         </div>
 
-        {/* Selection actions */}
         {selectedContacts.size > 0 && (
           <div className="bg-primary/10 rounded-lg p-3 mb-4 flex items-center justify-between">
             <span className="text-sm font-medium">
@@ -287,11 +383,43 @@ export default function BMExpertiseMap() {
                   />
                 </TableHead>
                 <TableHead className="w-10"></TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Title</TableHead>
+                <TableHead>
+                  <button 
+                    className="flex items-center hover:text-foreground transition-colors"
+                    onClick={() => handleSort('name')}
+                  >
+                    Name
+                    <SortIcon field="name" />
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button 
+                    className="flex items-center hover:text-foreground transition-colors"
+                    onClick={() => handleSort('title')}
+                  >
+                    Title
+                    <SortIcon field="title" />
+                  </button>
+                </TableHead>
                 <TableHead>Region</TableHead>
-                <TableHead>Office</TableHead>
-                <TableHead>Practice Group</TableHead>
+                <TableHead>
+                  <button 
+                    className="flex items-center hover:text-foreground transition-colors"
+                    onClick={() => handleSort('office')}
+                  >
+                    Office
+                    <SortIcon field="office" />
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button 
+                    className="flex items-center hover:text-foreground transition-colors"
+                    onClick={() => handleSort('practice_group')}
+                  >
+                    Practice Group
+                    <SortIcon field="practice_group" />
+                  </button>
+                </TableHead>
                 <TableHead className="text-right">Expertise Areas</TableHead>
               </TableRow>
             </TableHeader>
@@ -302,14 +430,14 @@ export default function BMExpertiseMap() {
                     Loading...
                   </TableCell>
                 </TableRow>
-              ) : contacts.length === 0 ? (
+              ) : sortedContacts.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     {hasActiveFilters ? 'No contacts match your filters' : 'No contacts yet. Import from Excel to get started.'}
                   </TableCell>
                 </TableRow>
               ) : (
-                contacts.map((contact) => (
+                sortedContacts.map((contact) => (
                   <Collapsible key={contact.id} asChild open={expandedRows.has(contact.id)}>
                     <>
                       <TableRow 

@@ -119,7 +119,7 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               {contact.full_name}
@@ -132,7 +132,7 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
             </DialogTitle>
           </DialogHeader>
 
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto space-y-4 pr-2">
             {/* Email with verification status */}
             <div className="flex items-center gap-3 text-sm">
               <Mail className="h-4 w-4 text-muted-foreground" />
@@ -347,36 +347,37 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
                 </span>
               </div>
             </div>
+          </div>
 
-            <div className="flex gap-2 pt-4">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleEnrich}
-                disabled={enrichContact.isPending}
-              >
-                {enrichContact.isPending ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Wand2 className="h-4 w-4 mr-2" />
-                )}
-                Enrich
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setShowEditDialog(true)}
-              >
-                <Pencil className="h-4 w-4 mr-2" />
-                Edit
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
+          {/* Fixed footer */}
+          <div className="flex gap-2 pt-4 border-t bg-background flex-shrink-0">
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={handleEnrich}
+              disabled={enrichContact.isPending}
+            >
+              {enrichContact.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Wand2 className="h-4 w-4 mr-2" />
+              )}
+              Enrich
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={() => setShowEditDialog(true)}
+            >
+              <Pencil className="h-4 w-4 mr-2" />
+              Edit
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

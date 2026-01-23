@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -83,6 +83,20 @@ export default function BMExpertiseMap() {
   }), [search, selectedRegions, selectedOffices, selectedPracticeGroups, selectedExpertise, expertiseMode]);
 
   const { data: contacts = [], isLoading } = useBMInternalContacts(filters);
+
+  // Clear expanded rows when filtered contacts change (prevents stale expansion state)
+  useEffect(() => {
+    setExpandedRows(prev => {
+      // Only keep expanded rows for contacts that are still in the current filtered list
+      const currentContactIds = new Set(contacts.map(c => c.id));
+      const validExpandedRows = new Set([...prev].filter(id => currentContactIds.has(id)));
+      // Only update if there's a difference to avoid unnecessary re-renders
+      if (validExpandedRows.size !== prev.size) {
+        return validExpandedRows;
+      }
+      return prev;
+    });
+  }, [contacts]);
 
   // Apply sorting
   const sortedContacts = useMemo(() => {

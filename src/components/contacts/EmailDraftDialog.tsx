@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { type DistributionContact } from "@/lib/hooks/useDistributionContacts";
 import { useCreateDistributionEmailDraft } from "@/lib/hooks/useDistributionEmailDrafts";
-import { Mail, ExternalLink, AlertCircle, Users } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Mail, ExternalLink, AlertCircle, Users, Loader2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface EmailDraftDialogProps {
@@ -33,6 +34,14 @@ interface EmailDraftDialogProps {
 }
 
 type DeliveryMode = 'individual' | 'to_all' | 'bcc_all';
+
+interface JapaneseDetectionResult {
+  id: string;
+  full_name: string;
+  is_japanese: boolean;
+  confidence: "high" | "medium" | "low";
+  reason?: string;
+}
 
 export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: EmailDraftDialogProps) {
   const [draftType, setDraftType] = useState<'event_invitation' | 'article_sharing' | 'firm_update'>('event_invitation');
@@ -46,6 +55,11 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
     new Set(contacts.map(c => c.id))
   );
 
+  // Japanese detection state
+  const [isAnalyzingJapanese, setIsAnalyzingJapanese] = useState(false);
+  const [japaneseContacts, setJapaneseContacts] = useState<JapaneseDetectionResult[]>([]);
+  const [useJapaneseFormality, setUseJapaneseFormality] = useState(true);
+
   const createDraft = useCreateDistributionEmailDraft();
 
   // Reset selected contacts when dialog opens with new contacts
@@ -53,12 +67,67 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
     setSelectedContactIds(new Set(contacts.map(c => c.id)));
   }, [contacts]);
 
+  // Analyze contacts for Japanese when dialog opens
+  useEffect(() => {
+    if (open && contacts.length > 0) {
+      analyzeJapaneseContacts();
+    } else if (!open) {
+      // Reset state when dialog closes
+      setJapaneseContacts([]);
+      setUseJapaneseFormality(true);
+    }
+  }, [open, contacts]);
+
+  const analyzeJapaneseContacts = async () => {
+    setIsAnalyzingJapanese(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('detect-japanese-contacts', {
+        body: {
+          contacts: contacts.map(c => ({
+            id: c.id,
+            full_name: c.full_name,
+            company: c.company,
+            location: c.country, // Use country field as location
+          })),
+        },
+      });
+
+      if (error) {
+        console.error("Error detecting Japanese contacts:", error);
+        setJapaneseContacts([]);
+      } else {
+        setJapaneseContacts(data?.results || []);
+      }
+    } catch (err) {
+      console.error("Failed to analyze Japanese contacts:", err);
+      setJapaneseContacts([]);
+    } finally {
+      setIsAnalyzingJapanese(false);
+    }
+  };
+
   const selectedContacts = useMemo(() => 
     contacts.filter(c => selectedContactIds.has(c.id)),
     [contacts, selectedContactIds]
   );
 
   const emails = selectedContacts.map(c => c.email);
+
+  // Check if any selected contacts are Japanese
+  const selectedJapaneseContacts = useMemo(() => 
+    japaneseContacts.filter(jc => 
+      jc.is_japanese && selectedContactIds.has(jc.id)
+    ),
+    [japaneseContacts, selectedContactIds]
+  );
+
+  const hasJapaneseRecipients = selectedJapaneseContacts.length > 0;
+
+  // Create a set of Japanese contact IDs for quick lookup
+  const japaneseContactIds = useMemo(() => 
+    new Set(japaneseContacts.filter(jc => jc.is_japanese).map(jc => jc.id)),
+    [japaneseContacts]
+  );
 
   // Extract first name from full_name
   // Handles both "Firstname Surname" and "Surname, Firstname" formats
@@ -78,6 +147,37 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
     // Otherwise assume "Firstname Surname" format
     const parts = trimmed.split(/\s+/);
     return parts[0] || trimmed;
+  };
+
+  // Get surname for Japanese addressing
+  const getSurname = (fullName: string): string => {
+    const trimmed = fullName.trim();
+    
+    // Check if name is in "Surname, Firstname" format
+    if (trimmed.includes(',')) {
+      const parts = trimmed.split(',');
+      // Surname is before the comma
+      return parts[0].trim() || trimmed;
+    }
+    
+    // Otherwise assume "Firstname Surname" format - surname is last part
+    const parts = trimmed.split(/\s+/);
+    return parts[parts.length - 1] || trimmed;
+  };
+
+  // Get appropriate salutation for a contact
+  const getPersonalizedSalutation = (contact: DistributionContact): string => {
+    const isJapanese = japaneseContactIds.has(contact.id);
+    
+    if (isJapanese && useJapaneseFormality) {
+      // Use Japanese style: Surname-san
+      const surname = getSurname(contact.full_name);
+      return `${surname}-san`;
+    } else {
+      // Use Western style: Dear/Hi FirstName
+      const firstName = getFirstName(contact.full_name);
+      return `${salutation} ${firstName}`;
+    }
   };
 
   const toggleContact = (contactId: string) => {
@@ -133,9 +233,8 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
       // Open mailto links with staggered timing to avoid browser blocking
       selectedContacts.forEach((contact, index) => {
         setTimeout(() => {
-          const firstName = getFirstName(contact.full_name);
-          // Salutation with single comma, no extra punctuation
-          const personalizedBody = `${salutation} ${firstName},\n\n${body}`;
+          const personalizedSalutation = getPersonalizedSalutation(contact);
+          const personalizedBody = `${personalizedSalutation},\n\n${body}`;
           const mailtoUrl = `mailto:${encodeURIComponent(contact.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(personalizedBody)}`;
           window.open(mailtoUrl, "_blank");
         }, index * 100); // 100ms delay between each
@@ -174,6 +273,12 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
               <Label className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 Recipients
+                {isAnalyzingJapanese && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Analysing...
+                  </span>
+                )}
               </Label>
               <Button
                 variant="ghost"
@@ -186,25 +291,33 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
             </div>
             <ScrollArea className="h-32 rounded-md border p-2">
               <div className="space-y-1">
-                {contacts.map((contact) => (
-                  <div
-                    key={contact.id}
-                    className="flex items-center gap-2 py-1 px-1 hover:bg-muted/50 rounded"
-                  >
-                    <Checkbox
-                      id={`contact-${contact.id}`}
-                      checked={selectedContactIds.has(contact.id)}
-                      onCheckedChange={() => toggleContact(contact.id)}
-                    />
-                    <label
-                      htmlFor={`contact-${contact.id}`}
-                      className="flex-1 text-sm cursor-pointer truncate"
+                {contacts.map((contact) => {
+                  const isJapanese = japaneseContactIds.has(contact.id);
+                  return (
+                    <div
+                      key={contact.id}
+                      className="flex items-center gap-2 py-1 px-1 hover:bg-muted/50 rounded"
                     >
-                      <span className="font-medium">{contact.full_name}</span>
-                      <span className="text-muted-foreground ml-2">{contact.email}</span>
-                    </label>
-                  </div>
-                ))}
+                      <Checkbox
+                        id={`contact-${contact.id}`}
+                        checked={selectedContactIds.has(contact.id)}
+                        onCheckedChange={() => toggleContact(contact.id)}
+                      />
+                      <label
+                        htmlFor={`contact-${contact.id}`}
+                        className="flex-1 text-sm cursor-pointer truncate"
+                      >
+                        <span className="font-medium">{contact.full_name}</span>
+                        {isJapanese && (
+                          <span className="ml-1 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                            JP
+                          </span>
+                        )}
+                        <span className="text-muted-foreground ml-2">{contact.email}</span>
+                      </label>
+                    </div>
+                  );
+                })}
               </div>
             </ScrollArea>
             {selectedContacts.length === 0 && (
@@ -251,21 +364,46 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
           </div>
 
           {deliveryMode === 'individual' && (
-            <div>
-              <Label>Salutation</Label>
-              <Select value={salutation} onValueChange={(v) => setSalutation(v as 'Dear' | 'Hi')}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Dear">Dear [First Name]</SelectItem>
-                  <SelectItem value="Hi">Hi [First Name]</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Each email will begin with "{salutation} [First Name],"
-              </p>
-            </div>
+            <>
+              <div>
+                <Label>Salutation</Label>
+                <Select value={salutation} onValueChange={(v) => setSalutation(v as 'Dear' | 'Hi')}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Dear">Dear [First Name]</SelectItem>
+                    <SelectItem value="Hi">Hi [First Name]</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Each email will begin with "{salutation} [First Name],"
+                </p>
+              </div>
+
+              {/* Japanese formality option - only show if Japanese recipients detected */}
+              {hasJapaneseRecipients && (
+                <div className="flex items-start space-x-3 p-3 bg-muted/50 rounded-lg border">
+                  <Checkbox
+                    id="japanese-formality"
+                    checked={useJapaneseFormality}
+                    onCheckedChange={(checked) => setUseJapaneseFormality(checked === true)}
+                  />
+                  <div className="space-y-1">
+                    <label
+                      htmlFor="japanese-formality"
+                      className="text-sm font-medium cursor-pointer"
+                    >
+                      Use formal Japanese addressing for Japanese recipients
+                    </label>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedJapaneseContacts.length} Japanese recipient{selectedJapaneseContacts.length !== 1 ? 's' : ''} detected. 
+                      When enabled, they will be addressed as "[Surname]-san" instead of "{salutation} [First Name]".
+                    </p>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
           {showIndividualWarning && (

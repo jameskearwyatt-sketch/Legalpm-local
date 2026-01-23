@@ -555,8 +555,9 @@ async function searchApolloByNameAndCompany(fullName: string, company: string, a
   try {
     console.log('Searching Apollo by name + company:', { fullName, company });
     
-    // Apollo People Search API - finds people by name and organization
-    const response = await fetch('https://api.apollo.io/v1/mixed_people/search', {
+    // Apollo People API Search - NEW endpoint (old mixed_people/search is deprecated)
+    // Docs: https://docs.apollo.io/reference/people-api-search
+    const response = await fetch('https://api.apollo.io/api/v1/mixed_people/search', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -564,8 +565,9 @@ async function searchApolloByNameAndCompany(fullName: string, company: string, a
         'X-Api-Key': apiKey,
       },
       body: JSON.stringify({
-        q_person_name: fullName,
+        person_titles: [], // Empty to match any title
         q_organization_name: company,
+        person_names: [fullName],
         per_page: 1,
       }),
     });

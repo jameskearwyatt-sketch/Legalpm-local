@@ -81,12 +81,15 @@ export interface BMInternalContact {
 export type BMInternalContactInsert = Omit<BMInternalContact, 'id' | 'created_at' | 'updated_at'>;
 export type BMInternalContactUpdate = Partial<BMInternalContactInsert>;
 
+export type ExpertiseFilterMode = 'and' | 'or';
+
 export interface BMContactFilters {
   search?: string;
   regions?: string[];
   offices?: string[];
   practiceGroups?: string[];
   expertiseAreas?: string[]; // e.g., ['project_development.offshore_wind', 'ma.nuclear']
+  expertiseMode?: ExpertiseFilterMode; // 'and' = must have all, 'or' = must have any
 }
 
 // Helper to check if contact has specific expertise
@@ -230,9 +233,18 @@ export function useBMInternalContacts(filters?: BMContactFilters) {
       }
 
       if (filters?.expertiseAreas?.length) {
-        contacts = contacts.filter(c => 
-          filters.expertiseAreas!.some(area => hasExpertise(c.expertise, area))
-        );
+        const mode = filters.expertiseMode || 'or';
+        if (mode === 'and') {
+          // AND logic: contact must have ALL selected expertise areas
+          contacts = contacts.filter(c => 
+            filters.expertiseAreas!.every(area => hasExpertise(c.expertise, area))
+          );
+        } else {
+          // OR logic: contact must have ANY of the selected expertise areas
+          contacts = contacts.filter(c => 
+            filters.expertiseAreas!.some(area => hasExpertise(c.expertise, area))
+          );
+        }
       }
 
       return contacts;

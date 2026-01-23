@@ -701,13 +701,14 @@ async function enrichWithApollo(
   }
   
   // HELPER: Extract best location from Apollo person response
-  // Apollo stores location in multiple places - person.contact is most accurate for individuals
-  // ALSO: Infer country from city name if country is missing or contradicts city
-  function extractBestLocation(person: ApolloPersonResponse['person']): { city?: string; country?: string } {
+  // CRITICAL: LinkedIn data should NEVER fall back to organization HQ - that's where the company is, not the person
+  // Apollo search may have person-level location that's more accurate
+  function extractBestLocation(person: ApolloPersonResponse['person'], isLinkedInSource: boolean = false): { city?: string; country?: string; fromOrg?: boolean } {
     if (!person) return {};
     
     let city: string | undefined;
     let country: string | undefined;
+    let fromOrg = false;
     
     // Priority 1: contact.city/country (MOST ACCURATE for individual's actual location)
     if (person.contact?.city || person.contact?.country) {
@@ -721,11 +722,13 @@ async function enrichWithApollo(
       city = person.city || undefined;
       country = person.country || undefined;
     }
-    // Priority 3: organization location (LEAST preferred - this is company HQ, not person's location!)
-    else if (person.organization?.city || person.organization?.country) {
-      console.log('Falling back to organization location (company HQ, not person):', person.organization.city, person.organization.country);
+    // Priority 3: organization location - ONLY use for Apollo search, NEVER for LinkedIn
+    // LinkedIn should tell us where the person IS, not where the company HQ is
+    else if (!isLinkedInSource && (person.organization?.city || person.organization?.country)) {
+      console.log('Falling back to organization location (company HQ - ONLY because this is Apollo search, not LinkedIn):', person.organization.city, person.organization.country);
       city = person.organization.city || undefined;
       country = person.organization.country || undefined;
+      fromOrg = true; // Mark this as org-sourced so we can deprioritize it
     }
     
     // SMART FIX: If we have a city, infer the correct country from it
@@ -742,14 +745,16 @@ async function enrichWithApollo(
     }
     
     // SMART FIX: If we still don't have a country, try to infer from company name
-    if (!country && person.organization?.name) {
+    // But only do this if we're not using LinkedIn (where we expect person-level data)
+    if (!country && !isLinkedInSource && person.organization?.name) {
       const companyCountry = extractCountryFromCompanyName(person.organization.name);
       if (companyCountry) {
         country = companyCountry;
+        fromOrg = true;
       }
     }
     
-    return { city, country };
+    return { city, country, fromOrg };
   }
   
   // STEP 3: Merge results - prioritize different sources for different data
@@ -786,17 +791,28 @@ async function enrichWithApollo(
       mergedResult.person!.email_status = apolloSearchEmail.email_status;
     }
     
-    // LOCATION: Extract from contact objects (person's actual location, not company HQ)
-    const linkedInLocation = extractBestLocation(linkedIn);
-    const apolloSearchLocation = extractBestLocation(apolloSearch);
+    // LOCATION: LinkedIn is authoritative for where the person actually lives
+    // Apollo search may have org-level location which is just company HQ - we should NOT use that
+    // Pass isLinkedInSource=true so LinkedIn data never falls back to org location
+    const linkedInLocation = extractBestLocation(linkedIn, true); // true = is LinkedIn source, never use org fallback
+    const apolloSearchLocation = extractBestLocation(apolloSearch, false); // false = Apollo search, can use org as last resort
     
-    // Prefer LinkedIn contact location (most current), then Apollo search location
+    // SMART MERGE: LinkedIn location is authoritative (where person actually is)
+    // Only use Apollo search location if:
+    // 1. LinkedIn has no location data, AND
+    // 2. Apollo search location is NOT from organization (company HQ)
     if (linkedInLocation.city || linkedInLocation.country) {
-      console.log('Using location from LinkedIn match:', linkedInLocation.city, linkedInLocation.country);
+      console.log('Using location from LinkedIn match (AUTHORITATIVE for person location):', linkedInLocation.city, linkedInLocation.country);
       mergedResult.person!.city = linkedInLocation.city;
       mergedResult.person!.country = linkedInLocation.country;
-    } else if (apolloSearchLocation.city || apolloSearchLocation.country) {
-      console.log('Using location from Apollo search:', apolloSearchLocation.city, apolloSearchLocation.country);
+    } else if ((apolloSearchLocation.city || apolloSearchLocation.country) && !apolloSearchLocation.fromOrg) {
+      // Apollo search has person-level location (not from org)
+      console.log('Using person-level location from Apollo search:', apolloSearchLocation.city, apolloSearchLocation.country);
+      mergedResult.person!.city = apolloSearchLocation.city;
+      mergedResult.person!.country = apolloSearchLocation.country;
+    } else if (apolloSearchLocation.fromOrg) {
+      // Apollo only has org-level location - log warning but still use as last resort
+      console.log('WARNING: Only org-level location available from Apollo (company HQ, may be wrong):', apolloSearchLocation.city, apolloSearchLocation.country);
       mergedResult.person!.city = apolloSearchLocation.city;
       mergedResult.person!.country = apolloSearchLocation.country;
     }

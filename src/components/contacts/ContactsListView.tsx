@@ -44,6 +44,7 @@ import { ContactDetailDialog } from "./ContactDetailDialog";
 import { ContactHistoryDialog } from "./ContactHistoryDialog";
 import { FocusAreaAssignmentDialog } from "./FocusAreaAssignmentDialog";
 import { ExclusionFilterCheckbox } from "./ExclusionFilterCheckbox";
+import { ReidentifyExcludedDialog } from "./ReidentifyExcludedDialog";
 import { SortableFilterableHeader, SortDirection } from "./SortableFilterableHeader";
 import { StickyTableHeader } from "@/components/ui/sticky-table-header";
 import { TableScrollControls } from "@/components/ui/table-scroll-controls";
@@ -490,11 +491,14 @@ export function ContactsListView() {
   }, [allContacts]);
 
 
-  const handleReidentifyProtected = useCallback(async () => {
+  const handleReidentifyProtected = useCallback(async (contactIds: string[]) => {
     setIsReidentifying(true);
     try {
-      // Update all protected contacts to re-include them in exclusion filters
-      const updates = protectedContacts.map(contact => {
+      // Filter to only the selected contacts
+      const contactsToUpdate = protectedContacts.filter(c => contactIds.includes(c.id));
+      
+      // Update selected protected contacts to re-include them in exclusion filters
+      const updates = contactsToUpdate.map(contact => {
         const updateData: { id: string; is_law_firm?: boolean; is_consultant?: boolean; classification_reason: string } = {
           id: contact.id,
           classification_reason: "Re-identified by user",
@@ -509,10 +513,10 @@ export function ContactsListView() {
       });
       
       await Promise.all(updates);
-      toast.success(`Re-identified ${protectedContacts.length} protected contact(s)`);
-      setShowReidentifyConfirm(false);
+      toast.success(`Re-identified ${contactsToUpdate.length} contact(s)`);
     } catch (error) {
       toast.error("Failed to re-identify some contacts");
+      throw error;
     } finally {
       setIsReidentifying(false);
     }
@@ -1286,47 +1290,13 @@ export function ContactsListView() {
         onComplete={() => setSelectedIds(new Set())}
       />
 
-      {/* Re-identify protected contacts confirmation */}
-      <AlertDialog open={showReidentifyConfirm} onOpenChange={setShowReidentifyConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Re-identify Excluded Contacts?</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>
-                You have <strong>{protectedContacts.length}</strong> contact{protectedContacts.length !== 1 ? 's' : ''} that 
-                you previously protected from exclusion filters.
-              </p>
-              <p>
-                This will reset their classification so they will appear in the "Exclude law firms" 
-                or "Exclude consultants" lists again.
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Protected contacts: {protectedContacts.slice(0, 5).map(c => c.full_name).join(", ")}
-                {protectedContacts.length > 5 && ` and ${protectedContacts.length - 5} more...`}
-              </p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isReidentifying}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleReidentifyProtected}
-              disabled={isReidentifying}
-            >
-              {isReidentifying ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Re-identifying...
-                </>
-              ) : (
-                <>
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Re-identify All
-                </>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Re-identify protected contacts dialog */}
+      <ReidentifyExcludedDialog
+        open={showReidentifyConfirm}
+        onOpenChange={setShowReidentifyConfirm}
+        protectedContacts={protectedContacts}
+        onReidentify={handleReidentifyProtected}
+      />
 
       {/* Add to Custom List Dialog */}
       <AddToListDialog

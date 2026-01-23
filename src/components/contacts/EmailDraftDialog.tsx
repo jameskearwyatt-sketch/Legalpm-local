@@ -165,8 +165,8 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
     return parts[parts.length - 1] || trimmed;
   };
 
-  // Get appropriate salutation for a contact
-  const getPersonalizedSalutation = (contact: DistributionContact): string => {
+  // Get the name part for a contact (for individual salutation)
+  const getNameForSalutation = (contact: DistributionContact): string => {
     const isJapanese = japaneseContactIds.has(contact.id);
     
     if (isJapanese && useJapaneseFormality) {
@@ -174,10 +174,42 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
       const surname = getSurname(contact.full_name);
       return `${surname}-san`;
     } else {
+      // Use Western style: FirstName only
+      return getFirstName(contact.full_name);
+    }
+  };
+
+  // Get appropriate salutation for a contact (for individual emails)
+  const getPersonalizedSalutation = (contact: DistributionContact): string => {
+    const isJapanese = japaneseContactIds.has(contact.id);
+    
+    if (isJapanese && useJapaneseFormality) {
+      // Use Japanese style: Surname-san (no "Dear" prefix)
+      const surname = getSurname(contact.full_name);
+      return `${surname}-san`;
+    } else {
       // Use Western style: Dear/Hi FirstName
       const firstName = getFirstName(contact.full_name);
       return `${salutation} ${firstName}`;
     }
+  };
+
+  // Build combined salutation for "To All" mode
+  // Japanese recipients appear first, then others
+  const buildCombinedSalutation = (): string => {
+    // Separate Japanese and non-Japanese contacts
+    const japaneseRecipients = selectedContacts.filter(c => japaneseContactIds.has(c.id));
+    const otherRecipients = selectedContacts.filter(c => !japaneseContactIds.has(c.id));
+    
+    // Build name list with Japanese first
+    const orderedContacts = useJapaneseFormality 
+      ? [...japaneseRecipients, ...otherRecipients]
+      : selectedContacts;
+    
+    const names = orderedContacts.map(contact => getNameForSalutation(contact));
+    
+    // Format: "Dear Name1, Name2, Name3,"
+    return `Dear ${names.join(", ")}`;
   };
 
   const toggleContact = (contactId: string) => {
@@ -241,8 +273,17 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
       });
     } else if (deliveryMode === 'to_all') {
       // All recipients in TO field, separated by semicolon and space
-      const toList = emails.join("; ");
-      const mailtoUrl = `mailto:${encodeURIComponent(toList)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      // Order emails with Japanese first if using formality
+      const japaneseRecipients = selectedContacts.filter(c => japaneseContactIds.has(c.id));
+      const otherRecipients = selectedContacts.filter(c => !japaneseContactIds.has(c.id));
+      const orderedContacts = useJapaneseFormality 
+        ? [...japaneseRecipients, ...otherRecipients]
+        : selectedContacts;
+      
+      const toList = orderedContacts.map(c => c.email).join("; ");
+      const combinedSalutation = buildCombinedSalutation();
+      const personalizedBody = `${combinedSalutation},\n\n${body}`;
+      const mailtoUrl = `mailto:${encodeURIComponent(toList)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(personalizedBody)}`;
       window.open(mailtoUrl, "_blank");
     } else {
       // BCC all - recipients in BCC field
@@ -363,23 +404,33 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
             </RadioGroup>
           </div>
 
-          {deliveryMode === 'individual' && (
+          {(deliveryMode === 'individual' || deliveryMode === 'to_all') && (
             <>
-              <div>
-                <Label>Salutation</Label>
-                <Select value={salutation} onValueChange={(v) => setSalutation(v as 'Dear' | 'Hi')}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Dear">Dear [First Name]</SelectItem>
-                    <SelectItem value="Hi">Hi [First Name]</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Each email will begin with "{salutation} [First Name],"
-                </p>
-              </div>
+              {deliveryMode === 'individual' && (
+                <div>
+                  <Label>Salutation</Label>
+                  <Select value={salutation} onValueChange={(v) => setSalutation(v as 'Dear' | 'Hi')}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Dear">Dear [First Name]</SelectItem>
+                      <SelectItem value="Hi">Hi [First Name]</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Each email will begin with "{salutation} [First Name],"
+                  </p>
+                </div>
+              )}
+
+              {deliveryMode === 'to_all' && (
+                <div className="p-3 bg-muted/30 rounded-lg border">
+                  <p className="text-sm text-muted-foreground">
+                    Email will begin with: <span className="font-medium text-foreground">"Dear [all first names, separated by commas],"</span>
+                  </p>
+                </div>
+              )}
 
               {/* Japanese formality option - only show if Japanese recipients detected */}
               {hasJapaneseRecipients && (
@@ -398,7 +449,10 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
                     </label>
                     <p className="text-xs text-muted-foreground">
                       {selectedJapaneseContacts.length} Japanese recipient{selectedJapaneseContacts.length !== 1 ? 's' : ''} detected. 
-                      When enabled, they will be addressed as "[Surname]-san" instead of "{salutation} [First Name]".
+                      {deliveryMode === 'individual' 
+                        ? ` When enabled, they will be addressed as "[Surname]-san" instead of "${salutation} [First Name]".`
+                        : ` When enabled, Japanese names will appear first as "[Surname]-san" (e.g., "Dear Tanaka-san, Smith-san, John, Jane,").`
+                      }
                     </p>
                   </div>
                 </div>
@@ -428,7 +482,7 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
           <div>
             <Label>
               Body
-              {deliveryMode === 'individual' && (
+              {(deliveryMode === 'individual' || deliveryMode === 'to_all') && (
                 <span className="text-xs text-muted-foreground ml-2">
                   (salutation will be added automatically)
                 </span>

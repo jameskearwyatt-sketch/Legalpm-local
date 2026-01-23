@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { X, ChevronDown, Building2 } from "lucide-react";
+import { ChevronDown, Building2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { type DistributionContact } from "@/lib/hooks/useDistributionContacts";
 
@@ -18,6 +18,7 @@ interface ExclusionFilterCheckboxProps {
   onCheckedChange: (checked: boolean) => void;
   excludedContacts: DistributionContact[];
   onProtectContact: (contactId: string) => void;
+  onBulkProtectContacts?: (contactIds: string[]) => Promise<void>;
   icon: React.ReactNode;
   className?: string;
 }
@@ -28,11 +29,85 @@ export function ExclusionFilterCheckbox({
   onCheckedChange,
   excludedContacts,
   onProtectContact,
+  onBulkProtectContacts,
   icon,
   className,
 }: ExclusionFilterCheckboxProps) {
   const [showExcluded, setShowExcluded] = useState(false);
+  const [selectedForProtection, setSelectedForProtection] = useState<Set<string>>(new Set());
+  const [isProcessing, setIsProcessing] = useState(false);
+  
   const excludedCount = excludedContacts.length;
+  const selectedCount = selectedForProtection.size;
+
+  // Reset selection when popover closes or excluded contacts change
+  useEffect(() => {
+    if (!showExcluded) {
+      setSelectedForProtection(new Set());
+    }
+  }, [showExcluded]);
+
+  // Also reset when the excluded contacts list changes (after processing)
+  useEffect(() => {
+    setSelectedForProtection(prev => {
+      const newSet = new Set<string>();
+      prev.forEach(id => {
+        if (excludedContacts.some(c => c.id === id)) {
+          newSet.add(id);
+        }
+      });
+      return newSet;
+    });
+  }, [excludedContacts]);
+
+  const handleSelectAll = () => {
+    setSelectedForProtection(new Set(excludedContacts.map(c => c.id)));
+  };
+
+  const handleSelectNone = () => {
+    setSelectedForProtection(new Set());
+  };
+
+  const handleToggleContact = (contactId: string) => {
+    setSelectedForProtection(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(contactId)) {
+        newSet.delete(contactId);
+      } else {
+        newSet.add(contactId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleProcess = async () => {
+    if (selectedCount === 0) return;
+    
+    setIsProcessing(true);
+    try {
+      if (onBulkProtectContacts) {
+        // Use bulk operation if available
+        await onBulkProtectContacts(Array.from(selectedForProtection));
+      } else {
+        // Fall back to individual calls
+        const ids = Array.from(selectedForProtection);
+        for (const id of ids) {
+          onProtectContact(id);
+          // Small delay to prevent overwhelming the server
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+      }
+      setSelectedForProtection(new Set());
+      setShowExcluded(false);
+    } catch (error) {
+      console.error('Failed to process contacts:', error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const isAllSelected = excludedCount > 0 && selectedCount === excludedCount;
+  const isNoneSelected = selectedCount === 0;
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
@@ -68,47 +143,96 @@ export function ExclusionFilterCheckbox({
             </Button>
           </PopoverTrigger>
           <PopoverContent 
-            className="w-80 p-0" 
+            className="w-96 p-0" 
             align="start"
             sideOffset={4}
           >
-            <div className="p-3 border-b">
+            {/* Header */}
+            <div className="p-3 border-b bg-muted/30">
               <h4 className="font-medium text-sm">Excluded Contacts</h4>
               <p className="text-xs text-muted-foreground mt-1">
-                Click ✕ to protect a contact from this filter
+                Select contacts to protect from this filter, then click Process
               </p>
             </div>
+            
+            {/* Selection controls */}
+            <div className="p-2 border-b flex items-center justify-between gap-2 bg-muted/10">
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={handleSelectAll}
+                  disabled={isAllSelected || isProcessing}
+                >
+                  Select All
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={handleSelectNone}
+                  disabled={isNoneSelected || isProcessing}
+                >
+                  Select None
+                </Button>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                {selectedCount} of {excludedCount} selected
+              </span>
+            </div>
+
+            {/* Contacts list with checkboxes */}
             <ScrollArea className="h-64 overflow-auto">
               <div className="p-2 space-y-1">
-                {excludedContacts.map((contact) => (
-                  <div
-                    key={contact.id}
-                    className="flex items-center gap-3 p-2 rounded-md hover:bg-muted/50"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {contact.full_name}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                        <Building2 className="h-3 w-3 flex-shrink-0" />
-                        {contact.company || "No company"}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="flex items-center justify-center h-6 w-6 rounded border border-destructive/30 bg-destructive/10 text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onProtectContact(contact.id);
-                      }}
-                      title="Protect from this filter"
+                {excludedContacts.map((contact) => {
+                  const isSelected = selectedForProtection.has(contact.id);
+                  return (
+                    <label
+                      key={contact.id}
+                      className={cn(
+                        "flex items-center gap-3 p-2 rounded-md cursor-pointer transition-colors",
+                        isSelected 
+                          ? "bg-primary/10 border border-primary/20" 
+                          : "hover:bg-muted/50 border border-transparent"
+                      )}
                     >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                ))}
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => handleToggleContact(contact.id)}
+                        disabled={isProcessing}
+                        className="flex-shrink-0"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {contact.full_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
+                          <Building2 className="h-3 w-3 flex-shrink-0" />
+                          {contact.company || "No company"}
+                        </p>
+                      </div>
+                    </label>
+                  );
+                })}
               </div>
             </ScrollArea>
+
+            {/* Footer with Process button */}
+            <div className="p-3 border-t bg-muted/30 flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Protected contacts won't be excluded
+              </p>
+              <Button
+                size="sm"
+                onClick={handleProcess}
+                disabled={selectedCount === 0 || isProcessing}
+                className="gap-2"
+              >
+                {isProcessing && <Loader2 className="h-3 w-3 animate-spin" />}
+                Process {selectedCount > 0 && `(${selectedCount})`}
+              </Button>
+            </div>
           </PopoverContent>
         </Popover>
       )}

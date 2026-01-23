@@ -61,6 +61,7 @@ interface ApolloPersonResponse {
       email_status?: string;
       organization_name?: string;
       city?: string;
+      state?: string;
       country?: string;
     };
     // Also check contact_emails array for the most current email
@@ -69,7 +70,97 @@ interface ApolloPersonResponse {
       email_status?: string;
       position?: number;
     }>;
+    // Employment history can reveal current location
+    employment_history?: Array<{
+      current?: boolean;
+      organization_name?: string;
+      raw_address?: string;
+    }>;
   };
+}
+
+// Map of country names that might appear in company names
+const countryPatterns: { [key: string]: string } = {
+  'australia': 'Australia',
+  'uk': 'United Kingdom',
+  'usa': 'United States',
+  'us': 'United States',
+  'canada': 'Canada',
+  'germany': 'Germany',
+  'france': 'France',
+  'japan': 'Japan',
+  'china': 'China',
+  'india': 'India',
+  'singapore': 'Singapore',
+  'hong kong': 'Hong Kong',
+  'netherlands': 'Netherlands',
+  'switzerland': 'Switzerland',
+  'ireland': 'Ireland',
+  'new zealand': 'New Zealand',
+  'brazil': 'Brazil',
+  'mexico': 'Mexico',
+  'south africa': 'South Africa',
+  'uae': 'United Arab Emirates',
+  'dubai': 'United Arab Emirates',
+};
+
+// Cities that are well-known and imply their country
+const cityToCountry: { [key: string]: string } = {
+  'sydney': 'Australia',
+  'melbourne': 'Australia',
+  'brisbane': 'Australia',
+  'perth': 'Australia',
+  'london': 'United Kingdom',
+  'manchester': 'United Kingdom',
+  'birmingham': 'United Kingdom',
+  'new york': 'United States',
+  'los angeles': 'United States',
+  'chicago': 'United States',
+  'san francisco': 'United States',
+  'tokyo': 'Japan',
+  'paris': 'France',
+  'berlin': 'Germany',
+  'toronto': 'Canada',
+  'vancouver': 'Canada',
+  'singapore': 'Singapore',
+  'hong kong': 'Hong Kong',
+  'dubai': 'United Arab Emirates',
+  'mumbai': 'India',
+  'bangalore': 'India',
+  'delhi': 'India',
+  'shanghai': 'China',
+  'beijing': 'China',
+};
+
+// Extract country from company name (e.g., "KPMG Australia" -> "Australia")
+function extractCountryFromCompanyName(companyName: string | undefined): string | undefined {
+  if (!companyName) return undefined;
+  
+  const lowerName = companyName.toLowerCase();
+  
+  for (const [pattern, country] of Object.entries(countryPatterns)) {
+    // Check if company name ends with or contains the country
+    if (lowerName.includes(pattern)) {
+      console.log(`Inferred country "${country}" from company name "${companyName}"`);
+      return country;
+    }
+  }
+  
+  return undefined;
+}
+
+// Infer country from city name
+function inferCountryFromCity(city: string | undefined): string | undefined {
+  if (!city) return undefined;
+  
+  const lowerCity = city.toLowerCase();
+  const country = cityToCountry[lowerCity];
+  
+  if (country) {
+    console.log(`Inferred country "${country}" from city "${city}"`);
+  }
+  
+  return country;
 }
 
 // Comprehensive male/female name database for gender inference
@@ -485,29 +576,54 @@ async function enrichWithApollo(
   
   // HELPER: Extract best location from Apollo person response
   // Apollo stores location in multiple places - person.contact is most accurate for individuals
+  // ALSO: Infer country from city name if country is missing or contradicts city
   function extractBestLocation(person: ApolloPersonResponse['person']): { city?: string; country?: string } {
     if (!person) return {};
+    
+    let city: string | undefined;
+    let country: string | undefined;
     
     // Priority 1: contact.city/country (MOST ACCURATE for individual's actual location)
     if (person.contact?.city || person.contact?.country) {
       console.log('Found location in contact object:', person.contact.city, person.contact.country);
-      return { city: person.contact.city || undefined, country: person.contact.country || undefined };
+      city = person.contact.city || undefined;
+      country = person.contact.country || undefined;
     }
-    
     // Priority 2: person.city/country (person-level location)
-    if (person.city || person.country) {
+    else if (person.city || person.country) {
       console.log('Found location at person level:', person.city, person.country);
-      return { city: person.city || undefined, country: person.country || undefined };
+      city = person.city || undefined;
+      country = person.country || undefined;
     }
-    
     // Priority 3: organization location (LEAST preferred - this is company HQ, not person's location!)
-    // Only use as absolute last resort and with low confidence
-    if (person.organization?.city || person.organization?.country) {
+    else if (person.organization?.city || person.organization?.country) {
       console.log('Falling back to organization location (company HQ, not person):', person.organization.city, person.organization.country);
-      return { city: person.organization.city || undefined, country: person.organization.country || undefined };
+      city = person.organization.city || undefined;
+      country = person.organization.country || undefined;
     }
     
-    return {};
+    // SMART FIX: If we have a city, infer the correct country from it
+    // This fixes cases like "Sydney" being paired with "United Kingdom"
+    if (city) {
+      const inferredCountry = inferCountryFromCity(city);
+      if (inferredCountry) {
+        // If inferred country differs from Apollo's country, trust the city-based inference
+        if (country && inferredCountry !== country) {
+          console.log(`CORRECTING country: "${country}" -> "${inferredCountry}" based on city "${city}"`);
+        }
+        country = inferredCountry;
+      }
+    }
+    
+    // SMART FIX: If we still don't have a country, try to infer from company name
+    if (!country && person.organization?.name) {
+      const companyCountry = extractCountryFromCompanyName(person.organization.name);
+      if (companyCountry) {
+        country = companyCountry;
+      }
+    }
+    
+    return { city, country };
   }
   
   // STEP 3: Merge results - prioritize different sources for different data
@@ -643,6 +759,7 @@ Deno.serve(async (req) => {
       // 1. contact.city/country (person's actual current location - MOST ACCURATE)
       // 2. person.city/country (person-level, set by merge step)
       // 3. organization location (company HQ - LEAST preferred, often wrong for remote workers)
+      // THEN: Apply city-to-country inference to catch data inconsistencies
       const contactCity = person.contact?.city;
       const contactCountry = person.contact?.country;
       const personCity = person.city;
@@ -670,6 +787,27 @@ Deno.serve(async (req) => {
         result.country = orgCountry || undefined;
         result.confidence.location = 0.4; // Very low confidence - company HQ != person's location
         console.log('WARNING: Falling back to org location (company HQ, may be wrong):', result.city, result.country);
+      }
+      
+      // SMART FIX: Apply city-to-country inference to catch inconsistencies like "Sydney, United Kingdom"
+      if (result.city) {
+        const inferredCountry = inferCountryFromCity(result.city);
+        if (inferredCountry) {
+          if (result.country && inferredCountry !== result.country) {
+            console.log(`CORRECTING country in final result: "${result.country}" -> "${inferredCountry}" based on city "${result.city}"`);
+          }
+          result.country = inferredCountry;
+          result.confidence.location = 0.95; // High confidence when we can infer from city
+        }
+      }
+      
+      // SMART FIX: If still no country, try to infer from company name
+      if (!result.country && person.organization?.name) {
+        const companyCountry = extractCountryFromCompanyName(person.organization.name);
+        if (companyCountry) {
+          result.country = companyCountry;
+          result.confidence.location = 0.7; // Medium confidence from company name
+        }
       }
       
       // LinkedIn URL

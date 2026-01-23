@@ -878,21 +878,43 @@ export function QuickToDoButton() {
   const buttonRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Load saved position on mount
+  // Load saved position on mount - with FORCED visibility check
   useEffect(() => {
+    // Always clear any potentially bad position data on mount
     const saved = localStorage.getItem(STORAGE_KEY);
+    
+    // Force reset to guarantee visibility - button must be within visible area
+    const safeX = 280; // Right of sidebar
+    const safeY = window.innerHeight - 100; // Bottom area
+    
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const maxX = window.innerWidth - 56;
-        const maxY = window.innerHeight - 56;
-        setPosition({
-          x: Math.min(Math.max(0, parsed.x), maxX),
-          y: Math.min(Math.max(0, parsed.y), maxY),
-        });
+        const maxX = window.innerWidth - 80;
+        const maxY = window.innerHeight - 80;
+        
+        // Only use saved position if it's actually within visible bounds
+        const isVisible = parsed.x >= 0 && parsed.x <= maxX && parsed.y >= 0 && parsed.y <= maxY;
+        
+        if (isVisible) {
+          setPosition({
+            x: Math.min(Math.max(20, parsed.x), maxX),
+            y: Math.min(Math.max(20, parsed.y), maxY),
+          });
+        } else {
+          // Position was off-screen, reset to safe default
+          console.log('QuickToDo button position was off-screen, resetting to visible area');
+          localStorage.removeItem(STORAGE_KEY);
+          setPosition({ x: safeX, y: safeY });
+        }
       } catch {
-        // Invalid saved position, use default
+        // Invalid saved position, use safe default
+        localStorage.removeItem(STORAGE_KEY);
+        setPosition({ x: safeX, y: safeY });
       }
+    } else {
+      // No saved position, use safe default
+      setPosition({ x: safeX, y: safeY });
     }
   }, []);
 
@@ -901,6 +923,27 @@ export function QuickToDoButton() {
     if (position) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(position));
     }
+  }, [position]);
+
+  // Ensure button stays visible on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      if (position) {
+        const maxX = window.innerWidth - 80;
+        const maxY = window.innerHeight - 80;
+        
+        // If button is now off-screen, move it back
+        if (position.x > maxX || position.y > maxY) {
+          setPosition({
+            x: Math.min(position.x, maxX),
+            y: Math.min(position.y, maxY),
+          });
+        }
+      }
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, [position]);
 
   // Persist panel open state
@@ -2003,21 +2046,30 @@ export function QuickToDoButton() {
   };
 
   const getButtonStyle = (): React.CSSProperties => {
+    // ALWAYS ensure the button is within visible viewport bounds
+    const maxX = window.innerWidth - 80;
+    const maxY = window.innerHeight - 80;
+    
     if (position) {
+      // Clamp position to ensure visibility
+      const clampedX = Math.min(Math.max(20, position.x), maxX);
+      const clampedY = Math.min(Math.max(20, position.y), maxY);
+      
       return {
         position: 'fixed',
-        left: position.x,
-        top: position.y,
+        left: clampedX,
+        top: clampedY,
         right: 'auto',
         bottom: 'auto',
         zIndex: 9999,
       };
     }
-    // Default: bottom-left corner, above sidebar on desktop
+    
+    // Default: guaranteed visible position - bottom-left area, right of sidebar
     return {
       position: 'fixed',
       left: 280,
-      bottom: 24,
+      bottom: 100,
       zIndex: 9999,
     };
   };

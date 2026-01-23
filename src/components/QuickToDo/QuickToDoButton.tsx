@@ -802,9 +802,12 @@ export function QuickToDoButton() {
   } = useSlateItems();
   const { batchUpdateSlateOrder } = useSlateOrder();
   
+  // FORCE RESET: Clear any potentially stuck state on mount
   const [isOpen, setIsOpen] = useState(() => {
     try {
-      return localStorage.getItem(PANEL_OPEN_KEY) === 'true';
+      // Force close on mount to ensure button is visible
+      localStorage.removeItem(PANEL_OPEN_KEY);
+      return false;
     } catch {
       return false;
     }
@@ -838,10 +841,12 @@ export function QuickToDoButton() {
   const [completedSearchQuery, setCompletedSearchQuery] = useState("");
   const [viewingNotesTask, setViewingNotesTask] = useState<UnifiedTask | null>(null);
   
-  // Slate panel state
+  // Slate panel state - FORCE RESET to ensure button is visible
   const [isSlateOpen, setIsSlateOpen] = useState(() => {
     try {
-      return localStorage.getItem(SLATE_OPEN_KEY) === 'true';
+      // Force close on mount to ensure button is visible
+      localStorage.removeItem(SLATE_OPEN_KEY);
+      return false;
     } catch {
       return false;
     }
@@ -880,42 +885,17 @@ export function QuickToDoButton() {
 
   // Load saved position on mount - with FORCED visibility check
   useEffect(() => {
-    // Always clear any potentially bad position data on mount
-    const saved = localStorage.getItem(STORAGE_KEY);
+    // AGGRESSIVE RESET: Clear all potentially problematic localStorage keys
+    // This ensures the button WILL be visible
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(SLATE_POSITION_KEY);
     
-    // Force reset to guarantee visibility - button must be within visible area
+    // Force a guaranteed visible position
     const safeX = 280; // Right of sidebar
-    const safeY = window.innerHeight - 100; // Bottom area
+    const safeY = window.innerHeight - 120; // Near bottom
     
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        const maxX = window.innerWidth - 80;
-        const maxY = window.innerHeight - 80;
-        
-        // Only use saved position if it's actually within visible bounds
-        const isVisible = parsed.x >= 0 && parsed.x <= maxX && parsed.y >= 0 && parsed.y <= maxY;
-        
-        if (isVisible) {
-          setPosition({
-            x: Math.min(Math.max(20, parsed.x), maxX),
-            y: Math.min(Math.max(20, parsed.y), maxY),
-          });
-        } else {
-          // Position was off-screen, reset to safe default
-          console.log('QuickToDo button position was off-screen, resetting to visible area');
-          localStorage.removeItem(STORAGE_KEY);
-          setPosition({ x: safeX, y: safeY });
-        }
-      } catch {
-        // Invalid saved position, use safe default
-        localStorage.removeItem(STORAGE_KEY);
-        setPosition({ x: safeX, y: safeY });
-      }
-    } else {
-      // No saved position, use safe default
-      setPosition({ x: safeX, y: safeY });
-    }
+    console.log('QuickToDo: Forcing button to visible position:', { x: safeX, y: safeY });
+    setPosition({ x: safeX, y: safeY });
   }, []);
 
   // Save position when it changes
@@ -2663,6 +2643,7 @@ export function QuickToDoButton() {
           ref={buttonRef}
           className="flex items-center gap-1.5 group"
           style={getButtonStyle()}
+          data-testid="quick-todo-button"
         >
           {/* Slate Circle - 1/4 surface area of main button */}
           <div className="relative">

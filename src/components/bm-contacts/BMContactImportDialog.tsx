@@ -293,7 +293,7 @@ export function BMContactImportDialog({ open, onOpenChange }: BMContactImportDia
           {/* File info */}
           {file && (
             <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-              <FileSpreadsheet className="h-5 w-5 text-green-600" />
+              <FileSpreadsheet className="h-5 w-5 text-primary" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{file.name}</p>
                 <p className="text-xs text-muted-foreground">
@@ -318,7 +318,7 @@ export function BMContactImportDialog({ open, onOpenChange }: BMContactImportDia
 
           {/* Success */}
           {parsedCount > 0 && !parsing && !error && (
-            <div className="flex items-center gap-2 text-green-600">
+            <div className="flex items-center gap-2 text-primary">
               <CheckCircle2 className="h-4 w-4" />
               <span className="text-sm">Ready to import {parsedCount} contacts</span>
             </div>

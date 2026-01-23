@@ -37,10 +37,8 @@ import {
   useDistinctBMOffices,
   useDistinctBMPracticeGroups,
   countExpertiseAreas,
-  type BMInternalContact,
   type BMContactFilters,
 } from "@/lib/hooks/useBMInternalContacts";
-import { EXPERTISE_CATEGORIES, getAllExpertiseFields } from "@/lib/bmExpertiseConfig";
 import { BMContactImportDialog } from "@/components/bm-contacts/BMContactImportDialog";
 import { BMContactDetailRow } from "@/components/bm-contacts/BMContactDetailRow";
 import { BMAddToShortlistDialog } from "@/components/bm-contacts/BMAddToShortlistDialog";

@@ -915,6 +915,11 @@ export function ContactsListView() {
         </div>
       )}
 
+      {/* Contact count display */}
+      <div className="text-sm text-muted-foreground px-1">
+        {contactsAfterExclusion.length} contact{contactsAfterExclusion.length !== 1 ? 's' : ''} showing
+      </div>
+
       {/* Contacts table with sticky header and floating scroll bar */}
       <StickyTableHeader>
         <TableScrollControls>

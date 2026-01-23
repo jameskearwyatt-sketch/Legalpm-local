@@ -12,7 +12,7 @@ import MatterForm from "./pages/MatterForm";
 import Growth from "./pages/Growth";
 import GrowthProjectDetail from "./pages/GrowthProjectDetail";
 import Settings from "./pages/Settings";
-import Reports from "./pages/Reports";
+import Reports from "./pages/Reports"; // Keep for backward compatibility
 import Help from "./pages/Help";
 import Flags from "./pages/Flags";
 import RedFlags from "./pages/RedFlags";

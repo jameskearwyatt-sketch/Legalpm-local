@@ -157,35 +157,13 @@ export function useCustomListContacts(listId: string | null) {
     enabled: !!listId && !!user?.id,
   });
 
-  // Check which contacts are already in a list - memoized to prevent infinite loops
-  const checkExistingContacts = useCallback(async (checkListId: string, checkContactIds: string[]): Promise<{
-    existing: string[];
-    toAdd: string[];
-  }> => {
-    if (!user?.id) return { existing: [], toAdd: checkContactIds };
-
-    const { data, error } = await supabase
-      .from("custom_list_contacts")
-      .select("contact_id")
-      .eq("list_id", checkListId)
-      .in("contact_id", checkContactIds);
-
-    if (error) throw error;
-
-    const existingSet = new Set((data || []).map((item: { contact_id: string }) => item.contact_id));
-    const existing = checkContactIds.filter(id => existingSet.has(id));
-    const toAdd = checkContactIds.filter(id => !existingSet.has(id));
-
-    return { existing, toAdd };
-  }, [user?.id]);
-
   // Add contacts to a list
   const addContacts = useMutation({
-    mutationFn: async ({ listId, contactIds }: { listId: string; contactIds: string[] }) => {
+    mutationFn: async ({ listId: targetListId, contactIds: targetContactIds }: { listId: string; contactIds: string[] }) => {
       if (!user?.id) throw new Error("Not authenticated");
 
-      const records = contactIds.map(contactId => ({
-        list_id: listId,
+      const records = targetContactIds.map(contactId => ({
+        list_id: targetListId,
         contact_id: contactId,
         user_id: user.id,
       }));
@@ -207,12 +185,12 @@ export function useCustomListContacts(listId: string | null) {
 
   // Remove contacts from a list
   const removeContacts = useMutation({
-    mutationFn: async ({ listId, contactIds }: { listId: string; contactIds: string[] }) => {
+    mutationFn: async ({ listId: targetListId, contactIds: targetContactIds }: { listId: string; contactIds: string[] }) => {
       const { error } = await supabase
         .from("custom_list_contacts")
         .delete()
-        .eq("list_id", listId)
-        .in("contact_id", contactIds);
+        .eq("list_id", targetListId)
+        .in("contact_id", targetContactIds);
 
       if (error) throw error;
     },
@@ -225,6 +203,28 @@ export function useCustomListContacts(listId: string | null) {
       toast.error(`Failed to remove contacts: ${error.message}`);
     },
   });
+
+  // Check which contacts are already in a list - memoized AFTER all hooks
+  const checkExistingContacts = useCallback(async (checkListId: string, checkContactIds: string[]): Promise<{
+    existing: string[];
+    toAdd: string[];
+  }> => {
+    if (!user?.id) return { existing: [], toAdd: checkContactIds };
+
+    const { data, error } = await supabase
+      .from("custom_list_contacts")
+      .select("contact_id")
+      .eq("list_id", checkListId)
+      .in("contact_id", checkContactIds);
+
+    if (error) throw error;
+
+    const existingSet = new Set((data || []).map((item: { contact_id: string }) => item.contact_id));
+    const existing = checkContactIds.filter(id => existingSet.has(id));
+    const toAdd = checkContactIds.filter(id => !existingSet.has(id));
+
+    return { existing, toAdd };
+  }, [user?.id]);
 
   return {
     contactIds,

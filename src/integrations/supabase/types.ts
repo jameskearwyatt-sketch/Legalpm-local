@@ -299,6 +299,72 @@ export type Database = {
         }
         Relationships: []
       }
+      custom_distribution_lists: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      custom_list_contacts: {
+        Row: {
+          added_at: string
+          contact_id: string
+          id: string
+          list_id: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          contact_id: string
+          id?: string
+          list_id: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          contact_id?: string
+          id?: string
+          list_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_list_contacts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "distribution_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "custom_list_contacts_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "custom_distribution_lists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       detailed_wip_update_items: {
         Row: {
           budget_line_item_id: string

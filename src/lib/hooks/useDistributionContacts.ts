@@ -214,13 +214,8 @@ export function useDistributionContacts(filters?: ContactFilters) {
         );
       }
 
-      // AI Classification exclusion filters
-      if (filters?.excludeLawFirms) {
-        contacts = contacts.filter(c => c.is_law_firm !== true);
-      }
-      if (filters?.excludeConsultants) {
-        contacts = contacts.filter(c => c.is_consultant !== true);
-      }
+      // Note: excludeLawFirms and excludeConsultants are applied at the UI level
+      // (in ContactsListView) so they filter the currently visible list, not the entire dataset
 
       return contacts;
     },

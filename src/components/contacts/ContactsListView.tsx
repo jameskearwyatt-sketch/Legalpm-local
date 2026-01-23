@@ -582,6 +582,7 @@ export function ContactsListView() {
             isActive={smartSearchState.isActive}
             matchCount={smartSearchState.matches.size}
             queryUnderstanding={smartSearchState.queryUnderstanding}
+            activeQuery={smartSearchState.query}
           />
 
           {unknownGenderCount > 0 && (

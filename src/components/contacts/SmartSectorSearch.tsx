@@ -25,6 +25,7 @@ interface SmartSectorSearchProps {
   isActive: boolean;
   matchCount: number;
   queryUnderstanding?: string;
+  activeQuery?: string; // The currently active search query
 }
 
 export function SmartSectorSearch({
@@ -36,6 +37,7 @@ export function SmartSectorSearch({
   isActive,
   matchCount,
   queryUnderstanding,
+  activeQuery,
 }: SmartSectorSearchProps) {
   const [inputValue, setInputValue] = useState("");
   const [showUnderstanding, setShowUnderstanding] = useState(false);
@@ -67,10 +69,12 @@ export function SmartSectorSearch({
   }, [onClear]);
 
   const handleDeepSearch = useCallback(() => {
-    if (inputValue.trim()) {
-      onDeepSearch(inputValue.trim());
+    // Use the active query (stored from initial search) since input gets cleared
+    const queryToUse = activeQuery || inputValue.trim();
+    if (queryToUse) {
+      onDeepSearch(queryToUse);
     }
-  }, [inputValue, onDeepSearch]);
+  }, [activeQuery, inputValue, onDeepSearch]);
 
   return (
     <div className="flex items-center gap-2">

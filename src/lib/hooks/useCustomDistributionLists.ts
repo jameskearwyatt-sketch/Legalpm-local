@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -156,27 +157,27 @@ export function useCustomListContacts(listId: string | null) {
     enabled: !!listId && !!user?.id,
   });
 
-  // Check which contacts are already in a list
-  const checkExistingContacts = async (listId: string, contactIds: string[]): Promise<{
+  // Check which contacts are already in a list - memoized to prevent infinite loops
+  const checkExistingContacts = useCallback(async (checkListId: string, checkContactIds: string[]): Promise<{
     existing: string[];
     toAdd: string[];
   }> => {
-    if (!user?.id) return { existing: [], toAdd: contactIds };
+    if (!user?.id) return { existing: [], toAdd: checkContactIds };
 
     const { data, error } = await supabase
       .from("custom_list_contacts")
       .select("contact_id")
-      .eq("list_id", listId)
-      .in("contact_id", contactIds);
+      .eq("list_id", checkListId)
+      .in("contact_id", checkContactIds);
 
     if (error) throw error;
 
     const existingSet = new Set((data || []).map((item: { contact_id: string }) => item.contact_id));
-    const existing = contactIds.filter(id => existingSet.has(id));
-    const toAdd = contactIds.filter(id => !existingSet.has(id));
+    const existing = checkContactIds.filter(id => existingSet.has(id));
+    const toAdd = checkContactIds.filter(id => !existingSet.has(id));
 
     return { existing, toAdd };
-  };
+  }, [user?.id]);
 
   // Add contacts to a list
   const addContacts = useMutation({

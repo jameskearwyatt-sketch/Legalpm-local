@@ -33,7 +33,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    console.log("Parsing business card image...");
+    console.log("Parsing business card image for multiple cards...");
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -46,9 +46,11 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `You are an expert at extracting contact information from business cards. 
-Extract all visible contact details from the business card image and return them in a structured format.
-Be thorough - look for:
+            content: `You are an expert at extracting contact information from business cards.
+
+IMPORTANT: This image may contain ONE OR MULTIPLE business cards. Carefully scan the entire image and identify ALL visible business cards.
+
+For EACH business card you find, extract:
 - Full name (first and last name combined)
 - Email address
 - Company/organization name
@@ -57,9 +59,11 @@ Be thorough - look for:
 - LinkedIn URL or handle
 - Location (city and/or country)
 
-If a field is not visible or unclear, return null for that field.
-For names, if you see first and last name separately, combine them into full_name.
-For LinkedIn, if you see a LinkedIn handle like "/in/johnsmith", convert it to a full URL.`
+If a field is not visible or unclear on a card, return null for that field.
+For LinkedIn, if you see a handle like "/in/johnsmith", convert it to a full URL.
+
+Return ALL contacts found - if there are 10 business cards, return 10 contacts.
+If cards overlap or are partially obscured, only extract what you can clearly read.`
           },
           {
             role: "user",
@@ -72,7 +76,7 @@ For LinkedIn, if you see a LinkedIn handle like "/in/johnsmith", convert it to a
               },
               {
                 type: "text",
-                text: "Extract all contact information from this business card."
+                text: "Identify ALL business cards in this image and extract contact information from each one. There may be multiple cards - extract them all."
               }
             ]
           }
@@ -81,55 +85,73 @@ For LinkedIn, if you see a LinkedIn handle like "/in/johnsmith", convert it to a
           {
             type: "function",
             function: {
-              name: "extract_contact",
-              description: "Extract contact information from a business card",
+              name: "extract_contacts",
+              description: "Extract contact information from one or more business cards in an image",
               parameters: {
                 type: "object",
                 properties: {
-                  full_name: { 
-                    type: "string", 
-                    description: "Full name of the person (first and last name combined)"
+                  contacts: {
+                    type: "array",
+                    description: "Array of contacts extracted from business cards in the image",
+                    items: {
+                      type: "object",
+                      properties: {
+                        full_name: { 
+                          type: "string", 
+                          description: "Full name of the person (first and last name combined)"
+                        },
+                        email: { 
+                          type: ["string", "null"],
+                          description: "Email address"
+                        },
+                        company: { 
+                          type: ["string", "null"],
+                          description: "Company or organization name"
+                        },
+                        job_title: { 
+                          type: ["string", "null"],
+                          description: "Job title or position"
+                        },
+                        phone: { 
+                          type: ["string", "null"],
+                          description: "Phone number"
+                        },
+                        linkedin_url: { 
+                          type: ["string", "null"],
+                          description: "Full LinkedIn profile URL"
+                        },
+                        country: { 
+                          type: ["string", "null"],
+                          description: "Country"
+                        },
+                        city: { 
+                          type: ["string", "null"],
+                          description: "City"
+                        }
+                      },
+                      required: ["full_name"]
+                    }
                   },
-                  email: { 
-                    type: ["string", "null"],
-                    description: "Email address"
-                  },
-                  company: { 
-                    type: ["string", "null"],
-                    description: "Company or organization name"
-                  },
-                  job_title: { 
-                    type: ["string", "null"],
-                    description: "Job title or position"
-                  },
-                  phone: { 
-                    type: ["string", "null"],
-                    description: "Phone number"
-                  },
-                  linkedin_url: { 
-                    type: ["string", "null"],
-                    description: "Full LinkedIn profile URL"
-                  },
-                  country: { 
-                    type: ["string", "null"],
-                    description: "Country"
-                  },
-                  city: { 
-                    type: ["string", "null"],
-                    description: "City"
+                  total_cards_detected: {
+                    type: "number",
+                    description: "Total number of business cards detected in the image"
                   },
                   confidence: {
                     type: "string",
                     enum: ["high", "medium", "low"],
-                    description: "How confident are you in the extraction"
+                    description: "Overall confidence in the extraction"
+                  },
+                  notes: {
+                    type: ["string", "null"],
+                    description: "Any notes about cards that couldn't be read or other issues"
                   }
                 },
-                required: ["full_name", "confidence"]
+                required: ["contacts", "total_cards_detected", "confidence"]
               }
             }
           }
         ],
-        tool_choice: { type: "function", function: { name: "extract_contact" } }
+        tool_choice: { type: "function", function: { name: "extract_contacts" } }
       }),
     });
 
@@ -159,17 +181,31 @@ For LinkedIn, if you see a LinkedIn handle like "/in/johnsmith", convert it to a
       throw new Error("No tool call in AI response");
     }
 
-    const result = JSON.parse(toolCall.function.arguments) as BusinessCardContact & { confidence: string };
+    const result = JSON.parse(toolCall.function.arguments) as {
+      contacts: BusinessCardContact[];
+      total_cards_detected: number;
+      confidence: string;
+      notes?: string;
+    };
 
-    // Normalize LinkedIn URL if it's a handle
-    if (result.linkedin_url && !result.linkedin_url.startsWith("http")) {
-      const handle = result.linkedin_url.replace(/^\/?(in\/)?/, "");
-      result.linkedin_url = `https://www.linkedin.com/in/${handle}`;
-    }
+    // Normalize LinkedIn URLs for all contacts
+    result.contacts = result.contacts.map(contact => {
+      if (contact.linkedin_url && !contact.linkedin_url.startsWith("http")) {
+        const handle = contact.linkedin_url.replace(/^\/?(in\/)?/, "");
+        contact.linkedin_url = `https://www.linkedin.com/in/${handle}`;
+      }
+      return contact;
+    });
 
-    console.log("Extracted contact:", result);
+    console.log(`Extracted ${result.contacts.length} contacts from ${result.total_cards_detected} detected cards`);
 
-    return new Response(JSON.stringify({ success: true, contact: result }), {
+    return new Response(JSON.stringify({ 
+      success: true, 
+      contacts: result.contacts,
+      total_cards_detected: result.total_cards_detected,
+      confidence: result.confidence,
+      notes: result.notes
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
 

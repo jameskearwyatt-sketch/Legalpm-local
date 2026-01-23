@@ -340,6 +340,11 @@ export function ContactsListView() {
     [contacts]
   );
 
+  const noFocusAreaCount = useMemo(() => 
+    contacts.filter(c => !c.emi_focus_areas || c.emi_focus_areas.length === 0).length,
+    [contacts]
+  );
+
   return (
     <div className="space-y-4">
       {/* Sticky top section - higher z-index than table headers */}
@@ -394,6 +399,18 @@ export function ContactsListView() {
             >
               <Sparkles className="h-4 w-4" />
               Assign Genders ({unknownGenderCount})
+            </Button>
+          )}
+
+          {noFocusAreaCount > 0 && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowFocusAreaDialog(true)}
+              className="gap-2"
+            >
+              <Target className="h-4 w-4" />
+              EMI Focus Area ({noFocusAreaCount})
             </Button>
           )}
 
@@ -616,15 +633,6 @@ export function ContactsListView() {
             Enrich
           </Button>
 
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setShowFocusAreaDialog(true)}
-            className="gap-2"
-          >
-            <Target className="h-4 w-4" />
-            Focus Areas
-          </Button>
 
           <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
             <Download className="h-4 w-4" />

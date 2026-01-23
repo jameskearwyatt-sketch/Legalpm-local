@@ -78,12 +78,12 @@ export function ExclusionFilterCheckbox({
                 Click ✕ to protect a contact from this filter
               </p>
             </div>
-            <ScrollArea className="max-h-64">
+            <ScrollArea className="h-64 overflow-auto">
               <div className="p-2 space-y-1">
                 {excludedContacts.map((contact) => (
                   <div
                     key={contact.id}
-                    className="flex items-center justify-between gap-2 p-2 rounded-md hover:bg-muted/50 group"
+                    className="flex items-center justify-between gap-2 p-2 rounded-md hover:bg-muted/50"
                   >
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">
@@ -97,7 +97,7 @@ export function ExclusionFilterCheckbox({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+                      className="h-6 w-6 flex-shrink-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                       onClick={(e) => {
                         e.stopPropagation();
                         onProtectContact(contact.id);

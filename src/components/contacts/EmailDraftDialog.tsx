@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,9 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { type DistributionContact } from "@/lib/hooks/useDistributionContacts";
 import { useCreateDistributionEmailDraft } from "@/lib/hooks/useDistributionEmailDrafts";
-import { Mail, ExternalLink, AlertCircle } from "lucide-react";
+import { Mail, ExternalLink, AlertCircle, Users } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface EmailDraftDialogProps {
@@ -38,10 +40,25 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
   const [salutation, setSalutation] = useState<'Dear' | 'Hi'>('Dear');
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  
+  // Track which contacts are selected (all selected by default)
+  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(() => 
+    new Set(contacts.map(c => c.id))
+  );
 
   const createDraft = useCreateDistributionEmailDraft();
 
-  const emails = contacts.map(c => c.email);
+  // Reset selected contacts when dialog opens with new contacts
+  useMemo(() => {
+    setSelectedContactIds(new Set(contacts.map(c => c.id)));
+  }, [contacts]);
+
+  const selectedContacts = useMemo(() => 
+    contacts.filter(c => selectedContactIds.has(c.id)),
+    [contacts, selectedContactIds]
+  );
+
+  const emails = selectedContacts.map(c => c.email);
 
   // Extract first name from full_name
   const getFirstName = (fullName: string): string => {
@@ -49,20 +66,44 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
     return parts[0] || fullName;
   };
 
+  const toggleContact = (contactId: string) => {
+    setSelectedContactIds(prev => {
+      const next = new Set(prev);
+      if (next.has(contactId)) {
+        next.delete(contactId);
+      } else {
+        next.add(contactId);
+      }
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    if (selectedContactIds.size === contacts.length) {
+      setSelectedContactIds(new Set());
+    } else {
+      setSelectedContactIds(new Set(contacts.map(c => c.id)));
+    }
+  };
+
   const handleSaveDraft = async () => {
+    if (selectedContacts.length === 0) return;
+    
     await createDraft.mutateAsync({
       campaign_id: campaignId || null,
       draft_type: draftType,
       delivery_mode: deliveryMode,
       subject,
       body,
-      recipient_count: contacts.length,
+      recipient_count: selectedContacts.length,
       recipient_emails: emails,
     });
     onOpenChange(false);
   };
 
   const handleOpenEmails = async () => {
+    if (selectedContacts.length === 0) return;
+
     // Save draft first to log the email action
     await createDraft.mutateAsync({
       campaign_id: campaignId || null,
@@ -70,18 +111,20 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
       delivery_mode: deliveryMode,
       subject,
       body,
-      recipient_count: contacts.length,
+      recipient_count: selectedContacts.length,
       recipient_emails: emails,
     });
 
     if (deliveryMode === 'individual') {
-      // Open multiple mailto links for individual emails
-      contacts.forEach((contact) => {
-        const firstName = getFirstName(contact.full_name);
-        // Salutation with single comma
-        const personalizedBody = `${salutation} ${firstName},\n\n${body}`;
-        const mailtoUrl = `mailto:${encodeURIComponent(contact.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(personalizedBody)}`;
-        window.open(mailtoUrl, "_blank");
+      // Open mailto links with staggered timing to avoid browser blocking
+      selectedContacts.forEach((contact, index) => {
+        setTimeout(() => {
+          const firstName = getFirstName(contact.full_name);
+          // Salutation with single comma, no extra punctuation
+          const personalizedBody = `${salutation} ${firstName},\n\n${body}`;
+          const mailtoUrl = `mailto:${encodeURIComponent(contact.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(personalizedBody)}`;
+          window.open(mailtoUrl, "_blank");
+        }, index * 100); // 100ms delay between each
       });
     } else if (deliveryMode === 'to_all') {
       // All recipients in TO field, separated by semicolon and space
@@ -98,7 +141,7 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
     onOpenChange(false);
   };
 
-  const showIndividualWarning = deliveryMode === 'individual' && contacts.length > 10;
+  const showIndividualWarning = deliveryMode === 'individual' && selectedContacts.length > 10;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -106,11 +149,55 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Mail className="h-5 w-5" />
-            Draft Email ({contacts.length} recipient{contacts.length !== 1 ? 's' : ''})
+            Draft Email ({selectedContacts.length} recipient{selectedContacts.length !== 1 ? 's' : ''})
           </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Recipient List */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Recipients
+              </Label>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={toggleAll}
+                className="text-xs h-7"
+              >
+                {selectedContactIds.size === contacts.length ? 'Deselect All' : 'Select All'}
+              </Button>
+            </div>
+            <ScrollArea className="h-32 rounded-md border p-2">
+              <div className="space-y-1">
+                {contacts.map((contact) => (
+                  <div
+                    key={contact.id}
+                    className="flex items-center gap-2 py-1 px-1 hover:bg-muted/50 rounded"
+                  >
+                    <Checkbox
+                      id={`contact-${contact.id}`}
+                      checked={selectedContactIds.has(contact.id)}
+                      onCheckedChange={() => toggleContact(contact.id)}
+                    />
+                    <label
+                      htmlFor={`contact-${contact.id}`}
+                      className="flex-1 text-sm cursor-pointer truncate"
+                    >
+                      <span className="font-medium">{contact.full_name}</span>
+                      <span className="text-muted-foreground ml-2">{contact.email}</span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+            {selectedContacts.length === 0 && (
+              <p className="text-xs text-destructive mt-1">Please select at least one recipient</p>
+            )}
+          </div>
+
           <div>
             <Label>Email Type</Label>
             <Select value={draftType} onValueChange={(v) => setDraftType(v as typeof draftType)}>
@@ -171,7 +258,7 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
             <Alert variant="destructive" className="border-destructive/50 bg-destructive/10">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Opening {contacts.length} emails at once may be blocked by your browser. 
+                Opening {selectedContacts.length} emails at once may be blocked by your browser. 
                 Some email clients may not open all windows.
               </AlertDescription>
             </Alert>
@@ -196,7 +283,7 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
               )}
             </Label>
             <Textarea
-              rows={10}
+              rows={8}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder="Compose your email..."
@@ -208,13 +295,21 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button variant="secondary" onClick={handleSaveDraft} disabled={!subject || !body}>
+          <Button 
+            variant="secondary" 
+            onClick={handleSaveDraft} 
+            disabled={!subject || !body || selectedContacts.length === 0}
+          >
             Save Draft
           </Button>
-          <Button onClick={handleOpenEmails} disabled={!subject} className="gap-2">
+          <Button 
+            onClick={handleOpenEmails} 
+            disabled={!subject || selectedContacts.length === 0} 
+            className="gap-2"
+          >
             <ExternalLink className="h-4 w-4" />
             {deliveryMode === 'individual' 
-              ? `Open ${contacts.length} Email${contacts.length !== 1 ? 's' : ''}`
+              ? `Open ${selectedContacts.length} Email${selectedContacts.length !== 1 ? 's' : ''}`
               : 'Open in Email Client'
             }
           </Button>

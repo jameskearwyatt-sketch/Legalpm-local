@@ -31,7 +31,7 @@ import { useContactImportFormats, ContactColumnMappings } from "@/lib/hooks/useC
 import { ContactFormatTrainingDialog } from "./ContactFormatTrainingDialog";
 import { ImportPreviewDialog } from "./ImportPreviewDialog";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, FileText, Loader2, FileSpreadsheet, X, ChevronsUpDown, Check, User, CreditCard, Camera } from "lucide-react";
+import { Upload, FileText, Loader2, FileSpreadsheet, X, ChevronsUpDown, Check, User, CreditCard, Camera, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { cn } from "@/lib/utils";
@@ -245,36 +245,6 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
     await processWithMappings(parsedData, parsedHeaders, mappings);
   };
 
-  const parsePastedText = (text: string, owner?: string): DistributionContactInsert[] => {
-    const lines = text.trim().split("\n").filter(l => l.trim());
-    const firstLine = lines[0]?.toLowerCase() || '';
-    const hasHeaders = firstLine.includes('name') || firstLine.includes('email');
-    const dataLines = hasHeaders ? lines.slice(1) : lines;
-
-    return dataLines.map(line => {
-      const parts = line.split(/[,\t]/).map(p => p.trim());
-      const emailPart = parts.find(p => p.includes("@")) || "";
-      const namePart = parts.find(p => !p.includes("@") && p.length > 0) || "Unknown";
-      
-      return {
-        full_name: namePart,
-        email: emailPart.toLowerCase(),
-        company: null,
-        job_title: null,
-        country: null,
-        city: null,
-        gender: "unknown" as const,
-        sectors: [],
-        sectors_ai_assigned: false,
-        linkedin_url: null,
-        notes: null,
-        relationship_owner: owner || null,
-        do_not_contact: false,
-        provenance: "Pasted import",
-      };
-    }).filter(c => c.email);
-  };
-
   const handlePasteImport = async () => {
     if (!pastedText.trim()) {
       toast.error("Please paste some contact data");
@@ -287,18 +257,58 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
         await ensureOwner.mutateAsync(defaultOwner);
       }
 
-      const contacts = parsePastedText(pastedText, defaultOwner);
-      if (contacts.length === 0) {
-        toast.error("No valid contacts found.");
+      // Use AI to intelligently parse the pasted text
+      const { data, error } = await supabase.functions.invoke("parse-pasted-contacts", {
+        body: { pastedText: pastedText.trim() },
+      });
+
+      if (error) throw new Error(error.message);
+      if (!data.success) throw new Error(data.error || "Failed to parse contacts");
+
+      const extractedContacts = data.contacts || [];
+      
+      if (extractedContacts.length === 0) {
+        toast.error("No valid contacts found. Please check the pasted data contains names and email addresses.");
         return;
       }
 
-      // Show preview dialog instead of importing directly
+      // Convert extracted contacts to DistributionContactInsert format
+      const contacts: DistributionContactInsert[] = extractedContacts.map((c: {
+        full_name: string;
+        email: string;
+        company?: string | null;
+        job_title?: string | null;
+        phone?: string | null;
+      }) => ({
+        full_name: c.full_name,
+        email: c.email.toLowerCase(),
+        company: c.company || null,
+        job_title: c.job_title || null,
+        country: null,
+        city: null,
+        gender: "unknown" as const,
+        sectors: [],
+        sectors_ai_assigned: false,
+        linkedin_url: null,
+        notes: c.phone ? `Phone: ${c.phone}` : null,
+        relationship_owner: defaultOwner || null,
+        do_not_contact: false,
+        provenance: "Pasted import (AI parsed)",
+      }));
+
+      if (data.notes) {
+        console.log("AI parsing notes:", data.notes);
+      }
+
+      toast.success(`AI extracted ${contacts.length} contact${contacts.length !== 1 ? 's' : ''}`);
+
+      // Show preview dialog
       setContactsToPreview(contacts);
       setImportSource("pasted text");
       setParseStep("preview");
     } catch (error) {
-      toast.error("Processing failed");
+      console.error("Paste import error:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to parse pasted contacts");
     } finally {
       setIsProcessing(false);
     }
@@ -562,13 +572,16 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
 
             <TabsContent value="paste" className="space-y-4 mt-4">
               <div>
-                <Label>Paste contact data</Label>
+                <Label className="flex items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-primary" />
+                  Paste contact data
+                </Label>
                 <p className="text-sm text-muted-foreground mb-2">
-                  Paste names and emails, one per line. Supports CSV format.
+                  Paste contacts from Outlook, emails, or any source. AI will intelligently extract names and email addresses from messy formatting, semicolons, parentheses, "Surname, FirstName" formats, and more.
                 </p>
                 <Textarea
                   rows={8}
-                  placeholder="John Smith, john@example.com&#10;Jane Doe, jane@example.com"
+                  placeholder="Smith, John &lt;john.smith@example.com&gt;; Doe, Jane (jane.doe@company.org)&#10;&#10;Or any format - AI will figure it out!"
                   value={pastedText}
                   onChange={(e) => setPastedText(e.target.value)}
                 />

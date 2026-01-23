@@ -28,6 +28,7 @@ import {
 import {
   useDistributionContacts,
   useBulkDeleteDistributionContacts,
+  useUpdateDistributionContact,
   type ContactFilters,
   type DistributionContact,
   type UpdatedTimePeriod,
@@ -42,6 +43,7 @@ import { EmailDraftDialog } from "./EmailDraftDialog";
 import { ContactDetailDialog } from "./ContactDetailDialog";
 import { ContactHistoryDialog } from "./ContactHistoryDialog";
 import { FocusAreaAssignmentDialog } from "./FocusAreaAssignmentDialog";
+import { ExclusionFilterCheckbox } from "./ExclusionFilterCheckbox";
 import { SortableFilterableHeader, SortDirection } from "./SortableFilterableHeader";
 import { StickyTableHeader } from "@/components/ui/sticky-table-header";
 import { TableScrollControls } from "@/components/ui/table-scroll-controls";
@@ -65,6 +67,8 @@ import {
   Clock,
   Target,
   AlertCircle,
+  Scale,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
@@ -357,6 +361,42 @@ export function ContactsListView() {
     [contacts]
   );
 
+  // Get contacts that would be excluded by law firm filter
+  const excludedLawFirmContacts = useMemo(() => 
+    allContacts.filter(c => c.is_law_firm === true),
+    [allContacts]
+  );
+
+  // Get contacts that would be excluded by consultant filter
+  const excludedConsultantContacts = useMemo(() => 
+    allContacts.filter(c => c.is_consultant === true),
+    [allContacts]
+  );
+
+  // Count unclassified contacts
+  const unclassifiedCount = useMemo(() => 
+    contacts.filter(c => c.classified_at === null).length,
+    [contacts]
+  );
+
+  const updateContact = useUpdateDistributionContact();
+
+  // Handler to "protect" a contact from exclusion filter (set is_law_firm or is_consultant to false)
+  const handleProtectFromLawFirm = useCallback((contactId: string) => {
+    updateContact.mutate({
+      id: contactId,
+      is_law_firm: false,
+      classification_reason: "User protected from law firm exclusion",
+    });
+  }, [updateContact]);
+
+  const handleProtectFromConsultant = useCallback((contactId: string) => {
+    updateContact.mutate({
+      id: contactId,
+      is_consultant: false,
+      classification_reason: "User protected from consultant exclusion",
+    });
+  }, [updateContact]);
   return (
     <div className="space-y-4">
       {/* Sticky top section - higher z-index than table headers */}
@@ -570,6 +610,45 @@ export function ContactsListView() {
                 className="w-[180px]"
                 popoverWidth="280px"
               />
+            )}
+
+            <div className="h-6 w-px bg-border" />
+
+            {/* AI Classification Exclusion Filters */}
+            <ExclusionFilterCheckbox
+              label="Exclude law firms"
+              checked={filters.excludeLawFirms === true}
+              onCheckedChange={(checked) => setFilters(f => ({ ...f, excludeLawFirms: checked || undefined }))}
+              excludedContacts={excludedLawFirmContacts}
+              onProtectContact={handleProtectFromLawFirm}
+              icon={<Scale className="h-3 w-3" />}
+            />
+
+            <ExclusionFilterCheckbox
+              label="Exclude consultants"
+              checked={filters.excludeConsultants === true}
+              onCheckedChange={(checked) => setFilters(f => ({ ...f, excludeConsultants: checked || undefined }))}
+              excludedContacts={excludedConsultantContacts}
+              onProtectContact={handleProtectFromConsultant}
+              icon={<Users className="h-3 w-3" />}
+            />
+
+            {/* Classify button if there are unclassified contacts */}
+            {unclassifiedCount > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => classifyContacts.mutate({ classifyAll: true })}
+                disabled={classifyContacts.isPending}
+                className="gap-2"
+              >
+                {classifyContacts.isPending ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                Classify ({unclassifiedCount})
+              </Button>
             )}
 
             {hasActiveFilters && (

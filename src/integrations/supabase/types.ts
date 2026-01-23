@@ -2573,7 +2573,7 @@ export type Database = {
       app_role: "admin" | "user"
       budget_type: "Fixed" | "Cap" | "Estimate" | "Retainer" | "Hourly"
       contact_gender: "male" | "female" | "unknown"
-      email_delivery_mode: "bcc_all" | "individual"
+      email_delivery_mode: "bcc_all" | "individual" | "to_all"
       email_draft_type: "event_invitation" | "article_sharing" | "firm_update"
       fee_type:
         | "Discounted Rates with Cap"
@@ -2742,7 +2742,7 @@ export const Constants = {
       app_role: ["admin", "user"],
       budget_type: ["Fixed", "Cap", "Estimate", "Retainer", "Hourly"],
       contact_gender: ["male", "female", "unknown"],
-      email_delivery_mode: ["bcc_all", "individual"],
+      email_delivery_mode: ["bcc_all", "individual", "to_all"],
       email_draft_type: ["event_invitation", "article_sharing", "firm_update"],
       fee_type: [
         "Discounted Rates with Cap",

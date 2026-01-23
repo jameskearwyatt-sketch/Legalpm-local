@@ -53,7 +53,7 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
     await createDraft.mutateAsync({
       campaign_id: campaignId || null,
       draft_type: draftType,
-      delivery_mode: deliveryMode === 'to_all' ? 'bcc_all' : deliveryMode, // Map to existing enum
+      delivery_mode: deliveryMode,
       subject,
       body,
       recipient_count: contacts.length,
@@ -62,11 +62,23 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
     onOpenChange(false);
   };
 
-  const handleOpenEmails = () => {
+  const handleOpenEmails = async () => {
+    // Save draft first to log the email action
+    await createDraft.mutateAsync({
+      campaign_id: campaignId || null,
+      draft_type: draftType,
+      delivery_mode: deliveryMode,
+      subject,
+      body,
+      recipient_count: contacts.length,
+      recipient_emails: emails,
+    });
+
     if (deliveryMode === 'individual') {
       // Open multiple mailto links for individual emails
       contacts.forEach((contact) => {
         const firstName = getFirstName(contact.full_name);
+        // Salutation with single comma
         const personalizedBody = `${salutation} ${firstName},\n\n${body}`;
         const mailtoUrl = `mailto:${encodeURIComponent(contact.email)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(personalizedBody)}`;
         window.open(mailtoUrl, "_blank");
@@ -82,6 +94,8 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
       const mailtoUrl = `mailto:?bcc=${encodeURIComponent(bccList)}&subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       window.open(mailtoUrl, "_blank");
     }
+
+    onOpenChange(false);
   };
 
   const showIndividualWarning = deliveryMode === 'individual' && contacts.length > 10;

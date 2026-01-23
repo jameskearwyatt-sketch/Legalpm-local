@@ -342,14 +342,14 @@ export function ContactsListView() {
 
   return (
     <div className="space-y-4">
-      {/* Sticky top section */}
-      <div className="sticky top-0 z-20 bg-background pb-2 pt-1 -mt-1 space-y-3">
+      {/* Sticky top section - higher z-index than table headers */}
+      <div className="sticky top-0 z-30 bg-background pb-2 pt-1 -mt-1 space-y-3">
         {/* Actions bar */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search contacts..."
+              placeholder="Search all contacts..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9"
@@ -363,7 +363,7 @@ export function ContactsListView() {
             className="gap-2"
           >
             <Filter className="h-4 w-4" />
-            Filters
+            Advanced Filters
             {hasActiveFilters && (
               <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center">
                 !
@@ -371,15 +371,15 @@ export function ContactsListView() {
             )}
           </Button>
 
-          {hasColumnFilters && (
+          {(hasActiveFilters || hasColumnFilters) && (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setColumnFilters({})}
-              className="gap-1 text-muted-foreground"
+              onClick={clearFilters}
+              className="gap-1 text-muted-foreground hover:text-destructive"
             >
               <X className="h-4 w-4" />
-              Clear column filters
+              Clear all
             </Button>
           )}
 
@@ -408,9 +408,9 @@ export function ContactsListView() {
           </Button>
         </div>
 
-        {/* Filters panel */}
+        {/* Advanced filters panel - for bulk/category filters */}
         {showFilters && (
-          <div className="flex flex-wrap items-center gap-3 p-4 bg-muted/30 rounded-lg border">
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/30 rounded-lg border">
             <Select
               value={filters.naicsSector || ""}
               onValueChange={(v) => setFilters(f => ({ ...f, naicsSector: v || undefined }))}
@@ -652,15 +652,16 @@ export function ContactsListView() {
         <TableScrollControls>
           <div className="border rounded-lg overflow-x-auto">
             <Table className="table-fixed">
-              <TableHeader>
+              <TableHeader className="bg-muted/50">
                 <TableRow>
-                  <TableHead className="w-10">
+                  <TableHead className="w-10 bg-muted/50">
                     <Checkbox
                       checked={filteredAndSortedContacts.length > 0 && selectedIds.size === filteredAndSortedContacts.length}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
-                  <TableHead className="w-[140px]">
+                  {/* Name: Sort + Search */}
+                  <TableHead className="w-[140px] bg-muted/50">
                     <SortableFilterableHeader
                       label="Name"
                       columnKey="full_name"
@@ -669,20 +670,21 @@ export function ContactsListView() {
                       onSort={handleSort}
                       filterValue={columnFilters.full_name || ""}
                       onFilterChange={handleColumnFilter}
+                      mode="sort-and-search"
                     />
                   </TableHead>
-                  <TableHead className="w-[180px]">
+                  {/* Email: Search only (no sort) */}
+                  <TableHead className="w-[180px] bg-muted/50">
                     <SortableFilterableHeader
                       label="Email"
                       columnKey="email"
-                      sortKey={sortKey}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
                       filterValue={columnFilters.email || ""}
                       onFilterChange={handleColumnFilter}
+                      mode="search-only"
                     />
                   </TableHead>
-                  <TableHead className="w-[120px]">
+                  {/* Company: Sort + Dropdown filter */}
+                  <TableHead className="w-[120px] bg-muted/50">
                     <SortableFilterableHeader
                       label="Company"
                       columnKey="company"
@@ -692,21 +694,21 @@ export function ContactsListView() {
                       filterValue={columnFilters.company || ""}
                       onFilterChange={handleColumnFilter}
                       filterOptions={uniqueCompanies}
+                      mode="dropdown-filter"
                     />
                   </TableHead>
-                  <TableHead className="w-[120px]">
+                  {/* Title: Search only (no sort) */}
+                  <TableHead className="w-[120px] bg-muted/50">
                     <SortableFilterableHeader
                       label="Title"
                       columnKey="job_title"
-                      sortKey={sortKey}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
                       filterValue={columnFilters.job_title || ""}
                       onFilterChange={handleColumnFilter}
-                      filterOptions={uniqueJobTitles}
+                      mode="search-only"
                     />
                   </TableHead>
-                  <TableHead className="w-[100px]">
+                  {/* Owner: Sort + Dropdown filter */}
+                  <TableHead className="w-[100px] bg-muted/50">
                     <SortableFilterableHeader
                       label="Owner"
                       columnKey="relationship_owner"
@@ -716,9 +718,11 @@ export function ContactsListView() {
                       filterValue={columnFilters.relationship_owner || ""}
                       onFilterChange={handleColumnFilter}
                       filterOptions={uniqueOwners}
+                      mode="dropdown-filter"
                     />
                   </TableHead>
-                  <TableHead className="w-[80px]">
+                  {/* Country: Sort + Dropdown filter */}
+                  <TableHead className="w-[90px] bg-muted/50">
                     <SortableFilterableHeader
                       label="Country"
                       columnKey="country"
@@ -728,16 +732,20 @@ export function ContactsListView() {
                       filterValue={columnFilters.country || ""}
                       onFilterChange={handleColumnFilter}
                       filterOptions={uniqueCountries}
+                      mode="dropdown-filter"
                     />
                   </TableHead>
-                  <TableHead className="w-[130px]">
-                    <span className="text-xs">Assigned Sector (NAICS)</span>
+                  {/* Static headers for special columns */}
+                  <TableHead className="w-[120px] bg-muted/50">
+                    <span className="text-xs font-medium">Sector</span>
                   </TableHead>
-                  <TableHead className="w-[130px]">
-                    <span className="text-xs">EMI Focus Area</span>
+                  <TableHead className="w-[120px] bg-muted/50">
+                    <span className="text-xs font-medium">Focus Area</span>
                   </TableHead>
-                  <TableHead className="w-[80px] text-center">Updated</TableHead>
-                  <TableHead className="w-[60px]"></TableHead>
+                  <TableHead className="w-[70px] bg-muted/50 text-center">
+                    <span className="text-xs font-medium">Updated</span>
+                  </TableHead>
+                  <TableHead className="w-[50px] bg-muted/50"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -750,7 +758,7 @@ export function ContactsListView() {
                 ) : filteredAndSortedContacts.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
-                      {hasColumnFilters ? "No contacts match the current filters." : "No contacts found. Add your first contact or import from a file."}
+                      {hasColumnFilters || hasActiveFilters ? "No contacts match the current filters." : "No contacts found. Add your first contact or import from a file."}
                     </TableCell>
                   </TableRow>
                 ) : (

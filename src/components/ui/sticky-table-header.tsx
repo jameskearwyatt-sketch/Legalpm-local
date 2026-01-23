@@ -152,7 +152,7 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
             top: 0,
             left: headerInfo.left,
             width: `calc(100vw - ${headerInfo.left}px - 16px)`,
-            zIndex: 50,
+            zIndex: 20, // Below the sticky action bar (z-30)
             overflow: 'hidden',
           }}
         >

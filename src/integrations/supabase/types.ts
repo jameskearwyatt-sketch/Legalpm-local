@@ -14,6 +14,117 @@ export type Database = {
   }
   public: {
     Tables: {
+      bm_contact_shortlists: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      bm_internal_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          expertise: Json
+          first_name: string
+          id: string
+          office: string | null
+          practice_group: string | null
+          region: string | null
+          surname: string
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          expertise?: Json
+          first_name: string
+          id?: string
+          office?: string | null
+          practice_group?: string | null
+          region?: string | null
+          surname: string
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          expertise?: Json
+          first_name?: string
+          id?: string
+          office?: string | null
+          practice_group?: string | null
+          region?: string | null
+          surname?: string
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      bm_shortlist_members: {
+        Row: {
+          added_at: string
+          contact_id: string
+          id: string
+          shortlist_id: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          contact_id: string
+          id?: string
+          shortlist_id: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          contact_id?: string
+          id?: string
+          shortlist_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bm_shortlist_members_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "bm_internal_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bm_shortlist_members_shortlist_id_fkey"
+            columns: ["shortlist_id"]
+            isOneToOne: false
+            referencedRelation: "bm_contact_shortlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budget_amendments: {
         Row: {
           amendment_date: string

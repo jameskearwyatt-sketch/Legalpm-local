@@ -26,6 +26,7 @@ import {
 import {
   type DistributionContact,
   useDeleteDistributionContact,
+  useDistributionContact,
 } from "@/lib/hooks/useDistributionContacts";
 import { useEnrichContact } from "@/lib/hooks/useContactEnrichment";
 import { ContactFormDialog } from "./ContactFormDialog";
@@ -56,11 +57,15 @@ interface ContactDetailDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function ContactDetailDialog({ contact, open, onOpenChange }: ContactDetailDialogProps) {
+export function ContactDetailDialog({ contact: initialContact, open, onOpenChange }: ContactDetailDialogProps) {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const deleteContact = useDeleteDistributionContact();
   const enrichContact = useEnrichContact();
+  
+  // Fetch fresh data so dialog auto-updates after enrichment/edits
+  const { data: freshContact } = useDistributionContact(open ? initialContact.id : undefined);
+  const contact = freshContact ?? initialContact;
 
   const handleEnrich = () => {
     enrichContact.mutate({

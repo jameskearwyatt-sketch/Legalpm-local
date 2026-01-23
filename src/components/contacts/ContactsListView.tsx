@@ -122,6 +122,8 @@ export function ContactsListView() {
   // Custom distribution list state
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
   const [showAddToListDialog, setShowAddToListDialog] = useState(false);
+  const [showRemoveFromListConfirm, setShowRemoveFromListConfirm] = useState(false);
+  const [isRemovingFromList, setIsRemovingFromList] = useState(false);
 
   // Sorting state
   const [sortKey, setSortKey] = useState<string | null>("full_name");
@@ -162,7 +164,7 @@ export function ContactsListView() {
   } = useSmartSectorSearch();
 
   // Custom distribution list contacts
-  const { contactIds: customListContactIds } = useCustomListContacts(selectedListId);
+  const { contactIds: customListContactIds, removeContacts } = useCustomListContacts(selectedListId);
 
   const uniqueOwners = useMemo(() => 
     [...new Set(contacts.map(c => c.relationship_owner).filter(Boolean) as string[])].sort(),
@@ -385,6 +387,25 @@ export function ContactsListView() {
     await bulkDelete.mutateAsync(ids);
     setSelectedIds(new Set());
     setShowDeleteConfirm(false);
+  };
+
+  const handleRemoveFromList = async () => {
+    if (!selectedListId) return;
+    setIsRemovingFromList(true);
+    try {
+      const ids = Array.from(selectedIds);
+      await removeContacts.mutateAsync({
+        listId: selectedListId,
+        contactIds: ids,
+      });
+      setSelectedIds(new Set());
+      setShowRemoveFromListConfirm(false);
+      toast.success(`Removed ${ids.length} contact${ids.length !== 1 ? 's' : ''} from list`);
+    } catch (error) {
+      console.error("Error removing contacts from list:", error);
+    } finally {
+      setIsRemovingFromList(false);
+    }
   };
 
   const clearFilters = () => {
@@ -860,6 +881,19 @@ export function ContactsListView() {
             Add to List
           </Button>
 
+          {/* Remove from List - only shown when viewing a specific list */}
+          {selectedListId && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowRemoveFromListConfirm(true)}
+              className="gap-2 text-destructive hover:text-destructive"
+            >
+              <XCircle className="h-4 w-4" />
+              Remove from List
+            </Button>
+          )}
+
           <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
             <Download className="h-4 w-4" />
             Export
@@ -1297,6 +1331,36 @@ export function ContactsListView() {
         }))}
         onSuccess={() => setSelectedIds(new Set())}
       />
+
+      {/* Remove from List Confirmation */}
+      <AlertDialog open={showRemoveFromListConfirm} onOpenChange={setShowRemoveFromListConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove {selectedIds.size} Contact{selectedIds.size !== 1 ? 's' : ''} from List?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove the selected contact{selectedIds.size !== 1 ? 's' : ''} from this distribution list. 
+              The contacts themselves will not be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRemovingFromList}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleRemoveFromList}
+              disabled={isRemovingFromList}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isRemovingFromList ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                "Remove from List"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

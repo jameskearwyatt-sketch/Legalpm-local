@@ -485,6 +485,8 @@ export type Database = {
       distribution_contacts: {
         Row: {
           city: string | null
+          classification_reason: string | null
+          classified_at: string | null
           company: string | null
           company_keywords: string[] | null
           country: string | null
@@ -499,6 +501,8 @@ export type Database = {
           full_name: string
           gender: Database["public"]["Enums"]["contact_gender"]
           id: string
+          is_consultant: boolean | null
+          is_law_firm: boolean | null
           job_title: string | null
           last_enriched_at: string | null
           linkedin_url: string | null
@@ -514,6 +518,8 @@ export type Database = {
         }
         Insert: {
           city?: string | null
+          classification_reason?: string | null
+          classified_at?: string | null
           company?: string | null
           company_keywords?: string[] | null
           country?: string | null
@@ -528,6 +534,8 @@ export type Database = {
           full_name: string
           gender?: Database["public"]["Enums"]["contact_gender"]
           id?: string
+          is_consultant?: boolean | null
+          is_law_firm?: boolean | null
           job_title?: string | null
           last_enriched_at?: string | null
           linkedin_url?: string | null
@@ -543,6 +551,8 @@ export type Database = {
         }
         Update: {
           city?: string | null
+          classification_reason?: string | null
+          classified_at?: string | null
           company?: string | null
           company_keywords?: string[] | null
           country?: string | null
@@ -557,6 +567,8 @@ export type Database = {
           full_name?: string
           gender?: Database["public"]["Enums"]["contact_gender"]
           id?: string
+          is_consultant?: boolean | null
+          is_law_firm?: boolean | null
           job_title?: string | null
           last_enriched_at?: string | null
           linkedin_url?: string | null

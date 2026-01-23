@@ -14,6 +14,9 @@ export interface DistributionEmailDraft {
   recipient_count: number;
   recipient_emails: string[];
   created_at: string;
+  was_sent: boolean;
+  sent_date: string | null;
+  sent_confirmed_at: string | null;
 }
 
 export function useDistributionEmailDrafts(campaignId?: string) {
@@ -48,7 +51,7 @@ export function useCreateDistributionEmailDraft() {
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: async (draft: Omit<DistributionEmailDraft, 'id' | 'user_id' | 'created_at'>) => {
+    mutationFn: async (draft: Omit<DistributionEmailDraft, 'id' | 'user_id' | 'created_at' | 'was_sent' | 'sent_date' | 'sent_confirmed_at'>) => {
       if (!user) throw new Error("Not authenticated");
 
       const { data, error } = await supabase
@@ -84,6 +87,55 @@ export function useCreateDistributionEmailDraft() {
     },
     onError: () => {
       toast.error("Failed to create email draft");
+    },
+  });
+}
+
+export function useUpdateDistributionEmailDraft() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ id, was_sent, sent_date }: { id: string; was_sent: boolean; sent_date: string | null }) => {
+      if (!user) throw new Error("Not authenticated");
+
+      const updates: Record<string, unknown> = {
+        was_sent,
+        sent_date,
+        sent_confirmed_at: was_sent ? new Date().toISOString() : null,
+      };
+
+      const { data, error } = await supabase
+        .from("distribution_email_drafts")
+        .update(updates)
+        .eq("id", id)
+        .eq("user_id", user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Log activity if marking as sent
+      if (was_sent) {
+        await supabase.from("distribution_activity_log").insert({
+          user_id: user.id,
+          activity_type: "email_sent_confirmed",
+          description: `Confirmed email was sent on ${sent_date}`,
+          metadata: { draft_id: id, sent_date },
+        });
+      }
+
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["distribution-email-drafts"] });
+      queryClient.invalidateQueries({ queryKey: ["distribution-activity"] });
+      if (variables.was_sent) {
+        toast.success("Email marked as sent");
+      }
+    },
+    onError: () => {
+      toast.error("Failed to update email");
     },
   });
 }

@@ -2,10 +2,9 @@ import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ContactsListView } from "@/components/contacts/ContactsListView";
-import { CampaignsView } from "@/components/contacts/CampaignsView";
-import { SectorManagement } from "@/components/contacts/SectorManagement";
+import { EmailOutreachView } from "@/components/contacts/EmailOutreachView";
 import { ActivityLogView } from "@/components/contacts/ActivityLogView";
-import { Users, FolderOpen, Tags, History } from "lucide-react";
+import { Users, Mail, History } from "lucide-react";
 
 export default function Contacts() {
   const [activeTab, setActiveTab] = useState("contacts");
@@ -28,13 +27,9 @@ export default function Contacts() {
               <Users className="h-4 w-4" />
               Contacts
             </TabsTrigger>
-            <TabsTrigger value="campaigns" className="gap-2">
-              <FolderOpen className="h-4 w-4" />
-              Campaigns
-            </TabsTrigger>
-            <TabsTrigger value="sectors" className="gap-2">
-              <Tags className="h-4 w-4" />
-              Sectors
+            <TabsTrigger value="email-outreach" className="gap-2">
+              <Mail className="h-4 w-4" />
+              Email Outreach
             </TabsTrigger>
             <TabsTrigger value="activity" className="gap-2">
               <History className="h-4 w-4" />
@@ -46,12 +41,8 @@ export default function Contacts() {
             <ContactsListView />
           </TabsContent>
 
-          <TabsContent value="campaigns" className="mt-0">
-            <CampaignsView />
-          </TabsContent>
-
-          <TabsContent value="sectors" className="mt-0">
-            <SectorManagement />
+          <TabsContent value="email-outreach" className="mt-0">
+            <EmailOutreachView />
           </TabsContent>
 
           <TabsContent value="activity" className="mt-0">

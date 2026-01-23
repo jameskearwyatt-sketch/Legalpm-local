@@ -663,8 +663,11 @@ export type Database = {
           id: string
           recipient_count: number
           recipient_emails: string[]
+          sent_confirmed_at: string | null
+          sent_date: string | null
           subject: string
           user_id: string
+          was_sent: boolean
         }
         Insert: {
           body: string
@@ -675,8 +678,11 @@ export type Database = {
           id?: string
           recipient_count?: number
           recipient_emails?: string[]
+          sent_confirmed_at?: string | null
+          sent_date?: string | null
           subject: string
           user_id: string
+          was_sent?: boolean
         }
         Update: {
           body?: string
@@ -687,8 +693,11 @@ export type Database = {
           id?: string
           recipient_count?: number
           recipient_emails?: string[]
+          sent_confirmed_at?: string | null
+          sent_date?: string | null
           subject?: string
           user_id?: string
+          was_sent?: boolean
         }
         Relationships: [
           {

@@ -49,16 +49,21 @@ export type UpdatedTimePeriod = 'week' | 'month' | '3months' | '6months' | 'year
 
 export interface ContactFilters {
   sectors?: string[];
-  naicsSector?: string;
-  emiFocusArea?: string;
-  country?: string;
+  naicsSectors?: string[];  // Multi-select for NAICS-derived sectors
+  emiFocusAreas?: string[]; // Multi-select for EMI Focus Areas
+  countries?: string[];     // Multi-select for countries
+  relationship_owners?: string[]; // Multi-select for owners
   gender?: 'male' | 'female' | 'unknown';
   company?: string;
-  relationship_owner?: string;
   do_not_contact?: boolean;
   search?: string;
   updatedPeriod?: UpdatedTimePeriod;
   enrichedPeriod?: UpdatedTimePeriod;
+  // Legacy single-value filters (for backwards compatibility)
+  naicsSector?: string;
+  emiFocusArea?: string;
+  country?: string;
+  relationship_owner?: string;
 }
 
 // Helper to get date cutoff for period filters
@@ -95,6 +100,7 @@ export function useDistributionContacts(filters?: ContactFilters) {
         .eq("user_id", user.id)
         .order("full_name", { ascending: true });
 
+      // Single-value country filter (legacy)
       if (filters?.country) {
         query = query.eq("country", filters.country);
       }
@@ -104,6 +110,7 @@ export function useDistributionContacts(filters?: ContactFilters) {
       if (filters?.company) {
         query = query.ilike("company", `%${filters.company}%`);
       }
+      // Single-value relationship_owner filter (legacy)
       if (filters?.relationship_owner) {
         query = query.eq("relationship_owner", filters.relationship_owner);
       }
@@ -146,16 +153,43 @@ export function useDistributionContacts(filters?: ContactFilters) {
         }
       }
       
-      // Filter by NAICS-derived sector in JS
-      if (filters?.naicsSector) {
+      // Multi-select: Filter by NAICS-derived sectors (OR within, AND with other filters)
+      if (filters?.naicsSectors && filters.naicsSectors.length > 0) {
+        contacts = contacts.filter(c => {
+          const sector = getPrimaryNaicsSector(c.naics_codes);
+          return sector && filters.naicsSectors!.includes(sector);
+        });
+      }
+      // Legacy single-value NAICS sector filter
+      else if (filters?.naicsSector) {
         contacts = contacts.filter(c => {
           const sector = getPrimaryNaicsSector(c.naics_codes);
           return sector === filters.naicsSector;
         });
       }
       
-      // Filter by EMI Focus Area in JS
-      if (filters?.emiFocusArea) {
+      // Multi-select: Filter by countries (OR within, AND with other filters)
+      if (filters?.countries && filters.countries.length > 0) {
+        contacts = contacts.filter(c => 
+          c.country && filters.countries!.includes(c.country)
+        );
+      }
+      
+      // Multi-select: Filter by relationship owners (OR within, AND with other filters)
+      if (filters?.relationship_owners && filters.relationship_owners.length > 0) {
+        contacts = contacts.filter(c => 
+          c.relationship_owner && filters.relationship_owners!.includes(c.relationship_owner)
+        );
+      }
+      
+      // Multi-select: Filter by EMI Focus Areas (OR within, AND with other filters)
+      if (filters?.emiFocusAreas && filters.emiFocusAreas.length > 0) {
+        contacts = contacts.filter(c => 
+          c.emi_focus_areas?.some(area => filters.emiFocusAreas!.includes(area))
+        );
+      }
+      // Legacy single-value EMI Focus Area filter
+      else if (filters?.emiFocusArea) {
         contacts = contacts.filter(c => 
           c.emi_focus_areas?.includes(filters.emiFocusArea!)
         );

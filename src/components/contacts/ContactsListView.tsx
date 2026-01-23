@@ -69,6 +69,7 @@ import {
   AlertCircle,
   Scale,
   Users,
+  RotateCcw,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
@@ -108,6 +109,8 @@ export function ContactsListView() {
   const [selectedContact, setSelectedContact] = useState<DistributionContact | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [historyContact, setHistoryContact] = useState<{ id: string; name: string } | null>(null);
+  const [showReidentifyConfirm, setShowReidentifyConfirm] = useState(false);
+  const [isReidentifying, setIsReidentifying] = useState(false);
 
   // Sorting state
   const [sortKey, setSortKey] = useState<string | null>("full_name");
@@ -397,6 +400,40 @@ export function ContactsListView() {
       classification_reason: "User protected from consultant exclusion",
     });
   }, [updateContact]);
+
+  // Find protected contacts (where user set is_law_firm=false or is_consultant=false)
+  const protectedContacts = useMemo(() => {
+    return allContacts.filter(c => c.is_law_firm === false || c.is_consultant === false);
+  }, [allContacts]);
+
+
+  const handleReidentifyProtected = useCallback(async () => {
+    setIsReidentifying(true);
+    try {
+      // Update all protected contacts to re-include them in exclusion filters
+      const updates = protectedContacts.map(contact => {
+        const updateData: { id: string; is_law_firm?: boolean; is_consultant?: boolean; classification_reason: string } = {
+          id: contact.id,
+          classification_reason: "Re-identified by user",
+        };
+        if (contact.is_law_firm === false) {
+          updateData.is_law_firm = true;
+        }
+        if (contact.is_consultant === false) {
+          updateData.is_consultant = true;
+        }
+        return updateContact.mutateAsync(updateData);
+      });
+      
+      await Promise.all(updates);
+      toast.success(`Re-identified ${protectedContacts.length} protected contact(s)`);
+      setShowReidentifyConfirm(false);
+    } catch (error) {
+      toast.error("Failed to re-identify some contacts");
+    } finally {
+      setIsReidentifying(false);
+    }
+  }, [protectedContacts, updateContact]);
   return (
     <div className="space-y-4">
       {/* Sticky top section - higher z-index than table headers */}
@@ -632,6 +669,19 @@ export function ContactsListView() {
               onProtectContact={handleProtectFromConsultant}
               icon={<Users className="h-3 w-3" />}
             />
+
+            {/* Re-identify protected contacts button */}
+            {protectedContacts.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowReidentifyConfirm(true)}
+                className="gap-2 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950"
+              >
+                <RotateCcw className="h-3 w-3" />
+                Re-identify Protected ({protectedContacts.length})
+              </Button>
+            )}
 
             {/* Classify button if there are unclassified contacts */}
             {unclassifiedCount > 0 && (
@@ -1100,6 +1150,48 @@ export function ContactsListView() {
         selectedContactIds={Array.from(selectedIds)}
         onComplete={() => setSelectedIds(new Set())}
       />
+
+      {/* Re-identify protected contacts confirmation */}
+      <AlertDialog open={showReidentifyConfirm} onOpenChange={setShowReidentifyConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Re-identify Protected Contacts?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                You have <strong>{protectedContacts.length}</strong> contact{protectedContacts.length !== 1 ? 's' : ''} that 
+                you previously protected from exclusion filters.
+              </p>
+              <p>
+                This will reset their classification so they will appear in the "Exclude law firms" 
+                or "Exclude consultants" lists again.
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">
+                Protected contacts: {protectedContacts.slice(0, 5).map(c => c.full_name).join(", ")}
+                {protectedContacts.length > 5 && ` and ${protectedContacts.length - 5} more...`}
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isReidentifying}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleReidentifyProtected}
+              disabled={isReidentifying}
+            >
+              {isReidentifying ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Re-identifying...
+                </>
+              ) : (
+                <>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Re-identify All
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

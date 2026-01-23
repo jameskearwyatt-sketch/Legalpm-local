@@ -478,6 +478,29 @@ export function ContactsListView() {
     });
   }, [updateContact]);
 
+  // Bulk protection handlers for the new checkbox-based UI
+  const handleBulkProtectFromLawFirm = useCallback(async (contactIds: string[]) => {
+    const promises = contactIds.map(id => 
+      updateContact.mutateAsync({
+        id,
+        is_law_firm: false,
+        classification_reason: "User protected from law firm exclusion",
+      })
+    );
+    await Promise.all(promises);
+  }, [updateContact]);
+
+  const handleBulkProtectFromConsultant = useCallback(async (contactIds: string[]) => {
+    const promises = contactIds.map(id => 
+      updateContact.mutateAsync({
+        id,
+        is_consultant: false,
+        classification_reason: "User protected from consultant exclusion",
+      })
+    );
+    await Promise.all(promises);
+  }, [updateContact]);
+
   // Find protected contacts - those that were PREVIOUSLY classified as law firms or consultants
   // but were manually protected by the user (indicated by specific classification_reason values)
   const protectedContacts = useMemo(() => {
@@ -757,6 +780,7 @@ export function ContactsListView() {
               onCheckedChange={(checked) => setFilters(f => ({ ...f, excludeLawFirms: checked || undefined }))}
               excludedContacts={excludedLawFirmContacts}
               onProtectContact={handleProtectFromLawFirm}
+              onBulkProtectContacts={handleBulkProtectFromLawFirm}
               icon={<Scale className="h-3 w-3" />}
             />
 
@@ -766,6 +790,7 @@ export function ContactsListView() {
               onCheckedChange={(checked) => setFilters(f => ({ ...f, excludeConsultants: checked || undefined }))}
               excludedContacts={excludedConsultantContacts}
               onProtectContact={handleProtectFromConsultant}
+              onBulkProtectContacts={handleBulkProtectFromConsultant}
               icon={<Users className="h-3 w-3" />}
             />
 

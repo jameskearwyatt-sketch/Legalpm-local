@@ -47,10 +47,12 @@ import {
   useUpdateDistributionContact,
   type DistributionContact,
 } from "@/lib/hooks/useDistributionContacts";
+import { useEnrichContact } from "@/lib/hooks/useContactEnrichment";
 import { useDistributionRelationshipOwners, useEnsureRelationshipOwner } from "@/lib/hooks/useDistributionRelationshipOwners";
 import { COUNTRIES } from "@/lib/countries";
-import { Check, ChevronsUpDown, X, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, X, Plus, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 const contactSchema = z.object({
   full_name: z.string().min(1, "Name is required"),
@@ -84,8 +86,10 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
 
   const createContact = useCreateDistributionContact();
   const updateContact = useUpdateDistributionContact();
+  const enrichContact = useEnrichContact();
   const { data: relationshipOwners = [] } = useDistributionRelationshipOwners();
   const ensureOwner = useEnsureRelationshipOwner();
+  const [isEnriching, setIsEnriching] = useState(false);
 
   const form = useForm<ContactFormData>({
     resolver: zodResolver(contactSchema),
@@ -142,7 +146,7 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
     }
   }, [contact, form]);
 
-  const onSubmit = async (data: ContactFormData) => {
+  const onSubmit = async (data: ContactFormData, shouldEnrich: boolean = false) => {
     // Ensure relationship owner is saved for autocomplete
     if (data.relationship_owner) {
       await ensureOwner.mutateAsync(data.relationship_owner);
@@ -174,8 +178,9 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         relationship_owner: data.relationship_owner || null,
         provenance: data.provenance || null,
       });
+      onOpenChange(false);
     } else {
-      await createContact.mutateAsync({
+      const result = await createContact.mutateAsync({
         full_name: data.full_name,
         email: data.email,
         gender: data.gender,
@@ -193,9 +198,43 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         relationship_owner: data.relationship_owner || null,
         provenance: data.provenance || "Manual entry",
       });
-    }
 
-    onOpenChange(false);
+      if (shouldEnrich && result?.id) {
+        setIsEnriching(true);
+        try {
+          await enrichContact.mutateAsync({
+            contactId: result.id,
+            fullName: data.full_name,
+            email: data.email,
+            linkedinUrl: data.linkedin_url || null,
+            company: data.company || null,
+          });
+          toast.success("Contact created and enriched");
+        } catch (error) {
+          console.error("Enrichment failed:", error);
+          toast.error("Contact created but enrichment failed");
+        } finally {
+          setIsEnriching(false);
+        }
+      }
+      onOpenChange(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const isValid = await form.trigger();
+    if (isValid) {
+      onSubmit(form.getValues(), false);
+    }
+  };
+
+  const handleSubmitAndEnrich = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    const isValid = await form.trigger();
+    if (isValid) {
+      onSubmit(form.getValues(), true);
+    }
   };
 
   const selectedFocusAreas = form.watch("emi_focus_areas");
@@ -244,7 +283,7 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
             <div className="flex-1 overflow-y-auto space-y-4 pr-2">
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -628,7 +667,22 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={createContact.isPending || updateContact.isPending}>
+              {!contact && (
+                <Button 
+                  type="button" 
+                  variant="secondary"
+                  onClick={handleSubmitAndEnrich}
+                  disabled={createContact.isPending || isEnriching}
+                >
+                  {isEnriching ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="mr-2 h-4 w-4" />
+                  )}
+                  Save & Enrich
+                </Button>
+              )}
+              <Button type="submit" disabled={createContact.isPending || updateContact.isPending || isEnriching}>
                 {contact ? "Save Changes" : "Add Contact"}
               </Button>
             </DialogFooter>

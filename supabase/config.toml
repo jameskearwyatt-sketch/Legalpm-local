@@ -80,3 +80,6 @@ verify_jwt = false
 
 [functions.detect-japanese-contacts]
 verify_jwt = false
+
+[functions.parse-business-card]
+verify_jwt = false

@@ -2398,7 +2398,33 @@ export default function MatterDetail() {
                   </Select>
                 </div>
               </div>
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Fee Estimate (Quote Given)</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                      {formData.fee_currency || 'GBP'}
+                    </span>
+                    <Input 
+                      type="number" 
+                      className="pl-12"
+                      value={formData.fee_amount_upper_end || ''} 
+                      onChange={(e) => updateField('fee_amount_upper_end', parseFloat(e.target.value) || 0)} 
+                      placeholder="0"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Fee Currency</Label>
+                  <Select value={formData.fee_currency || 'GBP'} onValueChange={(v) => updateField('fee_currency', v)}>
+                    <SelectTrigger><SelectValue placeholder="Select currency" /></SelectTrigger>
+                    <SelectContent>
+                      {currencies.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-2">
                   <Label>Deal Value</Label>
                   <Input type="number" value={formData.deal_value || ''} onChange={(e) => updateField('deal_value', parseFloat(e.target.value) || null)} />

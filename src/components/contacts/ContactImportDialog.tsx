@@ -92,6 +92,7 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
     const lastName = getValue(mappings.last_name);
     
     if (!fullName && (firstName || lastName)) {
+      // Always use "FirstName Surname" format for consistency
       fullName = [firstName, lastName].filter(Boolean).join(" ");
     }
 

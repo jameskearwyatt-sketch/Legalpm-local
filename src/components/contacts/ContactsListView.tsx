@@ -1006,7 +1006,7 @@ export function ContactsListView() {
                   {/* Sector: Sort only */}
                   <TableHead className="w-[120px] bg-muted/50">
                     <SortableFilterableHeader
-                      label="Sector"
+                      label="Assigned Sector"
                       columnKey="naics_sector"
                       sortKey={sortKey}
                       sortDirection={sortDirection}
@@ -1015,7 +1015,7 @@ export function ContactsListView() {
                     />
                   </TableHead>
                   <TableHead className="w-[120px] bg-muted/50">
-                    <span className="text-xs font-medium">Focus Area</span>
+                    <span className="text-xs font-medium">EMI Focus Area</span>
                   </TableHead>
                   <TableHead className="w-[70px] bg-muted/50 text-center">
                     <span className="text-xs font-medium">Updated</span>

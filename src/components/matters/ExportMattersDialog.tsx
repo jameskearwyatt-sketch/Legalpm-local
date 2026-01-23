@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Download, Loader2 } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Download, Loader2, ChevronRight, ChevronDown } from 'lucide-react';
 import { MatterWithFinancials, MatterCategory } from '@/lib/hooks/useMatters';
 import { useExchangeRates } from '@/lib/hooks/useExchangeRates';
 import { convertToUsd } from '@/lib/currencyUtils';
@@ -25,7 +27,8 @@ const categories: { value: MatterCategory; label: string }[] = [
 ];
 
 export function ExportMattersDialog({ open, onOpenChange, matters, userName }: ExportMattersDialogProps) {
-  const [selectedCategories, setSelectedCategories] = useState<MatterCategory[]>(['Live']);
+  const [selectedMatterIds, setSelectedMatterIds] = useState<Set<string>>(new Set());
+  const [expandedCategories, setExpandedCategories] = useState<Set<MatterCategory>>(new Set());
   const [isExporting, setIsExporting] = useState(false);
   const { data: exchangeData } = useExchangeRates();
   const { toast } = useToast();
@@ -36,6 +39,27 @@ export function ExportMattersDialog({ open, onOpenChange, matters, userName }: E
   const toUsd = (amount: number, feeCurrency: string, exchangeRate: number) => {
     return convertToUsd(amount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
   };
+
+  // Group matters by category
+  const mattersByCategory = useMemo(() => {
+    const grouped: Record<MatterCategory, MatterWithFinancials[]> = {
+      Live: [],
+      Pipeline: [],
+      Closed: [],
+      Lost: [],
+    };
+    matters.forEach(m => {
+      const cat = m.category as MatterCategory;
+      if (grouped[cat]) {
+        grouped[cat].push(m);
+      }
+    });
+    // Sort each category by matter name
+    Object.keys(grouped).forEach(cat => {
+      grouped[cat as MatterCategory].sort((a, b) => a.matter_name.localeCompare(b.matter_name));
+    });
+    return grouped;
+  }, [matters]);
 
   const isMyMatter = (matter: MatterWithFinancials): boolean => {
     if (!userName) return false;
@@ -188,17 +212,17 @@ export function ExportMattersDialog({ open, onOpenChange, matters, userName }: E
   };
 
   const handleExport = async () => {
-    if (selectedCategories.length === 0) {
-      toast({ title: 'Please select at least one category', variant: 'destructive' });
+    if (selectedMatterIds.size === 0) {
+      toast({ title: 'Please select at least one matter', variant: 'destructive' });
       return;
     }
 
     setIsExporting(true);
     try {
-      const filteredMatters = matters.filter(m => selectedCategories.includes(m.category as MatterCategory));
+      const filteredMatters = matters.filter(m => selectedMatterIds.has(m.id));
       
       if (filteredMatters.length === 0) {
-        toast({ title: 'No matters to export', description: 'Selected categories have no matters', variant: 'destructive' });
+        toast({ title: 'No matters to export', variant: 'destructive' });
         setIsExporting(false);
         return;
       }
@@ -215,9 +239,7 @@ export function ExportMattersDialog({ open, onOpenChange, matters, userName }: E
         paid: myTotals.paid + otherTotals.paid,
       };
 
-      const title = selectedCategories.length === 1 
-        ? `${selectedCategories[0]} Matters` 
-        : `Matters Export (${selectedCategories.join(', ')})`;
+      const title = 'Matters Export';
 
       const workbook = new ExcelJS.Workbook();
       workbook.creator = 'Matter Management';
@@ -322,10 +344,7 @@ export function ExportMattersDialog({ open, onOpenChange, matters, userName }: E
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      const filename = selectedCategories.length === 1 
-        ? `${selectedCategories[0]}_Matters` 
-        : 'Matters_Export';
-      a.download = `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      a.download = `Matters_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -341,60 +360,189 @@ export function ExportMattersDialog({ open, onOpenChange, matters, userName }: E
   };
 
   const toggleCategory = (category: MatterCategory) => {
-    setSelectedCategories(prev => 
-      prev.includes(category) 
-        ? prev.filter(c => c !== category)
-        : [...prev, category]
-    );
+    setExpandedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
   };
 
-  const getCategoryCount = (category: MatterCategory) => {
-    return matters.filter(m => m.category === category).length;
+  const toggleMatter = (matterId: string) => {
+    setSelectedMatterIds(prev => {
+      const next = new Set(prev);
+      if (next.has(matterId)) {
+        next.delete(matterId);
+      } else {
+        next.add(matterId);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAllInCategory = (category: MatterCategory) => {
+    const categoryMatters = mattersByCategory[category];
+    const categoryMatterIds = categoryMatters.map(m => m.id);
+    const allSelected = categoryMatterIds.every(id => selectedMatterIds.has(id));
+    
+    setSelectedMatterIds(prev => {
+      const next = new Set(prev);
+      if (allSelected) {
+        // Deselect all in category
+        categoryMatterIds.forEach(id => next.delete(id));
+      } else {
+        // Select all in category
+        categoryMatterIds.forEach(id => next.add(id));
+      }
+      return next;
+    });
+  };
+
+  const getCategorySelectionState = (category: MatterCategory): 'none' | 'some' | 'all' => {
+    const categoryMatters = mattersByCategory[category];
+    if (categoryMatters.length === 0) return 'none';
+    const selectedCount = categoryMatters.filter(m => selectedMatterIds.has(m.id)).length;
+    if (selectedCount === 0) return 'none';
+    if (selectedCount === categoryMatters.length) return 'all';
+    return 'some';
+  };
+
+  const getSelectedCountInCategory = (category: MatterCategory): number => {
+    return mattersByCategory[category].filter(m => selectedMatterIds.has(m.id)).length;
+  };
+
+  // Reset selection when dialog opens
+  const handleOpenChange = (newOpen: boolean) => {
+    if (newOpen) {
+      setSelectedMatterIds(new Set());
+      setExpandedCategories(new Set());
+    }
+    onOpenChange(newOpen);
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Export Matters</DialogTitle>
           <DialogDescription>
-            Select which categories of matters to export to Excel.
+            Expand categories to select individual matters, or select all within a category.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 py-4">
-          {categories.map(({ value, label }) => {
-            const count = getCategoryCount(value);
-            return (
-              <label
-                key={value}
-                className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors"
-              >
-                <Checkbox
-                  checked={selectedCategories.includes(value)}
-                  onCheckedChange={() => toggleCategory(value)}
-                />
-                <span className="flex-1 font-medium">{label}</span>
-                <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
-                  {count}
-                </span>
-              </label>
-            );
-          })}
-        </div>
+        <ScrollArea className="flex-1 -mx-6 px-6">
+          <div className="space-y-2 py-4">
+            {categories.map(({ value, label }) => {
+              const categoryMatters = mattersByCategory[value];
+              const count = categoryMatters.length;
+              const isExpanded = expandedCategories.has(value);
+              const selectionState = getCategorySelectionState(value);
+              const selectedCount = getSelectedCountInCategory(value);
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isExporting}>
-            Cancel
-          </Button>
-          <Button onClick={handleExport} disabled={isExporting || selectedCategories.length === 0}>
-            {isExporting ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Download className="mr-2 h-4 w-4" />
-            )}
-            Export
-          </Button>
+              return (
+                <Collapsible
+                  key={value}
+                  open={isExpanded}
+                  onOpenChange={() => toggleCategory(value)}
+                >
+                  <div className="rounded-lg border bg-card">
+                    <div className="flex items-center gap-2 p-3">
+                      <Checkbox
+                        checked={selectionState === 'all'}
+                        ref={(el) => {
+                          if (el) {
+                            (el as any).indeterminate = selectionState === 'some';
+                          }
+                        }}
+                        onCheckedChange={() => toggleSelectAllInCategory(value)}
+                        onClick={(e) => e.stopPropagation()}
+                        disabled={count === 0}
+                      />
+                      <CollapsibleTrigger asChild>
+                        <button 
+                          className="flex flex-1 items-center gap-2 text-left hover:bg-muted/50 rounded px-2 py-1 -ml-2 transition-colors"
+                          disabled={count === 0}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span className="flex-1 font-medium">{label}</span>
+                        </button>
+                      </CollapsibleTrigger>
+                      <span className="text-sm text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                        {selectedCount > 0 ? `${selectedCount}/` : ''}{count}
+                      </span>
+                    </div>
+                    
+                    <CollapsibleContent>
+                      <div className="border-t bg-muted/30">
+                        {categoryMatters.length === 0 ? (
+                          <div className="px-4 py-3 text-sm text-muted-foreground italic">
+                            No matters in this category
+                          </div>
+                        ) : (
+                          <div className="max-h-48 overflow-y-auto">
+                            {categoryMatters.map((matter) => {
+                              const clientName = getMatterClientDisplayName(matter);
+                              const isSelected = selectedMatterIds.has(matter.id);
+                              return (
+                                <label
+                                  key={matter.id}
+                                  className={`flex items-start gap-3 px-4 py-2 hover:bg-muted/50 cursor-pointer transition-colors border-b border-border/50 last:border-b-0 ${
+                                    isSelected ? 'bg-primary/5' : ''
+                                  }`}
+                                >
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={() => toggleMatter(matter.id)}
+                                    className="mt-0.5"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="font-medium text-sm truncate">
+                                      {matter.matter_name}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      {clientName} {matter.cm_number ? `• ${matter.cm_number}` : ''}
+                                    </div>
+                                  </div>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </CollapsibleContent>
+                  </div>
+                </Collapsible>
+              );
+            })}
+          </div>
+        </ScrollArea>
+
+        <DialogFooter className="border-t pt-4 mt-2">
+          <div className="flex items-center justify-between w-full gap-3">
+            <span className="text-sm text-muted-foreground">
+              {selectedMatterIds.size} matter{selectedMatterIds.size !== 1 ? 's' : ''} selected
+            </span>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isExporting}>
+                Cancel
+              </Button>
+              <Button onClick={handleExport} disabled={isExporting || selectedMatterIds.size === 0}>
+                {isExporting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                Export
+              </Button>
+            </div>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

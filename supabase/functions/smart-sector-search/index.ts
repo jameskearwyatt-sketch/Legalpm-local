@@ -113,7 +113,7 @@ Provide a brief 2-3 sentence understanding followed by a bullet list of related 
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: "You are an industry classification expert." },
           { role: "user", content: understandingPrompt }
@@ -124,6 +124,13 @@ Provide a brief 2-3 sentence understanding followed by a bullet list of related 
     if (!understandingResponse.ok) {
       const errorText = await understandingResponse.text();
       console.error("AI understanding error:", understandingResponse.status, errorText);
+      
+      if (understandingResponse.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "AI service is busy. Please wait a moment and try again." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
       throw new Error("Failed to analyze sector query");
     }
 
@@ -172,7 +179,7 @@ Skip contacts with no meaningful connection.`;
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: "google/gemini-2.5-flash",
           messages: [
             { role: "system", content: "You are a precise contact matching system. Only match contacts with genuine relevance to the search query." },
             { role: "user", content: matchPrompt }
@@ -210,6 +217,11 @@ Skip contacts with no meaningful connection.`;
 
       if (!matchResponse.ok) {
         console.error("AI matching error for batch:", matchResponse.status);
+        // On rate limit, wait briefly before continuing to next batch
+        if (matchResponse.status === 429) {
+          console.log("Rate limited on batch, waiting before retry...");
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
         continue;
       }
 

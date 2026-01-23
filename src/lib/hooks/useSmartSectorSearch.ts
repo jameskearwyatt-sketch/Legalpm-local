@@ -64,7 +64,10 @@ export function useSmartSectorSearch() {
     },
     onError: (error: Error) => {
       console.error("Smart search error:", error);
-      toast.error(error.message || "Smart search failed");
+      const message = error.message?.includes("busy") || error.message?.includes("429")
+        ? "AI service is busy. Please wait a moment and try again."
+        : error.message || "Smart search failed";
+      toast.error(message);
     }
   });
 
@@ -94,7 +97,10 @@ export function useSmartSectorSearch() {
     onError: (error: Error) => {
       console.error("Deep search error:", error);
       setSearchState(prev => ({ ...prev, isDeepSearchPending: false }));
-      toast.error(error.message || "Deep search failed");
+      const message = error.message?.includes("busy") || error.message?.includes("429")
+        ? "AI service is busy. Please wait a moment and try again."
+        : error.message || "Deep search failed";
+      toast.error(message);
     }
   });
 

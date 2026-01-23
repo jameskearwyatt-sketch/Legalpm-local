@@ -8,7 +8,7 @@ export interface DistributionEmailDraft {
   user_id: string;
   campaign_id: string | null;
   draft_type: 'event_invitation' | 'article_sharing' | 'firm_update';
-  delivery_mode: 'bcc_all' | 'individual';
+  delivery_mode: 'bcc_all' | 'individual' | 'to_all';
   subject: string;
   body: string;
   recipient_count: number;

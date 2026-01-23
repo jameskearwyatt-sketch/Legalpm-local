@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,9 +26,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
   type DistributionContact,
   useDeleteDistributionContact,
   useDistributionContact,
+  useUpdateDistributionContact,
 } from "@/lib/hooks/useDistributionContacts";
 import { useEnrichContact } from "@/lib/hooks/useContactEnrichment";
 import { ContactFormDialog } from "./ContactFormDialog";
@@ -49,6 +58,9 @@ import {
   Tags,
   ChevronDown,
   Briefcase,
+  Scale,
+  Users,
+  Info,
 } from "lucide-react";
 
 interface ContactDetailDialogProps {
@@ -62,6 +74,7 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const deleteContact = useDeleteDistributionContact();
   const enrichContact = useEnrichContact();
+  const updateContact = useUpdateDistributionContact();
   
   // Fetch fresh data so dialog auto-updates after enrichment/edits
   const { data: freshContact } = useDistributionContact(open ? initialContact.id : undefined);
@@ -82,6 +95,27 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
     onOpenChange(false);
   };
 
+  const handleToggleLawFirm = (value: boolean) => {
+    updateContact.mutate({
+      id: contact.id,
+      is_law_firm: value,
+      classified_at: new Date().toISOString(),
+      classification_reason: value 
+        ? "Manually marked as law firm by user" 
+        : "Manually unmarked as law firm by user",
+    });
+  };
+
+  const handleToggleConsultant = (value: boolean) => {
+    updateContact.mutate({
+      id: contact.id,
+      is_consultant: value,
+      classified_at: new Date().toISOString(),
+      classification_reason: value 
+        ? "Manually marked as consultant by user" 
+        : "Manually unmarked as consultant by user",
+    });
+  };
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -234,6 +268,69 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
                 </p>
               </div>
             )}
+
+            {/* Classification Section */}
+            <div className="space-y-3 pt-3 border-t">
+              <div className="text-sm font-medium flex items-center gap-2">
+                <Scale className="h-4 w-4 text-muted-foreground" />
+                Contact Classification
+                {contact.classified_at && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-xs">
+                          {contact.classification_reason || "Classified by AI"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {format(new Date(contact.classified_at), "d MMM yyyy")}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+              
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="is-law-firm" className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Scale className="h-4 w-4 text-muted-foreground" />
+                    Works at a Law Firm
+                  </Label>
+                  <Switch
+                    id="is-law-firm"
+                    checked={contact.is_law_firm === true}
+                    onCheckedChange={handleToggleLawFirm}
+                    disabled={updateContact.isPending}
+                  />
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="is-consultant" className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    Professional Consultant
+                  </Label>
+                  <Switch
+                    id="is-consultant"
+                    checked={contact.is_consultant === true}
+                    onCheckedChange={handleToggleConsultant}
+                    disabled={updateContact.isPending}
+                  />
+                </div>
+              </div>
+              
+              {(contact.is_law_firm || contact.is_consultant) && (
+                <p className="text-xs text-muted-foreground">
+                  {contact.is_law_firm && contact.is_consultant 
+                    ? "This contact will be excluded by both 'Exclude law firms' and 'Exclude consultants' filters."
+                    : contact.is_law_firm 
+                      ? "This contact will be excluded by the 'Exclude law firms' filter."
+                      : "This contact will be excluded by the 'Exclude consultants' filter."}
+                </p>
+              )}
+            </div>
 
             <div className="pt-4 border-t space-y-2">
               <div className="flex items-center gap-3 text-xs text-muted-foreground">

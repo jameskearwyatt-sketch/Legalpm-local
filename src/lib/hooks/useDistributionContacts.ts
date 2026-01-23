@@ -35,9 +35,14 @@ export interface DistributionContact {
   // Email-company mismatch tracking
   email_company_mismatch: boolean;
   email_mismatch_dismissed: boolean;
+  // AI classification
+  is_law_firm: boolean | null;
+  is_consultant: boolean | null;
+  classification_reason: string | null;
+  classified_at: string | null;
 }
 
-export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'last_enriched_at' | 'email_status' | 'sic_codes' | 'naics_codes' | 'company_keywords' | 'emi_focus_areas' | 'emi_focus_areas_assigned_at' | 'email_company_mismatch' | 'email_mismatch_dismissed'> & {
+export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'last_enriched_at' | 'email_status' | 'sic_codes' | 'naics_codes' | 'company_keywords' | 'emi_focus_areas' | 'emi_focus_areas_assigned_at' | 'email_company_mismatch' | 'email_mismatch_dismissed' | 'is_law_firm' | 'is_consultant' | 'classification_reason' | 'classified_at'> & {
   email_status?: string | null;
   sic_codes?: string[] | null;
   naics_codes?: string[] | null;
@@ -47,6 +52,10 @@ export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_i
   emi_focus_areas_assigned_at?: string | null;
   email_company_mismatch?: boolean;
   email_mismatch_dismissed?: boolean;
+  is_law_firm?: boolean | null;
+  is_consultant?: boolean | null;
+  classification_reason?: string | null;
+  classified_at?: string | null;
 };
 export type DistributionContactUpdate = Partial<DistributionContactInsert>;
 
@@ -64,6 +73,9 @@ export interface ContactFilters {
   search?: string;
   updatedPeriod?: UpdatedTimePeriod;
   enrichedPeriod?: UpdatedTimePeriod;
+  // AI classification exclusion filters
+  excludeLawFirms?: boolean;
+  excludeConsultants?: boolean;
   // Legacy single-value filters (for backwards compatibility)
   naicsSector?: string;
   emiFocusArea?: string;
@@ -198,6 +210,14 @@ export function useDistributionContacts(filters?: ContactFilters) {
         contacts = contacts.filter(c => 
           c.emi_focus_areas?.includes(filters.emiFocusArea!)
         );
+      }
+
+      // AI Classification exclusion filters
+      if (filters?.excludeLawFirms) {
+        contacts = contacts.filter(c => c.is_law_firm !== true);
+      }
+      if (filters?.excludeConsultants) {
+        contacts = contacts.filter(c => c.is_consultant !== true);
       }
 
       return contacts;

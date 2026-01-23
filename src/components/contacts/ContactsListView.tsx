@@ -70,6 +70,7 @@ import { toast } from "sonner";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
 import { useBulkEnrichContacts } from "@/lib/hooks/useContactEnrichment";
 import { useDetectEmailMismatch, useDismissEmailMismatch } from "@/lib/hooks/useEmailMismatchDetection";
+import { useClassifyContacts } from "@/lib/hooks/useContactClassification";
 import { GenderAssignmentDialog } from "./GenderAssignmentDialog";
 import {
   AlertDialog,
@@ -128,6 +129,7 @@ export function ContactsListView() {
   const bulkEnrich = useBulkEnrichContacts();
   const detectMismatch = useDetectEmailMismatch();
   const dismissMismatch = useDismissEmailMismatch();
+  const classifyContacts = useClassifyContacts();
 
   // Get unique values for filter dropdowns
   const uniqueOwners = useMemo(() => 

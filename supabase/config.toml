@@ -77,3 +77,6 @@ verify_jwt = false
 
 [functions.smart-sector-search]
 verify_jwt = false
+
+[functions.detect-japanese-contacts]
+verify_jwt = false

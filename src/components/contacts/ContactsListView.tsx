@@ -193,7 +193,9 @@ export function ContactsListView() {
     return Array.from(areas).sort();
   }, [allContacts]);
 
-  // Apply column filters, smart search, and sorting
+  // Apply column filters, smart search, sorting, and exclusion filters
+  // NOTE: Exclusion filters (excludeLawFirms, excludeConsultants) are applied HERE
+  // so they filter only the currently visible/filtered list, not the entire dataset
   const filteredAndSortedContacts = useMemo(() => {
     let result = [...contacts];
 
@@ -249,9 +251,26 @@ export function ContactsListView() {
     return result;
   }, [contacts, columnFilters, sortKey, sortDirection, smartSearchState.isActive, smartSearchState.matches]);
 
+  // Contacts BEFORE exclusion filters are applied - used for the exclusion filter popover lists
+  const contactsBeforeExclusion = filteredAndSortedContacts;
+
+  // Apply exclusion filters LAST - these filter from the currently visible list
+  const contactsAfterExclusion = useMemo(() => {
+    let result = [...filteredAndSortedContacts];
+    
+    if (filters.excludeLawFirms) {
+      result = result.filter(c => c.is_law_firm !== true);
+    }
+    if (filters.excludeConsultants) {
+      result = result.filter(c => c.is_consultant !== true);
+    }
+    
+    return result;
+  }, [filteredAndSortedContacts, filters.excludeLawFirms, filters.excludeConsultants]);
+
   const eligibleContacts = useMemo(() => 
-    filteredAndSortedContacts.filter(c => !c.do_not_contact),
-    [filteredAndSortedContacts]
+    contactsAfterExclusion.filter(c => !c.do_not_contact),
+    [contactsAfterExclusion]
   );
 
   const selectedContacts = useMemo(() => 
@@ -283,7 +302,7 @@ export function ContactsListView() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(new Set(filteredAndSortedContacts.map(c => c.id)));
+      setSelectedIds(new Set(contactsAfterExclusion.map(c => c.id)));
     } else {
       setSelectedIds(new Set());
     }
@@ -302,7 +321,7 @@ export function ContactsListView() {
   const handleExport = async () => {
     const contactsToExport = selectedIds.size > 0 
       ? contacts.filter(c => selectedIds.has(c.id))
-      : filteredAndSortedContacts;
+      : contactsAfterExclusion;
 
     const headers = ["Full Name", "Email", "Company", "Job Title", "Country", "City", "Gender", "Sectors", "LinkedIn", "Relationship Owner", "Do Not Contact"];
     const rows = contactsToExport.map(c => [
@@ -385,16 +404,16 @@ export function ContactsListView() {
     [contacts]
   );
 
-  // Get contacts that would be excluded by law firm filter
+  // Get contacts that would be excluded by law firm filter FROM THE CURRENTLY VISIBLE LIST
   const excludedLawFirmContacts = useMemo(() => 
-    allContacts.filter(c => c.is_law_firm === true),
-    [allContacts]
+    contactsBeforeExclusion.filter(c => c.is_law_firm === true),
+    [contactsBeforeExclusion]
   );
 
-  // Get contacts that would be excluded by consultant filter
+  // Get contacts that would be excluded by consultant filter FROM THE CURRENTLY VISIBLE LIST
   const excludedConsultantContacts = useMemo(() => 
-    allContacts.filter(c => c.is_consultant === true),
-    [allContacts]
+    contactsBeforeExclusion.filter(c => c.is_consultant === true),
+    [contactsBeforeExclusion]
   );
 
   // Count unclassified contacts
@@ -840,7 +859,7 @@ export function ContactsListView() {
                 <TableRow>
                   <TableHead className="w-10 bg-muted/50">
                     <Checkbox
-                      checked={filteredAndSortedContacts.length > 0 && selectedIds.size === filteredAndSortedContacts.length}
+                      checked={contactsAfterExclusion.length > 0 && selectedIds.size === contactsAfterExclusion.length}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
@@ -946,14 +965,14 @@ export function ContactsListView() {
                       Loading contacts...
                     </TableCell>
                   </TableRow>
-                ) : filteredAndSortedContacts.length === 0 ? (
+                ) : contactsAfterExclusion.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
                       {hasColumnFilters || hasActiveFilters ? "No contacts match the current filters." : "No contacts found. Add your first contact or import from a file."}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredAndSortedContacts.map((contact) => (
+                  contactsAfterExclusion.map((contact) => (
                     <TableRow 
                       key={contact.id}
                       className={contact.do_not_contact ? "opacity-60 bg-muted/30" : ""}
@@ -1115,11 +1134,11 @@ export function ContactsListView() {
 
       {/* Summary */}
       <div className="text-sm text-muted-foreground">
-        Showing {filteredAndSortedContacts.length} contact{filteredAndSortedContacts.length !== 1 ? 's' : ''} 
-        {filteredAndSortedContacts.length !== contacts.length && (
+        Showing {contactsAfterExclusion.length} contact{contactsAfterExclusion.length !== 1 ? 's' : ''} 
+        {contactsAfterExclusion.length !== contacts.length && (
           <> (filtered from {contacts.length})</>
         )}
-        {eligibleContacts.length !== filteredAndSortedContacts.length && (
+        {eligibleContacts.length !== contactsAfterExclusion.length && (
           <> • {eligibleContacts.length} contactable</>
         )}
       </div>

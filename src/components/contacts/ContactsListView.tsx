@@ -474,7 +474,7 @@ export function ContactsListView() {
 
             {/* Multi-select: Country */}
             <MultiSelectFilter
-              options={countries}
+              options={[...countries].sort((a, b) => a.localeCompare(b))}
               selected={filters.countries || []}
               onChange={(v) => setFilters(f => ({ ...f, countries: v.length > 0 ? v : undefined }))}
               placeholder="Country"
@@ -497,7 +497,7 @@ export function ContactsListView() {
 
             {/* Multi-select: Owner */}
             <MultiSelectFilter
-              options={relationshipOwners.map(r => r.name)}
+              options={relationshipOwners.map(r => r.name).sort((a, b) => a.localeCompare(b))}
               selected={filters.relationship_owners || []}
               onChange={(v) => setFilters(f => ({ ...f, relationship_owners: v.length > 0 ? v : undefined }))}
               placeholder="Owner"

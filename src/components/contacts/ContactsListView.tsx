@@ -55,6 +55,7 @@ import {
   MoreVertical,
   Upload,
   X,
+  XCircle,
   AlertTriangle,
   Sparkles,
   Trash2,
@@ -63,10 +64,12 @@ import {
   History,
   Clock,
   Target,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
 import { useBulkEnrichContacts } from "@/lib/hooks/useContactEnrichment";
+import { useDetectEmailMismatch, useDismissEmailMismatch } from "@/lib/hooks/useEmailMismatchDetection";
 import { GenderAssignmentDialog } from "./GenderAssignmentDialog";
 import {
   AlertDialog,
@@ -121,6 +124,8 @@ export function ContactsListView() {
   const logActivity = useLogDistributionActivity();
   const bulkDelete = useBulkDeleteDistributionContacts();
   const bulkEnrich = useBulkEnrichContacts();
+  const detectMismatch = useDetectEmailMismatch();
+  const dismissMismatch = useDismissEmailMismatch();
 
   // Get unique values for filter dropdowns
   const uniqueOwners = useMemo(() => 
@@ -347,6 +352,11 @@ export function ContactsListView() {
     [contacts]
   );
 
+  const emailMismatchCount = useMemo(() => 
+    contacts.filter(c => c.email_company_mismatch && !c.email_mismatch_dismissed).length,
+    [contacts]
+  );
+
   return (
     <div className="space-y-4">
       {/* Sticky top section - higher z-index than table headers */}
@@ -415,6 +425,26 @@ export function ContactsListView() {
               EMI Focus Area ({noFocusAreaCount})
             </Button>
           )}
+
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => detectMismatch.mutate({ runAll: true })}
+            disabled={detectMismatch.isPending}
+            className="gap-2"
+          >
+            {detectMismatch.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <AlertCircle className="h-4 w-4" />
+            )}
+            Check Emails
+            {emailMismatchCount > 0 && (
+              <Badge variant="destructive" className="ml-1 h-5 px-1.5">
+                {emailMismatchCount}
+              </Badge>
+            )}
+          </Button>
 
           <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)} className="gap-2">
             <Upload className="h-4 w-4" />
@@ -770,7 +800,33 @@ export function ContactsListView() {
                           <Badge variant="destructive" className="ml-1 text-xs">DNC</Badge>
                         )}
                       </TableCell>
-                      <TableCell className="text-muted-foreground truncate text-sm">{contact.email}</TableCell>
+                      <TableCell className="truncate text-sm">
+                        {contact.email_company_mismatch && !contact.email_mismatch_dismissed ? (
+                          <div className="flex items-center gap-1">
+                            <span className="text-destructive font-medium truncate">{contact.email}</span>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      dismissMismatch.mutate(contact.id);
+                                    }}
+                                    className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                                  >
+                                    <XCircle className="h-4 w-4" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p className="text-xs">Email may not match company. Click to dismiss.</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">{contact.email}</span>
+                        )}
+                      </TableCell>
                       <TableCell className="truncate text-sm">{contact.company || "-"}</TableCell>
                       <TableCell className="truncate text-sm">{contact.job_title || "-"}</TableCell>
                       <TableCell className="text-muted-foreground truncate text-sm">{contact.relationship_owner || "-"}</TableCell>

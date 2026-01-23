@@ -32,9 +32,12 @@ export interface DistributionContact {
   // EMI Focus Areas
   emi_focus_areas: string[];
   emi_focus_areas_assigned_at: string | null;
+  // Email-company mismatch tracking
+  email_company_mismatch: boolean;
+  email_mismatch_dismissed: boolean;
 }
 
-export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'last_enriched_at' | 'email_status' | 'sic_codes' | 'naics_codes' | 'company_keywords' | 'emi_focus_areas' | 'emi_focus_areas_assigned_at'> & {
+export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'last_enriched_at' | 'email_status' | 'sic_codes' | 'naics_codes' | 'company_keywords' | 'emi_focus_areas' | 'emi_focus_areas_assigned_at' | 'email_company_mismatch' | 'email_mismatch_dismissed'> & {
   email_status?: string | null;
   sic_codes?: string[] | null;
   naics_codes?: string[] | null;
@@ -42,6 +45,8 @@ export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_i
   last_enriched_at?: string | null;
   emi_focus_areas?: string[];
   emi_focus_areas_assigned_at?: string | null;
+  email_company_mismatch?: boolean;
+  email_mismatch_dismissed?: boolean;
 };
 export type DistributionContactUpdate = Partial<DistributionContactInsert>;
 

@@ -61,9 +61,23 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
   const emails = selectedContacts.map(c => c.email);
 
   // Extract first name from full_name
+  // Handles both "Firstname Surname" and "Surname, Firstname" formats
   const getFirstName = (fullName: string): string => {
-    const parts = fullName.trim().split(/\s+/);
-    return parts[0] || fullName;
+    const trimmed = fullName.trim();
+    
+    // Check if name is in "Surname, Firstname" format
+    if (trimmed.includes(',')) {
+      const parts = trimmed.split(',');
+      if (parts.length >= 2) {
+        // Take the part after the comma (firstname) and get first word
+        const firstNamePart = parts[1].trim().split(/\s+/)[0];
+        return firstNamePart || trimmed;
+      }
+    }
+    
+    // Otherwise assume "Firstname Surname" format
+    const parts = trimmed.split(/\s+/);
+    return parts[0] || trimmed;
   };
 
   const toggleContact = (contactId: string) => {

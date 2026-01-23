@@ -54,6 +54,7 @@ import { CustomDistributionListDropdown } from "./CustomDistributionListDropdown
 import { AddToListDialog } from "./AddToListDialog";
 import { useCustomListContacts } from "@/lib/hooks/useCustomDistributionLists";
 import { useSmartSectorSearch } from "@/lib/hooks/useSmartSectorSearch";
+import { exportContactsToExcel } from "@/lib/exportContactsToExcel";
 import {
   Plus,
   Search,
@@ -341,33 +342,11 @@ export function ContactsListView() {
       ? contacts.filter(c => selectedIds.has(c.id))
       : contactsAfterExclusion;
 
-    const headers = ["Full Name", "Email", "Company", "Job Title", "Country", "City", "Gender", "Sectors", "LinkedIn", "Relationship Owner", "Do Not Contact"];
-    const rows = contactsToExport.map(c => [
-      c.full_name,
-      c.email,
-      c.company || "",
-      c.job_title || "",
-      c.country || "",
-      c.city || "",
-      c.gender,
-      c.sectors.join("; "),
-      c.linkedin_url || "",
-      c.relationship_owner || "",
-      c.do_not_contact ? "Yes" : "No",
-    ]);
-
-    const csvContent = [headers.join(","), ...rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `contacts-export-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
+    await exportContactsToExcel(contactsToExport);
 
     await logActivity.mutateAsync({
       activity_type: "export_generated",
-      description: `Exported ${contactsToExport.length} contacts to CSV`,
+      description: `Exported ${contactsToExport.length} contacts to Excel`,
       metadata: { count: contactsToExport.length },
     });
 

@@ -38,22 +38,22 @@ serve(async (req) => {
 
 IMPORTANT RULES:
 1. Each person with a valid email address should be extracted as a separate contact
-2. Names may appear in various formats:
-   - "Surname, FirstName" (Outlook format)
-   - "FirstName Surname"
-   - "Mr./Ms./Dr. FirstName Surname"
-   - Just email addresses with the name in the email prefix
+2. Names may appear in various formats - ALWAYS output names in "Surname, FirstName" format:
+   - "Surname, FirstName" (Outlook format) -> keep as "Surname, FirstName"
+   - "FirstName Surname" -> convert to "Surname, FirstName"
+   - "Mr./Ms./Dr. FirstName Surname" -> convert to "Surname, FirstName" (drop title)
+   - Just email addresses with the name in the email prefix -> extract and format as "Surname, FirstName" if possible
 3. Ignore all irrelevant formatting characters like parentheses, semicolons, brackets, pipes, etc.
 4. Extract email addresses accurately - they are the most critical field
 5. If you see patterns like "Display Name <email@domain.com>", extract both the name and email
-6. If a name appears to be "Surname, FirstName", convert it to "FirstName Surname" format
-7. Look for company names near the contact (often after a comma or in email domains)
-8. Look for job titles (often words like Manager, Director, VP, CEO, Partner, etc.)
-9. Phone numbers may be present - extract if clearly associated with a contact
-10. Multiple contacts may be separated by newlines, semicolons, or commas - handle all formats
-11. Ignore obviously invalid emails or system/no-reply addresses
+6. Look for company names near the contact (often after a comma or in email domains)
+7. Look for job titles (often words like Manager, Director, VP, CEO, Partner, etc.)
+8. Phone numbers may be present - extract if clearly associated with a contact
+9. Multiple contacts may be separated by newlines, semicolons, or commas - handle all formats
+10. Ignore obviously invalid emails or system/no-reply addresses
+11. For single-word names or unclear names, just use the name as-is
 
-OUTPUT FORMAT: Return valid JSON with an array of contacts. Each contact must have at minimum an email.`;
+OUTPUT FORMAT: Return valid JSON with an array of contacts. Each contact must have at minimum an email. Names MUST be in "Surname, FirstName" format.`;
 
     const userPrompt = `Extract all contacts from this pasted text. The text may contain formatting artifacts, separators, and irrelevant characters. Focus on finding names and email addresses.
 
@@ -95,7 +95,7 @@ Extract every valid contact you can find and return them as JSON.`;
                       properties: {
                         full_name: { 
                           type: 'string', 
-                          description: 'Full name in "FirstName LastName" format. If only email available, use email prefix cleaned up.' 
+                          description: 'Full name in "Surname, FirstName" format (e.g., "Smith, John"). Always use comma to separate surname from first name.' 
                         },
                         email: { 
                           type: 'string', 

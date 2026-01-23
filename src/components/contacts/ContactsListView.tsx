@@ -401,9 +401,13 @@ export function ContactsListView() {
     });
   }, [updateContact]);
 
-  // Find protected contacts (where user set is_law_firm=false or is_consultant=false)
+  // Find protected contacts - those that were PREVIOUSLY classified as law firms or consultants
+  // but were manually protected by the user (indicated by specific classification_reason values)
   const protectedContacts = useMemo(() => {
-    return allContacts.filter(c => c.is_law_firm === false || c.is_consultant === false);
+    return allContacts.filter(c => 
+      c.classification_reason?.includes("User protected from law firm exclusion") ||
+      c.classification_reason?.includes("User protected from consultant exclusion")
+    );
   }, [allContacts]);
 
 

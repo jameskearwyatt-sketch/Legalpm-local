@@ -511,6 +511,46 @@ function inferGenderFromName(fullName: string): { gender: 'male' | 'female' | 'u
   return { gender: 'unknown', confidence: 0 };
 }
 
+// Helper to check if an email is a placeholder/invalid email that should be ignored
+function isPlaceholderEmail(email: string | undefined | null): boolean {
+  if (!email) return true;
+  
+  const lowerEmail = email.toLowerCase().trim();
+  
+  // Common placeholder patterns
+  const placeholderPatterns = [
+    /^unknown\d*@/,           // unknown@, unknown1@, unknown123@
+    /^placeholder@/,
+    /^noemail@/,
+    /^none@/,
+    /^na@/,
+    /^test@/,
+    /^fake@/,
+    /^dummy@/,
+    /@example\./,             // anything@example.com
+    /@unknown\./,             // anything@unknown.com
+    /@placeholder\./,
+    /@noreply\./,
+  ];
+  
+  for (const pattern of placeholderPatterns) {
+    if (pattern.test(lowerEmail)) {
+      console.log(`Detected placeholder email: "${email}"`);
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// Helper to get a valid email (returns undefined if placeholder)
+function getValidEmail(email: string | undefined | null): string | undefined {
+  if (isPlaceholderEmail(email)) {
+    return undefined;
+  }
+  return email || undefined;
+}
+
 async function searchApolloByNameAndCompany(fullName: string, company: string, apiKey: string): Promise<ApolloPersonResponse | null> {
   try {
     console.log('Searching Apollo by name + company:', { fullName, company });
@@ -541,12 +581,68 @@ async function searchApolloByNameAndCompany(fullName: string, company: string, a
     
     // Return first matching person
     if (data.people && data.people.length > 0) {
-      return { person: data.people[0] };
+      const person = data.people[0];
+      
+      // If the search returned a placeholder email but we have a person ID, 
+      // try to enrich to get the real email
+      if (person.id && isPlaceholderEmail(person.email)) {
+        console.log('Search returned placeholder email, trying People Enrich with ID:', person.id);
+        const enrichedPerson = await enrichApolloPersonById(person.id, apiKey);
+        if (enrichedPerson?.person) {
+          // Merge the enriched data with search data
+          return { 
+            person: { 
+              ...person, 
+              ...enrichedPerson.person,
+              // Keep organization data from search if enrichment doesn't have it
+              organization: enrichedPerson.person.organization || person.organization
+            } 
+          };
+        }
+      }
+      
+      return { person: person };
     }
     
     return null;
   } catch (error) {
     console.error('Error calling Apollo Search API:', error);
+    return null;
+  }
+}
+
+// Apollo People Enrich endpoint - gets full data including revealed emails
+async function enrichApolloPersonById(personId: string, apiKey: string): Promise<ApolloPersonResponse | null> {
+  try {
+    console.log('Enriching Apollo person by ID:', personId);
+    
+    // Apollo People Enrich API - gets full person data including revealed emails
+    const response = await fetch('https://api.apollo.io/v1/people/match', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'X-Api-Key': apiKey,
+      },
+      body: JSON.stringify({
+        id: personId,
+        reveal_personal_emails: true,
+        reveal_phone_number: false,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Apollo Enrich API error:', response.status, errorText);
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log('Apollo Enrich by ID response:', JSON.stringify(data, null, 2));
+    
+    return data;
+  } catch (error) {
+    console.error('Error calling Apollo Enrich API:', error);
     return null;
   }
 }
@@ -577,6 +673,24 @@ async function matchApolloByLinkedIn(linkedinUrl: string, apiKey: string): Promi
     const data = await response.json();
     console.log('Apollo LinkedIn Match response:', JSON.stringify(data, null, 2));
     
+    // If LinkedIn match returned a placeholder email but we have a person ID, 
+    // try to enrich to get the real email
+    if (data?.person?.id && isPlaceholderEmail(data.person.email)) {
+      console.log('LinkedIn match returned placeholder email, trying People Enrich with ID:', data.person.id);
+      const enrichedData = await enrichApolloPersonById(data.person.id, apiKey);
+      if (enrichedData?.person) {
+        // Merge the enriched data - keep LinkedIn data for org/title, use enriched for email
+        return { 
+          person: { 
+            ...data.person, 
+            ...enrichedData.person,
+            // Keep original organization from LinkedIn (more accurate for current job)
+            organization: data.person.organization || enrichedData.person.organization
+          } 
+        };
+      }
+    }
+    
     return data;
   } catch (error) {
     console.error('Error calling Apollo LinkedIn Match API:', error);
@@ -585,6 +699,13 @@ async function matchApolloByLinkedIn(linkedinUrl: string, apiKey: string): Promi
 }
 
 async function matchApolloByEmail(email: string, fullName: string, apiKey: string): Promise<ApolloPersonResponse | null> {
+  // CRITICAL: Skip email match if the input email is a placeholder
+  // This prevents us from searching Apollo with invalid/fake emails
+  if (isPlaceholderEmail(email)) {
+    console.log('Skipping email match - input email is placeholder:', email);
+    return null;
+  }
+  
   try {
     console.log('Matching Apollo by email:', { email, fullName });
     
@@ -673,30 +794,46 @@ async function enrichWithApollo(
   
   // HELPER: Extract best email from Apollo person response
   // Apollo stores emails in multiple nested locations - we need to check all of them
+  // CRITICAL: Filter out placeholder emails like unknown1@unknown.com
   function extractBestEmail(person: ApolloPersonResponse['person']): { email?: string; email_status?: string } {
     if (!person) return {};
     
     // Priority 1: contact.email (MOST CURRENT - updated when person changes jobs)
     if (person.contact?.email) {
-      console.log('Found email in contact object:', person.contact.email);
-      return { email: person.contact.email, email_status: person.contact.email_status || undefined };
+      const validEmail = getValidEmail(person.contact.email);
+      if (validEmail) {
+        console.log('Found VALID email in contact object:', validEmail);
+        return { email: validEmail, email_status: person.contact.email_status || undefined };
+      } else {
+        console.log('Contact email is placeholder, skipping:', person.contact.email);
+      }
     }
     
     // Priority 2: contact_emails array (first/position=0 is most current)
     if (person.contact_emails && person.contact_emails.length > 0) {
-      const primaryEmail = person.contact_emails.find(e => e.position === 0) || person.contact_emails[0];
-      if (primaryEmail?.email) {
-        console.log('Found email in contact_emails array:', primaryEmail.email);
-        return { email: primaryEmail.email, email_status: primaryEmail.email_status || undefined };
+      // Try to find a valid email in the array
+      for (const contactEmail of person.contact_emails) {
+        const validEmail = getValidEmail(contactEmail?.email);
+        if (validEmail) {
+          console.log('Found VALID email in contact_emails array:', validEmail);
+          return { email: validEmail, email_status: contactEmail.email_status || undefined };
+        }
       }
+      console.log('All contact_emails are placeholders, skipping');
     }
     
     // Priority 3: person.email (may be stale/old job)
     if (person.email) {
-      console.log('Using person.email (may be stale):', person.email);
-      return { email: person.email, email_status: person.email_status || undefined };
+      const validEmail = getValidEmail(person.email);
+      if (validEmail) {
+        console.log('Using VALID person.email:', validEmail);
+        return { email: validEmail, email_status: person.email_status || undefined };
+      } else {
+        console.log('Person email is placeholder, skipping:', person.email);
+      }
     }
     
+    console.log('No valid email found in Apollo response');
     return {};
   }
   
@@ -975,35 +1112,54 @@ Deno.serve(async (req) => {
       // 1. contact.email (most current, updated when person changes jobs)
       // 2. contact_emails[0].email (array of emails, first is usually most current)
       // 3. person.email (can be stale/old job email but still useful)
+      // CRITICAL: Filter out placeholder emails like unknown1@unknown.com
       let bestEmail: string | undefined;
       let bestEmailStatus: string | undefined;
       
       // Priority 1: Check nested contact object (MOST CURRENT email)
       if (person.contact?.email) {
-        bestEmail = person.contact.email;
-        bestEmailStatus = person.contact.email_status || undefined;
-        console.log('FINAL: Found email in contact object:', bestEmail);
+        const validEmail = getValidEmail(person.contact.email);
+        if (validEmail) {
+          bestEmail = validEmail;
+          bestEmailStatus = person.contact.email_status || undefined;
+          console.log('FINAL: Found VALID email in contact object:', bestEmail);
+        } else {
+          console.log('FINAL: Contact email is placeholder, skipping:', person.contact.email);
+        }
       }
       
       // Priority 2: Check contact_emails array
       if (!bestEmail && person.contact_emails && person.contact_emails.length > 0) {
-        const primaryContactEmail = person.contact_emails.find(e => e.position === 0) || person.contact_emails[0];
-        if (primaryContactEmail?.email) {
-          bestEmail = primaryContactEmail.email;
-          bestEmailStatus = primaryContactEmail.email_status || undefined;
-          console.log('FINAL: Found email in contact_emails array:', bestEmail);
+        for (const contactEmail of person.contact_emails) {
+          const validEmail = getValidEmail(contactEmail?.email);
+          if (validEmail) {
+            bestEmail = validEmail;
+            bestEmailStatus = contactEmail.email_status || undefined;
+            console.log('FINAL: Found VALID email in contact_emails array:', bestEmail);
+            break;
+          }
+        }
+        if (!bestEmail) {
+          console.log('FINAL: All contact_emails are placeholders, skipping');
         }
       }
       
       // Priority 3: Fall back to person.email (may be stale but still useful)
       if (!bestEmail && person.email) {
-        bestEmail = person.email;
-        bestEmailStatus = person.email_status || undefined;
-        console.log('FINAL: Using person.email (may be stale):', bestEmail);
+        const validEmail = getValidEmail(person.email);
+        if (validEmail) {
+          bestEmail = validEmail;
+          bestEmailStatus = person.email_status || undefined;
+          console.log('FINAL: Using VALID person.email:', bestEmail);
+        } else {
+          console.log('FINAL: Person email is placeholder, skipping:', person.email);
+        }
       }
       
       if (bestEmail) {
         result.email = bestEmail;
+      } else {
+        console.log('FINAL: No valid email found - Apollo only returned placeholder emails');
       }
       if (bestEmailStatus) {
         result.email_status = bestEmailStatus;

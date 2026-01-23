@@ -47,10 +47,9 @@ import {
   useUpdateDistributionContact,
   type DistributionContact,
 } from "@/lib/hooks/useDistributionContacts";
-import { useDistributionSectors } from "@/lib/hooks/useDistributionSectors";
 import { useDistributionRelationshipOwners, useEnsureRelationshipOwner } from "@/lib/hooks/useDistributionRelationshipOwners";
 import { COUNTRIES } from "@/lib/countries";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { Check, ChevronsUpDown, X, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const contactSchema = z.object({
@@ -61,7 +60,7 @@ const contactSchema = z.object({
   country: z.string().optional(),
   city: z.string().optional(),
   gender: z.enum(["male", "female", "unknown"]),
-  sectors: z.array(z.string()),
+  emi_focus_areas: z.array(z.string()),
   linkedin_url: z.string().url().optional().or(z.literal("")),
   notes: z.string().optional(),
   relationship_owner: z.string().optional(),
@@ -85,7 +84,6 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
 
   const createContact = useCreateDistributionContact();
   const updateContact = useUpdateDistributionContact();
-  const { data: sectors = [] } = useDistributionSectors();
   const { data: relationshipOwners = [] } = useDistributionRelationshipOwners();
   const ensureOwner = useEnsureRelationshipOwner();
 
@@ -99,7 +97,7 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
       country: "",
       city: "",
       gender: "unknown",
-      sectors: [],
+      emi_focus_areas: [],
       linkedin_url: "",
       notes: "",
       relationship_owner: "",
@@ -118,7 +116,7 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         country: contact.country || "",
         city: contact.city || "",
         gender: contact.gender,
-        sectors: contact.sectors,
+        emi_focus_areas: contact.emi_focus_areas || [],
         linkedin_url: contact.linkedin_url || "",
         notes: contact.notes || "",
         relationship_owner: contact.relationship_owner || "",
@@ -134,7 +132,7 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         country: "",
         city: "",
         gender: "unknown",
-        sectors: [],
+        emi_focus_areas: [],
         linkedin_url: "",
         notes: "",
         relationship_owner: "",
@@ -150,13 +148,22 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
       await ensureOwner.mutateAsync(data.relationship_owner);
     }
 
+    // Determine if EMI focus areas were manually changed
+    const hadExistingFocusAreas = contact?.emi_focus_areas && contact.emi_focus_areas.length > 0;
+    const focusAreasChanged = contact 
+      ? JSON.stringify(data.emi_focus_areas.sort()) !== JSON.stringify((contact.emi_focus_areas || []).sort())
+      : data.emi_focus_areas.length > 0;
+    const markAsManualEdit = focusAreasChanged || contact?.emi_focus_areas_manual_edit;
+
     if (contact) {
       await updateContact.mutateAsync({
         id: contact.id,
         full_name: data.full_name,
         email: data.email,
         gender: data.gender,
-        sectors: data.sectors,
+        emi_focus_areas: data.emi_focus_areas,
+        emi_focus_areas_manual_edit: markAsManualEdit ? true : false,
+        emi_focus_areas_assigned_at: focusAreasChanged ? new Date().toISOString() : contact.emi_focus_areas_assigned_at,
         do_not_contact: data.do_not_contact,
         company: data.company || null,
         job_title: data.job_title || null,
@@ -166,14 +173,16 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         notes: data.notes || null,
         relationship_owner: data.relationship_owner || null,
         provenance: data.provenance || null,
-        sectors_ai_assigned: false,
       });
     } else {
       await createContact.mutateAsync({
         full_name: data.full_name,
         email: data.email,
         gender: data.gender,
-        sectors: data.sectors,
+        sectors: [],
+        sectors_ai_assigned: false,
+        emi_focus_areas: data.emi_focus_areas,
+        emi_focus_areas_manual_edit: data.emi_focus_areas.length > 0,
         do_not_contact: data.do_not_contact,
         company: data.company || null,
         job_title: data.job_title || null,
@@ -183,23 +192,43 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         notes: data.notes || null,
         relationship_owner: data.relationship_owner || null,
         provenance: data.provenance || "Manual entry",
-        sectors_ai_assigned: false,
       });
     }
 
     onOpenChange(false);
   };
 
-  const selectedSectors = form.watch("sectors");
+  const selectedFocusAreas = form.watch("emi_focus_areas");
+  const [focusAreaInput, setFocusAreaInput] = useState("");
 
-  const toggleSector = (sector: string) => {
-    const current = form.getValues("sectors");
-    if (current.includes(sector)) {
-      form.setValue("sectors", current.filter(s => s !== sector));
+  const toggleFocusArea = (area: string) => {
+    const current = form.getValues("emi_focus_areas");
+    if (current.includes(area)) {
+      form.setValue("emi_focus_areas", current.filter(a => a !== area));
     } else {
-      form.setValue("sectors", [...current, sector]);
+      form.setValue("emi_focus_areas", [...current, area]);
     }
   };
+
+  const addCustomFocusArea = () => {
+    const trimmed = focusAreaInput.trim();
+    if (trimmed && !selectedFocusAreas.includes(trimmed)) {
+      form.setValue("emi_focus_areas", [...selectedFocusAreas, trimmed]);
+      setFocusAreaInput("");
+    }
+  };
+
+  // Common EMI focus areas for suggestions
+  const suggestedFocusAreas = [
+    "Nuclear", "Oil & Gas", "Renewables", "Mining & Metals", "PPAs",
+    "Hydrogen", "Wind", "Solar", "BESS", "Utilities & Grid",
+    "Natural Gas", "Power Generation", "Water & Environment", "Infrastructure"
+  ];
+
+  const filteredSuggestions = suggestedFocusAreas.filter(area =>
+    area.toLowerCase().includes(focusAreaInput.toLowerCase()) &&
+    !selectedFocusAreas.includes(area)
+  );
 
   const filteredOwners = relationshipOwners.filter(o => 
     o.name.toLowerCase().includes(ownerSearch.toLowerCase())
@@ -373,69 +402,93 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
 
             <FormField
               control={form.control}
-              name="sectors"
+              name="emi_focus_areas"
               render={() => (
                 <FormItem>
-                  <FormLabel>Sectors</FormLabel>
-                  <Popover open={sectorOpen} onOpenChange={setSectorOpen}>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          className="w-full justify-between h-auto min-h-10"
-                        >
-                          {selectedSectors.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {selectedSectors.map(s => (
-                                <Badge key={s} variant="secondary" className="mr-1">
-                                  {s}
-                                  <button
-                                    type="button"
-                                    className="ml-1 hover:text-destructive"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      toggleSector(s);
-                                    }}
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </Badge>
+                  <FormLabel>EMI Focus Areas</FormLabel>
+                  <div className="space-y-2">
+                    {/* Selected focus areas */}
+                    {selectedFocusAreas.length > 0 && (
+                      <div className="flex flex-wrap gap-1 p-2 border rounded-md bg-muted/30">
+                        {selectedFocusAreas.map(area => (
+                          <Badge key={area} variant="secondary">
+                            {area}
+                            <button
+                              type="button"
+                              className="ml-1 hover:text-destructive"
+                              onClick={() => toggleFocusArea(area)}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Input for adding focus areas */}
+                    <Popover open={sectorOpen} onOpenChange={setSectorOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className="w-full justify-between"
+                            type="button"
+                          >
+                            <span className="text-muted-foreground">Add focus areas...</span>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0">
+                        <Command>
+                          <CommandInput 
+                            placeholder="Search or type custom..." 
+                            value={focusAreaInput}
+                            onValueChange={setFocusAreaInput}
+                          />
+                          <CommandList>
+                            <CommandEmpty>
+                              {focusAreaInput.trim() && (
+                                <button
+                                  type="button"
+                                  className="w-full p-2 text-sm text-left hover:bg-accent flex items-center gap-2"
+                                  onClick={() => {
+                                    addCustomFocusArea();
+                                    setSectorOpen(false);
+                                  }}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  Add "{focusAreaInput.trim()}"
+                                </button>
+                              )}
+                              {!focusAreaInput.trim() && "Type to add custom focus area"}
+                            </CommandEmpty>
+                            <CommandGroup heading="Suggested">
+                              {filteredSuggestions.map((area) => (
+                                <CommandItem
+                                  key={area}
+                                  value={area}
+                                  onSelect={() => {
+                                    toggleFocusArea(area);
+                                    setFocusAreaInput("");
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedFocusAreas.includes(area) ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {area}
+                                </CommandItem>
                               ))}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">Select sectors</span>
-                          )}
-                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-[300px] p-0">
-                      <Command>
-                        <CommandInput placeholder="Search sectors..." />
-                        <CommandList>
-                          <CommandEmpty>No sectors found. Add sectors in the Sectors tab.</CommandEmpty>
-                          <CommandGroup>
-                            {sectors.map((sector) => (
-                              <CommandItem
-                                key={sector.id}
-                                value={sector.name}
-                                onSelect={() => toggleSector(sector.name)}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    selectedSectors.includes(sector.name) ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                {sector.name}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}

@@ -8,6 +8,7 @@ const corsHeaders = {
 interface AssignmentRequest {
   contactIds: string[];
   focusAreas: string[]; // The approved focus areas to use
+  protectManualEdits?: boolean; // Skip contacts with manual edits
 }
 
 // NAICS prefix to focus area mapping
@@ -104,20 +105,31 @@ Deno.serve(async (req) => {
       });
     }
 
-    const { contactIds, focusAreas }: AssignmentRequest = await req.json();
+    const { contactIds, focusAreas, protectManualEdits = true }: AssignmentRequest = await req.json();
     
-    console.log(`Assigning focus areas to ${contactIds.length} contacts`);
+    console.log(`Assigning focus areas to ${contactIds.length} contacts (protect manual: ${protectManualEdits})`);
 
-    // Fetch contacts with their NAICS codes
+    // Fetch contacts with their NAICS codes and manual edit flag
     const { data: contacts, error: contactsError } = await supabase
       .from('distribution_contacts')
-      .select('id, full_name, company, naics_codes, linkedin_url, job_title')
+      .select('id, full_name, company, naics_codes, linkedin_url, job_title, emi_focus_areas_manual_edit')
       .eq('user_id', user.id)
       .in('id', contactIds);
     
     if (contactsError) {
       console.error('Error fetching contacts:', contactsError);
       throw contactsError;
+    }
+
+    // Filter out manually edited contacts if protection is enabled
+    const contactsToProcess = protectManualEdits 
+      ? contacts?.filter(c => !c.emi_focus_areas_manual_edit) || []
+      : contacts || [];
+    
+    const skippedCount = (contacts?.length || 0) - contactsToProcess.length;
+    
+    if (skippedCount > 0) {
+      console.log(`Skipping ${skippedCount} contacts with manual edits`);
     }
 
     // Fetch clients and matters for work type matching
@@ -172,8 +184,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Prepare contact data for AI
-    const contactData = contacts?.map(c => {
+    // Prepare contact data for AI (only contacts we're processing)
+    const contactData = contactsToProcess.map(c => {
       const matchedClient = findMatchingClient(c.company);
       const naicsBasedAreas = getFocusAreasFromNaics(c.naics_codes, focusAreas);
       
@@ -186,7 +198,7 @@ Deno.serve(async (req) => {
         matchedClient: matchedClient?.name || null,
         matterNames: matchedClient?.matters.map(m => m.matterName) || [],
       };
-    }) || [];
+    });
 
     console.log('Sending to AI for focus area assignment...');
     
@@ -310,12 +322,13 @@ Return assignments for all contacts.`
       }
     }
 
-    console.log(`Updated ${successCount} contacts, ${errorCount} errors`);
+    console.log(`Updated ${successCount} contacts, ${errorCount} errors, ${skippedCount} skipped`);
 
     return new Response(JSON.stringify({
       success: true,
       updated: successCount,
       errors: errorCount,
+      skipped: skippedCount,
       assignments,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

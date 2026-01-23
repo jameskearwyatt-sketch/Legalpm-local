@@ -498,6 +498,7 @@ export type Database = {
           email_status: string | null
           emi_focus_areas: string[]
           emi_focus_areas_assigned_at: string | null
+          emi_focus_areas_manual_edit: boolean
           full_name: string
           gender: Database["public"]["Enums"]["contact_gender"]
           id: string
@@ -531,6 +532,7 @@ export type Database = {
           email_status?: string | null
           emi_focus_areas?: string[]
           emi_focus_areas_assigned_at?: string | null
+          emi_focus_areas_manual_edit?: boolean
           full_name: string
           gender?: Database["public"]["Enums"]["contact_gender"]
           id?: string
@@ -564,6 +566,7 @@ export type Database = {
           email_status?: string | null
           emi_focus_areas?: string[]
           emi_focus_areas_assigned_at?: string | null
+          emi_focus_areas_manual_edit?: boolean
           full_name?: string
           gender?: Database["public"]["Enums"]["contact_gender"]
           id?: string

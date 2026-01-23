@@ -74,3 +74,6 @@ verify_jwt = false
 
 [functions.classify-contacts]
 verify_jwt = false
+
+[functions.smart-sector-search]
+verify_jwt = false

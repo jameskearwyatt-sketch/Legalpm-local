@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { List, Check, AlertCircle, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -49,28 +49,39 @@ export function AddToListDialog({
   const [isChecking, setIsChecking] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [hasChecked, setHasChecked] = useState(false);
+  
+  // Track the last checked combination to prevent infinite loops
+  const lastCheckedRef = useRef<string>("");
 
-  // Reset state when dialog opens/closes
+  // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
       setSelectedListId("");
       setExistingContacts([]);
       setContactsToAdd([]);
       setHasChecked(false);
+      lastCheckedRef.current = "";
     }
   }, [open]);
 
   // Check for existing contacts when list is selected
   useEffect(() => {
-    const checkContacts = async () => {
-      if (!selectedListId || selectedContacts.length === 0) {
-        setExistingContacts([]);
-        setContactsToAdd([]);
-        setHasChecked(false);
-        return;
-      }
+    if (!open || !selectedListId || selectedContacts.length === 0) {
+      return;
+    }
 
+    // Create a unique key for this check combination
+    const checkKey = `${selectedListId}-${selectedContacts.map(c => c.id).sort().join(",")}`;
+    
+    // Skip if we've already checked this exact combination
+    if (lastCheckedRef.current === checkKey) {
+      return;
+    }
+
+    const performCheck = async () => {
       setIsChecking(true);
+      lastCheckedRef.current = checkKey;
+      
       try {
         const contactIds = selectedContacts.map(c => c.id);
         const result = await checkExistingContacts(selectedListId, contactIds);
@@ -89,8 +100,8 @@ export function AddToListDialog({
       }
     };
 
-    checkContacts();
-  }, [selectedListId, selectedContacts, checkExistingContacts]);
+    performCheck();
+  }, [open, selectedListId, selectedContacts, checkExistingContacts]);
 
   const handleAddContacts = async () => {
     if (!selectedListId || contactsToAdd.length === 0) return;

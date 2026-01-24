@@ -45,6 +45,7 @@ import { ContactHistoryDialog } from "./ContactHistoryDialog";
 import { FocusAreaAssignmentDialog } from "./FocusAreaAssignmentDialog";
 import { ExclusionFilterCheckbox } from "./ExclusionFilterCheckbox";
 import { ReidentifyExcludedDialog } from "./ReidentifyExcludedDialog";
+import { EnrichmentPreCheckDialog } from "./EnrichmentPreCheckDialog";
 import { SortableFilterableHeader, SortDirection } from "./SortableFilterableHeader";
 import { StickyTableHeader } from "@/components/ui/sticky-table-header";
 import { TableScrollControls } from "@/components/ui/table-scroll-controls";
@@ -127,6 +128,7 @@ export function ContactsListView() {
   const [showAddToListDialog, setShowAddToListDialog] = useState(false);
   const [showRemoveFromListConfirm, setShowRemoveFromListConfirm] = useState(false);
   const [isRemovingFromList, setIsRemovingFromList] = useState(false);
+  const [showEnrichmentPreCheck, setShowEnrichmentPreCheck] = useState(false);
 
   // Sorting state
   const [sortKey, setSortKey] = useState<string | null>("full_name");
@@ -849,27 +851,7 @@ export function ContactsListView() {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={() => {
-              const contactsToEnrich = selectedContacts.map(c => ({
-                contactId: c.id,
-                fullName: c.full_name,
-                email: c.email,
-                linkedinUrl: c.linkedin_url,
-                company: c.company,
-              }));
-              bulkEnrich.mutate(contactsToEnrich, {
-                onSuccess: (results) => {
-                  const success = results.filter(r => r.success).length;
-                  const failed = results.filter(r => !r.success).length;
-                  if (success > 0) {
-                    toast.success(`Enriched ${success} contact${success !== 1 ? 's' : ''}`);
-                  }
-                  if (failed > 0) {
-                    toast.error(`Failed to enrich ${failed} contact${failed !== 1 ? 's' : ''}`);
-                  }
-                },
-              });
-            }}
+            onClick={() => setShowEnrichmentPreCheck(true)}
             disabled={bulkEnrich.isPending}
             className="gap-2"
           >
@@ -1342,6 +1324,38 @@ export function ContactsListView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Smart Enrichment Pre-Check Dialog */}
+      <EnrichmentPreCheckDialog
+        open={showEnrichmentPreCheck}
+        onOpenChange={setShowEnrichmentPreCheck}
+        contacts={selectedContacts}
+        isEnriching={bulkEnrich.isPending}
+        onEnrich={(contactIds) => {
+          const contactsToEnrich = selectedContacts
+            .filter(c => contactIds.includes(c.id))
+            .map(c => ({
+              contactId: c.id,
+              fullName: c.full_name,
+              email: c.email,
+              linkedinUrl: c.linkedin_url,
+              company: c.company,
+            }));
+          bulkEnrich.mutate(contactsToEnrich, {
+            onSuccess: (results) => {
+              const success = results.filter(r => r.success).length;
+              const failed = results.filter(r => !r.success).length;
+              setShowEnrichmentPreCheck(false);
+              if (success > 0) {
+                toast.success(`Enriched ${success} contact${success !== 1 ? 's' : ''}`);
+              }
+              if (failed > 0) {
+                toast.error(`Failed to enrich ${failed} contact${failed !== 1 ? 's' : ''}`);
+              }
+            },
+          });
+        }}
+      />
     </div>
   );
 }

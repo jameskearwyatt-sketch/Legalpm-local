@@ -230,6 +230,7 @@ export function ContactsListView() {
         case 'relationship_owner': return contact.relationship_owner;
         case 'gender': return contact.gender;
         case 'naics_sector': return getPrimaryNaicsSector(contact.naics_codes);
+        case 'created_at': return contact.created_at;
         default: return null;
       }
     };
@@ -575,11 +576,11 @@ export function ContactsListView() {
             </Button>
           )}
 
-          {/* Just Enriched indicator */}
+          {/* Just Added/Enriched indicator */}
           {justEnrichedIds && justEnrichedIds.size > 0 && (
             <Badge variant="secondary" className="gap-1.5 bg-success/10 text-success border-success/20">
               <Wand2 className="h-3 w-3" />
-              Showing {justEnrichedIds.size} just enriched
+              Showing {justEnrichedIds.size} just added
               <button 
                 onClick={() => setJustEnrichedIds(null)}
                 className="ml-1 hover:bg-success/20 rounded p-0.5"
@@ -1057,8 +1058,15 @@ export function ContactsListView() {
                   <TableHead className="w-[120px] bg-muted/50">
                     <span className="text-xs font-medium">EMI Focus Area</span>
                   </TableHead>
-                  <TableHead className="w-[70px] bg-muted/50 text-center">
-                    <span className="text-xs font-medium">Updated</span>
+                  <TableHead className="w-[80px] bg-muted/50 text-center">
+                    <SortableFilterableHeader
+                      label="Added"
+                      columnKey="created_at"
+                      sortKey={sortKey}
+                      sortDirection={sortDirection}
+                      onSort={handleSort}
+                      mode="sort-only"
+                    />
                   </TableHead>
                   <TableHead className="w-[50px] bg-muted/50"></TableHead>
                 </TableRow>
@@ -1174,12 +1182,13 @@ export function ContactsListView() {
                                   <Sparkles className="h-3 w-3 text-primary" />
                                 )}
                                 <span>
-                                  {format(new Date(contact.updated_at), "d MMM")}
+                                  {format(new Date(contact.created_at), "d MMM")}
                                 </span>
                               </div>
                             </TooltipTrigger>
                             <TooltipContent>
                               <div className="text-xs space-y-1">
+                                <div>Added: {format(new Date(contact.created_at), "d MMM yyyy HH:mm")}</div>
                                 <div>Updated: {format(new Date(contact.updated_at), "d MMM yyyy HH:mm")}</div>
                                 {contact.last_enriched_at && (
                                   <div className="flex items-center gap-1">
@@ -1252,11 +1261,28 @@ export function ContactsListView() {
       <ContactFormDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
+        onContactCreated={(contactId, wasEnriched) => {
+          // Auto-filter to show the newly created contact
+          setJustEnrichedIds(new Set([contactId]));
+          toast.success(
+            wasEnriched ? 'Contact created and enriched' : 'Contact created',
+            { description: 'Showing new contact. Click badge to see all.' }
+          );
+        }}
       />
 
       <ContactImportDialog
         open={showImportDialog}
         onOpenChange={setShowImportDialog}
+        onImportComplete={(importedIds) => {
+          if (importedIds.length > 0) {
+            setJustEnrichedIds(new Set(importedIds));
+            toast.success(
+              `Imported ${importedIds.length} contact${importedIds.length !== 1 ? 's' : ''}`,
+              { description: 'Showing imported contacts. Click badge to see all.' }
+            );
+          }
+        }}
       />
 
       {showEmailDialog && (

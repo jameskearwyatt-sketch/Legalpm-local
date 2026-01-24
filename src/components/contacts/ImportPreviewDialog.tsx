@@ -35,7 +35,7 @@ interface ImportPreviewDialogProps {
   onOpenChange: (open: boolean) => void;
   contacts: DistributionContactInsert[];
   source: string;
-  onComplete: () => void;
+  onComplete: (importedIds: string[]) => void;
 }
 
 export function ImportPreviewDialog({
@@ -85,7 +85,9 @@ export function ImportPreviewDialog({
         toast.success(`Imported ${contacts.length} contacts`);
       }
 
-      onComplete();
+      // Pass back the IDs of imported contacts for filtering
+      const importedIds = result?.map((c: { id: string }) => c.id) || [];
+      onComplete(importedIds);
       onOpenChange(false);
     } catch (error) {
       console.error("Import error:", error);
@@ -111,7 +113,7 @@ export function ImportPreviewDialog({
 
         {stage === "preview" && (
           <>
-            <ScrollArea className="flex-1 max-h-[400px] border rounded-md">
+            <div className="flex-1 max-h-[400px] border rounded-md overflow-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -136,7 +138,7 @@ export function ImportPreviewDialog({
                   ))}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
 
             <Separator />
 

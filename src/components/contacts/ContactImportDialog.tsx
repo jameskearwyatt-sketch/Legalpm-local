@@ -39,9 +39,10 @@ import { cn } from "@/lib/utils";
 interface ContactImportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onImportComplete?: (importedIds: string[]) => void;
 }
 
-export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogProps) {
+export function ContactImportDialog({ open, onOpenChange, onImportComplete }: ContactImportDialogProps) {
   const [activeTab, setActiveTab] = useState("paste");
   const [pastedText, setPastedText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -729,9 +730,10 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
         }}
         contacts={contactsToPreview}
         source={importSource}
-        onComplete={() => {
+        onComplete={(importedIds) => {
           resetDialog();
           onOpenChange(false);
+          onImportComplete?.(importedIds);
         }}
       />
     </>

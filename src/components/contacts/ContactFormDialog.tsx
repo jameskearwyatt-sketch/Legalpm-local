@@ -76,9 +76,10 @@ interface ContactFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   contact?: DistributionContact;
+  onContactCreated?: (contactId: string, wasEnriched: boolean) => void;
 }
 
-export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDialogProps) {
+export function ContactFormDialog({ open, onOpenChange, contact, onContactCreated }: ContactFormDialogProps) {
   const [countryOpen, setCountryOpen] = useState(false);
   const [sectorOpen, setSectorOpen] = useState(false);
   const [ownerOpen, setOwnerOpen] = useState(false);
@@ -216,6 +217,9 @@ export function ContactFormDialog({ open, onOpenChange, contact }: ContactFormDi
         } finally {
           setIsEnriching(false);
         }
+        onContactCreated?.(result.id, true);
+      } else if (result?.id) {
+        onContactCreated?.(result.id, false);
       }
       onOpenChange(false);
     }

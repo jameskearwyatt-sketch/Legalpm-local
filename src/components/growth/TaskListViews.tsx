@@ -3,7 +3,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { Trash2, User, Check, ChevronDown, ChevronRight, Filter, Clock, MessageSquare, X, ListTodo, Mail, Loader2, Copy } from 'lucide-react';
+import { Trash2, User, Check, ChevronDown, ChevronRight, Filter, Clock, MessageSquare, X, ListTodo, Mail, Loader2, Copy, FileDown } from 'lucide-react';
+import { ExportListDialog } from './ExportListDialog';
 import { cn } from '@/lib/utils';
 import {
   Dialog,
@@ -646,6 +647,7 @@ export const TodaysFocusView = ({
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [taskToComplete, setTaskToComplete] = useState<GrowthTask | null>(null);
   const [completionNotes, setCompletionNotes] = useState('');
+  const [showExportDialog, setShowExportDialog] = useState(false);
   
   const pendingTasks = tasks.filter(t => !t.is_completed);
   const completedTasks = tasks.filter(t => t.is_completed).sort((a, b) => 
@@ -803,8 +805,25 @@ export const TodaysFocusView = ({
         </DialogContent>
       </Dialog>
 
+      {/* Export List Dialog */}
+      <ExportListDialog
+        open={showExportDialog}
+        onOpenChange={setShowExportDialog}
+        tasks={tasks}
+        projectName={projectName}
+      />
+
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/50 rounded-lg">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowExportDialog(true)}
+          className="gap-1.5"
+        >
+          <FileDown className="h-4 w-4" />
+          Export List
+        </Button>
         <div className="flex items-center gap-2 ml-auto">
           <button
             type="button"

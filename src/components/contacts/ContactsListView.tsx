@@ -129,6 +129,7 @@ export function ContactsListView() {
   const [showRemoveFromListConfirm, setShowRemoveFromListConfirm] = useState(false);
   const [isRemovingFromList, setIsRemovingFromList] = useState(false);
   const [showEnrichmentPreCheck, setShowEnrichmentPreCheck] = useState(false);
+  const [justEnrichedIds, setJustEnrichedIds] = useState<Set<string> | null>(null);
 
   // Sorting state
   const [sortKey, setSortKey] = useState<string | null>("full_name");
@@ -238,6 +239,11 @@ export function ContactsListView() {
       result = result.filter(contact => customListSet.has(contact.id));
     }
 
+    // Apply "just enriched" filter (if active - shows only recently enriched contacts)
+    if (justEnrichedIds && justEnrichedIds.size > 0) {
+      result = result.filter(contact => justEnrichedIds.has(contact.id));
+    }
+
     // Apply smart sector search filter (if active)
     if (smartSearchState.isActive) {
       result = result.filter(contact => smartSearchState.matches.has(contact.id));
@@ -272,7 +278,7 @@ export function ContactsListView() {
     }
 
     return result;
-  }, [contacts, columnFilters, sortKey, sortDirection, smartSearchState.isActive, smartSearchState.matches, selectedListId, customListContactIds]);
+  }, [contacts, columnFilters, sortKey, sortDirection, smartSearchState.isActive, smartSearchState.matches, selectedListId, customListContactIds, justEnrichedIds]);
 
   // Contacts BEFORE exclusion filters are applied - used for the exclusion filter popover lists
   const contactsBeforeExclusion = filteredAndSortedContacts;
@@ -398,12 +404,13 @@ export function ContactsListView() {
     setSortKey("full_name");
     setSortDirection("asc");
     clearSmartSearch();
+    setJustEnrichedIds(null);
   };
 
   const hasActiveFilters = Object.entries(filters).some(([_, v]) => {
     if (Array.isArray(v)) return v.length > 0;
     return v !== undefined && v !== "";
-  }) || searchQuery || Object.values(columnFilters).some(v => v) || smartSearchState.isActive;
+  }) || searchQuery || Object.values(columnFilters).some(v => v) || smartSearchState.isActive || justEnrichedIds !== null;
 
   const hasColumnFilters = Object.values(columnFilters).some(v => v);
 
@@ -565,6 +572,20 @@ export function ContactsListView() {
               <X className="h-4 w-4" />
               Clear all
             </Button>
+          )}
+
+          {/* Just Enriched indicator */}
+          {justEnrichedIds && justEnrichedIds.size > 0 && (
+            <Badge variant="secondary" className="gap-1.5 bg-success/10 text-success border-success/20">
+              <Wand2 className="h-3 w-3" />
+              Showing {justEnrichedIds.size} just enriched
+              <button 
+                onClick={() => setJustEnrichedIds(null)}
+                className="ml-1 hover:bg-success/20 rounded p-0.5"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
           )}
 
           <div className="flex-1" />
@@ -1343,11 +1364,21 @@ export function ContactsListView() {
             }));
           bulkEnrich.mutate(contactsToEnrich, {
             onSuccess: (results) => {
-              const success = results.filter(r => r.success).length;
+              const successIds = results
+                .filter(r => r.success)
+                .map(r => r.contactId);
               const failed = results.filter(r => !r.success).length;
+              
               setShowEnrichmentPreCheck(false);
-              if (success > 0) {
-                toast.success(`Enriched ${success} contact${success !== 1 ? 's' : ''}`);
+              setSelectedIds(new Set()); // Clear selection
+              
+              // Apply filter to show only enriched contacts
+              if (successIds.length > 0) {
+                setJustEnrichedIds(new Set(successIds));
+                toast.success(
+                  `Enriched ${successIds.length} contact${successIds.length !== 1 ? 's' : ''}`,
+                  { description: 'Showing enriched contacts. Click "Clear all" to see all contacts.' }
+                );
               }
               if (failed > 0) {
                 toast.error(`Failed to enrich ${failed} contact${failed !== 1 ? 's' : ''}`);

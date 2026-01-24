@@ -140,7 +140,7 @@ export function FocusAreaAssignmentDialog({
             {step === 'done' && "Assignment Complete"}
           </DialogTitle>
           <DialogDescription>
-            {step === 'analyze' && `AI will analyze ${selectedContactIds.length > 0 ? selectedContactIds.length : 'all'} contact(s), their companies, NAICS codes, and your matter history to propose relevant EMI Focus Areas.`}
+            {step === 'analyze' && `AI will analyze ${selectedContactIds.length > 0 ? selectedContactIds.length + ' selected' : 'contacts without focus areas'}, their companies, NAICS codes, and your matter history to propose relevant EMI Focus Areas.`}
             {step === 'review' && "Review the proposed focus areas below. You can add, remove, or rename them before assigning to contacts."}
             {step === 'protect-confirm' && "Some contacts may have manually edited focus areas. Would you like to protect them from being overwritten?"}
             {step === 'assign' && "Please wait while focus areas are being assigned to contacts..."}

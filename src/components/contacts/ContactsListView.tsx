@@ -80,6 +80,7 @@ import {
   Users,
   RotateCcw,
   List,
+  Copy,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDisplayName } from "@/lib/utils";
@@ -910,6 +911,27 @@ export function ContactsListView() {
           <Button variant="outline" size="sm" onClick={handleExport} className="gap-2">
             <Download className="h-4 w-4" />
             Export
+          </Button>
+
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => {
+              const selectedContacts = contacts.filter(c => selectedIds.has(c.id));
+              const emails = selectedContacts
+                .map(c => c.email)
+                .filter(Boolean)
+                .join('; ');
+              navigator.clipboard.writeText(emails).then(() => {
+                toast.success(`Copied ${selectedContacts.length} email address${selectedContacts.length !== 1 ? 'es' : ''}`);
+              }).catch(() => {
+                toast.error('Failed to copy to clipboard');
+              });
+            }}
+            className="gap-2"
+          >
+            <Copy className="h-4 w-4" />
+            Copy Emails
           </Button>
 
           <Button 

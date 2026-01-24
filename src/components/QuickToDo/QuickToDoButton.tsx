@@ -883,18 +883,29 @@ export function QuickToDoButton() {
   const buttonRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Load saved position on mount - with FORCED visibility check
+  // Load saved position on mount - restore from localStorage or use default
   useEffect(() => {
-    // AGGRESSIVE RESET: Clear all potentially problematic localStorage keys
-    // This ensures the button WILL be visible
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(SLATE_POSITION_KEY);
+    const savedPosition = localStorage.getItem(STORAGE_KEY);
     
-    // Force a guaranteed visible position
+    if (savedPosition) {
+      try {
+        const parsed = JSON.parse(savedPosition);
+        // Validate that the saved position is still within viewport
+        const maxX = window.innerWidth - 80;
+        const maxY = window.innerHeight - 80;
+        
+        if (parsed.x >= 0 && parsed.x <= maxX && parsed.y >= 0 && parsed.y <= maxY) {
+          setPosition(parsed);
+          return;
+        }
+      } catch (e) {
+        // Invalid JSON, fall through to default
+      }
+    }
+    
+    // Default position if no valid saved position
     const safeX = 280; // Right of sidebar
     const safeY = window.innerHeight - 120; // Near bottom
-    
-    console.log('QuickToDo: Forcing button to visible position:', { x: safeX, y: safeY });
     setPosition({ x: safeX, y: safeY });
   }, []);
 

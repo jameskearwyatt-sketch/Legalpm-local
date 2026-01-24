@@ -108,12 +108,12 @@ Deno.serve(async (req) => {
     const { contactIds, focusAreas, protectManualEdits = true }: AssignmentRequest = await req.json();
     
     const isAllContacts = !contactIds || contactIds.length === 0;
-    console.log(`Assigning focus areas to ${isAllContacts ? 'all' : contactIds.length} contacts (protect manual: ${protectManualEdits})`);
+    console.log(`Assigning focus areas to ${isAllContacts ? 'contacts without focus areas' : contactIds.length + ' selected contacts'} (protect manual: ${protectManualEdits})`);
 
-    // Fetch contacts with their NAICS codes and manual edit flag
+    // Fetch contacts with their NAICS codes, focus areas, and manual edit flag
     let contactsQuery = supabase
       .from('distribution_contacts')
-      .select('id, full_name, company, naics_codes, linkedin_url, job_title, emi_focus_areas_manual_edit')
+      .select('id, full_name, company, naics_codes, linkedin_url, job_title, emi_focus_areas, emi_focus_areas_manual_edit')
       .eq('user_id', user.id);
     
     // Only filter by IDs if specific contacts were selected
@@ -130,12 +130,21 @@ Deno.serve(async (req) => {
     
     console.log(`Fetched ${contacts?.length || 0} contacts from database`);
 
+    // For "all contacts" mode, only process contacts WITHOUT focus areas already
+    let contactsAfterFocusFilter = contacts || [];
+    if (isAllContacts) {
+      contactsAfterFocusFilter = contactsAfterFocusFilter.filter(c => 
+        !c.emi_focus_areas || c.emi_focus_areas.length === 0
+      );
+      console.log(`Filtered to ${contactsAfterFocusFilter.length} contacts without existing focus areas`);
+    }
+
     // Filter out manually edited contacts if protection is enabled
     const contactsToProcess = protectManualEdits 
-      ? contacts?.filter(c => !c.emi_focus_areas_manual_edit) || []
-      : contacts || [];
+      ? contactsAfterFocusFilter.filter(c => !c.emi_focus_areas_manual_edit)
+      : contactsAfterFocusFilter;
     
-    const skippedCount = (contacts?.length || 0) - contactsToProcess.length;
+    const skippedCount = contactsAfterFocusFilter.length - contactsToProcess.length;
     
     if (skippedCount > 0) {
       console.log(`Skipping ${skippedCount} contacts with manual edits`);

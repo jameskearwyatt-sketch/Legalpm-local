@@ -123,14 +123,18 @@ Deno.serve(async (req) => {
     
     console.log(`Analyzing ${contactIds?.length || 'all'} contacts for user ${user.id}`);
 
-    // Fetch contacts (either specified IDs or all)
+    // Fetch contacts (either specified IDs or those without focus areas)
     let contactsQuery = supabase
       .from('distribution_contacts')
-      .select('id, full_name, company, naics_codes, linkedin_url, job_title')
+      .select('id, full_name, company, naics_codes, linkedin_url, job_title, emi_focus_areas')
       .eq('user_id', user.id);
     
     if (contactIds && contactIds.length > 0) {
+      // Specific contacts selected - analyze those
       contactsQuery = contactsQuery.in('id', contactIds);
+    } else {
+      // No specific selection - only analyze contacts WITHOUT focus areas
+      contactsQuery = contactsQuery.or('emi_focus_areas.is.null,emi_focus_areas.eq.{}');
     }
     
     const { data: contacts, error: contactsError } = await contactsQuery;
@@ -140,7 +144,12 @@ Deno.serve(async (req) => {
       throw contactsError;
     }
 
-    console.log(`Found ${contacts?.length || 0} contacts to analyze`);
+    // Filter out contacts that already have focus areas (for the "all" case)
+    const contactsToAnalyze = contactIds && contactIds.length > 0 
+      ? contacts 
+      : contacts?.filter(c => !c.emi_focus_areas || c.emi_focus_areas.length === 0);
+
+    console.log(`Found ${contactsToAnalyze?.length || 0} contacts to analyze (without focus areas)`);
 
     // Fetch clients and matters to match work types
     const { data: clients, error: clientsError } = await supabase
@@ -205,7 +214,7 @@ Deno.serve(async (req) => {
     }
 
     // Gather unique companies for web scraping
-    const uniqueCompanies = [...new Set(contacts?.map(c => c.company).filter(Boolean) || [])];
+    const uniqueCompanies = [...new Set(contactsToAnalyze?.map(c => c.company).filter(Boolean) || [])];
     console.log(`Found ${uniqueCompanies.length} unique companies`);
 
     // Scrape company info using Firecrawl (batch, up to 10)
@@ -248,7 +257,7 @@ Deno.serve(async (req) => {
     const allWorkTypes = new Set<string>();
     const allNaicsDescriptions = new Set<string>();
     
-    for (const contact of (contacts || [])) {
+    for (const contact of (contactsToAnalyze || [])) {
       const matchedClient = findMatchingClient(contact.company);
       const naicsDesc = getNaicsDescription(contact.naics_codes);
       const webData = contact.company ? companyWebData.get(contact.company) : null;

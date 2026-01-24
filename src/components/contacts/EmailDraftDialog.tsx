@@ -148,37 +148,17 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
   );
 
   // Extract first name from full_name
-  // Handles both "Firstname Surname" and "Surname, Firstname" formats
+  // Names are now stored in "FirstName Surname" format
   const getFirstName = (fullName: string): string => {
     const trimmed = fullName.trim();
-    
-    // Check if name is in "Surname, Firstname" format
-    if (trimmed.includes(',')) {
-      const parts = trimmed.split(',');
-      if (parts.length >= 2) {
-        // Take the part after the comma (firstname) and get first word
-        const firstNamePart = parts[1].trim().split(/\s+/)[0];
-        return firstNamePart || trimmed;
-      }
-    }
-    
-    // Otherwise assume "Firstname Surname" format
     const parts = trimmed.split(/\s+/);
     return parts[0] || trimmed;
   };
 
   // Get surname for Japanese addressing
+  // Names are now stored in "FirstName Surname" format
   const getSurname = (fullName: string): string => {
     const trimmed = fullName.trim();
-    
-    // Check if name is in "Surname, Firstname" format
-    if (trimmed.includes(',')) {
-      const parts = trimmed.split(',');
-      // Surname is before the comma
-      return parts[0].trim() || trimmed;
-    }
-    
-    // Otherwise assume "Firstname Surname" format - surname is last part
     const parts = trimmed.split(/\s+/);
     return parts[parts.length - 1] || trimmed;
   };

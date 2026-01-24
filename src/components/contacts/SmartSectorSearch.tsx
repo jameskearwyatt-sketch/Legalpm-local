@@ -142,9 +142,11 @@ export function SmartSectorSearch({
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-96 p-0" align="start">
-                <ScrollArea className="h-[280px] p-4">
-                  <div className="space-y-2">
-                    <p className="font-medium text-sm">AI Understanding</p>
+                <div className="p-4 pb-2 border-b">
+                  <p className="font-medium text-sm">AI Understanding</p>
+                </div>
+                <ScrollArea className="h-[320px]">
+                  <div className="p-4 pt-3">
                     <p className="text-muted-foreground whitespace-pre-wrap text-xs leading-relaxed">
                       {queryUnderstanding}
                     </p>

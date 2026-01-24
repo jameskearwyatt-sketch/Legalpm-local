@@ -107,19 +107,28 @@ Deno.serve(async (req) => {
 
     const { contactIds, focusAreas, protectManualEdits = true }: AssignmentRequest = await req.json();
     
-    console.log(`Assigning focus areas to ${contactIds.length} contacts (protect manual: ${protectManualEdits})`);
+    const isAllContacts = !contactIds || contactIds.length === 0;
+    console.log(`Assigning focus areas to ${isAllContacts ? 'all' : contactIds.length} contacts (protect manual: ${protectManualEdits})`);
 
     // Fetch contacts with their NAICS codes and manual edit flag
-    const { data: contacts, error: contactsError } = await supabase
+    let contactsQuery = supabase
       .from('distribution_contacts')
       .select('id, full_name, company, naics_codes, linkedin_url, job_title, emi_focus_areas_manual_edit')
-      .eq('user_id', user.id)
-      .in('id', contactIds);
+      .eq('user_id', user.id);
+    
+    // Only filter by IDs if specific contacts were selected
+    if (!isAllContacts) {
+      contactsQuery = contactsQuery.in('id', contactIds);
+    }
+    
+    const { data: contacts, error: contactsError } = await contactsQuery;
     
     if (contactsError) {
       console.error('Error fetching contacts:', contactsError);
       throw contactsError;
     }
+    
+    console.log(`Fetched ${contacts?.length || 0} contacts from database`);
 
     // Filter out manually edited contacts if protection is enabled
     const contactsToProcess = protectManualEdits 

@@ -555,9 +555,27 @@ async function searchApolloByNameAndCompany(fullName: string, company: string, a
   try {
     console.log('Searching Apollo by name + company:', { fullName, company });
     
-    // Apollo People API Search - NEW endpoint (old mixed_people/search is deprecated)
+    // Parse the name - handle both "FirstName Surname" and "Surname, FirstName" formats
+    let firstName = '';
+    let lastName = '';
+    
+    if (fullName.includes(',')) {
+      // "Surname, FirstName" format
+      const parts = fullName.split(',').map(p => p.trim());
+      lastName = parts[0] || '';
+      firstName = parts[1] || '';
+    } else {
+      // "FirstName Surname" format
+      const parts = fullName.trim().split(/\s+/);
+      firstName = parts[0] || '';
+      lastName = parts.slice(1).join(' ') || '';
+    }
+    
+    console.log('Parsed name:', { firstName, lastName, originalName: fullName });
+    
+    // Apollo People API Search - NEW endpoint
     // Docs: https://docs.apollo.io/reference/people-api-search
-    const response = await fetch('https://api.apollo.io/api/v1/mixed_people/search', {
+    const response = await fetch('https://api.apollo.io/api/v1/mixed_people/api_search', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -565,17 +583,20 @@ async function searchApolloByNameAndCompany(fullName: string, company: string, a
         'X-Api-Key': apiKey,
       },
       body: JSON.stringify({
-        person_titles: [], // Empty to match any title
         q_organization_name: company,
-        person_names: [fullName],
-        per_page: 1,
+        person_first_name: firstName,
+        person_last_name: lastName,
+        per_page: 5,
       }),
     });
     
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Apollo Search API error:', response.status, errorText);
-      return null;
+      
+      // If the new endpoint fails, try the People Match API as fallback
+      console.log('Trying People Match API as fallback...');
+      return await matchApolloByNameAndCompany(fullName, company, apiKey);
     }
     
     const data = await response.json();
@@ -606,9 +627,60 @@ async function searchApolloByNameAndCompany(fullName: string, company: string, a
       return { person: person };
     }
     
+    console.log('Apollo search by name + company returned no results');
     return null;
   } catch (error) {
     console.error('Error calling Apollo Search API:', error);
+    return null;
+  }
+}
+
+// Fallback: Use People Match API with name and company domain
+async function matchApolloByNameAndCompany(fullName: string, company: string, apiKey: string): Promise<ApolloPersonResponse | null> {
+  try {
+    console.log('Trying People Match API with name + company:', { fullName, company });
+    
+    const response = await fetch('https://api.apollo.io/v1/people/match', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'X-Api-Key': apiKey,
+      },
+      body: JSON.stringify({
+        name: fullName,
+        organization_name: company,
+        reveal_personal_emails: false,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Apollo People Match API error:', response.status, errorText);
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log('Apollo People Match response:', JSON.stringify(data, null, 2));
+    
+    // If match found and has placeholder email, try to enrich
+    if (data?.person?.id && isPlaceholderEmail(data.person.email)) {
+      console.log('People Match returned placeholder email, trying enrich with ID:', data.person.id);
+      const enrichedData = await enrichApolloPersonById(data.person.id, apiKey);
+      if (enrichedData?.person) {
+        return { 
+          person: { 
+            ...data.person, 
+            ...enrichedData.person,
+            organization: data.person.organization || enrichedData.person.organization
+          } 
+        };
+      }
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error calling Apollo People Match API:', error);
     return null;
   }
 }

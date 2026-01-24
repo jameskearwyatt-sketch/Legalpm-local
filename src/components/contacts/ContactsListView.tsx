@@ -81,6 +81,7 @@ import {
   List,
 } from "lucide-react";
 import { toast } from "sonner";
+import { formatDisplayName } from "@/lib/utils";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
 import { useBulkEnrichContacts } from "@/lib/hooks/useContactEnrichment";
 import { useDetectEmailMismatch, useDismissEmailMismatch } from "@/lib/hooks/useEmailMismatchDetection";
@@ -1068,7 +1069,7 @@ export function ContactsListView() {
                             onClick={() => setSelectedContact(contact)}
                             className="font-medium hover:underline text-left truncate max-w-full"
                           >
-                            {contact.full_name}
+                            {formatDisplayName(contact.full_name)}
                           </button>
                           {contact.do_not_contact && (
                             <Badge variant="destructive" className="shrink-0 text-xs">DNC</Badge>
@@ -1172,7 +1173,7 @@ export function ContactsListView() {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            onClick={() => setHistoryContact({ id: contact.id, name: contact.full_name })}
+                            onClick={() => setHistoryContact({ id: contact.id, name: formatDisplayName(contact.full_name) })}
                           >
                             <History className="h-3.5 w-3.5" />
                           </Button>

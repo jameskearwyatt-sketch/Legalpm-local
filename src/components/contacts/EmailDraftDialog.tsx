@@ -27,6 +27,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Mail, ExternalLink, AlertCircle, Users, Loader2, FileSignature, Save } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { formatDisplayName } from "@/lib/utils";
 
 interface EmailDraftDialogProps {
   open: boolean;
@@ -349,7 +350,7 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
                         htmlFor={`contact-${contact.id}`}
                         className="flex-1 text-sm cursor-pointer truncate"
                       >
-                        <span className="font-medium">{contact.full_name}</span>
+                        <span className="font-medium">{formatDisplayName(contact.full_name)}</span>
                         {isJapanese && (
                           <span className="ml-1 text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded">
                             JP

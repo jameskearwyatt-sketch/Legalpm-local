@@ -40,6 +40,7 @@ import {
 import { useEnrichContact } from "@/lib/hooks/useContactEnrichment";
 import { ContactFormDialog } from "./ContactFormDialog";
 import { getPrimaryNaicsSector } from "@/lib/naicsUtils";
+import { formatDisplayName } from "@/lib/utils";
 import {
   Building2,
   Mail,
@@ -122,7 +123,7 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
         <DialogContent className="max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
-              {contact.full_name}
+              {formatDisplayName(contact.full_name)}
               {contact.do_not_contact && (
                 <Badge variant="destructive" className="gap-1">
                   <AlertTriangle className="h-3 w-3" />
@@ -393,7 +394,7 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Contact</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete {contact.full_name}? This action cannot be undone.
+              Are you sure you want to delete {formatDisplayName(contact.full_name)}? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

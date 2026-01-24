@@ -120,8 +120,8 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col overflow-hidden">
-          <DialogHeader>
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col overflow-hidden p-0">
+          <DialogHeader className="px-6 pt-6 pb-0">
             <DialogTitle className="flex items-center gap-3">
               {formatDisplayName(contact.full_name)}
               {contact.do_not_contact && (
@@ -133,7 +133,7 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
             </DialogTitle>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+          <div className="flex-1 overflow-y-auto space-y-4 px-6 py-4">
             {/* Email with verification status */}
             <div className="flex items-center gap-3 text-sm">
               <Mail className="h-4 w-4 text-muted-foreground" />
@@ -351,7 +351,7 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
           </div>
 
           {/* Fixed footer */}
-          <div className="flex gap-2 pt-4 border-t bg-background flex-shrink-0">
+          <div className="flex gap-2 p-6 pt-4 border-t bg-background flex-shrink-0">
             <Button
               variant="outline"
               className="flex-1"

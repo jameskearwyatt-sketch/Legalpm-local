@@ -551,6 +551,51 @@ function getValidEmail(email: string | undefined | null): string | undefined {
   return email || undefined;
 }
 
+// Helper function to check if two names match (fuzzy matching)
+function namesMatch(searchName: string, foundName: string): boolean {
+  if (!searchName || !foundName) return false;
+  
+  // Normalize both names: lowercase, remove extra spaces, handle comma format
+  const normalize = (name: string): string[] => {
+    let normalized = name.toLowerCase().trim();
+    
+    // Handle "Surname, FirstName" format
+    if (normalized.includes(',')) {
+      const parts = normalized.split(',').map(p => p.trim());
+      normalized = `${parts[1]} ${parts[0]}`;
+    }
+    
+    // Split into individual name parts
+    return normalized.split(/\s+/).filter(p => p.length > 0);
+  };
+  
+  const searchParts = normalize(searchName);
+  const foundParts = normalize(foundName);
+  
+  // Check if first name matches (at least first 3 chars for nicknames like "Bob" vs "Robert")
+  const searchFirst = searchParts[0] || '';
+  const foundFirst = foundParts[0] || '';
+  
+  const firstNameMatch = searchFirst === foundFirst || 
+    searchFirst.startsWith(foundFirst.substring(0, 3)) ||
+    foundFirst.startsWith(searchFirst.substring(0, 3));
+  
+  // Check if last name matches
+  const searchLast = searchParts[searchParts.length - 1] || '';
+  const foundLast = foundParts[foundParts.length - 1] || '';
+  
+  const lastNameMatch = searchLast === foundLast;
+  
+  console.log('Name matching:', { 
+    searchName, foundName, 
+    searchFirst, foundFirst, firstNameMatch,
+    searchLast, foundLast, lastNameMatch,
+    match: firstNameMatch && lastNameMatch
+  });
+  
+  return firstNameMatch && lastNameMatch;
+}
+
 async function searchApolloByNameAndCompany(fullName: string, company: string, apiKey: string): Promise<ApolloPersonResponse | null> {
   try {
     console.log('Searching Apollo by name + company:', { fullName, company });
@@ -586,7 +631,7 @@ async function searchApolloByNameAndCompany(fullName: string, company: string, a
         q_organization_name: company,
         person_first_name: firstName,
         person_last_name: lastName,
-        per_page: 5,
+        per_page: 10, // Get more results to find the right person
       }),
     });
     
@@ -600,31 +645,44 @@ async function searchApolloByNameAndCompany(fullName: string, company: string, a
     }
     
     const data = await response.json();
-    console.log('Apollo Search response:', JSON.stringify(data, null, 2));
+    console.log('Apollo Search response - found', data.people?.length || 0, 'people');
     
-    // Return first matching person
+    // CRITICAL: Find the person whose name actually matches what we're looking for
     if (data.people && data.people.length > 0) {
-      const person = data.people[0];
+      // Try to find exact or close match
+      const matchingPerson = data.people.find((p: any) => {
+        const apolloFullName = p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim();
+        return namesMatch(fullName, apolloFullName);
+      });
+      
+      if (!matchingPerson) {
+        console.log('Apollo search returned people but none matched the name:', fullName);
+        console.log('Names returned:', data.people.map((p: any) => p.name || `${p.first_name} ${p.last_name}`));
+        // Fall back to People Match API which is more precise
+        return await matchApolloByNameAndCompany(fullName, company, apiKey);
+      }
+      
+      console.log('Found matching person:', matchingPerson.name || `${matchingPerson.first_name} ${matchingPerson.last_name}`);
       
       // If the search returned a placeholder email but we have a person ID, 
       // try to enrich to get the real email
-      if (person.id && isPlaceholderEmail(person.email)) {
-        console.log('Search returned placeholder email, trying People Enrich with ID:', person.id);
-        const enrichedPerson = await enrichApolloPersonById(person.id, apiKey);
+      if (matchingPerson.id && isPlaceholderEmail(matchingPerson.email)) {
+        console.log('Search returned placeholder email, trying People Enrich with ID:', matchingPerson.id);
+        const enrichedPerson = await enrichApolloPersonById(matchingPerson.id, apiKey);
         if (enrichedPerson?.person) {
           // Merge the enriched data with search data
           return { 
             person: { 
-              ...person, 
+              ...matchingPerson, 
               ...enrichedPerson.person,
               // Keep organization data from search if enrichment doesn't have it
-              organization: enrichedPerson.person.organization || person.organization
+              organization: enrichedPerson.person.organization || matchingPerson.organization
             } 
           };
         }
       }
       
-      return { person: person };
+      return { person: matchingPerson };
     }
     
     console.log('Apollo search by name + company returned no results');

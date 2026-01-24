@@ -51,7 +51,7 @@ serve(async (req) => {
 IMPORTANT: This image may contain ONE OR MULTIPLE business cards. Carefully scan the entire image and identify ALL visible business cards.
 
 For EACH business card you find, extract:
-- Full name (ALWAYS in "Surname, FirstName" format - e.g., "Smith, John" not "John Smith")
+- Full name (ALWAYS in "FirstName Surname" format - e.g., "John Smith" not "Smith, John")
 - Email address
 - Company/organization name
 - Job title/position
@@ -98,7 +98,7 @@ If cards overlap or are partially obscured, only extract what you can clearly re
                       properties: {
                         full_name: { 
                           type: "string", 
-                          description: "Full name in 'Surname, FirstName' format (e.g., 'Smith, John')"
+                          description: "Full name in 'FirstName Surname' format (e.g., 'John Smith')"
                         },
                         email: { 
                           type: ["string", "null"],

@@ -92,8 +92,8 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
     const lastName = getValue(mappings.last_name);
     
     if (!fullName && (firstName || lastName)) {
-      // Always use "Surname, FirstName" format for consistency
-      fullName = [lastName, firstName].filter(Boolean).join(", ");
+      // Always use "FirstName Surname" format for consistency
+      fullName = [firstName, lastName].filter(Boolean).join(" ");
     }
 
     const email = getValue(mappings.email).toLowerCase();
@@ -578,11 +578,11 @@ export function ContactImportDialog({ open, onOpenChange }: ContactImportDialogP
                   Paste contact data
                 </Label>
                 <p className="text-sm text-muted-foreground mb-2">
-                  Paste contacts from Outlook, emails, or any source. AI will intelligently extract names and email addresses from messy formatting, semicolons, parentheses, "Surname, FirstName" formats, and more.
+                  Paste contacts from Outlook, emails, or any source. AI will intelligently extract names and email addresses from any format.
                 </p>
                 <Textarea
                   rows={8}
-                  placeholder="Smith, John &lt;john.smith@example.com&gt;; Doe, Jane (jane.doe@company.org)&#10;&#10;Or any format - AI will figure it out!"
+                  placeholder="John Smith &lt;john.smith@example.com&gt;; Jane Doe (jane.doe@company.org)&#10;&#10;Or any format - AI will figure it out!"
                   value={pastedText}
                   onChange={(e) => setPastedText(e.target.value)}
                 />

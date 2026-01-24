@@ -83,7 +83,7 @@ import {
   Copy,
 } from "lucide-react";
 import { toast } from "sonner";
-import { formatDisplayName } from "@/lib/utils";
+import { formatDisplayName, extractSurnameForSort } from "@/lib/utils";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
 import { useBulkEnrichContacts } from "@/lib/hooks/useContactEnrichment";
 import { useDetectEmailMismatch, useDismissEmailMismatch } from "@/lib/hooks/useEmailMismatchDetection";
@@ -218,10 +218,10 @@ export function ContactsListView() {
   const filteredAndSortedContacts = useMemo(() => {
     let result = [...contacts];
 
-    // Helper to get field value by key
+    // Helper to get field value by key (for sorting, use surname extraction for names)
     const getFieldValue = (contact: DistributionContact, key: string): unknown => {
       switch (key) {
-        case 'full_name': return contact.full_name;
+        case 'full_name': return extractSurnameForSort(contact.full_name); // Sort by surname
         case 'email': return contact.email;
         case 'company': return contact.company;
         case 'job_title': return contact.job_title;

@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useCustomDistributionLists, useCustomListContacts } from "@/lib/hooks/useCustomDistributionLists";
 import { toast } from "sonner";
+import { formatDisplayName } from "@/lib/utils";
 
 interface Contact {
   id: string;
@@ -185,7 +186,7 @@ export function AddToListDialog({
                       {existingContacts.map((contact) => (
                         <div key={contact.id} className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
                           <Check className="h-3 w-3" />
-                          <span className="font-medium">{contact.full_name}</span>
+                          <span className="font-medium">{formatDisplayName(contact.full_name)}</span>
                           <span className="text-amber-600/70 dark:text-amber-500">
                             {contact.company || contact.email}
                           </span>
@@ -210,7 +211,7 @@ export function AddToListDialog({
                       {contactsToAdd.map((contact) => (
                         <div key={contact.id} className="text-xs text-emerald-700 dark:text-emerald-400 flex items-center gap-2">
                           <Plus className="h-3 w-3" />
-                          <span className="font-medium">{contact.full_name}</span>
+                          <span className="font-medium">{formatDisplayName(contact.full_name)}</span>
                           <span className="text-emerald-600/70 dark:text-emerald-500">
                             {contact.company || contact.email}
                           </span>

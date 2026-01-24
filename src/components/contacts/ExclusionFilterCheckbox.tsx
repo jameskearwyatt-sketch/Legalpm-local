@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ChevronDown, Building2, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDisplayName } from "@/lib/utils";
 import { type DistributionContact } from "@/lib/hooks/useDistributionContacts";
 
 interface ExclusionFilterCheckboxProps {
@@ -204,7 +204,7 @@ export function ExclusionFilterCheckbox({
                         />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium truncate">
-                            {contact.full_name}
+                            {formatDisplayName(contact.full_name)}
                           </p>
                           <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
                             <Building2 className="h-3 w-3 flex-shrink-0" />

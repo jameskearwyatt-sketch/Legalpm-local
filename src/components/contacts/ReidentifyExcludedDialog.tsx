@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { type DistributionContact } from "@/lib/hooks/useDistributionContacts";
 import { Loader2, RotateCcw, Building2, Users } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatDisplayName } from "@/lib/utils";
 
 interface ReidentifyExcludedDialogProps {
   open: boolean;
@@ -165,7 +165,7 @@ export function ReidentifyExcludedDialog({
                     disabled={isProcessing}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm truncate">{contact.full_name}</p>
+                    <p className="font-medium text-sm truncate">{formatDisplayName(contact.full_name)}</p>
                     <p className="text-xs text-muted-foreground truncate">
                       {contact.company || contact.email}
                     </p>

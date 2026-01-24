@@ -28,6 +28,7 @@ import { useBulkEnrichContacts } from "@/lib/hooks/useContactEnrichment";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
 import { Loader2, Sparkles, Check, X, UserPlus } from "lucide-react";
 import { toast } from "sonner";
+import { formatDisplayName } from "@/lib/utils";
 
 interface ImportPreviewDialogProps {
   open: boolean;
@@ -124,7 +125,7 @@ export function ImportPreviewDialog({
                 <TableBody>
                   {contacts.map((contact, idx) => (
                     <TableRow key={idx}>
-                      <TableCell className="font-medium">{contact.full_name}</TableCell>
+                      <TableCell className="font-medium">{formatDisplayName(contact.full_name)}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {contact.email}
                       </TableCell>

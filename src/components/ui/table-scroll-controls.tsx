@@ -187,7 +187,7 @@ export function TableScrollControls({ children, className }: TableScrollControls
             bottom: '80px',
             left: `${position.left + position.width / 2}px`,
             transform: 'translateX(-50%)',
-            zIndex: 99999,
+            zIndex: 40, // Below dialogs (z-50) but above normal content
           }}
           className="animate-in fade-in slide-in-from-bottom-2 duration-200"
         >

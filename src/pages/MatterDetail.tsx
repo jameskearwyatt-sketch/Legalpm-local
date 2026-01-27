@@ -673,6 +673,9 @@ export default function MatterDetail() {
   const totalBudgetUsedPercent = totalBudget > 0 ? (totalUsed / totalBudget) * 100 : 0;
   
   const collectionRate = billedAmount > 0 ? (paidAmount / billedAmount) * 100 : 100;
+  // Realization rate = Paid / (Billed + WIP Write-offs) - shows what % of resolved WIP was collected
+  const totalResolvedWip = billedAmount + wipWriteOffAmount;
+  const realizationRate = totalResolvedWip > 0 ? (paidAmount / totalResolvedWip) * 100 : 100;
 
   const isPipeline = formData.category === 'Pipeline';
   const relevantStages = formData.category === 'Pipeline' ? pipelineStages : formData.category === 'Live' ? liveStages : allStages;
@@ -1399,6 +1402,17 @@ export default function MatterDetail() {
                           collectionRate < 60 && "text-danger"
                         )}>
                           {collectionRate.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center py-3 border-b">
+                        <span className="text-muted-foreground">Realization Rate</span>
+                        <span className={cn(
+                          "text-lg font-semibold",
+                          realizationRate >= 80 && "text-success",
+                          realizationRate >= 60 && realizationRate < 80 && "text-warning",
+                          realizationRate < 60 && "text-danger"
+                        )}>
+                          {realizationRate.toFixed(1)}%
                         </span>
                       </div>
                     </>

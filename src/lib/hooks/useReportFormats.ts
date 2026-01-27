@@ -8,6 +8,7 @@ export interface ColumnMappings {
   matter_name?: number;
   client_name?: number;
   wip?: number;
+  wip_write_off?: number; // Write-offs column for tracking actual write-offs
   accounts_receivable?: number;
   total_billed?: number;
   total_paid?: number;

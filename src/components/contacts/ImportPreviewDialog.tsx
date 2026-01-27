@@ -71,12 +71,19 @@ export function ImportPreviewDialog({
         setStage("enriching");
         
         // Enrich the newly created contacts
-        const contactsToEnrich = result.map((contact: { id: string; full_name: string; email: string; linkedin_url?: string | null; company?: string | null }) => ({
+        // IMPORTANT: Pass current values so history tracking compares against UPLOADED data, not empty
+        const contactsToEnrich = result.map((contact: { id: string; full_name: string; email: string; linkedin_url?: string | null; company?: string | null; job_title?: string | null; country?: string | null; city?: string | null }) => ({
           contactId: contact.id,
           fullName: contact.full_name,
           email: contact.email,
           linkedinUrl: contact.linkedin_url,
           company: contact.company,
+          // Pass current values for proper history tracking
+          currentEmail: contact.email,
+          currentCompany: contact.company,
+          currentJobTitle: contact.job_title,
+          currentCountry: contact.country,
+          currentCity: contact.city,
         }));
 
         await bulkEnrich.mutateAsync(contactsToEnrich);

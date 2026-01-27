@@ -70,10 +70,11 @@ interface ApolloPersonResponse {
       email_status?: string;
       position?: number;
     }>;
-    // Employment history can reveal current location
+    // Employment history can reveal current location and title
     employment_history?: Array<{
       current?: boolean;
       organization_name?: string;
+      title?: string;
       raw_address?: string;
     }>;
   };
@@ -1226,9 +1227,25 @@ Deno.serve(async (req) => {
         result.linkedin_url = person.linkedin_url;
       }
       
-      // Company
+      // Company - check organization.name first, then fall back to employment_history
       if (person.organization?.name) {
         result.company = person.organization.name;
+      } else if (person.employment_history && person.employment_history.length > 0) {
+        // Find the current job from employment history
+        const currentJob = person.employment_history.find(job => job.current) || person.employment_history[0];
+        if (currentJob?.organization_name) {
+          result.company = currentJob.organization_name;
+          console.log('Extracted company from employment_history:', result.company);
+        }
+      }
+      
+      // Job title - also check employment_history as fallback
+      if (!result.job_title && person.employment_history && person.employment_history.length > 0) {
+        const currentJob = person.employment_history.find((job: { current?: boolean; title?: string }) => job.current) || person.employment_history[0];
+        if ((currentJob as { title?: string })?.title) {
+          result.job_title = (currentJob as { title?: string }).title;
+          console.log('Extracted job_title from employment_history:', result.job_title);
+        }
       }
       
       // Sectors/Industry

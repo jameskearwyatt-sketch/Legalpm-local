@@ -70,7 +70,34 @@ export function useEnrichmentChanges(contactIds: string[] | null) {
 }
 
 /**
+ * Normalizes a string for comparison - lowercase, trimmed, and whitespace-collapsed
+ */
+function normalizeForComparison(value: string | null): string {
+  if (!value) return '';
+  return value.toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+/**
+ * Checks if there's a substantive change between two values
+ * (ignoring case, leading/trailing whitespace, and multiple spaces)
+ */
+function hasSubstantiveChange(oldVal: string | null, newVal: string | null): boolean {
+  const normalizedOld = normalizeForComparison(oldVal);
+  const normalizedNew = normalizeForComparison(newVal);
+  
+  // Both empty = no change
+  if (!normalizedOld && !normalizedNew) return false;
+  
+  // One empty, one not = real change (e.g., null -> "Google")
+  if (!normalizedOld || !normalizedNew) return true;
+  
+  // Compare normalized values
+  return normalizedOld !== normalizedNew;
+}
+
+/**
  * Returns contacts that have meaningful enrichment changes (email or company)
+ * Uses case-insensitive comparison to avoid flagging trivial formatting differences
  */
 export function getContactsWithMeaningfulChanges(
   changes: ContactEnrichmentChanges
@@ -78,11 +105,11 @@ export function getContactsWithMeaningfulChanges(
   const result = new Set<string>();
   
   for (const [contactId, fieldChanges] of Object.entries(changes)) {
-    // Check if there's an actual value change (not just null -> null or same value)
+    // Check for substantive changes (case-insensitive, whitespace-normalized)
     const hasEmailChange = fieldChanges.email && 
-      fieldChanges.email.old !== fieldChanges.email.new;
+      hasSubstantiveChange(fieldChanges.email.old, fieldChanges.email.new);
     const hasCompanyChange = fieldChanges.company && 
-      fieldChanges.company.old !== fieldChanges.company.new;
+      hasSubstantiveChange(fieldChanges.company.old, fieldChanges.company.new);
     
     if (hasEmailChange || hasCompanyChange) {
       result.add(contactId);

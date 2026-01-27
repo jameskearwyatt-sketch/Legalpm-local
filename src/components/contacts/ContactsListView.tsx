@@ -1387,9 +1387,13 @@ export function ContactsListView() {
       <ContactImportDialog
         open={showImportDialog}
         onOpenChange={setShowImportDialog}
-        onImportComplete={(importedIds) => {
+        onImportComplete={async (importedIds) => {
           if (importedIds.length > 0) {
-            setJustEnrichedIds(new Set(importedIds));
+            // Store IDs but don't filter yet - wait for query to refetch
+            const idsSet = new Set(importedIds);
+            // Small delay to allow query invalidation to propagate and refetch
+            await new Promise(resolve => setTimeout(resolve, 500));
+            setJustEnrichedIds(idsSet);
             toast.success(
               `Imported ${importedIds.length} contact${importedIds.length !== 1 ? 's' : ''}`,
               { description: 'Showing imported contacts. Click badge to see all.' }

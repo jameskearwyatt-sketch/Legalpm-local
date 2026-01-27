@@ -16,14 +16,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
 import { type DistributionContactInsert } from "@/lib/hooks/useDistributionContacts";
 import { useDistributionSectors } from "@/lib/hooks/useDistributionSectors";
 import { useDistributionRelationshipOwners, useEnsureRelationshipOwner } from "@/lib/hooks/useDistributionRelationshipOwners";
@@ -543,85 +535,104 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
     if (imageInputRef.current) imageInputRef.current.value = '';
   };
 
-  const OwnerSelector = () => (
-    <div>
-      <Label className="flex items-center gap-2">
-        <User className="h-4 w-4" />
-        Contact Owner <span className="text-destructive">*</span>
-      </Label>
-      <p className="text-sm text-muted-foreground mb-2">
-        Required. Assign a relationship owner to imported contacts.
-      </p>
-      <Popover open={ownerPopoverOpen} onOpenChange={setOwnerPopoverOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            role="combobox"
-            className={cn(
-              "w-full justify-between",
-              !defaultOwner && "border-destructive/50"
-            )}
-          >
-            {defaultOwner || "Select or type owner name..."}
-            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-[300px] p-0">
-          <Command shouldFilter={false}>
+  const OwnerSelector = () => {
+    const showAddNew = ownerSearch.trim() && 
+      !filteredOwners.some(o => o.name.toLowerCase() === ownerSearch.trim().toLowerCase());
+
+    return (
+      <div>
+        <Label className="flex items-center gap-2">
+          <User className="h-4 w-4" />
+          Contact Owner <span className="text-destructive">*</span>
+        </Label>
+        <p className="text-sm text-muted-foreground mb-2">
+          Required. Assign a relationship owner to imported contacts.
+        </p>
+        <Popover open={ownerPopoverOpen} onOpenChange={setOwnerPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              role="combobox"
+              className={cn(
+                "w-full justify-between",
+                !defaultOwner && "border-destructive/50"
+              )}
+            >
+              {defaultOwner || "Select or type owner name..."}
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[300px] p-0 bg-popover">
             <div className="flex items-center border-b px-3">
               <User className="mr-2 h-4 w-4 shrink-0 opacity-50" />
               <input
-                className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                type="text"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                className="flex h-10 w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
                 placeholder="Search or add owner..."
                 value={ownerSearch}
                 onChange={(e) => setOwnerSearch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && ownerSearch.trim()) {
+                    e.preventDefault();
+                    setDefaultOwner(ownerSearch.trim());
+                    setOwnerSearch("");
+                    setOwnerPopoverOpen(false);
+                  }
+                }}
               />
             </div>
-            <CommandList>
-              <CommandEmpty>
-                {ownerSearch.trim() && (
-                  <button
-                    type="button"
-                    className="w-full p-2 text-left hover:bg-accent text-sm"
-                    onClick={() => {
-                      setDefaultOwner(ownerSearch.trim());
-                      setOwnerSearch("");
-                      setOwnerPopoverOpen(false);
-                    }}
-                  >
-                    Add "{ownerSearch.trim()}" as new owner
-                  </button>
-                )}
-              </CommandEmpty>
-              <CommandGroup>
-                {filteredOwners.map((owner) => (
-                  <CommandItem
-                    key={owner.id}
-                    value={owner.name}
-                    onSelect={() => {
-                      setDefaultOwner(owner.name);
-                      setOwnerPopoverOpen(false);
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        "mr-2 h-4 w-4",
-                        defaultOwner === owner.name ? "opacity-100" : "opacity-0"
-                      )}
-                    />
-                    {owner.name}
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
-        </PopoverContent>
-      </Popover>
-      {!defaultOwner && (
-        <p className="text-xs text-destructive mt-1">Contact owner is required</p>
-      )}
-    </div>
-  );
+            <div className="max-h-[200px] overflow-y-auto">
+              {showAddNew && (
+                <button
+                  type="button"
+                  className="w-full p-2 text-left hover:bg-accent text-sm flex items-center gap-2"
+                  onClick={() => {
+                    setDefaultOwner(ownerSearch.trim());
+                    setOwnerSearch("");
+                    setOwnerPopoverOpen(false);
+                  }}
+                >
+                  <span className="text-primary">+</span> Add "{ownerSearch.trim()}" as new owner
+                </button>
+              )}
+              {filteredOwners.length === 0 && !showAddNew && (
+                <p className="p-2 text-sm text-muted-foreground">No owners found. Type to add one.</p>
+              )}
+              {filteredOwners.map((owner) => (
+                <button
+                  key={owner.id}
+                  type="button"
+                  className={cn(
+                    "w-full p-2 text-left hover:bg-accent text-sm flex items-center gap-2",
+                    defaultOwner === owner.name && "bg-accent"
+                  )}
+                  onClick={() => {
+                    setDefaultOwner(owner.name);
+                    setOwnerSearch("");
+                    setOwnerPopoverOpen(false);
+                  }}
+                >
+                  <Check
+                    className={cn(
+                      "h-4 w-4",
+                      defaultOwner === owner.name ? "opacity-100" : "opacity-0"
+                    )}
+                  />
+                  {owner.name}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+        {!defaultOwner && (
+          <p className="text-xs text-destructive mt-1">Contact owner is required</p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>

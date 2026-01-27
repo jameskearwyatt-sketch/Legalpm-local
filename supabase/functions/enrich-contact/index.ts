@@ -780,6 +780,91 @@ async function enrichApolloPersonById(personId: string, apiKey: string): Promise
   }
 }
 
+// Apollo Organization Enrich - gets full company data including NAICS/SIC codes
+interface ApolloOrganization {
+  id?: string;
+  name?: string;
+  industry?: string;
+  primary_industry?: string;
+  keywords?: string[];
+  sic_codes?: string[];
+  naics_codes?: string[];
+  city?: string;
+  country?: string;
+  linkedin_url?: string;
+  website_url?: string;
+  estimated_num_employees?: number;
+}
+
+// Helper to guess domain from company name
+function guessDomainFromCompany(companyName: string): string {
+  // Clean up company name: lowercase, remove common suffixes, replace spaces with nothing
+  let domain = companyName.toLowerCase().trim();
+  
+  // Remove common company suffixes
+  const suffixes = [
+    ' inc', ' inc.', ' llc', ' ltd', ' limited', ' corp', ' corporation', 
+    ' co', ' co.', ' company', ' group', ' holding', ' holdings', 
+    ' gmbh', ' ag', ' sa', ' nv', ' plc', ' pvt', ' private'
+  ];
+  for (const suffix of suffixes) {
+    if (domain.endsWith(suffix)) {
+      domain = domain.slice(0, -suffix.length);
+    }
+  }
+  
+  // Remove special characters and spaces
+  domain = domain.replace(/[^a-z0-9]/g, '');
+  
+  // Add .com
+  return domain + '.com';
+}
+
+async function enrichApolloOrganization(companyName: string, emailDomain?: string, apiKey?: string): Promise<ApolloOrganization | null> {
+  if (!apiKey) return null;
+  
+  try {
+    // Try to get domain from email first, otherwise guess from company name
+    let domain = emailDomain;
+    if (!domain) {
+      domain = guessDomainFromCompany(companyName);
+    }
+    console.log('Enriching organization with domain:', domain, '(from company:', companyName, ')');
+    
+    // Apollo Organization Enrich API - requires domain parameter
+    const response = await fetch('https://api.apollo.io/v1/organizations/enrich', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'X-Api-Key': apiKey,
+      },
+      body: JSON.stringify({
+        domain: domain,
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Apollo Organization Enrich API error:', response.status, errorText);
+      
+      // If domain guess failed, try without the guessed domain
+      if (!emailDomain && domain) {
+        console.log('Domain guess failed, organization enrich unavailable');
+      }
+      return null;
+    }
+    
+    const data = await response.json();
+    console.log('Apollo Organization Enrich response:', JSON.stringify(data?.organization || data, null, 2).slice(0, 1500));
+    
+    return data?.organization || null;
+  } catch (error) {
+    console.error('Error calling Apollo Organization Enrich API:', error);
+    return null;
+  }
+}
+
 async function matchApolloByLinkedIn(linkedinUrl: string, apiKey: string): Promise<ApolloPersonResponse | null> {
   try {
     console.log('Matching Apollo by LinkedIn URL:', { linkedinUrl });
@@ -1327,6 +1412,61 @@ Deno.serve(async (req) => {
       // Company keywords
       if (person.organization?.keywords && person.organization.keywords.length > 0) {
         result.company_keywords = person.organization.keywords;
+      }
+    }
+    
+    // STEP 6: If we still don't have NAICS/SIC codes but we have a company name,
+    // call Organization Enrich API to get industry data
+    const companyNameToEnrich = result.company || company;
+    const hasIndustryCodes = (result.naics_codes && result.naics_codes.length > 0) || 
+                             (result.sic_codes && result.sic_codes.length > 0);
+    
+    if (!hasIndustryCodes && companyNameToEnrich) {
+      console.log('STEP 6: Missing industry codes - enriching organization:', companyNameToEnrich);
+      // Extract domain from email for more accurate organization lookup
+      const emailDomain = email ? email.split('@')[1] : undefined;
+      const orgData = await enrichApolloOrganization(companyNameToEnrich, emailDomain, apolloApiKey);
+      
+      if (orgData) {
+        result.sources.push('apollo_org');
+        
+        // NAICS codes from organization
+        if (orgData.naics_codes && orgData.naics_codes.length > 0) {
+          result.naics_codes = orgData.naics_codes;
+          console.log('Got NAICS codes from org enrich:', result.naics_codes);
+        }
+        
+        // SIC codes from organization
+        if (orgData.sic_codes && orgData.sic_codes.length > 0) {
+          result.sic_codes = orgData.sic_codes;
+          console.log('Got SIC codes from org enrich:', result.sic_codes);
+        }
+        
+        // Industry/sector from organization
+        if (!result.sectors || result.sectors.length === 0) {
+          const industry = orgData.primary_industry || orgData.industry;
+          if (industry) {
+            result.sectors = [industry];
+            result.confidence.sector = 0.8;
+            console.log('Got sector from org enrich:', industry);
+          }
+        }
+        
+        // Company keywords from organization
+        if ((!result.company_keywords || result.company_keywords.length === 0) && 
+            orgData.keywords && orgData.keywords.length > 0) {
+          result.company_keywords = orgData.keywords;
+          console.log('Got keywords from org enrich:', result.company_keywords.slice(0, 5));
+        }
+        
+        // Location from organization as last resort
+        if (!result.country && orgData.country) {
+          result.country = orgData.country;
+          result.confidence.location = 0.3; // Very low - this is company HQ
+          console.log('Got country from org enrich (HQ location):', result.country);
+        }
+      } else {
+        console.log('Organization enrich returned no data for:', companyNameToEnrich);
       }
     }
     

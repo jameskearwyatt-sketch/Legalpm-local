@@ -417,7 +417,7 @@ export function useDistinctCountries() {
       if (error) throw error;
       
       const countries = [...new Set(data?.map(d => d.country).filter(Boolean) as string[])];
-      return countries.sort();
+      return countries.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     },
     enabled: !!user,
   });
@@ -440,7 +440,7 @@ export function useDistinctCompanies() {
       if (error) throw error;
       
       const companies = [...new Set(data?.map(d => d.company).filter(Boolean) as string[])];
-      return companies.sort();
+      return companies.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     },
     enabled: !!user,
   });

@@ -64,9 +64,11 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
   const ensureOwner = useEnsureRelationshipOwner();
   const { findMatchingFormat, saveFormat, createHeaderSignature } = useContactImportFormats();
 
-  const filteredOwners = relationshipOwners.filter(o =>
-    o.name.toLowerCase().includes(ownerSearch.toLowerCase())
-  );
+  const filteredOwners = ownerSearch.trim() 
+    ? relationshipOwners.filter(o =>
+        o.name.toLowerCase().includes(ownerSearch.toLowerCase())
+      )
+    : relationshipOwners;
 
   const normaliseGender = (value: string | undefined): 'male' | 'female' | 'unknown' => {
     if (!value) return 'unknown';
@@ -174,6 +176,64 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
     });
   };
 
+  // Auto-detect essential fields from headers using common patterns
+  const autoDetectMappings = (headers: string[]): { mappings: ContactColumnMappings; hasMissingEssentials: boolean } => {
+    const mappings: ContactColumnMappings = {};
+    const lowerHeaders = headers.map(h => h.toLowerCase().trim());
+    
+    // Email detection patterns
+    const emailPatterns = ['email', 'e-mail', 'email address', 'emailaddress', 'mail'];
+    const emailIdx = lowerHeaders.findIndex(h => emailPatterns.some(p => h.includes(p)));
+    if (emailIdx !== -1) mappings.email = emailIdx;
+    
+    // Full name detection patterns
+    const fullNamePatterns = ['full name', 'fullname', 'name', 'contact name', 'contact'];
+    const fullNameIdx = lowerHeaders.findIndex(h => fullNamePatterns.some(p => h === p || h.includes(p)));
+    if (fullNameIdx !== -1 && fullNameIdx !== emailIdx) mappings.full_name = fullNameIdx;
+    
+    // First name detection
+    const firstNamePatterns = ['first name', 'firstname', 'first', 'given name', 'forename'];
+    const firstNameIdx = lowerHeaders.findIndex(h => firstNamePatterns.some(p => h === p || h.includes(p)));
+    if (firstNameIdx !== -1) mappings.first_name = firstNameIdx;
+    
+    // Last name detection  
+    const lastNamePatterns = ['last name', 'lastname', 'surname', 'family name', 'last'];
+    const lastNameIdx = lowerHeaders.findIndex(h => lastNamePatterns.some(p => h === p || h.includes(p)));
+    if (lastNameIdx !== -1) mappings.last_name = lastNameIdx;
+    
+    // Company detection
+    const companyPatterns = ['company', 'organization', 'organisation', 'employer', 'firm', 'company name'];
+    const companyIdx = lowerHeaders.findIndex(h => companyPatterns.some(p => h === p || h.includes(p)));
+    if (companyIdx !== -1) mappings.company = companyIdx;
+    
+    // Job title detection
+    const titlePatterns = ['job title', 'title', 'position', 'role', 'designation'];
+    const titleIdx = lowerHeaders.findIndex(h => titlePatterns.some(p => h === p || h.includes(p)));
+    if (titleIdx !== -1) mappings.job_title = titleIdx;
+    
+    // Country detection
+    const countryPatterns = ['country', 'location', 'nation'];
+    const countryIdx = lowerHeaders.findIndex(h => countryPatterns.some(p => h === p || h.includes(p)));
+    if (countryIdx !== -1) mappings.country = countryIdx;
+    
+    // City detection
+    const cityPatterns = ['city', 'town'];
+    const cityIdx = lowerHeaders.findIndex(h => cityPatterns.some(p => h === p || h.includes(p)));
+    if (cityIdx !== -1) mappings.city = cityIdx;
+    
+    // LinkedIn detection
+    const linkedinPatterns = ['linkedin', 'linkedin url', 'linkedin profile'];
+    const linkedinIdx = lowerHeaders.findIndex(h => linkedinPatterns.some(p => h === p || h.includes(p)));
+    if (linkedinIdx !== -1) mappings.linkedin_url = linkedinIdx;
+    
+    // Check if essential fields are present
+    const hasEmail = mappings.email !== undefined;
+    const hasName = mappings.full_name !== undefined || 
+                    (mappings.first_name !== undefined && mappings.last_name !== undefined);
+    
+    return { mappings, hasMissingEssentials: !hasEmail || !hasName };
+  };
+
   const handleFileAnalyse = async () => {
     if (!selectedFile) return;
 
@@ -189,8 +249,18 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
         toast.success(`Recognized format: "${matchedFormat.format_name}". Processing ${rows.length} contacts...`);
         await processWithMappings(rows, headers, matchedFormat.column_mappings);
       } else {
-        toast.info(`New format detected with ${rows.length} rows. Please train the column mapping.`);
-        setParseStep("training");
+        // Try auto-detection
+        const { mappings: autoMappings, hasMissingEssentials } = autoDetectMappings(headers);
+        
+        if (hasMissingEssentials) {
+          // Essential fields not found - prompt for training
+          toast.warning(`Could not auto-detect Email or Name columns. Please map the columns manually.`);
+          setParseStep("training");
+        } else {
+          // Auto-detection successful, but still new format - let user verify/save
+          toast.info(`Auto-detected ${Object.keys(autoMappings).length} columns. Please verify the mapping.`);
+          setParseStep("training");
+        }
       }
     } catch (error) {
       console.error("Analysis error:", error);
@@ -497,24 +567,29 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[300px] p-0">
-          <Command>
-            <CommandInput
-              placeholder="Search or add owner..."
-              value={ownerSearch}
-              onValueChange={setOwnerSearch}
-            />
+          <Command shouldFilter={false}>
+            <div className="flex items-center border-b px-3">
+              <User className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+              <input
+                className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
+                placeholder="Search or add owner..."
+                value={ownerSearch}
+                onChange={(e) => setOwnerSearch(e.target.value)}
+              />
+            </div>
             <CommandList>
               <CommandEmpty>
-                {ownerSearch && (
+                {ownerSearch.trim() && (
                   <button
                     type="button"
                     className="w-full p-2 text-left hover:bg-accent text-sm"
                     onClick={() => {
-                      setDefaultOwner(ownerSearch);
+                      setDefaultOwner(ownerSearch.trim());
+                      setOwnerSearch("");
                       setOwnerPopoverOpen(false);
                     }}
                   >
-                    Add "{ownerSearch}" as new owner
+                    Add "{ownerSearch.trim()}" as new owner
                   </button>
                 )}
               </CommandEmpty>

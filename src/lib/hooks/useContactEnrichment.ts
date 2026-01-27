@@ -31,6 +31,7 @@ interface EnrichContactParams {
   linkedinUrl?: string | null;
   company?: string | null;
   // Current values for history tracking
+  currentEmail?: string | null;
   currentJobTitle?: string | null;
   currentCompany?: string | null;
   currentCountry?: string | null;
@@ -133,7 +134,12 @@ export function useEnrichContact() {
       if (result.linkedin_url) {
         updates.linkedin_url = result.linkedin_url;
       }
-      if (result.email) {
+      if (result.email && result.email !== params.currentEmail) {
+        historyChanges.push({
+          fieldName: 'email',
+          oldValue: params.currentEmail || null,
+          newValue: result.email,
+        });
         updates.email = result.email;
       }
       if (result.email_status) {

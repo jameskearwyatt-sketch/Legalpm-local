@@ -86,6 +86,7 @@ import { toast } from "sonner";
 import { formatDisplayName, extractSurnameForSort } from "@/lib/utils";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
 import { useBulkEnrichContacts } from "@/lib/hooks/useContactEnrichment";
+import { useEnrichmentChanges, getContactsWithMeaningfulChanges, type ContactEnrichmentChanges } from "@/lib/hooks/useEnrichmentChanges";
 import { useDetectEmailMismatch, useDismissEmailMismatch } from "@/lib/hooks/useEmailMismatchDetection";
 import { useClassifyContacts } from "@/lib/hooks/useContactClassification";
 import { GenderAssignmentDialog } from "./GenderAssignmentDialog";
@@ -131,6 +132,7 @@ export function ContactsListView() {
   const [isRemovingFromList, setIsRemovingFromList] = useState(false);
   const [showEnrichmentPreCheck, setShowEnrichmentPreCheck] = useState(false);
   const [justEnrichedIds, setJustEnrichedIds] = useState<Set<string> | null>(null);
+  const [showOnlyEnrichedWithChanges, setShowOnlyEnrichedWithChanges] = useState(false);
 
   // Sorting state
   const [sortKey, setSortKey] = useState<string | null>("full_name");
@@ -169,6 +171,19 @@ export function ContactsListView() {
     getMatchForContact,
     isContactMatched,
   } = useSmartSectorSearch();
+
+  // Fetch enrichment changes for recently enriched contacts (email/company diffs)
+  const justEnrichedIdsArray = useMemo(
+    () => (justEnrichedIds ? Array.from(justEnrichedIds) : null),
+    [justEnrichedIds]
+  );
+  const { data: enrichmentChanges = {} } = useEnrichmentChanges(justEnrichedIdsArray);
+  
+  // Contacts with meaningful email/company changes
+  const contactsWithMeaningfulChanges = useMemo(
+    () => getContactsWithMeaningfulChanges(enrichmentChanges),
+    [enrichmentChanges]
+  );
 
   // Custom distribution list contacts
   const { contactIds: customListContactIds, removeContacts } = useCustomListContacts(selectedListId);
@@ -244,6 +259,11 @@ export function ContactsListView() {
     // Apply "just enriched" filter (if active - shows only recently enriched contacts)
     if (justEnrichedIds && justEnrichedIds.size > 0) {
       result = result.filter(contact => justEnrichedIds.has(contact.id));
+      
+      // Further filter to only show those with meaningful changes (email/company)
+      if (showOnlyEnrichedWithChanges && contactsWithMeaningfulChanges.size > 0) {
+        result = result.filter(contact => contactsWithMeaningfulChanges.has(contact.id));
+      }
     }
 
     // Apply smart sector search filter (if active)
@@ -280,7 +300,7 @@ export function ContactsListView() {
     }
 
     return result;
-  }, [contacts, columnFilters, sortKey, sortDirection, smartSearchState.isActive, smartSearchState.matches, selectedListId, customListContactIds, justEnrichedIds]);
+  }, [contacts, columnFilters, sortKey, sortDirection, smartSearchState.isActive, smartSearchState.matches, selectedListId, customListContactIds, justEnrichedIds, showOnlyEnrichedWithChanges, contactsWithMeaningfulChanges]);
 
   // Contacts BEFORE exclusion filters are applied - used for the exclusion filter popover lists
   const contactsBeforeExclusion = filteredAndSortedContacts;
@@ -407,6 +427,7 @@ export function ContactsListView() {
     setSortDirection("asc");
     clearSmartSearch();
     setJustEnrichedIds(null);
+    setShowOnlyEnrichedWithChanges(false);
   };
 
   const hasActiveFilters = Object.entries(filters).some(([_, v]) => {
@@ -578,16 +599,37 @@ export function ContactsListView() {
 
           {/* Just Added/Enriched indicator */}
           {justEnrichedIds && justEnrichedIds.size > 0 && (
-            <Badge variant="secondary" className="gap-1.5 bg-success/10 text-success border-success/20">
-              <Wand2 className="h-3 w-3" />
-              Showing {justEnrichedIds.size} just added
-              <button 
-                onClick={() => setJustEnrichedIds(null)}
-                className="ml-1 hover:bg-success/20 rounded p-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="gap-1.5 bg-success/10 text-success border-success/20">
+                <Wand2 className="h-3 w-3" />
+                Showing {justEnrichedIds.size} just added
+                <button 
+                  onClick={() => {
+                    setJustEnrichedIds(null);
+                    setShowOnlyEnrichedWithChanges(false);
+                  }}
+                  className="ml-1 hover:bg-success/20 rounded p-0.5"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+              
+              {/* Filter to show only contacts with email/company changes */}
+              {contactsWithMeaningfulChanges.size > 0 && (
+                <Button
+                  variant={showOnlyEnrichedWithChanges ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowOnlyEnrichedWithChanges(!showOnlyEnrichedWithChanges)}
+                  className="gap-1.5 h-6 text-xs"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {showOnlyEnrichedWithChanges 
+                    ? `Showing ${contactsWithMeaningfulChanges.size} with changes`
+                    : `${contactsWithMeaningfulChanges.size} with email/company changes`
+                  }
+                </Button>
+              )}
+            </div>
           )}
 
           <div className="flex-1" />
@@ -1113,33 +1155,101 @@ export function ContactsListView() {
                         </div>
                       </TableCell>
                       <TableCell className="truncate text-sm">
-                        {contact.email_company_mismatch && !contact.email_mismatch_dismissed ? (
-                          <div className="flex items-center gap-1">
-                            <span className="text-destructive font-medium truncate">{contact.email}</span>
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      dismissMismatch.mutate(contact.id);
-                                    }}
-                                    className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                                  >
-                                    <XCircle className="h-4 w-4" />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p className="text-xs">Email may not match company. Click to dismiss.</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground">{contact.email}</span>
-                        )}
+                        {(() => {
+                          const emailChange = enrichmentChanges[contact.id]?.email;
+                          const hasEmailChange = emailChange && emailChange.old !== emailChange.new;
+                          
+                          if (contact.email_company_mismatch && !contact.email_mismatch_dismissed) {
+                            return (
+                              <div className="flex items-center gap-1">
+                                <span className="text-destructive font-medium truncate">{contact.email}</span>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          dismissMismatch.mutate(contact.id);
+                                        }}
+                                        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                                      >
+                                        <XCircle className="h-4 w-4" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="text-xs">Email may not match company. Click to dismiss.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            );
+                          }
+                          
+                          if (hasEmailChange) {
+                            return (
+                              <div className="flex items-center gap-1">
+                                <span className="text-muted-foreground truncate">{contact.email}</span>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="shrink-0 text-primary">
+                                        <Sparkles className="h-3 w-3" />
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      <div className="text-xs space-y-1">
+                                        <p className="font-medium">Email enriched</p>
+                                        <p className="text-muted-foreground">
+                                          <span className="line-through">{emailChange.old || "(empty)"}</span>
+                                          {" → "}
+                                          <span className="text-foreground">{emailChange.new}</span>
+                                        </p>
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            );
+                          }
+                          
+                          return <span className="text-muted-foreground">{contact.email}</span>;
+                        })()}
                       </TableCell>
-                      <TableCell className="truncate text-sm">{contact.company || "-"}</TableCell>
+                      <TableCell className="truncate text-sm">
+                        {(() => {
+                          const companyChange = enrichmentChanges[contact.id]?.company;
+                          const hasCompanyChange = companyChange && companyChange.old !== companyChange.new;
+                          
+                          if (hasCompanyChange) {
+                            return (
+                              <div className="flex items-center gap-1">
+                                <span className="truncate">{contact.company || "-"}</span>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="shrink-0 text-primary">
+                                        <Sparkles className="h-3 w-3" />
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      <div className="text-xs space-y-1">
+                                        <p className="font-medium">Company enriched</p>
+                                        <p className="text-muted-foreground">
+                                          <span className="line-through">{companyChange.old || "(empty)"}</span>
+                                          {" → "}
+                                          <span className="text-foreground">{companyChange.new}</span>
+                                        </p>
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            );
+                          }
+                          
+                          return <span>{contact.company || "-"}</span>;
+                        })()}
+                      </TableCell>
                       <TableCell className="truncate text-sm">{contact.job_title || "-"}</TableCell>
                       <TableCell className="text-muted-foreground truncate text-sm">{contact.relationship_owner || "-"}</TableCell>
                       <TableCell className="text-sm">{contact.country || "-"}</TableCell>

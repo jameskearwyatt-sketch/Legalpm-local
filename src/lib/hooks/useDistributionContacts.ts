@@ -301,6 +301,8 @@ export function useUpdateDistributionContact() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["distribution-contacts"] });
       queryClient.invalidateQueries({ queryKey: ["distribution-contact", variables.id] });
+      queryClient.invalidateQueries({ queryKey: ["distribution-contacts-companies"] });
+      queryClient.invalidateQueries({ queryKey: ["distribution-contacts-countries"] });
       toast.success("Contact updated");
     },
     onError: () => {
@@ -388,6 +390,8 @@ export function useBulkCreateDistributionContacts() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["distribution-contacts"] });
+      queryClient.invalidateQueries({ queryKey: ["distribution-contacts-companies"] });
+      queryClient.invalidateQueries({ queryKey: ["distribution-contacts-countries"] });
       toast.success(`${data?.length || 0} contacts imported`);
     },
     onError: () => {

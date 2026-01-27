@@ -194,17 +194,20 @@ export function ContactsListView() {
   );
 
   const uniqueCompanies = useMemo(() => 
-    [...new Set(contacts.map(c => c.company).filter(Boolean) as string[])].sort(),
+    [...new Set(contacts.map(c => c.company).filter(Boolean) as string[])]
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
     [contacts]
   );
 
   const uniqueJobTitles = useMemo(() => 
-    [...new Set(contacts.map(c => c.job_title).filter(Boolean) as string[])].sort(),
+    [...new Set(contacts.map(c => c.job_title).filter(Boolean) as string[])]
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
     [contacts]
   );
 
   const uniqueCountries = useMemo(() => 
-    [...new Set(contacts.map(c => c.country).filter(Boolean) as string[])].sort(),
+    [...new Set(contacts.map(c => c.country).filter(Boolean) as string[])]
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
     [contacts]
   );
 

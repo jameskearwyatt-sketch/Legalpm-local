@@ -66,6 +66,7 @@ interface ImportedMatterData {
   isMultiClientAggregate?: boolean;
   currency: string;
   wip: { value: number; current: number; changed: boolean; selected: boolean };
+  wipWriteOff: { value: number; current: number; changed: boolean; selected: boolean }; // WIP write-offs
   accountsReceivable: { value: number; current: number; changed: boolean; selected: boolean };
   totalBilled: { value: number; current: number; changed: boolean; selected: boolean };
   totalPaid: { value: number; current: number; changed: boolean; selected: boolean };
@@ -283,6 +284,7 @@ export function MasterWipUpdateDialog({
           client_name: m.clients?.name || '',
           currency: (m as any).effective_currency ?? m.fee_currency,
           current_wip: snapshot?.wip_amount || 0,
+          current_wip_write_off: snapshot?.wip_write_off_amount || 0,
           current_ar: snapshot?.accounts_receivable || 0,
           current_billed: snapshot?.billed_amount || 0,
           current_paid: snapshot?.paid_amount || 0,
@@ -335,6 +337,9 @@ export function MasterWipUpdateDialog({
         return {
           ...d,
           wip: { ...d.wip, selected: d.wip.changed },
+          wipWriteOff: d.wipWriteOff 
+            ? { ...d.wipWriteOff, selected: d.wipWriteOff.changed }
+            : { value: 0, current: 0, changed: false, selected: false },
           accountsReceivable: { ...d.accountsReceivable, selected: d.accountsReceivable.changed },
           totalBilled: { ...d.totalBilled, selected: d.totalBilled.changed },
           totalPaid: { ...d.totalPaid, selected: d.totalPaid.changed },
@@ -349,6 +354,9 @@ export function MasterWipUpdateDialog({
         return {
           ...d,
           wip: { ...d.wip, selected: d.wip.changed },
+          wipWriteOff: d.wipWriteOff 
+            ? { ...d.wipWriteOff, selected: d.wipWriteOff.changed }
+            : { value: 0, current: 0, changed: false, selected: false },
           accountsReceivable: { ...d.accountsReceivable, selected: d.accountsReceivable.changed },
           totalBilled: { ...d.totalBilled, selected: d.totalBilled.changed },
           totalPaid: { ...d.totalPaid, selected: d.totalPaid.changed },
@@ -361,6 +369,9 @@ export function MasterWipUpdateDialog({
       const unmatched: ImportedMatterData[] = (data.unmatchedData || []).map((d: any) => ({
         ...d,
         wip: { ...d.wip, selected: false },
+        wipWriteOff: d.wipWriteOff 
+          ? { ...d.wipWriteOff, selected: false }
+          : { value: 0, current: 0, changed: false, selected: false },
         accountsReceivable: { ...d.accountsReceivable, selected: false },
         totalBilled: { ...d.totalBilled, selected: false },
         totalPaid: { ...d.totalPaid, selected: false },
@@ -759,7 +770,7 @@ export function MasterWipUpdateDialog({
         return {
           matter_id: d.matchedMatterId!,
           wip_amount: rawWip,
-          wip_write_off_amount: 0, // Not tracked in new flow
+          wip_write_off_amount: d.wipWriteOff?.selected ? d.wipWriteOff.value : d.wipWriteOff?.current || 0,
           billed_amount: rawBilled,
           accounts_receivable: rawAr,
           paid_amount: rawPaid,

@@ -12,6 +12,7 @@ interface MatterInfo {
   client_name: string;
   currency: string;
   current_wip: number;
+  current_wip_write_off: number;
   current_ar: number;
   current_billed: number;
   current_paid: number;
@@ -23,6 +24,7 @@ interface ColumnMappings {
   matter_name?: number;
   client_name?: number;
   wip?: number;
+  wip_write_off?: number; // Write-offs column
   accounts_receivable?: number;
   total_billed?: number;
   total_paid?: number;
@@ -38,6 +40,7 @@ interface ParsedRow {
   matterName: string;
   clientName: string;
   wip: number;
+  wipWriteOff: number; // Write-off amount
   accountsReceivable: number;
   totalBilled: number;
   totalPaid: number;
@@ -68,6 +71,7 @@ interface MatchedData {
   isMultiClientAggregate?: boolean;
   currency: string;
   wip: { value: number; current: number; changed: boolean };
+  wipWriteOff: { value: number; current: number; changed: boolean };
   accountsReceivable: { value: number; current: number; changed: boolean };
   totalBilled: { value: number; current: number; changed: boolean };
   totalPaid: { value: number; current: number; changed: boolean };
@@ -246,6 +250,7 @@ serve(async (req) => {
       matterName: columnMappings.matter_name !== undefined ? (row[columnMappings.matter_name] || '') : '',
       clientName: columnMappings.client_name !== undefined ? (row[columnMappings.client_name] || '') : '',
       wip: columnMappings.wip !== undefined ? parseNumber(row[columnMappings.wip]) : 0,
+      wipWriteOff: columnMappings.wip_write_off !== undefined ? parseNumber(row[columnMappings.wip_write_off]) : 0,
       accountsReceivable: columnMappings.accounts_receivable !== undefined ? parseNumber(row[columnMappings.accounts_receivable]) : 0,
       totalBilled: columnMappings.total_billed !== undefined ? parseNumber(row[columnMappings.total_billed]) : 0,
       totalPaid: columnMappings.total_paid !== undefined ? parseNumber(row[columnMappings.total_paid]) : 0,
@@ -326,6 +331,7 @@ serve(async (req) => {
       rowIndices: number[];
       clientNames: string[];
       totalWip: number;
+      totalWipWriteOff: number;
       totalAr: number;
       totalBilled: number;
       totalPaid: number;
@@ -359,6 +365,7 @@ serve(async (req) => {
             existing.clientNames.push(match.parsed.clientName);
           }
           existing.totalWip += match.parsed.wip;
+          existing.totalWipWriteOff += match.parsed.wipWriteOff;
           existing.totalAr += match.parsed.accountsReceivable;
           existing.totalBilled += match.parsed.totalBilled;
           existing.totalPaid += match.parsed.totalPaid;
@@ -377,6 +384,7 @@ serve(async (req) => {
             rowIndices: [match.parsed.rowIndex],
             clientNames: match.parsed.clientName ? [match.parsed.clientName] : [],
             totalWip: match.parsed.wip,
+            totalWipWriteOff: match.parsed.wipWriteOff,
             totalAr: match.parsed.accountsReceivable,
             totalBilled: match.parsed.totalBilled,
             totalPaid: match.parsed.totalPaid,
@@ -419,6 +427,11 @@ serve(async (req) => {
           value: agg.totalWip,
           current: agg.matter.current_wip,
           changed: !isWithinTolerance(agg.totalWip, agg.matter.current_wip),
+        },
+        wipWriteOff: {
+          value: agg.totalWipWriteOff,
+          current: agg.matter.current_wip_write_off || 0,
+          changed: !isWithinTolerance(agg.totalWipWriteOff, agg.matter.current_wip_write_off || 0),
         },
         accountsReceivable: {
           value: agg.totalAr,
@@ -470,6 +483,11 @@ serve(async (req) => {
           current: matter.current_wip,
           changed: !isWithinTolerance(match.parsed.wip, matter.current_wip),
         },
+        wipWriteOff: {
+          value: match.parsed.wipWriteOff,
+          current: matter.current_wip_write_off || 0,
+          changed: !isWithinTolerance(match.parsed.wipWriteOff, matter.current_wip_write_off || 0),
+        },
         accountsReceivable: {
           value: match.parsed.accountsReceivable,
           current: matter.current_ar,
@@ -513,6 +531,11 @@ serve(async (req) => {
           value: match.parsed.wip,
           current: 0,
           changed: true,
+        },
+        wipWriteOff: {
+          value: match.parsed.wipWriteOff,
+          current: 0,
+          changed: match.parsed.wipWriteOff > 0,
         },
         accountsReceivable: {
           value: match.parsed.accountsReceivable,

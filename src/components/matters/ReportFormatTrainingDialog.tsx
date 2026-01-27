@@ -26,13 +26,14 @@ interface ReportFormatTrainingDialogProps {
   existingName?: string;
 }
 
-type FieldType = 'matter_number' | 'matter_name' | 'client_name' | 'wip' | 'accounts_receivable' | 'total_billed' | 'total_paid' | 'wip_disbursements' | 'ar_disbursements' | 'paid_disbursements';
+type FieldType = 'matter_number' | 'matter_name' | 'client_name' | 'wip' | 'wip_write_off' | 'accounts_receivable' | 'total_billed' | 'total_paid' | 'wip_disbursements' | 'ar_disbursements' | 'paid_disbursements';
 
 const FIELD_CONFIG: Record<FieldType, { label: string; color: string; required: boolean; group?: string }> = {
   matter_number: { label: 'Matter Number', color: 'bg-blue-500', required: true },
   matter_name: { label: 'Matter Name', color: 'bg-indigo-500', required: false },
   client_name: { label: 'Client Name', color: 'bg-cyan-500', required: false },
   wip: { label: 'WIP', color: 'bg-amber-500', required: true },
+  wip_write_off: { label: 'WIP Write-off', color: 'bg-red-500', required: false, group: 'financials' },
   accounts_receivable: { label: 'Accounts Receivable', color: 'bg-orange-500', required: true },
   total_billed: { label: 'Total Billed', color: 'bg-purple-500', required: true },
   total_paid: { label: 'Total Paid', color: 'bg-green-500', required: true },

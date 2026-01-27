@@ -11,22 +11,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { type DistributionContactInsert } from "@/lib/hooks/useDistributionContacts";
 import { useDistributionSectors } from "@/lib/hooks/useDistributionSectors";
 import { useDistributionRelationshipOwners, useEnsureRelationshipOwner } from "@/lib/hooks/useDistributionRelationshipOwners";
 import { useContactImportFormats, ContactColumnMappings } from "@/lib/hooks/useContactImportFormats";
 import { ContactFormatTrainingDialog } from "./ContactFormatTrainingDialog";
 import { ImportPreviewDialog } from "./ImportPreviewDialog";
+import { OwnerSelector } from "./OwnerSelector";
 import { supabase } from "@/integrations/supabase/client";
-import { Upload, FileText, Loader2, FileSpreadsheet, X, ChevronsUpDown, Check, User, CreditCard, Camera, Sparkles } from "lucide-react";
+import { Upload, FileText, Loader2, FileSpreadsheet, X, CreditCard, Camera, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
-import { cn } from "@/lib/utils";
 
 interface ContactImportDialogProps {
   open: boolean;
@@ -44,8 +39,6 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
   const [parsedHeaders, setParsedHeaders] = useState<string[]>([]);
   const [parseStep, setParseStep] = useState<"select" | "training" | "preview">("select");
   const [defaultOwner, setDefaultOwner] = useState<string>("");
-  const [ownerSearch, setOwnerSearch] = useState("");
-  const [ownerPopoverOpen, setOwnerPopoverOpen] = useState(false);
   const [contactsToPreview, setContactsToPreview] = useState<DistributionContactInsert[]>([]);
   const [importSource, setImportSource] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -55,12 +48,6 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
   const { data: relationshipOwners = [] } = useDistributionRelationshipOwners();
   const ensureOwner = useEnsureRelationshipOwner();
   const { findMatchingFormat, saveFormat, createHeaderSignature } = useContactImportFormats();
-
-  const filteredOwners = ownerSearch.trim() 
-    ? relationshipOwners.filter(o =>
-        o.name.toLowerCase().includes(ownerSearch.toLowerCase())
-      )
-    : relationshipOwners;
 
   const normaliseGender = (value: string | undefined): 'male' | 'female' | 'unknown' => {
     if (!value) return 'unknown';
@@ -515,7 +502,6 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
     setParsedHeaders([]);
     setParseStep("select");
     setDefaultOwner("");
-    setOwnerSearch("");
     setContactsToPreview([]);
     setImportSource("");
     if (fileInputRef.current) fileInputRef.current.value = '';
@@ -535,103 +521,10 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
     if (imageInputRef.current) imageInputRef.current.value = '';
   };
 
-  const OwnerSelector = () => {
-    const showAddNew = ownerSearch.trim() && 
-      !filteredOwners.some(o => o.name.toLowerCase() === ownerSearch.trim().toLowerCase());
-
-    return (
-      <div>
-        <Label className="flex items-center gap-2">
-          <User className="h-4 w-4" />
-          Contact Owner <span className="text-destructive">*</span>
-        </Label>
-        <p className="text-sm text-muted-foreground mb-2">
-          Required. Assign a relationship owner to imported contacts.
-        </p>
-        <Popover open={ownerPopoverOpen} onOpenChange={setOwnerPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              role="combobox"
-              className={cn(
-                "w-full justify-between",
-                !defaultOwner && "border-destructive/50"
-              )}
-            >
-              {defaultOwner || "Select or type owner name..."}
-              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-[300px] p-0 bg-popover">
-            <div className="flex items-center border-b px-3">
-              <User className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-              <input
-                type="text"
-                autoComplete="off"
-                autoCorrect="off"
-                spellCheck={false}
-                className="flex h-10 w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                placeholder="Search or add owner..."
-                value={ownerSearch}
-                onChange={(e) => setOwnerSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && ownerSearch.trim()) {
-                    e.preventDefault();
-                    setDefaultOwner(ownerSearch.trim());
-                    setOwnerSearch("");
-                    setOwnerPopoverOpen(false);
-                  }
-                }}
-              />
-            </div>
-            <div className="max-h-[200px] overflow-y-auto">
-              {showAddNew && (
-                <button
-                  type="button"
-                  className="w-full p-2 text-left hover:bg-accent text-sm flex items-center gap-2"
-                  onClick={() => {
-                    setDefaultOwner(ownerSearch.trim());
-                    setOwnerSearch("");
-                    setOwnerPopoverOpen(false);
-                  }}
-                >
-                  <span className="text-primary">+</span> Add "{ownerSearch.trim()}" as new owner
-                </button>
-              )}
-              {filteredOwners.length === 0 && !showAddNew && (
-                <p className="p-2 text-sm text-muted-foreground">No owners found. Type to add one.</p>
-              )}
-              {filteredOwners.map((owner) => (
-                <button
-                  key={owner.id}
-                  type="button"
-                  className={cn(
-                    "w-full p-2 text-left hover:bg-accent text-sm flex items-center gap-2",
-                    defaultOwner === owner.name && "bg-accent"
-                  )}
-                  onClick={() => {
-                    setDefaultOwner(owner.name);
-                    setOwnerSearch("");
-                    setOwnerPopoverOpen(false);
-                  }}
-                >
-                  <Check
-                    className={cn(
-                      "h-4 w-4",
-                      defaultOwner === owner.name ? "opacity-100" : "opacity-0"
-                    )}
-                  />
-                  {owner.name}
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
-        {!defaultOwner && (
-          <p className="text-xs text-destructive mt-1">Contact owner is required</p>
-        )}
-      </div>
-    );
+  const ownerSelectorProps = {
+    defaultOwner,
+    onOwnerChange: setDefaultOwner,
+    relationshipOwners: relationshipOwners.map(o => ({ id: o.id, name: o.name })),
   };
 
   return (
@@ -674,7 +567,7 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
                   onChange={(e) => setPastedText(e.target.value)}
                 />
               </div>
-              <OwnerSelector />
+              <OwnerSelector {...ownerSelectorProps} />
             </TabsContent>
 
             <TabsContent value="file" className="space-y-4 mt-4">
@@ -719,7 +612,7 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
                   </button>
                 )}
               </div>
-              <OwnerSelector />
+              <OwnerSelector {...ownerSelectorProps} />
             </TabsContent>
 
             <TabsContent value="card" className="space-y-4 mt-4">
@@ -764,7 +657,7 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
                   </button>
                 )}
               </div>
-              <OwnerSelector />
+              <OwnerSelector {...ownerSelectorProps} />
             </TabsContent>
           </Tabs>
 

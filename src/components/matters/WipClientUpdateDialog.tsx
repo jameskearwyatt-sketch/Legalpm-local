@@ -656,19 +656,20 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
                 {liveMatters.map(matter => {
                   const client = clientMap.get(matter.client_id);
                   const hasContacts = getClientBillingContacts(matter.client_id).length > 0;
-                  return (
-                    <div
-                      key={matter.id}
-                      className={cn(
-                        "flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors",
-                        selectedMatterIds.has(matter.id) && "bg-primary/5 border-primary/30"
-                      )}
-                      onClick={() => toggleMatter(matter.id)}
-                    >
-                      <Checkbox
-                        checked={selectedMatterIds.has(matter.id)}
-                        onCheckedChange={() => toggleMatter(matter.id)}
-                      />
+                    return (
+                      <div
+                        key={matter.id}
+                        className={cn(
+                          "flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 cursor-pointer transition-colors",
+                          selectedMatterIds.has(matter.id) && "bg-primary/5 border-primary/30"
+                        )}
+                        onClick={() => toggleMatter(matter.id)}
+                      >
+                        <Checkbox
+                          checked={selectedMatterIds.has(matter.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onCheckedChange={() => toggleMatter(matter.id)}
+                        />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">
                           {(matter as any).matter_display_name || matter.matter_name}

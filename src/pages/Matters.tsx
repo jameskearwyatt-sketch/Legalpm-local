@@ -43,12 +43,13 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { EditableFinancialCell } from '@/components/matters/EditableFinancialCell';
 import { BilledAmountCell } from '@/components/matters/BilledAmountCell';
-import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload, History, Eye, Lightbulb, Download } from 'lucide-react';
+import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload, History, Eye, Lightbulb, Download, Mail } from 'lucide-react';
 import { ExportMattersDialog } from '@/components/matters/ExportMattersDialog';
 import { ProgressSlider } from '@/components/matters/ProgressSlider';
 import { MasterWipUpdateDialog } from '@/components/matters/MasterWipUpdateDialog';
 import { DisbursementReviewResult } from '@/components/matters/DisbursementReviewDialog';
 import { MasterWipHistoryDialog } from '@/components/matters/MasterWipHistoryDialog';
+import { WipClientUpdateDialog } from '@/components/matters/WipClientUpdateDialog';
 import { useMasterWipUpdates } from '@/lib/hooks/useMasterWipUpdates';
 import { useHighlightMovements } from '@/lib/hooks/useHighlightMovements';
 import { HighlightedFinancialValue } from '@/components/matters/HighlightedFinancialValue';
@@ -559,6 +560,7 @@ export default function Matters() {
   const [showMasterWipDialog, setShowMasterWipDialog] = useState(false);
   const [showMasterWipHistoryDialog, setShowMasterWipHistoryDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
+  const [showWipClientUpdateDialog, setShowWipClientUpdateDialog] = useState(false);
   const [isTogglingProposals, setIsTogglingProposals] = useState(false);
   const { createMasterUpdate, lastMasterChanges, lastMasterUpdateDate } = useMasterWipUpdates();
   const { masterHighlightEnabled, toggleMasterHighlight } = useHighlightMovements();
@@ -1040,6 +1042,13 @@ export default function Matters() {
                   >
                     <History className="mr-2 h-4 w-4" />
                     History
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={() => setShowWipClientUpdateDialog(true)}
+                  >
+                    <Mail className="mr-2 h-4 w-4" />
+                    Update Clients on WIP
                   </Button>
                   <Button 
                     variant="default" 
@@ -1605,6 +1614,13 @@ export default function Matters() {
         onOpenChange={setShowExportDialog}
         matters={matters}
         userName={userProfile?.full_name || ''}
+      />
+
+      {/* WIP Client Update Dialog */}
+      <WipClientUpdateDialog
+        open={showWipClientUpdateDialog}
+        onOpenChange={setShowWipClientUpdateDialog}
+        matters={matters}
       />
     </AppLayout>
   );

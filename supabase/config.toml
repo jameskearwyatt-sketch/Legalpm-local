@@ -86,3 +86,6 @@ verify_jwt = false
 
 [functions.parse-pasted-contacts]
 verify_jwt = false
+
+[functions.analyze-wip-changes]
+verify_jwt = false

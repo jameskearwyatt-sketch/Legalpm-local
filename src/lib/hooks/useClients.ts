@@ -3,6 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
 
+export interface BillingContact {
+  contact_id: string | null;
+  name: string;
+  email: string;
+}
+
 export interface Client {
   id: string;
   user_id: string;
@@ -10,6 +16,7 @@ export interface Client {
   display_name: string | null;
   group_sector: string | null;
   billing_contact: string | null;
+  billing_contacts: BillingContact[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -35,7 +42,14 @@ export function useClients() {
         .order('name');
 
       if (error) throw error;
-      return data as Client[];
+      
+      // Transform the data to properly type billing_contacts
+      return (data || []).map(client => ({
+        ...client,
+        billing_contacts: Array.isArray(client.billing_contacts) 
+          ? (client.billing_contacts as unknown as BillingContact[])
+          : null,
+      })) as Client[];
     },
     enabled: !!user,
   });

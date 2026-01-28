@@ -30,7 +30,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MatterWithFinancials } from "@/lib/hooks/useMatters";
-import { useClients, Client } from "@/lib/hooks/useClients";
+import { useClients, Client, BillingContact } from "@/lib/hooks/useClients";
 import { useDistributionContacts } from "@/lib/hooks/useDistributionContacts";
 import { useWipEmailTemplates } from "@/lib/hooks/useWipEmailTemplates";
 import { useWipEmailLog } from "@/lib/hooks/useWipEmailLog";
@@ -68,11 +68,6 @@ interface WipClientUpdateDialogProps {
   matters: MatterWithFinancials[];
 }
 
-interface BillingContact {
-  contact_id: string | null;
-  name: string;
-  email: string;
-}
 
 interface MatterEmailData {
   matterId: string;
@@ -152,32 +147,36 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
     const client = clientMap.get(clientId);
     if (!client) return [];
     
-    // Parse billing_contacts JSONB field
-    try {
-      const billingContacts = (client as any).billing_contacts;
-      if (Array.isArray(billingContacts)) {
-        return billingContacts as BillingContact[];
-      }
-    } catch {
-      // Invalid JSON, return empty
+    // Use properly typed billing_contacts field
+    if (Array.isArray(client.billing_contacts)) {
+      return client.billing_contacts;
     }
     return [];
   };
 
-  // Check which clients are missing billing contacts
-  const clientsMissingBillingContacts = useMemo(() => {
-    const missing = new Set<string>();
+  // Get unique clients for selected matters (for billing contacts step)
+  const selectedClientIds = useMemo(() => {
+    const clientIds = new Set<string>();
     selectedMatterIds.forEach(matterId => {
       const matter = liveMatters.find(m => m.id === matterId);
       if (matter) {
-        const contacts = getClientBillingContacts(matter.client_id);
-        if (contacts.length === 0) {
-          missing.add(matter.client_id);
-        }
+        clientIds.add(matter.client_id);
+      }
+    });
+    return clientIds;
+  }, [selectedMatterIds, liveMatters]);
+
+  // Check which clients are missing billing contacts
+  const clientsMissingBillingContacts = useMemo(() => {
+    const missing = new Set<string>();
+    selectedClientIds.forEach(clientId => {
+      const contacts = getClientBillingContacts(clientId);
+      if (contacts.length === 0) {
+        missing.add(clientId);
       }
     });
     return missing;
-  }, [selectedMatterIds, liveMatters, clientMap]);
+  }, [selectedClientIds, clientMap]);
 
   // Selected matters array
   const selectedMatters = useMemo(() =>
@@ -594,12 +593,8 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
   const goToNextStep = () => {
     switch (step) {
       case "select-matters":
-        if (clientsMissingBillingContacts.size > 0) {
-          setStep("billing-contacts");
-        } else {
-          initializeMatterData();
-          setStep("welcome-paragraph");
-        }
+        // Always go to billing contacts step so users can review/edit contacts
+        setStep("billing-contacts");
         break;
       case "billing-contacts":
         initializeMatterData();
@@ -623,11 +618,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         setStep("select-matters");
         break;
       case "welcome-paragraph":
-        if (clientsMissingBillingContacts.size > 0) {
-          setStep("billing-contacts");
-        } else {
-          setStep("select-matters");
-        }
+        setStep("billing-contacts");
         break;
       case "matter-details":
         setStep("welcome-paragraph");
@@ -699,25 +690,46 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
       case "billing-contacts":
         return (
           <div className="space-y-4">
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                The following clients need billing contacts before you can proceed. Add at least one billing contact for each.
-              </AlertDescription>
-            </Alert>
+            {clientsMissingBillingContacts.size > 0 ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {clientsMissingBillingContacts.size} client{clientsMissingBillingContacts.size !== 1 ? 's' : ''} need{clientsMissingBillingContacts.size === 1 ? 's' : ''} at least one billing contact before you can proceed.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Alert>
+                <Check className="h-4 w-4" />
+                <AlertDescription>
+                  All clients have billing contacts. You can add additional contacts or proceed to the next step.
+                </AlertDescription>
+              </Alert>
+            )}
             <ScrollArea className="h-[400px]">
               <div className="space-y-6 pr-4">
-                {Array.from(clientsMissingBillingContacts).map(clientId => {
+                {Array.from(selectedClientIds).map(clientId => {
                   const client = clientMap.get(clientId);
                   if (!client) return null;
                   const billingContacts = getClientBillingContacts(clientId);
+                  const isMissingContacts = clientsMissingBillingContacts.has(clientId);
                   
                   return (
-                    <Card key={clientId}>
+                    <Card key={clientId} className={cn(isMissingContacts && "border-destructive")}>
                       <CardContent className="pt-4">
-                        <div className="flex items-center gap-2 mb-4">
-                          <Building2 className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{getClientDisplayName(client)}</span>
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">{getClientDisplayName(client)}</span>
+                          </div>
+                          {isMissingContacts ? (
+                            <Badge variant="destructive" className="text-xs">
+                              No contacts
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs">
+                              {billingContacts.length} contact{billingContacts.length !== 1 ? 's' : ''}
+                            </Badge>
+                          )}
                         </div>
                         
                         {billingContacts.length > 0 && (
@@ -1114,10 +1126,6 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         {step !== "complete" && (
           <div className="flex items-center justify-center gap-1 py-2">
             {steps.map((s, idx) => {
-              // Skip billing contacts step if not needed
-              if (s.key === "billing-contacts" && clientsMissingBillingContacts.size === 0) {
-                return null;
-              }
               return (
                 <div key={s.key} className="flex items-center">
                   <div

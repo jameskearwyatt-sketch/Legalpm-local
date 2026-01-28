@@ -347,6 +347,7 @@ export type Database = {
       clients: {
         Row: {
           billing_contact: string | null
+          billing_contacts: Json | null
           created_at: string
           display_name: string | null
           group_sector: string | null
@@ -357,6 +358,7 @@ export type Database = {
         }
         Insert: {
           billing_contact?: string | null
+          billing_contacts?: Json | null
           created_at?: string
           display_name?: string | null
           group_sector?: string | null
@@ -367,6 +369,7 @@ export type Database = {
         }
         Update: {
           billing_contact?: string | null
+          billing_contacts?: Json | null
           created_at?: string
           display_name?: string | null
           group_sector?: string | null
@@ -2539,6 +2542,112 @@ export type Database = {
           use_billed_only_for_burn?: boolean
           user_id?: string
           wip_warning_threshold?: number
+        }
+        Relationships: []
+      }
+      wip_email_log: {
+        Row: {
+          body: string
+          client_id: string
+          created_at: string
+          id: string
+          matter_id: string
+          recipient_emails: string[]
+          recipient_names: string[]
+          review_period_end: string
+          review_period_start: string
+          sent_confirmed_at: string | null
+          sent_date: string | null
+          subject: string
+          user_id: string
+          was_sent: boolean
+          welcome_template_id: string | null
+        }
+        Insert: {
+          body: string
+          client_id: string
+          created_at?: string
+          id?: string
+          matter_id: string
+          recipient_emails?: string[]
+          recipient_names?: string[]
+          review_period_end: string
+          review_period_start: string
+          sent_confirmed_at?: string | null
+          sent_date?: string | null
+          subject: string
+          user_id: string
+          was_sent?: boolean
+          welcome_template_id?: string | null
+        }
+        Update: {
+          body?: string
+          client_id?: string
+          created_at?: string
+          id?: string
+          matter_id?: string
+          recipient_emails?: string[]
+          recipient_names?: string[]
+          review_period_end?: string
+          review_period_start?: string
+          sent_confirmed_at?: string | null
+          sent_date?: string | null
+          subject?: string
+          user_id?: string
+          was_sent?: boolean
+          welcome_template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wip_email_log_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wip_email_log_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wip_email_log_welcome_template_id_fkey"
+            columns: ["welcome_template_id"]
+            isOneToOne: false
+            referencedRelation: "wip_email_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wip_email_templates: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_default: boolean
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_default?: boolean
+          name?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

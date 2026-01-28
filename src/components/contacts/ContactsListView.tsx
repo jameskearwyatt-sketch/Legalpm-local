@@ -236,10 +236,27 @@ export function ContactsListView() {
   const filteredAndSortedContacts = useMemo(() => {
     let result = [...contacts];
 
-    // Helper to get field value by key (for sorting, use surname extraction for names)
-    const getFieldValue = (contact: DistributionContact, key: string): unknown => {
+    // Helper to get field value for SORTING (uses surname extraction for names)
+    const getSortValue = (contact: DistributionContact, key: string): unknown => {
       switch (key) {
         case 'full_name': return extractSurnameForSort(contact.full_name); // Sort by surname
+        case 'email': return contact.email;
+        case 'company': return contact.company;
+        case 'job_title': return contact.job_title;
+        case 'country': return contact.country;
+        case 'city': return contact.city;
+        case 'relationship_owner': return contact.relationship_owner;
+        case 'gender': return contact.gender;
+        case 'naics_sector': return getPrimaryNaicsSector(contact.naics_codes);
+        case 'created_at': return contact.created_at;
+        default: return null;
+      }
+    };
+
+    // Helper to get field value for FILTERING (uses full name for name search)
+    const getFilterValue = (contact: DistributionContact, key: string): unknown => {
+      switch (key) {
+        case 'full_name': return contact.full_name; // Filter on full name, not just surname
         case 'email': return contact.email;
         case 'company': return contact.company;
         case 'job_title': return contact.job_title;
@@ -275,22 +292,23 @@ export function ContactsListView() {
     }
 
     // Apply column filters
+    // Apply column filters (use getFilterValue - searches full name)
     Object.entries(columnFilters).forEach(([key, value]) => {
       if (!value) return;
       const lowerValue = value.toLowerCase();
       
       result = result.filter(contact => {
-        const fieldValue = getFieldValue(contact, key);
+        const fieldValue = getFilterValue(contact, key);
         if (fieldValue === null || fieldValue === undefined) return false;
         return String(fieldValue).toLowerCase().includes(lowerValue);
       });
     });
 
-    // Apply sorting
+    // Apply sorting (use getSortValue - sorts by surname for names)
     if (sortKey && sortDirection) {
       result.sort((a, b) => {
-        const aVal = getFieldValue(a, sortKey);
-        const bVal = getFieldValue(b, sortKey);
+        const aVal = getSortValue(a, sortKey);
+        const bVal = getSortValue(b, sortKey);
         
         // Handle nulls
         if (aVal === null || aVal === undefined) return sortDirection === "asc" ? 1 : -1;

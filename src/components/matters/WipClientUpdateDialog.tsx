@@ -407,9 +407,13 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         }
 
         // Subject line
-        const subject = `${emailData.matterName} - Work in Progress Financial Update`;
+        const subject = `Budget Utilization Update - ${emailData.matterName}`;
 
-        // Log the email
+        // Log the email - use a very old date for "from beginning" since column is NOT NULL
+        const periodStartForLog = emailData.reviewPeriodStart 
+          ? format(emailData.reviewPeriodStart, "yyyy-MM-dd")
+          : "1900-01-01"; // Placeholder for "from beginning"
+
         await createLogEntry.mutateAsync({
           matter_id: emailData.matterId,
           client_id: emailData.clientId,
@@ -417,7 +421,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
           recipient_names: recipientNames,
           subject,
           body: fullBody,
-          review_period_start: emailData.reviewPeriodStart ? format(emailData.reviewPeriodStart, "yyyy-MM-dd") : null,
+          review_period_start: periodStartForLog,
           review_period_end: format(emailData.reviewPeriodEnd, "yyyy-MM-dd"),
           welcome_template_id: selectedTemplateId,
         });

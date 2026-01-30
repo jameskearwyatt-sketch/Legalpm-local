@@ -76,24 +76,26 @@ interface MatterEmailData {
   clientName: string;
   feeCurrency: string;
   billingContacts: BillingContact[];
-  reviewPeriodStart: Date;
+  reviewPeriodStart: Date | null; // null means "from beginning" / all time
   reviewPeriodEnd: Date;
   userNotes: string;
   generatedNarrative: string;
   currentWip: number;
   currentAr: number;
   currentPaid: number;
+  totalBudgetUtilised: number; // WIP + AR + Paid (all time)
 }
 
 type WizardStep = "select-matters" | "billing-contacts" | "welcome-paragraph" | "matter-details" | "review-emails" | "complete";
 
 const REVIEW_PERIOD_OPTIONS = [
-  { value: "1w", label: "Past week", days: 7 },
-  { value: "2w", label: "Past 2 weeks", days: 14 },
-  { value: "1m", label: "Past month", days: 30 },
-  { value: "6w", label: "Past 6 weeks", days: 42 },
-  { value: "2m", label: "Past 2 months", days: 60 },
-  { value: "custom", label: "Custom date", days: 0 },
+  { value: "all", label: "From beginning (totals only)", days: -1 },
+  { value: "1w", label: "Also report: past week", days: 7 },
+  { value: "2w", label: "Also report: past 2 weeks", days: 14 },
+  { value: "1m", label: "Also report: past month", days: 30 },
+  { value: "6w", label: "Also report: past 6 weeks", days: 42 },
+  { value: "2m", label: "Also report: past 2 months", days: 60 },
+  { value: "custom", label: "Also report: custom period", days: 0 },
 ];
 
 export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClientUpdateDialogProps) {
@@ -223,14 +225,18 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
       
       // Determine default review period based on last sent email
       const lastSent = getLastSentForMatter(matter.id);
-      let reviewStart: Date;
+      let reviewStart: Date | null;
       
       if (lastSent?.sent_date) {
         reviewStart = parseISO(lastSent.sent_date);
       } else {
-        // Default to 2 weeks ago
-        reviewStart = subWeeks(new Date(), 2);
+        // Default to "from beginning" (null) if no previous email
+        reviewStart = null;
       }
+
+      const currentWip = matter.latest_snapshot?.wip_amount || 0;
+      const currentAr = matter.latest_snapshot?.accounts_receivable || 0;
+      const currentPaid = matter.latest_snapshot?.paid_amount || 0;
 
       newData.set(matter.id, {
         matterId: matter.id,
@@ -243,9 +249,10 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         reviewPeriodEnd: new Date(),
         userNotes: "",
         generatedNarrative: "",
-        currentWip: matter.latest_snapshot?.wip_amount || 0,
-        currentAr: matter.latest_snapshot?.accounts_receivable || 0,
-        currentPaid: matter.latest_snapshot?.paid_amount || 0,
+        currentWip,
+        currentAr,
+        currentPaid,
+        totalBudgetUtilised: currentWip + currentAr + currentPaid,
       });
     });
 
@@ -281,7 +288,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
     queryClient.invalidateQueries({ queryKey: ["clients"] });
   };
 
-  // Generate AI narratives for all matters
+  // Generate narratives for all matters
   const generateNarratives = async () => {
     setIsGenerating(true);
 
@@ -293,17 +300,21 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         matterIds.map(async (matterId) => {
           const data = matterEmailData.get(matterId)!;
           
-          // Fetch the most recent snapshot AT or BEFORE the review period start
-          // This gives us the baseline to compare against current values
-          const { data: startSnapshots } = await supabase
-            .from("financial_snapshot_history")
-            .select("*")
-            .eq("matter_id", matterId)
-            .lte("as_of_date", format(data.reviewPeriodStart, "yyyy-MM-dd"))
-            .order("as_of_date", { ascending: false })
-            .limit(1);
+          let startSnapshot = null;
+          
+          // Only fetch start snapshot if we have a period start date (not "all time")
+          if (data.reviewPeriodStart) {
+            // Fetch the most recent snapshot AT or BEFORE the review period start
+            const { data: startSnapshots } = await supabase
+              .from("financial_snapshot_history")
+              .select("*")
+              .eq("matter_id", matterId)
+              .lte("as_of_date", format(data.reviewPeriodStart, "yyyy-MM-dd"))
+              .order("as_of_date", { ascending: false })
+              .limit(1);
 
-          const startSnapshot = startSnapshots?.[0] || null;
+            startSnapshot = startSnapshots?.[0] || null;
+          }
 
           return {
             matterId,
@@ -318,12 +329,15 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
               wip_write_off_amount: startSnapshot.wip_write_off_amount,
               as_of_date: startSnapshot.as_of_date,
             } : null,
-            // No longer sending endSnapshot - we use currentWip/currentAr/currentPaid instead
             endSnapshot: null,
             currentWip: data.currentWip,
             currentAr: data.currentAr,
             currentPaid: data.currentPaid,
-            reviewPeriodDays: differenceInDays(data.reviewPeriodEnd, data.reviewPeriodStart),
+            totalBudgetUtilised: data.totalBudgetUtilised,
+            // reviewPeriodDays: null means "from beginning" / all time
+            reviewPeriodDays: data.reviewPeriodStart 
+              ? differenceInDays(data.reviewPeriodEnd, data.reviewPeriodStart)
+              : null,
             userNotes: data.userNotes,
           };
         })
@@ -445,8 +459,11 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
     const existing = newData.get(matterId);
     if (!existing) return;
 
-    let startDate: Date;
-    if (option === "custom" && customDate) {
+    let startDate: Date | null;
+    if (option === "all") {
+      // "From beginning" - no period comparison, just totals
+      startDate = null;
+    } else if (option === "custom" && customDate) {
       startDate = customDate;
     } else {
       const optionData = REVIEW_PERIOD_OPTIONS.find(o => o.value === option);
@@ -493,16 +510,20 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
 
     setIsGenerating(true);
     try {
-      // Fetch the most recent snapshot AT or BEFORE the review period start
-      const { data: startSnapshots } = await supabase
-        .from("financial_snapshot_history")
-        .select("*")
-        .eq("matter_id", matterId)
-        .lte("as_of_date", format(data.reviewPeriodStart, "yyyy-MM-dd"))
-        .order("as_of_date", { ascending: false })
-        .limit(1);
+      let startSnapshot = null;
+      
+      // Only fetch start snapshot if we have a period start date (not "all time")
+      if (data.reviewPeriodStart) {
+        const { data: startSnapshots } = await supabase
+          .from("financial_snapshot_history")
+          .select("*")
+          .eq("matter_id", matterId)
+          .lte("as_of_date", format(data.reviewPeriodStart, "yyyy-MM-dd"))
+          .order("as_of_date", { ascending: false })
+          .limit(1);
 
-      const startSnapshot = startSnapshots?.[0] || null;
+        startSnapshot = startSnapshots?.[0] || null;
+      }
 
       const { data: analysisData, error } = await supabase.functions.invoke("analyze-wip-changes", {
         body: {
@@ -523,7 +544,10 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
             currentWip: data.currentWip,
             currentAr: data.currentAr,
             currentPaid: data.currentPaid,
-            reviewPeriodDays: differenceInDays(data.reviewPeriodEnd, data.reviewPeriodStart),
+            totalBudgetUtilised: data.totalBudgetUtilised,
+            reviewPeriodDays: data.reviewPeriodStart 
+              ? differenceInDays(data.reviewPeriodEnd, data.reviewPeriodStart)
+              : null,
             userNotes: data.userNotes,
           }],
         },

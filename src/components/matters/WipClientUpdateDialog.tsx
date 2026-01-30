@@ -293,17 +293,17 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         matterIds.map(async (matterId) => {
           const data = matterEmailData.get(matterId)!;
           
-          // Fetch snapshots within the review period
-          const { data: snapshots } = await supabase
+          // Fetch the most recent snapshot AT or BEFORE the review period start
+          // This gives us the baseline to compare against current values
+          const { data: startSnapshots } = await supabase
             .from("financial_snapshot_history")
             .select("*")
             .eq("matter_id", matterId)
-            .gte("as_of_date", format(data.reviewPeriodStart, "yyyy-MM-dd"))
-            .lte("as_of_date", format(data.reviewPeriodEnd, "yyyy-MM-dd"))
-            .order("as_of_date", { ascending: true });
+            .lte("as_of_date", format(data.reviewPeriodStart, "yyyy-MM-dd"))
+            .order("as_of_date", { ascending: false })
+            .limit(1);
 
-          const startSnapshot = snapshots?.[0] || null;
-          const endSnapshot = snapshots?.[snapshots.length - 1] || null;
+          const startSnapshot = startSnapshots?.[0] || null;
 
           return {
             matterId,
@@ -318,14 +318,8 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
               wip_write_off_amount: startSnapshot.wip_write_off_amount,
               as_of_date: startSnapshot.as_of_date,
             } : null,
-            endSnapshot: endSnapshot ? {
-              wip_amount: endSnapshot.wip_amount,
-              billed_amount: endSnapshot.billed_amount,
-              paid_amount: endSnapshot.paid_amount,
-              accounts_receivable: endSnapshot.accounts_receivable,
-              wip_write_off_amount: endSnapshot.wip_write_off_amount,
-              as_of_date: endSnapshot.as_of_date,
-            } : null,
+            // No longer sending endSnapshot - we use currentWip/currentAr/currentPaid instead
+            endSnapshot: null,
             currentWip: data.currentWip,
             currentAr: data.currentAr,
             currentPaid: data.currentPaid,
@@ -335,11 +329,10 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         })
       );
 
-      // Call AI edge function
+      // Call edge function
       const { data: analysisData, error } = await supabase.functions.invoke("analyze-wip-changes", {
         body: {
           matters: mattersForAnalysis,
-          welcomeParagraph,
         },
       });
 
@@ -500,16 +493,16 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
 
     setIsGenerating(true);
     try {
-      const { data: snapshots } = await supabase
+      // Fetch the most recent snapshot AT or BEFORE the review period start
+      const { data: startSnapshots } = await supabase
         .from("financial_snapshot_history")
         .select("*")
         .eq("matter_id", matterId)
-        .gte("as_of_date", format(data.reviewPeriodStart, "yyyy-MM-dd"))
-        .lte("as_of_date", format(data.reviewPeriodEnd, "yyyy-MM-dd"))
-        .order("as_of_date", { ascending: true });
+        .lte("as_of_date", format(data.reviewPeriodStart, "yyyy-MM-dd"))
+        .order("as_of_date", { ascending: false })
+        .limit(1);
 
-      const startSnapshot = snapshots?.[0] || null;
-      const endSnapshot = snapshots?.[snapshots.length - 1] || null;
+      const startSnapshot = startSnapshots?.[0] || null;
 
       const { data: analysisData, error } = await supabase.functions.invoke("analyze-wip-changes", {
         body: {
@@ -526,21 +519,13 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
               wip_write_off_amount: startSnapshot.wip_write_off_amount,
               as_of_date: startSnapshot.as_of_date,
             } : null,
-            endSnapshot: endSnapshot ? {
-              wip_amount: endSnapshot.wip_amount,
-              billed_amount: endSnapshot.billed_amount,
-              paid_amount: endSnapshot.paid_amount,
-              accounts_receivable: endSnapshot.accounts_receivable,
-              wip_write_off_amount: endSnapshot.wip_write_off_amount,
-              as_of_date: endSnapshot.as_of_date,
-            } : null,
+            endSnapshot: null,
             currentWip: data.currentWip,
             currentAr: data.currentAr,
             currentPaid: data.currentPaid,
             reviewPeriodDays: differenceInDays(data.reviewPeriodEnd, data.reviewPeriodStart),
             userNotes: data.userNotes,
           }],
-          welcomeParagraph,
         },
       });
 

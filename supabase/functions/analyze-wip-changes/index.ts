@@ -47,20 +47,16 @@ serve(async (req) => {
   }
 
   try {
-    const { matters, welcomeParagraph } = await req.json() as { 
+    const { matters } = await req.json() as { 
       matters: MatterData[];
-      welcomeParagraph: string;
     };
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
+    
     const results: AnalysisResult[] = [];
 
     for (const matter of matters) {
-      const { startSnapshot, endSnapshot, feeCurrency, userNotes, reviewPeriodDays } = matter;
+      const { startSnapshot, feeCurrency, userNotes, reviewPeriodDays } = matter;
       
       let narrative = "";
       let changes = {
@@ -71,107 +67,78 @@ serve(async (req) => {
         newWipIncurred: 0,
       };
 
-      // If no historical data, just report current figures
-      if (!startSnapshot || !endSnapshot) {
-        // No comparison available - just report current state
-        const currentTotal = matter.currentWip + matter.currentAr + matter.currentPaid;
-        if (currentTotal > 0) {
-          narrative = `Our current work in progress stands at ${formatCurrency(matter.currentWip, feeCurrency)}.`;
-          if (matter.currentAr > 0) {
-            narrative += ` We have outstanding invoices totalling ${formatCurrency(matter.currentAr, feeCurrency)}.`;
-          }
-          if (matter.currentPaid > 0) {
-            narrative += ` Thank you for your payment of ${formatCurrency(matter.currentPaid, feeCurrency)} received to date.`;
-          }
-        } else {
-          narrative = "No fees have been incurred on this matter to date.";
-        }
-      } else {
-        // Calculate changes
-        changes.wipChange = endSnapshot.wip_amount - startSnapshot.wip_amount;
-        changes.arChange = endSnapshot.accounts_receivable - startSnapshot.accounts_receivable;
-        changes.paidChange = endSnapshot.paid_amount - startSnapshot.paid_amount;
-        
-        // Derive billing and new WIP
-        // If AR went up, we billed that amount
-        // If WIP went down but AR went up, we billed from WIP
-        // Net new WIP = WIP change + amount billed from WIP
-        const wipDecrease = Math.max(0, -changes.wipChange);
-        const arIncrease = Math.max(0, changes.arChange);
-        
-        // New billing is the increase in AR
-        changes.newBilling = arIncrease;
-        
-        // If WIP decreased and AR increased, part of WIP was billed
-        // True new WIP incurred = WIP end - (WIP start - billed from WIP)
-        // Actually: if WIP went from 100 to 20, and AR went from 0 to 100:
-        //   - We billed 100 (from WIP)
-        //   - New WIP incurred = 20 (current WIP)
-        //   This means we incurred 20 new WIP after billing
-        // 
-        // More generally:
-        // New WIP incurred = endWip - startWip + amountBilledFromWip
-        // amountBilledFromWip = min(wipDecrease, arIncrease)
-        const billedFromWip = Math.min(wipDecrease, arIncrease);
-        changes.newWipIncurred = changes.wipChange + billedFromWip;
-        
-        // Use AI to generate narrative
-        const prompt = buildAnalysisPrompt(matter, changes, reviewPeriodDays, userNotes);
-        
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              {
-                role: "system",
-                content: `You are a senior lawyer writing a professional but warm email update to a client about the financial status of their legal matter. Write in UK English. Be concise, clear, and informative. Use formal business English but avoid being overly stiff. Never mention specific amounts unless they are significant changes. Always frame things positively where possible. The currency is ${feeCurrency}.`,
-              },
-              { role: "user", content: prompt },
-            ],
-          }),
-        });
+      // Build period description
+      const periodDescription = reviewPeriodDays <= 7 
+        ? "the past week" 
+        : reviewPeriodDays <= 14 
+          ? "the past two weeks" 
+          : reviewPeriodDays <= 31 
+            ? "the past month" 
+            : reviewPeriodDays <= 45
+              ? "the past six weeks"
+              : `the past ${Math.round(reviewPeriodDays / 30)} months`;
 
-        if (!response.ok) {
-          console.error("AI API error:", response.status, await response.text());
-          // Fallback to template-based narrative
-          narrative = buildFallbackNarrative(matter, changes, reviewPeriodDays);
-        } else {
-          const data = await response.json();
-          narrative = data.choices?.[0]?.message?.content || buildFallbackNarrative(matter, changes, reviewPeriodDays);
-        }
+      // If no historical data, just report current figures
+      if (!startSnapshot) {
+        // No comparison available - just report current state
+        narrative = buildCurrentStateNarrative(matter, feeCurrency);
+      } else {
+        // Calculate changes: compare start snapshot to CURRENT values (not end snapshot)
+        // This ensures we capture all changes up to now
+        changes.wipChange = matter.currentWip - startSnapshot.wip_amount;
+        changes.arChange = matter.currentAr - startSnapshot.accounts_receivable;
+        changes.paidChange = matter.currentPaid - startSnapshot.paid_amount;
+        
+        // Total budget utilised in period = new WIP incurred
+        // If WIP went from 0 to 100k, we incurred 100k
+        // If WIP went from 50k to 30k but AR went from 0 to 80k, we incurred 60k (30k current + 80k billed - 50k start)
+        // Formula: current WIP + (current billed - start billed) - start WIP
+        // Or simpler: currentWip + currentAr + currentPaid - (startWip + startAr + startPaid)
+        const startTotal = startSnapshot.wip_amount + startSnapshot.accounts_receivable + startSnapshot.paid_amount;
+        const currentTotal = matter.currentWip + matter.currentAr + matter.currentPaid;
+        changes.newWipIncurred = currentTotal - startTotal;
+        
+        // New billing is the increase in billed amount (AR + Paid)
+        const startBilled = startSnapshot.accounts_receivable + startSnapshot.paid_amount;
+        const currentBilled = matter.currentAr + matter.currentPaid;
+        changes.newBilling = Math.max(0, currentBilled - startBilled);
+        
+        // Build factual narrative
+        narrative = buildFactualNarrative(matter, changes, periodDescription, feeCurrency);
       }
 
       // Polish user notes if provided
-      if (userNotes && userNotes.trim()) {
-        const polishResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              {
-                role: "system",
-                content: "You are a senior lawyer. Polish the following notes into professional prose suitable for a client email. Keep it concise. Write in UK English. Output ONLY the polished text, nothing else.",
-              },
-              { role: "user", content: userNotes },
-            ],
-          }),
-        });
+      if (userNotes && userNotes.trim() && LOVABLE_API_KEY) {
+        try {
+          const polishResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash",
+              messages: [
+                {
+                  role: "system",
+                  content: "You are a senior lawyer. Polish the following notes into professional prose suitable for a client email. Keep it concise. Write in UK English. Output ONLY the polished text, nothing else. Do not add any greetings, sign-offs, or introductory phrases.",
+                },
+                { role: "user", content: userNotes },
+              ],
+            }),
+          });
 
-        if (polishResponse.ok) {
-          const polishData = await polishResponse.json();
-          const polishedNotes = polishData.choices?.[0]?.message?.content;
-          if (polishedNotes) {
-            narrative = narrative + "\n\n" + polishedNotes;
+          if (polishResponse.ok) {
+            const polishData = await polishResponse.json();
+            const polishedNotes = polishData.choices?.[0]?.message?.content;
+            if (polishedNotes) {
+              narrative = narrative + "\n\n" + polishedNotes;
+            }
           }
+        } catch (e) {
+          console.error("Failed to polish notes:", e);
+          // If AI fails, just append raw notes
+          narrative = narrative + "\n\n" + userNotes;
         }
       }
 
@@ -206,70 +173,63 @@ function formatCurrency(amount: number, currency: string): string {
   return `${symbol}${amount.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
 }
 
-function buildAnalysisPrompt(
-  matter: MatterData,
-  changes: AnalysisResult["changes"],
-  reviewPeriodDays: number,
-  userNotes?: string
-): string {
-  const periodDescription = reviewPeriodDays <= 7 
-    ? "the past week" 
-    : reviewPeriodDays <= 14 
-      ? "the past two weeks" 
-      : reviewPeriodDays <= 31 
-        ? "the past month" 
-        : `the past ${Math.round(reviewPeriodDays / 7)} weeks`;
-
-  let prompt = `Write a brief paragraph (2-4 sentences) for a client email update about the financial status of their legal matter "${matter.matterName}".
-
-Review period: ${periodDescription}
-Currency: ${matter.feeCurrency}
-
-Financial changes during this period:
-- Work in Progress (WIP) change: ${changes.wipChange >= 0 ? '+' : ''}${formatCurrency(changes.wipChange, matter.feeCurrency)}
-- Current WIP: ${formatCurrency(matter.currentWip, matter.feeCurrency)}
-- Accounts Receivable (outstanding invoices) change: ${changes.arChange >= 0 ? '+' : ''}${formatCurrency(changes.arChange, matter.feeCurrency)}
-- Current AR: ${formatCurrency(matter.currentAr, matter.feeCurrency)}
-- Payments received change: ${changes.paidChange >= 0 ? '+' : ''}${formatCurrency(changes.paidChange, matter.feeCurrency)}
-- Total paid to date: ${formatCurrency(matter.currentPaid, matter.feeCurrency)}
-
-Key interpretations:
-- New fees incurred: ${formatCurrency(Math.max(0, changes.newWipIncurred), matter.feeCurrency)}
-- New invoices issued: ${formatCurrency(changes.newBilling, matter.feeCurrency)}
-
-Write a professional, warm paragraph explaining the current financial position. Focus on what's most relevant to the client. If we've billed them, mention it. If we've incurred new fees, explain briefly. If they've made payments, thank them.`;
-
-  return prompt;
-}
-
-function buildFallbackNarrative(
-  matter: MatterData,
-  changes: AnalysisResult["changes"],
-  reviewPeriodDays: number
-): string {
-  const periodDescription = reviewPeriodDays <= 7 
-    ? "the past week" 
-    : reviewPeriodDays <= 14 
-      ? "the past two weeks" 
-      : "the review period";
-  
+function buildCurrentStateNarrative(matter: MatterData, currency: string): string {
   const parts: string[] = [];
   
-  if (changes.newWipIncurred > 0) {
-    parts.push(`During ${periodDescription}, we have incurred ${formatCurrency(changes.newWipIncurred, matter.feeCurrency)} in additional fees.`);
+  parts.push(`Our current work in progress stands at ${formatCurrency(matter.currentWip, currency)}.`);
+  
+  if (matter.currentAr > 0) {
+    parts.push(`Outstanding invoices total ${formatCurrency(matter.currentAr, currency)}.`);
   }
   
-  if (changes.newBilling > 0) {
-    parts.push(`We have issued invoices totalling ${formatCurrency(changes.newBilling, matter.feeCurrency)}.`);
-  }
-  
-  if (changes.paidChange > 0) {
-    parts.push(`Thank you for your payment of ${formatCurrency(changes.paidChange, matter.feeCurrency)}.`);
-  }
-  
-  if (parts.length === 0) {
-    parts.push(`Our work in progress currently stands at ${formatCurrency(matter.currentWip, matter.feeCurrency)}.`);
+  if (matter.currentPaid > 0) {
+    parts.push(`Payments received to date: ${formatCurrency(matter.currentPaid, currency)}.`);
   }
   
   return parts.join(" ");
+}
+
+function buildFactualNarrative(
+  matter: MatterData,
+  changes: AnalysisResult["changes"],
+  periodDescription: string,
+  currency: string
+): string {
+  const parts: string[] = [];
+  
+  // Opening with budget utilisation
+  if (changes.newWipIncurred > 0) {
+    parts.push(`In ${periodDescription}, we have utilised ${formatCurrency(changes.newWipIncurred, currency)} of the budget.`);
+  } else if (changes.newWipIncurred === 0) {
+    parts.push(`In ${periodDescription}, there has been no additional budget utilisation.`);
+  } else {
+    // Negative means write-offs or adjustments
+    parts.push(`In ${periodDescription}, there has been a credit adjustment of ${formatCurrency(Math.abs(changes.newWipIncurred), currency)}.`);
+  }
+  
+  // Current position summary
+  parts.push("");
+  parts.push("Current position:");
+  parts.push(`• Work in progress: ${formatCurrency(matter.currentWip, currency)}`);
+  
+  if (matter.currentAr > 0) {
+    parts.push(`• Outstanding invoices: ${formatCurrency(matter.currentAr, currency)}`);
+  }
+  
+  if (matter.currentPaid > 0) {
+    parts.push(`• Paid to date: ${formatCurrency(matter.currentPaid, currency)}`);
+  }
+  
+  // Additional context if there was billing activity
+  if (changes.newBilling > 0) {
+    parts.push("");
+    parts.push(`Invoices totalling ${formatCurrency(changes.newBilling, currency)} were issued during this period.`);
+  }
+  
+  if (changes.paidChange > 0) {
+    parts.push("");
+    parts.push(`Thank you for your payment of ${formatCurrency(changes.paidChange, currency)}.`);
+  }
+  
+  return parts.join("\n");
 }

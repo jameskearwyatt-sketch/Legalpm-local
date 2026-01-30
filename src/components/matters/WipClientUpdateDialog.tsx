@@ -417,7 +417,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
           recipient_names: recipientNames,
           subject,
           body: fullBody,
-          review_period_start: format(emailData.reviewPeriodStart, "yyyy-MM-dd"),
+          review_period_start: emailData.reviewPeriodStart ? format(emailData.reviewPeriodStart, "yyyy-MM-dd") : null,
           review_period_end: format(emailData.reviewPeriodEnd, "yyyy-MM-dd"),
           welcome_template_id: selectedTemplateId,
         });
@@ -916,7 +916,10 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
               <div className="space-y-4 pr-4">
                 {Array.from(matterEmailData.values()).map((data, idx) => {
                   const lastSent = getLastSentForMatter(data.matterId);
-                  const daysSinceStart = differenceInDays(new Date(), data.reviewPeriodStart);
+                  // daysSinceStart is null for "from beginning" mode
+                  const daysSinceStart = data.reviewPeriodStart 
+                    ? differenceInDays(new Date(), data.reviewPeriodStart)
+                    : -1; // -1 matches the "all" option
                   
                   return (
                     <Card key={data.matterId}>
@@ -964,29 +967,33 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
                               </SelectContent>
                             </Select>
                             <p className="text-xs text-muted-foreground mt-1">
-                              From: {format(data.reviewPeriodStart, "d MMM yyyy")}
+                              {data.reviewPeriodStart 
+                                ? `From: ${format(data.reviewPeriodStart, "d MMM yyyy")}`
+                                : "From: Beginning of matter"}
                             </p>
                           </div>
                           
-                          <div>
-                            <Label className="text-xs">Custom Start Date</Label>
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button variant="outline" className="w-full justify-start">
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {format(data.reviewPeriodStart, "d MMM yyyy")}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0">
-                                <Calendar
-                                  mode="single"
-                                  selected={data.reviewPeriodStart}
-                                  onSelect={(date) => date && updateMatterReviewPeriod(data.matterId, "custom", date)}
-                                  className="pointer-events-auto"
-                                />
-                              </PopoverContent>
-                            </Popover>
-                          </div>
+                          {data.reviewPeriodStart && (
+                            <div>
+                              <Label className="text-xs">Custom Start Date</Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" className="w-full justify-start">
+                                    <CalendarIcon className="mr-2 h-4 w-4" />
+                                    {format(data.reviewPeriodStart, "d MMM yyyy")}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0">
+                                  <Calendar
+                                    mode="single"
+                                    selected={data.reviewPeriodStart}
+                                    onSelect={(date) => date && updateMatterReviewPeriod(data.matterId, "custom", date)}
+                                    className="pointer-events-auto"
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                          )}
                         </div>
 
                         <div className="mt-3">

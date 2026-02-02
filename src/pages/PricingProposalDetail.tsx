@@ -1738,7 +1738,7 @@ export default function PricingProposalDetail() {
               <Card>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <CardTitle className="text-base">Category Breakdown (Midpoint Pricing)</CardTitle>
+                    <CardTitle className="text-base">Category Breakdown (Upper Estimate)</CardTitle>
                     {enabledAFAs.length > 0 && (
                       <div className="flex gap-1.5 flex-wrap">
                         {enabledAFAs.map(afa => (
@@ -1764,6 +1764,7 @@ export default function PricingProposalDetail() {
                 <CardContent>
                   <CategorizedProposalView
                     items={draftItems}
+                    phases={phases}
                     onItemsChange={(updatedItems) => {
                       setDraftItems(updatedItems);
                       setHasUnsavedChanges(true);

@@ -31,6 +31,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TableScrollControls } from '@/components/ui/table-scroll-controls';
@@ -399,7 +400,8 @@ export function PhasedWorkItemsView({
                             </TableHead>
                             <TableHead className="w-[30px]"></TableHead>
                             <TableHead className="w-[40px]"></TableHead>
-                            <TableHead className="min-w-[250px]">Work Item</TableHead>
+                            <TableHead className="min-w-[180px]">Work Item</TableHead>
+                            <TableHead className="min-w-[200px]">Detail</TableHead>
                             <TableHead className="w-[130px]">Phase</TableHead>
                             <TableHead className="w-[110px]">Category</TableHead>
                             <TableHead className="w-[120px]">Provider</TableHead>
@@ -428,7 +430,7 @@ export function PhasedWorkItemsView({
                                 <React.Fragment key={`${phaseId}-${category}`}>
                                   {/* Category header row */}
                                   <TableRow className={cn("border-b-0", bgColor)}>
-                                    <TableCell colSpan={11} className="py-1.5">
+                                    <TableCell colSpan={12} className="py-1.5">
                                       <span className={cn("text-xs font-semibold uppercase tracking-wide", textColor)}>
                                         {category}
                                       </span>
@@ -659,15 +661,53 @@ function PhasedItemCells({
       {/* Work Item */}
       <TableCell className="align-top py-2">
         {viewingHistoricalVersion ? (
-          <p className="min-w-[250px] text-sm whitespace-pre-wrap">{item.work_item}</p>
+          <p className="min-w-[150px] text-sm whitespace-pre-wrap">{item.work_item}</p>
         ) : (
-          <Textarea
+          <Input
             value={item.work_item}
             onChange={(e) => onUpdate(index, { work_item: e.target.value })}
-            className="min-w-[250px] text-sm resize-none"
-            placeholder="Work item description"
-            rows={2}
+            className="min-w-[150px] text-sm"
+            placeholder="Short description"
           />
+        )}
+      </TableCell>
+
+      {/* Detail with truncation and hover popover */}
+      <TableCell className="align-top py-2">
+        {viewingHistoricalVersion ? (
+          item.detail ? (
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <p className="min-w-[180px] max-w-[250px] text-sm text-muted-foreground truncate cursor-help">
+                  {item.detail}
+                </p>
+              </HoverCardTrigger>
+              <HoverCardContent className="w-96 max-h-80 overflow-y-auto">
+                <p className="text-sm whitespace-pre-wrap">{item.detail}</p>
+              </HoverCardContent>
+            </HoverCard>
+          ) : (
+            <span className="text-muted-foreground text-xs">-</span>
+          )
+        ) : (
+          <div className="flex items-start gap-1 min-w-[180px]">
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <Textarea
+                  value={item.detail || ''}
+                  onChange={(e) => onUpdate(index, { detail: e.target.value || null })}
+                  className="text-sm resize-none min-w-[160px] max-h-[60px]"
+                  placeholder="Full detail (hover to read)"
+                  rows={2}
+                />
+              </HoverCardTrigger>
+              {item.detail && item.detail.length > 50 && (
+                <HoverCardContent className="w-96 max-h-80 overflow-y-auto">
+                  <p className="text-sm whitespace-pre-wrap">{item.detail}</p>
+                </HoverCardContent>
+              )}
+            </HoverCard>
+          </div>
         )}
       </TableCell>
 

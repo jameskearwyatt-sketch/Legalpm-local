@@ -206,6 +206,7 @@ export interface CreateProposalInput {
 export interface DraftProposalItem {
   id?: string;
   work_item: string;
+  detail?: string | null;
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
   fee_lower?: number;

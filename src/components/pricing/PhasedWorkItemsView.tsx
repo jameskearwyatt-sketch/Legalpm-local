@@ -25,7 +25,8 @@ import {
   CheckSquare,
   Square,
   FolderOpen,
-  Folder
+  Folder,
+  Copy
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,6 +58,7 @@ interface PhasedWorkItemsViewProps {
   onPhasesChange: (phases: ProposalPhase[]) => void;
   onUpdateItem: (index: number, updates: Partial<DraftProposalItem>) => void;
   onRemoveItem: (index: number) => void;
+  onDuplicateItem: (index: number) => void;
   onOpenIterativePricing: (index: number) => void;
   formatCurrency: (value: number) => string;
   viewingHistoricalVersion: boolean;
@@ -73,6 +75,7 @@ export function PhasedWorkItemsView({
   onPhasesChange,
   onUpdateItem,
   onRemoveItem,
+  onDuplicateItem,
   onOpenIterativePricing,
   formatCurrency,
   viewingHistoricalVersion,
@@ -512,6 +515,7 @@ export function PhasedWorkItemsView({
                                         index={originalIndex}
                                         onUpdate={onUpdateItem}
                                         onRemove={onRemoveItem}
+                                        onDuplicate={onDuplicateItem}
                                         onOpenIterativePricing={onOpenIterativePricing}
                                         formatCurrency={formatCurrency}
                                         viewingHistoricalVersion={viewingHistoricalVersion}
@@ -683,6 +687,7 @@ interface PhasedItemCellsProps {
   index: number;
   onUpdate: (index: number, updates: Partial<DraftProposalItem>) => void;
   onRemove: (index: number) => void;
+  onDuplicate: (index: number) => void;
   onOpenIterativePricing: (index: number) => void;
   formatCurrency: (value: number) => string;
   viewingHistoricalVersion: boolean;
@@ -697,6 +702,7 @@ function PhasedItemCells({
   index,
   onUpdate,
   onRemove,
+  onDuplicate,
   onOpenIterativePricing,
   formatCurrency,
   viewingHistoricalVersion,
@@ -733,18 +739,29 @@ function PhasedItemCells({
         )}
       </TableCell>
 
-      {/* Delete Button */}
+      {/* Delete & Duplicate Buttons */}
       <TableCell className="py-2 w-[40px]">
         {!viewingHistoricalVersion && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onRemove(index)}
-            className="h-8 w-8"
-            title="Delete item"
-          >
-            <Trash2 className="h-4 w-4 text-destructive" />
-          </Button>
+          <div className="flex items-center gap-0.5">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onDuplicate(index)}
+              className="h-7 w-7"
+              title="Duplicate item"
+            >
+              <Copy className="h-3.5 w-3.5 text-muted-foreground" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onRemove(index)}
+              className="h-7 w-7"
+              title="Delete item"
+            >
+              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+            </Button>
+          </div>
         )}
       </TableCell>
 

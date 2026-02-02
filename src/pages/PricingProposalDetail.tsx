@@ -363,8 +363,11 @@ export default function PricingProposalDetail() {
     }
   };
   
-  // Debounced auto-save: triggers 3 seconds after changes stop
+  // Debounced auto-save: triggers 5 seconds after changes stop
+  // Increased from 3s to reduce clunkiness during rapid text entry
   const hasInitializedOnce = useRef(false);
+  const lastChangeTimeRef = useRef<number>(0);
+  
   useEffect(() => {
     if (!isInitialized) return;
     
@@ -377,16 +380,17 @@ export default function PricingProposalDetail() {
     // Mark as having pending changes
     pendingChangesRef.current = true;
     setHasUnsavedChanges(true);
+    lastChangeTimeRef.current = Date.now();
     
     // Clear any existing timeout
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
     
-    // Set new timeout for 3 seconds after last change
+    // Set new timeout for 5 seconds after last change
     autoSaveTimeoutRef.current = setTimeout(() => {
       performSave(false); // Silent save (no toast)
-    }, 3000);
+    }, 5000);
     
     return () => {
       if (autoSaveTimeoutRef.current) {
@@ -808,6 +812,21 @@ export default function PricingProposalDetail() {
   // Remove work item
   const removeItem = (index: number) => {
     setDraftItems(prev => prev.filter((_, i) => i !== index));
+    setHasUnsavedChanges(true);
+  };
+
+  // Duplicate work item - inserts copy immediately below the original
+  const duplicateItem = (index: number) => {
+    setDraftItems(prev => {
+      const itemToDuplicate = prev[index];
+      const duplicatedItem: DraftProposalItem = {
+        ...itemToDuplicate,
+        id: `temp-${Date.now()}-${Math.random()}`, // New temporary ID
+      };
+      const newItems = [...prev];
+      newItems.splice(index + 1, 0, duplicatedItem);
+      return newItems;
+    });
     setHasUnsavedChanges(true);
   };
 
@@ -1783,6 +1802,7 @@ export default function PricingProposalDetail() {
                   }}
                   onUpdateItem={updateItem}
                   onRemoveItem={removeItem}
+                  onDuplicateItem={duplicateItem}
                   onOpenIterativePricing={openIterativePricing}
                   formatCurrency={formatCurrency}
                   viewingHistoricalVersion={viewingHistoricalVersion}

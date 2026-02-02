@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { DraftProposalItem, BUDGET_CATEGORIES } from '@/lib/hooks/usePricingProposals';
+import { DraftProposalItem, BUDGET_CATEGORIES, ProposalPhase } from '@/lib/hooks/usePricingProposals';
 
 type BudgetCategory = typeof BUDGET_CATEGORIES[number];
 
@@ -47,14 +47,44 @@ const categoryBorderColors: Record<BudgetCategory, string> = {
 
 interface CategorizedProposalViewProps {
   items: DraftProposalItem[];
+  phases: ProposalPhase[];
   onItemsChange: (items: DraftProposalItem[]) => void;
   formatCurrency: (value: number) => string;
   currencySymbol: string;
   customCategories?: string[];
 }
 
+// Helper function to calculate category totals from a list of items using fee_upper
+function calculateCategoryTotals(
+  items: DraftProposalItem[],
+  allCategories: string[]
+): Record<string, number> {
+  const totals: Record<string, number> = {};
+  
+  // Initialize all known categories
+  allCategories.forEach(category => {
+    totals[category] = 0;
+  });
+  
+  items.forEach(item => {
+    const category = item.category || 'Other';
+    const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
+    if (isIncluded) {
+      // Ensure category exists in totals
+      if (totals[category] === undefined) {
+        totals[category] = 0;
+      }
+      // Use fee_upper for upper estimate pricing
+      totals[category] += item.fee_upper ?? item.fee_amount ?? 0;
+    }
+  });
+  
+  return totals;
+}
+
 export function CategorizedProposalView({
   items,
+  phases,
   onItemsChange,
   formatCurrency,
   currencySymbol,
@@ -67,28 +97,26 @@ export function CategorizedProposalView({
     return [...BUDGET_CATEGORIES, ...customCategories];
   }, [customCategories]);
 
-  // Calculate totals per category (including custom ones)
+  // Get included phases (for determining if we show per-phase breakdowns)
+  const includedPhases = useMemo(() => {
+    return phases.filter(p => p.is_included);
+  }, [phases]);
+
+  // Calculate per-phase category totals
+  const phaseBreakdowns = useMemo(() => {
+    if (includedPhases.length <= 1) return null;
+    
+    return includedPhases.map(phase => {
+      const phaseItems = items.filter(item => item.phase_id === phase.id);
+      const totals = calculateCategoryTotals(phaseItems, allCategories);
+      const grandTotal = Object.values(totals).reduce((sum, val) => sum + val, 0);
+      return { phase, totals, grandTotal };
+    });
+  }, [items, includedPhases, allCategories]);
+
+  // Calculate aggregate totals (always shown)
   const categoryTotals = useMemo(() => {
-    const totals: Record<string, number> = {};
-    
-    // Initialize all known categories
-    allCategories.forEach(category => {
-      totals[category] = 0;
-    });
-    
-    items.forEach(item => {
-      const category = item.category || 'Other';
-      const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
-      if (isIncluded) {
-        // Ensure category exists in totals (in case item has a category not in allCategories)
-        if (totals[category] === undefined) {
-          totals[category] = 0;
-        }
-        totals[category] += item.fee_amount || 0;
-      }
-    });
-    
-    return totals;
+    return calculateCategoryTotals(items, allCategories);
   }, [items, allCategories]);
 
   // Grand total
@@ -171,6 +199,61 @@ export function CategorizedProposalView({
     }
   };
 
+  // Helper to render a category breakdown section
+  const renderCategoryBreakdown = (
+    totals: Record<string, number>,
+    total: number,
+    label?: string
+  ) => (
+    <div className="space-y-2">
+      {label && (
+        <div className="text-sm font-medium text-foreground">{label}</div>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {allCategories.map(category => {
+          const categoryTotal = totals[category];
+          if (categoryTotal === 0) return null;
+          
+          // Get colors - use 'Other' colors as fallback for custom categories
+          const isStandardCategory = (BUDGET_CATEGORIES as readonly string[]).includes(category);
+          const bgColor = isStandardCategory ? categoryBgColors[category as BudgetCategory] : 'bg-slate-100 dark:bg-slate-800/50';
+          const textColor = isStandardCategory ? categoryTextColors[category as BudgetCategory] : 'text-slate-700 dark:text-slate-300';
+          const borderColor = isStandardCategory ? categoryBorderColors[category as BudgetCategory] : 'border-slate-300 dark:border-slate-600';
+          
+          return (
+            <div
+              key={category}
+              className={cn(
+                'rounded-md px-3 py-2 border',
+                bgColor,
+                borderColor
+              )}
+            >
+              <div className={cn('text-xs font-medium', textColor)}>
+                {category}
+              </div>
+              <div className={cn('text-sm font-semibold', textColor)}>
+                {formatCurrency(categoryTotal)}
+              </div>
+            </div>
+          );
+        })}
+        
+        {/* Phase/Section Total Box */}
+        {total > 0 && (
+          <div className="rounded-md px-3 py-2 border bg-primary/10 border-primary/30">
+            <div className="text-xs font-medium text-primary">
+              {label ? 'Subtotal' : 'Total'}
+            </div>
+            <div className="text-sm font-semibold text-primary">
+              {formatCurrency(total)}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       {/* Auto-categorize button row */}
@@ -200,49 +283,26 @@ export function CategorizedProposalView({
         </Button>
       </div>
 
-      {/* Category Summary Boxes */}
-      <div className="flex flex-wrap gap-2">
-        {allCategories.map(category => {
-          const total = categoryTotals[category];
-          if (total === 0) return null;
+      {/* Per-Phase Breakdowns (if multiple phases) */}
+      {phaseBreakdowns && phaseBreakdowns.length > 1 && (
+        <div className="space-y-4">
+          {phaseBreakdowns.map(({ phase, totals, grandTotal: phaseTotal }) => (
+            <div key={phase.id}>
+              {renderCategoryBreakdown(totals, phaseTotal, phase.name)}
+            </div>
+          ))}
           
-          // Get colors - use 'Other' colors as fallback for custom categories
-          const isStandardCategory = (BUDGET_CATEGORIES as readonly string[]).includes(category);
-          const bgColor = isStandardCategory ? categoryBgColors[category as BudgetCategory] : 'bg-slate-100 dark:bg-slate-800/50';
-          const textColor = isStandardCategory ? categoryTextColors[category as BudgetCategory] : 'text-slate-700 dark:text-slate-300';
-          const borderColor = isStandardCategory ? categoryBorderColors[category as BudgetCategory] : 'border-slate-300 dark:border-slate-600';
-          
-          return (
-            <div
-              key={category}
-              className={cn(
-                'rounded-md px-3 py-2 border',
-                bgColor,
-                borderColor
-              )}
-            >
-              <div className={cn('text-xs font-medium', textColor)}>
-                {category}
-              </div>
-              <div className={cn('text-sm font-semibold', textColor)}>
-                {formatCurrency(total)}
-              </div>
-            </div>
-          );
-        })}
-        
-        {/* Total Box */}
-        {grandTotal > 0 && (
-          <div className="rounded-md px-3 py-2 border bg-primary/10 border-primary/30">
-            <div className="text-xs font-medium text-primary">
-              Total
-            </div>
-            <div className="text-sm font-semibold text-primary">
-              {formatCurrency(grandTotal)}
-            </div>
+          {/* Aggregate Total */}
+          <div className="pt-2 border-t">
+            {renderCategoryBreakdown(categoryTotals, grandTotal, 'Aggregate Total')}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Single breakdown (if single phase or no phases) */}
+      {(!phaseBreakdowns || phaseBreakdowns.length <= 1) && (
+        renderCategoryBreakdown(categoryTotals, grandTotal)
+      )}
     </div>
   );
 }

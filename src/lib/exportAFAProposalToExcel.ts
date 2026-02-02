@@ -22,6 +22,12 @@ function smartRound(value: number): number {
   return Math.round(value / 1000) * 1000;
 }
 
+interface WorkPhase {
+  id: string;
+  name: string;
+  is_included?: boolean;
+}
+
 interface ExportAFAProposalOptions {
   items: DraftProposalItem[];
   enabledAFAs: ProposalAFA[];
@@ -35,6 +41,8 @@ interface ExportAFAProposalOptions {
   afaBaseFigure?: FigureType | null;
   // Scope assumptions narratives
   scopeAssumptionNarratives?: string[];
+  // Work phases for organizing items
+  workPhases?: WorkPhase[];
 }
 
 export async function exportAFAProposalToExcel({
@@ -48,6 +56,7 @@ export async function exportAFAProposalToExcel({
   excelExportFigures,
   afaBaseFigure,
   scopeAssumptionNarratives,
+  workPhases,
 }: ExportAFAProposalOptions): Promise<void> {
   const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency;
   
@@ -278,7 +287,9 @@ export async function exportAFAProposalToExcel({
   headerRow.eachCell((cell, colNumber) => {
     cell.fill = headerFill;
     cell.font = headerFont;
-    cell.alignment = { horizontal: feeColumnIndices.includes(colNumber) ? 'right' : 'left', vertical: 'middle' };
+    // Center align Provider (col 3) and Fee columns
+    const isCenteredColumn = colNumber === 3 || feeColumnIndices.includes(colNumber);
+    cell.alignment = { horizontal: isCenteredColumn ? 'center' : 'left', vertical: 'middle' };
     cell.border = {
       bottom: { style: 'medium', color: { argb: primaryColor } },
     };
@@ -301,36 +312,18 @@ export async function exportAFAProposalToExcel({
     'Other': 'FFF9FAFB',
   };
 
-  // Group items by category
-  const groupedItems: Record<string, AFAFilteredItem[]> = {};
-  BUDGET_CATEGORIES.forEach((cat) => {
-    groupedItems[cat] = [];
-  });
-
+  // Get valid items for export
   const validItems = filterResult.items.filter(item => 
     item.work_item.trim() !== '' && (item.is_included !== false || !item.is_optional)
   );
-  
-  validItems.forEach((item) => {
-    let category = item.category || 'Other';
-    const isKnownCategory = BUDGET_CATEGORIES.includes(category as typeof BUDGET_CATEGORIES[number]);
-    
-    // Map unknown categories to "Other" to prevent items from being dropped
-    if (!isKnownCategory) {
-      category = 'Other';
-    }
-    
-    groupedItems[category].push(item);
-  });
 
   let grandTotal = 0;
   let bmTotal = 0;
   let lcTotal = 0;
 
-  // Process each category
-  for (const category of BUDGET_CATEGORIES) {
-    const categoryItems = groupedItems[category];
-    if (categoryItems.length === 0) continue;
+  // Helper to render items grouped by category
+  const renderCategoryGroup = (categoryItems: AFAFilteredItem[], category: string) => {
+    if (categoryItems.length === 0) return;
 
     // Category header
     const catHeaderRow = worksheet.getRow(currentRow);
@@ -351,11 +344,11 @@ export async function exportAFAProposalToExcel({
 
     let categoryTotal = 0;
 
-    // Add items - fee_amount is already properly rounded via largest remainder method in applyAFAFilters
-    // Do NOT re-round, as this would break the reconciliation
+    // Add items
     for (const item of categoryItems) {
       const feeAmount = item.fee_amount || 0;
       categoryTotal += feeAmount;
+      grandTotal += feeAmount;
       
       if (item.provider === 'Baker McKenzie') {
         bmTotal += feeAmount;
@@ -381,7 +374,6 @@ export async function exportAFAProposalToExcel({
         }
       }
       
-      // 5 columns: workItem, detail, provider, fee, comments
       dataRow.values = [
         workItemDisplay,
         item.detail || '',
@@ -390,13 +382,14 @@ export async function exportAFAProposalToExcel({
         item.afa_comment || '',
       ];
 
-      // Style the row (adjusted for 5 columns)
+      // Style the row
       dataRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
       dataRow.getCell(2).alignment = { wrapText: true, vertical: 'top' };
       dataRow.getCell(2).font = { size: 10 };
       dataRow.getCell(3).font = { size: 10, color: { argb: 'FF6B7280' } };
+      dataRow.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' }; // Center provider
       dataRow.getCell(4).numFmt = '#,##0';
-      dataRow.getCell(4).alignment = { horizontal: 'right' };
+      dataRow.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' }; // Center fee
       dataRow.getCell(5).font = { size: 9, color: { argb: 'FF2563EB' }, italic: true };
       dataRow.getCell(5).alignment = { wrapText: true };
       
@@ -444,14 +437,12 @@ export async function exportAFAProposalToExcel({
       currentRow++;
     }
 
-    grandTotal += categoryTotal;
-
     // Category subtotal
     if (categoryTotal > 0) {
       const subtotalRow = worksheet.getRow(currentRow);
       subtotalRow.values = ['', '', '', categoryTotal, ''];
       subtotalRow.getCell(4).numFmt = '#,##0';
-      subtotalRow.getCell(4).alignment = { horizontal: 'right' };
+      subtotalRow.getCell(4).alignment = { horizontal: 'center' };
       subtotalRow.font = { bold: true, size: 10, color: { argb: '4B5563' } };
       subtotalRow.getCell(4).border = {
         top: { style: 'thin', color: { argb: borderColor } },
@@ -460,6 +451,112 @@ export async function exportAFAProposalToExcel({
     }
 
     currentRow++;
+  };
+
+  // Check if we have phases
+  const hasPhases = workPhases && workPhases.length > 0;
+  
+  if (hasPhases) {
+    // Keep phases in their original order (as defined in the UI)
+    const sortedPhases = [...workPhases];
+    
+    // Process each phase
+    for (const phase of sortedPhases) {
+      // Get items in this phase
+      const phaseItems = validItems.filter(item => item.phase_id === phase.id);
+      if (phaseItems.length === 0) continue;
+      
+      // Phase header
+      const phaseHeaderRow = worksheet.getRow(currentRow);
+      worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+      phaseHeaderRow.getCell(1).value = `📁 ${phase.name}`;
+      phaseHeaderRow.getCell(1).font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+      phaseHeaderRow.getCell(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF4B5563' }, // Dark gray for phase headers
+      };
+      phaseHeaderRow.getCell(1).alignment = { vertical: 'middle' };
+      phaseHeaderRow.height = 26;
+      currentRow++;
+      
+      // Group phase items by category
+      const groupedByCategory: Record<string, AFAFilteredItem[]> = {};
+      BUDGET_CATEGORIES.forEach((cat) => {
+        groupedByCategory[cat] = [];
+      });
+      
+      phaseItems.forEach((item) => {
+        let category = item.category || 'Other';
+        const isKnownCategory = BUDGET_CATEGORIES.includes(category as typeof BUDGET_CATEGORIES[number]);
+        if (!isKnownCategory) {
+          category = 'Other';
+        }
+        groupedByCategory[category].push(item);
+      });
+      
+      // Render categories within this phase
+      for (const category of BUDGET_CATEGORIES) {
+        renderCategoryGroup(groupedByCategory[category], category);
+      }
+    }
+    
+    // Also handle unassigned items (no phase_id)
+    const unassignedItems = validItems.filter(item => !item.phase_id);
+    if (unassignedItems.length > 0) {
+      // Unassigned header
+      const unassignedHeaderRow = worksheet.getRow(currentRow);
+      worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+      unassignedHeaderRow.getCell(1).value = '📁 Other Work Items';
+      unassignedHeaderRow.getCell(1).font = { bold: true, size: 12, color: { argb: 'FFFFFFFF' } };
+      unassignedHeaderRow.getCell(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF6B7280' },
+      };
+      unassignedHeaderRow.getCell(1).alignment = { vertical: 'middle' };
+      unassignedHeaderRow.height = 26;
+      currentRow++;
+      
+      // Group unassigned by category
+      const groupedByCategory: Record<string, AFAFilteredItem[]> = {};
+      BUDGET_CATEGORIES.forEach((cat) => {
+        groupedByCategory[cat] = [];
+      });
+      
+      unassignedItems.forEach((item) => {
+        let category = item.category || 'Other';
+        const isKnownCategory = BUDGET_CATEGORIES.includes(category as typeof BUDGET_CATEGORIES[number]);
+        if (!isKnownCategory) {
+          category = 'Other';
+        }
+        groupedByCategory[category].push(item);
+      });
+      
+      for (const category of BUDGET_CATEGORIES) {
+        renderCategoryGroup(groupedByCategory[category], category);
+      }
+    }
+  } else {
+    // No phases - group all items by category only (original behavior)
+    const groupedItems: Record<string, AFAFilteredItem[]> = {};
+    BUDGET_CATEGORIES.forEach((cat) => {
+      groupedItems[cat] = [];
+    });
+
+    validItems.forEach((item) => {
+      let category = item.category || 'Other';
+      const isKnownCategory = BUDGET_CATEGORIES.includes(category as typeof BUDGET_CATEGORIES[number]);
+      if (!isKnownCategory) {
+        category = 'Other';
+      }
+      groupedItems[category].push(item);
+    });
+
+    // Process each category
+    for (const category of BUDGET_CATEGORIES) {
+      renderCategoryGroup(groupedItems[category], category);
+    }
   }
 
   // Provider breakdown

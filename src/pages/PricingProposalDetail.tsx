@@ -363,10 +363,11 @@ export default function PricingProposalDetail() {
     }
   };
   
-  // Debounced auto-save: triggers 5 seconds after changes stop
-  // Increased from 3s to reduce clunkiness during rapid text entry
+  // Debounced auto-save: triggers 15 seconds after changes stop
+  // Long delay to avoid disrupting text entry - manual save always available
   const hasInitializedOnce = useRef(false);
   const lastChangeTimeRef = useRef<number>(0);
+  const hasUnsavedChangesRef = useRef(false);
   
   useEffect(() => {
     if (!isInitialized) return;
@@ -377,9 +378,12 @@ export default function PricingProposalDetail() {
       return;
     }
     
-    // Mark as having pending changes
+    // Mark as having pending changes (use ref to avoid extra renders)
     pendingChangesRef.current = true;
-    setHasUnsavedChanges(true);
+    if (!hasUnsavedChangesRef.current) {
+      hasUnsavedChangesRef.current = true;
+      setHasUnsavedChanges(true);
+    }
     lastChangeTimeRef.current = Date.now();
     
     // Clear any existing timeout
@@ -387,10 +391,11 @@ export default function PricingProposalDetail() {
       clearTimeout(autoSaveTimeoutRef.current);
     }
     
-    // Set new timeout for 5 seconds after last change
+    // Set new timeout for 15 seconds after last change
     autoSaveTimeoutRef.current = setTimeout(() => {
       performSave(false); // Silent save (no toast)
-    }, 5000);
+      hasUnsavedChangesRef.current = false;
+    }, 15000);
     
     return () => {
       if (autoSaveTimeoutRef.current) {

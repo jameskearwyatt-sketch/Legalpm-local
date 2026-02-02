@@ -69,16 +69,18 @@ GRANULARITY RULES (follow precisely):
 5. Only create separate line items when the source document explicitly lists them as separate priced items
 
 EXTRACTION RULES:
-1. Create a SHORT one-line description (max 50 characters) - just a subject heading, not a full sentence
-2. Determine if the work is done by "Baker McKenzie" or "Local Counsel" based on context clues
-3. Extract the UPPER END fee amount as a number (no currency symbols)
+1. Create a SHORT one-line description (max 50 characters) for work_item - just a subject heading, not a full sentence
+2. PRESERVE THE FULL DETAIL in the detail field - copy the complete original text/description of the work item exactly as it appears in the source document, including all specifics, sub-items, and clarifications
+3. Determine if the work is done by "Baker McKenzie" or "Local Counsel" based on context clues
+4. Extract the UPPER END fee amount as a number (no currency symbols)
 
 FEE RANGE RULE:
 - If fees are given as a range (e.g., "$50,000 - $75,000"), extract ONLY the UPPER END
 - Examples: "$10,000 - $20,000" → use 20000, "between 5k and 15k" → use 15000
 
 OTHER RULES:
-- Keep descriptions extremely brief (e.g., "Due diligence review", "Contract drafting", "Regulatory filings")
+- Keep work_item descriptions extremely brief (e.g., "Due diligence review", "Contract drafting", "Regulatory filings")
+- The detail field should contain the full verbatim text from the source document describing what this work item includes
 - If fees are percentages or hourly, estimate a reasonable fixed amount or use 0
 - If you can't determine the provider, default to "Baker McKenzie"
 - If you can't determine the fee, use 0
@@ -126,6 +128,10 @@ Return the extracted items.`;
                           type: "string", 
                           description: "Short one-line description of the work (max 50 chars)" 
                         },
+                        detail: {
+                          type: "string",
+                          description: "Full verbatim text from the source document describing what this work item includes. Preserve all specifics, sub-items, and clarifications exactly as written."
+                        },
                         provider: { 
                           type: "string", 
                           enum: ["Baker McKenzie", "Local Counsel"],
@@ -136,7 +142,7 @@ Return the extracted items.`;
                           description: "Upper end fee amount as a number. For ranges, use ONLY the upper value (0 if unknown)" 
                         }
                       },
-                      required: ["work_item", "provider", "fee_amount"],
+                      required: ["work_item", "detail", "provider", "fee_amount"],
                       additionalProperties: false
                     }
                   }

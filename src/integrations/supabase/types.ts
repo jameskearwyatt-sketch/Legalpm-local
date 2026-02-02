@@ -2037,6 +2037,7 @@ export type Database = {
           associate_hours: number
           category: string | null
           created_at: string
+          detail: string | null
           fee_amount: number
           fee_lower: number
           fee_upper: number
@@ -2065,6 +2066,7 @@ export type Database = {
           associate_hours?: number
           category?: string | null
           created_at?: string
+          detail?: string | null
           fee_amount?: number
           fee_lower?: number
           fee_upper?: number
@@ -2093,6 +2095,7 @@ export type Database = {
           associate_hours?: number
           category?: string | null
           created_at?: string
+          detail?: string | null
           fee_amount?: number
           fee_lower?: number
           fee_upper?: number

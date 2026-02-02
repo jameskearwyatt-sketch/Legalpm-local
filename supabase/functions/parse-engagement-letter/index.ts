@@ -127,7 +127,7 @@ Remember: The detail field must contain the COMPLETE original text, not a summar
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-pro", // Use Pro model for better instruction following
         temperature: 0,
         messages: [
           { role: "system", content: systemPrompt },
@@ -236,8 +236,17 @@ Remember: The detail field must contain the COMPLETE original text, not a summar
     const result = JSON.parse(toolCall.function.arguments);
     console.log("Extracted phases:", result.phases?.length || 0);
     console.log("Extracted items:", result.items?.length || 0);
+    
+    // Log sample items to verify detail field is populated
+    if (result.items?.length > 0) {
+      const sampleItem = result.items[0];
+      console.log("Sample item - work_item:", sampleItem.work_item?.substring(0, 50));
+      console.log("Sample item - detail length:", sampleItem.detail?.length || 0);
+      console.log("Sample item - phase_id:", sampleItem.phase_id);
+      console.log("Sample item - category:", sampleItem.category);
+    }
 
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       phases: result.phases || [], 
       items: result.items || [] 
     }), {

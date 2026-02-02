@@ -69,14 +69,10 @@ export function EditableFinancialCell({ value, currency, onSave, className, comp
         <Input
           ref={inputRef}
           type="text"
+          inputMode="decimal"
           value={editValue}
           onChange={(e) => setEditValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          onBlur={() => {
-            setTimeout(() => {
-              if (!isSaving) handleCancel();
-            }, 150);
-          }}
           className={cn(
             "text-right",
             compact ? "h-5 w-16 text-xs px-1" : "h-7 w-24 text-sm"
@@ -88,6 +84,7 @@ export function EditableFinancialCell({ value, currency, onSave, className, comp
         ) : (
           <>
             <button
+              type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={handleSave}
               className="p-0.5 hover:bg-success/20 rounded text-success"
@@ -95,6 +92,7 @@ export function EditableFinancialCell({ value, currency, onSave, className, comp
               <Check className={compact ? "h-2.5 w-2.5" : "h-3 w-3"} />
             </button>
             <button
+              type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={handleCancel}
               className="p-0.5 hover:bg-destructive/20 rounded text-destructive"

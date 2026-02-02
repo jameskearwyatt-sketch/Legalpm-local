@@ -48,6 +48,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { 
   usePricingProposal, 
   DraftProposalItem, 
+  ProposalPhase,
   BUDGET_CATEGORIES,
   RateCard,
   ProposalAssumptions,
@@ -73,6 +74,7 @@ import { getCurrencySymbol } from "@/lib/currencyUtils";
 import { IterativePricingDialog, FeeOwnerHours } from "@/components/pricing/IterativePricingDialog";
 import { EditableRateCard } from "@/components/pricing/EditableRateCard";
 import { CategorizedProposalView, categoryBgColors, categoryTextColors, categoryBorderColors } from "@/components/pricing/CategorizedProposalView";
+import { PhasedWorkItemsView } from "@/components/pricing/PhasedWorkItemsView";
 import { LocalCounselPanel } from "@/components/pricing/LocalCounselPanel";
 import { AFATab } from "@/components/pricing/AFATab";
 import { ScopeAssumptionsTab, ScopeAssumptionsState, getAssumptionNarratives } from "@/components/pricing/ScopeAssumptionsTab";
@@ -125,6 +127,7 @@ export default function PricingProposalDetail() {
 
   // Local state for editing work items
   const [draftItems, setDraftItems] = useState<DraftProposalItem[]>([]);
+  const [phases, setPhases] = useState<ProposalPhase[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isExtractingRfp, setIsExtractingRfp] = useState(false);
   const [isGeneratingAiPricing, setIsGeneratingAiPricing] = useState(false);
@@ -173,6 +176,16 @@ export default function PricingProposalDetail() {
       if (proposal.scope_assumptions) {
         setScopeAssumptions(proposal.scope_assumptions);
       }
+      // Load phases from proposal work_phases
+      if (proposal.work_phases && Array.isArray(proposal.work_phases)) {
+        // Convert legacy WorkPhase format to ProposalPhase if needed
+        const loadedPhases: ProposalPhase[] = proposal.work_phases.map((p: any) => ({
+          id: p.id || `phase-${Date.now()}-${Math.random()}`,
+          name: p.name || 'Unnamed Phase',
+          is_included: p.is_included !== false,
+        }));
+        setPhases(loadedPhases);
+      }
     }
   }, [proposal]);
 
@@ -193,12 +206,13 @@ export default function PricingProposalDetail() {
         fee_upper: item.fee_upper,  // Preserve saved fee range
         pricing_method: item.pricing_method,
         category: item.category,
+        phase_id: (item as any).phase_id || null,  // Load phase assignment
         lc_firm_name: item.lc_firm_name || undefined,
         lc_country: item.lc_country || undefined,
         lc_library_id: item.lc_library_id || undefined,
         lc_currency: item.lc_currency || undefined,
         is_optional: item.is_optional,
-        is_included: item.is_included,
+        is_included: item.is_included ?? true,  // Default to included
         ai_rationale: item.ai_rationale,
         partner_hours: item.partner_hours || 0,
         associate_hours: item.associate_hours || 0,
@@ -225,10 +239,9 @@ export default function PricingProposalDetail() {
 
   // Calculate work items totals using the afaBaseFigure setting
   // This ensures AFA calculations use the user-selected baseline (lower/midpoint/upper)
+  // Items with is_included === false are excluded from all calculations
   const workItemTotals = useMemo(() => {
-    const includedItems = draftItems.filter(item => 
-      !item.is_optional || (item.is_optional && item.is_included !== false)
-    );
+    const includedItems = draftItems.filter(item => item.is_included !== false);
     
     // Use the afaBaseFigure setting to determine which fee to use for BM items
     const baseFigure: FigureType = assumptions.afaBaseFigure || 'midpoint';
@@ -541,11 +554,12 @@ export default function PricingProposalDetail() {
     return value.toFixed(1);
   };
 
-  // Save proposal settings (rate card, assumptions)
+  // Save proposal settings (rate card, assumptions, phases)
   const saveProposalSettings = async () => {
     await updateProposal.mutateAsync({
       rate_card: rateCard,
       assumptions: assumptions,
+      work_phases: phases as any, // ProposalPhase[] stored in work_phases JSON column
     });
     toast({ title: 'Settings saved' });
   };
@@ -1520,82 +1534,43 @@ export default function PricingProposalDetail() {
               </Card>
             )}
 
-            {/* Work Items Table */}
+            {/* Work Items - Phased View */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between">
                   <span>Work Items</span>
-                  {viewingHistoricalVersion && (
-                    <Badge variant="secondary" className="ml-2">
-                      Read-only (historical)
-                    </Badge>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-normal text-muted-foreground">
+                      {formatCurrency(workItemTotals.lowerTotal)} – {formatCurrency(workItemTotals.upperTotal)}
+                    </span>
+                    {viewingHistoricalVersion && (
+                      <Badge variant="secondary" className="ml-2">
+                        Read-only (historical)
+                      </Badge>
+                    )}
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {draftItems.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No work items yet. Upload an RFP or add items manually.</p>
-                  </div>
-                ) : (
-                  <DndContext
-                    sensors={sensors}
-                    collisionDetection={closestCenter}
-                    onDragEnd={handleDragEnd}
-                  >
-                    <TableScrollControls>
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-[30px]"></TableHead>
-                              <TableHead className="w-[40px]"></TableHead>
-                              <TableHead className="min-w-[280px]">Work Item</TableHead>
-                              <TableHead className="w-[110px]">Category</TableHead>
-                              <TableHead className="w-[120px]">Provider</TableHead>
-                              <TableHead className="w-[50px] text-center">Calc</TableHead>
-                              <TableHead className="text-right w-[100px]">Lower Est.</TableHead>
-                              <TableHead className="text-right w-[100px]">Upper Est.</TableHead>
-                              <TableHead className="w-[70px]">Method</TableHead>
-                              <TableHead className="text-center w-[45px]">Opt</TableHead>
-                              <TableHead className="text-center w-[45px]">Inc</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            <SortableContext
-                              items={draftItems.map((_, index) => index.toString())}
-                              strategy={verticalListSortingStrategy}
-                            >
-                              {draftItems.map((item, index) => (
-                                <DraggableProposalItem
-                                  key={index}
-                                  id={index.toString()}
-                                  item={item}
-                                  index={index}
-                                  onUpdate={updateItem}
-                                  onRemove={removeItem}
-                                  onOpenIterativePricing={openIterativePricing}
-                                  formatCurrency={formatCurrency}
-                                  viewingHistoricalVersion={viewingHistoricalVersion}
-                                  customCategories={customCategories}
-                                  onAddCustomCategory={addCustomCategory}
-                                />
-                              ))}
-                            </SortableContext>
-                            {/* Totals Row */}
-                            <TableRow className="bg-muted/50 font-semibold border-t-2">
-                              <TableCell colSpan={6} className="text-right">TOTALS</TableCell>
-                              <TableCell className="text-right">{formatCurrency(workItemTotals.lowerTotal)}</TableCell>
-                              <TableCell className="text-right">{formatCurrency(workItemTotals.upperTotal)}</TableCell>
-                              <TableCell colSpan={3}></TableCell>
-                            </TableRow>
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </TableScrollControls>
-                  </DndContext>
-                )}
+                <PhasedWorkItemsView
+                  items={draftItems}
+                  phases={phases}
+                  onItemsChange={(newItems) => {
+                    setDraftItems(newItems);
+                    setHasUnsavedChanges(true);
+                  }}
+                  onPhasesChange={(newPhases) => {
+                    setPhases(newPhases);
+                    setHasUnsavedChanges(true);
+                  }}
+                  onUpdateItem={updateItem}
+                  onRemoveItem={removeItem}
+                  onOpenIterativePricing={openIterativePricing}
+                  formatCurrency={formatCurrency}
+                  viewingHistoricalVersion={viewingHistoricalVersion}
+                  customCategories={customCategories}
+                  onAddCustomCategory={addCustomCategory}
+                />
               </CardContent>
             </Card>
 

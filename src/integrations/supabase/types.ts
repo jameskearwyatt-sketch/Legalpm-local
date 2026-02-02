@@ -2050,6 +2050,7 @@ export type Database = {
           lc_library_id: string | null
           num_turns: number
           partner_hours: number
+          phase_id: string | null
           pricing_method: string
           proposal_id: string
           provider: string
@@ -2077,6 +2078,7 @@ export type Database = {
           lc_library_id?: string | null
           num_turns?: number
           partner_hours?: number
+          phase_id?: string | null
           pricing_method?: string
           proposal_id: string
           provider?: string
@@ -2104,6 +2106,7 @@ export type Database = {
           lc_library_id?: string | null
           num_turns?: number
           partner_hours?: number
+          phase_id?: string | null
           pricing_method?: string
           proposal_id?: string
           provider?: string

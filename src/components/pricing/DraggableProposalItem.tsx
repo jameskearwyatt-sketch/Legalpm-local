@@ -48,6 +48,7 @@ interface DraggableProposalItemProps {
   customCategories?: string[];
   onAddCustomCategory?: (category: string) => void;
   afaDiscountMultiplier?: number;
+  hideIncludeColumn?: boolean;
 }
 
 // CURRENCIES no longer needed here
@@ -64,6 +65,7 @@ export function DraggableProposalItem({
   customCategories = [],
   onAddCustomCategory,
   afaDiscountMultiplier = 1,
+  hideIncludeColumn = false,
 }: DraggableProposalItemProps) {
   const [isCustomCategoryDialogOpen, setIsCustomCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -439,25 +441,29 @@ export function DraggableProposalItem({
       </TableCell>
 
       {/* Optional */}
-      <TableCell className="text-center">
-        <Checkbox
-          checked={item.is_optional}
-          onCheckedChange={(checked) => onUpdate(index, {
-            is_optional: !!checked,
-            is_included: checked ? false : true
-          })}
-          disabled={viewingHistoricalVersion}
-        />
-      </TableCell>
+      {!hideIncludeColumn && (
+        <TableCell className="text-center">
+          <Checkbox
+            checked={item.is_optional}
+            onCheckedChange={(checked) => onUpdate(index, {
+              is_optional: !!checked,
+              is_included: checked ? false : true
+            })}
+            disabled={viewingHistoricalVersion}
+          />
+        </TableCell>
+      )}
 
       {/* Include */}
-      <TableCell className="text-center">
-        <Switch
-          checked={item.is_included}
-          onCheckedChange={(checked) => onUpdate(index, { is_included: checked })}
-          disabled={!item.is_optional || viewingHistoricalVersion}
-        />
-      </TableCell>
+      {!hideIncludeColumn && (
+        <TableCell className="text-center">
+          <Switch
+            checked={item.is_included}
+            onCheckedChange={(checked) => onUpdate(index, { is_included: checked })}
+            disabled={!item.is_optional || viewingHistoricalVersion}
+          />
+        </TableCell>
+      )}
     </TableRow>
   );
 }

@@ -212,6 +212,7 @@ export interface DraftProposalItem {
   fee_upper?: number;
   pricing_method: 'ai_suggested' | 'pricing_tool' | 'manual';
   category?: string | null;
+  phase_id?: string | null;
   lc_firm_name?: string;
   lc_country?: string | null;
   lc_library_id?: string | null;
@@ -223,6 +224,13 @@ export interface DraftProposalItem {
   associate_hours?: number;
   num_turns?: number;
   item_type?: 'documentation' | 'negotiation' | 'due_diligence' | 'meeting';
+}
+
+// Phase definition for grouping work items
+export interface ProposalPhase {
+  id: string;
+  name: string;
+  is_included: boolean;
 }
 
 // Helper to safely parse JSON columns

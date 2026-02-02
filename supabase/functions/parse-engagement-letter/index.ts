@@ -57,44 +57,55 @@ serve(async (req) => {
 
     console.log("Parsing engagement letter text, length:", text.length);
 
-    const systemPrompt = `You are an expert legal billing analyst. Your task is to parse engagement letter or fee arrangement text and extract budget line items.
+    const systemPrompt = `You are an expert legal billing analyst. Your task is to parse engagement letter or fee arrangement text and extract budget line items WITH FULL DETAIL.
 
-CRITICAL CONSISTENCY RULES - YOU MUST FOLLOW THESE EXACTLY:
+CRITICAL - DETAIL PRESERVATION (MOST IMPORTANT):
+The "detail" field MUST contain the COMPLETE, VERBATIM text describing each work item from the source document. 
+- DO NOT summarize or shorten the detail
+- DO NOT paraphrase - copy the exact text
+- Include ALL bullet points, sub-items, clarifications, and specifics
+- If the source says "Due diligence on target company including review of all material contracts, employment agreements, IP portfolio, real estate leases, and pending litigation" - that ENTIRE sentence goes in detail
+- The detail field should be LONGER than the work_item field, not shorter or empty
 
-GRANULARITY RULES (follow precisely):
-1. Extract work items at the TASK level, not the phase level or sub-task level
-2. A "task" is a discrete billable activity (e.g., "Due diligence review", "Draft SPA", "Negotiate ancillary documents")
-3. DO NOT split into sub-tasks (e.g., don't split "Due diligence" into "Review contracts", "Review IP", "Review employment" unless the document explicitly prices them separately)
-4. DO NOT merge tasks into phases (e.g., don't combine "Draft SPA" and "Negotiate SPA" into just "SPA work")
-5. Only create separate line items when the source document explicitly lists them as separate priced items
+PHASE DETECTION:
+- Look for explicit phase indicators: "Phase 1", "Phase 2", "Pilot Phase", "Main Transaction", "Initial Phase", "Completion Phase", etc.
+- If the document organizes work into distinct phases, extract the phase name for each item
+- If NO phases are mentioned, leave phase_name as null (assume single transaction)
+- Common phase patterns: numbered phases, named stages, pre/post signing, pilot vs main
 
-EXTRACTION RULES:
-1. Create a SHORT one-line description (max 50 characters) for work_item - just a subject heading, not a full sentence
-2. PRESERVE THE FULL DETAIL in the detail field - copy the complete original text/description of the work item exactly as it appears in the source document, including all specifics, sub-items, and clarifications
-3. Determine if the work is done by "Baker McKenzie" or "Local Counsel" based on context clues
-4. Extract the UPPER END fee amount as a number (no currency symbols)
+CATEGORY ASSIGNMENT:
+- Assign each item to a category based on document structure or work type
+- Common categories: "Due Diligence", "Transaction Documents", "Tax", "Regulatory", "Employment", "IP", "Real Estate", "Competition/Antitrust", "Financing", "Corporate", "Post-Completion", "Project Management"
+- If the document groups items under headings, use those headings as categories
+- If unclear, infer from the work description (e.g., "review contracts" → "Due Diligence", "draft SPA" → "Transaction Documents")
 
-FEE RANGE RULE:
-- If fees are given as a range (e.g., "$50,000 - $75,000"), extract ONLY the UPPER END
-- Examples: "$10,000 - $20,000" → use 20000, "between 5k and 15k" → use 15000
+WORK_ITEM vs DETAIL:
+- work_item: SHORT summary (max 50 chars) - just a heading like "Due diligence review" or "Draft SPA"
+- detail: FULL verbatim text from source - everything the document says about this item
 
-OTHER RULES:
-- Keep work_item descriptions extremely brief (e.g., "Due diligence review", "Contract drafting", "Regulatory filings")
-- The detail field should contain the full verbatim text from the source document describing what this work item includes
-- If fees are percentages or hourly, estimate a reasonable fixed amount or use 0
-- If you can't determine the provider, default to "Baker McKenzie"
-- If you can't determine the fee, use 0
-- Look for terms like "local counsel", "local law firm", "in-country", "domestic counsel" to identify Local Counsel items
-- ONLY extract items that are explicitly mentioned in the text - do not infer or add items that might be needed`;
+PROVIDER DETECTION:
+- "Baker McKenzie" for main firm work
+- "Local Counsel" for local law firm, in-country counsel, domestic counsel references
 
-    const userPrompt = `Parse the following engagement letter/fee arrangement and extract budget line items. Currency context: ${currency || 'GBP'}
+FEE EXTRACTION:
+- For ranges like "$50,000 - $75,000", use the UPPER END (75000)
+- If fees are percentages or hourly, estimate or use 0`;
+
+    const userPrompt = `Parse the following engagement letter/fee arrangement and extract budget line items. 
+
+CRITICAL INSTRUCTIONS:
+1. For EACH work item, the "detail" field MUST contain the FULL original text - do NOT leave it empty or summarize
+2. If the document mentions phases (Phase 1, Phase 2, Pilot, Main Transaction, etc.), assign items to those phases
+3. Assign a category to each item based on document structure or work type
+
+Currency context: ${currency || 'GBP'}
 
 Text to parse:
 ---
 ${text}
 ---
 
-Return the extracted items.`;
+Return ALL extracted items with complete detail preserved.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -114,23 +125,44 @@ Return the extracted items.`;
             type: "function",
             function: {
               name: "extract_budget_items",
-              description: "Extract budget line items from engagement letter text. You MUST extract ALL billable work items mentioned in the document.",
+              description: "Extract budget line items from engagement letter text. You MUST extract ALL billable work items with COMPLETE detail preserved. The detail field must contain the full verbatim text, not a summary.",
               parameters: {
                 type: "object",
                 properties: {
+                  phases: {
+                    type: "array",
+                    description: "Array of phases detected in the document. Only include if the document explicitly mentions phases (Phase 1, Pilot, Main Transaction, etc.). Leave empty array if no phases.",
+                    items: {
+                      type: "object",
+                      properties: {
+                        id: { type: "string", description: "Unique ID for the phase (e.g., 'phase_1', 'pilot')" },
+                        name: { type: "string", description: "Phase name as it appears in the document" }
+                      },
+                      required: ["id", "name"],
+                      additionalProperties: false
+                    }
+                  },
                   items: {
                     type: "array",
-                    description: "Array of ALL work items found in the document. Extract every billable task mentioned.",
+                    description: "Array of ALL work items. Each MUST have complete detail preserved.",
                     items: {
                       type: "object",
                       properties: {
                         work_item: { 
                           type: "string", 
-                          description: "Short one-line description of the work (max 50 chars)" 
+                          description: "SHORT heading only (max 50 chars). Example: 'Due diligence review'" 
                         },
                         detail: {
                           type: "string",
-                          description: "Full verbatim text from the source document describing what this work item includes. Preserve all specifics, sub-items, and clarifications exactly as written."
+                          description: "CRITICAL: The COMPLETE, VERBATIM text from the source document. DO NOT summarize. Include all bullet points, sub-items, specifics. This should be LONGER than work_item, not empty."
+                        },
+                        category: {
+                          type: "string",
+                          description: "Category for this item. Use document headings if available, or infer: Due Diligence, Transaction Documents, Tax, Regulatory, Employment, IP, Real Estate, Competition/Antitrust, Financing, Corporate, Post-Completion, Project Management, Other"
+                        },
+                        phase_id: {
+                          type: "string",
+                          description: "ID of the phase this item belongs to (matches phases[].id). Null if no phases or item is not phase-specific."
                         },
                         provider: { 
                           type: "string", 
@@ -139,15 +171,15 @@ Return the extracted items.`;
                         },
                         fee_amount: { 
                           type: "number", 
-                          description: "Upper end fee amount as a number. For ranges, use ONLY the upper value (0 if unknown)" 
+                          description: "Upper end fee amount (0 if unknown)" 
                         }
                       },
-                      required: ["work_item", "detail", "provider", "fee_amount"],
+                      required: ["work_item", "detail", "category", "provider", "fee_amount"],
                       additionalProperties: false
                     }
                   }
                 },
-                required: ["items"],
+                required: ["phases", "items"],
                 additionalProperties: false
               }
             }
@@ -188,9 +220,13 @@ Return the extracted items.`;
     }
 
     const result = JSON.parse(toolCall.function.arguments);
+    console.log("Extracted phases:", result.phases?.length || 0);
     console.log("Extracted items:", result.items?.length || 0);
 
-    return new Response(JSON.stringify({ items: result.items || [] }), {
+    return new Response(JSON.stringify({ 
+      phases: result.phases || [], 
+      items: result.items || [] 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

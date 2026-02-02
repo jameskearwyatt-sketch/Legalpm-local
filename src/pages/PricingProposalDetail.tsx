@@ -695,6 +695,16 @@ export default function PricingProposalDetail() {
       if (extractError) throw extractError;
 
       if (extractedData.items && extractedData.items.length > 0) {
+        // Handle phases if the AI detected any
+        if (extractedData.phases && extractedData.phases.length > 0) {
+          const newPhases: ProposalPhase[] = extractedData.phases.map((phase: any) => ({
+            id: phase.id,
+            name: phase.name,
+            is_included: true,
+          }));
+          setPhases(prev => [...prev, ...newPhases]);
+        }
+
         const newItems: DraftProposalItem[] = extractedData.items.map((item: any) => {
           const feeAmount = item.fee_amount || 0;
           // Apply ±10% spread for AI-extracted items
@@ -703,12 +713,14 @@ export default function PricingProposalDetail() {
           
           return {
             work_item: item.work_item,
+            detail: item.detail || null, // Preserve the full detail from AI
             provider: item.provider === 'Local Counsel' ? 'Local Counsel' : 'Baker McKenzie',
             fee_amount: feeAmount,
             fee_lower: feeLower,
             fee_upper: feeUpper,
             pricing_method: 'ai_suggested' as PricingMethod,
             category: item.category || null,
+            phase_id: item.phase_id || null, // Preserve phase assignment from AI
             lc_firm_name: item.lc_firm_name,
             is_optional: false,
             is_included: true,
@@ -718,7 +730,8 @@ export default function PricingProposalDetail() {
 
         setDraftItems(prev => [...prev, ...newItems]);
         setHasUnsavedChanges(true);
-        toast({ title: `Extracted ${newItems.length} work items from RFP` });
+        const phaseMsg = extractedData.phases?.length > 0 ? ` across ${extractedData.phases.length} phases` : '';
+        toast({ title: `Extracted ${newItems.length} work items${phaseMsg} from RFP` });
       } else {
         toast({ title: 'No work items found in document', variant: 'destructive' });
       }
@@ -754,6 +767,16 @@ export default function PricingProposalDetail() {
       if (extractError) throw extractError;
 
       if (extractedData.items && extractedData.items.length > 0) {
+        // Handle phases if the AI detected any
+        if (extractedData.phases && extractedData.phases.length > 0) {
+          const newPhases: ProposalPhase[] = extractedData.phases.map((phase: any) => ({
+            id: phase.id,
+            name: phase.name,
+            is_included: true,
+          }));
+          setPhases(prev => [...prev, ...newPhases]);
+        }
+
         const newItems: DraftProposalItem[] = extractedData.items.map((item: any) => {
           const feeAmount = item.fee_amount || 0;
           const feeLower = Math.round(feeAmount * 0.9);
@@ -761,12 +784,14 @@ export default function PricingProposalDetail() {
           
           return {
             work_item: item.work_item,
+            detail: item.detail || null, // Preserve the full detail from AI
             provider: item.provider === 'Local Counsel' ? 'Local Counsel' : 'Baker McKenzie',
             fee_amount: feeAmount,
             fee_lower: feeLower,
             fee_upper: feeUpper,
             pricing_method: 'ai_suggested' as PricingMethod,
             category: item.category || null,
+            phase_id: item.phase_id || null, // Preserve phase assignment from AI
             lc_firm_name: item.lc_firm_name,
             is_optional: false,
             is_included: true,
@@ -776,7 +801,8 @@ export default function PricingProposalDetail() {
 
         setDraftItems(prev => [...prev, ...newItems]);
         setHasUnsavedChanges(true);
-        toast({ title: `Extracted ${newItems.length} work items from text` });
+        const phaseMsg = extractedData.phases?.length > 0 ? ` across ${extractedData.phases.length} phases` : '';
+        toast({ title: `Extracted ${newItems.length} work items${phaseMsg} from text` });
       } else {
         toast({ title: 'No work items found in text', variant: 'destructive' });
       }

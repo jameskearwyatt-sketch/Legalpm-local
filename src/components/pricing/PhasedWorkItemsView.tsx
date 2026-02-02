@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -87,6 +87,27 @@ export function PhasedWorkItemsView({
   const [isAddPhaseDialogOpen, setIsAddPhaseDialogOpen] = useState(false);
   const [newPhaseName, setNewPhaseName] = useState('');
 
+  // Keep expandedPhases in sync with phases - auto-expand new phases, remove deleted ones
+  useEffect(() => {
+    setExpandedPhases(prev => {
+      const next = new Set(prev);
+      // Add any new phases that aren't in the set
+      phases.forEach(p => {
+        if (!next.has(p.id)) {
+          next.add(p.id);
+        }
+      });
+      // Remove any phase IDs that no longer exist (except 'unassigned')
+      const validIds = new Set(['unassigned', ...phases.map(p => p.id)]);
+      next.forEach(id => {
+        if (!validIds.has(id)) {
+          next.delete(id);
+        }
+      });
+      return next;
+    });
+  }, [phases]);
+
   // Drag sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -100,7 +121,30 @@ export function PhasedWorkItemsView({
     return items.filter(item => item.is_included === false).length;
   }, [items]);
 
+  // Get set of valid phase IDs for quick lookup
+  const validPhaseIds = useMemo(() => new Set(phases.map(p => p.id)), [phases]);
+
+  // Auto-cleanup: If any items have orphaned phase_ids (pointing to deleted phases), 
+  // automatically clear them to prevent ghost phases
+  useEffect(() => {
+    const orphanedItems = items.filter(item => 
+      item.phase_id && !validPhaseIds.has(item.phase_id)
+    );
+    
+    if (orphanedItems.length > 0 && !viewingHistoricalVersion) {
+      console.log('Cleaning up orphaned phase_ids:', orphanedItems.map(i => i.work_item));
+      const cleanedItems = items.map(item => {
+        if (item.phase_id && !validPhaseIds.has(item.phase_id)) {
+          return { ...item, phase_id: null };
+        }
+        return item;
+      });
+      onItemsChange(cleanedItems);
+    }
+  }, [validPhaseIds]); // Only run when validPhaseIds changes (phase deleted)
+
   // Group items by phase and then by category
+  // IMPORTANT: If an item has a phase_id that doesn't exist in phases, treat it as unassigned
   const groupedItems = useMemo(() => {
     const result: Record<string, Record<string, { item: DraftProposalItem; originalIndex: number }[]>> = {
       unassigned: {},
@@ -111,9 +155,11 @@ export function PhasedWorkItemsView({
       result[phase.id] = {};
     });
 
-    // Group items
+    // Group items - orphaned phase_ids go to unassigned
     items.forEach((item, index) => {
-      const phaseId = item.phase_id || 'unassigned';
+      // If phase_id exists but the phase was deleted, treat as unassigned
+      const phaseExists = item.phase_id && validPhaseIds.has(item.phase_id);
+      const phaseId = phaseExists ? item.phase_id! : 'unassigned';
       const category = item.category || 'Other';
 
       if (!result[phaseId]) {
@@ -126,7 +172,7 @@ export function PhasedWorkItemsView({
     });
 
     return result;
-  }, [items, phases]);
+  }, [items, phases, validPhaseIds]);
 
   // Calculate phase totals
   const phaseTotals = useMemo(() => {

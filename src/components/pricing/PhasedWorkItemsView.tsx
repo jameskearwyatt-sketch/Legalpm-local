@@ -399,7 +399,8 @@ export function PhasedWorkItemsView({
                             </TableHead>
                             <TableHead className="w-[30px]"></TableHead>
                             <TableHead className="w-[40px]"></TableHead>
-                            <TableHead className="min-w-[280px]">Work Item</TableHead>
+                            <TableHead className="min-w-[250px]">Work Item</TableHead>
+                            <TableHead className="w-[130px]">Phase</TableHead>
                             <TableHead className="w-[110px]">Category</TableHead>
                             <TableHead className="w-[120px]">Provider</TableHead>
                             <TableHead className="w-[50px] text-center">Calc</TableHead>
@@ -427,7 +428,7 @@ export function PhasedWorkItemsView({
                                 <React.Fragment key={`${phaseId}-${category}`}>
                                   {/* Category header row */}
                                   <TableRow className={cn("border-b-0", bgColor)}>
-                                    <TableCell colSpan={10} className="py-1.5">
+                                    <TableCell colSpan={11} className="py-1.5">
                                       <span className={cn("text-xs font-semibold uppercase tracking-wide", textColor)}>
                                         {category}
                                       </span>
@@ -667,6 +668,34 @@ function PhasedItemCells({
             placeholder="Work item description"
             rows={2}
           />
+        )}
+      </TableCell>
+
+      {/* Phase selector */}
+      <TableCell>
+        {viewingHistoricalVersion ? (
+          <span className="text-sm text-muted-foreground">
+            {phases.find(p => p.id === item.phase_id)?.name || 'Unassigned'}
+          </span>
+        ) : (
+          <Select
+            value={item.phase_id || 'unassigned'}
+            onValueChange={(value) => onPhaseChange(value === 'unassigned' ? null : value)}
+          >
+            <SelectTrigger className="w-[120px] text-xs h-8">
+              <SelectValue placeholder="Phase" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unassigned">
+                <span className="text-muted-foreground">Unassigned</span>
+              </SelectItem>
+              {phases.map(phase => (
+                <SelectItem key={phase.id} value={phase.id}>
+                  {phase.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         )}
       </TableCell>
 

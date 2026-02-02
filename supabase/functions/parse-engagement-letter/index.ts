@@ -59,29 +59,39 @@ serve(async (req) => {
 
     const systemPrompt = `You are an expert legal billing analyst. Your task is to parse engagement letter or fee arrangement text and extract budget line items WITH FULL DETAIL.
 
-CRITICAL - DETAIL PRESERVATION (MOST IMPORTANT):
-The "detail" field MUST contain the COMPLETE, VERBATIM text describing each work item from the source document. 
-- DO NOT summarize or shorten the detail
-- DO NOT paraphrase - copy the exact text
-- Include ALL bullet points, sub-items, clarifications, and specifics
-- If the source says "Due diligence on target company including review of all material contracts, employment agreements, IP portfolio, real estate leases, and pending litigation" - that ENTIRE sentence goes in detail
-- The detail field should be LONGER than the work_item field, not shorter or empty
+CRITICAL - DETAIL PRESERVATION (HIGHEST PRIORITY):
+The "detail" field MUST contain the COMPLETE, VERBATIM, WORD-FOR-WORD text describing each work item from the source document.
+- DO NOT summarize, shorten, or paraphrase the detail - COPY IT EXACTLY AS WRITTEN
+- If the source says "Review and analysis of all material contracts including customer agreements, supplier contracts, distribution agreements, licensing arrangements, and any contracts with change of control provisions" - that ENTIRE text goes in detail VERBATIM
+- The detail field should contain the FULL original text, not a condensed version
+- If the source provides bullet points or sub-items, include ALL of them in detail
+- The work_item field is a SHORT summary (max 50 chars), the detail field is the FULL ORIGINAL TEXT
+- NEVER leave detail empty if there is descriptive text about the work item
 
-PHASE DETECTION:
-- Look for explicit phase indicators: "Phase 1", "Phase 2", "Pilot Phase", "Main Transaction", "Initial Phase", "Completion Phase", etc.
-- If the document organizes work into distinct phases, extract the phase name for each item
-- If NO phases are mentioned, leave phase_name as null (assume single transaction)
-- Common phase patterns: numbered phases, named stages, pre/post signing, pilot vs main
+PHASE DETECTION (VERY IMPORTANT):
+- Look for EXPLICIT phase indicators in the text: "Phase 1", "Phase 2", "PILOT PHASE", "MAIN PROGRAM PHASE", "Main Transaction", "Initial Phase", "Completion Phase", etc.
+- Phases are often marked with headings in CAPS, bold formatting indicators, or numbered sections
+- If you see text like "PILOT PHASE" followed by work items, then "MAIN PROGRAM PHASE" followed by more work items, those are TWO DISTINCT PHASES
+- Create a phase entry for EACH distinct phase mentioned and assign work items to the correct phase
+- Only leave phases empty if the document truly has NO phase structure (just one continuous list of work)
 
-CATEGORY ASSIGNMENT:
-- Assign each item to a category based on document structure or work type
-- Common categories: "Due Diligence", "Transaction Documents", "Tax", "Regulatory", "Employment", "IP", "Real Estate", "Competition/Antitrust", "Financing", "Corporate", "Post-Completion", "Project Management"
-- If the document groups items under headings, use those headings as categories
-- If unclear, infer from the work description (e.g., "review contracts" → "Due Diligence", "draft SPA" → "Transaction Documents")
+CATEGORY ASSIGNMENT (STRICT - USE ONLY THESE):
+You MUST use ONLY these exact category values - no variations, no synonyms, no invented categories:
+- "Due Diligence" (for review, analysis, investigation work)
+- "Documentation" (for drafting, reviewing transaction documents, agreements)
+- "Negotiations" (for negotiation support, term sheet work)
+- "Meetings" (for calls, meetings, coordination)
+- "Regulatory" (for regulatory filings, approvals, compliance)
+- "Closing" (for closing mechanics, completion activities)
+- "Tax" (for tax advice, structuring, opinions)
+- "Legal Opinions" (for formal legal opinions)
+- "Other" (ONLY if none of the above fit)
+
+DO NOT invent categories like "Transaction Documents", "Project Management", "Employment", "IP", etc. - map these to the closest valid category or use "Other".
 
 WORK_ITEM vs DETAIL:
-- work_item: SHORT summary (max 50 chars) - just a heading like "Due diligence review" or "Draft SPA"
-- detail: FULL verbatim text from source - everything the document says about this item
+- work_item: SHORT heading only (max 50 chars) - e.g., "Due diligence on contracts"
+- detail: The FULL, VERBATIM, UNEDITED text from source describing this work item
 
 PROVIDER DETECTION:
 - "Baker McKenzie" for main firm work
@@ -91,12 +101,15 @@ FEE EXTRACTION:
 - For ranges like "$50,000 - $75,000", use the UPPER END (75000)
 - If fees are percentages or hourly, estimate or use 0`;
 
-    const userPrompt = `Parse the following engagement letter/fee arrangement and extract budget line items. 
+    const userPrompt = `Parse the following engagement letter/fee arrangement and extract budget line items.
 
-CRITICAL INSTRUCTIONS:
-1. For EACH work item, the "detail" field MUST contain the FULL original text - do NOT leave it empty or summarize
-2. If the document mentions phases (Phase 1, Phase 2, Pilot, Main Transaction, etc.), assign items to those phases
-3. Assign a category to each item based on document structure or work type
+CRITICAL INSTRUCTIONS - READ CAREFULLY:
+
+1. DETAIL FIELD: For EACH work item, COPY THE EXACT ORIGINAL TEXT into the "detail" field. Do NOT summarize or shorten. The detail must be the VERBATIM text from the source document. If the source says "Comprehensive review of all target company material contracts, including but not limited to customer agreements, vendor contracts, and licensing arrangements, with particular focus on change of control provisions and assignability", that ENTIRE sentence goes in detail WORD FOR WORD.
+
+2. PHASES: Look for phase headings like "PILOT PHASE", "MAIN PROGRAM PHASE", "Phase 1", "Phase 2", etc. If you see these, create separate phase entries and assign each work item to its correct phase. The text structure shows which items belong to which phase.
+
+3. CATEGORIES: Use ONLY these exact values: "Due Diligence", "Documentation", "Negotiations", "Meetings", "Regulatory", "Closing", "Tax", "Legal Opinions", "Other". Do NOT use any other category names.
 
 Currency context: ${currency || 'GBP'}
 
@@ -105,7 +118,7 @@ Text to parse:
 ${text}
 ---
 
-Return ALL extracted items with complete detail preserved.`;
+Remember: The detail field must contain the COMPLETE original text, not a summary. Copy it exactly.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -154,11 +167,12 @@ Return ALL extracted items with complete detail preserved.`;
                         },
                         detail: {
                           type: "string",
-                          description: "CRITICAL: The COMPLETE, VERBATIM text from the source document. DO NOT summarize. Include all bullet points, sub-items, specifics. This should be LONGER than work_item, not empty."
+                          description: "CRITICAL: COPY THE EXACT, WORD-FOR-WORD text from the source document. This must be the FULL ORIGINAL TEXT, not a summary. If the source has a paragraph describing the work, copy that entire paragraph verbatim."
                         },
                         category: {
                           type: "string",
-                          description: "Category for this item. Use document headings if available, or infer: Due Diligence, Transaction Documents, Tax, Regulatory, Employment, IP, Real Estate, Competition/Antitrust, Financing, Corporate, Post-Completion, Project Management, Other"
+                          enum: ["Due Diligence", "Documentation", "Negotiations", "Meetings", "Regulatory", "Closing", "Tax", "Legal Opinions", "Other"],
+                          description: "Category for this item. MUST be one of the enum values. Map 'Transaction Documents' to 'Documentation', 'Project Management' to 'Other', etc."
                         },
                         phase_id: {
                           type: "string",

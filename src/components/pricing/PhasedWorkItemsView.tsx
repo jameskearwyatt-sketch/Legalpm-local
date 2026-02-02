@@ -661,12 +661,12 @@ function PhasedItemCells({
       {/* Work Item */}
       <TableCell className="align-top py-2">
         {viewingHistoricalVersion ? (
-          <p className="min-w-[150px] text-sm whitespace-pre-wrap">{item.work_item}</p>
+          <p className="min-w-[180px] text-sm whitespace-pre-wrap">{item.work_item}</p>
         ) : (
-          <Input
+          <Textarea
             value={item.work_item}
             onChange={(e) => onUpdate(index, { work_item: e.target.value })}
-            className="min-w-[150px] text-sm"
+            className="min-w-[180px] text-sm resize-none min-h-[80px]"
             placeholder="Short description"
           />
         )}

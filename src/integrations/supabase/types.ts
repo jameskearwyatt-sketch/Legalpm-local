@@ -2042,6 +2042,7 @@ export type Database = {
           fee_lower: number
           fee_upper: number
           id: string
+          internal_input_dept: string | null
           is_included: boolean
           is_optional: boolean
           is_pc_sum: boolean
@@ -2072,6 +2073,7 @@ export type Database = {
           fee_lower?: number
           fee_upper?: number
           id?: string
+          internal_input_dept?: string | null
           is_included?: boolean
           is_optional?: boolean
           is_pc_sum?: boolean
@@ -2102,6 +2104,7 @@ export type Database = {
           fee_lower?: number
           fee_upper?: number
           id?: string
+          internal_input_dept?: string | null
           is_included?: boolean
           is_optional?: boolean
           is_pc_sum?: boolean

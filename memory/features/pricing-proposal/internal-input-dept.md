@@ -1,0 +1,4 @@
+# Memory: features/pricing-proposal/internal-input-dept
+Updated: now
+
+Pricing proposals include an 'Internal BM Input Required' feature for requesting input from other internal departments (e.g., Tax, Madrid Real Estate). Each work item has an optional `internal_input_dept` field stored in the database. The UI provides a combobox allowing users to select existing departments or type new ones (Enter to confirm). Each unique department is assigned a distinct highlight color from a palette of 8 colors (yellow, green, blue, pink, orange, purple, cyan, lime). Rows with assigned departments are highlighted in their corresponding color in the UI. On Excel export, if any items have department assignments, users are prompted whether to include highlighting. If yes, the export adds a 'BM Input From' column and applies matching row colors for easy identification when requesting external input.

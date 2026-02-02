@@ -238,55 +238,84 @@ export default function PricingProposalDetail() {
     }
   }, [savedItems, isInitialized]);
 
-  // Auto-save: persist work items AND phases to database with debounce
-  // This ensures no data is lost when navigating away
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Auto-save: persist work items AND phases when navigating away (tab change or leaving page)
+  // NOT on every keystroke - that's too disruptive
   const [isSaving, setIsSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
-
+  
+  // Track if we have pending changes that need saving
+  const pendingChangesRef = useRef(false);
+  
+  // Update pending changes flag when draftItems or phases change
   useEffect(() => {
-    // Only auto-save if we've finished initializing
-    if (!isInitialized || !latestVersion) return;
-
-    // Clear any pending save
-    if (autoSaveTimeoutRef.current) {
-      clearTimeout(autoSaveTimeoutRef.current);
+    if (isInitialized) {
+      pendingChangesRef.current = true;
     }
+  }, [draftItems, phases, isInitialized]);
 
-    setAutoSaveStatus('idle');
-
-    // Debounce: save after 1 second of no changes
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      setIsSaving(true);
-      setAutoSaveStatus('saving');
-      try {
-        // Save work items to version
-        if (draftItems.length > 0) {
-          await updateCurrentVersion.mutateAsync({ items: draftItems });
-        }
-        // Also save phases to proposal
-        await updateProposal.mutateAsync({
-          work_phases: phases as any,
-        });
-        setHasUnsavedChanges(false);
-        setAutoSaveStatus('saved');
-        // Reset to idle after showing "saved" briefly
-        setTimeout(() => setAutoSaveStatus('idle'), 2000);
-      } catch (error) {
-        console.error('Auto-save failed:', error);
-        setAutoSaveStatus('idle');
-      } finally {
-        setIsSaving(false);
+  // Save function that can be called on navigation/tab change
+  const saveChanges = async () => {
+    if (!isInitialized || !latestVersion || !pendingChangesRef.current) return;
+    
+    setIsSaving(true);
+    setAutoSaveStatus('saving');
+    try {
+      // Save work items to version
+      if (draftItems.length > 0) {
+        await updateCurrentVersion.mutateAsync({ items: draftItems });
       }
-    }, 1000);
+      // Also save phases to proposal
+      await updateProposal.mutateAsync({
+        work_phases: phases as any,
+      });
+      setHasUnsavedChanges(false);
+      pendingChangesRef.current = false;
+      setAutoSaveStatus('saved');
+      setTimeout(() => setAutoSaveStatus('idle'), 2000);
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+      setAutoSaveStatus('idle');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-    // Cleanup timeout on unmount or before next effect
-    return () => {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current);
+  // Save when user navigates away from the page (route change or browser close)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (pendingChangesRef.current && isInitialized) {
+        // Trigger save synchronously isn't possible, but warn user
+        e.preventDefault();
+        e.returnValue = '';
       }
     };
-  }, [draftItems, phases, isInitialized, latestVersion]);
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    // Save on unmount (when navigating to different route)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Trigger save when component unmounts (navigation away)
+      if (pendingChangesRef.current && isInitialized && latestVersion) {
+        // Fire and forget - can't await in cleanup
+        const itemsToSave = draftItems;
+        const phasesToSave = phases;
+        if (itemsToSave.length > 0) {
+          updateCurrentVersion.mutate({ items: itemsToSave });
+        }
+        updateProposal.mutate({ work_phases: phasesToSave as any });
+      }
+    };
+  }, [isInitialized, latestVersion, draftItems, phases]);
+
+  // Save when switching tabs within the page
+  const handleTabChange = async (newTab: string) => {
+    // Save current work before switching tabs
+    if (pendingChangesRef.current) {
+      await saveChanges();
+    }
+    setActiveTab(newTab);
+  };
 
   // Calculate work items totals using the afaBaseFigure setting
   // This ensures AFA calculations use the user-selected baseline (lower/midpoint/upper)
@@ -1365,7 +1394,7 @@ export default function PricingProposalDetail() {
         </div>
 
         {/* Main Content with Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList className="grid w-full grid-cols-8 max-w-6xl">
             <TabsTrigger value="parameters">
               <Calculator className="h-4 w-4 mr-2" />
@@ -2385,6 +2414,11 @@ export default function PricingProposalDetail() {
                     <CheckCircle2 className="h-3 w-3 text-green-600" />
                     All changes saved
                   </>
+                )}
+                {autoSaveStatus === 'idle' && hasUnsavedChanges && (
+                  <span className="text-muted-foreground">
+                    Changes will save when you switch tabs or navigate away
+                  </span>
                 )}
               </span>
               <Button 

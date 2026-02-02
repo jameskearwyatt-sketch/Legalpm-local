@@ -108,11 +108,14 @@ export function WipShapingProposalDialog({
   // Local counsel form data - per-firm adjustments
   const [lcFormData, setLcFormData] = useState<LocalCounselProposalData[]>([]);
 
+  // Track if we've initialized for this dialog open
+  const [isInitialized, setIsInitialized] = useState(false);
+
   const roundTo2 = (n: number) => Math.round(n * 100) / 100;
 
-  // Reset form when dialog opens
+  // Reset form ONLY when dialog opens (not on every render)
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && !isInitialized) {
       if (existingProposal) {
         // Editing existing proposal - use stored values directly
         const rawWip = roundTo2(existingProposal.wip_amount);
@@ -166,8 +169,14 @@ export function WipShapingProposalDialog({
       setEntryMode('writeoff');
       setPastedText('');
       setShowAiHelper(false);
+      setIsInitialized(true);
     }
-  }, [isOpen, currentValues, existingProposal, localCounsels, existingProposalLocalCounsels]);
+    
+    // Reset initialization flag when dialog closes
+    if (!isOpen && isInitialized) {
+      setIsInitialized(false);
+    }
+  }, [isOpen, isInitialized, currentValues, existingProposal, localCounsels, existingProposalLocalCounsels]);
 
   const handleAiSummarize = async () => {
     if (!pastedText.trim()) {

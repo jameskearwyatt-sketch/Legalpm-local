@@ -200,6 +200,7 @@ export default function PricingProposalDetail() {
       setDraftItems(savedItems.map(item => ({
         id: item.id,
         work_item: item.work_item,
+        detail: (item as any).detail || null,  // Load detail from database
         provider: item.provider,
         fee_amount: item.fee_amount,
         fee_lower: item.fee_lower,  // Preserve saved fee range
@@ -236,6 +237,56 @@ export default function PricingProposalDetail() {
       setIsInitialized(true);
     }
   }, [savedItems, isInitialized]);
+
+  // Auto-save: persist work items AND phases to database with debounce
+  // This ensures no data is lost when navigating away
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
+
+  useEffect(() => {
+    // Only auto-save if we've finished initializing
+    if (!isInitialized || !latestVersion) return;
+
+    // Clear any pending save
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+
+    setAutoSaveStatus('idle');
+
+    // Debounce: save after 1 second of no changes
+    autoSaveTimeoutRef.current = setTimeout(async () => {
+      setIsSaving(true);
+      setAutoSaveStatus('saving');
+      try {
+        // Save work items to version
+        if (draftItems.length > 0) {
+          await updateCurrentVersion.mutateAsync({ items: draftItems });
+        }
+        // Also save phases to proposal
+        await updateProposal.mutateAsync({
+          work_phases: phases as any,
+        });
+        setHasUnsavedChanges(false);
+        setAutoSaveStatus('saved');
+        // Reset to idle after showing "saved" briefly
+        setTimeout(() => setAutoSaveStatus('idle'), 2000);
+      } catch (error) {
+        console.error('Auto-save failed:', error);
+        setAutoSaveStatus('idle');
+      } finally {
+        setIsSaving(false);
+      }
+    }, 1000);
+
+    // Cleanup timeout on unmount or before next effect
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [draftItems, phases, isInitialized, latestVersion]);
 
   // Calculate work items totals using the afaBaseFigure setting
   // This ensures AFA calculations use the user-selected baseline (lower/midpoint/upper)
@@ -2321,11 +2372,21 @@ export default function PricingProposalDetail() {
         {proposal.status === 'Draft' && !viewingHistoricalVersion && (
           <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <div className="container flex items-center justify-end gap-3 py-3 px-6">
-              {hasUnsavedChanges && (
-                <span className="text-sm text-muted-foreground mr-auto">
-                  You have unsaved changes
-                </span>
-              )}
+              {/* Auto-save status indicator */}
+              <span className="text-sm text-muted-foreground mr-auto flex items-center gap-2">
+                {autoSaveStatus === 'saving' && (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Saving...
+                  </>
+                )}
+                {autoSaveStatus === 'saved' && (
+                  <>
+                    <CheckCircle2 className="h-3 w-3 text-green-600" />
+                    All changes saved
+                  </>
+                )}
+              </span>
               <Button 
                 variant="outline" 
                 onClick={handleSaveCurrentVersion}

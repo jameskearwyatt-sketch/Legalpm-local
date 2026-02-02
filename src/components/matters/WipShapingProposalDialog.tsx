@@ -78,20 +78,32 @@ export function WipShapingProposalDialog({
   const [pastedText, setPastedText] = useState('');
   const [entryMode, setEntryMode] = useState<EntryMode>('writeoff');
   
+  // Use strings for controlled inputs to avoid number parsing issues
   const [formData, setFormData] = useState({
     // Raw values (starting points)
-    raw_wip: 0,
-    raw_ar: 0,
+    raw_wip: '0',
+    raw_ar: '0',
     // Write-off amounts (used when entryMode === 'writeoff')
-    wip_write_off: 0,
-    ar_write_off: 0,
+    wip_write_off: '0',
+    ar_write_off: '0',
     // Adjusted amounts (used when entryMode === 'adjusted')
-    adjusted_wip: 0,
-    adjusted_ar: 0,
+    adjusted_wip: '0',
+    adjusted_ar: '0',
     // Other fields
-    paid_amount: 0,
+    paid_amount: '0',
     notes: '',
   });
+
+  // Parse string values to numbers for calculations
+  const numericValues = {
+    raw_wip: parseFloat(formData.raw_wip) || 0,
+    raw_ar: parseFloat(formData.raw_ar) || 0,
+    wip_write_off: parseFloat(formData.wip_write_off) || 0,
+    ar_write_off: parseFloat(formData.ar_write_off) || 0,
+    adjusted_wip: parseFloat(formData.adjusted_wip) || 0,
+    adjusted_ar: parseFloat(formData.adjusted_ar) || 0,
+    paid_amount: parseFloat(formData.paid_amount) || 0,
+  };
 
   // Local counsel form data - per-firm adjustments
   const [lcFormData, setLcFormData] = useState<LocalCounselProposalData[]>([]);
@@ -112,13 +124,13 @@ export function WipShapingProposalDialog({
         const rawAr = roundTo2(adjustedAr + arWriteOff);
         
         setFormData({
-          raw_wip: rawWip,
-          raw_ar: rawAr,
-          wip_write_off: wipWriteOff,
-          ar_write_off: arWriteOff,
-          adjusted_wip: roundTo2(rawWip - wipWriteOff),
-          adjusted_ar: adjustedAr,
-          paid_amount: roundTo2(existingProposal.paid_amount),
+          raw_wip: String(rawWip),
+          raw_ar: String(rawAr),
+          wip_write_off: String(wipWriteOff),
+          ar_write_off: String(arWriteOff),
+          adjusted_wip: String(roundTo2(rawWip - wipWriteOff)),
+          adjusted_ar: String(adjustedAr),
+          paid_amount: String(roundTo2(existingProposal.paid_amount)),
           notes: existingProposal.notes || '',
         });
 
@@ -138,13 +150,13 @@ export function WipShapingProposalDialog({
         const arWriteOff = roundTo2(Math.max(0, rawAr - currentAr));
         
         setFormData({
-          raw_wip: rawWip,
-          raw_ar: rawAr,
-          wip_write_off: wipWriteOff,
-          ar_write_off: arWriteOff,
-          adjusted_wip: roundTo2(rawWip - wipWriteOff),
-          adjusted_ar: currentAr,
-          paid_amount: roundTo2(currentValues?.paid_amount || 0),
+          raw_wip: String(rawWip),
+          raw_ar: String(rawAr),
+          wip_write_off: String(wipWriteOff),
+          ar_write_off: String(arWriteOff),
+          adjusted_wip: String(roundTo2(rawWip - wipWriteOff)),
+          adjusted_ar: String(currentAr),
+          paid_amount: String(roundTo2(currentValues?.paid_amount || 0)),
           notes: '',
         });
 
@@ -199,19 +211,19 @@ export function WipShapingProposalDialog({
     let finalAdjustedAr: number;
 
     if (entryMode === 'writeoff') {
-      finalWipWriteOff = formData.wip_write_off;
-      finalArWriteOff = formData.ar_write_off;
-      finalAdjustedWip = formData.raw_wip - formData.wip_write_off;
-      finalAdjustedAr = formData.raw_ar - formData.ar_write_off;
+      finalWipWriteOff = numericValues.wip_write_off;
+      finalArWriteOff = numericValues.ar_write_off;
+      finalAdjustedWip = numericValues.raw_wip - numericValues.wip_write_off;
+      finalAdjustedAr = numericValues.raw_ar - numericValues.ar_write_off;
     } else {
-      finalAdjustedWip = formData.adjusted_wip;
-      finalAdjustedAr = formData.adjusted_ar;
-      finalWipWriteOff = formData.raw_wip - formData.adjusted_wip;
-      finalArWriteOff = formData.raw_ar - formData.adjusted_ar;
+      finalAdjustedWip = numericValues.adjusted_wip;
+      finalAdjustedAr = numericValues.adjusted_ar;
+      finalWipWriteOff = numericValues.raw_wip - numericValues.adjusted_wip;
+      finalArWriteOff = numericValues.raw_ar - numericValues.adjusted_ar;
     }
 
     const totalWriteOff = roundTo2(finalWipWriteOff + finalArWriteOff);
-    const calculatedBilledAmount = roundTo2(formData.paid_amount + finalAdjustedAr);
+    const calculatedBilledAmount = roundTo2(numericValues.paid_amount + finalAdjustedAr);
 
     return {
       wipWriteOff: roundTo2(finalWipWriteOff),
@@ -221,7 +233,7 @@ export function WipShapingProposalDialog({
       totalWriteOff,
       billedAmount: calculatedBilledAmount,
     };
-  }, [entryMode, formData.raw_wip, formData.raw_ar, formData.wip_write_off, formData.ar_write_off, formData.adjusted_wip, formData.adjusted_ar, formData.paid_amount]);
+  }, [entryMode, numericValues]);
 
   // Calculate LC totals from individual LC form data
   const lcTotals = useMemo(() => {
@@ -238,7 +250,7 @@ export function WipShapingProposalDialog({
     };
   }, [lcFormData]);
 
-  const updateField = (field: string, value: number | string) => {
+  const updateField = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -258,12 +270,12 @@ export function WipShapingProposalDialog({
     setIsSubmitting(true);
     try {
       await onSave({
-        wip_amount: formData.raw_wip,
+        wip_amount: numericValues.raw_wip,
         wip_write_off_amount: calculatedValues.wipWriteOff,
         ar_write_off_amount: calculatedValues.arWriteOff,
         billed_amount: calculatedValues.billedAmount,
         accounts_receivable: calculatedValues.adjustedAr,
-        paid_amount: formData.paid_amount,
+        paid_amount: numericValues.paid_amount,
         lc_wip_amount: lcTotals.totalProposedWip,
         lc_billed_amount: lcTotals.totalProposedBilled,
         notes: formData.notes.trim(),
@@ -416,7 +428,7 @@ export function WipShapingProposalDialog({
                     min="0"
                     step="0.01"
                     value={formData.raw_wip}
-                    onChange={(e) => updateField('raw_wip', parseFloat(e.target.value) || 0)}
+                    onChange={(e) => updateField('raw_wip', e.target.value)}
                     className="h-9"
                   />
                 </div>
@@ -429,10 +441,10 @@ export function WipShapingProposalDialog({
                         id="wip_write_off"
                         type="number"
                         min="0"
-                        max={formData.raw_wip}
+                        max={numericValues.raw_wip}
                         step="0.01"
                         value={formData.wip_write_off}
-                        onChange={(e) => updateField('wip_write_off', parseFloat(e.target.value) || 0)}
+                        onChange={(e) => updateField('wip_write_off', e.target.value)}
                         className="h-9"
                       />
                     </div>
@@ -453,7 +465,7 @@ export function WipShapingProposalDialog({
                         min="0"
                         step="0.01"
                         value={formData.adjusted_wip}
-                        onChange={(e) => updateField('adjusted_wip', parseFloat(e.target.value) || 0)}
+                        onChange={(e) => updateField('adjusted_wip', e.target.value)}
                         className="h-9"
                       />
                     </div>
@@ -484,7 +496,7 @@ export function WipShapingProposalDialog({
                     min="0"
                     step="0.01"
                     value={formData.raw_ar}
-                    onChange={(e) => updateField('raw_ar', parseFloat(e.target.value) || 0)}
+                    onChange={(e) => updateField('raw_ar', e.target.value)}
                     className="h-9"
                   />
                 </div>
@@ -497,10 +509,10 @@ export function WipShapingProposalDialog({
                         id="ar_write_off"
                         type="number"
                         min="0"
-                        max={formData.raw_ar}
+                        max={numericValues.raw_ar}
                         step="0.01"
                         value={formData.ar_write_off}
-                        onChange={(e) => updateField('ar_write_off', parseFloat(e.target.value) || 0)}
+                        onChange={(e) => updateField('ar_write_off', e.target.value)}
                         className="h-9"
                       />
                     </div>
@@ -521,7 +533,7 @@ export function WipShapingProposalDialog({
                         min="0"
                         step="0.01"
                         value={formData.adjusted_ar}
-                        onChange={(e) => updateField('adjusted_ar', parseFloat(e.target.value) || 0)}
+                        onChange={(e) => updateField('adjusted_ar', e.target.value)}
                         className="h-9"
                       />
                     </div>
@@ -570,7 +582,7 @@ export function WipShapingProposalDialog({
                     min="0"
                     step="0.01"
                     value={formData.paid_amount}
-                    onChange={(e) => updateField('paid_amount', parseFloat(e.target.value) || 0)}
+                    onChange={(e) => updateField('paid_amount', e.target.value)}
                     className="h-9"
                     disabled
                   />

@@ -246,27 +246,57 @@ export default function PricingProposalDetail() {
   // Track if we have pending changes that need saving
   const pendingChangesRef = useRef(false);
   
-  // Update pending changes flag when draftItems or phases change
+  // Store latest values in refs so cleanup doesn't re-trigger on every change
+  const draftItemsRef = useRef(draftItems);
+  const phasesRef = useRef(phases);
+  const isInitializedRef = useRef(isInitialized);
+  const latestVersionRef = useRef(latestVersion);
+  
+  // Keep refs in sync with state
+  useEffect(() => {
+    draftItemsRef.current = draftItems;
+  }, [draftItems]);
+  
+  useEffect(() => {
+    phasesRef.current = phases;
+  }, [phases]);
+  
+  useEffect(() => {
+    isInitializedRef.current = isInitialized;
+  }, [isInitialized]);
+  
+  useEffect(() => {
+    latestVersionRef.current = latestVersion;
+  }, [latestVersion]);
+  
+  // Update pending changes flag when draftItems or phases change (but not on initial load)
+  const hasInitializedOnce = useRef(false);
   useEffect(() => {
     if (isInitialized) {
-      pendingChangesRef.current = true;
+      if (hasInitializedOnce.current) {
+        // Only mark as pending after the first initialization
+        pendingChangesRef.current = true;
+        setHasUnsavedChanges(true);
+      } else {
+        hasInitializedOnce.current = true;
+      }
     }
   }, [draftItems, phases, isInitialized]);
 
   // Save function that can be called on navigation/tab change
   const saveChanges = async () => {
-    if (!isInitialized || !latestVersion || !pendingChangesRef.current) return;
+    if (!isInitializedRef.current || !latestVersionRef.current || !pendingChangesRef.current) return;
     
     setIsSaving(true);
     setAutoSaveStatus('saving');
     try {
       // Save work items to version
-      if (draftItems.length > 0) {
-        await updateCurrentVersion.mutateAsync({ items: draftItems });
+      if (draftItemsRef.current.length > 0) {
+        await updateCurrentVersion.mutateAsync({ items: draftItemsRef.current });
       }
       // Also save phases to proposal
       await updateProposal.mutateAsync({
-        work_phases: phases as any,
+        work_phases: phasesRef.current as any,
       });
       setHasUnsavedChanges(false);
       pendingChangesRef.current = false;
@@ -280,11 +310,10 @@ export default function PricingProposalDetail() {
     }
   };
 
-  // Save when user navigates away from the page (route change or browser close)
+  // Save when user navigates away from the page - only runs once on mount/unmount
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (pendingChangesRef.current && isInitialized) {
-        // Trigger save synchronously isn't possible, but warn user
+      if (pendingChangesRef.current && isInitializedRef.current) {
         e.preventDefault();
         e.returnValue = '';
       }
@@ -292,21 +321,20 @@ export default function PricingProposalDetail() {
     
     window.addEventListener('beforeunload', handleBeforeUnload);
     
-    // Save on unmount (when navigating to different route)
+    // This cleanup only runs when component truly unmounts (no dependencies)
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
       // Trigger save when component unmounts (navigation away)
-      if (pendingChangesRef.current && isInitialized && latestVersion) {
-        // Fire and forget - can't await in cleanup
-        const itemsToSave = draftItems;
-        const phasesToSave = phases;
+      if (pendingChangesRef.current && isInitializedRef.current && latestVersionRef.current) {
+        const itemsToSave = draftItemsRef.current;
+        const phasesToSave = phasesRef.current;
         if (itemsToSave.length > 0) {
           updateCurrentVersion.mutate({ items: itemsToSave });
         }
         updateProposal.mutate({ work_phases: phasesToSave as any });
       }
     };
-  }, [isInitialized, latestVersion, draftItems, phases]);
+  }, []); // Empty deps - only run on mount/unmount
 
   // Save when switching tabs within the page
   const handleTabChange = async (newTab: string) => {

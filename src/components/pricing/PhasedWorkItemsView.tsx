@@ -26,13 +26,15 @@ import {
   Square,
   FolderOpen,
   Folder,
-  Copy
+  Copy,
+  HelpCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TableScrollControls } from '@/components/ui/table-scroll-controls';
@@ -468,6 +470,25 @@ export function PhasedWorkItemsView({
                             <TableHead className="w-[50px] text-center">Calc</TableHead>
                             <TableHead className="text-right w-[100px]">Lower Est.</TableHead>
                             <TableHead className="text-right w-[100px]">Upper Est.</TableHead>
+                            <TableHead className="w-[60px] text-center">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center justify-center gap-1 cursor-help">
+                                      <span className="text-xs">PC Sum</span>
+                                      <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-xs">
+                                    <p className="text-xs">
+                                      <strong>Provisional Contract Sum</strong> – Check this when the scope is unclear 
+                                      (e.g., unknown entity count). This figure is highly provisional and subject to 
+                                      change when the structure is finalized.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </TableHead>
                             <TableHead className="w-[70px]">Method</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -490,7 +511,7 @@ export function PhasedWorkItemsView({
                                 <React.Fragment key={`${phaseId}-${category}`}>
                                   {/* Category header row */}
                                   <TableRow className={cn("border-b-0", bgColor)}>
-                                    <TableCell colSpan={12} className="py-1.5">
+                                    <TableCell colSpan={13} className="py-1.5">
                                       <span className={cn("text-xs font-semibold uppercase tracking-wide", textColor)}>
                                         {category}
                                       </span>
@@ -501,7 +522,10 @@ export function PhasedWorkItemsView({
                                   {categoryItems.map(({ item, originalIndex }) => (
                                     <TableRow
                                       key={originalIndex}
-                                      className={cn(item.is_included === false && "opacity-50 bg-muted/30")}
+                                      className={cn(
+                                        item.is_included === false && "opacity-50 bg-muted/30",
+                                        item.is_pc_sum && "text-violet-700 dark:text-violet-400"
+                                      )}
                                     >
                                       <TableCell className="py-2 w-[40px]">
                                         <Checkbox
@@ -934,6 +958,16 @@ function PhasedItemCells({
             />
           </div>
         )}
+      </TableCell>
+
+      {/* PC Sum checkbox */}
+      <TableCell className="text-center">
+        <Checkbox
+          checked={item.is_pc_sum === true}
+          onCheckedChange={(checked) => onUpdate(index, { is_pc_sum: !!checked })}
+          disabled={viewingHistoricalVersion}
+          className={cn(item.is_pc_sum && "border-violet-500 data-[state=checked]:bg-violet-600")}
+        />
       </TableCell>
 
       {/* Method */}

@@ -214,6 +214,8 @@ export default function PricingProposalDetail() {
         lc_currency: item.lc_currency || undefined,
         is_optional: item.is_optional,
         is_included: item.is_included ?? true,  // Default to included
+        is_pc_sum: (item as any).is_pc_sum ?? false,  // Load PC Sum flag
+        internal_input_dept: (item as any).internal_input_dept || null,  // Load BM Input dept
         ai_rationale: item.ai_rationale,
         partner_hours: item.partner_hours || 0,
         associate_hours: item.associate_hours || 0,

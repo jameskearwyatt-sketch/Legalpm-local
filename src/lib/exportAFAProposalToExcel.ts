@@ -87,7 +87,7 @@ export async function exportAFAProposalToExcel({
   // Merged Provider column (shows BM or LC firm name/country)
   const columns: { key: string; width: number }[] = [
     { key: 'workItem', width: 35 },
-    { key: 'detail', width: 55 },
+    { key: 'detail', width: 80 },
     { key: 'provider', width: 22 },
   ];
   

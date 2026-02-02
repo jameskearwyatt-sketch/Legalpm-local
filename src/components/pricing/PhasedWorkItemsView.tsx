@@ -401,7 +401,7 @@ export function PhasedWorkItemsView({
                             <TableHead className="w-[30px]"></TableHead>
                             <TableHead className="w-[40px]"></TableHead>
                             <TableHead className="min-w-[180px]">Work Item</TableHead>
-                            <TableHead className="min-w-[200px]">Detail</TableHead>
+                            <TableHead className="min-w-[400px]">Detail</TableHead>
                             <TableHead className="w-[130px]">Phase</TableHead>
                             <TableHead className="w-[110px]">Category</TableHead>
                             <TableHead className="w-[120px]">Provider</TableHead>
@@ -676,38 +676,20 @@ function PhasedItemCells({
       <TableCell className="align-top py-2">
         {viewingHistoricalVersion ? (
           item.detail ? (
-            <HoverCard>
-              <HoverCardTrigger asChild>
-                <p className="min-w-[180px] max-w-[250px] text-sm text-muted-foreground truncate cursor-help">
-                  {item.detail}
-                </p>
-              </HoverCardTrigger>
-              <HoverCardContent className="w-96 max-h-80 overflow-y-auto">
-                <p className="text-sm whitespace-pre-wrap">{item.detail}</p>
-              </HoverCardContent>
-            </HoverCard>
+            <p className="min-w-[350px] text-sm text-muted-foreground whitespace-pre-wrap">
+              {item.detail}
+            </p>
           ) : (
             <span className="text-muted-foreground text-xs">-</span>
           )
         ) : (
-          <div className="flex items-start gap-1 min-w-[180px]">
-            <HoverCard>
-              <HoverCardTrigger asChild>
-                <Textarea
-                  value={item.detail || ''}
-                  onChange={(e) => onUpdate(index, { detail: e.target.value || null })}
-                  className="text-sm resize-none min-w-[160px] max-h-[60px]"
-                  placeholder="Full detail (hover to read)"
-                  rows={2}
-                />
-              </HoverCardTrigger>
-              {item.detail && item.detail.length > 50 && (
-                <HoverCardContent className="w-96 max-h-80 overflow-y-auto">
-                  <p className="text-sm whitespace-pre-wrap">{item.detail}</p>
-                </HoverCardContent>
-              )}
-            </HoverCard>
-          </div>
+          <Textarea
+            value={item.detail || ''}
+            onChange={(e) => onUpdate(index, { detail: e.target.value || null })}
+            className="text-sm resize-none min-w-[350px]"
+            placeholder="Full detail"
+            style={{ minHeight: item.detail ? `${Math.max(60, Math.ceil((item.detail?.length || 0) / 50) * 24)}px` : '60px' }}
+          />
         )}
       </TableCell>
 

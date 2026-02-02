@@ -2044,6 +2044,7 @@ export type Database = {
           id: string
           is_included: boolean
           is_optional: boolean
+          is_pc_sum: boolean
           item_type: string
           lc_country: string | null
           lc_currency: string | null
@@ -2073,6 +2074,7 @@ export type Database = {
           id?: string
           is_included?: boolean
           is_optional?: boolean
+          is_pc_sum?: boolean
           item_type?: string
           lc_country?: string | null
           lc_currency?: string | null
@@ -2102,6 +2104,7 @@ export type Database = {
           id?: string
           is_included?: boolean
           is_optional?: boolean
+          is_pc_sum?: boolean
           item_type?: string
           lc_country?: string | null
           lc_currency?: string | null

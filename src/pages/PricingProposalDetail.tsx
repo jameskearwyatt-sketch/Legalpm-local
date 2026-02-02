@@ -238,15 +238,17 @@ export default function PricingProposalDetail() {
     }
   }, [savedItems, isInitialized]);
 
-  // Auto-save: persist work items AND phases when navigating away (tab change or leaving page)
-  // NOT on every keystroke - that's too disruptive
+  // Auto-save: Uses a debounced approach - saves 3 seconds after user stops making changes
+  // This ensures data is persisted without being disruptive on every keystroke
   const [isSaving, setIsSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'idle'>('idle');
   
   // Track if we have pending changes that need saving
   const pendingChangesRef = useRef(false);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSavingRef = useRef(false);
   
-  // Store latest values in refs so cleanup doesn't re-trigger on every change
+  // Store latest values in refs for the save function
   const draftItemsRef = useRef(draftItems);
   const phasesRef = useRef(phases);
   const isInitializedRef = useRef(isInitialized);
@@ -269,72 +271,153 @@ export default function PricingProposalDetail() {
     latestVersionRef.current = latestVersion;
   }, [latestVersion]);
   
-  // Update pending changes flag when draftItems or phases change (but not on initial load)
-  const hasInitializedOnce = useRef(false);
-  useEffect(() => {
-    if (isInitialized) {
-      if (hasInitializedOnce.current) {
-        // Only mark as pending after the first initialization
-        pendingChangesRef.current = true;
-        setHasUnsavedChanges(true);
-      } else {
-        hasInitializedOnce.current = true;
-      }
-    }
-  }, [draftItems, phases, isInitialized]);
-
-  // Save function that can be called on navigation/tab change
-  const saveChanges = async () => {
+  // Internal save function that persists to DB silently (no toast for auto-save)
+  const performSave = async (showToast = false) => {
     if (!isInitializedRef.current || !latestVersionRef.current || !pendingChangesRef.current) return;
+    if (isSavingRef.current) return; // Prevent overlapping saves
     
+    isSavingRef.current = true;
     setIsSaving(true);
     setAutoSaveStatus('saving');
+    
     try {
-      // Save work items to version
-      if (draftItemsRef.current.length > 0) {
-        await updateCurrentVersion.mutateAsync({ items: draftItemsRef.current });
+      const itemsToSave = draftItemsRef.current;
+      const phasesToSave = phasesRef.current;
+      
+      // Save work items to version (use mutateAsync for awaiting)
+      if (itemsToSave.length > 0) {
+        const { error: versionError } = await supabase
+          .from('pricing_proposal_versions')
+          .update({
+            total_amount: itemsToSave.filter(i => i.is_included !== false).reduce((sum, i) => sum + i.fee_amount, 0),
+            bm_total: itemsToSave.filter(i => i.provider === 'Baker McKenzie' && i.is_included !== false).reduce((sum, i) => sum + i.fee_amount, 0),
+            local_counsel_total: itemsToSave.filter(i => i.provider === 'Local Counsel' && i.is_included !== false).reduce((sum, i) => sum + i.fee_amount, 0),
+          })
+          .eq('id', latestVersionRef.current!.id);
+        
+        if (versionError) throw versionError;
+        
+        // Delete and re-insert items
+        await supabase
+          .from('pricing_proposal_items')
+          .delete()
+          .eq('version_id', latestVersionRef.current!.id);
+        
+        const itemsToInsert = itemsToSave.map((item, index) => ({
+          version_id: latestVersionRef.current!.id,
+          proposal_id: proposalId!,
+          user_id: proposal?.user_id,
+          work_item: item.work_item,
+          detail: item.detail || null,
+          provider: item.provider,
+          fee_amount: item.fee_amount,
+          fee_lower: item.fee_lower ?? item.fee_amount,
+          fee_upper: item.fee_upper ?? item.fee_amount,
+          pricing_method: item.pricing_method,
+          category: item.category || null,
+          phase_id: item.phase_id || null,
+          lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
+          lc_country: item.provider === 'Local Counsel' ? (item.lc_country || null) : null,
+          lc_library_id: item.provider === 'Local Counsel' ? (item.lc_library_id || null) : null,
+          lc_currency: item.provider === 'Local Counsel' ? (item.lc_currency || null) : null,
+          is_optional: item.is_optional ?? false,
+          is_included: item.is_included ?? true,
+          sort_order: index,
+          ai_rationale: item.ai_rationale || null,
+          partner_hours: item.partner_hours ?? 0,
+          associate_hours: item.associate_hours ?? 0,
+          num_turns: item.num_turns ?? 1,
+          item_type: item.item_type ?? 'documentation',
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('pricing_proposal_items')
+          .insert(itemsToInsert);
+        
+        if (insertError) throw insertError;
       }
-      // Also save phases to proposal
-      await updateProposal.mutateAsync({
-        work_phases: phasesRef.current as any,
-      });
+      
+      // Save phases to proposal
+      const { error: proposalError } = await supabase
+        .from('pricing_proposals')
+        .update({ work_phases: phasesToSave as any })
+        .eq('id', proposalId!);
+      
+      if (proposalError) throw proposalError;
+      
       setHasUnsavedChanges(false);
       pendingChangesRef.current = false;
       setAutoSaveStatus('saved');
+      
+      if (showToast) {
+        toast({ title: 'Changes saved' });
+      }
+      
       setTimeout(() => setAutoSaveStatus('idle'), 2000);
     } catch (error) {
       console.error('Auto-save failed:', error);
       setAutoSaveStatus('idle');
     } finally {
       setIsSaving(false);
+      isSavingRef.current = false;
     }
   };
+  
+  // Debounced auto-save: triggers 3 seconds after changes stop
+  const hasInitializedOnce = useRef(false);
+  useEffect(() => {
+    if (!isInitialized) return;
+    
+    // Skip the first render after initialization (this is the initial load)
+    if (!hasInitializedOnce.current) {
+      hasInitializedOnce.current = true;
+      return;
+    }
+    
+    // Mark as having pending changes
+    pendingChangesRef.current = true;
+    setHasUnsavedChanges(true);
+    
+    // Clear any existing timeout
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    
+    // Set new timeout for 3 seconds after last change
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      performSave(false); // Silent save (no toast)
+    }, 3000);
+    
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [draftItems, phases, isInitialized]);
 
-  // Save when user navigates away from the page - only runs once on mount/unmount
+  // Save function that can be called on navigation/tab change (with toast)
+  const saveChanges = async () => {
+    // Clear debounce timeout since we're saving now
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    await performSave(true);
+  };
+
+  // Warn before leaving if there are unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (pendingChangesRef.current && isInitializedRef.current) {
+        // Try to save immediately
+        performSave(false);
         e.preventDefault();
         e.returnValue = '';
       }
     };
     
     window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    // This cleanup only runs when component truly unmounts (no dependencies)
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Trigger save when component unmounts (navigation away)
-      if (pendingChangesRef.current && isInitializedRef.current && latestVersionRef.current) {
-        const itemsToSave = draftItemsRef.current;
-        const phasesToSave = phasesRef.current;
-        if (itemsToSave.length > 0) {
-          updateCurrentVersion.mutate({ items: itemsToSave });
-        }
-        updateProposal.mutate({ work_phases: phasesToSave as any });
-      }
-    };
-  }, []); // Empty deps - only run on mount/unmount
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
   // Save when switching tabs within the page
   const handleTabChange = async (newTab: string) => {
@@ -2445,7 +2528,13 @@ export default function PricingProposalDetail() {
                 )}
                 {autoSaveStatus === 'idle' && hasUnsavedChanges && (
                   <span className="text-muted-foreground">
-                    Changes will save when you switch tabs or navigate away
+                    Auto-saving in a few seconds...
+                  </span>
+                )}
+                {autoSaveStatus === 'idle' && !hasUnsavedChanges && (
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <CheckCircle2 className="h-3 w-3 text-green-600" />
+                    All changes saved
                   </span>
                 )}
               </span>

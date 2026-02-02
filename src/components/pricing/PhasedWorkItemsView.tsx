@@ -86,6 +86,7 @@ export function PhasedWorkItemsView({
   const [editingPhaseName, setEditingPhaseName] = useState('');
   const [isAddPhaseDialogOpen, setIsAddPhaseDialogOpen] = useState(false);
   const [newPhaseName, setNewPhaseName] = useState('');
+  const [isDeleteSelectedDialogOpen, setIsDeleteSelectedDialogOpen] = useState(false);
 
   // Keep expandedPhases in sync with phases - auto-expand new phases, remove deleted ones
   useEffect(() => {
@@ -303,6 +304,16 @@ export function PhasedWorkItemsView({
   // Check if all items are included
   const allIncluded = useMemo(() => items.length > 0 && items.every(item => item.is_included !== false), [items]);
   const noneIncluded = useMemo(() => items.length > 0 && items.every(item => item.is_included === false), [items]);
+  
+  // Count of selected (included) items for delete button
+  const selectedItemCount = useMemo(() => items.filter(item => item.is_included !== false).length, [items]);
+  
+  // Delete all selected (included) items
+  const deleteSelectedItems = useCallback(() => {
+    const newItems = items.filter(item => item.is_included === false);
+    onItemsChange(newItems);
+    setIsDeleteSelectedDialogOpen(false);
+  }, [items, onItemsChange]);
 
   // Get all categories for a phase (ordered)
   const getOrderedCategories = useCallback((categories: Record<string, any[]>) => {
@@ -563,6 +574,17 @@ export function PhasedWorkItemsView({
                 <Square className="h-4 w-4 mr-1" />
                 Deselect All
               </Button>
+              <div className="h-4 w-px bg-border mx-1" />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsDeleteSelectedDialogOpen(true)}
+                disabled={selectedItemCount === 0}
+                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete Selected ({selectedItemCount})
+              </Button>
             </>
           )}
         </div>
@@ -616,6 +638,28 @@ export function PhasedWorkItemsView({
             </Button>
             <Button onClick={handleAddPhase} disabled={!newPhaseName.trim()}>
               Create Phase
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Selected Confirmation Dialog */}
+      <Dialog open={isDeleteSelectedDialogOpen} onOpenChange={setIsDeleteSelectedDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Selected Items</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete {selectedItemCount} selected work item{selectedItemCount !== 1 ? 's' : ''}? 
+              This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDeleteSelectedDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={deleteSelectedItems}>
+              <Trash2 className="h-4 w-4 mr-1" />
+              Delete {selectedItemCount} Item{selectedItemCount !== 1 ? 's' : ''}
             </Button>
           </DialogFooter>
         </DialogContent>

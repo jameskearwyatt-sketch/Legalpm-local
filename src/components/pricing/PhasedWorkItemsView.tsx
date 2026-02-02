@@ -52,6 +52,7 @@ import { cn } from '@/lib/utils';
 import { DraftProposalItem, ProposalPhase, BUDGET_CATEGORIES } from '@/lib/hooks/usePricingProposals';
 import { DraggableProposalItem } from './DraggableProposalItem';
 import { categoryBgColors, categoryTextColors } from './CategorizedProposalView';
+import { InternalInputDeptSelector, DEPT_COLORS, getDeptColorIndex } from './InternalInputDeptSelector';
 
 interface PhasedWorkItemsViewProps {
   items: DraftProposalItem[];
@@ -66,6 +67,7 @@ interface PhasedWorkItemsViewProps {
   viewingHistoricalVersion: boolean;
   customCategories: string[];
   onAddCustomCategory: (category: string) => void;
+  existingInputDepts: string[]; // Unique list of departments used across all items
 }
 
 type BudgetCategory = typeof BUDGET_CATEGORIES[number];
@@ -83,6 +85,7 @@ export function PhasedWorkItemsView({
   viewingHistoricalVersion,
   customCategories,
   onAddCustomCategory,
+  existingInputDepts,
 }: PhasedWorkItemsViewProps) {
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(() => 
     new Set(['unassigned', ...phases.map(p => p.id)])
@@ -489,6 +492,24 @@ export function PhasedWorkItemsView({
                                 </Tooltip>
                               </TooltipProvider>
                             </TableHead>
+                            <TableHead className="w-[130px]">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center gap-1 cursor-help">
+                                      <span className="text-xs">BM Input?</span>
+                                      <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-xs">
+                                    <p className="text-xs">
+                                      Select an internal BM department/team to request input on this work item.
+                                      Rows are highlighted by department for easy identification.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </TableHead>
                             <TableHead className="w-[70px]">Method</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -511,7 +532,7 @@ export function PhasedWorkItemsView({
                                 <React.Fragment key={`${phaseId}-${category}`}>
                                   {/* Category header row */}
                                   <TableRow className={cn("border-b-0", bgColor)}>
-                                    <TableCell colSpan={13} className="py-1.5">
+                                    <TableCell colSpan={14} className="py-1.5">
                                       <span className={cn("text-xs font-semibold uppercase tracking-wide", textColor)}>
                                         {category}
                                       </span>
@@ -519,37 +540,46 @@ export function PhasedWorkItemsView({
                                   </TableRow>
                                   
                                   {/* Items in this category */}
-                                  {categoryItems.map(({ item, originalIndex }) => (
-                                    <TableRow
-                                      key={originalIndex}
-                                      className={cn(
-                                        item.is_included === false && "opacity-50 bg-muted/30",
-                                        item.is_pc_sum && "text-violet-700 dark:text-violet-400"
-                                      )}
-                                    >
-                                      <TableCell className="py-2 w-[40px]">
-                                        <Checkbox
-                                          checked={item.is_included !== false}
-                                          onCheckedChange={(checked) => onUpdateItem(originalIndex, { is_included: !!checked })}
-                                          disabled={viewingHistoricalVersion}
+                                  {categoryItems.map(({ item, originalIndex }) => {
+                                    // Get row highlighting based on internal input dept
+                                    const deptColorStyle = item.internal_input_dept 
+                                      ? DEPT_COLORS[getDeptColorIndex(item.internal_input_dept, existingInputDepts)]
+                                      : null;
+                                    
+                                    return (
+                                      <TableRow
+                                        key={originalIndex}
+                                        className={cn(
+                                          item.is_included === false && "opacity-50",
+                                          item.is_pc_sum && !item.internal_input_dept && "text-violet-700 dark:text-violet-400",
+                                          deptColorStyle && `${deptColorStyle.bg} ${deptColorStyle.text}`
+                                        )}
+                                      >
+                                        <TableCell className="py-2 w-[40px]">
+                                          <Checkbox
+                                            checked={item.is_included !== false}
+                                            onCheckedChange={(checked) => onUpdateItem(originalIndex, { is_included: !!checked })}
+                                            disabled={viewingHistoricalVersion}
+                                          />
+                                        </TableCell>
+                                        <PhasedItemCells
+                                          item={item}
+                                          index={originalIndex}
+                                          onUpdate={onUpdateItem}
+                                          onRemove={onRemoveItem}
+                                          onDuplicate={onDuplicateItem}
+                                          onOpenIterativePricing={onOpenIterativePricing}
+                                          formatCurrency={formatCurrency}
+                                          viewingHistoricalVersion={viewingHistoricalVersion}
+                                          customCategories={customCategories}
+                                          onAddCustomCategory={onAddCustomCategory}
+                                          phases={phases}
+                                          onPhaseChange={(phaseId) => onUpdateItem(originalIndex, { phase_id: phaseId })}
+                                          existingInputDepts={existingInputDepts}
                                         />
-                                      </TableCell>
-                                      <PhasedItemCells
-                                        item={item}
-                                        index={originalIndex}
-                                        onUpdate={onUpdateItem}
-                                        onRemove={onRemoveItem}
-                                        onDuplicate={onDuplicateItem}
-                                        onOpenIterativePricing={onOpenIterativePricing}
-                                        formatCurrency={formatCurrency}
-                                        viewingHistoricalVersion={viewingHistoricalVersion}
-                                        customCategories={customCategories}
-                                        onAddCustomCategory={onAddCustomCategory}
-                                        phases={phases}
-                                        onPhaseChange={(phaseId) => onUpdateItem(originalIndex, { phase_id: phaseId })}
-                                      />
-                                    </TableRow>
-                                  ))}
+                                      </TableRow>
+                                    );
+                                  })}
                                 </React.Fragment>
                               );
                             })}
@@ -719,6 +749,7 @@ interface PhasedItemCellsProps {
   onAddCustomCategory: (category: string) => void;
   phases: ProposalPhase[];
   onPhaseChange: (phaseId: string | null) => void;
+  existingInputDepts: string[];
 }
 
 function PhasedItemCells({
@@ -734,6 +765,7 @@ function PhasedItemCells({
   onAddCustomCategory,
   phases,
   onPhaseChange,
+  existingInputDepts,
 }: PhasedItemCellsProps) {
   const {
     attributes,
@@ -967,6 +999,16 @@ function PhasedItemCells({
           onCheckedChange={(checked) => onUpdate(index, { is_pc_sum: !!checked })}
           disabled={viewingHistoricalVersion}
           className={cn(item.is_pc_sum && "border-violet-500 data-[state=checked]:bg-violet-600")}
+        />
+      </TableCell>
+
+      {/* Internal Input Department */}
+      <TableCell>
+        <InternalInputDeptSelector
+          value={item.internal_input_dept}
+          onChange={(value) => onUpdate(index, { internal_input_dept: value })}
+          existingDepts={existingInputDepts}
+          disabled={viewingHistoricalVersion}
         />
       </TableCell>
 

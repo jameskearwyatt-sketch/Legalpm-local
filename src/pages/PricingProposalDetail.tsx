@@ -322,6 +322,8 @@ export default function PricingProposalDetail() {
           lc_currency: item.provider === 'Local Counsel' ? (item.lc_currency || null) : null,
           is_optional: item.is_optional ?? false,
           is_included: item.is_included ?? true,
+          is_pc_sum: item.is_pc_sum ?? false,
+          internal_input_dept: item.internal_input_dept || null,
           sort_order: index,
           ai_rationale: item.ai_rationale || null,
           partner_hours: item.partner_hours ?? 0,
@@ -475,6 +477,17 @@ export default function PricingProposalDetail() {
   const enabledAFAs = useMemo(() => {
     return proposalAFAs.filter(a => a.is_enabled);
   }, [proposalAFAs]);
+
+  // Get unique department names from all items for the "BM Input" column
+  const existingInputDepts = useMemo(() => {
+    const depts = new Set<string>();
+    draftItems.forEach(item => {
+      if (item.internal_input_dept) {
+        depts.add(item.internal_input_dept);
+      }
+    });
+    return Array.from(depts).sort();
+  }, [draftItems]);
 
   // Calculate hours with decay for negotiation turns
   const calculateNegotiationHours = (baseHours: number, decay: number, turns: number) => {
@@ -1183,7 +1196,16 @@ export default function PricingProposalDetail() {
   // Check if figure settings are complete
   const figureSettingsComplete = areFigureSettingsComplete(assumptions);
 
-  const exportToExcel = async () => {
+  // Export dialog state for internal input highlighting
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [includeInputHighlighting, setIncludeInputHighlighting] = useState(true);
+
+  // Check if any items have internal input dept assigned
+  const hasInternalInputDepts = useMemo(() => {
+    return draftItems.some(item => item.internal_input_dept);
+  }, [draftItems]);
+
+  const handleExportClick = () => {
     // Validate figure settings are complete
     if (!figureSettingsComplete) {
       toast({ 
@@ -1195,6 +1217,18 @@ export default function PricingProposalDetail() {
       return;
     }
 
+    // If there are items with internal input dept, show dialog
+    if (hasInternalInputDepts) {
+      setIsExportDialogOpen(true);
+    } else {
+      // No input depts, export directly
+      performExport(false);
+    }
+  };
+
+  const performExport = async (includeHighlighting: boolean) => {
+    setIsExportDialogOpen(false);
+    
     await exportAFAProposalToExcel({
       items: draftItems,
       enabledAFAs,
@@ -1207,6 +1241,8 @@ export default function PricingProposalDetail() {
       afaBaseFigure: assumptions.afaBaseFigure,
       scopeAssumptionNarratives: getAssumptionNarratives(scopeAssumptions),
       workPhases: phases.filter(p => p.is_included !== false),
+      includeInputDeptHighlighting: includeHighlighting,
+      existingInputDepts: existingInputDepts,
     });
     
     toast({ 
@@ -1402,7 +1438,7 @@ export default function PricingProposalDetail() {
                 {hasUnsavedChanges && (
                   <Badge variant="destructive">Unsaved changes</Badge>
                 )}
-                <Button variant="outline" onClick={exportToExcel}>
+                <Button variant="outline" onClick={handleExportClick}>
                   <FileDown className="h-4 w-4 mr-2" />
                   Export Excel
                 </Button>
@@ -1814,6 +1850,7 @@ export default function PricingProposalDetail() {
                   viewingHistoricalVersion={viewingHistoricalVersion}
                   customCategories={customCategories}
                   onAddCustomCategory={addCustomCategory}
+                  existingInputDepts={existingInputDepts}
                 />
               </CardContent>
             </Card>
@@ -2608,6 +2645,42 @@ export default function PricingProposalDetail() {
           initialItemType={currentIterativeItem?.item_type || 'documentation'}
           onApply={applyIterativePricing}
         />
+
+        {/* Export Dialog for Internal Input Highlighting */}
+        <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Export Options</DialogTitle>
+              <DialogDescription>
+                Some work items have internal BM input requests assigned. Would you like to include department highlighting in the Excel export?
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="include-highlighting"
+                  checked={includeInputHighlighting}
+                  onCheckedChange={(checked) => setIncludeInputHighlighting(!!checked)}
+                />
+                <label htmlFor="include-highlighting" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Include department highlighting and column in export
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                This will add color-coded rows and a "BM Input From" column showing which departments you've requested input from.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsExportDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={() => performExport(includeInputHighlighting)}>
+                <FileDown className="h-4 w-4 mr-2" />
+                Export Excel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

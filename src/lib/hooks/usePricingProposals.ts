@@ -229,6 +229,7 @@ export interface DraftProposalItem {
   is_optional?: boolean;
   is_included?: boolean;
   is_pc_sum?: boolean; // Provisional Contract Sum - scope unclear, very provisional figure
+  internal_input_dept?: string | null; // Internal BM department to request input from
   ai_rationale?: string | null;
   partner_hours?: number;
   associate_hours?: number;
@@ -529,6 +530,7 @@ export function usePricingProposal(proposalId?: string) {
             is_optional: item.is_optional ?? false,
             is_included: item.is_included ?? true,
             is_pc_sum: item.is_pc_sum ?? false,
+            internal_input_dept: item.internal_input_dept || null,
             sort_order: index,
             ai_rationale: item.ai_rationale || null,
             partner_hours: item.partner_hours ?? 0,
@@ -627,6 +629,7 @@ export function usePricingProposal(proposalId?: string) {
             is_optional: item.is_optional ?? false,
             is_included: item.is_included ?? true,
             is_pc_sum: item.is_pc_sum ?? false,
+            internal_input_dept: item.internal_input_dept || null,
             sort_order: index,
             ai_rationale: item.ai_rationale || null,
             partner_hours: item.partner_hours ?? 0,

@@ -9,6 +9,7 @@ import ExcelJS from 'exceljs';
 import { DraftProposalItem, BUDGET_CATEGORIES, ExportFigureSettings, FigureType } from '@/lib/hooks/usePricingProposals';
 import { ProposalAFA, AFA_TYPE_LABELS } from '@/lib/hooks/useProposalAFAs';
 import { applyAFAFilters, AFAFilteredItem, getItemFeeByFigureType } from '@/lib/afaFilterUtils';
+import { DEPT_COLORS, getDeptColorIndex } from '@/components/pricing/InternalInputDeptSelector';
 
 /**
  * Dynamic rounding based on value size:
@@ -43,6 +44,9 @@ interface ExportAFAProposalOptions {
   scopeAssumptionNarratives?: string[];
   // Work phases for organizing items
   workPhases?: WorkPhase[];
+  // Internal input department highlighting
+  includeInputDeptHighlighting?: boolean;
+  existingInputDepts?: string[];
 }
 
 export async function exportAFAProposalToExcel({
@@ -57,6 +61,8 @@ export async function exportAFAProposalToExcel({
   afaBaseFigure,
   scopeAssumptionNarratives,
   workPhases,
+  includeInputDeptHighlighting = false,
+  existingInputDepts = [],
 }: ExportAFAProposalOptions): Promise<void> {
   const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency;
   
@@ -105,6 +111,12 @@ export async function exportAFAProposalToExcel({
   if (exportUpper) columns.push({ key: 'feeUpper', width: 16 });
   
   columns.push({ key: 'pcSum', width: 10 }); // PC Sum column after fee columns
+  
+  // Add Internal Input column if highlighting is enabled
+  if (includeInputDeptHighlighting) {
+    columns.push({ key: 'internalInput', width: 20 });
+  }
+  
   columns.push({ key: 'comments', width: 35 });
   
   worksheet.columns = columns;
@@ -273,6 +285,12 @@ export async function exportAFAProposalToExcel({
   if (exportMidpoint) headerValues.push(`Midpoint (${currency})`);
   if (exportUpper) headerValues.push(`Upper Range (${currency})`);
   headerValues.push('PC Sum?');
+  
+  // Add Internal Input header if highlighting is enabled
+  if (includeInputDeptHighlighting) {
+    headerValues.push('BM Input From');
+  }
+  
   headerValues.push('Notes');
   
   // Track which column indices are fee columns (for right-alignment)
@@ -282,7 +300,9 @@ export async function exportAFAProposalToExcel({
   if (exportLower) feeColumnIndices.push(colIdx++);
   if (exportMidpoint) feeColumnIndices.push(colIdx++);
   if (exportUpper) feeColumnIndices.push(colIdx++);
-  const pcSumColumnIndex = colIdx; // PC Sum column comes after fee columns
+  const pcSumColumnIndex = colIdx++; // PC Sum column comes after fee columns
+  const internalInputColumnIndex = includeInputDeptHighlighting ? colIdx++ : -1;
+  const notesColumnIndex = colIdx;
 
   // Column headers
   const headerRow = worksheet.getRow(currentRow);
@@ -383,32 +403,59 @@ export async function exportAFAProposalToExcel({
         }
       }
       
-      dataRow.values = [
+      // Build row values dynamically based on columns
+      const rowValues: (string | number)[] = [
         workItemDisplay,
         item.detail || '',
         providerDisplay,
         feeAmount,
         item.is_pc_sum ? 'Yes' : '',
-        item.afa_comment || '',
       ];
+      
+      // Add internal input column if enabled
+      if (includeInputDeptHighlighting) {
+        rowValues.push(item.internal_input_dept || '');
+      }
+      
+      rowValues.push(item.afa_comment || '');
+      
+      dataRow.values = rowValues;
 
       // Style the row
       dataRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
       dataRow.getCell(2).alignment = { wrapText: true, vertical: 'top' };
       dataRow.getCell(2).font = { size: 10 };
       dataRow.getCell(3).font = { size: 10, color: { argb: 'FF6B7280' } };
-      dataRow.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' }; // Center provider
+      dataRow.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
       dataRow.getCell(4).numFmt = '#,##0';
-      dataRow.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' }; // Center fee
-      dataRow.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' }; // Center PC Sum
+      dataRow.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' };
+      dataRow.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
       if (item.is_pc_sum) {
-        dataRow.getCell(5).font = { size: 10, color: { argb: 'FF7C3AED' }, bold: true }; // Purple for PC Sum
+        dataRow.getCell(5).font = { size: 10, color: { argb: 'FF7C3AED' }, bold: true };
       }
-      dataRow.getCell(6).font = { size: 9, color: { argb: 'FF2563EB' }, italic: true };
-      dataRow.getCell(6).alignment = { wrapText: true };
       
-      // Highlight AFA-adjusted items
-      if (item.afa_adjusted) {
+      // Style internal input column if present
+      if (includeInputDeptHighlighting && internalInputColumnIndex > 0) {
+        dataRow.getCell(internalInputColumnIndex).alignment = { horizontal: 'center', vertical: 'middle' };
+        dataRow.getCell(internalInputColumnIndex).font = { size: 10, bold: !!item.internal_input_dept };
+      }
+      
+      // Style notes column
+      dataRow.getCell(notesColumnIndex).font = { size: 9, color: { argb: 'FF2563EB' }, italic: true };
+      dataRow.getCell(notesColumnIndex).alignment = { wrapText: true };
+      
+      // Apply row highlighting based on internal input dept (takes priority over other highlighting)
+      if (includeInputDeptHighlighting && item.internal_input_dept && existingInputDepts.length > 0) {
+        const colorIndex = getDeptColorIndex(item.internal_input_dept, existingInputDepts);
+        const deptColor = DEPT_COLORS[colorIndex];
+        dataRow.eachCell((cell) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: deptColor.excelBg },
+          };
+        });
+      } else if (item.afa_adjusted) {
         dataRow.eachCell((cell) => {
           cell.fill = {
             type: 'pattern',

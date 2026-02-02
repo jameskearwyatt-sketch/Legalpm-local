@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { FileText, Clock, Users, Scale, Sparkles, Pencil, Check, X, ChevronDown, ChevronRight, File } from "lucide-react";
-import { DraftProposalItem } from "@/lib/hooks/usePricingProposals";
+import { FileText, Clock, Users, Scale, Sparkles, Pencil, Check, X, ChevronDown, ChevronRight, File, Plus, Trash2 } from "lucide-react";
+import { DraftProposalItem, CustomAssumption } from "@/lib/hooks/usePricingProposals";
 
 // Simple assumptions (non-document-specific)
 export interface SimpleAssumption {
@@ -281,6 +281,7 @@ export interface ScopeAssumptionsState {
   documentAssumptions: DocumentAssumptionsState;
   // Generated narratives for documents (stored for editing)
   documentNarratives: string[];
+  customAssumptions?: CustomAssumption[];
 }
 
 const DEFAULT_DOCUMENT_STATE: DocumentAssumptionsState = {
@@ -300,6 +301,7 @@ const createDefaultState = (): ScopeAssumptionsState => ({
   })),
   documentAssumptions: DEFAULT_DOCUMENT_STATE,
   documentNarratives: [],
+  customAssumptions: [],
 });
 
 interface ScopeAssumptionsTabProps {
@@ -467,6 +469,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
   const [editingNarrative, setEditingNarrative] = useState<string | null>(null);
   const [editedText, setEditedText] = useState('');
   const [docSectionOpen, setDocSectionOpen] = useState(false);
+  const [newCustomAssumption, setNewCustomAssumption] = useState('');
 
   // Filter work items to only documentation/negotiation categories
   const documentWorkItems = useMemo(() => {
@@ -497,6 +500,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
         simpleAssumptions: mergedSimple,
         documentAssumptions: value.documentAssumptions || DEFAULT_DOCUMENT_STATE,
         documentNarratives: value.documentNarratives || [],
+        customAssumptions: value.customAssumptions || [],
       });
     }
   }, [value]);
@@ -694,6 +698,47 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
     });
   };
 
+  // Custom assumption handlers
+  const addCustomAssumption = () => {
+    const text = newCustomAssumption.trim();
+    if (!text) return;
+    
+    const newCustom: CustomAssumption = {
+      id: `custom-${Date.now()}`,
+      text,
+      enabled: true,
+    };
+    
+    updateState({
+      ...state,
+      customAssumptions: [...(state.customAssumptions || []), newCustom],
+    });
+    setNewCustomAssumption('');
+  };
+
+  const toggleCustomAssumption = (id: string, enabled: boolean) => {
+    updateState({
+      ...state,
+      customAssumptions: (state.customAssumptions || []).map(a =>
+        a.id === id ? { ...a, enabled } : a
+      ),
+    });
+  };
+
+  const removeCustomAssumption = (id: string) => {
+    updateState({
+      ...state,
+      customAssumptions: (state.customAssumptions || []).filter(a => a.id !== id),
+    });
+  };
+
+  const handleCustomAssumptionKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      addCustomAssumption();
+    }
+  };
+
   const enabledSimpleAssumptions = (state.simpleAssumptions || []).filter(a => a.enabled);
   const documentAssumptions = state.documentAssumptions || DEFAULT_DOCUMENT_STATE;
   const hasDocumentAssumptions = documentAssumptions.turnsEnabled || 
@@ -711,9 +756,12 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
   });
   const combinedProcessNarrative = generateProcessNarrative(enabledProcessAssumptions);
   
+  const enabledCustomAssumptions = (state.customAssumptions || []).filter(a => a.enabled);
+  
   const hasAnyEnabled = enabledSimpleAssumptions.length > 0 || 
     hasDocumentAssumptions ||
-    (state.documentNarratives || []).length > 0;
+    (state.documentNarratives || []).length > 0 ||
+    enabledCustomAssumptions.length > 0;
 
   // Group by section type first, then by category
   const generalAssumptions = SIMPLE_ASSUMPTIONS.filter(a => a.sectionType === 'general');
@@ -860,6 +908,71 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
             </div>
           )}
 
+          {/* Custom Assumptions */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Pencil className="h-4 w-4" />
+                Custom Assumptions
+              </CardTitle>
+              <CardDescription>
+                Add your own custom assumptions. Type your assumption and press Enter to add.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Input for new custom assumption */}
+              <div className="flex gap-2">
+                <Input
+                  value={newCustomAssumption}
+                  onChange={(e) => setNewCustomAssumption(e.target.value)}
+                  onKeyDown={handleCustomAssumptionKeyDown}
+                  placeholder="Type a custom assumption and press Enter..."
+                  className="flex-1"
+                />
+                <Button
+                  onClick={addCustomAssumption}
+                  disabled={!newCustomAssumption.trim()}
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add
+                </Button>
+              </div>
+
+              {/* List of custom assumptions */}
+              {(state.customAssumptions || []).length > 0 ? (
+                <div className="space-y-2">
+                  {(state.customAssumptions || []).map((assumption) => (
+                    <div 
+                      key={assumption.id} 
+                      className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg border border-border/50"
+                    >
+                      <Checkbox
+                        checked={assumption.enabled}
+                        onCheckedChange={(checked) => toggleCustomAssumption(assumption.id, !!checked)}
+                        className="mt-0.5"
+                      />
+                      <p className={`flex-1 text-sm ${!assumption.enabled ? 'text-muted-foreground line-through' : ''}`}>
+                        {assumption.text}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive shrink-0"
+                        onClick={() => removeCustomAssumption(assumption.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground italic text-center py-4">
+                  No custom assumptions added yet.
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Document-Specific Assumptions */}
           <Card>
@@ -1257,5 +1370,10 @@ export function getAssumptionNarratives(state: ScopeAssumptionsState | null): st
   
   const docNarratives = state.documentNarratives || [];
   
-  return [...simpleNarratives, ...docNarratives];
+  // Include enabled custom assumptions
+  const customNarratives = (state.customAssumptions || [])
+    .filter(a => a.enabled && a.text)
+    .map(a => a.text);
+  
+  return [...simpleNarratives, ...docNarratives, ...customNarratives];
 }

@@ -124,11 +124,19 @@ export interface DocumentAssumptionsState {
   configs: DocumentConfig[];
 }
 
+// Custom assumption added by user
+export interface CustomAssumption {
+  id: string;
+  text: string;
+  enabled: boolean;
+}
+
 export interface ScopeAssumptionsState {
   noAssumptionsApply: boolean;
   simpleAssumptions: SimpleAssumptionValue[];
   documentAssumptions: DocumentAssumptionsState;
   documentNarratives: string[];
+  customAssumptions?: CustomAssumption[];
 }
 
 export interface PricingProposal {

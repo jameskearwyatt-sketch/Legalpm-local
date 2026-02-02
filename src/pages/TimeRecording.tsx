@@ -35,7 +35,8 @@ import {
   Save,
   Trash2,
   FolderOpen,
-  Mail
+  Mail,
+  Plus
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -95,7 +96,7 @@ interface WorkItemAllocation {
 
 interface GridRowEntry {
   id: string;
-  type: 'matter' | 'non-chargeable';
+  type: 'matter' | 'non-chargeable' | 'ad-hoc';
   matterId?: string;
   matterNumber?: string;
   matterName?: string;
@@ -103,6 +104,9 @@ interface GridRowEntry {
   cmNumber?: string;
   nonChargeableCode?: string;
   nonChargeableName?: string;
+  // Ad-hoc matter fields (user-entered)
+  adHocMatterName?: string;
+  adHocMatterNumber?: string;
   hours: number;
   // For single-day: just one narrative
   narrative: string;
@@ -118,7 +122,7 @@ interface GridRowEntry {
 
 interface DayOutputEntry {
   id: string;
-  type: 'matter' | 'non-chargeable';
+  type: 'matter' | 'non-chargeable' | 'ad-hoc';
   matterId?: string;
   matterNumber?: string;
   matterName?: string;
@@ -127,6 +131,9 @@ interface DayOutputEntry {
   nonChargeableCode?: string;
   nonChargeableName?: string;
   otherDescription?: string;
+  // Ad-hoc matter fields
+  adHocMatterName?: string;
+  adHocMatterNumber?: string;
   hours: number;
   narrative: string;
   polishedNarrative: string;
@@ -499,6 +506,29 @@ export default function TimeRecording() {
     }));
   };
 
+  // Add a new ad-hoc matter entry
+  const addAdHocMatter = () => {
+    const newId = `adhoc-${Date.now()}`;
+    const newEntry: GridRowEntry = {
+      id: newId,
+      type: 'ad-hoc',
+      adHocMatterName: '',
+      adHocMatterNumber: '',
+      hours: 0,
+      narrative: '',
+      selectedDays: [],
+      dayNarratives: {},
+      workItemAllocations: [],
+      dayWorkItemAllocations: {},
+    };
+    setGridEntries(prev => [...prev, newEntry]);
+  };
+
+  // Remove an ad-hoc matter entry
+  const removeAdHocMatter = (id: string) => {
+    setGridEntries(prev => prev.filter(e => e.id !== id));
+  };
+
   const polishNarrative = async (narrative: string): Promise<string> => {
     if (!narrative.trim()) return '';
     try {
@@ -605,7 +635,7 @@ export default function TimeRecording() {
               }
             }
           } else {
-            // Non-matter entries or entries without allocations
+            // Non-matter entries, ad-hoc entries, or entries without allocations
             polishedEntries.push({
               id: entry.id,
               type: entry.type,
@@ -617,6 +647,8 @@ export default function TimeRecording() {
               nonChargeableCode: entry.nonChargeableCode,
               nonChargeableName: entry.nonChargeableName,
               otherDescription: entry.otherDescription,
+              adHocMatterName: entry.adHocMatterName,
+              adHocMatterNumber: entry.adHocMatterNumber,
               hours: entry.hours,
               narrative: entry.narrative,
               polishedNarrative: polished,
@@ -692,7 +724,7 @@ export default function TimeRecording() {
                 }
               }
             } else {
-              // Non-matter entries or entries without allocations
+              // Non-matter entries, ad-hoc entries, or entries without allocations
               outputMap[dateKey].push({
                 id: `${entry.id}-${dateKey}`,
                 type: entry.type,
@@ -704,6 +736,8 @@ export default function TimeRecording() {
                 nonChargeableCode: entry.nonChargeableCode,
                 nonChargeableName: entry.nonChargeableName,
                 otherDescription: entry.otherDescription,
+                adHocMatterName: entry.adHocMatterName,
+                adHocMatterNumber: entry.adHocMatterNumber,
                 hours: hoursPerDay[i],
                 narrative: rawNarrative,
                 polishedNarrative: polished,
@@ -780,6 +814,15 @@ export default function TimeRecording() {
           }
           output += `    TIME: ${entry.hours} hours\n`;
           output += `    NARRATIVE:\n    ${(entry.polishedNarrative || entry.narrative).replace(/\n/g, '\n    ')}\n\n`;
+        } else if (entry.type === 'ad-hoc') {
+          // Ad-hoc matter entries
+          lastMatterId = null;
+          output += `AD-HOC MATTER: ${entry.adHocMatterName || 'Unnamed Matter'}\n`;
+          output += `MATTER NUMBER: ${entry.adHocMatterNumber || 'N/A'}\n`;
+          output += `───────────────────────────────────────────────────────────────\n`;
+          output += `TIME: ${entry.hours} hours\n`;
+          output += `NARRATIVE:\n${entry.polishedNarrative || entry.narrative}\n`;
+          output += `───────────────────────────────────────────────────────────────\n\n`;
         } else {
           // Non-chargeable entries reset the matter tracking
           lastMatterId = null;
@@ -884,6 +927,26 @@ export default function TimeRecording() {
             matterBlockOpen = false;
             currentMatterId = null;
           }
+        } else if (entry.type === 'ad-hoc') {
+          // Ad-hoc matter entry - close any open matter block first
+          if (matterBlockOpen) {
+            html += `</div>`; // Close matter-block
+            matterBlockOpen = false;
+            currentMatterId = null;
+          }
+          
+          html += `<div class="matter-block" style="border-color: #a855f7;">`;
+          html += `<div class="matter-header" style="background-color: #faf5ff;">`;
+          html += `<table>`;
+          html += `<tr><td class="label-col"><span class="label">Matter:</span></td><td><span class="matter-name" style="color: #9333ea;">${entry.adHocMatterName || 'Unnamed Matter'}</span> <em style="color: #a855f7;">(Ad-Hoc)</em></td></tr>`;
+          html += `<tr><td class="label-col"><span class="label">Matter No:</span></td><td>${entry.adHocMatterNumber || 'N/A'}</td></tr>`;
+          html += `<tr><td class="label-col"><span class="label">Time:</span></td><td><span class="hours">${entry.hours} hours</span></td></tr>`;
+          html += `</table>`;
+          html += `</div>`;
+          html += `<div class="work-item-entry">`;
+          html += `<div class="narrative">${(entry.polishedNarrative || entry.narrative).replace(/\n/g, '<br>')}</div>`;
+          html += `</div>`;
+          html += `</div>`; // Close ad-hoc matter block
         } else {
           // Non-chargeable entry - close any open matter block first
           if (matterBlockOpen) {
@@ -1019,6 +1082,12 @@ export default function TimeRecording() {
           }
           output += `        ⏱️ ${entry.hours} hrs\n`;
           output += `        📝 ${(entry.polishedNarrative || entry.narrative).replace(/\n/g, '\n           ')}\n\n`;
+        } else if (entry.type === 'ad-hoc') {
+          lastMatterId = null;
+          output += `   🟣 AD-HOC MATTER: ${entry.adHocMatterName || 'Unnamed Matter'}\n`;
+          output += `   🔢 NUMBER: ${entry.adHocMatterNumber || 'N/A'}\n`;
+          output += `      ⏱️ ${entry.hours} hrs\n`;
+          output += `      📝 ${(entry.polishedNarrative || entry.narrative).replace(/\n/g, '\n           ')}\n\n`;
         } else {
           lastMatterId = null;
           const code = entry.nonChargeableCode ? ` (${entry.nonChargeableCode})` : '';
@@ -1740,6 +1809,125 @@ export default function TimeRecording() {
                     )}
                   </TableRow>
                 ))}
+
+                {/* Ad-Hoc Matters Section */}
+                <TableRow className="bg-muted/30">
+                  <TableCell colSpan={mode === 'single' ? 3 : 4} className="font-semibold text-purple-600 dark:text-purple-400">
+                    <div className="flex items-center justify-between">
+                      <span>Ad-Hoc Matters</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={addAdHocMatter}
+                        className="text-purple-600 dark:text-purple-400 hover:text-purple-700"
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Matter
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+                {gridEntries.filter(e => e.type === 'ad-hoc').map(entry => (
+                  <TableRow key={entry.id} className={entry.hours > 0 ? 'bg-purple-50 dark:bg-purple-950/20' : ''}>
+                    <TableCell>
+                      <div className="space-y-2">
+                        <Input
+                          placeholder="Matter Name"
+                          value={entry.adHocMatterName || ''}
+                          onChange={(e) => updateEntry(entry.id, { adHocMatterName: e.target.value })}
+                          className="font-medium"
+                        />
+                        <Input
+                          placeholder="Matter Number (e.g. 12345-1)"
+                          value={entry.adHocMatterNumber || ''}
+                          onChange={(e) => updateEntry(entry.id, { adHocMatterNumber: e.target.value })}
+                          className="text-sm"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeAdHocMatter(entry.id)}
+                          className="text-destructive hover:text-destructive h-7 px-2"
+                        >
+                          <Trash2 className="h-3 w-3 mr-1" />
+                          Remove
+                        </Button>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Input
+                        type="number"
+                        step="0.25"
+                        min="0"
+                        max="24"
+                        value={entry.hours || ''}
+                        onChange={(e) => updateEntry(entry.id, { hours: parseFloat(e.target.value) || 0 })}
+                        placeholder="0"
+                        className="w-20 text-center"
+                      />
+                    </TableCell>
+                    {mode === 'single' ? (
+                      <TableCell>
+                        <Input
+                          placeholder="Brief notes - AI will polish"
+                          value={entry.narrative}
+                          onChange={(e) => updateEntry(entry.id, { narrative: e.target.value })}
+                          disabled={entry.hours === 0}
+                        />
+                      </TableCell>
+                    ) : (
+                      <>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1 justify-center">
+                            {datesInRange.map(date => {
+                              const dateKey = format(date, 'yyyy-MM-dd');
+                              const isSelected = entry.selectedDays.some(d => format(d, 'yyyy-MM-dd') === dateKey);
+                              return (
+                                <div key={dateKey} className="flex flex-col items-center">
+                                  <span className="text-[10px] text-muted-foreground leading-tight">
+                                    {format(date, 'EEE')}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground mb-0.5 leading-tight">
+                                    {format(date, 'd')}
+                                  </span>
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={() => toggleDay(entry.id, date)}
+                                    disabled={entry.hours === 0}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {entry.selectedDays.length === 0 ? (
+                            <span className="text-muted-foreground text-sm">Select days first</span>
+                          ) : (
+                            <div className="space-y-2">
+                              {entry.selectedDays.map(date => {
+                                const dateKey = format(date, 'yyyy-MM-dd');
+                                return (
+                                  <div key={dateKey} className="flex items-center gap-2">
+                                    <Badge variant="outline" className="shrink-0 text-xs">
+                                      {format(date, 'EEE d')}
+                                    </Badge>
+                                    <Input
+                                      placeholder="Brief notes for this day"
+                                      value={entry.dayNarratives[dateKey] || ''}
+                                      onChange={(e) => updateDayNarrative(entry.id, date, e.target.value)}
+                                      className="flex-1"
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </TableCell>
+                      </>
+                    )}
+                  </TableRow>
+                ))}
               </TableBody>
             </Table>
           </div>
@@ -1876,6 +2064,18 @@ export default function TimeRecording() {
                               → {entry.workItemName}
                             </div>
                           )}
+                        </div>
+                      ) : entry.type === 'ad-hoc' ? (
+                        <div className="space-y-0.5">
+                          <div className="font-semibold text-purple-600 dark:text-purple-400">
+                            {entry.adHocMatterName || 'Unnamed Matter'}
+                          </div>
+                          <div className="text-sm text-muted-foreground font-medium">
+                            {entry.adHocMatterNumber || 'No matter number'}
+                          </div>
+                          <Badge variant="outline" className="text-xs text-purple-600 dark:text-purple-400 border-purple-300">
+                            Ad-Hoc
+                          </Badge>
                         </div>
                       ) : (
                         <div>

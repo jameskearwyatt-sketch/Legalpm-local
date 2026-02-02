@@ -1182,6 +1182,7 @@ export default function PricingProposalDetail() {
       excelExportFigures: assumptions.excelExportFigures,
       afaBaseFigure: assumptions.afaBaseFigure,
       scopeAssumptionNarratives: getAssumptionNarratives(scopeAssumptions),
+      workPhases: phases.filter(p => p.is_included !== false),
     });
     
     toast({ 

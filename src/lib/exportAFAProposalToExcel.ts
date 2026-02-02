@@ -104,6 +104,7 @@ export async function exportAFAProposalToExcel({
   if (exportMidpoint) columns.push({ key: 'feeMidpoint', width: 16 });
   if (exportUpper) columns.push({ key: 'feeUpper', width: 16 });
   
+  columns.push({ key: 'pcSum', width: 10 }); // PC Sum column after fee columns
   columns.push({ key: 'comments', width: 35 });
   
   worksheet.columns = columns;
@@ -266,11 +267,12 @@ export async function exportAFAProposalToExcel({
   disclaimerCell.alignment = { horizontal: 'center' };
   currentRow += 2;
 
-  // Build dynamic header values - includes Detail column
+  // Build dynamic header values - includes Detail column and PC Sum
   const headerValues: string[] = ['Scope of Work', 'Detail', 'Provider'];
   if (exportLower) headerValues.push(`Lower Range (${currency})`);
   if (exportMidpoint) headerValues.push(`Midpoint (${currency})`);
   if (exportUpper) headerValues.push(`Upper Range (${currency})`);
+  headerValues.push('PC Sum?');
   headerValues.push('Notes');
   
   // Track which column indices are fee columns (for right-alignment)
@@ -280,6 +282,7 @@ export async function exportAFAProposalToExcel({
   if (exportLower) feeColumnIndices.push(colIdx++);
   if (exportMidpoint) feeColumnIndices.push(colIdx++);
   if (exportUpper) feeColumnIndices.push(colIdx++);
+  const pcSumColumnIndex = colIdx; // PC Sum column comes after fee columns
 
   // Column headers
   const headerRow = worksheet.getRow(currentRow);
@@ -287,8 +290,8 @@ export async function exportAFAProposalToExcel({
   headerRow.eachCell((cell, colNumber) => {
     cell.fill = headerFill;
     cell.font = headerFont;
-    // Center align Provider (col 3) and Fee columns
-    const isCenteredColumn = colNumber === 3 || feeColumnIndices.includes(colNumber);
+    // Center align Provider (col 3), Fee columns, and PC Sum column
+    const isCenteredColumn = colNumber === 3 || feeColumnIndices.includes(colNumber) || colNumber === pcSumColumnIndex;
     cell.alignment = { horizontal: isCenteredColumn ? 'center' : 'left', vertical: 'middle' };
     cell.border = {
       bottom: { style: 'medium', color: { argb: primaryColor } },
@@ -320,6 +323,7 @@ export async function exportAFAProposalToExcel({
   let grandTotal = 0;
   let bmTotal = 0;
   let lcTotal = 0;
+  let hasPcSumItems = false; // Track if any items have PC Sum checked
 
   // Helper to render items grouped by category
   const renderCategoryGroup = (categoryItems: AFAFilteredItem[], category: string) => {
@@ -355,6 +359,11 @@ export async function exportAFAProposalToExcel({
       } else {
         lcTotal += feeAmount;
       }
+      
+      // Track PC Sum items
+      if (item.is_pc_sum) {
+        hasPcSumItems = true;
+      }
 
       const dataRow = worksheet.getRow(currentRow);
       
@@ -379,6 +388,7 @@ export async function exportAFAProposalToExcel({
         item.detail || '',
         providerDisplay,
         feeAmount,
+        item.is_pc_sum ? 'Yes' : '',
         item.afa_comment || '',
       ];
 
@@ -390,8 +400,12 @@ export async function exportAFAProposalToExcel({
       dataRow.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' }; // Center provider
       dataRow.getCell(4).numFmt = '#,##0';
       dataRow.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' }; // Center fee
-      dataRow.getCell(5).font = { size: 9, color: { argb: 'FF2563EB' }, italic: true };
-      dataRow.getCell(5).alignment = { wrapText: true };
+      dataRow.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' }; // Center PC Sum
+      if (item.is_pc_sum) {
+        dataRow.getCell(5).font = { size: 10, color: { argb: 'FF7C3AED' }, bold: true }; // Purple for PC Sum
+      }
+      dataRow.getCell(6).font = { size: 9, color: { argb: 'FF2563EB' }, italic: true };
+      dataRow.getCell(6).alignment = { wrapText: true };
       
       // Highlight AFA-adjusted items
       if (item.afa_adjusted) {
@@ -424,7 +438,7 @@ export async function exportAFAProposalToExcel({
 
       if (item.is_optional) {
         dataRow.getCell(1).font = { italic: true, color: { argb: 'FF6B7280' } };
-        dataRow.getCell(5).font = { italic: true, color: { argb: 'FF6B7280' } };
+        dataRow.getCell(6).font = { italic: true, color: { argb: 'FF6B7280' } };
       }
 
       // Subtle borders
@@ -440,7 +454,7 @@ export async function exportAFAProposalToExcel({
     // Category subtotal
     if (categoryTotal > 0) {
       const subtotalRow = worksheet.getRow(currentRow);
-      subtotalRow.values = ['', '', '', categoryTotal, ''];
+      subtotalRow.values = ['', '', '', categoryTotal, '', ''];
       subtotalRow.getCell(4).numFmt = '#,##0';
       subtotalRow.getCell(4).alignment = { horizontal: 'center' };
       subtotalRow.font = { bold: true, size: 10, color: { argb: '4B5563' } };
@@ -570,7 +584,7 @@ export async function exportAFAProposalToExcel({
 
   // Baker McKenzie fees (already accumulated from rounded line items)
   const bmRow = worksheet.getRow(currentRow);
-  bmRow.values = ['Baker McKenzie Fees', '', '', bmTotal, ''];
+  bmRow.values = ['Baker McKenzie Fees', '', '', bmTotal, '', ''];
   bmRow.getCell(4).numFmt = '#,##0';
   bmRow.getCell(4).alignment = { horizontal: 'right' };
   bmRow.getCell(1).font = { size: 11 };
@@ -579,7 +593,7 @@ export async function exportAFAProposalToExcel({
   // Local Counsel fees (already accumulated from rounded line items)
   if (lcTotal > 0) {
     const lcRow = worksheet.getRow(currentRow);
-    lcRow.values = ['Local Counsel Fees', '', '', lcTotal, ''];
+    lcRow.values = ['Local Counsel Fees', '', '', lcTotal, '', ''];
     lcRow.getCell(4).numFmt = '#,##0';
     lcRow.getCell(4).alignment = { horizontal: 'right' };
     lcRow.getCell(1).font = { size: 11 };
@@ -589,7 +603,7 @@ export async function exportAFAProposalToExcel({
   // Aggregate Line Item Estimate (sum of all line items)
   currentRow++;
   const aggregateRow = worksheet.getRow(currentRow);
-  aggregateRow.values = ['AGGREGATE LINE ITEM ESTIMATE', '', '', grandTotal, ''];
+  aggregateRow.values = ['AGGREGATE LINE ITEM ESTIMATE', '', '', grandTotal, '', ''];
   aggregateRow.getCell(4).numFmt = '#,##0';
   aggregateRow.getCell(4).alignment = { horizontal: 'right' };
   aggregateRow.getCell(4).font = { bold: true, size: 12, color: { argb: primaryColor } };
@@ -620,10 +634,10 @@ export async function exportAFAProposalToExcel({
     // Add each applied AFA
     for (const afa of filterResult.appliedAFAs) {
       const afaDetailRow = worksheet.getRow(currentRow);
-      afaDetailRow.values = [`  ${afa.label}`, '', '', '', afa.description];
+      afaDetailRow.values = [`  ${afa.label}`, '', '', '', '', afa.description];
       afaDetailRow.getCell(1).font = { size: 10, color: { argb: 'FF2563EB' }, italic: true };
-      afaDetailRow.getCell(5).font = { size: 10, color: { argb: 'FF6B7280' }, italic: true };
-      afaDetailRow.getCell(5).alignment = { wrapText: true };
+      afaDetailRow.getCell(6).font = { size: 10, color: { argb: 'FF6B7280' }, italic: true };
+      afaDetailRow.getCell(6).alignment = { wrapText: true };
       currentRow++;
     }
     
@@ -631,7 +645,7 @@ export async function exportAFAProposalToExcel({
     if (primaryAFA?.client_price && primaryAFA.client_price !== grandTotal) {
       currentRow++;
       const feeProposalRow = worksheet.getRow(currentRow);
-      feeProposalRow.values = ['FEE PROPOSAL', '', '', smartRound(primaryAFA.client_price), ''];
+      feeProposalRow.values = ['FEE PROPOSAL', '', '', smartRound(primaryAFA.client_price), '', ''];
       feeProposalRow.getCell(4).numFmt = '#,##0';
       feeProposalRow.getCell(4).alignment = { horizontal: 'right' };
       feeProposalRow.getCell(4).font = { bold: true, size: 13, color: { argb: 'FF2563EB' } };
@@ -683,6 +697,24 @@ export async function exportAFAProposalToExcel({
     noteCell.value = `• ${assumption}`;
     noteCell.font = { size: 9, color: { argb: 'FF9CA3AF' } };
     noteCell.alignment = { wrapText: true };
+    currentRow++;
+  }
+
+  // PC Sum explanatory note (only if there are PC Sum items)
+  if (hasPcSumItems) {
+    currentRow++;
+    worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+    const pcSumHeaderCell = worksheet.getCell(`A${currentRow}`);
+    pcSumHeaderCell.value = 'PC Sum (Provisional Contract Sum):';
+    pcSumHeaderCell.font = { bold: true, size: 10, color: { argb: 'FF7C3AED' } };
+    currentRow++;
+
+    worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+    const pcSumNoteCell = worksheet.getCell(`A${currentRow}`);
+    pcSumNoteCell.value = 'Items marked as "PC Sum" represent provisional cost estimates where the scope of work is not yet fully defined. These figures are highly indicative and subject to revision once the relevant aspects of the transaction structure have been finalized.';
+    pcSumNoteCell.font = { size: 9, color: { argb: 'FF7C3AED' }, italic: true };
+    pcSumNoteCell.alignment = { wrapText: true };
+    worksheet.getRow(currentRow).height = 36;
     currentRow++;
   }
 

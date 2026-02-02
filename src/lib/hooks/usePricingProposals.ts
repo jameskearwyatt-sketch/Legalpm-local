@@ -220,6 +220,7 @@ export interface DraftProposalItem {
   lc_currency?: string | null;
   is_optional?: boolean;
   is_included?: boolean;
+  is_pc_sum?: boolean; // Provisional Contract Sum - scope unclear, very provisional figure
   ai_rationale?: string | null;
   partner_hours?: number;
   associate_hours?: number;

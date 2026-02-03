@@ -1107,14 +1107,31 @@ export default function PricingProposalDetail() {
     }
   };
 
-  // Generate AI pricing for items without prices
+  // Generate AI pricing for selected items only (respects user's manual pricing on unselected items)
   const generateAiPricing = async () => {
     setIsGeneratingAiPricing(true);
     try {
-      const itemsNeedingPricing = draftItems.filter(i => !i.fee_amount || i.fee_amount === 0);
+      // Only apply AI pricing to items that are:
+      // 1. Selected (is_included = true) - user explicitly wants to price these
+      // 2. Have no existing price (fee_amount = 0) - don't overwrite manual pricing
+      const itemsNeedingPricing = draftItems.filter(i => 
+        i.is_included && (!i.fee_amount || i.fee_amount === 0)
+      );
+      
+      const selectedCount = draftItems.filter(i => i.is_included).length;
+      
+      if (selectedCount === 0) {
+        toast({ 
+          title: 'No items selected', 
+          description: 'Select items using checkboxes to apply AI pricing',
+          variant: 'destructive'
+        });
+        setIsGeneratingAiPricing(false);
+        return;
+      }
       
       if (itemsNeedingPricing.length === 0) {
-        toast({ title: 'All items already have prices' });
+        toast({ title: 'All selected items already have prices' });
         setIsGeneratingAiPricing(false);
         return;
       }
@@ -1134,7 +1151,8 @@ export default function PricingProposalDetail() {
 
       if (data.prices) {
         setDraftItems(prev => prev.map(item => {
-          if (!item.fee_amount || item.fee_amount === 0) {
+          // Only update items that are selected AND have no price
+          if (item.is_included && (!item.fee_amount || item.fee_amount === 0)) {
             // Match by checking if the AI response work_item contains or starts with the original work_item
             const priceInfo = data.prices.find((p: any) => 
               p.work_item === item.work_item || 
@@ -1160,7 +1178,10 @@ export default function PricingProposalDetail() {
           return item;
         }));
         setHasUnsavedChanges(true);
-        toast({ title: 'AI pricing suggestions applied' });
+        toast({ 
+          title: 'AI pricing applied', 
+          description: `Updated ${itemsNeedingPricing.length} selected item(s)`
+        });
       }
     } catch (error: any) {
       console.error('AI pricing error:', error);

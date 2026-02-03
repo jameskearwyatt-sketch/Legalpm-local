@@ -440,7 +440,8 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       });
 
       // Group all snapshots by date and aggregate (excluding excluded matters)
-      const trendByDate = new Map<string, { wip: number; billed: number; paid: number }>();
+      // Also track how many matters have data for each date to detect incomplete data
+      const trendByDate = new Map<string, { wip: number; billed: number; paid: number; matterCount: number }>();
       snapshots?.forEach(snap => {
         // Skip excluded matters for trend data
         if (excludedSet.has(snap.matter_id)) return;
@@ -450,18 +451,28 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         const exchangeRate = matterData?.exchangeRate || 1;
         const feeCurrency = matterData?.feeCurrency || 'GBP';
         
-        const existing = trendByDate.get(dateKey) || { wip: 0, billed: 0, paid: 0 };
+        const existing = trendByDate.get(dateKey) || { wip: 0, billed: 0, paid: 0, matterCount: 0 };
         existing.wip += convertToUsd(Number(snap.wip_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
         existing.billed += convertToUsd(Number(snap.billed_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
         existing.paid += convertToUsd(Number(snap.paid_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+        existing.matterCount += 1;
         trendByDate.set(dateKey, existing);
       });
 
-
-
-      // Better sorting approach - use the original date keys
-      const sortedTrendData: TrendDataPoint[] = Array.from(trendByDate.entries())
-        .sort(([dateA], [dateB]) => dateA.localeCompare(dateB))
+      // Sort by date
+      const sortedEntries = Array.from(trendByDate.entries())
+        .sort(([dateA], [dateB]) => dateA.localeCompare(dateB));
+      
+      // Find the maximum matter count (most complete data point)
+      const maxMatterCount = Math.max(...sortedEntries.map(([, v]) => v.matterCount), 1);
+      
+      // Filter out trailing data points that have significantly fewer matters
+      // (indicating incomplete/partial data uploads)
+      // Only include points where at least 50% of matters have data, or keep all if there are few matters
+      const minMatterThreshold = Math.max(Math.floor(maxMatterCount * 0.5), 1);
+      
+      const sortedTrendData: TrendDataPoint[] = sortedEntries
+        .filter(([, values]) => values.matterCount >= minMatterThreshold)
         .map(([dateStr, values]) => ({
           date: format(parseISO(dateStr), 'MMM d'),
           rawDate: dateStr,

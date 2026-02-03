@@ -496,6 +496,7 @@ export function MasterWipUpdateDialog({
     return importedData.map(item => {
       // Check each financial field for immateriality
       const wipImmaterial = item.wip.changed && isImmaterialChange(item.wip.value, item.wip.current);
+      const wipWriteOffImmaterial = item.wipWriteOff?.changed && isImmaterialChange(item.wipWriteOff.value, item.wipWriteOff.current);
       const arImmaterial = item.accountsReceivable.changed && isImmaterialChange(item.accountsReceivable.value, item.accountsReceivable.current);
       const billedImmaterial = item.totalBilled.changed && isImmaterialChange(item.totalBilled.value, item.totalBilled.current);
       const paidImmaterial = item.totalPaid.changed && isImmaterialChange(item.totalPaid.value, item.totalPaid.current);
@@ -503,6 +504,7 @@ export function MasterWipUpdateDialog({
       // An item is "all immaterial" if all its changes are immaterial
       const hasAnyMaterialChange = 
         (item.wip.changed && !wipImmaterial) ||
+        (item.wipWriteOff?.changed && !wipWriteOffImmaterial) ||
         (item.accountsReceivable.changed && !arImmaterial) ||
         (item.totalBilled.changed && !billedImmaterial) ||
         (item.totalPaid.changed && !paidImmaterial);
@@ -521,6 +523,7 @@ export function MasterWipUpdateDialog({
         ...item,
         isImmaterial,
         wipImmaterial,
+        wipWriteOffImmaterial,
         arImmaterial,
         billedImmaterial,
         paidImmaterial,
@@ -532,7 +535,8 @@ export function MasterWipUpdateDialog({
 
   const changedData = useMemo(() => {
     return categorizedData.filter((item) => {
-      const hasFinancialChanges = item.wip.changed || item.accountsReceivable.changed || 
+      const hasFinancialChanges = item.wip.changed || item.wipWriteOff?.changed || 
+                                   item.accountsReceivable.changed || 
                                    item.totalBilled.changed || item.totalPaid.changed;
       return hasFinancialChanges || item.hasUntrackedDisbursement;
     });
@@ -618,6 +622,7 @@ export function MasterWipUpdateDialog({
             ...item,
             selected: true,
             wip: { ...item.wip, selected: item.wip.changed },
+            wipWriteOff: item.wipWriteOff ? { ...item.wipWriteOff, selected: item.wipWriteOff.changed } : item.wipWriteOff,
             accountsReceivable: { ...item.accountsReceivable, selected: item.accountsReceivable.changed },
             totalBilled: { ...item.totalBilled, selected: item.totalBilled.changed },
             totalPaid: { ...item.totalPaid, selected: item.totalPaid.changed },
@@ -628,13 +633,14 @@ export function MasterWipUpdateDialog({
     );
   };
 
-  const toggleFieldSelection = (rowIndex: number, field: 'wip' | 'accountsReceivable' | 'totalBilled' | 'totalPaid') => {
+  const toggleFieldSelection = (rowIndex: number, field: 'wip' | 'wipWriteOff' | 'accountsReceivable' | 'totalBilled' | 'totalPaid') => {
     setImportedData((prev) =>
-      prev.map((item) =>
-        item.rowIndex === rowIndex
-          ? { ...item, [field]: { ...item[field], selected: !item[field].selected } }
-          : item
-      )
+      prev.map((item) => {
+        if (item.rowIndex !== rowIndex) return item;
+        const fieldData = item[field];
+        if (!fieldData) return item;
+        return { ...item, [field]: { ...fieldData, selected: !fieldData.selected } };
+      })
     );
   };
 
@@ -644,6 +650,7 @@ export function MasterWipUpdateDialog({
         ...item,
         selected: true,
         wip: { ...item.wip, selected: item.wip.changed },
+        wipWriteOff: item.wipWriteOff ? { ...item.wipWriteOff, selected: item.wipWriteOff.changed } : item.wipWriteOff,
         accountsReceivable: { ...item.accountsReceivable, selected: item.accountsReceivable.changed },
         totalBilled: { ...item.totalBilled, selected: item.totalBilled.changed },
         totalPaid: { ...item.totalPaid, selected: item.totalPaid.changed },
@@ -657,6 +664,7 @@ export function MasterWipUpdateDialog({
         ...item,
         selected: false,
         wip: { ...item.wip, selected: false },
+        wipWriteOff: item.wipWriteOff ? { ...item.wipWriteOff, selected: false } : item.wipWriteOff,
         accountsReceivable: { ...item.accountsReceivable, selected: false },
         totalBilled: { ...item.totalBilled, selected: false },
         totalPaid: { ...item.totalPaid, selected: false },
@@ -961,11 +969,11 @@ export function MasterWipUpdateDialog({
 
   const renderFieldChange = (
     item: ImportedMatterData,
-    field: 'wip' | 'accountsReceivable' | 'totalBilled' | 'totalPaid',
+    field: 'wip' | 'wipWriteOff' | 'accountsReceivable' | 'totalBilled' | 'totalPaid',
     label: string
   ) => {
     const data = item[field];
-    if (!data.changed) return null;
+    if (!data || !data.changed) return null;
 
     const isIncrease = data.value > data.current;
     const diff = data.value - data.current;
@@ -977,7 +985,7 @@ export function MasterWipUpdateDialog({
           onCheckedChange={() => toggleFieldSelection(item.rowIndex, field)}
           disabled={!item.selected}
         />
-        <span className="text-sm w-20 text-muted-foreground">{label}:</span>
+        <span className="text-sm w-24 text-muted-foreground">{label}:</span>
         <span className="text-sm text-muted-foreground line-through">
           {formatCurrency(data.current, item.currency)}
         </span>
@@ -1426,7 +1434,8 @@ export function MasterWipUpdateDialog({
                   
                   {/* Material Changes Items */}
                   {filteredMaterialData.map((item) => {
-                    const hasFinancialChanges = item.wip.changed || item.accountsReceivable.changed || 
+                    const hasFinancialChanges = item.wip.changed || item.wipWriteOff?.changed ||
+                                       item.accountsReceivable.changed || 
                                        item.totalBilled.changed || item.totalPaid.changed;
                     const hasSignificantDisbursements = item.hasUntrackedDisbursement;
                     const isExpanded = expandedRows.has(item.rowIndex);
@@ -1546,6 +1555,7 @@ export function MasterWipUpdateDialog({
                             {hasFinancialChanges && (
                               <>
                                 {renderFieldChange(item, 'wip', 'WIP')}
+                                {renderFieldChange(item, 'wipWriteOff', 'Write-off')}
                                 {renderFieldChange(item, 'accountsReceivable', 'AR')}
                                 {renderFieldChange(item, 'totalBilled', 'Billed')}
                                 {renderFieldChange(item, 'totalPaid', 'Paid')}
@@ -1597,7 +1607,8 @@ export function MasterWipUpdateDialog({
                     ) : (
                       <div className="divide-y divide-muted/30">
                         {filteredImmaterialData.map((item) => {
-                          const hasFinancialChanges = item.wip.changed || item.accountsReceivable.changed || 
+                          const hasFinancialChanges = item.wip.changed || item.wipWriteOff?.changed ||
+                                             item.accountsReceivable.changed || 
                                              item.totalBilled.changed || item.totalPaid.changed;
                           const isExpanded = expandedRows.has(item.rowIndex);
 
@@ -1650,6 +1661,7 @@ export function MasterWipUpdateDialog({
                               {isExpanded && (hasFinancialChanges || item.hasMinorLcDifference) && (
                                 <div className="ml-12 mt-2 pl-3 border-l-2 border-muted">
                                   {renderFieldChange(item, 'wip', 'WIP')}
+                                  {renderFieldChange(item, 'wipWriteOff', 'Write-off')}
                                   {renderFieldChange(item, 'accountsReceivable', 'AR')}
                                   {renderFieldChange(item, 'totalBilled', 'Billed')}
                                   {renderFieldChange(item, 'totalPaid', 'Paid')}

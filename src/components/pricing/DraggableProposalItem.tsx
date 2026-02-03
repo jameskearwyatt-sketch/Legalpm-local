@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Trash2, Calculator, Plus, Building2 } from 'lucide-react';
@@ -70,6 +70,36 @@ export function DraggableProposalItem({
   const [isCustomCategoryDialogOpen, setIsCustomCategoryDialogOpen] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   
+  // Local state for text inputs to avoid triggering parent re-renders on every keystroke
+  const [localWorkItem, setLocalWorkItem] = useState(item.work_item);
+  const [localDetail, setLocalDetail] = useState(item.detail || '');
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Sync local state when item changes from parent (e.g., after save/load)
+  useEffect(() => {
+    setLocalWorkItem(item.work_item);
+    setLocalDetail(item.detail || '');
+  }, [item.id]); // Only sync when item ID changes, not on every prop update
+  
+  // Debounced update to parent - reduces re-renders dramatically
+  const debouncedUpdate = useCallback((field: 'work_item' | 'detail', value: string) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      onUpdate(index, { [field]: value });
+    }, 300); // 300ms debounce for text input
+  }, [onUpdate, index]);
+  
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
+  
   const {
     attributes,
     listeners,
@@ -139,8 +169,17 @@ export function DraggableProposalItem({
           <p className="min-w-[250px] text-sm whitespace-pre-wrap">{item.work_item}</p>
         ) : (
           <Textarea
-            value={item.work_item}
-            onChange={(e) => onUpdate(index, { work_item: e.target.value })}
+            value={localWorkItem}
+            onChange={(e) => {
+              setLocalWorkItem(e.target.value);
+              debouncedUpdate('work_item', e.target.value);
+            }}
+            onBlur={() => {
+              // Ensure final value is synced on blur
+              if (localWorkItem !== item.work_item) {
+                onUpdate(index, { work_item: localWorkItem });
+              }
+            }}
             className="min-w-[250px] text-sm resize-none"
             placeholder="Work item description"
             rows={2}

@@ -43,6 +43,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { TableScrollControls } from '@/components/ui/table-scroll-controls';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { DebouncedTextarea } from '@/components/ui/debounced-textarea';
 import {
   Dialog,
   DialogContent,
@@ -1002,11 +1003,12 @@ function PhasedItemCells({
         {viewingHistoricalVersion ? (
           <p className="min-w-[180px] text-sm whitespace-pre-wrap">{item.work_item}</p>
         ) : (
-          <Textarea
+          <DebouncedTextarea
             value={item.work_item}
-            onChange={(e) => onUpdate(index, { work_item: e.target.value })}
+            onChange={(value) => onUpdate(index, { work_item: value })}
             className="min-w-[180px] text-sm resize-none min-h-[80px]"
             placeholder="Short description"
+            debounceMs={300}
           />
         )}
       </TableCell>
@@ -1022,12 +1024,13 @@ function PhasedItemCells({
             <span className="text-muted-foreground text-xs">-</span>
           )
         ) : (
-          <Textarea
+          <DebouncedTextarea
             value={item.detail || ''}
-            onChange={(e) => onUpdate(index, { detail: e.target.value || null })}
+            onChange={(value) => onUpdate(index, { detail: value || null })}
             className="text-sm resize-none min-w-[350px]"
             placeholder="Full detail"
             style={{ minHeight: item.detail ? `${Math.max(60, Math.ceil((item.detail?.length || 0) / 50) * 24)}px` : '60px' }}
+            debounceMs={300}
           />
         )}
       </TableCell>

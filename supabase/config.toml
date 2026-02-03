@@ -95,3 +95,9 @@ verify_jwt = false
 
 [functions.webauthn-authenticate]
 verify_jwt = false
+
+[functions.allocate-target-pricing]
+verify_jwt = false
+
+[functions.summarize-document]
+verify_jwt = false

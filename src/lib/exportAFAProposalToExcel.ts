@@ -10,6 +10,7 @@ import { DraftProposalItem, BUDGET_CATEGORIES, ExportFigureSettings, FigureType 
 import { ProposalAFA, AFA_TYPE_LABELS } from '@/lib/hooks/useProposalAFAs';
 import { applyAFAFilters, AFAFilteredItem, getItemFeeByFigureType } from '@/lib/afaFilterUtils';
 import { DEPT_COLORS, getDeptColorIndex } from '@/components/pricing/InternalInputDeptSelector';
+import { GroupedAssumptionNarratives, EXPORT_CATEGORY_LABELS, CATEGORY_ORDER } from '@/components/pricing/ScopeAssumptionsTab';
 
 /**
  * Dynamic rounding based on value size:
@@ -40,8 +41,9 @@ interface ExportAFAProposalOptions {
   // New figure settings
   excelExportFigures?: ExportFigureSettings | null;
   afaBaseFigure?: FigureType | null;
-  // Scope assumptions narratives
+  // Scope assumptions narratives - now supports grouped format
   scopeAssumptionNarratives?: string[];
+  groupedAssumptionNarratives?: GroupedAssumptionNarratives;
   // Work phases for organizing items
   workPhases?: WorkPhase[];
   // Internal input department highlighting
@@ -60,6 +62,7 @@ export async function exportAFAProposalToExcel({
   excelExportFigures,
   afaBaseFigure,
   scopeAssumptionNarratives,
+  groupedAssumptionNarratives,
   workPhases,
   includeInputDeptHighlighting = false,
   existingInputDepts = [],
@@ -236,9 +239,12 @@ export async function exportAFAProposalToExcel({
     currentRow++;
   }
 
-  // Scope Assumptions section - spans columns A-C only with proper text wrapping
-  if (scopeAssumptionNarratives && scopeAssumptionNarratives.length > 0) {
-    // Merge A-C for header (narrower than full width to create visual break)
+  // Scope Assumptions section - grouped by category with subheadings
+  const hasGroupedAssumptions = groupedAssumptionNarratives && Object.keys(groupedAssumptionNarratives).length > 0;
+  const hasFlatAssumptions = scopeAssumptionNarratives && scopeAssumptionNarratives.length > 0;
+  
+  if (hasGroupedAssumptions || hasFlatAssumptions) {
+    // Main header
     worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
     const assumptionsHeader = worksheet.getCell(`A${currentRow}`);
     assumptionsHeader.value = '📋 Key Assumptions';
@@ -251,22 +257,51 @@ export async function exportAFAProposalToExcel({
     worksheet.getRow(currentRow).height = 24;
     currentRow++;
 
-    for (const narrative of scopeAssumptionNarratives) {
-      // Merge only columns A-C for each assumption (creates visual break at column D)
+    // Helper to render a single narrative row
+    const renderNarrativeRow = (narrative: string) => {
       worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
       const narrativeCell = worksheet.getCell(`A${currentRow}`);
       narrativeCell.value = `• ${narrative}`;
       narrativeCell.font = { size: 10, color: { argb: 'FF4B5563' } };
       narrativeCell.alignment = { wrapText: true, vertical: 'top' };
       
-      // Calculate row height based on text length (columns A+B+C width ≈ 35+80+22 = 137 chars)
-      // Each character is roughly 1.2 units, so estimate lines needed
-      const combinedWidth = 137; // approx chars that fit in A+B+C
-      const textLength = narrative.length + 2; // +2 for bullet point
+      const combinedWidth = 137;
+      const textLength = narrative.length + 2;
       const estimatedLines = Math.ceil(textLength / combinedWidth);
-      const rowHeight = Math.max(20, estimatedLines * 15); // 15 points per line, min 20
+      const rowHeight = Math.max(20, estimatedLines * 15);
       worksheet.getRow(currentRow).height = rowHeight;
       currentRow++;
+    };
+
+    // Helper to render category subheading
+    const renderCategorySubheading = (categoryLabel: string) => {
+      worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+      const subheadingCell = worksheet.getCell(`A${currentRow}`);
+      subheadingCell.value = categoryLabel;
+      subheadingCell.font = { bold: true, size: 10, color: { argb: 'FF1F2937' }, italic: true };
+      subheadingCell.alignment = { vertical: 'middle' };
+      worksheet.getRow(currentRow).height = 20;
+      currentRow++;
+    };
+
+    if (hasGroupedAssumptions && groupedAssumptionNarratives) {
+      // Render grouped assumptions with category subheadings
+      for (const category of CATEGORY_ORDER) {
+        const narratives = groupedAssumptionNarratives[category];
+        if (!narratives || narratives.length === 0) continue;
+        
+        const categoryLabel = EXPORT_CATEGORY_LABELS[category] || category;
+        renderCategorySubheading(categoryLabel);
+        
+        for (const narrative of narratives) {
+          renderNarrativeRow(narrative);
+        }
+      }
+    } else if (hasFlatAssumptions && scopeAssumptionNarratives) {
+      // Fallback to flat list if no grouped data
+      for (const narrative of scopeAssumptionNarratives) {
+        renderNarrativeRow(narrative);
+      }
     }
     currentRow++;
   }

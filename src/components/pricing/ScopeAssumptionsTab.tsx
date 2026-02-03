@@ -1551,20 +1551,50 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
   );
 }
 
-// Helper to get all narratives for export
+// Helper to get all narratives for export (flat list - kept for backwards compatibility)
 export function getAssumptionNarratives(state: ScopeAssumptionsState | null): string[] {
-  if (!state || state.noAssumptionsApply) return [];
+  const grouped = getGroupedAssumptionNarratives(state);
+  // Flatten all groups into a single array
+  return Object.values(grouped).flat();
+}
+
+// Category labels for export
+const EXPORT_CATEGORY_LABELS: Record<string, string> = {
+  scope: 'Scope Boundaries',
+  timeline: 'Timeline',
+  process: 'Process',
+  local_counsel: 'Local Counsel',
+  documentation: 'Documentation',
+  other: 'Other Assumptions',
+};
+
+// Category order for export
+const CATEGORY_ORDER = ['scope', 'timeline', 'process', 'local_counsel', 'documentation', 'other'];
+
+export interface GroupedAssumptionNarratives {
+  [category: string]: string[];
+}
+
+// Helper to get narratives grouped by category for export
+export function getGroupedAssumptionNarratives(state: ScopeAssumptionsState | null): GroupedAssumptionNarratives {
+  if (!state || state.noAssumptionsApply) return {};
   
-  // Only these specific process assumptions get combined into a single narrative
   const COMBINABLE_PROCESS_IDS = ['single_counterparty', 'single_signing', 'virtual_completion'];
   
-  // Get individual assumption narratives (everything except the combinable ones)
-  const individualNarratives = state.simpleAssumptions
-    .filter(a => {
-      if (!a.enabled || !a.narrative) return false;
-      return !COMBINABLE_PROCESS_IDS.includes(a.assumptionId);
-    })
-    .map(a => a.narrative);
+  const grouped: GroupedAssumptionNarratives = {};
+  
+  // Group individual assumptions by category
+  state.simpleAssumptions.forEach(a => {
+    if (!a.enabled || !a.narrative) return;
+    if (COMBINABLE_PROCESS_IDS.includes(a.assumptionId)) return; // Handle separately
+    
+    // Find the definition to get category
+    const def = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
+    const category = def?.category || 'other';
+    
+    if (!grouped[category]) grouped[category] = [];
+    grouped[category].push(a.narrative);
+  });
   
   // Get combined process narrative (override or generated from combinable assumptions only)
   const combinableProcessAssumptions = state.simpleAssumptions.filter(a => 
@@ -1572,19 +1602,29 @@ export function getAssumptionNarratives(state: ScopeAssumptionsState | null): st
   );
   
   const processNarrative = state.processNarrativeOverride ?? generateProcessNarrative(combinableProcessAssumptions);
+  if (processNarrative) {
+    if (!grouped['process']) grouped['process'] = [];
+    grouped['process'].push(processNarrative);
+  }
   
+  // Document narratives go under documentation
   const docNarratives = state.documentNarratives || [];
+  if (docNarratives.length > 0) {
+    if (!grouped['documentation']) grouped['documentation'] = [];
+    grouped['documentation'].push(...docNarratives);
+  }
   
-  // Include enabled custom assumptions
+  // Custom assumptions go under "other"
   const customNarratives = (state.customAssumptions || [])
     .filter(a => a.enabled && a.text)
     .map(a => a.text);
-  
-  const allNarratives = [...individualNarratives];
-  if (processNarrative) {
-    allNarratives.push(processNarrative);
+  if (customNarratives.length > 0) {
+    if (!grouped['other']) grouped['other'] = [];
+    grouped['other'].push(...customNarratives);
   }
-  allNarratives.push(...docNarratives, ...customNarratives);
   
-  return allNarratives;
+  return grouped;
 }
+
+// Export category labels and order for use in Excel export
+export { EXPORT_CATEGORY_LABELS, CATEGORY_ORDER };

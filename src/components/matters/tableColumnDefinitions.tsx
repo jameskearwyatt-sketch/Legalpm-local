@@ -372,7 +372,12 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     ),
     renderCell: (ctx) => {
       const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
-      if (ctx.matter.local_counsel_billing === 'Disb' && ctx.matter.local_counsel_fee > 0) {
+      const localCounsels = (ctx.matter as any).local_counsels || [];
+      // Check if any local counsel has 'Disb' billing mode, or fallback to matter-level setting
+      const hasDisb = ctx.matter.local_counsel_billing === 'Disb' || 
+        localCounsels.some((lc: { billing_mode?: string }) => lc.billing_mode === 'Disb');
+      
+      if (hasDisb && ctx.matter.local_counsel_fee > 0) {
         return (
           <div className="flex flex-col items-end">
             <span className="text-muted-foreground">

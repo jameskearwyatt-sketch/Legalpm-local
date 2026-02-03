@@ -152,6 +152,7 @@ export default function PricingProposalDetail() {
   const [feeRateCard, setFeeRateCard] = useState<RateCard>(DEFAULT_RATE_CARD);
   const [assumptions, setAssumptions] = useState<ProposalAssumptions>(DEFAULT_ASSUMPTIONS);
   const [scopeAssumptions, setScopeAssumptions] = useState<ScopeAssumptionsState | null>(null);
+  const [scopeAssumptionsInitialized, setScopeAssumptionsInitialized] = useState(false);
 
   // Iterative pricing dialog state
   const [iterativeDialogOpen, setIterativeDialogOpen] = useState(false);
@@ -172,9 +173,10 @@ export default function PricingProposalDetail() {
     if (proposal) {
       setRateCard(proposal.rate_card || DEFAULT_RATE_CARD);
       setAssumptions(proposal.assumptions || DEFAULT_ASSUMPTIONS);
-      // Load scope assumptions from proposal (now properly typed)
-      if (proposal.scope_assumptions) {
+      // Load scope assumptions from proposal (only once to prevent overwriting local edits)
+      if (proposal.scope_assumptions && !scopeAssumptionsInitialized) {
         setScopeAssumptions(proposal.scope_assumptions);
+        setScopeAssumptionsInitialized(true);
       }
       // Load phases from proposal work_phases
       if (proposal.work_phases && Array.isArray(proposal.work_phases)) {

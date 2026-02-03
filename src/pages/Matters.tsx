@@ -525,11 +525,13 @@ export default function Matters() {
   });
   const [sortField, setSortField] = useState<SortField>(() => {
     const saved = localStorage.getItem('matters-sort-field');
-    return (saved as SortField) || 'matter_name';
+    // Default to BM burn descending (highest burn at top)
+    return (saved as SortField) || 'budget_burn_pct';
   });
   const [sortDirection, setSortDirection] = useState<SortDirection>(() => {
     const saved = localStorage.getItem('matters-sort-direction');
-    return (saved as SortDirection) || 'asc';
+    // Default to descending for burn rate
+    return (saved as SortDirection) || 'desc';
   });
 
   // Persist filter and sort preferences to localStorage
@@ -549,8 +551,9 @@ export default function Matters() {
     setSearch('');
     setClientFilter('all');
     setPracticeAreaFilter([]);
-    setSortField('matter_name');
-    setSortDirection('asc');
+    // Reset to default: BM burn descending
+    setSortField('budget_burn_pct');
+    setSortDirection('desc');
   };
 
   // Column settings per category

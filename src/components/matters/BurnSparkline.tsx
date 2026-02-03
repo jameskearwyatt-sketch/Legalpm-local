@@ -244,8 +244,9 @@ export function BurnSparkline({
     </div>
   );
 
-  // Check if start date is missing
+  // Check if start date or budget is missing
   const missingStartDate = !startDate;
+  const missingBudget = !bmBudget || bmBudget <= 0;
 
   // Render single dot for matters with only 1 real snapshot and no extrapolation possible
   if (dataPoints.length <= 1) {
@@ -294,6 +295,11 @@ export function BurnSparkline({
                 Start date required
               </span>
             )}
+            {missingBudget && (
+              <span className="text-[8px] text-muted-foreground/70 italic leading-none">
+                Budget required
+              </span>
+            )}
           </div>
         </HoverCardTrigger>
         <HoverCardContent side="left" className="w-auto p-3">
@@ -339,6 +345,11 @@ export function BurnSparkline({
           {missingStartDate && (
             <span className="text-[8px] text-muted-foreground/70 italic leading-none">
               Start date required
+            </span>
+          )}
+          {missingBudget && (
+            <span className="text-[8px] text-muted-foreground/70 italic leading-none">
+              Budget required
             </span>
           )}
         </div>

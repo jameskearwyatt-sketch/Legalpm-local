@@ -32,10 +32,16 @@ export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }
   const { createSnapshot, updateSnapshot } = useSnapshots(matterId);
   const isEditing = !!snapshot;
 
+  // IMPORTANT: In the database, wip_amount IS already NET (after write-offs)
+  // For the form, we display Raw WIP = NET + Write-off
+  const storedNetWip = snapshot?.wip_amount || 0;
+  const storedWriteOff = snapshot?.wip_write_off_amount || 0;
+  const initialRawWip = storedNetWip + storedWriteOff; // Reverse-calculate for display
+  
   const [formData, setFormData] = useState({
     as_of_date: snapshot?.as_of_date || format(new Date(), 'yyyy-MM-dd'),
-    wip_amount: snapshot?.wip_amount || 0,
-    wip_write_off_amount: snapshot?.wip_write_off_amount || 0,
+    wip_amount: initialRawWip, // Display Raw WIP in form
+    wip_write_off_amount: storedWriteOff,
     billed_amount: snapshot?.billed_amount || 0,
     accounts_receivable: (snapshot as any)?.accounts_receivable || 0,
     paid_amount: snapshot?.paid_amount || 0,
@@ -44,7 +50,7 @@ export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Calculate net WIP (Raw WIP - Write-offs)
+  // Calculate net WIP (Raw WIP - Write-offs) - this is what gets saved
   const netWip = useMemo(() => {
     return Math.max(0, formData.wip_amount - formData.wip_write_off_amount);
   }, [formData.wip_amount, formData.wip_write_off_amount]);
@@ -58,11 +64,18 @@ export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }
       setIsSubmitting(true);
 
       if (isEditing) {
-        await updateSnapshot.mutateAsync({ id: snapshot.id, ...validated });
+        // Save NET WIP, not raw WIP
+        await updateSnapshot.mutateAsync({ 
+          id: snapshot.id, 
+          ...validated,
+          wip_amount: netWip, // Override with NET value
+        });
       } else {
+        // Save NET WIP, not raw WIP
         await createSnapshot.mutateAsync({
           matter_id: matterId,
           ...validated,
+          wip_amount: netWip, // Override with NET value
         } as CreateSnapshotInput);
       }
       onSuccess();

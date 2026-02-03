@@ -94,7 +94,9 @@ export function BurnSparkline({
     );
 
     const realPoints: DataPoint[] = sorted.map(snap => {
-      const netWip = (snap.wip_amount || 0) - (snap.wip_write_off_amount || 0);
+      // For snapshots, wip_amount IS already NET (report already reduced it)
+      // Write-off is tracked separately for realization only, not subtracted again
+      const netWip = snap.wip_amount || 0;
       const burn = netWip + (snap.accounts_receivable || 0) + (snap.paid_amount || 0);
       return {
         date: snap.as_of_date,

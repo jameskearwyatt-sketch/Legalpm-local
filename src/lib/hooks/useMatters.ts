@@ -271,11 +271,15 @@ export function useMatters() {
         const showProposalData = (matter as any).show_shaping_proposal && selectedProposal;
         
         // Use proposal data if enabled, otherwise use snapshot
-        // WIP write-off applies to raw WIP only (separate from AR write-off)
-        const rawWipAmount = showProposalData ? selectedProposal.wip_amount : (snapshot?.wip_amount || 0);
+        // IMPORTANT: For proposals, wip_amount is RAW and we subtract write-off to get NET
+        // For snapshots (imported data), wip_amount IS already NET - write-off is tracked separately for realization only
         const wipWriteOffAmount = showProposalData ? selectedProposal.wip_write_off_amount : (snapshot?.wip_write_off_amount || 0);
-        // Net WIP = raw WIP minus WIP-specific write-offs only
-        const wipAmount = rawWipAmount - wipWriteOffAmount;
+        
+        // For proposals: wip_amount is RAW, need to subtract write-off
+        // For snapshots: wip_amount IS NET (report already reduced it), don't subtract again
+        const wipAmount = showProposalData 
+          ? selectedProposal.wip_amount - selectedProposal.wip_write_off_amount
+          : (snapshot?.wip_amount || 0);
         const billedAmount = showProposalData ? selectedProposal.billed_amount : (snapshot?.billed_amount || 0);
         // For proposals, accounts_receivable is already the adjusted value (raw AR - AR write-off)
         const accountsReceivable = showProposalData ? selectedProposal.accounts_receivable : (snapshot?.accounts_receivable || 0);
@@ -376,8 +380,10 @@ export function useMatters() {
           } : undefined,
           // ACTUAL snapshot - never contains proposal data, always the real system figures
           // Use this for Master WIP import comparisons to ensure accurate tracking
+          // IMPORTANT: For snapshots, wip_amount IS already NET (report already reduced it)
+          // The write-off is stored separately for realization tracking only
           actual_snapshot: snapshot ? {
-            wip_amount: (snapshot.wip_amount || 0) - (snapshot.wip_write_off_amount || 0), // Net WIP from real snapshot
+            wip_amount: snapshot.wip_amount || 0, // Already NET WIP from real snapshot
             wip_write_off_amount: snapshot.wip_write_off_amount || 0,
             billed_amount: snapshot.billed_amount || 0,
             accounts_receivable: snapshot.accounts_receivable || 0,

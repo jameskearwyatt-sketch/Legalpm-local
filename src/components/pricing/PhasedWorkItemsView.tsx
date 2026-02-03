@@ -406,18 +406,15 @@ export function PhasedWorkItemsView({
     return [...standardCats, ...customCats];
   }, []);
 
-  // Phase section component - extracted so hooks work properly
-  const PhaseSection = ({ 
-    phaseId, 
-    phaseName, 
-    isUnassigned = false,
-    dragHandleProps
-  }: { 
-    phaseId: string; 
-    phaseName: string; 
-    isUnassigned?: boolean;
-    dragHandleProps?: { attributes: Record<string, any>; listeners: Record<string, any> | undefined } | null;
-  }) => {
+  // Phase section render function - NOTE: This creates a new function each render
+  // which causes React to see it as a different component. For now, we rely on
+  // the memoized PhasedItemCells to prevent textarea remounting.
+  const renderPhaseSection = (
+    phaseId: string,
+    phaseName: string,
+    isUnassigned: boolean = false,
+    dragHandleProps?: { attributes: Record<string, any>; listeners: Record<string, any> | undefined } | null
+  ) => {
     const categories = groupedItems[phaseId] || {};
     const totals = phaseTotals[phaseId] || { lower: 0, upper: 0, included: 0, total: 0 };
     const isExpanded = expandedPhases.has(phaseId);
@@ -786,13 +783,11 @@ export function PhasedWorkItemsView({
                 phaseId={phase.id}
                 disabled={viewingHistoricalVersion}
               >
-                {(dragHandleProps) => (
-                  <PhaseSection 
-                    phaseId={phase.id} 
-                    phaseName={phase.name} 
-                    isUnassigned={false}
-                    dragHandleProps={dragHandleProps}
-                  />
+                {(dragHandleProps) => renderPhaseSection(
+                  phase.id, 
+                  phase.name, 
+                  false,
+                  dragHandleProps
                 )}
               </SortablePhaseWrapper>
             ))}
@@ -802,7 +797,7 @@ export function PhasedWorkItemsView({
       
       {/* Unassigned section (not draggable) */}
       <div className="mt-3">
-        <PhaseSection phaseId="unassigned" phaseName="Unassigned Items" isUnassigned={true} />
+        {renderPhaseSection("unassigned", "Unassigned Items", true)}
       </div>
 
       {/* Empty state */}

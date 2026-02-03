@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -132,6 +133,7 @@ export default function PricingProposalDetail() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isExtractingRfp, setIsExtractingRfp] = useState(false);
   const [isGeneratingAiPricing, setIsGeneratingAiPricing] = useState(false);
+  const [isAiPricingConfirmOpen, setIsAiPricingConfirmOpen] = useState(false);
   const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
   const [pastedText, setPastedText] = useState("");
   const [customCategories, setCustomCategories] = useState<string[]>([]);
@@ -1769,7 +1771,7 @@ export default function PricingProposalDetail() {
                   </Button>
                   <Button 
                     variant="outline" 
-                    onClick={generateAiPricing}
+                    onClick={() => setIsAiPricingConfirmOpen(true)}
                     disabled={isGeneratingAiPricing}
                   >
                     {isGeneratingAiPricing ? (
@@ -1777,7 +1779,7 @@ export default function PricingProposalDetail() {
                     ) : (
                       <Sparkles className="h-4 w-4 mr-2" />
                     )}
-                    AI Price All
+                    AI Price Selected Items
                   </Button>
                   <Button 
                     variant="outline" 
@@ -2721,6 +2723,40 @@ export default function PricingProposalDetail() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* AI Pricing Confirmation Dialog */}
+        <AlertDialog open={isAiPricingConfirmOpen} onOpenChange={setIsAiPricingConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-500" />
+                Confirm AI Pricing
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-3">
+                <p>
+                  AI pricing will be applied to all <strong>selected items</strong> that don't already have a price.
+                </p>
+                <p className="text-amber-600 dark:text-amber-400 font-medium">
+                  ⚠️ Please ensure you have <strong>deselected</strong> any work items you wish to remain unchanged before proceeding.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Items with existing prices will not be overwritten.
+                </p>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={() => {
+                  setIsAiPricingConfirmOpen(false);
+                  generateAiPricing();
+                }}
+              >
+                Proceed with AI Pricing
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </AppLayout>
   );

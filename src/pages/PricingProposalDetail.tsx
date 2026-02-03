@@ -77,7 +77,7 @@ import { CategorizedProposalView, categoryBgColors, categoryTextColors, category
 import { PhasedWorkItemsView } from "@/components/pricing/PhasedWorkItemsView";
 import { LocalCounselPanel } from "@/components/pricing/LocalCounselPanel";
 import { AFATab } from "@/components/pricing/AFATab";
-import { ScopeAssumptionsTab, ScopeAssumptionsState, getAssumptionNarratives } from "@/components/pricing/ScopeAssumptionsTab";
+import { ScopeAssumptionsTab, ScopeAssumptionsState, getAssumptionNarratives, getGroupedAssumptionNarratives } from "@/components/pricing/ScopeAssumptionsTab";
 import { exportAFAProposalToExcel } from "@/lib/exportAFAProposalToExcel";
 import { applyAFAFilters, getAFASummary } from "@/lib/afaFilterUtils";
 import {
@@ -1244,6 +1244,7 @@ export default function PricingProposalDetail() {
       excelExportFigures: assumptions.excelExportFigures,
       afaBaseFigure: assumptions.afaBaseFigure,
       scopeAssumptionNarratives: getAssumptionNarratives(scopeAssumptions),
+      groupedAssumptionNarratives: getGroupedAssumptionNarratives(scopeAssumptions),
       workPhases: phases.filter(p => p.is_included !== false),
       includeInputDeptHighlighting: includeHighlighting,
       existingInputDepts: existingInputDepts,

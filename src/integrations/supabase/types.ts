@@ -1927,6 +1927,54 @@ export type Database = {
           },
         ]
       }
+      passkeys: {
+        Row: {
+          authenticator_attachment: string | null
+          backup_eligible: boolean | null
+          backup_state: boolean | null
+          counter: number | null
+          created_at: string | null
+          credential_id: string
+          device_name: string | null
+          id: string
+          last_used_at: string | null
+          public_key: string
+          transports: string[] | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          authenticator_attachment?: string | null
+          backup_eligible?: boolean | null
+          backup_state?: boolean | null
+          counter?: number | null
+          created_at?: string | null
+          credential_id: string
+          device_name?: string | null
+          id?: string
+          last_used_at?: string | null
+          public_key: string
+          transports?: string[] | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          authenticator_attachment?: string | null
+          backup_eligible?: boolean | null
+          backup_state?: boolean | null
+          counter?: number | null
+          created_at?: string | null
+          credential_id?: string
+          device_name?: string | null
+          id?: string
+          last_used_at?: string | null
+          public_key?: string
+          transports?: string[] | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       payments: {
         Row: {
           allocated_invoice_id: string | null

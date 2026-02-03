@@ -6,9 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { Scale, Loader2 } from 'lucide-react';
+import { Scale, Loader2, Fingerprint, Smartphone } from 'lucide-react';
 import { z } from 'zod';
+import { useWebAuthn } from '@/lib/hooks/useWebAuthn';
 
 const authSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -22,16 +24,55 @@ export default function Auth() {
   const [fullName, setFullName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
+  const [hasPlatformAuth, setHasPlatformAuth] = useState(false);
+  const [hasPasskeys, setHasPasskeys] = useState(false);
+  const [checkingPasskeys, setCheckingPasskeys] = useState(false);
   
   const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { 
+    isSupported: webAuthnSupported, 
+    isLoading: webAuthnLoading,
+    checkPlatformAuthenticator,
+    authenticateWithPasskey,
+    checkPasskeysForEmail,
+  } = useWebAuthn();
 
   useEffect(() => {
     if (user) {
       navigate('/');
     }
   }, [user, navigate]);
+
+  // Check if platform authenticator is available
+  useEffect(() => {
+    const checkAuth = async () => {
+      if (webAuthnSupported) {
+        const available = await checkPlatformAuthenticator();
+        setHasPlatformAuth(available);
+      }
+    };
+    checkAuth();
+  }, [webAuthnSupported, checkPlatformAuthenticator]);
+
+  // Check if user has passkeys when email changes (debounced)
+  useEffect(() => {
+    const checkPasskeys = async () => {
+      if (!email || !email.includes('@') || !hasPlatformAuth) {
+        setHasPasskeys(false);
+        return;
+      }
+      
+      setCheckingPasskeys(true);
+      const has = await checkPasskeysForEmail(email);
+      setHasPasskeys(has);
+      setCheckingPasskeys(false);
+    };
+
+    const timer = setTimeout(checkPasskeys, 500);
+    return () => clearTimeout(timer);
+  }, [email, hasPlatformAuth, checkPasskeysForEmail]);
 
   const validateForm = (isSignUp: boolean) => {
     try {
@@ -73,6 +114,33 @@ export default function Auth() {
         description: 'You have successfully signed in.',
       });
       navigate('/');
+    }
+  };
+
+  const handleFaceIdSignIn = async () => {
+    if (!email || !email.includes('@')) {
+      toast({
+        title: 'Email required',
+        description: 'Please enter your email address first.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const result = await authenticateWithPasskey(email);
+    
+    if (result.success) {
+      toast({
+        title: 'Welcome back!',
+        description: 'Signed in with Face ID.',
+      });
+      navigate('/');
+    } else if (result.error) {
+      toast({
+        title: 'Face ID sign in failed',
+        description: result.error,
+        variant: 'destructive',
+      });
     }
   };
 
@@ -174,6 +242,56 @@ export default function Auth() {
                       'Sign In'
                     )}
                   </Button>
+
+                  {/* Face ID / Biometric Sign In */}
+                  {hasPlatformAuth && (
+                    <>
+                      <div className="relative my-4">
+                        <Separator />
+                        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+                          or
+                        </span>
+                      </div>
+                      
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full"
+                        onClick={handleFaceIdSignIn}
+                        disabled={webAuthnLoading || !email || checkingPasskeys}
+                      >
+                        {webAuthnLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Authenticating...
+                          </>
+                        ) : checkingPasskeys ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Checking...
+                          </>
+                        ) : (
+                          <>
+                            <Fingerprint className="mr-2 h-4 w-4" />
+                            Sign in with Face ID / Touch ID
+                          </>
+                        )}
+                      </Button>
+                      
+                      {hasPasskeys && email && (
+                        <p className="text-xs text-center text-muted-foreground mt-2">
+                          <Smartphone className="inline h-3 w-3 mr-1" />
+                          Face ID available for this account
+                        </p>
+                      )}
+                      
+                      {!hasPasskeys && email && email.includes('@') && !checkingPasskeys && (
+                        <p className="text-xs text-center text-muted-foreground mt-2">
+                          Sign in with password first, then set up Face ID in Settings
+                        </p>
+                      )}
+                    </>
+                  )}
                 </form>
               </TabsContent>
 

@@ -89,3 +89,9 @@ verify_jwt = false
 
 [functions.analyze-wip-changes]
 verify_jwt = false
+
+[functions.webauthn-register]
+verify_jwt = false
+
+[functions.webauthn-authenticate]
+verify_jwt = false

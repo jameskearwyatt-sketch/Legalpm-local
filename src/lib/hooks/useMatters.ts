@@ -170,6 +170,8 @@ export interface CreateMatterInput {
   // Manual budget override
   use_manual_budget?: boolean;
   manual_budget_amount?: number;
+  // Multi-client flag
+  is_multi_client?: boolean;
 }
 
 export function useMatters() {
@@ -428,10 +430,40 @@ export function useMatters() {
 
   const createMatter = useMutation({
     mutationFn: async (input: CreateMatterInput) => {
+      // Check if there's an existing matter for this client with a client-wide rate modifier
+      // Only apply if the new matter is not multi-client
+      let rateModifierOverride: { 
+        rate_modifier?: string; 
+        rate_modifier_value?: number; 
+        rate_modifier_scope?: string;
+      } = {};
+      
+      if (input.client_id && !input.is_multi_client) {
+        const { data: existingMatter } = await supabase
+          .from('matters')
+          .select('rate_modifier, rate_modifier_value, rate_modifier_scope')
+          .eq('client_id', input.client_id)
+          .eq('user_id', user!.id)
+          .eq('rate_modifier_scope', 'all_client_matters')
+          .limit(1)
+          .maybeSingle();
+        
+        if (existingMatter && existingMatter.rate_modifier && 
+            (existingMatter.rate_modifier === 'discounted_rates' || existingMatter.rate_modifier === 'blended_hourly_rate')) {
+          rateModifierOverride = {
+            rate_modifier: existingMatter.rate_modifier,
+            rate_modifier_value: existingMatter.rate_modifier_value,
+            rate_modifier_scope: existingMatter.rate_modifier_scope,
+          };
+          console.log('Applying client-wide rate modifier to new matter:', rateModifierOverride);
+        }
+      }
+      
       const { data, error } = await supabase
         .from('matters')
         .insert({
           ...input,
+          ...rateModifierOverride,
           user_id: user!.id,
         })
         .select()

@@ -81,11 +81,16 @@ Deno.serve(async (req) => {
         transports: ['internal', 'hybrid'],
       }));
 
-      // Extract the registrable domain (e.g., lovable.app) for cross-subdomain compatibility
+      // Extract the registrable domain for cross-subdomain compatibility
       const origin = req.headers.get('origin') || 'https://legalpm.lovable.app';
       const hostname = new URL(origin).hostname;
       // Use the parent domain for RP ID to work across preview and published URLs
-      const rpId = hostname.endsWith('.lovable.app') ? 'lovable.app' : hostname;
+      let rpId = hostname;
+      if (hostname.endsWith('.lovable.app')) {
+        rpId = 'lovable.app';
+      } else if (hostname.endsWith('.lovableproject.com')) {
+        rpId = 'lovableproject.com';
+      }
       
       console.log('Origin:', origin, 'Hostname:', hostname, 'RP ID:', rpId);
       

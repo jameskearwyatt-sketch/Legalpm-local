@@ -92,7 +92,12 @@ Deno.serve(async (req) => {
       // Extract the registrable domain for cross-subdomain compatibility
       const origin = req.headers.get('origin') || 'https://legalpm.lovable.app';
       const hostname = new URL(origin).hostname;
-      const rpId = hostname.endsWith('.lovable.app') ? 'lovable.app' : hostname;
+      let rpId = hostname;
+      if (hostname.endsWith('.lovable.app')) {
+        rpId = 'lovable.app';
+      } else if (hostname.endsWith('.lovableproject.com')) {
+        rpId = 'lovableproject.com';
+      }
       
       console.log('Auth Origin:', origin, 'RP ID:', rpId);
 

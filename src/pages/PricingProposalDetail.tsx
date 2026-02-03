@@ -1164,7 +1164,8 @@ export default function PricingProposalDetail() {
       if (error) throw error;
 
       if (data.prices) {
-        setDraftItems(prev => prev.map(item => {
+        // Build updated items with AI pricing applied
+        const updatedItems = draftItems.map(item => {
           // Only update items that are selected AND have no price
           if (item.is_included && (!item.fee_amount || item.fee_amount === 0)) {
             // Match by checking if the AI response work_item contains or starts with the original work_item
@@ -1190,10 +1191,26 @@ export default function PricingProposalDetail() {
             }
           }
           return item;
-        }));
-        setHasUnsavedChanges(true);
+        });
+        
+        // Update local state
+        setDraftItems(updatedItems);
+        
+        // IMPORTANT: Immediately persist AI pricing to prevent loss
+        // Clear any pending auto-save timeout and save immediately
+        if (autoSaveTimeoutRef.current) {
+          clearTimeout(autoSaveTimeoutRef.current);
+        }
+        
+        // Update refs with the new data before saving
+        draftItemsRef.current = updatedItems;
+        pendingChangesRef.current = true;
+        
+        // Perform immediate save (silent)
+        await performSave(false);
+        
         toast({ 
-          title: 'AI pricing applied', 
+          title: 'AI pricing applied and saved', 
           description: `Updated ${itemsNeedingPricing.length} selected item(s)`
         });
       }

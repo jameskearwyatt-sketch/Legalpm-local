@@ -768,16 +768,18 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
     documentAssumptions.whoDraftsEnabled || 
     documentAssumptions.clientFormEnabled;
   
-  // Split process assumptions from others for combined narrative
-  const enabledProcessAssumptions = enabledSimpleAssumptions.filter(a => {
-    const def = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
-    return def?.category === 'process';
-  });
-  const enabledNonProcessAssumptions = enabledSimpleAssumptions.filter(a => {
-    const def = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
-    return def?.category !== 'process';
-  });
-  const generatedProcessNarrative = generateProcessNarrative(enabledProcessAssumptions);
+  // Only these specific process assumptions get combined into a single narrative
+  const COMBINABLE_PROCESS_IDS = ['single_counterparty', 'single_signing', 'virtual_completion'];
+  
+  // Split: combinable process assumptions vs everything else (including other process assumptions)
+  const combinableProcessAssumptions = enabledSimpleAssumptions.filter(a => 
+    COMBINABLE_PROCESS_IDS.includes(a.assumptionId)
+  );
+  const individualAssumptions = enabledSimpleAssumptions.filter(a => 
+    !COMBINABLE_PROCESS_IDS.includes(a.assumptionId)
+  );
+  
+  const generatedProcessNarrative = generateProcessNarrative(combinableProcessAssumptions);
   // Use override if set, otherwise use generated
   const combinedProcessNarrative = state.processNarrativeOverride ?? generatedProcessNarrative;
   
@@ -1194,8 +1196,8 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
-                {/* Non-process assumption narratives (individual) */}
-                {enabledNonProcessAssumptions.map(assumption => {
+                {/* Individual assumption narratives (all except the combinable process ones) */}
+                {individualAssumptions.map(assumption => {
                   const def = SIMPLE_ASSUMPTIONS.find(a => a.id === assumption.assumptionId);
                   if (!def) return null;
 
@@ -1287,7 +1289,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                           <Badge variant="outline" className="text-xs">
                             Process
                           </Badge>
-                          {enabledProcessAssumptions.map(a => {
+                          {combinableProcessAssumptions.map(a => {
                             const def = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
                             return def ? (
                               <Badge key={a.assumptionId} variant="secondary" className="text-xs">
@@ -1444,23 +1446,23 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
 export function getAssumptionNarratives(state: ScopeAssumptionsState | null): string[] {
   if (!state || state.noAssumptionsApply) return [];
   
-  // Get non-process assumption narratives
-  const nonProcessNarratives = state.simpleAssumptions
+  // Only these specific process assumptions get combined into a single narrative
+  const COMBINABLE_PROCESS_IDS = ['single_counterparty', 'single_signing', 'virtual_completion'];
+  
+  // Get individual assumption narratives (everything except the combinable ones)
+  const individualNarratives = state.simpleAssumptions
     .filter(a => {
       if (!a.enabled || !a.narrative) return false;
-      const def = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
-      return def?.category !== 'process';
+      return !COMBINABLE_PROCESS_IDS.includes(a.assumptionId);
     })
     .map(a => a.narrative);
   
-  // Get process narrative (override or generated)
-  const enabledProcessAssumptions = state.simpleAssumptions.filter(a => {
-    if (!a.enabled) return false;
-    const def = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
-    return def?.category === 'process';
-  });
+  // Get combined process narrative (override or generated from combinable assumptions only)
+  const combinableProcessAssumptions = state.simpleAssumptions.filter(a => 
+    a.enabled && COMBINABLE_PROCESS_IDS.includes(a.assumptionId)
+  );
   
-  const processNarrative = state.processNarrativeOverride ?? generateProcessNarrative(enabledProcessAssumptions);
+  const processNarrative = state.processNarrativeOverride ?? generateProcessNarrative(combinableProcessAssumptions);
   
   const docNarratives = state.documentNarratives || [];
   
@@ -1469,7 +1471,7 @@ export function getAssumptionNarratives(state: ScopeAssumptionsState | null): st
     .filter(a => a.enabled && a.text)
     .map(a => a.text);
   
-  const allNarratives = [...nonProcessNarratives];
+  const allNarratives = [...individualNarratives];
   if (processNarrative) {
     allNarratives.push(processNarrative);
   }

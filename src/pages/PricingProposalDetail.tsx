@@ -73,6 +73,7 @@ import * as XLSX from "xlsx";
 import ExcelJS from "exceljs";
 import { cn } from "@/lib/utils";
 import { getCurrencySymbol } from "@/lib/currencyUtils";
+import { calculateFeeRange } from "@/lib/feeSpreadUtils";
 import { IterativePricingDialog, FeeOwnerHours } from "@/components/pricing/IterativePricingDialog";
 import { EditableRateCard } from "@/components/pricing/EditableRateCard";
 import { CategorizedProposalView, categoryBgColors, categoryTextColors, categoryBorderColors } from "@/components/pricing/CategorizedProposalView";
@@ -962,18 +963,18 @@ export default function PricingProposalDetail() {
   }) => {
     if (iterativeDialogIndex === null) return;
     
-    // Apply ±10% spread for iterative pricing (same as AI-generated)
-    const feeLower = Math.round(result.calculatedFee * 0.9);
-    const feeUpper = Math.round(result.calculatedFee * 1.1);
+    // Get the current item's category for risk-based spread calculation
+    const currentItem = draftItems[iterativeDialogIndex];
+    const { fee_lower, fee_amount } = calculateFeeRange(result.calculatedFee, currentItem?.category);
     
     updateItem(iterativeDialogIndex, {
       partner_hours: result.feeOwnerHours.partner || 0,
       associate_hours: result.feeOwnerHours.associate || 0,
       num_turns: result.numTurns,
       item_type: result.itemType as 'documentation' | 'negotiation' | 'due_diligence' | 'meeting',
-      fee_amount: result.calculatedFee,
-      fee_lower: feeLower,
-      fee_upper: feeUpper,
+      fee_amount,
+      fee_lower,
+      fee_upper: result.calculatedFee, // The calculated fee becomes the upper estimate
       pricing_method: 'pricing_tool',
     });
   };
@@ -1254,15 +1255,14 @@ export default function PricingProposalDetail() {
               item.work_item?.startsWith(p.work_item)
             );
             if (priceInfo) {
-              const feeAmount = priceInfo.fee_amount || 0;
-              // Apply ±10% spread for AI-priced items
-              const feeLower = Math.round(feeAmount * 0.9);
-              const feeUpper = Math.round(feeAmount * 1.1);
+              const feeUpper = priceInfo.fee_amount || 0;
+              // Calculate fee_lower based on category risk (10-20% spread)
+              const { fee_lower, fee_amount } = calculateFeeRange(feeUpper, item.category);
               
               return {
                 ...item,
-                fee_amount: feeAmount,
-                fee_lower: feeLower,
+                fee_amount,
+                fee_lower,
                 fee_upper: feeUpper,
                 pricing_method: 'ai_suggested' as PricingMethod,
                 ai_rationale: priceInfo.rationale || 'AI suggested pricing',
@@ -1377,15 +1377,15 @@ export default function PricingProposalDetail() {
           });
           
           if (matchIdx !== undefined) {
-            const feeAmount = allocation.fee_amount || 0;
-            // Apply ±10% spread
-            const feeLower = Math.round(feeAmount * 0.9);
-            const feeUpper = Math.round(feeAmount * 1.1);
+            const feeUpper = allocation.fee_amount || 0;
+            // Calculate fee_lower based on category risk (10-20% spread)
+            const category = draftItems[matchIdx]?.category;
+            const { fee_lower, fee_amount } = calculateFeeRange(feeUpper, category);
             
             updatedItems[matchIdx] = {
               ...updatedItems[matchIdx],
-              fee_amount: feeAmount,
-              fee_lower: feeLower,
+              fee_amount,
+              fee_lower,
               fee_upper: feeUpper,
               pricing_method: 'ai_suggested' as PricingMethod,
               ai_rationale: allocation.rationale || 'AI allocated from target budget',

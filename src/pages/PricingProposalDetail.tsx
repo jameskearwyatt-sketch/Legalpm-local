@@ -43,7 +43,8 @@ import {
   Layers,
   AlertCircle,
   Settings2,
-  Scale
+  Scale,
+  Target
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { 
@@ -137,6 +138,12 @@ export default function PricingProposalDetail() {
   const [isPasteDialogOpen, setIsPasteDialogOpen] = useState(false);
   const [pastedText, setPastedText] = useState("");
   const [customCategories, setCustomCategories] = useState<string[]>([]);
+  
+  // Target pricing dialog state
+  const [isTargetPricingDialogOpen, setIsTargetPricingDialogOpen] = useState(false);
+  const [targetPricingPhaseId, setTargetPricingPhaseId] = useState<string>("all");
+  const [targetPricingAmount, setTargetPricingAmount] = useState<string>("");
+  const [isAllocatingTargetPricing, setIsAllocatingTargetPricing] = useState(false);
   
   const [isDeletingVersion, setIsDeletingVersion] = useState(false);
   const [isSendToMatterOpen, setIsSendToMatterOpen] = useState(false);
@@ -1222,6 +1229,125 @@ export default function PricingProposalDetail() {
     }
   };
 
+  // AI Target Pricing - allocate a target budget across selected items in a phase
+  const generateTargetPricing = async () => {
+    const targetAmount = parseFloat(targetPricingAmount);
+    if (!targetAmount || targetAmount <= 0) {
+      toast({ title: 'Please enter a valid target amount', variant: 'destructive' });
+      return;
+    }
+
+    setIsAllocatingTargetPricing(true);
+    try {
+      // Get items to price based on phase selection
+      let itemsToPriceIndices: number[] = [];
+      
+      if (targetPricingPhaseId === 'all') {
+        // All selected items across all phases
+        itemsToPriceIndices = draftItems
+          .map((item, idx) => item.is_included ? idx : -1)
+          .filter(idx => idx !== -1);
+      } else if (targetPricingPhaseId === 'unassigned') {
+        // Selected items with no phase assignment
+        itemsToPriceIndices = draftItems
+          .map((item, idx) => (item.is_included && !item.phase_id) ? idx : -1)
+          .filter(idx => idx !== -1);
+      } else {
+        // Selected items in specific phase
+        itemsToPriceIndices = draftItems
+          .map((item, idx) => (item.is_included && item.phase_id === targetPricingPhaseId) ? idx : -1)
+          .filter(idx => idx !== -1);
+      }
+
+      if (itemsToPriceIndices.length === 0) {
+        toast({ 
+          title: 'No selected items found', 
+          description: 'Select items using checkboxes before applying target pricing',
+          variant: 'destructive'
+        });
+        setIsAllocatingTargetPricing(false);
+        return;
+      }
+
+      const itemsToPrice = itemsToPriceIndices.map(idx => draftItems[idx]);
+      const phaseName = targetPricingPhaseId === 'all' 
+        ? 'Entire Project' 
+        : targetPricingPhaseId === 'unassigned'
+          ? 'Unassigned Items'
+          : phases.find(p => p.id === targetPricingPhaseId)?.name || 'Selected Phase';
+
+      const { data, error } = await supabase.functions.invoke('allocate-target-pricing', {
+        body: {
+          items: itemsToPrice.map(i => ({
+            work_item: i.work_item,
+            provider: i.provider,
+            category: i.category,
+          })),
+          targetAmount,
+          currency: proposal?.currency,
+          phaseName,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data.allocations) {
+        // Build updated items with allocated pricing
+        const updatedItems = [...draftItems];
+        
+        for (const allocation of data.allocations) {
+          // Find matching item index
+          const matchIdx = itemsToPriceIndices.find(idx => {
+            const item = draftItems[idx];
+            return item.work_item === allocation.work_item || 
+              item.work_item?.startsWith(allocation.work_item) ||
+              allocation.work_item?.startsWith(item.work_item);
+          });
+          
+          if (matchIdx !== undefined) {
+            const feeAmount = allocation.fee_amount || 0;
+            // Apply ±10% spread
+            const feeLower = Math.round(feeAmount * 0.9);
+            const feeUpper = Math.round(feeAmount * 1.1);
+            
+            updatedItems[matchIdx] = {
+              ...updatedItems[matchIdx],
+              fee_amount: feeAmount,
+              fee_lower: feeLower,
+              fee_upper: feeUpper,
+              pricing_method: 'ai_suggested' as PricingMethod,
+              ai_rationale: allocation.rationale || 'AI allocated from target budget',
+            };
+          }
+        }
+        
+        // Update local state
+        setDraftItems(updatedItems);
+        
+        // Immediately persist
+        if (autoSaveTimeoutRef.current) {
+          clearTimeout(autoSaveTimeoutRef.current);
+        }
+        draftItemsRef.current = updatedItems;
+        pendingChangesRef.current = true;
+        await performSave(false);
+        
+        setIsTargetPricingDialogOpen(false);
+        setTargetPricingAmount("");
+        
+        toast({ 
+          title: 'Target pricing allocated and saved', 
+          description: `Allocated ${currencySymbol}${targetAmount.toLocaleString()} across ${itemsToPriceIndices.length} item(s)`
+        });
+      }
+    } catch (error: any) {
+      console.error('Target pricing error:', error);
+      toast({ title: 'Failed to allocate pricing', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsAllocatingTargetPricing(false);
+    }
+  };
+
   // Sanitize items before saving - map 'iterative' to 'pricing_tool' for DB constraint
   const sanitizeItemsForSave = (items: typeof draftItems) => {
     return items.map(item => ({
@@ -1797,6 +1923,18 @@ export default function PricingProposalDetail() {
                       <Sparkles className="h-4 w-4 mr-2" />
                     )}
                     AI Price Selected Items
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsTargetPricingDialogOpen(true)}
+                    disabled={isAllocatingTargetPricing || draftItems.filter(i => i.is_included).length === 0}
+                  >
+                    {isAllocatingTargetPricing ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Target className="h-4 w-4 mr-2" />
+                    )}
+                    AI Price to Target
                   </Button>
                   <Button 
                     variant="outline" 
@@ -2774,6 +2912,132 @@ export default function PricingProposalDetail() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* Target Pricing Dialog */}
+        <Dialog open={isTargetPricingDialogOpen} onOpenChange={setIsTargetPricingDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Target className="h-5 w-5" />
+                AI Price to Target
+              </DialogTitle>
+              <DialogDescription>
+                Set a target budget and AI will intelligently allocate it across the selected work items.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              {/* Phase selector */}
+              <div className="space-y-2">
+                <Label htmlFor="target-phase">Scope</Label>
+                <Select value={targetPricingPhaseId} onValueChange={setTargetPricingPhaseId}>
+                  <SelectTrigger id="target-phase">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">
+                      All Selected Items ({draftItems.filter(i => i.is_included).length} items)
+                    </SelectItem>
+                    {phases.map(phase => {
+                      const phaseItems = draftItems.filter(i => i.is_included && i.phase_id === phase.id);
+                      return (
+                        <SelectItem key={phase.id} value={phase.id} disabled={phaseItems.length === 0}>
+                          {phase.name} ({phaseItems.length} items)
+                        </SelectItem>
+                      );
+                    })}
+                    {(() => {
+                      const unassignedItems = draftItems.filter(i => i.is_included && !i.phase_id);
+                      return (
+                        <SelectItem value="unassigned" disabled={unassignedItems.length === 0}>
+                          Unassigned Items ({unassignedItems.length} items)
+                        </SelectItem>
+                      );
+                    })()}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Current total preview */}
+              <div className="rounded-lg bg-muted/50 p-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Current Total (Selected):</span>
+                  <span className="font-medium">
+                    {currencySymbol}
+                    {(() => {
+                      let items = draftItems.filter(i => i.is_included);
+                      if (targetPricingPhaseId !== 'all') {
+                        if (targetPricingPhaseId === 'unassigned') {
+                          items = items.filter(i => !i.phase_id);
+                        } else {
+                          items = items.filter(i => i.phase_id === targetPricingPhaseId);
+                        }
+                      }
+                      return items.reduce((sum, i) => sum + (i.fee_amount || 0), 0).toLocaleString();
+                    })()}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Items to allocate:</span>
+                  <span className="font-medium">
+                    {(() => {
+                      let items = draftItems.filter(i => i.is_included);
+                      if (targetPricingPhaseId !== 'all') {
+                        if (targetPricingPhaseId === 'unassigned') {
+                          items = items.filter(i => !i.phase_id);
+                        } else {
+                          items = items.filter(i => i.phase_id === targetPricingPhaseId);
+                        }
+                      }
+                      return items.length;
+                    })()}
+                  </span>
+                </div>
+              </div>
+
+              {/* Target amount input */}
+              <div className="space-y-2">
+                <Label htmlFor="target-amount">Target Budget ({proposal?.currency || 'GBP'})</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    {currencySymbol}
+                  </span>
+                  <Input
+                    id="target-amount"
+                    type="text"
+                    inputMode="numeric"
+                    value={targetPricingAmount}
+                    onChange={(e) => {
+                      // Allow only numbers and commas
+                      const value = e.target.value.replace(/[^0-9,]/g, '');
+                      setTargetPricingAmount(value);
+                    }}
+                    placeholder="e.g., 150,000"
+                    className="pl-7"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  AI will allocate this total across all selected items based on complexity and historical data.
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsTargetPricingDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={generateTargetPricing} 
+                disabled={!targetPricingAmount || isAllocatingTargetPricing}
+              >
+                {isAllocatingTargetPricing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Target className="h-4 w-4 mr-2" />
+                )}
+                Allocate Budget
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </AppLayout>
   );

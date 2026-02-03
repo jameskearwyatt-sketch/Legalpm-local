@@ -466,19 +466,26 @@ export function useMatters() {
       if (error) throw error;
 
       // Check if we need to propagate rate modifier to other client matters
-      if (input.rate_modifier_scope === 'all_client_matters' && 
-          (input.rate_modifier === 'discounted_rates' || input.rate_modifier === 'blended_hourly_rate')) {
+      // Use the updated matter's data to check the scope (in case input didn't explicitly include it)
+      const effectiveScope = input.rate_modifier_scope ?? data.rate_modifier_scope;
+      const effectiveModifier = input.rate_modifier ?? data.rate_modifier;
+      const effectiveValue = input.rate_modifier_value ?? data.rate_modifier_value;
+      
+      if (effectiveScope === 'all_client_matters' && 
+          (effectiveModifier === 'discounted_rates' || effectiveModifier === 'blended_hourly_rate')) {
         
-        // Get the client_id from the updated matter
+        // Get the client_id and user_id from the updated matter
         const clientId = data.client_id;
+        const userId = data.user_id;
         
-        if (clientId) {
+        if (clientId && userId) {
           // Find all other matters for this client where the client is the SOLE client (not multi-client)
-          // Exclude the current matter
+          // Exclude the current matter, and ensure they belong to the same user (for RLS compliance)
           const { data: otherMatters, error: fetchError } = await supabase
             .from('matters')
             .select('id')
             .eq('client_id', clientId)
+            .eq('user_id', userId)
             .eq('is_multi_client', false)
             .neq('id', id);
           
@@ -486,14 +493,20 @@ export function useMatters() {
             // Update all those matters with the same rate modifier settings
             const otherMatterIds = otherMatters.map(m => m.id);
             
-            await supabase
+            const { error: updateError } = await supabase
               .from('matters')
               .update({
-                rate_modifier: input.rate_modifier,
-                rate_modifier_value: input.rate_modifier_value,
-                rate_modifier_scope: input.rate_modifier_scope,
+                rate_modifier: effectiveModifier,
+                rate_modifier_value: effectiveValue,
+                rate_modifier_scope: effectiveScope,
               })
               .in('id', otherMatterIds);
+            
+            if (updateError) {
+              console.error('Failed to propagate rate modifier to other matters:', updateError);
+            } else {
+              console.log(`Propagated rate modifier to ${otherMatters.length} other matters for client ${clientId}`);
+            }
           }
         }
       }
@@ -503,7 +516,8 @@ export function useMatters() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['matters'] });
       // Show a more informative message when propagating
-      if (variables.rate_modifier_scope === 'all_client_matters') {
+      const effectiveScope = (variables as any).rate_modifier_scope;
+      if (effectiveScope === 'all_client_matters') {
         toast({ title: 'Rate modifier applied to all client matters' });
       } else {
         toast({ title: 'Matter updated successfully' });

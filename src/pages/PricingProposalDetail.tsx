@@ -128,6 +128,7 @@ export default function PricingProposalDetail() {
   // Local state for editing work items
   const [draftItems, setDraftItems] = useState<DraftProposalItem[]>([]);
   const [phases, setPhases] = useState<ProposalPhase[]>([]);
+  const [phasesInitialized, setPhasesInitialized] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isExtractingRfp, setIsExtractingRfp] = useState(false);
   const [isGeneratingAiPricing, setIsGeneratingAiPricing] = useState(false);
@@ -178,8 +179,8 @@ export default function PricingProposalDetail() {
         setScopeAssumptions(proposal.scope_assumptions);
         setScopeAssumptionsInitialized(true);
       }
-      // Load phases from proposal work_phases
-      if (proposal.work_phases && Array.isArray(proposal.work_phases)) {
+      // Load phases from proposal work_phases (only once to prevent overwriting local edits)
+      if (proposal.work_phases && Array.isArray(proposal.work_phases) && !phasesInitialized) {
         // Convert legacy WorkPhase format to ProposalPhase if needed
         const loadedPhases: ProposalPhase[] = proposal.work_phases.map((p: any) => ({
           id: p.id || `phase-${Date.now()}-${Math.random()}`,
@@ -187,6 +188,7 @@ export default function PricingProposalDetail() {
           is_included: p.is_included !== false,
         }));
         setPhases(loadedPhases);
+        setPhasesInitialized(true);
       }
     }
   }, [proposal]);

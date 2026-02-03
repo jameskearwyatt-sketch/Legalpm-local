@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, Trash2, Calculator, Plus, Building2 } from 'lucide-react';
@@ -53,7 +53,9 @@ interface DraggableProposalItemProps {
 
 // CURRENCIES no longer needed here
 
-export function DraggableProposalItem({
+// Memoized component to prevent re-renders when typing in textareas
+// Uses custom comparison to ignore work_item/detail changes (handled locally)
+function DraggableProposalItemInner({
   id,
   item,
   index,
@@ -506,3 +508,53 @@ export function DraggableProposalItem({
     </TableRow>
   );
 }
+
+// Custom comparison function - only re-render when meaningful props change
+// Ignores work_item and detail since those are managed with local state
+function arePropsEqual(
+  prevProps: DraggableProposalItemProps,
+  nextProps: DraggableProposalItemProps
+): boolean {
+  // Always re-render if ID or index changed
+  if (prevProps.id !== nextProps.id || prevProps.index !== nextProps.index) {
+    return false;
+  }
+  
+  // Check item properties that matter for rendering (excluding work_item/detail which use local state)
+  const prevItem = prevProps.item;
+  const nextItem = nextProps.item;
+  
+  if (
+    prevItem.id !== nextItem.id ||
+    prevItem.provider !== nextItem.provider ||
+    prevItem.fee_amount !== nextItem.fee_amount ||
+    prevItem.fee_lower !== nextItem.fee_lower ||
+    prevItem.fee_upper !== nextItem.fee_upper ||
+    prevItem.pricing_method !== nextItem.pricing_method ||
+    prevItem.category !== nextItem.category ||
+    prevItem.lc_firm_name !== nextItem.lc_firm_name ||
+    prevItem.lc_country !== nextItem.lc_country ||
+    prevItem.is_optional !== nextItem.is_optional ||
+    prevItem.is_included !== nextItem.is_included
+  ) {
+    return false;
+  }
+  
+  // Check other props
+  if (
+    prevProps.viewingHistoricalVersion !== nextProps.viewingHistoricalVersion ||
+    prevProps.afaDiscountMultiplier !== nextProps.afaDiscountMultiplier ||
+    prevProps.hideIncludeColumn !== nextProps.hideIncludeColumn
+  ) {
+    return false;
+  }
+  
+  // Arrays - compare by length and reference (shallow)
+  if (prevProps.customCategories?.length !== nextProps.customCategories?.length) {
+    return false;
+  }
+  
+  return true;
+}
+
+export const DraggableProposalItem = memo(DraggableProposalItemInner, arePropsEqual);

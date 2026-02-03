@@ -321,9 +321,12 @@ export function PhasedWorkItemsView({
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    // Only handle phase reordering (phase IDs start with 'phase-')
-    if (!activeId.startsWith('phase-') || !overId.startsWith('phase-')) {
-      console.log('[Phase Drag] Not a phase drag - IDs:', activeId, overId);
+    // Check if both IDs are phases (exist in phases array)
+    const isActivePhase = phases.some(p => p.id === activeId);
+    const isOverPhase = phases.some(p => p.id === overId);
+    
+    if (!isActivePhase || !isOverPhase) {
+      console.log('[Phase Drag] Not a phase drag - IDs:', activeId, overId, 'isActivePhase:', isActivePhase, 'isOverPhase:', isOverPhase);
       return;
     }
 

@@ -386,22 +386,32 @@ export default function PricingProposalDetail() {
   const lastChangeTimeRef = useRef<number>(0);
   const hasUnsavedChangesRef = useRef(false);
   
+  // Use a simple counter to track if items/phases arrays changed reference
+  const itemsLengthRef = useRef(0);
+  const phasesLengthRef = useRef(0);
+  
+  // Effect only marks pending changes - doesn't cause re-renders
   useEffect(() => {
     if (!isInitialized) return;
     
     // Skip the first render after initialization (this is the initial load)
     if (!hasInitializedOnce.current) {
       hasInitializedOnce.current = true;
+      itemsLengthRef.current = draftItems.length;
+      phasesLengthRef.current = phases.length;
       return;
     }
     
-    // Mark as having pending changes (use ref to avoid extra renders)
+    // Mark as having pending changes using refs (no re-render)
     pendingChangesRef.current = true;
+    lastChangeTimeRef.current = Date.now();
+    
+    // Only update hasUnsavedChanges state once (when transitioning from saved to unsaved)
     if (!hasUnsavedChangesRef.current) {
       hasUnsavedChangesRef.current = true;
-      setHasUnsavedChanges(true);
+      // Use setTimeout to batch this state update
+      setTimeout(() => setHasUnsavedChanges(true), 0);
     }
-    lastChangeTimeRef.current = Date.now();
     
     // Clear any existing timeout
     if (autoSaveTimeoutRef.current) {

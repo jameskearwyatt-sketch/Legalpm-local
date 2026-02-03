@@ -327,6 +327,31 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
       const currentAr = matter.latest_snapshot?.accounts_receivable || 0;
       const currentPaid = matter.latest_snapshot?.paid_amount || 0;
 
+      // Calculate effective agreed budget - use the matter's effective budget
+      // This accounts for manual budget overrides, different billing currencies, and line item totals
+      const matterAny = matter as any;
+      const useManualBudget = matterAny.use_manual_budget ?? false;
+      const manualBudgetAmount = matterAny.manual_budget_amount ?? 0;
+      const differentBillingCurrency = matterAny.different_billing_currency ?? false;
+      const agreedBillingAmount = matterAny.agreed_billing_amount ?? 0;
+      const feeUpperEnd = matter.fee_amount_upper_end ?? 0;
+      const bmFeeComponent = matter.bm_fee_component ?? 0;
+      const localCounselFee = matter.local_counsel_fee ?? 0;
+      
+      // Priority: manual override > agreed billing amount (for different currency) > sum of BM + LC components > fee upper end
+      let effectiveAgreedBudget = 0;
+      if (useManualBudget && manualBudgetAmount > 0) {
+        effectiveAgreedBudget = manualBudgetAmount + localCounselFee;
+      } else if (differentBillingCurrency && agreedBillingAmount > 0) {
+        effectiveAgreedBudget = agreedBillingAmount;
+      } else if (bmFeeComponent > 0 || localCounselFee > 0) {
+        effectiveAgreedBudget = bmFeeComponent + localCounselFee;
+      } else if (feeUpperEnd > 0) {
+        effectiveAgreedBudget = feeUpperEnd;
+      } else {
+        effectiveAgreedBudget = matter.agreed_budget_amount ?? 0;
+      }
+
       newData.set(matter.id, {
         matterId: matter.id,
         matterName: (matter as any).matter_display_name || matter.matter_name,
@@ -342,7 +367,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         currentAr,
         currentPaid,
         totalBudgetUtilised: currentWip + currentAr + currentPaid,
-        agreedBudget: matter.agreed_budget_amount || 0,
+        agreedBudget: effectiveAgreedBudget,
         isMultiClient: (matter as any).is_multi_client || false,
       });
     });

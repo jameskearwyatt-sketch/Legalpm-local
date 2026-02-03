@@ -28,7 +28,9 @@ import {
   Folder,
   Copy,
   HelpCircle,
-  GripVertical
+  GripVertical,
+  ChevronsDownUp,
+  ChevronsUpDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -235,6 +237,27 @@ export function PhasedWorkItemsView({
       return next;
     });
   }, []);
+
+  // Expand all phases
+  const expandAllPhases = useCallback(() => {
+    setExpandedPhases(new Set(['unassigned', ...phases.map(p => p.id)]));
+  }, [phases]);
+
+  // Collapse all phases
+  const collapseAllPhases = useCallback(() => {
+    setExpandedPhases(new Set());
+  }, []);
+
+  // Check if all phases are expanded
+  const allPhasesExpanded = useMemo(() => {
+    const allPhaseIds = ['unassigned', ...phases.map(p => p.id)];
+    return allPhaseIds.every(id => expandedPhases.has(id));
+  }, [phases, expandedPhases]);
+
+  // Check if all phases are collapsed  
+  const allPhasesCollapsed = useMemo(() => {
+    return expandedPhases.size === 0;
+  }, [expandedPhases]);
 
   // Toggle all items in a phase
   const togglePhaseItems = useCallback((phaseId: string, included: boolean) => {
@@ -716,12 +739,34 @@ export function PhasedWorkItemsView({
           )}
         </div>
 
-        {!viewingHistoricalVersion && (
-          <Button onClick={() => setIsAddPhaseDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-1" />
-            Add Phase
+        <div className="flex items-center gap-2">
+          {/* Collapse/Expand All toggle */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={allPhasesCollapsed ? expandAllPhases : collapseAllPhases}
+            title={allPhasesCollapsed ? "Expand all phases" : "Collapse all phases"}
+          >
+            {allPhasesCollapsed ? (
+              <>
+                <ChevronsUpDown className="h-4 w-4 mr-1" />
+                Expand All
+              </>
+            ) : (
+              <>
+                <ChevronsDownUp className="h-4 w-4 mr-1" />
+                Collapse All
+              </>
+            )}
           </Button>
-        )}
+
+          {!viewingHistoricalVersion && (
+            <Button onClick={() => setIsAddPhaseDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-1" />
+              Add Phase
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Phase sections with drag-and-drop */}

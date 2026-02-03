@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -667,7 +667,6 @@ export function PhasedWorkItemsView({
                                           customCategories={customCategories}
                                           onAddCustomCategory={onAddCustomCategory}
                                           phases={phases}
-                                          onPhaseChange={(phaseId) => onUpdateItem(originalIndex, { phase_id: phaseId })}
                                           existingInputDepts={existingInputDepts}
                                         />
                                       </TableRow>
@@ -925,11 +924,11 @@ interface PhasedItemCellsProps {
   customCategories: string[];
   onAddCustomCategory: (category: string) => void;
   phases: ProposalPhase[];
-  onPhaseChange: (phaseId: string | null) => void;
   existingInputDepts: string[];
 }
 
-function PhasedItemCells({
+// Memoized to prevent re-renders when parent state changes but item data hasn't
+const PhasedItemCells = memo(function PhasedItemCells({
   item,
   index,
   onUpdate,
@@ -941,7 +940,6 @@ function PhasedItemCells({
   customCategories,
   onAddCustomCategory,
   phases,
-  onPhaseChange,
   existingInputDepts,
 }: PhasedItemCellsProps) {
   const {
@@ -1044,7 +1042,7 @@ function PhasedItemCells({
         ) : (
           <Select
             value={item.phase_id || 'unassigned'}
-            onValueChange={(value) => onPhaseChange(value === 'unassigned' ? null : value)}
+            onValueChange={(value) => onUpdate(index, { phase_id: value === 'unassigned' ? null : value })}
           >
             <SelectTrigger className="w-[120px] text-xs h-8">
               <SelectValue placeholder="Phase" />
@@ -1209,4 +1207,38 @@ function PhasedItemCells({
       </TableCell>
     </>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison - only re-render when meaningful props change
+  // Ignore work_item and detail since DebouncedTextarea handles those locally
+  if (prevProps.index !== nextProps.index) return false;
+  if (prevProps.viewingHistoricalVersion !== nextProps.viewingHistoricalVersion) return false;
+  
+  const prevItem = prevProps.item;
+  const nextItem = nextProps.item;
+  
+  // Compare item fields that affect rendering (excluding work_item/detail)
+  if (
+    prevItem.id !== nextItem.id ||
+    prevItem.provider !== nextItem.provider ||
+    prevItem.fee_amount !== nextItem.fee_amount ||
+    prevItem.fee_lower !== nextItem.fee_lower ||
+    prevItem.fee_upper !== nextItem.fee_upper ||
+    prevItem.pricing_method !== nextItem.pricing_method ||
+    prevItem.category !== nextItem.category ||
+    prevItem.phase_id !== nextItem.phase_id ||
+    prevItem.lc_firm_name !== nextItem.lc_firm_name ||
+    prevItem.lc_country !== nextItem.lc_country ||
+    prevItem.is_pc_sum !== nextItem.is_pc_sum ||
+    prevItem.internal_input_dept !== nextItem.internal_input_dept ||
+    prevItem.is_included !== nextItem.is_included
+  ) {
+    return false;
+  }
+  
+  // Check array props by length
+  if (prevProps.phases.length !== nextProps.phases.length) return false;
+  if (prevProps.customCategories.length !== nextProps.customCategories.length) return false;
+  if (prevProps.existingInputDepts.length !== nextProps.existingInputDepts.length) return false;
+  
+  return true; // Props are equal, don't re-render
+});

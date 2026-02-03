@@ -145,14 +145,20 @@ export function useWebAuthn() {
     }
   };
 
-  // Check if user has passkeys registered
+  // Check if user has passkeys registered (silently handles 404s as expected)
   const checkPasskeysForEmail = async (email: string): Promise<boolean> => {
     try {
       const { data, error } = await supabase.functions.invoke('webauthn-authenticate', {
         body: { action: 'generate-options', email },
       });
-      return !error && data?.hasPasskeys === true;
+      // 404 responses (no account, no passkeys) are expected - just return false
+      if (error) {
+        // Don't log expected "not found" errors
+        return false;
+      }
+      return data?.hasPasskeys === true;
     } catch {
+      // Network or other errors - silently return false
       return false;
     }
   };

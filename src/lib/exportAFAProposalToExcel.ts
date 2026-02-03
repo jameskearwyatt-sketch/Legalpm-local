@@ -265,10 +265,14 @@ export async function exportAFAProposalToExcel({
       narrativeCell.font = { size: 10, color: { argb: 'FF4B5563' } };
       narrativeCell.alignment = { wrapText: true, vertical: 'top' };
       
-      const combinedWidth = 137;
-      const textLength = narrative.length + 2;
-      const estimatedLines = Math.ceil(textLength / combinedWidth);
-      const rowHeight = Math.max(20, estimatedLines * 15);
+      // More conservative estimate: columns A+B+C have widths 8+35+80 = 123 units
+      // At ~7 chars per unit for size 10 font, that's roughly 90 chars per line
+      const charsPerLine = 85;
+      const textLength = narrative.length + 2; // +2 for bullet
+      const estimatedLines = Math.ceil(textLength / charsPerLine);
+      // Use 18 points per line (size 10 font needs ~14pt, plus padding)
+      // Minimum height of 22 to ensure single lines aren't cramped
+      const rowHeight = Math.max(22, estimatedLines * 18);
       worksheet.getRow(currentRow).height = rowHeight;
       currentRow++;
     };

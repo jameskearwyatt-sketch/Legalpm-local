@@ -1694,6 +1694,10 @@ export default function PricingProposalDetail() {
                 {hasUnsavedChanges && (
                   <Badge variant="destructive">Unsaved changes</Badge>
                 )}
+                <Button onClick={() => setIsAddWorkItemDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Item
+                </Button>
                 <Button variant="outline" onClick={handleExportClick}>
                   <FileDown className="h-4 w-4 mr-2" />
                   Export Excel
@@ -3116,53 +3120,6 @@ export default function PricingProposalDetail() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-
-        {/* Sticky Bottom Action Bar - Always visible */}
-        {!viewingHistoricalVersion && activeTab === 'items' && (
-          <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t shadow-lg">
-            <div className="container max-w-7xl mx-auto px-4 py-3">
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  <Button onClick={() => setIsAddWorkItemDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Item
-                  </Button>
-                </div>
-                <div className="flex items-center gap-3">
-                  {autoSaveStatus === 'saving' && (
-                    <span className="text-sm text-muted-foreground flex items-center gap-1">
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                      Saving...
-                    </span>
-                  )}
-                  {autoSaveStatus === 'saved' && (
-                    <span className="text-sm text-muted-foreground flex items-center gap-1">
-                      <CheckCircle2 className="h-3 w-3 text-green-600" />
-                      Saved
-                    </span>
-                  )}
-                  {hasUnsavedChanges && (
-                    <Badge variant="outline" className="text-amber-600 border-amber-600">
-                      Unsaved changes
-                    </Badge>
-                  )}
-                  <Button
-                    onClick={() => performSave(true)}
-                    disabled={!hasUnsavedChanges || isSaving}
-                    variant={hasUnsavedChanges ? 'default' : 'outline'}
-                  >
-                    {isSaving ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save Version
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </AppLayout>
   );

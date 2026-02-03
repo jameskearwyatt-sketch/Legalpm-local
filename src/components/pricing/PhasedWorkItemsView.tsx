@@ -311,20 +311,34 @@ export function PhasedWorkItemsView({
   // Handle phase drag end (for reordering phases)
   const handlePhaseDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
-    if (!over || active.id === over.id) return;
+    console.log('[Phase Drag] active:', active.id, 'over:', over?.id);
+    
+    if (!over || active.id === over.id) {
+      console.log('[Phase Drag] No change - same position or no target');
+      return;
+    }
 
     const activeId = active.id as string;
     const overId = over.id as string;
 
     // Only handle phase reordering (phase IDs start with 'phase-')
-    if (!activeId.startsWith('phase-') || !overId.startsWith('phase-')) return;
+    if (!activeId.startsWith('phase-') || !overId.startsWith('phase-')) {
+      console.log('[Phase Drag] Not a phase drag - IDs:', activeId, overId);
+      return;
+    }
 
     const activeIndex = phases.findIndex(p => p.id === activeId);
     const overIndex = phases.findIndex(p => p.id === overId);
 
-    if (activeIndex === -1 || overIndex === -1) return;
+    console.log('[Phase Drag] Indices - active:', activeIndex, 'over:', overIndex);
+    
+    if (activeIndex === -1 || overIndex === -1) {
+      console.log('[Phase Drag] Invalid indices');
+      return;
+    }
 
     const newPhases = arrayMove(phases, activeIndex, overIndex);
+    console.log('[Phase Drag] New order:', newPhases.map(p => p.name));
     onPhasesChange(newPhases);
   }, [phases, onPhasesChange]);
 

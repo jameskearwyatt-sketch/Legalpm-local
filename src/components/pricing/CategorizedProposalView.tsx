@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
-import { Loader2, Wand2, ChevronDown, ChevronRight } from 'lucide-react';
+import { useMemo, useState, useCallback } from 'react';
+import { Loader2, Wand2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DraftProposalItem, BUDGET_CATEGORIES, ProposalPhase } from '@/lib/hooks/usePricingProposals';
+import { CategoryFeeAllocationDialog } from './CategoryFeeAllocationDialog';
 
 type BudgetCategory = typeof BUDGET_CATEGORIES[number];
 
@@ -52,6 +54,7 @@ interface CategorizedProposalViewProps {
   formatCurrency: (value: number) => string;
   currencySymbol: string;
   customCategories?: string[];
+  onNavigateToCategory?: (phaseId: string | null, category: string) => void;
 }
 
 // Helper function to calculate category totals from a list of items using fee_upper
@@ -82,6 +85,44 @@ function calculateCategoryTotals(
   return totals;
 }
 
+// Get items by phase and category with their original indices
+function getItemsForPhaseCategory(
+  items: DraftProposalItem[],
+  phaseId: string | null,
+  category: string,
+  phases: ProposalPhase[]
+): { index: number; workItem: string; currentFee: number }[] {
+  const validPhaseIds = new Set(phases.map(p => p.id));
+  
+  return items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => {
+      // Check if included
+      const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
+      if (!isIncluded) return false;
+      
+      // Check category match
+      const itemCategory = item.category || 'Other';
+      if (itemCategory !== category) return false;
+      
+      // Check phase match
+      if (phaseId === null) {
+        // Aggregate - include all
+        return true;
+      } else if (phaseId === 'unassigned') {
+        // Unassigned items (no phase_id or orphaned phase_id)
+        return !item.phase_id || !validPhaseIds.has(item.phase_id);
+      } else {
+        return item.phase_id === phaseId;
+      }
+    })
+    .map(({ item, index }) => ({
+      index,
+      workItem: item.work_item,
+      currentFee: item.fee_upper ?? item.fee_amount ?? 0,
+    }));
+}
+
 export function CategorizedProposalView({
   items,
   phases,
@@ -89,8 +130,15 @@ export function CategorizedProposalView({
   formatCurrency,
   currencySymbol,
   customCategories = [],
+  onNavigateToCategory,
 }: CategorizedProposalViewProps) {
   const [isCategorizing, setIsCategorizing] = useState(false);
+  
+  // Allocation dialog state
+  const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
+  const [selectedPhaseName, setSelectedPhaseName] = useState<string | null>(null);
 
   // Combine standard and custom categories for display
   const allCategories = useMemo(() => {
@@ -126,6 +174,55 @@ export function CategorizedProposalView({
 
   // Count uncategorized items
   const uncategorizedCount = items.filter(item => !item.category && item.work_item.trim()).length;
+
+  // Handle tile click for navigation
+  const handleTileClick = useCallback((phaseId: string | null, category: string) => {
+    if (onNavigateToCategory) {
+      onNavigateToCategory(phaseId, category);
+    }
+  }, [onNavigateToCategory]);
+  
+  // Handle edit click for fee allocation
+  const handleEditClick = useCallback((
+    e: React.MouseEvent,
+    phaseId: string | null,
+    phaseName: string | null,
+    category: string
+  ) => {
+    e.stopPropagation(); // Prevent tile navigation
+    setSelectedPhaseId(phaseId);
+    setSelectedPhaseName(phaseName);
+    setSelectedCategory(category);
+    setAllocationDialogOpen(true);
+  }, []);
+  
+  // Get affected items for the dialog
+  const affectedItems = useMemo(() => {
+    if (!allocationDialogOpen || !selectedCategory) return [];
+    return getItemsForPhaseCategory(items, selectedPhaseId, selectedCategory, phases);
+  }, [allocationDialogOpen, items, selectedPhaseId, selectedCategory, phases]);
+  
+  // Current total for selected category
+  const selectedCategoryTotal = useMemo(() => {
+    return affectedItems.reduce((sum, item) => sum + item.currentFee, 0);
+  }, [affectedItems]);
+  
+  // Apply fee allocations
+  const handleApplyAllocations = useCallback((allocations: Map<number, number>) => {
+    const newItems = items.map((item, index) => {
+      const newFee = allocations.get(index);
+      if (newFee !== undefined) {
+        return {
+          ...item,
+          fee_upper: newFee,
+          fee_amount: Math.round((item.fee_lower ?? 0) + newFee) / 2, // Update midpoint
+        };
+      }
+      return item;
+    });
+    onItemsChange(newItems);
+    toast.success(`Allocated fees across ${allocations.size} work items`);
+  }, [items, onItemsChange]);
 
   // Auto-categorize items using AI
   const handleAutoCategorize = async () => {
@@ -203,11 +300,12 @@ export function CategorizedProposalView({
   const renderCategoryBreakdown = (
     totals: Record<string, number>,
     total: number,
-    label?: string
+    phaseId: string | null,
+    phaseName: string | null
   ) => (
     <div className="space-y-2">
-      {label && (
-        <div className="text-sm font-medium text-foreground">{label}</div>
+      {phaseName && (
+        <div className="text-sm font-medium text-foreground">{phaseName}</div>
       )}
       <div className="flex flex-wrap gap-2">
         {allCategories.map(category => {
@@ -221,21 +319,43 @@ export function CategorizedProposalView({
           const borderColor = isStandardCategory ? categoryBorderColors[category as BudgetCategory] : 'border-slate-300 dark:border-slate-600';
           
           return (
-            <div
-              key={category}
-              className={cn(
-                'rounded-md px-3 py-2 border',
-                bgColor,
-                borderColor
-              )}
-            >
-              <div className={cn('text-xs font-medium', textColor)}>
-                {category}
+            <TooltipProvider key={category}>
+              <div
+                className={cn(
+                  'rounded-md px-3 py-2 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
+                  bgColor,
+                  borderColor
+                )}
+                onClick={() => handleTileClick(phaseId, category)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    handleTileClick(phaseId, category);
+                  }
+                }}
+              >
+                <div className={cn('text-xs font-medium', textColor)}>
+                  {category}
+                </div>
+                <div className={cn('text-sm font-semibold flex items-center gap-1', textColor)}>
+                  <span>{formatCurrency(categoryTotal)}</span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
+                        onClick={(e) => handleEditClick(e, phaseId, phaseName, category)}
+                      >
+                        <Pencil className="h-3 w-3" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Adjust fee and distribute pro-rata</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
               </div>
-              <div className={cn('text-sm font-semibold', textColor)}>
-                {formatCurrency(categoryTotal)}
-              </div>
-            </div>
+            </TooltipProvider>
           );
         })}
         
@@ -243,7 +363,7 @@ export function CategorizedProposalView({
         {total > 0 && (
           <div className="rounded-md px-3 py-2 border bg-primary/10 border-primary/30">
             <div className="text-xs font-medium text-primary">
-              {label ? 'Subtotal' : 'Total'}
+              {phaseName ? 'Subtotal' : 'Total'}
             </div>
             <div className="text-sm font-semibold text-primary">
               {formatCurrency(total)}
@@ -261,6 +381,9 @@ export function CategorizedProposalView({
         <div className="text-sm text-muted-foreground">
           {uncategorizedCount > 0 && (
             <span>{uncategorizedCount} item(s) need categorization</span>
+          )}
+          {onNavigateToCategory && (
+            <span className="ml-2 text-xs">(Click a tile to navigate)</span>
           )}
         </div>
         <Button
@@ -288,21 +411,34 @@ export function CategorizedProposalView({
         <div className="space-y-4">
           {phaseBreakdowns.map(({ phase, totals, grandTotal: phaseTotal }) => (
             <div key={phase.id}>
-              {renderCategoryBreakdown(totals, phaseTotal, phase.name)}
+              {renderCategoryBreakdown(totals, phaseTotal, phase.id, phase.name)}
             </div>
           ))}
           
           {/* Aggregate Total */}
           <div className="pt-2 border-t">
-            {renderCategoryBreakdown(categoryTotals, grandTotal, 'Aggregate Total')}
+            {renderCategoryBreakdown(categoryTotals, grandTotal, null, 'Aggregate Total')}
           </div>
         </div>
       )}
 
       {/* Single breakdown (if single phase or no phases) */}
       {(!phaseBreakdowns || phaseBreakdowns.length <= 1) && (
-        renderCategoryBreakdown(categoryTotals, grandTotal)
+        renderCategoryBreakdown(categoryTotals, grandTotal, null, null)
       )}
+      
+      {/* Fee Allocation Dialog */}
+      <CategoryFeeAllocationDialog
+        open={allocationDialogOpen}
+        onOpenChange={setAllocationDialogOpen}
+        categoryName={selectedCategory}
+        phaseName={selectedPhaseName}
+        currentTotal={selectedCategoryTotal}
+        affectedItems={affectedItems}
+        formatCurrency={formatCurrency}
+        currencySymbol={currencySymbol}
+        onApply={handleApplyAllocations}
+      />
     </div>
   );
 }

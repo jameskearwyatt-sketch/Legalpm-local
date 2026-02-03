@@ -562,15 +562,21 @@ export default function MatterDetail() {
   
   // Financial snapshots are stored in BILLING currency - no conversion needed
   // If showing proposal, use proposal values; otherwise use snapshot values
-  // WIP write-off applies to raw WIP only
-  const rawWipAmount = showProposalValues 
-    ? selectedProposal.wip_amount 
-    : (latestSnapshot?.wip_amount || 0);
+  // IMPORTANT: For proposals, wip_amount is RAW and we subtract write-off to get NET
+  // For snapshots (imported data), wip_amount IS already NET - write-off is tracked separately for realization only
   const wipWriteOffAmount = showProposalValues 
     ? selectedProposal.wip_write_off_amount 
     : (latestSnapshot?.wip_write_off_amount || 0);
-  // Net WIP = raw WIP minus WIP-specific write-offs only
-  const wipAmount = rawWipAmount - wipWriteOffAmount;
+  
+  // For proposals: wip_amount is RAW, need to subtract write-off
+  // For snapshots: wip_amount IS NET (report already reduced it), don't subtract again
+  const wipAmount = showProposalValues 
+    ? selectedProposal.wip_amount - selectedProposal.wip_write_off_amount
+    : (latestSnapshot?.wip_amount || 0);
+  // For display purposes, rawWipAmount for proposals is the stored value; for snapshots it's wip + write-off
+  const rawWipAmount = showProposalValues 
+    ? selectedProposal.wip_amount 
+    : (latestSnapshot?.wip_amount || 0) + wipWriteOffAmount;
   
   // AR write-off is separate - applies to accounts receivable
   const arWriteOffAmount = showProposalValues 
@@ -1220,9 +1226,10 @@ export default function MatterDetail() {
                   
                   // Previous snapshot values for display in tooltip
                   // Financial snapshots are stored in billing currency - no conversion needed
+                  // For snapshots, wip_amount IS already NET - write-off tracked separately
                   // If no previous snapshot, show 0 as the "previous" value
                   const prevWipDisplay = hasPrevious 
-                    ? previousSnapshot.wip_amount - previousSnapshot.wip_write_off_amount
+                    ? previousSnapshot.wip_amount
                     : 0;
                   const prevArDisplay = hasPrevious 
                     ? previousSnapshot.accounts_receivable

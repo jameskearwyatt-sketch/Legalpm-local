@@ -92,12 +92,15 @@ export function FinancialSnapshotUpdateDialog({
   
   useEffect(() => {
     if (isOpen) {
-      const rawWip = roundTo2(currentValues?.wip_amount || 0);
+      // IMPORTANT: In the database, wip_amount IS already NET (after write-offs)
+      // To display Raw WIP in the form, we need to add write-off back
+      const netWip = roundTo2(currentValues?.wip_amount || 0);
       const writeOff = roundTo2(currentValues?.wip_write_off_amount || 0);
+      const rawWip = roundTo2(netWip + writeOff); // Reverse-calculate raw WIP for display
       setFormData({
-        wip_amount: rawWip,
+        wip_amount: rawWip, // Display Raw WIP in the form
         wip_write_off_amount: writeOff,
-        adjusted_wip: roundTo2(rawWip - writeOff),
+        adjusted_wip: netWip, // This is the actual stored value
         billed_amount: roundTo2(currentValues?.billed_amount || 0),
         accounts_receivable: roundTo2(currentValues?.accounts_receivable || 0),
         paid_amount: roundTo2(currentValues?.paid_amount || 0),
@@ -156,8 +159,10 @@ export function FinancialSnapshotUpdateDialog({
         billing_mode: lc.billing_mode,
       }));
 
+      // IMPORTANT: Save NET WIP (not raw) since that's how snapshots work
+      // The write-off is stored separately for realization tracking
       await onSave({
-        wip_amount: formData.wip_amount,
+        wip_amount: calculatedValues.netWip, // Save NET WIP, not raw
         wip_write_off_amount: calculatedValues.writeOff,
         billed_amount: formData.billed_amount,
         accounts_receivable: formData.accounts_receivable,

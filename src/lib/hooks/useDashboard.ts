@@ -212,10 +212,15 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         const budget = Number(matter.fee_amount_upper_end) || 0;
         
         // Use proposal data if enabled for WIP display, otherwise use snapshot
-        // For WIP: use net WIP (raw WIP - WIP write-off) from proposal for display
-        const rawWipAmount = showProposalData ? Number(proposal.wip_amount) : Number(snapshot?.wip_amount) || 0;
+        // IMPORTANT: For proposals, wip_amount is RAW and we subtract write-off to get NET
+        // For snapshots (imported data), wip_amount IS already NET - don't subtract again
+        const snapshotWipAmount = Number(snapshot?.wip_amount) || 0;
+        const proposalRawWip = showProposalData ? Number(proposal.wip_amount) : 0;
         const proposalWipWriteOff = showProposalData ? Number(proposal.wip_write_off_amount) : 0;
-        const wipAmount = rawWipAmount - proposalWipWriteOff; // Net WIP for display (adjusted by proposals)
+        // For proposals: subtract write-off from raw. For snapshots: use as-is (already net)
+        const wipAmount = showProposalData 
+          ? proposalRawWip - proposalWipWriteOff 
+          : snapshotWipAmount;
         
         // IMPORTANT: For realization rate calculation, ONLY use actual write-offs from snapshots
         // Proposal write-offs are provisional and should not affect collection/realization rates

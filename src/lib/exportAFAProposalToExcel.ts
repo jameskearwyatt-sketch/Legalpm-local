@@ -99,8 +99,9 @@ export async function exportAFAProposalToExcel({
   const afaHighlightColor = 'FFF0F9FF'; // Light blue for AFA-adjusted items
 
   // Build column definitions dynamically based on selected figures
-  // Merged Provider column (shows BM or LC firm name/country)
+  // Item # column first, then merged Provider column (shows BM or LC firm name/country)
   const columns: { key: string; width: number }[] = [
+    { key: 'itemNumber', width: 8 },
     { key: 'workItem', width: 35 },
     { key: 'detail', width: 80 },
     { key: 'provider', width: 22 },
@@ -279,8 +280,8 @@ export async function exportAFAProposalToExcel({
   disclaimerCell.alignment = { horizontal: 'center' };
   currentRow += 2;
 
-  // Build dynamic header values - includes Detail column and PC Sum
-  const headerValues: string[] = ['Scope of Work', 'Detail', 'Provider'];
+  // Build dynamic header values - includes Item #, Detail column and PC Sum
+  const headerValues: string[] = ['Item #', 'Scope of Work', 'Detail', 'Provider'];
   if (exportLower) headerValues.push(`Lower Range (${currency})`);
   if (exportMidpoint) headerValues.push(`Midpoint (${currency})`);
   if (exportUpper) headerValues.push(`Upper Range (${currency})`);
@@ -294,15 +295,18 @@ export async function exportAFAProposalToExcel({
   headerValues.push('Notes');
   
   // Track which column indices are fee columns (for right-alignment)
-  // With detail column: workItem(1), detail(2), provider(3), fee columns start at 4
+  // With item # and detail column: itemNumber(1), workItem(2), detail(3), provider(4), fee columns start at 5
   const feeColumnIndices: number[] = [];
-  let colIdx = 4; // Fee columns now start at column 4
+  let colIdx = 5; // Fee columns now start at column 5
   if (exportLower) feeColumnIndices.push(colIdx++);
   if (exportMidpoint) feeColumnIndices.push(colIdx++);
   if (exportUpper) feeColumnIndices.push(colIdx++);
   const pcSumColumnIndex = colIdx++; // PC Sum column comes after fee columns
   const internalInputColumnIndex = includeInputDeptHighlighting ? colIdx++ : -1;
   const notesColumnIndex = colIdx;
+  
+  // Sequential item numbering counter
+  let itemNumber = 1;
 
   // Column headers
   const headerRow = worksheet.getRow(currentRow);
@@ -310,8 +314,8 @@ export async function exportAFAProposalToExcel({
   headerRow.eachCell((cell, colNumber) => {
     cell.fill = headerFill;
     cell.font = headerFont;
-    // Center align Provider (col 3), Fee columns, and PC Sum column
-    const isCenteredColumn = colNumber === 3 || feeColumnIndices.includes(colNumber) || colNumber === pcSumColumnIndex;
+    // Center align Item # (col 1), Provider (col 4), Fee columns, and PC Sum column
+    const isCenteredColumn = colNumber === 1 || colNumber === 4 || feeColumnIndices.includes(colNumber) || colNumber === pcSumColumnIndex;
     cell.alignment = { horizontal: isCenteredColumn ? 'center' : 'left', vertical: 'middle' };
     cell.border = {
       bottom: { style: 'medium', color: { argb: primaryColor } },
@@ -403,8 +407,9 @@ export async function exportAFAProposalToExcel({
         }
       }
       
-      // Build row values dynamically based on columns
+      // Build row values dynamically based on columns (Item # is first column)
       const rowValues: (string | number)[] = [
+        itemNumber++, // Sequential item number
         workItemDisplay,
         item.detail || '',
         providerDisplay,
@@ -421,17 +426,19 @@ export async function exportAFAProposalToExcel({
       
       dataRow.values = rowValues;
 
-      // Style the row
-      dataRow.getCell(1).alignment = { wrapText: true, vertical: 'top' };
+      // Style the row - Item # is now column 1, work item is column 2, etc.
+      dataRow.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' };
+      dataRow.getCell(1).font = { size: 10, color: { argb: 'FF6B7280' } };
       dataRow.getCell(2).alignment = { wrapText: true, vertical: 'top' };
-      dataRow.getCell(2).font = { size: 10 };
-      dataRow.getCell(3).font = { size: 10, color: { argb: 'FF6B7280' } };
-      dataRow.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
-      dataRow.getCell(4).numFmt = '#,##0';
+      dataRow.getCell(3).alignment = { wrapText: true, vertical: 'top' };
+      dataRow.getCell(3).font = { size: 10 };
+      dataRow.getCell(4).font = { size: 10, color: { argb: 'FF6B7280' } };
       dataRow.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' };
+      dataRow.getCell(5).numFmt = '#,##0';
       dataRow.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
+      dataRow.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
       if (item.is_pc_sum) {
-        dataRow.getCell(5).font = { size: 10, color: { argb: 'FF7C3AED' }, bold: true };
+        dataRow.getCell(6).font = { size: 10, color: { argb: 'FF7C3AED' }, bold: true };
       }
       
       // Style internal input column if present
@@ -484,8 +491,8 @@ export async function exportAFAProposalToExcel({
       }
 
       if (item.is_optional) {
-        dataRow.getCell(1).font = { italic: true, color: { argb: 'FF6B7280' } };
-        dataRow.getCell(6).font = { italic: true, color: { argb: 'FF6B7280' } };
+        dataRow.getCell(2).font = { italic: true, color: { argb: 'FF6B7280' } };
+        dataRow.getCell(7).font = { italic: true, color: { argb: 'FF6B7280' } };
       }
 
       // Subtle borders
@@ -498,14 +505,14 @@ export async function exportAFAProposalToExcel({
       currentRow++;
     }
 
-    // Category subtotal
+    // Category subtotal - now fee column is at index 5
     if (categoryTotal > 0) {
       const subtotalRow = worksheet.getRow(currentRow);
-      subtotalRow.values = ['', '', '', categoryTotal, '', ''];
-      subtotalRow.getCell(4).numFmt = '#,##0';
-      subtotalRow.getCell(4).alignment = { horizontal: 'center' };
+      subtotalRow.values = ['', '', '', '', categoryTotal, '', ''];
+      subtotalRow.getCell(5).numFmt = '#,##0';
+      subtotalRow.getCell(5).alignment = { horizontal: 'center' };
       subtotalRow.font = { bold: true, size: 10, color: { argb: '4B5563' } };
-      subtotalRow.getCell(4).border = {
+      subtotalRow.getCell(5).border = {
         top: { style: 'thin', color: { argb: borderColor } },
       };
       currentRow++;
@@ -623,7 +630,7 @@ export async function exportAFAProposalToExcel({
   // Provider breakdown
   currentRow++;
   const breakdownHeaderRow = worksheet.getRow(currentRow);
-  worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+  worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
   breakdownHeaderRow.getCell(1).value = 'Fee Breakdown by Provider';
   breakdownHeaderRow.getCell(1).font = { bold: true, size: 11, color: { argb: primaryColor } };
   breakdownHeaderRow.height = 24;
@@ -631,35 +638,35 @@ export async function exportAFAProposalToExcel({
 
   // Baker McKenzie fees (already accumulated from rounded line items)
   const bmRow = worksheet.getRow(currentRow);
-  bmRow.values = ['Baker McKenzie Fees', '', '', bmTotal, '', ''];
-  bmRow.getCell(4).numFmt = '#,##0';
-  bmRow.getCell(4).alignment = { horizontal: 'right' };
-  bmRow.getCell(1).font = { size: 11 };
+  bmRow.values = ['', 'Baker McKenzie Fees', '', '', bmTotal, '', ''];
+  bmRow.getCell(5).numFmt = '#,##0';
+  bmRow.getCell(5).alignment = { horizontal: 'right' };
+  bmRow.getCell(2).font = { size: 11 };
   currentRow++;
 
   // Local Counsel fees (already accumulated from rounded line items)
   if (lcTotal > 0) {
     const lcRow = worksheet.getRow(currentRow);
-    lcRow.values = ['Local Counsel Fees', '', '', lcTotal, '', ''];
-    lcRow.getCell(4).numFmt = '#,##0';
-    lcRow.getCell(4).alignment = { horizontal: 'right' };
-    lcRow.getCell(1).font = { size: 11 };
+    lcRow.values = ['', 'Local Counsel Fees', '', '', lcTotal, '', ''];
+    lcRow.getCell(5).numFmt = '#,##0';
+    lcRow.getCell(5).alignment = { horizontal: 'right' };
+    lcRow.getCell(2).font = { size: 11 };
     currentRow++;
   }
 
   // Aggregate Line Item Estimate (sum of all line items)
   currentRow++;
   const aggregateRow = worksheet.getRow(currentRow);
-  aggregateRow.values = ['AGGREGATE LINE ITEM ESTIMATE', '', '', grandTotal, '', ''];
-  aggregateRow.getCell(4).numFmt = '#,##0';
-  aggregateRow.getCell(4).alignment = { horizontal: 'right' };
-  aggregateRow.getCell(4).font = { bold: true, size: 12, color: { argb: primaryColor } };
-  aggregateRow.getCell(4).fill = {
+  aggregateRow.values = ['', 'AGGREGATE LINE ITEM ESTIMATE', '', '', grandTotal, '', ''];
+  aggregateRow.getCell(5).numFmt = '#,##0';
+  aggregateRow.getCell(5).alignment = { horizontal: 'right' };
+  aggregateRow.getCell(5).font = { bold: true, size: 12, color: { argb: primaryColor } };
+  aggregateRow.getCell(5).fill = {
     type: 'pattern',
     pattern: 'solid',
     fgColor: { argb: 'FFF3F4F6' },
   };
-  aggregateRow.getCell(1).font = { bold: true, size: 12, color: { argb: primaryColor } };
+  aggregateRow.getCell(2).font = { bold: true, size: 12, color: { argb: primaryColor } };
   aggregateRow.eachCell((cell) => {
     cell.border = {
       top: { style: 'medium', color: { argb: primaryColor } },
@@ -681,10 +688,10 @@ export async function exportAFAProposalToExcel({
     // Add each applied AFA
     for (const afa of filterResult.appliedAFAs) {
       const afaDetailRow = worksheet.getRow(currentRow);
-      afaDetailRow.values = [`  ${afa.label}`, '', '', '', '', afa.description];
-      afaDetailRow.getCell(1).font = { size: 10, color: { argb: 'FF2563EB' }, italic: true };
-      afaDetailRow.getCell(6).font = { size: 10, color: { argb: 'FF6B7280' }, italic: true };
-      afaDetailRow.getCell(6).alignment = { wrapText: true };
+      afaDetailRow.values = ['', `  ${afa.label}`, '', '', '', '', afa.description];
+      afaDetailRow.getCell(2).font = { size: 10, color: { argb: 'FF2563EB' }, italic: true };
+      afaDetailRow.getCell(7).font = { size: 10, color: { argb: 'FF6B7280' }, italic: true };
+      afaDetailRow.getCell(7).alignment = { wrapText: true };
       currentRow++;
     }
     
@@ -692,16 +699,16 @@ export async function exportAFAProposalToExcel({
     if (primaryAFA?.client_price && primaryAFA.client_price !== grandTotal) {
       currentRow++;
       const feeProposalRow = worksheet.getRow(currentRow);
-      feeProposalRow.values = ['FEE PROPOSAL', '', '', smartRound(primaryAFA.client_price), '', ''];
-      feeProposalRow.getCell(4).numFmt = '#,##0';
-      feeProposalRow.getCell(4).alignment = { horizontal: 'right' };
-      feeProposalRow.getCell(4).font = { bold: true, size: 13, color: { argb: 'FF2563EB' } };
-      feeProposalRow.getCell(4).fill = {
+      feeProposalRow.values = ['', 'FEE PROPOSAL', '', '', smartRound(primaryAFA.client_price), '', ''];
+      feeProposalRow.getCell(5).numFmt = '#,##0';
+      feeProposalRow.getCell(5).alignment = { horizontal: 'right' };
+      feeProposalRow.getCell(5).font = { bold: true, size: 13, color: { argb: 'FF2563EB' } };
+      feeProposalRow.getCell(5).fill = {
         type: 'pattern',
         pattern: 'solid',
         fgColor: { argb: 'FFDBEAFE' },
       };
-      feeProposalRow.getCell(1).font = { bold: true, size: 13, color: { argb: 'FF2563EB' } };
+      feeProposalRow.getCell(2).font = { bold: true, size: 13, color: { argb: 'FF2563EB' } };
       feeProposalRow.eachCell((cell) => {
         cell.border = {
           top: { style: 'thin', color: { argb: 'FF2563EB' } },

@@ -151,8 +151,9 @@ export function BurnSparkline({
   }, [snapshots, startDate, burnRatePerMonth]);
 
   // Determine color based on burn percentage
+  // Red only shows at 105%+ (marginally over budget is not alarming)
   const getColor = (percent: number) => {
-    if (percent > 100) return { fill: 'rgba(239, 68, 68, 0.3)', stroke: '#ef4444', stripeColor: '#ef4444' }; // red
+    if (percent > 105) return { fill: 'rgba(239, 68, 68, 0.3)', stroke: '#ef4444', stripeColor: '#ef4444' }; // red
     if (percent > 80) return { fill: 'rgba(245, 158, 11, 0.3)', stroke: '#f59e0b', stripeColor: '#f59e0b' }; // orange/warning
     return { fill: 'rgba(34, 197, 94, 0.3)', stroke: '#22c55e', stripeColor: '#22c55e' }; // green/success
   };
@@ -245,16 +246,25 @@ export function BurnSparkline({
     let drop = null;
     let proposalArea = '';
     
-    // When proposal is active, compare the raw burn (from snapshot) with adjusted burn (currentBurn)
-    // The dataPoints use snapshot values, so the last point reflects raw burn
-    // currentBurn reflects the proposal-adjusted value
-    if (hasActiveProposal && rawBurn !== undefined) {
-      const lastPoint = points[points.length - 1];
-      const rawY = scaleY(rawBurn);
-      const adjustedY = scaleY(currentBurn);
+    // When proposal is active, calculate the write-off amount to show the drop
+    if (hasActiveProposal && proposalData) {
+      const totalWriteOff = (proposalData.wip_write_off_amount || 0) + (proposalData.ar_write_off_amount || 0);
       
-      // Only show drop if there's a meaningful difference (more than 1 pixel)
-      if (Math.abs(rawY - adjustedY) > 1) {
+      // If there's any write-off in the proposal, show the drop segment
+      if (totalWriteOff > 0) {
+        const lastPoint = points[points.length - 1];
+        
+        // Calculate raw burn from the last snapshot data point
+        // (the dataPoints are built from snapshots which have raw values)
+        const lastDataPoint = dataPoints[dataPoints.length - 1];
+        const snapshotBurn = lastDataPoint?.burn || 0;
+        
+        // The adjusted burn is the snapshot burn minus the write-offs
+        const adjustedBurn = snapshotBurn - totalWriteOff;
+        
+        const rawY = scaleY(snapshotBurn);
+        const adjustedY = scaleY(Math.max(0, adjustedBurn));
+        
         // Drop segment: from raw burn point down to adjusted value
         drop = {
           x1: lastPoint.x,
@@ -264,7 +274,6 @@ export function BurnSparkline({
         };
         
         // Create a "proposal area" that shows the adjusted fill region
-        // This is the area from bottom to the adjusted burn level
         proposalArea = `M ${points[0].x} ${bottomY}`;
         proposalArea += ` L ${points[0].x} ${points[0].y}`;
         for (let i = 1; i < points.length - 1; i++) {
@@ -284,26 +293,36 @@ export function BurnSparkline({
       dropSegment: drop,
       proposalAreaD: proposalArea,
     };
-  }, [dataPoints, bmBudget, currentBurn, chartWidth, chartHeight, width, hasActiveProposal, rawBurn]);
+  }, [dataPoints, bmBudget, currentBurn, chartWidth, chartHeight, width, hasActiveProposal, proposalData]);
 
+  // Calculate the total write-off from proposal for tooltip display
+  const proposalWriteOff = proposalData 
+    ? (proposalData.wip_write_off_amount || 0) + (proposalData.ar_write_off_amount || 0)
+    : 0;
+  
   // Tooltip content
   const tooltipContent = (
     <div className="flex flex-col gap-1 text-xs">
       <div className="font-medium text-foreground">
         {formatCurrency(currentBurn, currency)}
-        {hasActiveProposal && rawBurn !== undefined && rawBurn !== currentBurn && (
+        {hasActiveProposal && proposalWriteOff > 0 && (
           <span className="text-muted-foreground font-normal ml-1">
-            (adj. from {formatCurrency(rawBurn, currency)})
+            (adj.)
           </span>
         )}
       </div>
+      {hasActiveProposal && proposalWriteOff > 0 && (
+        <div className="text-muted-foreground text-[10px]">
+          Write-off: {formatCurrency(proposalWriteOff, currency)}
+        </div>
+      )}
       {usdEquivalent !== undefined && currency !== 'USD' && (
         <div className="text-muted-foreground">
           ≈ {formatCurrency(usdEquivalent, 'USD')}
         </div>
       )}
       <div className={
-        adjustedBurnPercent > 100 ? 'text-destructive' :
+        adjustedBurnPercent > 105 ? 'text-destructive' :
         adjustedBurnPercent > 80 ? 'text-warning' : 'text-success'
       }>
         {adjustedBurnPercent.toFixed(0)}% of budget

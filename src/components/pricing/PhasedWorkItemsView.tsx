@@ -28,8 +28,7 @@ import {
   Folder,
   Copy,
   HelpCircle,
-  ArrowUp,
-  ArrowDown
+  GripVertical
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -309,21 +308,28 @@ export function PhasedWorkItemsView({
     onPhasesChange(newPhases);
   }, [items, phases, onItemsChange, onPhasesChange]);
 
-  // Move phase up or down
-  const movePhase = useCallback((phaseId: string, direction: 'up' | 'down') => {
-    const currentIndex = phases.findIndex(p => p.id === phaseId);
-    if (currentIndex === -1) return;
-    
-    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex < 0 || newIndex >= phases.length) return;
-    
-    const newPhases = [...phases];
-    [newPhases[currentIndex], newPhases[newIndex]] = [newPhases[newIndex], newPhases[currentIndex]];
+  // Handle phase drag end (for reordering phases)
+  const handlePhaseDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const activeId = active.id as string;
+    const overId = over.id as string;
+
+    // Only handle phase reordering (phase IDs start with 'phase-')
+    if (!activeId.startsWith('phase-') || !overId.startsWith('phase-')) return;
+
+    const activeIndex = phases.findIndex(p => p.id === activeId);
+    const overIndex = phases.findIndex(p => p.id === overId);
+
+    if (activeIndex === -1 || overIndex === -1) return;
+
+    const newPhases = arrayMove(phases, activeIndex, overIndex);
     onPhasesChange(newPhases);
   }, [phases, onPhasesChange]);
 
-  // Handle drag end
-  const handleDragEnd = useCallback((event: DragEndEvent) => {
+  // Handle item drag end (for reordering items within phases)
+  const handleItemDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -360,15 +366,16 @@ export function PhasedWorkItemsView({
   }, []);
 
   // Render phase section
-  const renderPhaseSection = (phaseId: string, phaseName: string, isUnassigned: boolean = false, phaseIndex: number = -1) => {
+  const renderPhaseSection = (phaseId: string, phaseName: string, isUnassigned: boolean = false) => {
     const categories = groupedItems[phaseId] || {};
     const totals = phaseTotals[phaseId] || { lower: 0, upper: 0, included: 0, total: 0 };
     const isExpanded = expandedPhases.has(phaseId);
     const phase = phases.find(p => p.id === phaseId);
     const hasExcludedItems = totals.included < totals.total;
     const orderedCategories = getOrderedCategories(categories);
-    const canMoveUp = !isUnassigned && phaseIndex > 0;
-    const canMoveDown = !isUnassigned && phaseIndex >= 0 && phaseIndex < phases.length - 1;
+
+    // Get drag handle props from context (if wrapped in SortablePhaseWrapper)
+    const dragContext = usePhaseDragHandle();
 
     // Don't render empty unassigned section
     if (isUnassigned && totals.total === 0) return null;
@@ -379,6 +386,15 @@ export function PhasedWorkItemsView({
           <CardHeader className="py-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
+                {!isUnassigned && !viewingHistoricalVersion && dragContext && (
+                  <div 
+                    className="cursor-grab active:cursor-grabbing"
+                    {...dragContext.attributes}
+                    {...dragContext.listeners}
+                  >
+                    <GripVertical className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                )}
                 {!viewingHistoricalVersion && (
                   <Checkbox
                     checked={!hasExcludedItems && totals.total > 0}
@@ -434,44 +450,6 @@ export function PhasedWorkItemsView({
                 </span>
                 {!isUnassigned && !viewingHistoricalVersion && (
                   <div className="flex items-center gap-1">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            disabled={!canMoveUp}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              movePhase(phaseId, 'up');
-                            }}
-                          >
-                            <ArrowUp className="h-3.5 w-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Move phase up</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7"
-                            disabled={!canMoveDown}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              movePhase(phaseId, 'down');
-                            }}
-                          >
-                            <ArrowDown className="h-3.5 w-3.5" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Move phase down</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
                     <Button
                       size="icon"
                       variant="ghost"
@@ -516,7 +494,7 @@ export function PhasedWorkItemsView({
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
-                  onDragEnd={handleDragEnd}
+                  onDragEnd={handleItemDragEnd}
                 >
                   <TableScrollControls>
                     <div className="overflow-x-auto">
@@ -722,9 +700,32 @@ export function PhasedWorkItemsView({
         )}
       </div>
 
-      {/* Phase sections */}
-      <div className="space-y-3">
-        {phases.map((phase, index) => renderPhaseSection(phase.id, phase.name, false, index))}
+      {/* Phase sections with drag-and-drop */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handlePhaseDragEnd}
+      >
+        <SortableContext
+          items={phases.map(p => p.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-3">
+            {phases.map((phase) => (
+              <SortablePhaseWrapper 
+                key={phase.id} 
+                phaseId={phase.id}
+                disabled={viewingHistoricalVersion}
+              >
+                {renderPhaseSection(phase.id, phase.name, false)}
+              </SortablePhaseWrapper>
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+      
+      {/* Unassigned section (not draggable) */}
+      <div className="mt-3">
         {renderPhaseSection('unassigned', 'Unassigned Items', true)}
       </div>
 
@@ -793,10 +794,55 @@ export function PhasedWorkItemsView({
   );
 }
 
-// Inline table cells component for items within the phased view
+// Sortable wrapper for phase cards - uses context to pass drag handle listeners
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Calculator, Building2 } from 'lucide-react';
+
+interface SortablePhaseWrapperProps {
+  phaseId: string;
+  disabled: boolean;
+  children: React.ReactNode;
+}
+
+// Create a context to pass drag handle props to the phase section
+const PhaseDragContext = React.createContext<{
+  attributes: Record<string, any>;
+  listeners: Record<string, any> | undefined;
+} | null>(null);
+
+function SortablePhaseWrapper({ phaseId, disabled, children }: SortablePhaseWrapperProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: phaseId, disabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 10 : undefined,
+  };
+
+  return (
+    <PhaseDragContext.Provider value={{ attributes, listeners }}>
+      <div ref={setNodeRef} style={style}>
+        {children}
+      </div>
+    </PhaseDragContext.Provider>
+  );
+}
+
+// Hook to use the phase drag handle in child components
+function usePhaseDragHandle() {
+  return React.useContext(PhaseDragContext);
+}
+
+// Inline table cells component for items within the phased view
+import { Calculator, Building2 } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';

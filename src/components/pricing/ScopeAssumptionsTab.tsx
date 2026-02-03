@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { FileText, Clock, Users, Scale, Sparkles, Pencil, Check, X, ChevronDown, ChevronRight, File, Plus, Trash2 } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { FileText, Clock, Users, Scale, Sparkles, Pencil, Check, X, ChevronDown, ChevronRight, File, Plus, Trash2, Briefcase } from "lucide-react";
 import { DraftProposalItem, CustomAssumption } from "@/lib/hooks/usePricingProposals";
 
 // Simple assumptions (non-document-specific)
@@ -337,7 +338,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
   timeline: <Clock className="h-4 w-4" />,
   scope: <Scale className="h-4 w-4" />,
   process: <Users className="h-4 w-4" />,
-  local_counsel: <Users className="h-4 w-4" />,
+  local_counsel: <Briefcase className="h-4 w-4" />,
   documentation: <FileText className="h-4 w-4" />,
 };
 
@@ -590,6 +591,50 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
     });
   };
 
+  // Special handler for mutually exclusive local counsel assumptions (radio button behavior)
+  const selectLocalCounselAssumption = (assumptionId: string) => {
+    const LOCAL_COUNSEL_IDS = ['lc_bm_onbill', 'lc_direct_billing'];
+    const def = SIMPLE_ASSUMPTIONS.find(a => a.id === assumptionId);
+    if (!def) return;
+
+    const newAssumptions = (state.simpleAssumptions || []).map(a => {
+      if (LOCAL_COUNSEL_IDS.includes(a.assumptionId)) {
+        // Enable the selected one, disable the other
+        const isSelected = a.assumptionId === assumptionId;
+        const matchingDef = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
+        return { 
+          ...a, 
+          enabled: isSelected,
+          narrative: isSelected && matchingDef ? matchingDef.narrativeTemplate() : '',
+        };
+      }
+      return a;
+    });
+
+    updateState({
+      ...state,
+      noAssumptionsApply: false,
+      simpleAssumptions: newAssumptions,
+    });
+  };
+
+  // Clear local counsel selection (allow deselecting)
+  const clearLocalCounselAssumption = () => {
+    const LOCAL_COUNSEL_IDS = ['lc_bm_onbill', 'lc_direct_billing'];
+    
+    const newAssumptions = (state.simpleAssumptions || []).map(a => {
+      if (LOCAL_COUNSEL_IDS.includes(a.assumptionId)) {
+        return { ...a, enabled: false, narrative: '' };
+      }
+      return a;
+    });
+
+    updateState({
+      ...state,
+      simpleAssumptions: newAssumptions,
+    });
+  };
+
   const updateSimpleInputValue = (assumptionId: string, inputValue: string) => {
     const def = SIMPLE_ASSUMPTIONS.find(a => a.id === assumptionId);
     if (!def) return;
@@ -826,6 +871,11 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
   const groupedGeneral = groupByCategory(generalAssumptions);
   const groupedSectorSpecific = groupByCategory(sectorSpecificAssumptions);
 
+  // Get currently selected local counsel assumption ID (for radio group)
+  const selectedLocalCounselId = (state.simpleAssumptions || [])
+    .find(a => ['lc_bm_onbill', 'lc_direct_billing'].includes(a.assumptionId) && a.enabled)
+    ?.assumptionId || '';
+
   const renderAssumptionGroup = (groupedAssumptions: Record<string, SimpleAssumption[]>) => (
     <div className="grid gap-6 lg:grid-cols-2">
       {Object.entries(groupedAssumptions).map(([category, assumptions]) => (
@@ -837,53 +887,91 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {assumptions.map(def => {
-              const assumption = (state.simpleAssumptions || []).find(a => a.assumptionId === def.id);
-              const isEnabled = assumption?.enabled || false;
-              const inputValue = assumption?.inputValue;
-
-              return (
-                <div key={def.id} className="space-y-2">
-                  <div className="flex items-start space-x-3">
-                    <Checkbox 
-                      id={def.id}
-                      checked={isEnabled}
-                      onCheckedChange={(checked) => toggleSimpleAssumption(def.id, !!checked)}
-                      className="mt-0.5"
-                    />
-                    <div className="flex-1 space-y-1">
-                      <Label htmlFor={def.id} className="text-sm font-medium cursor-pointer">
-                        {def.label}
-                      </Label>
-                      <p className="text-xs text-muted-foreground">{def.description}</p>
+            {/* Special handling for local_counsel category - use radio buttons */}
+            {category === 'local_counsel' ? (
+              <div className="space-y-3">
+                <RadioGroup
+                  value={selectedLocalCounselId}
+                  onValueChange={(value) => selectLocalCounselAssumption(value)}
+                >
+                  {assumptions.map(def => (
+                    <div key={def.id} className="flex items-start space-x-3">
+                      <RadioGroupItem 
+                        value={def.id} 
+                        id={def.id}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1 space-y-1">
+                        <Label htmlFor={def.id} className="text-sm font-medium cursor-pointer">
+                          {def.label}
+                        </Label>
+                        <p className="text-xs text-muted-foreground">{def.description}</p>
+                      </div>
                     </div>
+                  ))}
+                </RadioGroup>
+                {selectedLocalCounselId && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={clearLocalCounselAssumption}
+                    className="text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Clear selection
+                  </Button>
+                )}
+              </div>
+            ) : (
+              /* Standard checkbox rendering for other categories */
+              assumptions.map(def => {
+                const assumption = (state.simpleAssumptions || []).find(a => a.assumptionId === def.id);
+                const isEnabled = assumption?.enabled || false;
+                const inputValue = assumption?.inputValue;
+
+                return (
+                  <div key={def.id} className="space-y-2">
+                    <div className="flex items-start space-x-3">
+                      <Checkbox 
+                        id={def.id}
+                        checked={isEnabled}
+                        onCheckedChange={(checked) => toggleSimpleAssumption(def.id, !!checked)}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1 space-y-1">
+                        <Label htmlFor={def.id} className="text-sm font-medium cursor-pointer">
+                          {def.label}
+                        </Label>
+                        <p className="text-xs text-muted-foreground">{def.description}</p>
+                      </div>
+                    </div>
+
+                    {isEnabled && def.requiresInput && (
+                      <div className="ml-7 mt-2">
+                        <Label className="text-xs text-muted-foreground">{def.inputLabel}</Label>
+                        {def.inputType === 'select' && def.inputOptions && (
+                          <Select
+                            value={inputValue || ''}
+                            onValueChange={(val) => updateSimpleInputValue(def.id, val)}
+                          >
+                            <SelectTrigger className="h-8 text-sm mt-1">
+                              <SelectValue placeholder="Select..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {def.inputOptions.map(opt => (
+                                <SelectItem key={opt.value} value={opt.value}>
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    )}
                   </div>
-
-                  {isEnabled && def.requiresInput && (
-                    <div className="ml-7 mt-2">
-                      <Label className="text-xs text-muted-foreground">{def.inputLabel}</Label>
-                      {def.inputType === 'select' && def.inputOptions && (
-                        <Select
-                          value={inputValue || ''}
-                          onValueChange={(val) => updateSimpleInputValue(def.id, val)}
-                        >
-                          <SelectTrigger className="h-8 text-sm mt-1">
-                            <SelectValue placeholder="Select..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {def.inputOptions.map(opt => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </CardContent>
         </Card>
       ))}

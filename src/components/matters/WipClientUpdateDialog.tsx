@@ -85,6 +85,19 @@ interface MatterEmailData {
   currentPaid: number;
   totalBudgetUtilised: number; // WIP + AR + Paid (all time)
   agreedBudget: number;
+  isMultiClient: boolean; // Track if this matter is multi-client
+}
+
+// Amalgamated email for multiple matters of the same client
+interface AmalgamatedEmailData {
+  clientId: string;
+  clientName: string;
+  feeCurrency: string;
+  billingContacts: BillingContact[];
+  matterNames: string[];
+  matterIds: string[];
+  combinedNarrative: string;
+  isAmalgamated: boolean;
 }
 
 type WizardStep = "select-matters" | "billing-contacts" | "welcome-paragraph" | "matter-details" | "review-emails" | "complete";
@@ -119,6 +132,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [contactSearch, setContactSearch] = useState("");
+  const [amalgamatedNarrativeOverrides, setAmalgamatedNarrativeOverrides] = useState<Map<number, string>>(new Map());
 
   // Filter to only show Live matters
   const liveMatters = useMemo(() => 
@@ -135,6 +149,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
       setWelcomeParagraph(defaultTemplate?.content || "");
       setSelectedTemplateId(defaultTemplate?.id || null);
       setCurrentEmailIndex(0);
+      setAmalgamatedNarrativeOverrides(new Map());
     }
   }, [open, defaultTemplate]);
 
@@ -187,11 +202,84 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
     [liveMatters, selectedMatterIds]
   );
 
-  // Emails for review
-  const emailsForReview = useMemo(() => 
-    Array.from(matterEmailData.values()),
-    [matterEmailData]
-  );
+  // Amalgamated emails for review - group sole-client matters by client
+  const emailsForReview = useMemo((): AmalgamatedEmailData[] => {
+    const matterDataArray = Array.from(matterEmailData.values());
+    
+    // Group single-client matters by client
+    const clientGroups = new Map<string, MatterEmailData[]>();
+    const standaloneMultiClientMatters: MatterEmailData[] = [];
+    
+    matterDataArray.forEach(data => {
+      if (data.isMultiClient) {
+        // Multi-client matters get their own email
+        standaloneMultiClientMatters.push(data);
+      } else {
+        // Group by client
+        const existing = clientGroups.get(data.clientId) || [];
+        existing.push(data);
+        clientGroups.set(data.clientId, existing);
+      }
+    });
+    
+    const amalgamatedEmails: AmalgamatedEmailData[] = [];
+    
+    // Process client groups - amalgamate if more than one matter
+    clientGroups.forEach((matters, clientId) => {
+      if (matters.length === 1) {
+        // Single matter for this client - no amalgamation needed
+        const m = matters[0];
+        amalgamatedEmails.push({
+          clientId: m.clientId,
+          clientName: m.clientName,
+          feeCurrency: m.feeCurrency,
+          billingContacts: m.billingContacts,
+          matterNames: [m.matterName],
+          matterIds: [m.matterId],
+          combinedNarrative: m.generatedNarrative,
+          isAmalgamated: false,
+        });
+      } else {
+        // Multiple matters for this client - amalgamate
+        const firstMatter = matters[0];
+        // Combine narratives with matter headers (plain text formatting)
+        const combinedNarrative = matters.map(m => 
+          `${m.matterName.toUpperCase()}\n${"─".repeat(Math.min(m.matterName.length, 40))}\n${m.generatedNarrative}`
+        ).join("\n\n");
+        
+        amalgamatedEmails.push({
+          clientId,
+          clientName: firstMatter.clientName,
+          feeCurrency: firstMatter.feeCurrency,
+          billingContacts: firstMatter.billingContacts,
+          matterNames: matters.map(m => m.matterName),
+          matterIds: matters.map(m => m.matterId),
+          combinedNarrative,
+          isAmalgamated: true,
+        });
+      }
+    });
+    
+    // Add multi-client matters as standalone emails
+    standaloneMultiClientMatters.forEach(m => {
+      amalgamatedEmails.push({
+        clientId: m.clientId,
+        clientName: m.clientName,
+        feeCurrency: m.feeCurrency,
+        billingContacts: m.billingContacts,
+        matterNames: [m.matterName],
+        matterIds: [m.matterId],
+        combinedNarrative: m.generatedNarrative,
+        isAmalgamated: false,
+      });
+    });
+    
+    // Apply narrative overrides
+    return amalgamatedEmails.map((email, idx) => ({
+      ...email,
+      combinedNarrative: amalgamatedNarrativeOverrides.get(idx) ?? email.combinedNarrative,
+    }));
+  }, [matterEmailData, amalgamatedNarrativeOverrides]);
 
   // Toggle matter selection
   const toggleMatter = (matterId: string) => {
@@ -255,6 +343,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         currentPaid,
         totalBudgetUtilised: currentWip + currentAr + currentPaid,
         agreedBudget: matter.agreed_budget_amount || 0,
+        isMultiClient: (matter as any).is_multi_client || false,
       });
     });
 
@@ -384,7 +473,8 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
     setIsExporting(true);
 
     try {
-      const emails = Array.from(matterEmailData.values());
+      // Use the amalgamated emails for export
+      const emails = emailsForReview;
       
       for (let i = 0; i < emails.length; i++) {
         const emailData = emails[i];
@@ -400,34 +490,49 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         
         // Build full email body
         let fullBody = `${greeting}\n\n`;
+        
+        // For amalgamated emails, list the matter names at the top
+        if (emailData.isAmalgamated) {
+          fullBody += `This update covers the following matters:\n`;
+          emailData.matterNames.forEach(name => {
+            fullBody += `• ${name}\n`;
+          });
+          fullBody += `\n`;
+        }
+        
         if (welcomeParagraph) {
           fullBody += `${welcomeParagraph}\n\n`;
         }
-        fullBody += emailData.generatedNarrative;
+        fullBody += emailData.combinedNarrative;
         
         if (emailSignature) {
           fullBody += `\n\n${emailSignature}`;
         }
 
-        // Subject line
-        const subject = `Budget Utilization Update - ${emailData.matterName}`;
+        // Subject line - generic for amalgamated, specific for single matter
+        const subject = emailData.isAmalgamated 
+          ? `Work in Progress Update - ${emailData.clientName}`
+          : `Budget Utilization Update - ${emailData.matterNames[0]}`;
 
-        // Log the email - use a very old date for "from beginning" since column is NOT NULL
-        const periodStartForLog = emailData.reviewPeriodStart 
-          ? format(emailData.reviewPeriodStart, "yyyy-MM-dd")
-          : "1900-01-01"; // Placeholder for "from beginning"
+        // Log the email for each matter in the amalgamated email
+        for (const matterId of emailData.matterIds) {
+          const matterData = matterEmailData.get(matterId);
+          const periodStartForLog = matterData?.reviewPeriodStart 
+            ? format(matterData.reviewPeriodStart, "yyyy-MM-dd")
+            : "1900-01-01";
 
-        await createLogEntry.mutateAsync({
-          matter_id: emailData.matterId,
-          client_id: emailData.clientId,
-          recipient_emails: recipientEmails,
-          recipient_names: recipientNames,
-          subject,
-          body: fullBody,
-          review_period_start: periodStartForLog,
-          review_period_end: format(emailData.reviewPeriodEnd, "yyyy-MM-dd"),
-          welcome_template_id: selectedTemplateId,
-        });
+          await createLogEntry.mutateAsync({
+            matter_id: matterId,
+            client_id: emailData.clientId,
+            recipient_emails: recipientEmails,
+            recipient_names: recipientNames,
+            subject,
+            body: fullBody,
+            review_period_start: periodStartForLog,
+            review_period_end: format(matterData?.reviewPeriodEnd || new Date(), "yyyy-MM-dd"),
+            welcome_template_id: selectedTemplateId,
+          });
+        }
 
         // Open mailto with delay to avoid browser blocking
         setTimeout(() => {
@@ -508,6 +613,15 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
       generatedNarrative: narrative,
     });
     setMatterEmailData(newData);
+  };
+
+  // Update amalgamated email narrative
+  const updateAmalgamatedNarrative = (emailIndex: number, narrative: string) => {
+    setAmalgamatedNarrativeOverrides(prev => {
+      const next = new Map(prev);
+      next.set(emailIndex, narrative);
+      return next;
+    });
   };
 
   // Regenerate single email
@@ -1049,26 +1163,39 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => regenerateSingleEmail(currentEmail.matterId)}
-                disabled={isGenerating}
-              >
-                {isGenerating ? (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                )}
-                Regenerate
-              </Button>
+              {!currentEmail.isAmalgamated && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => regenerateSingleEmail(currentEmail.matterIds[0])}
+                  disabled={isGenerating}
+                >
+                  {isGenerating ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                  )}
+                  Regenerate
+                </Button>
+              )}
             </div>
 
             <Card>
               <CardContent className="pt-4 space-y-3">
                 <div>
-                  <Label className="text-xs text-muted-foreground">Matter</Label>
-                  <p className="font-medium">{currentEmail.matterName}</p>
+                  <Label className="text-xs text-muted-foreground">
+                    {currentEmail.isAmalgamated ? "Matters" : "Matter"}
+                  </Label>
+                  {currentEmail.isAmalgamated ? (
+                    <div className="space-y-1">
+                      {currentEmail.matterNames.map((name, idx) => (
+                        <p key={idx} className="font-medium">• {name}</p>
+                      ))}
+                      <Badge variant="secondary" className="mt-2">Amalgamated Email</Badge>
+                    </div>
+                  ) : (
+                    <p className="font-medium">{currentEmail.matterNames[0]}</p>
+                  )}
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">To</Label>
@@ -1078,7 +1205,11 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Subject</Label>
-                  <p className="text-sm">{currentEmail.matterName} - Work in Progress Financial Update</p>
+                  <p className="text-sm">
+                    {currentEmail.isAmalgamated 
+                      ? `Work in Progress Update - ${currentEmail.clientName}`
+                      : `${currentEmail.matterNames[0]} - Work in Progress Financial Update`}
+                  </p>
                 </div>
                 <Separator />
                 <div>
@@ -1087,12 +1218,20 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
                     <p className="font-medium mb-2">
                       Dear {currentEmail.billingContacts.map(c => formatDisplayName(c.name).split(" ")[0]).join(", ")},
                     </p>
+                    {currentEmail.isAmalgamated && (
+                      <div className="mb-3">
+                        <p>This update covers the following matters:</p>
+                        {currentEmail.matterNames.map((name, idx) => (
+                          <p key={idx}>• {name}</p>
+                        ))}
+                      </div>
+                    )}
                     {welcomeParagraph && (
                       <p className="mb-3">{welcomeParagraph}</p>
                     )}
                     <Textarea
-                      value={currentEmail.generatedNarrative}
-                      onChange={(e) => updateNarrative(currentEmail.matterId, e.target.value)}
+                      value={currentEmail.combinedNarrative}
+                      onChange={(e) => updateAmalgamatedNarrative(currentEmailIndex, e.target.value)}
                       className="min-h-[120px] bg-background"
                     />
                     {emailSignature && (

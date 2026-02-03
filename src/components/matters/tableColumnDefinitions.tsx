@@ -15,6 +15,7 @@ import { formatCurrency, convertToUsd } from '@/lib/currencyUtils';
 import { getClientDisplayName } from '@/lib/clientUtils';
 import { ProgressSlider } from './ProgressSlider';
 import { HighlightedFinancialValue } from './HighlightedFinancialValue';
+import { BurnSparkline } from './BurnSparkline';
 import { MatterWithFinancials, MatterCategory } from '@/lib/hooks/useMatters';
 
 // Types for column definitions
@@ -291,11 +292,11 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     },
   },
 
-  // BM Burn - Live only
+  // BM Burn - Live only (with sparkline chart)
   bm_burn: {
     id: 'bm_burn',
     categories: ['Live'],
-    headerClassName: 'text-right min-w-[75px]',
+    headerClassName: 'text-right min-w-[95px]',
     cellClassName: (ctx) => cn(
       "text-right",
       (ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
@@ -305,24 +306,22 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     ),
     renderCell: (ctx) => {
       const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
+      const bmBudget = (ctx.matter as any).effective_bm_fee || ctx.matter.bm_fee_component || 0;
+      const burnPercent = 100 - ((ctx.matter as any).bm_headroom_percent || 0);
+      const usdEquivalent = currency !== 'USD' 
+        ? convertToUsd(ctx.budgetBurn, currency, ctx.matter.exchange_rate, ctx.gbpToUsdRate, ctx.liveRates)
+        : undefined;
+      
       return (
-        <div className="flex flex-col items-end">
-          <span className="text-muted-foreground">
-            {formatCurrency(ctx.budgetBurn, currency)}
-          </span>
-          {currency !== 'USD' && (
-            <span className="text-[10px] text-muted-foreground/70">
-              ≈ {formatCurrency(convertToUsd(ctx.budgetBurn, currency, ctx.matter.exchange_rate, ctx.gbpToUsdRate, ctx.liveRates), 'USD')}
-            </span>
-          )}
-          <span className={cn(
-            "text-[10px]",
-            (100 - ((ctx.matter as any).bm_headroom_percent || 0)) > 100 ? "text-danger" :
-            (100 - ((ctx.matter as any).bm_headroom_percent || 0)) > 80 ? "text-warning" : "text-success"
-          )}>
-            {(100 - ((ctx.matter as any).bm_headroom_percent || 0)).toFixed(0)}%
-          </span>
-        </div>
+        <BurnSparkline
+          snapshots={(ctx.matter as any).snapshot_history || []}
+          bmBudget={bmBudget}
+          currentBurn={ctx.budgetBurn}
+          currency={currency}
+          burnPercent={burnPercent}
+          usdEquivalent={usdEquivalent}
+          startDate={ctx.matter.start_date}
+        />
       );
     },
   },

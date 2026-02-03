@@ -82,6 +82,14 @@ export interface LocalCounselBrief {
   billed_amount: number;
 }
 
+export interface SnapshotHistoryPoint {
+  as_of_date: string;
+  wip_amount: number;
+  wip_write_off_amount: number;
+  accounts_receivable: number;
+  paid_amount: number;
+}
+
 export interface MatterWithFinancials extends Matter {
   latest_snapshot?: {
     wip_amount: number;
@@ -103,6 +111,8 @@ export interface MatterWithFinancials extends Matter {
     as_of_date: string;
     update_source?: string | null;
   };
+  // All historical snapshots for sparkline charts
+  snapshot_history?: SnapshotHistoryPoint[];
   remaining_budget: number;
   budget_used_percent: number;
   collection_rate: number;
@@ -207,10 +217,22 @@ export function useMatters() {
 
       // Create a map of matter_id to latest snapshot
       const snapshotMap = new Map<string, any>();
+      // Also create a map of matter_id to ALL snapshots for sparkline history
+      const snapshotHistoryMap = new Map<string, SnapshotHistoryPoint[]>();
       snapshots?.forEach(snap => {
         if (!snapshotMap.has(snap.matter_id)) {
           snapshotMap.set(snap.matter_id, snap);
         }
+        // Add to history map
+        const history = snapshotHistoryMap.get(snap.matter_id) || [];
+        history.push({
+          as_of_date: snap.as_of_date,
+          wip_amount: snap.wip_amount || 0,
+          wip_write_off_amount: snap.wip_write_off_amount || 0,
+          accounts_receivable: snap.accounts_receivable || 0,
+          paid_amount: snap.paid_amount || 0,
+        });
+        snapshotHistoryMap.set(snap.matter_id, history);
       });
       
       // Create a map of matter_id to aggregated LC financials and full LC list
@@ -387,6 +409,8 @@ export function useMatters() {
           // Include proposal info for highlighting in master table
           selected_proposal: selectedProposal || null,
           show_shaping_proposal: (matter as any).show_shaping_proposal || false,
+          // Include snapshot history for sparkline charts
+          snapshot_history: snapshotHistoryMap.get(matter.id) || [],
         } as MatterWithFinancials;
       }) || [];
     },

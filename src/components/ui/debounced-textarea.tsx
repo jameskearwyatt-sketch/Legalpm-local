@@ -19,6 +19,9 @@ export const DebouncedTextarea = React.forwardRef<HTMLTextAreaElement, Debounced
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
     const isFirstMount = useRef(true);
     
+    // Track the last value we sent to parent to detect external changes
+    const lastSentValueRef = useRef<string>(value);
+    
     // Sync local state when value prop changes from parent
     // (e.g., after save/load, or when item is replaced)
     useEffect(() => {
@@ -28,10 +31,11 @@ export const DebouncedTextarea = React.forwardRef<HTMLTextAreaElement, Debounced
         return;
       }
       
-      // Only sync if the change came from outside (not from our own debounced update)
-      // We detect this by checking if there's no pending debounce
-      if (!debounceTimerRef.current) {
+      // Only sync if the value changed externally (not from our own update)
+      // Compare against the last value we sent to parent
+      if (value !== lastSentValueRef.current) {
         setLocalValue(value);
+        lastSentValueRef.current = value;
       }
     }, [value]);
     
@@ -47,6 +51,7 @@ export const DebouncedTextarea = React.forwardRef<HTMLTextAreaElement, Debounced
       // Set new debounce timer
       debounceTimerRef.current = setTimeout(() => {
         debounceTimerRef.current = null;
+        lastSentValueRef.current = newValue; // Track what we're sending
         onChange(newValue);
       }, debounceMs);
     }, [onChange, debounceMs]);
@@ -58,6 +63,7 @@ export const DebouncedTextarea = React.forwardRef<HTMLTextAreaElement, Debounced
         debounceTimerRef.current = null;
       }
       if (localValue !== value) {
+        lastSentValueRef.current = localValue; // Track what we're sending
         onChange(localValue);
       }
     }, [localValue, value, onChange]);

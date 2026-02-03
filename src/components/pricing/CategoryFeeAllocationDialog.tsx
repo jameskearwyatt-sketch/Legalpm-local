@@ -10,10 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import { ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { DraftProposalItem } from '@/lib/hooks/usePricingProposals';
 
 // Smart rounding: nearest 100 for <10k, nearest 1000 for >=10k
 function smartRound(value: number): number {
@@ -102,16 +100,112 @@ function distributeProRata(
   return result;
 }
 
+// Two-tier distribution: first by category, then by items within each category
+function distributeTwoTier(
+  items: { index: number; currentFee: number; category: string }[],
+  targetTotal: number
+): Map<number, number> {
+  const result = new Map<number, number>();
+  
+  if (items.length === 0) return result;
+  
+  // Group items by category
+  const categoryGroups = new Map<string, { index: number; currentFee: number }[]>();
+  items.forEach(item => {
+    const existing = categoryGroups.get(item.category) || [];
+    existing.push({ index: item.index, currentFee: item.currentFee });
+    categoryGroups.set(item.category, existing);
+  });
+  
+  // Calculate current category totals
+  const categoryTotals: { category: string; total: number }[] = [];
+  categoryGroups.forEach((groupItems, category) => {
+    const total = groupItems.reduce((sum, item) => sum + item.currentFee, 0);
+    categoryTotals.push({ category, total });
+  });
+  
+  const currentGrandTotal = categoryTotals.reduce((sum, c) => sum + c.total, 0);
+  
+  // First tier: distribute target across categories pro-rata
+  const categoryTargets = new Map<string, number>();
+  
+  if (currentGrandTotal === 0) {
+    // Equal distribution across categories
+    const equalShare = targetTotal / categoryTotals.length;
+    const roundedShare = smartRound(equalShare);
+    let distributed = 0;
+    categoryTotals.forEach((cat, idx) => {
+      if (idx === categoryTotals.length - 1) {
+        categoryTargets.set(cat.category, targetTotal - distributed);
+      } else {
+        categoryTargets.set(cat.category, roundedShare);
+        distributed += roundedShare;
+      }
+    });
+  } else {
+    // Pro-rata by current category totals
+    const categoryShares = categoryTotals.map(cat => ({
+      category: cat.category,
+      proportion: cat.total / currentGrandTotal,
+      exactShare: (cat.total / currentGrandTotal) * targetTotal,
+    }));
+    
+    const roundedCategoryShares = categoryShares.map(share => ({
+      ...share,
+      rounded: smartRound(share.exactShare),
+      remainder: share.exactShare - smartRound(share.exactShare),
+    }));
+    
+    // Reconcile category discrepancy
+    const totalCategoryRounded = roundedCategoryShares.reduce((sum, s) => sum + s.rounded, 0);
+    let categoryDiscrepancy = targetTotal - totalCategoryRounded;
+    
+    const sortedCategories = [...roundedCategoryShares].sort((a, b) =>
+      categoryDiscrepancy > 0 ? b.remainder - a.remainder : a.remainder - b.remainder
+    );
+    
+    const catIncrement = targetTotal / categoryTotals.length >= 10000 ? 1000 : 100;
+    
+    sortedCategories.forEach(share => {
+      if (Math.abs(categoryDiscrepancy) >= catIncrement) {
+        const adjustment = categoryDiscrepancy > 0 ? catIncrement : -catIncrement;
+        share.rounded += adjustment;
+        categoryDiscrepancy -= adjustment;
+      }
+    });
+    
+    if (categoryDiscrepancy !== 0 && sortedCategories.length > 0) {
+      sortedCategories[0].rounded += categoryDiscrepancy;
+    }
+    
+    roundedCategoryShares.forEach(share => {
+      categoryTargets.set(share.category, share.rounded);
+    });
+  }
+  
+  // Second tier: distribute each category's target across its items
+  categoryGroups.forEach((groupItems, category) => {
+    const categoryTarget = categoryTargets.get(category) ?? 0;
+    const itemAllocations = distributeProRata(groupItems, categoryTarget);
+    itemAllocations.forEach((value, index) => {
+      result.set(index, value);
+    });
+  });
+  
+  return result;
+}
+
 interface CategoryFeeAllocationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  categoryName: string;
-  phaseName: string | null; // null for aggregate
+  categoryName: string | null; // null for subtotal edit
+  phaseName: string | null;
   currentTotal: number;
-  affectedItems: { index: number; workItem: string; currentFee: number }[];
+  affectedItems: { index: number; workItem: string; currentFee: number; category: string }[];
   formatCurrency: (value: number) => string;
   currencySymbol: string;
   onApply: (allocations: Map<number, number>) => void;
+  isSubtotalEdit?: boolean; // true = editing phase subtotal, false = editing single category
 }
 
 export function CategoryFeeAllocationDialog({
@@ -124,6 +218,7 @@ export function CategoryFeeAllocationDialog({
   formatCurrency,
   currencySymbol,
   onApply,
+  isSubtotalEdit = false,
 }: CategoryFeeAllocationDialogProps) {
   const [newTotalInput, setNewTotalInput] = useState('');
   
@@ -142,15 +237,18 @@ export function CategoryFeeAllocationDialog({
   const difference = newTotal - currentTotal;
   const percentChange = currentTotal > 0 ? (difference / currentTotal) * 100 : 0;
   
-  // Preview allocations
+  // Preview allocations - use two-tier for subtotal, single-tier for category
   const previewAllocations = useMemo(() => {
+    if (isSubtotalEdit) {
+      return distributeTwoTier(affectedItems, newTotal);
+    }
     return distributeProRata(
       affectedItems.map(item => ({ index: item.index, currentFee: item.currentFee })),
       newTotal
     );
-  }, [affectedItems, newTotal]);
+  }, [affectedItems, newTotal, isSubtotalEdit]);
   
-  // Preview items with new values
+  // Preview items with new values, grouped by category for subtotal view
   const previewItems = useMemo(() => {
     return affectedItems.map(item => ({
       ...item,
@@ -158,6 +256,19 @@ export function CategoryFeeAllocationDialog({
       change: (previewAllocations.get(item.index) ?? item.currentFee) - item.currentFee,
     }));
   }, [affectedItems, previewAllocations]);
+  
+  // Group items by category for subtotal preview
+  const groupedPreviewItems = useMemo(() => {
+    if (!isSubtotalEdit) return null;
+    
+    const groups = new Map<string, typeof previewItems>();
+    previewItems.forEach(item => {
+      const existing = groups.get(item.category) || [];
+      existing.push(item);
+      groups.set(item.category, existing);
+    });
+    return groups;
+  }, [previewItems, isSubtotalEdit]);
   
   const formatNumber = (value: string): string => {
     const num = parseFloat(value.replace(/,/g, ''));
@@ -172,23 +283,25 @@ export function CategoryFeeAllocationDialog({
   
   const hasChanges = difference !== 0;
   
+  // Build dialog title and description
+  const dialogTitle = isSubtotalEdit ? 'Adjust Phase Subtotal' : 'Adjust Category Fee';
+  const dialogDescription = isSubtotalEdit
+    ? <>Adjust the subtotal for <strong>{phaseName}</strong>. The change will be distributed pro-rata across categories first, then within each category across {affectedItems.length} work item(s).</>
+    : <>Adjust the total fee for <strong>{categoryName}</strong>{phaseName && <> in <strong>{phaseName}</strong></>}. The change will be distributed pro-rata across {affectedItems.length} work item(s).</>;
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-[650px] max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Adjust Category Fee</DialogTitle>
-          <DialogDescription>
-            Adjust the total fee for <strong>{categoryName}</strong>
-            {phaseName && <> in <strong>{phaseName}</strong></>}.
-            The change will be distributed pro-rata across {affectedItems.length} work item(s).
-          </DialogDescription>
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4 overflow-y-auto flex-1">
           {/* Current vs New Total */}
           <div className="grid grid-cols-3 gap-4 items-center">
             <div className="text-center">
-              <Label className="text-xs text-muted-foreground">Current Total</Label>
+              <Label className="text-xs text-muted-foreground">Current {isSubtotalEdit ? 'Subtotal' : 'Total'}</Label>
               <div className="text-lg font-semibold">{formatCurrency(currentTotal)}</div>
             </div>
             
@@ -197,7 +310,7 @@ export function CategoryFeeAllocationDialog({
             </div>
             
             <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">New Total ({currencySymbol})</Label>
+              <Label className="text-xs text-muted-foreground">New {isSubtotalEdit ? 'Subtotal' : 'Total'} ({currencySymbol})</Label>
               <Input
                 type="text"
                 value={formatNumber(newTotalInput)}
@@ -234,10 +347,11 @@ export function CategoryFeeAllocationDialog({
               <div className="px-3 py-2 bg-muted/50 border-b">
                 <span className="text-sm font-medium">Preview Allocation</span>
               </div>
-              <div className="max-h-[200px] overflow-y-auto">
+              <div className="max-h-[250px] overflow-y-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-background">
                     <tr className="border-b">
+                      {isSubtotalEdit && <th className="text-left px-3 py-2 font-medium">Category</th>}
                       <th className="text-left px-3 py-2 font-medium">Work Item</th>
                       <th className="text-right px-3 py-2 font-medium">Current</th>
                       <th className="text-right px-3 py-2 font-medium">New</th>
@@ -245,25 +359,61 @@ export function CategoryFeeAllocationDialog({
                     </tr>
                   </thead>
                   <tbody>
-                    {previewItems.map((item, idx) => (
-                      <tr key={item.index} className={cn(idx % 2 === 0 && "bg-muted/30")}>
-                        <td className="px-3 py-1.5 truncate max-w-[200px]" title={item.workItem}>
-                          {item.workItem || '(No description)'}
-                        </td>
-                        <td className="text-right px-3 py-1.5 text-muted-foreground">
-                          {formatCurrency(item.currentFee)}
-                        </td>
-                        <td className="text-right px-3 py-1.5 font-medium">
-                          {formatCurrency(item.newFee)}
-                        </td>
-                        <td className={cn(
-                          "text-right px-3 py-1.5",
-                          item.change > 0 ? "text-green-600" : item.change < 0 ? "text-red-600" : "text-muted-foreground"
-                        )}>
-                          {item.change > 0 ? '+' : ''}{formatCurrency(item.change)}
-                        </td>
-                      </tr>
-                    ))}
+                    {isSubtotalEdit && groupedPreviewItems ? (
+                      // Grouped view for subtotal
+                      Array.from(groupedPreviewItems.entries()).map(([category, items]) => (
+                        <React.Fragment key={category}>
+                          {items.map((item, idx) => (
+                            <tr key={item.index} className={cn(idx % 2 === 0 && "bg-muted/30")}>
+                              {idx === 0 && (
+                                <td 
+                                  className="px-3 py-1.5 text-xs font-medium text-muted-foreground align-top"
+                                  rowSpan={items.length}
+                                >
+                                  {category}
+                                </td>
+                              )}
+                              <td className="px-3 py-1.5 truncate max-w-[180px]" title={item.workItem}>
+                                {item.workItem || '(No description)'}
+                              </td>
+                              <td className="text-right px-3 py-1.5 text-muted-foreground">
+                                {formatCurrency(item.currentFee)}
+                              </td>
+                              <td className="text-right px-3 py-1.5 font-medium">
+                                {formatCurrency(item.newFee)}
+                              </td>
+                              <td className={cn(
+                                "text-right px-3 py-1.5",
+                                item.change > 0 ? "text-green-600" : item.change < 0 ? "text-red-600" : "text-muted-foreground"
+                              )}>
+                                {item.change > 0 ? '+' : ''}{formatCurrency(item.change)}
+                              </td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      ))
+                    ) : (
+                      // Flat view for category edit
+                      previewItems.map((item, idx) => (
+                        <tr key={item.index} className={cn(idx % 2 === 0 && "bg-muted/30")}>
+                          <td className="px-3 py-1.5 truncate max-w-[200px]" title={item.workItem}>
+                            {item.workItem || '(No description)'}
+                          </td>
+                          <td className="text-right px-3 py-1.5 text-muted-foreground">
+                            {formatCurrency(item.currentFee)}
+                          </td>
+                          <td className="text-right px-3 py-1.5 font-medium">
+                            {formatCurrency(item.newFee)}
+                          </td>
+                          <td className={cn(
+                            "text-right px-3 py-1.5",
+                            item.change > 0 ? "text-green-600" : item.change < 0 ? "text-red-600" : "text-muted-foreground"
+                          )}>
+                            {item.change > 0 ? '+' : ''}{formatCurrency(item.change)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -272,7 +422,7 @@ export function CategoryFeeAllocationDialog({
           
           {!hasChanges && (
             <div className="text-center text-muted-foreground py-4">
-              Enter a new total to see the allocation preview.
+              Enter a new {isSubtotalEdit ? 'subtotal' : 'total'} to see the allocation preview.
             </div>
           )}
         </div>

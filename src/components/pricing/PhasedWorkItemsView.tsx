@@ -27,7 +27,9 @@ import {
   FolderOpen,
   Folder,
   Copy,
-  HelpCircle
+  HelpCircle,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -295,6 +297,19 @@ export function PhasedWorkItemsView({
     onPhasesChange(newPhases);
   }, [items, phases, onItemsChange, onPhasesChange]);
 
+  // Move phase up or down
+  const movePhase = useCallback((phaseId: string, direction: 'up' | 'down') => {
+    const currentIndex = phases.findIndex(p => p.id === phaseId);
+    if (currentIndex === -1) return;
+    
+    const newIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= phases.length) return;
+    
+    const newPhases = [...phases];
+    [newPhases[currentIndex], newPhases[newIndex]] = [newPhases[newIndex], newPhases[currentIndex]];
+    onPhasesChange(newPhases);
+  }, [phases, onPhasesChange]);
+
   // Handle drag end
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
@@ -333,13 +348,15 @@ export function PhasedWorkItemsView({
   }, []);
 
   // Render phase section
-  const renderPhaseSection = (phaseId: string, phaseName: string, isUnassigned: boolean = false) => {
+  const renderPhaseSection = (phaseId: string, phaseName: string, isUnassigned: boolean = false, phaseIndex: number = -1) => {
     const categories = groupedItems[phaseId] || {};
     const totals = phaseTotals[phaseId] || { lower: 0, upper: 0, included: 0, total: 0 };
     const isExpanded = expandedPhases.has(phaseId);
     const phase = phases.find(p => p.id === phaseId);
     const hasExcludedItems = totals.included < totals.total;
     const orderedCategories = getOrderedCategories(categories);
+    const canMoveUp = !isUnassigned && phaseIndex > 0;
+    const canMoveDown = !isUnassigned && phaseIndex >= 0 && phaseIndex < phases.length - 1;
 
     // Don't render empty unassigned section
     if (isUnassigned && totals.total === 0) return null;
@@ -405,6 +422,44 @@ export function PhasedWorkItemsView({
                 </span>
                 {!isUnassigned && !viewingHistoricalVersion && (
                   <div className="flex items-center gap-1">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            disabled={!canMoveUp}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              movePhase(phaseId, 'up');
+                            }}
+                          >
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Move phase up</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            disabled={!canMoveDown}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              movePhase(phaseId, 'down');
+                            }}
+                          >
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Move phase down</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <Button
                       size="icon"
                       variant="ghost"
@@ -657,7 +712,7 @@ export function PhasedWorkItemsView({
 
       {/* Phase sections */}
       <div className="space-y-3">
-        {phases.map(phase => renderPhaseSection(phase.id, phase.name))}
+        {phases.map((phase, index) => renderPhaseSection(phase.id, phase.name, false, index))}
         {renderPhaseSection('unassigned', 'Unassigned Items', true)}
       </div>
 

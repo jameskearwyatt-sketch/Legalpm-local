@@ -236,9 +236,10 @@ export async function exportAFAProposalToExcel({
     currentRow++;
   }
 
-  // Scope Assumptions section
+  // Scope Assumptions section - spans columns A-C only with proper text wrapping
   if (scopeAssumptionNarratives && scopeAssumptionNarratives.length > 0) {
-    worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+    // Merge A-C for header (narrower than full width to create visual break)
+    worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
     const assumptionsHeader = worksheet.getCell(`A${currentRow}`);
     assumptionsHeader.value = '📋 Key Assumptions';
     assumptionsHeader.font = { bold: true, size: 12, color: { argb: 'FF374151' } };
@@ -251,12 +252,20 @@ export async function exportAFAProposalToExcel({
     currentRow++;
 
     for (const narrative of scopeAssumptionNarratives) {
-      worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+      // Merge only columns A-C for each assumption (creates visual break at column D)
+      worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
       const narrativeCell = worksheet.getCell(`A${currentRow}`);
       narrativeCell.value = `• ${narrative}`;
       narrativeCell.font = { size: 10, color: { argb: 'FF4B5563' } };
       narrativeCell.alignment = { wrapText: true, vertical: 'top' };
-      worksheet.getRow(currentRow).height = 20;
+      
+      // Calculate row height based on text length (columns A+B+C width ≈ 35+80+22 = 137 chars)
+      // Each character is roughly 1.2 units, so estimate lines needed
+      const combinedWidth = 137; // approx chars that fit in A+B+C
+      const textLength = narrative.length + 2; // +2 for bullet point
+      const estimatedLines = Math.ceil(textLength / combinedWidth);
+      const rowHeight = Math.max(20, estimatedLines * 15); // 15 points per line, min 20
+      worksheet.getRow(currentRow).height = rowHeight;
       currentRow++;
     }
     currentRow++;

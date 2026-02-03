@@ -282,6 +282,8 @@ export interface ScopeAssumptionsState {
   // Generated narratives for documents (stored for editing)
   documentNarratives: string[];
   customAssumptions?: CustomAssumption[];
+  // Custom-edited process narrative (overrides auto-generated)
+  processNarrativeOverride?: string;
 }
 
 const DEFAULT_DOCUMENT_STATE: DocumentAssumptionsState = {
@@ -302,6 +304,7 @@ const createDefaultState = (): ScopeAssumptionsState => ({
   documentAssumptions: DEFAULT_DOCUMENT_STATE,
   documentNarratives: [],
   customAssumptions: [],
+  processNarrativeOverride: undefined,
 });
 
 interface ScopeAssumptionsTabProps {
@@ -501,6 +504,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
         documentAssumptions: value.documentAssumptions || DEFAULT_DOCUMENT_STATE,
         documentNarratives: value.documentNarratives || [],
         customAssumptions: value.customAssumptions || [],
+        processNarrativeOverride: value.processNarrativeOverride,
       });
     }
   }, [value]);
@@ -695,7 +699,26 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
     updateState({
       ...state,
       simpleAssumptions: newAssumptions,
+      // Clear process narrative override when regenerating
+      processNarrativeOverride: undefined,
     });
+  };
+
+  // Process narrative editing
+  const saveProcessNarrative = () => {
+    updateState({
+      ...state,
+      processNarrativeOverride: editedText,
+    });
+    setEditingNarrative(null);
+  };
+
+  const regenerateProcessNarrative = () => {
+    updateState({
+      ...state,
+      processNarrativeOverride: undefined,
+    });
+    setEditingNarrative(null);
   };
 
   // Custom assumption handlers
@@ -754,7 +777,9 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
     const def = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
     return def?.category !== 'process';
   });
-  const combinedProcessNarrative = generateProcessNarrative(enabledProcessAssumptions);
+  const generatedProcessNarrative = generateProcessNarrative(enabledProcessAssumptions);
+  // Use override if set, otherwise use generated
+  const combinedProcessNarrative = state.processNarrativeOverride ?? generatedProcessNarrative;
   
   const enabledCustomAssumptions = (state.customAssumptions || []).filter(a => a.enabled);
   
@@ -1270,9 +1295,64 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                               </Badge>
                             ) : null;
                           })}
+                          {state.processNarrativeOverride && (
+                            <Badge variant="secondary" className="text-xs">
+                              Edited
+                            </Badge>
+                          )}
                         </div>
-                        <p className="text-sm text-foreground">{combinedProcessNarrative}</p>
+                        
+                        {editingNarrative === 'process' ? (
+                          <div className="space-y-2">
+                            <Textarea
+                              value={editedText}
+                              onChange={(e) => setEditedText(e.target.value)}
+                              className="min-h-[60px] text-sm"
+                            />
+                            <div className="flex gap-2">
+                              <Button 
+                                size="sm" 
+                                onClick={saveProcessNarrative}
+                                className="h-7"
+                              >
+                                <Check className="h-3 w-3 mr-1" />
+                                Save
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={cancelEditing}
+                                className="h-7"
+                              >
+                                <X className="h-3 w-3 mr-1" />
+                                Cancel
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="ghost"
+                                onClick={regenerateProcessNarrative}
+                                className="h-7 ml-auto"
+                              >
+                                <Sparkles className="h-3 w-3 mr-1" />
+                                Regenerate
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-foreground">{combinedProcessNarrative}</p>
+                        )}
                       </div>
+                      
+                      {editingNarrative !== 'process' && combinedProcessNarrative && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-7 w-7 shrink-0"
+                          onClick={() => startEditingNarrative('process', combinedProcessNarrative)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1364,9 +1444,23 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
 export function getAssumptionNarratives(state: ScopeAssumptionsState | null): string[] {
   if (!state || state.noAssumptionsApply) return [];
   
-  const simpleNarratives = state.simpleAssumptions
-    .filter(a => a.enabled && a.narrative)
+  // Get non-process assumption narratives
+  const nonProcessNarratives = state.simpleAssumptions
+    .filter(a => {
+      if (!a.enabled || !a.narrative) return false;
+      const def = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
+      return def?.category !== 'process';
+    })
     .map(a => a.narrative);
+  
+  // Get process narrative (override or generated)
+  const enabledProcessAssumptions = state.simpleAssumptions.filter(a => {
+    if (!a.enabled) return false;
+    const def = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
+    return def?.category === 'process';
+  });
+  
+  const processNarrative = state.processNarrativeOverride ?? generateProcessNarrative(enabledProcessAssumptions);
   
   const docNarratives = state.documentNarratives || [];
   
@@ -1375,5 +1469,11 @@ export function getAssumptionNarratives(state: ScopeAssumptionsState | null): st
     .filter(a => a.enabled && a.text)
     .map(a => a.text);
   
-  return [...simpleNarratives, ...docNarratives, ...customNarratives];
+  const allNarratives = [...nonProcessNarratives];
+  if (processNarrative) {
+    allNarratives.push(processNarrative);
+  }
+  allNarratives.push(...docNarratives, ...customNarratives);
+  
+  return allNarratives;
 }

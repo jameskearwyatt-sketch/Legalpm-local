@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef, memo, forwardRef, useImperativeHandle } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -74,9 +74,14 @@ interface PhasedWorkItemsViewProps {
   existingInputDepts: string[]; // Unique list of departments used across all items
 }
 
+// Expose methods for external navigation
+export interface PhasedWorkItemsViewRef {
+  navigateToPhaseCategory: (phaseId: string | null, category: string) => void;
+}
+
 type BudgetCategory = typeof BUDGET_CATEGORIES[number];
 
-export function PhasedWorkItemsView({
+export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWorkItemsViewProps>(function PhasedWorkItemsView({
   items,
   phases,
   onItemsChange,
@@ -90,7 +95,7 @@ export function PhasedWorkItemsView({
   customCategories,
   onAddCustomCategory,
   existingInputDepts,
-}: PhasedWorkItemsViewProps) {
+}, ref) {
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(() => 
     new Set(['unassigned', ...phases.map(p => p.id)])
   );
@@ -100,8 +105,66 @@ export function PhasedWorkItemsView({
   const [newPhaseName, setNewPhaseName] = useState('');
   const [isDeleteSelectedDialogOpen, setIsDeleteSelectedDialogOpen] = useState(false);
 
+  // Refs for each phase card (for scroll navigation)
+  const phaseRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
   // Track known phase IDs to distinguish new phases from reordering
   const knownPhaseIdsRef = useRef<Set<string>>(new Set(phases.map(p => p.id)));
+
+  // Expose navigation method via ref
+  useImperativeHandle(ref, () => ({
+    navigateToPhaseCategory: (phaseId: string | null, category: string) => {
+      // For aggregate (phaseId === null), expand all phases that have the category
+      // For specific phase, expand just that phase
+      const targetPhaseId = phaseId ?? 'unassigned';
+      
+      if (phaseId === null) {
+        // Aggregate: expand all phases
+        setExpandedPhases(new Set(['unassigned', ...phases.map(p => p.id)]));
+        
+        // Find the first phase that has items in this category
+        const validIds = new Set(phases.map(p => p.id));
+        const firstPhaseWithCategory = phases.find(phase => {
+          return items.some(item => {
+            const itemCategory = item.category || 'Other';
+            return itemCategory === category && item.phase_id === phase.id;
+          });
+        });
+        
+        // Also check unassigned
+        const hasUnassignedInCategory = items.some(item => {
+          const itemCategory = item.category || 'Other';
+          const itemPhaseId = item.phase_id;
+          return itemCategory === category && (!itemPhaseId || !validIds.has(itemPhaseId));
+        });
+        
+        const scrollTarget = hasUnassignedInCategory ? 'unassigned' : (firstPhaseWithCategory?.id || 'unassigned');
+        
+        // Scroll to the target phase after a brief delay to allow expansion
+        setTimeout(() => {
+          const el = phaseRefs.current[scrollTarget];
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+      } else {
+        // Specific phase: expand just that phase
+        setExpandedPhases(prev => {
+          const next = new Set(prev);
+          next.add(targetPhaseId);
+          return next;
+        });
+        
+        // Scroll to that phase
+        setTimeout(() => {
+          const el = phaseRefs.current[targetPhaseId];
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 100);
+      }
+    },
+  }), [phases, items]);
 
   // Keep expandedPhases in sync with phases - auto-expand ONLY truly new phases, remove deleted ones
   useEffect(() => {
@@ -426,7 +489,11 @@ export function PhasedWorkItemsView({
     if (isUnassigned && totals.total === 0) return null;
 
     return (
-      <Card key={phaseId} className="transition-all">
+      <Card 
+        key={phaseId} 
+        className="transition-all"
+        ref={(el) => { phaseRefs.current[phaseId] = el; }}
+      >
         <Collapsible open={isExpanded} onOpenChange={() => togglePhaseExpansion(phaseId)}>
           <CardHeader className="py-3">
             <div className="flex items-center justify-between gap-2">
@@ -863,7 +930,7 @@ export function PhasedWorkItemsView({
       </Dialog>
     </div>
   );
-}
+});
 
 // Sortable wrapper for phase cards - uses context to pass drag handle listeners
 import { useSortable } from '@dnd-kit/sortable';

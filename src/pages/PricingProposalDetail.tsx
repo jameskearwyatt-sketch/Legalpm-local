@@ -76,7 +76,7 @@ import { getCurrencySymbol } from "@/lib/currencyUtils";
 import { IterativePricingDialog, FeeOwnerHours } from "@/components/pricing/IterativePricingDialog";
 import { EditableRateCard } from "@/components/pricing/EditableRateCard";
 import { CategorizedProposalView, categoryBgColors, categoryTextColors, categoryBorderColors } from "@/components/pricing/CategorizedProposalView";
-import { PhasedWorkItemsView } from "@/components/pricing/PhasedWorkItemsView";
+import { PhasedWorkItemsView, PhasedWorkItemsViewRef } from "@/components/pricing/PhasedWorkItemsView";
 import { AddWorkItemDialog } from "@/components/pricing/AddWorkItemDialog";
 import { LocalCounselPanel } from "@/components/pricing/LocalCounselPanel";
 import { AFATab } from "@/components/pricing/AFATab";
@@ -107,6 +107,7 @@ export default function PricingProposalDetail() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const phasedWorkItemsRef = useRef<PhasedWorkItemsViewRef>(null);
   
   const { 
     proposal, 
@@ -1509,6 +1510,13 @@ export default function PricingProposalDetail() {
     });
   };
 
+  // Handle navigation from category breakdown tiles
+  const handleNavigateToCategory = useCallback((phaseId: string | null, category: string) => {
+    if (phasedWorkItemsRef.current) {
+      phasedWorkItemsRef.current.navigateToPhaseCategory(phaseId, category);
+    }
+  }, []);
+
   // Send to matter (uses raw items - AFA info stored in notes)
   const handleSendToMatter = async () => {
     // Validate figure settings are complete
@@ -2083,6 +2091,7 @@ export default function PricingProposalDetail() {
                     formatCurrency={formatCurrency}
                     currencySymbol={currencySymbol}
                     customCategories={customCategories}
+                    onNavigateToCategory={handleNavigateToCategory}
                   />
                 </CardContent>
               </Card>
@@ -2107,6 +2116,7 @@ export default function PricingProposalDetail() {
               </CardHeader>
               <CardContent>
                 <PhasedWorkItemsView
+                  ref={phasedWorkItemsRef}
                   items={draftItems}
                   phases={phases}
                   onItemsChange={(newItems) => {

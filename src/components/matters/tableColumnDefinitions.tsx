@@ -321,6 +321,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
           burnPercent={burnPercent}
           usdEquivalent={usdEquivalent}
           startDate={ctx.matter.start_date}
+          onHoldMonths={(ctx.matter as any).on_hold_months || 0}
         />
       );
     },

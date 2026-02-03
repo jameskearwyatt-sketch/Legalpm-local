@@ -77,6 +77,7 @@ import { IterativePricingDialog, FeeOwnerHours } from "@/components/pricing/Iter
 import { EditableRateCard } from "@/components/pricing/EditableRateCard";
 import { CategorizedProposalView, categoryBgColors, categoryTextColors, categoryBorderColors } from "@/components/pricing/CategorizedProposalView";
 import { PhasedWorkItemsView } from "@/components/pricing/PhasedWorkItemsView";
+import { AddWorkItemDialog } from "@/components/pricing/AddWorkItemDialog";
 import { LocalCounselPanel } from "@/components/pricing/LocalCounselPanel";
 import { AFATab } from "@/components/pricing/AFATab";
 import { ScopeAssumptionsTab, ScopeAssumptionsState, getAssumptionNarratives, getGroupedAssumptionNarratives } from "@/components/pricing/ScopeAssumptionsTab";
@@ -144,6 +145,7 @@ export default function PricingProposalDetail() {
   const [targetPricingPhaseId, setTargetPricingPhaseId] = useState<string>("all");
   const [targetPricingAmount, setTargetPricingAmount] = useState<string>("");
   const [isAllocatingTargetPricing, setIsAllocatingTargetPricing] = useState(false);
+  const [isAddWorkItemDialogOpen, setIsAddWorkItemDialogOpen] = useState(false);
   
   const [isDeletingVersion, setIsDeletingVersion] = useState(false);
   const [isSendToMatterOpen, setIsSendToMatterOpen] = useState(false);
@@ -802,21 +804,80 @@ export default function PricingProposalDetail() {
     toast({ title: 'Settings saved' });
   };
 
-  // Add new work item
-  const addItem = () => {
-    setDraftItems(prev => [...prev, {
-      work_item: "",
-      provider: "Baker McKenzie",
-      fee_amount: 0,
-      fee_lower: 0,
-      fee_upper: 0,
-      pricing_method: "manual",
-      category: null,
-      is_optional: false,
-      is_included: true,
-    }]);
+  // Add new work item via dialog - places item in correct position based on phase and category
+  const handleAddWorkItem = useCallback((newItem: DraftProposalItem) => {
+    setDraftItems(prev => {
+      // Find the correct position based on phase and category
+      // Items should be grouped by phase first, then by category within each phase
+      const targetPhaseId = newItem.phase_id || null;
+      const targetCategory = newItem.category || 'Other';
+      
+      // Find items in the same phase
+      let insertIndex = prev.length; // Default to end
+      
+      // First, find items in the same phase
+      const phaseItems = prev.map((item, idx) => ({ item, idx }))
+        .filter(({ item }) => (item.phase_id || null) === targetPhaseId);
+      
+      if (phaseItems.length > 0) {
+        // Find items in the same category within this phase
+        const categoryItems = phaseItems.filter(({ item }) => (item.category || 'Other') === targetCategory);
+        
+        if (categoryItems.length > 0) {
+          // Insert after the last item of the same category
+          insertIndex = categoryItems[categoryItems.length - 1].idx + 1;
+        } else {
+          // No items with same category - find where this category should go
+          // Use BUDGET_CATEGORIES order to determine position
+          const categoryOrder = Object.fromEntries(
+            BUDGET_CATEGORIES.map((cat, idx) => [cat, idx])
+          );
+          const targetOrder = categoryOrder[targetCategory] ?? 999;
+          
+          // Find the first item in this phase with a higher category order
+          const higherCategoryItem = phaseItems.find(({ item }) => {
+            const itemCategory = item.category || 'Other';
+            const itemOrder = categoryOrder[itemCategory] ?? 999;
+            return itemOrder > targetOrder;
+          });
+          
+          if (higherCategoryItem) {
+            insertIndex = higherCategoryItem.idx;
+          } else {
+            // Insert after the last item in this phase
+            insertIndex = phaseItems[phaseItems.length - 1].idx + 1;
+          }
+        }
+      } else {
+        // No items in this phase - find where this phase should be inserted
+        // Phases should maintain their order, unassigned goes last
+        if (targetPhaseId === null) {
+          // Unassigned - insert at the end
+          insertIndex = prev.length;
+        } else {
+          // Find the first item from a later phase or unassigned
+          const phaseIndex = phases.findIndex(p => p.id === targetPhaseId);
+          if (phaseIndex >= 0) {
+            const laterPhases = phases.slice(phaseIndex + 1).map(p => p.id);
+            
+            const laterPhaseItem = prev.findIndex(item => 
+              laterPhases.includes(item.phase_id || '') || item.phase_id === null
+            );
+            
+            if (laterPhaseItem >= 0) {
+              insertIndex = laterPhaseItem;
+            }
+          }
+        }
+      }
+      
+      // Insert the new item at the calculated position
+      const newItems = [...prev];
+      newItems.splice(insertIndex, 0, newItem);
+      return newItems;
+    });
     setHasUnsavedChanges(true);
-  };
+  }, [phases]);
 
   // Update work item - memoized to prevent child re-renders
   const updateItem = useCallback((index: number, updates: Partial<DraftProposalItem>) => {
@@ -1968,13 +2029,24 @@ export default function PricingProposalDetail() {
                     <RotateCcw className="h-4 w-4 mr-2" />
                     Clear Pricing
                   </Button>
-                  <Button onClick={addItem}>
+                  <Button onClick={() => setIsAddWorkItemDialogOpen(true)}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Item
                   </Button>
                 </CardContent>
               </Card>
             )}
+
+            {/* Add Work Item Dialog */}
+            <AddWorkItemDialog
+              open={isAddWorkItemDialogOpen}
+              onOpenChange={setIsAddWorkItemDialogOpen}
+              onAdd={handleAddWorkItem}
+              phases={phases}
+              customCategories={customCategories}
+              onAddCustomCategory={addCustomCategory}
+              currencySymbol={currencySymbol}
+            />
 
             {/* Category Summary with Auto-Categorize */}
             {draftItems.length > 0 && !viewingHistoricalVersion && (

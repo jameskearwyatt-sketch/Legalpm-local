@@ -1136,6 +1136,16 @@ export default function PricingProposalDetail() {
         return;
       }
 
+      // Gather already-priced items from this proposal for context
+      const pricedItemsInProposal = draftItems
+        .filter(i => i.fee_amount && i.fee_amount > 0)
+        .map(i => ({
+          work_item: i.work_item,
+          provider: i.provider,
+          category: i.category,
+          fee_amount: i.fee_amount,
+        }));
+
       const { data, error } = await supabase.functions.invoke('suggest-pricing', {
         body: {
           items: itemsNeedingPricing.map(i => ({
@@ -1144,6 +1154,8 @@ export default function PricingProposalDetail() {
             category: i.category,
           })),
           currency: proposal?.currency,
+          proposalId, // Current proposal ID to exclude from historical data
+          pricedItemsInProposal, // Already priced items in this proposal for reference
         },
       });
 

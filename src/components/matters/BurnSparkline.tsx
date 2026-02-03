@@ -15,6 +15,11 @@ interface SnapshotPoint {
   wip_write_off_amount?: number;
 }
 
+interface ProposalData {
+  wip_write_off_amount?: number;
+  ar_write_off_amount?: number;
+}
+
 interface BurnSparklineProps {
   snapshots: SnapshotPoint[];
   bmBudget: number;
@@ -24,6 +29,12 @@ interface BurnSparklineProps {
   usdEquivalent?: number;
   startDate?: string | null;
   onHoldMonths?: number;
+  /** Whether a WIP proposal is currently active for this matter */
+  hasActiveProposal?: boolean;
+  /** The proposal data with write-off amounts */
+  proposalData?: ProposalData | null;
+  /** The raw burn amount before proposal adjustments */
+  rawBurn?: number;
 }
 
 interface DataPoint {
@@ -41,6 +52,9 @@ export function BurnSparkline({
   usdEquivalent,
   startDate,
   onHoldMonths = 0,
+  hasActiveProposal = false,
+  proposalData,
+  rawBurn,
 }: BurnSparklineProps) {
   // Dimensions for the sparkline
   const width = 90;
@@ -138,24 +152,39 @@ export function BurnSparkline({
 
   // Determine color based on burn percentage
   const getColor = (percent: number) => {
-    if (percent > 100) return { fill: 'rgba(239, 68, 68, 0.3)', stroke: '#ef4444' }; // red
-    if (percent > 80) return { fill: 'rgba(245, 158, 11, 0.3)', stroke: '#f59e0b' }; // orange/warning
-    return { fill: 'rgba(34, 197, 94, 0.3)', stroke: '#22c55e' }; // green/success
+    if (percent > 100) return { fill: 'rgba(239, 68, 68, 0.3)', stroke: '#ef4444', stripeColor: '#ef4444' }; // red
+    if (percent > 80) return { fill: 'rgba(245, 158, 11, 0.3)', stroke: '#f59e0b', stripeColor: '#f59e0b' }; // orange/warning
+    return { fill: 'rgba(34, 197, 94, 0.3)', stroke: '#22c55e', stripeColor: '#22c55e' }; // green/success
   };
 
-  const colors = getColor(burnPercent);
+  // Calculate the adjusted burn percent based on proposal if active
+  const adjustedBurnPercent = useMemo(() => {
+    if (hasActiveProposal && bmBudget > 0) {
+      return (currentBurn / bmBudget) * 100;
+    }
+    return burnPercent;
+  }, [hasActiveProposal, currentBurn, bmBudget, burnPercent]);
+
+  // Use adjusted colors when proposal is active
+  const colors = hasActiveProposal ? getColor(adjustedBurnPercent) : getColor(burnPercent);
+  
+  // Generate unique ID for this sparkline's pattern
+  const patternId = useMemo(() => `stripe-pattern-${Math.random().toString(36).substr(2, 9)}`, []);
 
   // Count real snapshots for tooltip
   const realSnapshotCount = dataPoints.filter(d => !d.isSynthetic).length;
 
-  // Build SVG path
-  const { pathD, areaD, budgetLineY, dotPosition } = useMemo(() => {
+  // Build SVG path with proposal drop support
+  const { pathD, areaD, budgetLineY, dotPosition, dropSegment, proposalAreaD } = useMemo(() => {
     if (dataPoints.length === 0) {
-      return { pathD: '', areaD: '', budgetLineY: 0, dotPosition: null };
+      return { pathD: '', areaD: '', budgetLineY: 0, dotPosition: null, dropSegment: null, proposalAreaD: '' };
     }
 
-    // Determine Y scale - max of budget or highest burn value
-    const maxBurn = Math.max(...dataPoints.map(d => d.burn), currentBurn);
+    // Use rawBurn for the historical chart if we have a proposal, otherwise use currentBurn
+    const chartEndValue = hasActiveProposal && rawBurn !== undefined ? rawBurn : currentBurn;
+
+    // Determine Y scale - max of budget or highest burn value (use raw burn for scaling)
+    const maxBurn = Math.max(...dataPoints.map(d => d.burn), chartEndValue, currentBurn);
     const yMax = Math.max(bmBudget * 1.1, maxBurn * 1.1, 1); // At least show some range
     
     // X scale - time range (always start from startDate if available, otherwise first data point)
@@ -182,7 +211,7 @@ export function BurnSparkline({
     }));
 
     if (points.length === 0) {
-      return { pathD: '', areaD: '', budgetLineY: budgetY, dotPosition: null };
+      return { pathD: '', areaD: '', budgetLineY: budgetY, dotPosition: null, dropSegment: null, proposalAreaD: '' };
     }
 
     // For single point (after extrapolation), still try to show a line from zero
@@ -192,16 +221,18 @@ export function BurnSparkline({
         areaD: '',
         budgetLineY: budgetY,
         dotPosition: { x: width / 2, y: scaleY(dataPoints[0].burn) },
+        dropSegment: null,
+        proposalAreaD: '',
       };
     }
 
-    // Line path
+    // Line path (historical data)
     let linePath = `M ${points[0].x} ${points[0].y}`;
     for (let i = 1; i < points.length; i++) {
       linePath += ` L ${points[i].x} ${points[i].y}`;
     }
 
-    // Area path (fill under the line)
+    // Area path (fill under the historical line)
     const bottomY = padding.top + chartHeight;
     let areaPath = `M ${points[0].x} ${bottomY}`;
     areaPath += ` L ${points[0].x} ${points[0].y}`;
@@ -210,19 +241,54 @@ export function BurnSparkline({
     }
     areaPath += ` L ${points[points.length - 1].x} ${bottomY} Z`;
 
+    // Calculate drop segment and proposal area if we have an active proposal with a difference
+    let drop = null;
+    let proposalArea = '';
+    
+    if (hasActiveProposal && rawBurn !== undefined && rawBurn !== currentBurn) {
+      const lastPoint = points[points.length - 1];
+      const adjustedY = scaleY(currentBurn);
+      
+      // Drop segment: from last historical point down to adjusted value
+      drop = {
+        x1: lastPoint.x,
+        y1: lastPoint.y,
+        x2: lastPoint.x,
+        y2: adjustedY,
+      };
+      
+      // Create a "proposal area" that shows the adjusted fill region
+      // This is the area from bottom to the adjusted burn level
+      proposalArea = `M ${points[0].x} ${bottomY}`;
+      proposalArea += ` L ${points[0].x} ${points[0].y}`;
+      for (let i = 1; i < points.length - 1; i++) {
+        proposalArea += ` L ${points[i].x} ${points[i].y}`;
+      }
+      // Connect to the adjusted endpoint
+      proposalArea += ` L ${lastPoint.x} ${adjustedY}`;
+      proposalArea += ` L ${lastPoint.x} ${bottomY} Z`;
+    }
+
     return {
       pathD: linePath,
       areaD: areaPath,
       budgetLineY: budgetY,
       dotPosition: null,
+      dropSegment: drop,
+      proposalAreaD: proposalArea,
     };
-  }, [dataPoints, bmBudget, currentBurn, chartWidth, chartHeight, width]);
+  }, [dataPoints, bmBudget, currentBurn, chartWidth, chartHeight, width, hasActiveProposal, rawBurn]);
 
   // Tooltip content
   const tooltipContent = (
     <div className="flex flex-col gap-1 text-xs">
       <div className="font-medium text-foreground">
         {formatCurrency(currentBurn, currency)}
+        {hasActiveProposal && rawBurn !== undefined && rawBurn !== currentBurn && (
+          <span className="text-muted-foreground font-normal ml-1">
+            (adj. from {formatCurrency(rawBurn, currency)})
+          </span>
+        )}
       </div>
       {usdEquivalent !== undefined && currency !== 'USD' && (
         <div className="text-muted-foreground">
@@ -230,10 +296,13 @@ export function BurnSparkline({
         </div>
       )}
       <div className={
-        burnPercent > 100 ? 'text-destructive' :
-        burnPercent > 80 ? 'text-warning' : 'text-success'
+        adjustedBurnPercent > 100 ? 'text-destructive' :
+        adjustedBurnPercent > 80 ? 'text-warning' : 'text-success'
       }>
-        {burnPercent.toFixed(0)}% of budget
+        {adjustedBurnPercent.toFixed(0)}% of budget
+        {hasActiveProposal && (
+          <span className="text-muted-foreground ml-1">(with proposal)</span>
+        )}
       </div>
       {realSnapshotCount > 0 && (
         <div className="text-muted-foreground text-[10px] mt-1 pt-1 border-t">
@@ -314,11 +383,48 @@ export function BurnSparkline({
       <HoverCardTrigger asChild>
         <div className="cursor-pointer flex flex-col items-end">
           <svg width={width} height={height} className="overflow-visible">
-            {/* Area fill */}
-            <path
-              d={areaD}
-              fill={colors.fill}
-            />
+            {/* Define stripe pattern for proposal areas */}
+            <defs>
+              <pattern
+                id={patternId}
+                patternUnits="userSpaceOnUse"
+                width="4"
+                height="4"
+                patternTransform="rotate(45)"
+              >
+                <line
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="4"
+                  stroke={colors.stripeColor}
+                  strokeWidth="2"
+                  strokeOpacity="0.4"
+                />
+              </pattern>
+            </defs>
+            
+            {/* Area fill - use stripes when proposal is active */}
+            {hasActiveProposal && proposalAreaD ? (
+              <>
+                {/* Solid fill for the adjusted (proposal) area */}
+                <path
+                  d={proposalAreaD}
+                  fill={colors.fill}
+                />
+                {/* Striped overlay for the entire historical area to indicate proposal is active */}
+                <path
+                  d={areaD}
+                  fill={`url(#${patternId})`}
+                />
+              </>
+            ) : (
+              <path
+                d={areaD}
+                fill={colors.fill}
+              />
+            )}
+            
             {/* Line */}
             <path
               d={pathD}
@@ -328,6 +434,30 @@ export function BurnSparkline({
               strokeLinecap="round"
               strokeLinejoin="round"
             />
+            
+            {/* Drop segment - shows the proposal adjustment */}
+            {dropSegment && (
+              <line
+                x1={dropSegment.x1}
+                y1={dropSegment.y1}
+                x2={dropSegment.x2}
+                y2={dropSegment.y2}
+                stroke={colors.stroke}
+                strokeWidth={2}
+                strokeDasharray="2,2"
+              />
+            )}
+            
+            {/* Adjusted endpoint dot when proposal is active */}
+            {dropSegment && (
+              <circle
+                cx={dropSegment.x2}
+                cy={dropSegment.y2}
+                r={3}
+                fill={colors.stroke}
+              />
+            )}
+            
             {/* Budget threshold line */}
             {bmBudget > 0 && budgetLineY > padding.top && budgetLineY < height - padding.bottom && (
               <line

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   DndContext,
   DragEndEvent,
@@ -98,16 +98,24 @@ export function PhasedWorkItemsView({
   const [newPhaseName, setNewPhaseName] = useState('');
   const [isDeleteSelectedDialogOpen, setIsDeleteSelectedDialogOpen] = useState(false);
 
-  // Keep expandedPhases in sync with phases - auto-expand new phases, remove deleted ones
+  // Track known phase IDs to distinguish new phases from reordering
+  const knownPhaseIdsRef = useRef<Set<string>>(new Set(phases.map(p => p.id)));
+
+  // Keep expandedPhases in sync with phases - auto-expand ONLY truly new phases, remove deleted ones
   useEffect(() => {
+    const currentPhaseIds = new Set(phases.map(p => p.id));
+    const knownIds = knownPhaseIdsRef.current;
+    
     setExpandedPhases(prev => {
       const next = new Set(prev);
-      // Add any new phases that aren't in the set
+      
+      // Only auto-expand phases that are genuinely new (not just reordered)
       phases.forEach(p => {
-        if (!next.has(p.id)) {
+        if (!knownIds.has(p.id) && !next.has(p.id)) {
           next.add(p.id);
         }
       });
+      
       // Remove any phase IDs that no longer exist (except 'unassigned')
       const validIds = new Set(['unassigned', ...phases.map(p => p.id)]);
       next.forEach(id => {
@@ -115,8 +123,12 @@ export function PhasedWorkItemsView({
           next.delete(id);
         }
       });
+      
       return next;
     });
+    
+    // Update known phase IDs for next comparison
+    knownPhaseIdsRef.current = currentPhaseIds;
   }, [phases]);
 
   // Drag sensors

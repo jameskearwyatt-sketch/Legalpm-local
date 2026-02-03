@@ -89,9 +89,9 @@ function calculateCategoryTotals(
 function getItemsForPhaseCategory(
   items: DraftProposalItem[],
   phaseId: string | null,
-  category: string,
+  category: string | null, // null means all categories in phase (for subtotal)
   phases: ProposalPhase[]
-): { index: number; workItem: string; currentFee: number }[] {
+): { index: number; workItem: string; currentFee: number; category: string }[] {
   const validPhaseIds = new Set(phases.map(p => p.id));
   
   return items
@@ -101,9 +101,11 @@ function getItemsForPhaseCategory(
       const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
       if (!isIncluded) return false;
       
-      // Check category match
-      const itemCategory = item.category || 'Other';
-      if (itemCategory !== category) return false;
+      // Check category match (null = all categories)
+      if (category !== null) {
+        const itemCategory = item.category || 'Other';
+        if (itemCategory !== category) return false;
+      }
       
       // Check phase match
       if (phaseId === null) {
@@ -120,6 +122,7 @@ function getItemsForPhaseCategory(
       index,
       workItem: item.work_item,
       currentFee: item.fee_upper ?? item.fee_amount ?? 0,
+      category: item.category || 'Other',
     }));
 }
 
@@ -136,9 +139,10 @@ export function CategorizedProposalView({
   
   // Allocation dialog state
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null); // null for subtotal
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
   const [selectedPhaseName, setSelectedPhaseName] = useState<string | null>(null);
+  const [isSubtotalEdit, setIsSubtotalEdit] = useState(false);
 
   // Combine standard and custom categories for display
   const allCategories = useMemo(() => {
@@ -182,7 +186,7 @@ export function CategorizedProposalView({
     }
   }, [onNavigateToCategory]);
   
-  // Handle edit click for fee allocation
+  // Handle edit click for fee allocation (category level)
   const handleEditClick = useCallback((
     e: React.MouseEvent,
     phaseId: string | null,
@@ -193,16 +197,32 @@ export function CategorizedProposalView({
     setSelectedPhaseId(phaseId);
     setSelectedPhaseName(phaseName);
     setSelectedCategory(category);
+    setIsSubtotalEdit(false);
+    setAllocationDialogOpen(true);
+  }, []);
+  
+  // Handle subtotal edit click (phase level - all categories)
+  const handleSubtotalEditClick = useCallback((
+    e: React.MouseEvent,
+    phaseId: string,
+    phaseName: string
+  ) => {
+    e.stopPropagation();
+    setSelectedPhaseId(phaseId);
+    setSelectedPhaseName(phaseName);
+    setSelectedCategory(null); // null = all categories
+    setIsSubtotalEdit(true);
     setAllocationDialogOpen(true);
   }, []);
   
   // Get affected items for the dialog
   const affectedItems = useMemo(() => {
-    if (!allocationDialogOpen || !selectedCategory) return [];
+    if (!allocationDialogOpen) return [];
+    // For subtotal edit, pass null category to get all items in phase
     return getItemsForPhaseCategory(items, selectedPhaseId, selectedCategory, phases);
   }, [allocationDialogOpen, items, selectedPhaseId, selectedCategory, phases]);
   
-  // Current total for selected category
+  // Current total for selected category/subtotal
   const selectedCategoryTotal = useMemo(() => {
     return affectedItems.reduce((sum, item) => sum + item.currentFee, 0);
   }, [affectedItems]);
@@ -297,82 +317,131 @@ export function CategorizedProposalView({
   };
 
   // Helper to render a category breakdown section
+  // isAggregate = true means this is the aggregate totals row (no navigation/editing)
   const renderCategoryBreakdown = (
     totals: Record<string, number>,
     total: number,
     phaseId: string | null,
-    phaseName: string | null
-  ) => (
-    <div className="space-y-2">
-      {phaseName && (
-        <div className="text-sm font-medium text-foreground">{phaseName}</div>
-      )}
-      <div className="flex flex-wrap gap-2">
-        {allCategories.map(category => {
-          const categoryTotal = totals[category];
-          if (categoryTotal === 0) return null;
-          
-          // Get colors - use 'Other' colors as fallback for custom categories
-          const isStandardCategory = (BUDGET_CATEGORIES as readonly string[]).includes(category);
-          const bgColor = isStandardCategory ? categoryBgColors[category as BudgetCategory] : 'bg-slate-100 dark:bg-slate-800/50';
-          const textColor = isStandardCategory ? categoryTextColors[category as BudgetCategory] : 'text-slate-700 dark:text-slate-300';
-          const borderColor = isStandardCategory ? categoryBorderColors[category as BudgetCategory] : 'border-slate-300 dark:border-slate-600';
-          
-          return (
-            <TooltipProvider key={category}>
-              <div
-                className={cn(
-                  'rounded-md px-3 py-2 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
-                  bgColor,
-                  borderColor
-                )}
-                onClick={() => handleTileClick(phaseId, category)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    handleTileClick(phaseId, category);
-                  }
-                }}
-              >
-                <div className={cn('text-xs font-medium', textColor)}>
-                  {category}
+    phaseName: string | null,
+    isAggregate: boolean = false
+  ) => {
+    const isPhaseRow = phaseId !== null && !isAggregate;
+    
+    return (
+      <div className="space-y-2">
+        {phaseName && (
+          <div className="text-sm font-medium text-foreground">{phaseName}</div>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {allCategories.map(category => {
+            const categoryTotal = totals[category];
+            if (categoryTotal === 0) return null;
+            
+            // Get colors - use 'Other' colors as fallback for custom categories
+            const isStandardCategory = (BUDGET_CATEGORIES as readonly string[]).includes(category);
+            const bgColor = isStandardCategory ? categoryBgColors[category as BudgetCategory] : 'bg-slate-100 dark:bg-slate-800/50';
+            const textColor = isStandardCategory ? categoryTextColors[category as BudgetCategory] : 'text-slate-700 dark:text-slate-300';
+            const borderColor = isStandardCategory ? categoryBorderColors[category as BudgetCategory] : 'border-slate-300 dark:border-slate-600';
+            
+            // Aggregate row: no interactivity
+            if (isAggregate) {
+              return (
+                <div
+                  key={category}
+                  className={cn(
+                    'rounded-md px-3 py-2 border',
+                    bgColor,
+                    borderColor
+                  )}
+                >
+                  <div className={cn('text-xs font-medium', textColor)}>
+                    {category}
+                  </div>
+                  <div className={cn('text-sm font-semibold', textColor)}>
+                    {formatCurrency(categoryTotal)}
+                  </div>
                 </div>
-                <div className={cn('text-sm font-semibold flex items-center gap-1', textColor)}>
-                  <span>{formatCurrency(categoryTotal)}</span>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
-                        onClick={(e) => handleEditClick(e, phaseId, phaseName, category)}
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Adjust fee and distribute pro-rata</p>
-                    </TooltipContent>
-                  </Tooltip>
+              );
+            }
+            
+            // Phase row: navigation + edit
+            return (
+              <TooltipProvider key={category}>
+                <div
+                  className={cn(
+                    'rounded-md px-3 py-2 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
+                    bgColor,
+                    borderColor
+                  )}
+                  onClick={() => handleTileClick(phaseId, category)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      handleTileClick(phaseId, category);
+                    }
+                  }}
+                >
+                  <div className={cn('text-xs font-medium', textColor)}>
+                    {category}
+                  </div>
+                  <div className={cn('text-sm font-semibold flex items-center gap-1', textColor)}>
+                    <span>{formatCurrency(categoryTotal)}</span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
+                          onClick={(e) => handleEditClick(e, phaseId, phaseName, category)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Adjust fee and distribute pro-rata</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                </div>
+              </TooltipProvider>
+            );
+          })}
+          
+          {/* Phase/Section Total Box */}
+          {total > 0 && (
+            <TooltipProvider>
+              <div className={cn(
+                'rounded-md px-3 py-2 border bg-primary/10 border-primary/30',
+                isPhaseRow && 'group'
+              )}>
+                <div className="text-xs font-medium text-primary">
+                  {isAggregate ? 'Total' : 'Subtotal'}
+                </div>
+                <div className="text-sm font-semibold text-primary flex items-center gap-1">
+                  <span>{formatCurrency(total)}</span>
+                  {/* Subtotal edit button - only for phase rows */}
+                  {isPhaseRow && phaseId && phaseName && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-primary/20"
+                          onClick={(e) => handleSubtotalEditClick(e, phaseId, phaseName)}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Adjust phase subtotal and distribute across categories</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
               </div>
             </TooltipProvider>
-          );
-        })}
-        
-        {/* Phase/Section Total Box */}
-        {total > 0 && (
-          <div className="rounded-md px-3 py-2 border bg-primary/10 border-primary/30">
-            <div className="text-xs font-medium text-primary">
-              {phaseName ? 'Subtotal' : 'Total'}
-            </div>
-            <div className="text-sm font-semibold text-primary">
-              {formatCurrency(total)}
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -411,20 +480,20 @@ export function CategorizedProposalView({
         <div className="space-y-4">
           {phaseBreakdowns.map(({ phase, totals, grandTotal: phaseTotal }) => (
             <div key={phase.id}>
-              {renderCategoryBreakdown(totals, phaseTotal, phase.id, phase.name)}
+              {renderCategoryBreakdown(totals, phaseTotal, phase.id, phase.name, false)}
             </div>
           ))}
           
-          {/* Aggregate Total */}
+          {/* Aggregate Total - isAggregate = true (no interactivity) */}
           <div className="pt-2 border-t">
-            {renderCategoryBreakdown(categoryTotals, grandTotal, null, 'Aggregate Total')}
+            {renderCategoryBreakdown(categoryTotals, grandTotal, null, 'Aggregate Total', true)}
           </div>
         </div>
       )}
 
       {/* Single breakdown (if single phase or no phases) */}
       {(!phaseBreakdowns || phaseBreakdowns.length <= 1) && (
-        renderCategoryBreakdown(categoryTotals, grandTotal, null, null)
+        renderCategoryBreakdown(categoryTotals, grandTotal, null, null, false)
       )}
       
       {/* Fee Allocation Dialog */}
@@ -438,6 +507,7 @@ export function CategorizedProposalView({
         formatCurrency={formatCurrency}
         currencySymbol={currencySymbol}
         onApply={handleApplyAllocations}
+        isSubtotalEdit={isSubtotalEdit}
       />
     </div>
   );

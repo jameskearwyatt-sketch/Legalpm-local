@@ -244,15 +244,17 @@ export function BurnSparkline({
     </div>
   );
 
+  // Check if start date is missing
+  const missingStartDate = !startDate;
+
   // Render single dot for matters with only 1 real snapshot and no extrapolation possible
   if (dataPoints.length <= 1) {
-    const dotY = dotPosition?.y ?? height / 2;
     const dotX = width / 2;
     
     return (
       <HoverCard openDelay={100} closeDelay={50}>
         <HoverCardTrigger asChild>
-          <div className="cursor-pointer flex items-center justify-end">
+          <div className="cursor-pointer flex flex-col items-end">
             <svg width={width} height={height} className="overflow-visible">
               {/* Budget line */}
               {bmBudget > 0 && (
@@ -287,6 +289,11 @@ export function BurnSparkline({
                 opacity={0.4}
               />
             </svg>
+            {missingStartDate && (
+              <span className="text-[8px] text-muted-foreground/70 italic leading-none">
+                Start date required
+              </span>
+            )}
           </div>
         </HoverCardTrigger>
         <HoverCardContent side="left" className="w-auto p-3">
@@ -299,7 +306,7 @@ export function BurnSparkline({
   return (
     <HoverCard openDelay={100} closeDelay={50}>
       <HoverCardTrigger asChild>
-        <div className="cursor-pointer flex items-center justify-end">
+        <div className="cursor-pointer flex flex-col items-end">
           <svg width={width} height={height} className="overflow-visible">
             {/* Area fill */}
             <path
@@ -329,6 +336,11 @@ export function BurnSparkline({
               />
             )}
           </svg>
+          {missingStartDate && (
+            <span className="text-[8px] text-muted-foreground/70 italic leading-none">
+              Start date required
+            </span>
+          )}
         </div>
       </HoverCardTrigger>
       <HoverCardContent side="left" className="w-auto p-3">

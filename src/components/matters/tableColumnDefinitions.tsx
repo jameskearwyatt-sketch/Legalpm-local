@@ -10,12 +10,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, ArrowRightCircle, Lightbulb, ArrowUpDown } from 'lucide-react';
+import { MoreHorizontal, ArrowRightCircle, Lightbulb, ArrowUpDown, Info } from 'lucide-react';
 import { formatCurrency, convertToUsd } from '@/lib/currencyUtils';
 import { getClientDisplayName } from '@/lib/clientUtils';
 import { ProgressSlider } from './ProgressSlider';
 import { HighlightedFinancialValue } from './HighlightedFinancialValue';
 import { BurnSparkline } from './BurnSparkline';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { MatterWithFinancials, MatterCategory } from '@/lib/hooks/useMatters';
 
 // Types for column definitions
@@ -302,7 +307,18 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
       (ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: (ctx) => (
-      <SortableHeader field="budget_burn_pct" {...ctx}>BM Burn</SortableHeader>
+      <div className="flex items-center gap-1">
+        <SortableHeader field="budget_burn_pct" {...ctx}>BM Burn</SortableHeader>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Info className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[220px] text-xs">
+            When WIP proposals are applied, sorting uses adjusted figures. 
+            Charts show historical data with proposal adjustments visualized as striped areas.
+          </TooltipContent>
+        </Tooltip>
+      </div>
     ),
     renderCell: (ctx) => {
       const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
@@ -311,6 +327,15 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
       const usdEquivalent = currency !== 'USD' 
         ? convertToUsd(ctx.budgetBurn, currency, ctx.matter.exchange_rate, ctx.gbpToUsdRate, ctx.liveRates)
         : undefined;
+      
+      // Check for active proposal
+      const hasActiveProposal = !!(ctx.matter as any).show_shaping_proposal && !!(ctx.matter as any).selected_proposal;
+      const proposal = (ctx.matter as any).selected_proposal;
+      
+      // Calculate raw burn (before proposal adjustments) for the drop visualization
+      const rawBurn = (ctx.matter.latest_snapshot?.wip_amount || 0) + 
+                      (ctx.matter.latest_snapshot?.accounts_receivable || 0) + 
+                      (ctx.matter.latest_snapshot?.paid_amount || 0);
       
       return (
         <BurnSparkline
@@ -322,6 +347,12 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
           usdEquivalent={usdEquivalent}
           startDate={ctx.matter.start_date}
           onHoldMonths={(ctx.matter as any).on_hold_months || 0}
+          hasActiveProposal={hasActiveProposal}
+          proposalData={hasActiveProposal ? {
+            wip_write_off_amount: proposal?.wip_write_off_amount || 0,
+            ar_write_off_amount: proposal?.ar_write_off_amount || 0,
+          } : null}
+          rawBurn={rawBurn}
         />
       );
     },

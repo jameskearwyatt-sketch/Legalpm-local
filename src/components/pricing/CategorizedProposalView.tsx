@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DraftProposalItem, BUDGET_CATEGORIES, ProposalPhase } from '@/lib/hooks/usePricingProposals';
 import { CategoryFeeAllocationDialog } from './CategoryFeeAllocationDialog';
-
+import { calculateFeeRange } from '@/lib/feeSpreadUtils';
 type BudgetCategory = typeof BUDGET_CATEGORIES[number];
 
 // Category color maps for summary boxes
@@ -227,15 +227,18 @@ export function CategorizedProposalView({
     return affectedItems.reduce((sum, item) => sum + item.currentFee, 0);
   }, [affectedItems]);
   
-  // Apply fee allocations
+  // Apply fee allocations - now includes risk-based lower estimate calculation
   const handleApplyAllocations = useCallback((allocations: Map<number, number>) => {
     const newItems = items.map((item, index) => {
-      const newFee = allocations.get(index);
-      if (newFee !== undefined) {
+      const newFeeUpper = allocations.get(index);
+      if (newFeeUpper !== undefined) {
+        // Calculate fee_lower and fee_amount based on category risk
+        const { fee_lower, fee_amount } = calculateFeeRange(newFeeUpper, item.category);
         return {
           ...item,
-          fee_upper: newFee,
-          fee_amount: Math.round((item.fee_lower ?? 0) + newFee) / 2, // Update midpoint
+          fee_upper: newFeeUpper,
+          fee_lower,
+          fee_amount,
         };
       }
       return item;

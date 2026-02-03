@@ -20,9 +20,11 @@ interface StatCardProps {
   variant?: 'default' | 'success' | 'warning' | 'danger';
   className?: string;
   infoTooltip?: string;
+  note?: string; // Optional note to display below the value (e.g., for WIP proposals)
+  noteVariant?: 'default' | 'amber' | 'info';
 }
 
-export function StatCard({ title, value, icon, trend, variant = 'default', className, infoTooltip }: StatCardProps) {
+export function StatCard({ title, value, icon, trend, variant = 'default', className, infoTooltip, note, noteVariant = 'default' }: StatCardProps) {
   const variantStyles = {
     default: 'bg-card',
     success: 'bg-success/5 border-success/20',
@@ -58,6 +60,16 @@ export function StatCard({ title, value, icon, trend, variant = 'default', class
               )}
             </div>
             <p className="text-2xl font-heading font-bold text-foreground">{value}</p>
+            {note && (
+              <p className={cn(
+                'text-xs mt-0.5',
+                noteVariant === 'amber' ? 'text-amber-600 dark:text-amber-500' : 
+                noteVariant === 'info' ? 'text-blue-600 dark:text-blue-500' : 
+                'text-muted-foreground'
+              )}>
+                {note}
+              </p>
+            )}
             {trend && (
               <div className="flex items-center gap-1 text-sm">
                 {trend.value > 0 ? (

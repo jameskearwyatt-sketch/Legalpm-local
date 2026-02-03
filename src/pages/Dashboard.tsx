@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/ui/stat-card';
@@ -51,6 +51,8 @@ export default function Dashboard() {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const isHoveringTooltipRef = useRef(false);
   const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // "Not my matters" checkbox defaults to unchecked (meaning they're excluded by default)
+  const [notMyMattersIncluded, setNotMyMattersIncluded] = useState(false);
   const { data: stats, isLoading } = useDashboard(excludedMatterIds, excludedPipelineMatterIds);
   const { matters } = useMatters();
   const { user } = useAuth();
@@ -147,6 +149,19 @@ export default function Dashboard() {
 
     return { myPipelineMatterIds: myIds, notMyPipelineMatterIds: notMyIds };
   }, [stats?.pipelineMatters, matters, userName]);
+
+  // Initialize exclusions: by default, exclude "not my matters"
+  // This runs once when the not-my-matters set is first populated
+  const [hasInitializedExclusions, setHasInitializedExclusions] = useState(false);
+  
+  useEffect(() => {
+    if (!hasInitializedExclusions && notMyMatterIds.size > 0) {
+      // Exclude all "not my matters" by default
+      setExcludedMatterIds(Array.from(notMyMatterIds));
+      setExcludedPipelineMatterIds(Array.from(notMyPipelineMatterIds));
+      setHasInitializedExclusions(true);
+    }
+  }, [notMyMatterIds, notMyPipelineMatterIds, hasInitializedExclusions]);
 
   // Calculate master checkbox states for Live matters
   const myMattersAllIncluded = useMemo(() => {
@@ -338,6 +353,7 @@ export default function Dashboard() {
       value: formatCurrency(stats?.totalWip || 0, 'USD'),
       icon: <Clock className="h-5 w-5" />,
       variant: 'default' as const,
+      hasProposalAdjustment: stats?.hasActiveWipProposals || false,
     },
     {
       title: 'Total Billed',
@@ -403,6 +419,8 @@ export default function Dashboard() {
               icon={card.icon}
               variant={card.variant}
               infoTooltip={'infoTooltip' in card ? card.infoTooltip : undefined}
+              note={'hasProposalAdjustment' in card && card.hasProposalAdjustment ? 'Adjusted for WIP proposals' : undefined}
+              noteVariant={'hasProposalAdjustment' in card && card.hasProposalAdjustment ? 'amber' : undefined}
             />
           ))}
         </div>

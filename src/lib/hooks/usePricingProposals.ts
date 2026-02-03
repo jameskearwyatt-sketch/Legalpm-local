@@ -137,6 +137,8 @@ export interface ScopeAssumptionsState {
   documentAssumptions: DocumentAssumptionsState;
   documentNarratives: string[];
   customAssumptions?: CustomAssumption[];
+  // Custom-edited process narrative (overrides auto-generated)
+  processNarrativeOverride?: string;
 }
 
 export interface PricingProposal {

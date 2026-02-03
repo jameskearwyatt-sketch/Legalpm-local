@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -818,8 +818,8 @@ export default function PricingProposalDetail() {
     setHasUnsavedChanges(true);
   };
 
-  // Update work item
-  const updateItem = (index: number, updates: Partial<DraftProposalItem>) => {
+  // Update work item - memoized to prevent child re-renders
+  const updateItem = useCallback((index: number, updates: Partial<DraftProposalItem>) => {
     setDraftItems(prev => {
       const updatedItems = prev.map((item, i) => 
         i === index ? { ...item, ...updates } : item
@@ -850,16 +850,16 @@ export default function PricingProposalDetail() {
       return updatedItems;
     });
     setHasUnsavedChanges(true);
-  };
+  }, []);
 
-  // Remove work item
-  const removeItem = (index: number) => {
+  // Remove work item - memoized to prevent child re-renders
+  const removeItem = useCallback((index: number) => {
     setDraftItems(prev => prev.filter((_, i) => i !== index));
     setHasUnsavedChanges(true);
-  };
+  }, []);
 
   // Duplicate work item - inserts copy immediately below the original
-  const duplicateItem = (index: number) => {
+  const duplicateItem = useCallback((index: number) => {
     setDraftItems(prev => {
       const itemToDuplicate = prev[index];
       const duplicatedItem: DraftProposalItem = {
@@ -871,10 +871,10 @@ export default function PricingProposalDetail() {
       return newItems;
     });
     setHasUnsavedChanges(true);
-  };
+  }, []);
 
   // Handle drag end for reordering items
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
     if (!over || active.id === over.id) return;
 
@@ -883,13 +883,13 @@ export default function PricingProposalDetail() {
 
     setDraftItems(prev => arrayMove(prev, oldIndex, newIndex));
     setHasUnsavedChanges(true);
-  };
+  }, []);
 
   // Open iterative pricing dialog for a work item
-  const openIterativePricing = (index: number) => {
+  const openIterativePricing = useCallback((index: number) => {
     setIterativeDialogIndex(index);
     setIterativeDialogOpen(true);
-  };
+  }, []);
 
   // Apply iterative pricing result to work item
   const applyIterativePricing = (result: {

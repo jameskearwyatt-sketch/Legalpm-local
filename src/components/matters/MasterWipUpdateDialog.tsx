@@ -577,6 +577,7 @@ export function MasterWipUpdateDialog({
       if (!d.selected || !d.matchedMatterId) return sum;
       return sum + 
         (d.wip.selected && d.wip.changed ? 1 : 0) +
+        (d.wipWriteOff?.selected && d.wipWriteOff?.changed ? 1 : 0) +
         (d.accountsReceivable.selected && d.accountsReceivable.changed ? 1 : 0) +
         (d.totalBilled.selected && d.totalBilled.changed ? 1 : 0) +
         (d.totalPaid.selected && d.totalPaid.changed ? 1 : 0);
@@ -884,6 +885,7 @@ export function MasterWipUpdateDialog({
 
     // Update the item with the confirmed match
     const snapshot = selectedMatter.latest_snapshot;
+    const currentWipWriteOff = snapshot?.wip_write_off_amount || 0;
     const updatedItem: ImportedMatterData = {
       ...item,
       matchedMatterId: matterId,
@@ -895,6 +897,12 @@ export function MasterWipUpdateDialog({
         ...item.wip, 
         current: snapshot?.wip_amount || 0,
         changed: Math.abs(item.wip.value - (snapshot?.wip_amount || 0)) / Math.max(snapshot?.wip_amount || 1, 1) > 0.005,
+      },
+      wipWriteOff: {
+        value: item.wipWriteOff?.value || 0,
+        current: currentWipWriteOff,
+        changed: Math.abs((item.wipWriteOff?.value || 0) - currentWipWriteOff) / Math.max(currentWipWriteOff || 1, 1) > 0.005,
+        selected: false, // Will be set below
       },
       accountsReceivable: { 
         ...item.accountsReceivable, 
@@ -918,6 +926,7 @@ export function MasterWipUpdateDialog({
     setImportedData(prev => [...prev, {
       ...updatedItem,
       wip: { ...updatedItem.wip, selected: updatedItem.wip.changed },
+      wipWriteOff: { ...updatedItem.wipWriteOff, selected: updatedItem.wipWriteOff.changed },
       accountsReceivable: { ...updatedItem.accountsReceivable, selected: updatedItem.accountsReceivable.changed },
       totalBilled: { ...updatedItem.totalBilled, selected: updatedItem.totalBilled.changed },
       totalPaid: { ...updatedItem.totalPaid, selected: updatedItem.totalPaid.changed },
@@ -956,6 +965,9 @@ export function MasterWipUpdateDialog({
     const remaining = lowConfidenceData.map(item => ({
       ...item,
       wip: { ...item.wip, selected: item.wip.changed },
+      wipWriteOff: item.wipWriteOff 
+        ? { ...item.wipWriteOff, selected: item.wipWriteOff.changed }
+        : { value: 0, current: 0, changed: false, selected: false },
       accountsReceivable: { ...item.accountsReceivable, selected: item.accountsReceivable.changed },
       totalBilled: { ...item.totalBilled, selected: item.totalBilled.changed },
       totalPaid: { ...item.totalPaid, selected: item.totalPaid.changed },
@@ -1126,6 +1138,12 @@ export function MasterWipUpdateDialog({
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">WIP:</span>
                         <span>Column {(format.column_mappings.wip) + 1}</span>
+                      </div>
+                    )}
+                    {format.column_mappings.wip_write_off !== undefined && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">WIP Write-off:</span>
+                        <span>Column {(format.column_mappings.wip_write_off) + 1}</span>
                       </div>
                     )}
                     {format.column_mappings.accounts_receivable !== undefined && (

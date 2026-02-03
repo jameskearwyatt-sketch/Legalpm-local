@@ -450,7 +450,12 @@ export function useMatters() {
   });
 
   const updateMatter = useMutation({
-    mutationFn: async ({ id, ...input }: Partial<CreateMatterInput> & { id: string }) => {
+    mutationFn: async ({ id, ...input }: Partial<CreateMatterInput> & { id: string } & { 
+      rate_modifier?: string | null;
+      rate_modifier_value?: number | null;
+      rate_modifier_scope?: string | null;
+    }) => {
+      // First, update the current matter
       const { data, error } = await supabase
         .from('matters')
         .update(input)
@@ -459,11 +464,50 @@ export function useMatters() {
         .single();
 
       if (error) throw error;
+
+      // Check if we need to propagate rate modifier to other client matters
+      if (input.rate_modifier_scope === 'all_client_matters' && 
+          (input.rate_modifier === 'discounted_rates' || input.rate_modifier === 'blended_hourly_rate')) {
+        
+        // Get the client_id from the updated matter
+        const clientId = data.client_id;
+        
+        if (clientId) {
+          // Find all other matters for this client where the client is the SOLE client (not multi-client)
+          // Exclude the current matter
+          const { data: otherMatters, error: fetchError } = await supabase
+            .from('matters')
+            .select('id')
+            .eq('client_id', clientId)
+            .eq('is_multi_client', false)
+            .neq('id', id);
+          
+          if (!fetchError && otherMatters && otherMatters.length > 0) {
+            // Update all those matters with the same rate modifier settings
+            const otherMatterIds = otherMatters.map(m => m.id);
+            
+            await supabase
+              .from('matters')
+              .update({
+                rate_modifier: input.rate_modifier,
+                rate_modifier_value: input.rate_modifier_value,
+                rate_modifier_scope: input.rate_modifier_scope,
+              })
+              .in('id', otherMatterIds);
+          }
+        }
+      }
+
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['matters'] });
-      toast({ title: 'Matter updated successfully' });
+      // Show a more informative message when propagating
+      if (variables.rate_modifier_scope === 'all_client_matters') {
+        toast({ title: 'Rate modifier applied to all client matters' });
+      } else {
+        toast({ title: 'Matter updated successfully' });
+      }
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to update matter', description: error.message, variant: 'destructive' });

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { format, parseISO } from 'date-fns';
-import { formatCurrency, convertToUsd } from '@/lib/currencyUtils';
+import { format, parseISO, differenceInDays } from 'date-fns';
+import { formatCurrency } from '@/lib/currencyUtils';
 import {
   HoverCard,
   HoverCardContent,
@@ -23,6 +23,13 @@ interface BurnSparklineProps {
   burnPercent: number;
   usdEquivalent?: number;
   startDate?: string | null;
+  onHoldMonths?: number;
+}
+
+interface DataPoint {
+  date: string;
+  burn: number;
+  isSynthetic?: boolean;
 }
 
 export function BurnSparkline({
@@ -33,6 +40,7 @@ export function BurnSparkline({
   burnPercent,
   usdEquivalent,
   startDate,
+  onHoldMonths = 0,
 }: BurnSparklineProps) {
   // Dimensions for the sparkline
   const width = 90;
@@ -41,7 +49,28 @@ export function BurnSparkline({
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
-  // Calculate burn for each snapshot
+  // Calculate burn rate per month for extrapolation
+  const burnRatePerMonth = useMemo(() => {
+    if (!startDate || currentBurn <= 0) return 0;
+    
+    const start = parseISO(startDate);
+    const now = new Date();
+    
+    // Calculate months elapsed
+    const yearDiff = now.getFullYear() - start.getFullYear();
+    const monthDiff = now.getMonth() - start.getMonth();
+    const dayDiff = now.getDate() - start.getDate();
+    let totalMonths = yearDiff * 12 + monthDiff;
+    const daysInCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    totalMonths += dayDiff / daysInCurrentMonth;
+    
+    // Subtract on-hold months
+    const activeMonths = Math.max(totalMonths - onHoldMonths, 0.1);
+    
+    return currentBurn / activeMonths;
+  }, [startDate, currentBurn, onHoldMonths]);
+
+  // Calculate burn for each snapshot and add synthetic historical points
   const dataPoints = useMemo(() => {
     if (!snapshots || snapshots.length === 0) return [];
     
@@ -50,15 +79,62 @@ export function BurnSparkline({
       new Date(a.as_of_date).getTime() - new Date(b.as_of_date).getTime()
     );
 
-    return sorted.map(snap => {
+    const realPoints: DataPoint[] = sorted.map(snap => {
       const netWip = (snap.wip_amount || 0) - (snap.wip_write_off_amount || 0);
       const burn = netWip + (snap.accounts_receivable || 0) + (snap.paid_amount || 0);
       return {
         date: snap.as_of_date,
         burn,
+        isSynthetic: false,
       };
     });
-  }, [snapshots]);
+
+    // If we have a start date and burn rate, extrapolate backwards to zero
+    if (startDate && burnRatePerMonth > 0 && realPoints.length > 0) {
+      const startDateParsed = parseISO(startDate);
+      const firstRealPoint = realPoints[0];
+      const firstRealDate = parseISO(firstRealPoint.date);
+      
+      // Only extrapolate if the first snapshot is after the start date
+      if (firstRealDate > startDateParsed) {
+        const syntheticPoints: DataPoint[] = [];
+        
+        // Always add a zero point at start date
+        syntheticPoints.push({
+          date: startDate,
+          burn: 0,
+          isSynthetic: true,
+        });
+        
+        // Calculate how many months between start and first real snapshot
+        const daysBetween = differenceInDays(firstRealDate, startDateParsed);
+        const monthsBetween = daysBetween / 30.44; // Average days per month
+        
+        // Generate intermediate points using burn rate, walking forward from zero
+        // We'll add points roughly monthly, stopping when we reach the first real snapshot
+        if (monthsBetween > 1) {
+          const numIntermediatePoints = Math.min(Math.floor(monthsBetween), 6); // Cap at 6 points
+          
+          for (let i = 1; i <= numIntermediatePoints; i++) {
+            const fraction = i / (numIntermediatePoints + 1);
+            const pointDate = new Date(startDateParsed.getTime() + fraction * daysBetween * 24 * 60 * 60 * 1000);
+            const estimatedBurn = Math.min(fraction * firstRealPoint.burn, firstRealPoint.burn);
+            
+            syntheticPoints.push({
+              date: pointDate.toISOString().split('T')[0],
+              burn: Math.max(0, estimatedBurn),
+              isSynthetic: true,
+            });
+          }
+        }
+        
+        // Prepend synthetic points to real points
+        return [...syntheticPoints, ...realPoints];
+      }
+    }
+
+    return realPoints;
+  }, [snapshots, startDate, burnRatePerMonth]);
 
   // Determine color based on burn percentage
   const getColor = (percent: number) => {
@@ -68,6 +144,9 @@ export function BurnSparkline({
   };
 
   const colors = getColor(burnPercent);
+
+  // Count real snapshots for tooltip
+  const realSnapshotCount = dataPoints.filter(d => !d.isSynthetic).length;
 
   // Build SVG path
   const { pathD, areaD, budgetLineY, dotPosition } = useMemo(() => {
@@ -79,7 +158,7 @@ export function BurnSparkline({
     const maxBurn = Math.max(...dataPoints.map(d => d.burn), currentBurn);
     const yMax = Math.max(bmBudget * 1.1, maxBurn * 1.1, 1); // At least show some range
     
-    // X scale - time range
+    // X scale - time range (always start from startDate if available, otherwise first data point)
     const dates = dataPoints.map(d => new Date(d.date).getTime());
     const minDate = Math.min(...dates);
     const maxDate = Math.max(...dates, Date.now());
@@ -106,7 +185,7 @@ export function BurnSparkline({
       return { pathD: '', areaD: '', budgetLineY: budgetY, dotPosition: null };
     }
 
-    // For single point, just return dot position
+    // For single point (after extrapolation), still try to show a line from zero
     if (points.length === 1) {
       return {
         pathD: '',
@@ -156,16 +235,16 @@ export function BurnSparkline({
       }>
         {burnPercent.toFixed(0)}% of budget
       </div>
-      {dataPoints.length > 0 && (
+      {realSnapshotCount > 0 && (
         <div className="text-muted-foreground text-[10px] mt-1 pt-1 border-t">
-          {dataPoints.length} snapshot{dataPoints.length !== 1 ? 's' : ''} 
+          {realSnapshotCount} snapshot{realSnapshotCount !== 1 ? 's' : ''} 
           {startDate && ` since ${format(parseISO(startDate), 'MMM yyyy')}`}
         </div>
       )}
     </div>
   );
 
-  // Render single dot for matters with only 1 snapshot
+  // Render single dot for matters with only 1 real snapshot and no extrapolation possible
   if (dataPoints.length <= 1) {
     const dotY = dotPosition?.y ?? height / 2;
     const dotX = width / 2;

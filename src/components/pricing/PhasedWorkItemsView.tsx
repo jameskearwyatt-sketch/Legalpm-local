@@ -365,17 +365,24 @@ export function PhasedWorkItemsView({
     return [...standardCats, ...customCats];
   }, []);
 
-  // Render phase section
-  const renderPhaseSection = (phaseId: string, phaseName: string, isUnassigned: boolean = false) => {
+  // Phase section component - extracted so hooks work properly
+  const PhaseSection = ({ 
+    phaseId, 
+    phaseName, 
+    isUnassigned = false,
+    dragHandleProps
+  }: { 
+    phaseId: string; 
+    phaseName: string; 
+    isUnassigned?: boolean;
+    dragHandleProps?: { attributes: Record<string, any>; listeners: Record<string, any> | undefined } | null;
+  }) => {
     const categories = groupedItems[phaseId] || {};
     const totals = phaseTotals[phaseId] || { lower: 0, upper: 0, included: 0, total: 0 };
     const isExpanded = expandedPhases.has(phaseId);
     const phase = phases.find(p => p.id === phaseId);
     const hasExcludedItems = totals.included < totals.total;
     const orderedCategories = getOrderedCategories(categories);
-
-    // Get drag handle props from context (if wrapped in SortablePhaseWrapper)
-    const dragContext = usePhaseDragHandle();
 
     // Don't render empty unassigned section
     if (isUnassigned && totals.total === 0) return null;
@@ -386,11 +393,11 @@ export function PhasedWorkItemsView({
           <CardHeader className="py-3">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                {!isUnassigned && !viewingHistoricalVersion && dragContext && (
+                {!isUnassigned && !viewingHistoricalVersion && dragHandleProps && (
                   <div 
                     className="cursor-grab active:cursor-grabbing"
-                    {...dragContext.attributes}
-                    {...dragContext.listeners}
+                    {...dragHandleProps.attributes}
+                    {...dragHandleProps.listeners}
                   >
                     <GripVertical className="h-5 w-5 text-muted-foreground" />
                   </div>
@@ -717,7 +724,14 @@ export function PhasedWorkItemsView({
                 phaseId={phase.id}
                 disabled={viewingHistoricalVersion}
               >
-                {renderPhaseSection(phase.id, phase.name, false)}
+                {(dragHandleProps) => (
+                  <PhaseSection 
+                    phaseId={phase.id} 
+                    phaseName={phase.name} 
+                    isUnassigned={false}
+                    dragHandleProps={dragHandleProps}
+                  />
+                )}
               </SortablePhaseWrapper>
             ))}
           </div>
@@ -726,7 +740,7 @@ export function PhasedWorkItemsView({
       
       {/* Unassigned section (not draggable) */}
       <div className="mt-3">
-        {renderPhaseSection('unassigned', 'Unassigned Items', true)}
+        <PhaseSection phaseId="unassigned" phaseName="Unassigned Items" isUnassigned={true} />
       </div>
 
       {/* Empty state */}
@@ -801,14 +815,8 @@ import { CSS } from '@dnd-kit/utilities';
 interface SortablePhaseWrapperProps {
   phaseId: string;
   disabled: boolean;
-  children: React.ReactNode;
+  children: (dragHandleProps: { attributes: Record<string, any>; listeners: Record<string, any> | undefined } | null) => React.ReactNode;
 }
-
-// Create a context to pass drag handle props to the phase section
-const PhaseDragContext = React.createContext<{
-  attributes: Record<string, any>;
-  listeners: Record<string, any> | undefined;
-} | null>(null);
 
 function SortablePhaseWrapper({ phaseId, disabled, children }: SortablePhaseWrapperProps) {
   const {
@@ -828,17 +836,10 @@ function SortablePhaseWrapper({ phaseId, disabled, children }: SortablePhaseWrap
   };
 
   return (
-    <PhaseDragContext.Provider value={{ attributes, listeners }}>
-      <div ref={setNodeRef} style={style}>
-        {children}
-      </div>
-    </PhaseDragContext.Provider>
+    <div ref={setNodeRef} style={style}>
+      {children(disabled ? null : { attributes, listeners })}
+    </div>
   );
-}
-
-// Hook to use the phase drag handle in child components
-function usePhaseDragHandle() {
-  return React.useContext(PhaseDragContext);
 }
 
 // Inline table cells component for items within the phased view

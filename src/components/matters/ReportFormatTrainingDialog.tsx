@@ -33,7 +33,7 @@ const FIELD_CONFIG: Record<FieldType, { label: string; color: string; required: 
   matter_name: { label: 'Matter Name', color: 'bg-indigo-500', required: false },
   client_name: { label: 'Client Name', color: 'bg-cyan-500', required: false },
   wip: { label: 'WIP', color: 'bg-amber-500', required: true },
-  wip_write_off: { label: 'WIP Write-off', color: 'bg-red-500', required: false, group: 'financials' },
+  wip_write_off: { label: 'WIP Write-off', color: 'bg-red-500', required: false },
   accounts_receivable: { label: 'Accounts Receivable', color: 'bg-orange-500', required: true },
   total_billed: { label: 'Total Billed', color: 'bg-purple-500', required: true },
   total_paid: { label: 'Total Paid', color: 'bg-green-500', required: true },

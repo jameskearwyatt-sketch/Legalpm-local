@@ -26,6 +26,7 @@ interface MatterData {
   currentAr: number;
   currentPaid: number;
   totalBudgetUtilised: number;
+  agreedBudget: number;
   reviewPeriodDays: number | null; // null means "from beginning" / all time
   userNotes?: string;
 }
@@ -167,8 +168,14 @@ function formatCurrency(amount: number, currency: string): string {
 
 function buildAggregateSection(matter: MatterData, currency: string): string {
   const totalUtilised = matter.totalBudgetUtilised || (matter.currentWip + matter.currentAr + matter.currentPaid);
+  const agreedBudget = matter.agreedBudget || 0;
   
   const lines: string[] = [];
+  
+  // Show agreed budget first if available
+  if (agreedBudget > 0) {
+    lines.push(`Agreed budget: ${formatCurrency(agreedBudget, currency)}`);
+  }
   
   lines.push(`Total budget utilised to date: ${formatCurrency(totalUtilised, currency)}`);
   lines.push("");

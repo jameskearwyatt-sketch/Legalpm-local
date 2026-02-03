@@ -16,7 +16,7 @@ export interface SimpleAssumption {
   id: string;
   label: string;
   description: string;
-  category: 'timeline' | 'scope' | 'process';
+  category: 'timeline' | 'scope' | 'process' | 'local_counsel';
   sectionType: 'general' | 'sector_specific';
   requiresInput: boolean;
   inputType?: 'text' | 'number' | 'select';
@@ -248,6 +248,25 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
     requiresInput: false,
     narrativeTemplate: () => 'All transaction documents will be governed by a single jurisdiction. Multi-jurisdictional advice or coordination with foreign counsel is excluded unless separately scoped.',
   },
+  // --- LOCAL COUNSEL ASSUMPTIONS ---
+  {
+    id: 'lc_bm_onbill',
+    label: 'Local counsel fees on-billed by Baker McKenzie',
+    description: 'LC bills BM, BM on-bills client as disbursement',
+    category: 'local_counsel',
+    sectionType: 'general',
+    requiresInput: false,
+    narrativeTemplate: () => 'The client will enter into a separate engagement letter with local counsel. Local counsel fees will be billed to Baker McKenzie, who will on-bill these to the client as a disbursement.',
+  },
+  {
+    id: 'lc_direct_billing',
+    label: 'Client interfaces directly with local counsel',
+    description: 'Client handles LC fees and billing directly',
+    category: 'local_counsel',
+    sectionType: 'general',
+    requiresInput: false,
+    narrativeTemplate: () => 'The client will enter into a separate engagement letter with local counsel. The client will interface directly with local counsel in relation to their fees and billing arrangements.',
+  },
   // --- SECTOR-SPECIFIC ASSUMPTIONS (placeholder for future) ---
 ];
 
@@ -318,6 +337,7 @@ const categoryIcons: Record<string, React.ReactNode> = {
   timeline: <Clock className="h-4 w-4" />,
   scope: <Scale className="h-4 w-4" />,
   process: <Users className="h-4 w-4" />,
+  local_counsel: <Users className="h-4 w-4" />,
   documentation: <FileText className="h-4 w-4" />,
 };
 
@@ -325,6 +345,7 @@ const categoryLabels: Record<string, string> = {
   timeline: 'Timeline',
   scope: 'Scope Boundaries',
   process: 'Process',
+  local_counsel: 'Local Counsel',
   documentation: 'Documentation',
 };
 

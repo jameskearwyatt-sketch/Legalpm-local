@@ -136,14 +136,30 @@ Provide a fee amount in ${currency} and a brief rationale for each.`;
     const data = await response.json();
     console.log('AI response:', JSON.stringify(data, null, 2));
 
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall || toolCall.function.name !== 'suggest_pricing') {
-      throw new Error('Invalid response from AI');
+    // Handle multiple tool calls - AI may split responses across multiple calls
+    const toolCalls = data.choices?.[0]?.message?.tool_calls || [];
+    if (toolCalls.length === 0) {
+      throw new Error('No tool calls in AI response');
     }
 
-    const pricing = JSON.parse(toolCall.function.arguments);
+    // Merge prices from all tool calls
+    const allPrices: any[] = [];
+    for (const toolCall of toolCalls) {
+      if (toolCall.function?.name === 'suggest_pricing') {
+        try {
+          const parsed = JSON.parse(toolCall.function.arguments);
+          if (parsed.prices && Array.isArray(parsed.prices)) {
+            allPrices.push(...parsed.prices);
+          }
+        } catch (parseErr) {
+          console.error('Failed to parse tool call arguments:', parseErr);
+        }
+      }
+    }
 
-    return new Response(JSON.stringify(pricing), {
+    console.log(`Merged ${allPrices.length} prices from ${toolCalls.length} tool calls`);
+
+    return new Response(JSON.stringify({ prices: allPrices }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

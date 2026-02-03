@@ -530,6 +530,9 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         }
         fullBody += emailData.combinedNarrative;
         
+        // Standard closing paragraph
+        fullBody += `\n\nPlease do let me know if it would be helpful to discuss these figures or if you would like any further information.\n\nKind regards,`;
+        
         if (emailSignature) {
           fullBody += `\n\n${emailSignature}`;
         }

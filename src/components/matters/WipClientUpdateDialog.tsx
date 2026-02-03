@@ -84,6 +84,7 @@ interface MatterEmailData {
   currentAr: number;
   currentPaid: number;
   totalBudgetUtilised: number; // WIP + AR + Paid (all time)
+  agreedBudget: number;
 }
 
 type WizardStep = "select-matters" | "billing-contacts" | "welcome-paragraph" | "matter-details" | "review-emails" | "complete";
@@ -253,6 +254,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         currentAr,
         currentPaid,
         totalBudgetUtilised: currentWip + currentAr + currentPaid,
+        agreedBudget: matter.agreed_budget_amount || 0,
       });
     });
 
@@ -334,6 +336,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
             currentAr: data.currentAr,
             currentPaid: data.currentPaid,
             totalBudgetUtilised: data.totalBudgetUtilised,
+            agreedBudget: data.agreedBudget,
             // reviewPeriodDays: null means "from beginning" / all time
             reviewPeriodDays: data.reviewPeriodStart 
               ? differenceInDays(data.reviewPeriodEnd, data.reviewPeriodStart)

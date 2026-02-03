@@ -1694,6 +1694,10 @@ export default function PricingProposalDetail() {
                 {hasUnsavedChanges && (
                   <Badge variant="destructive">Unsaved changes</Badge>
                 )}
+                <Button onClick={() => setIsAddWorkItemDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Item
+                </Button>
                 <Button variant="outline" onClick={handleExportClick}>
                   <FileDown className="h-4 w-4 mr-2" />
                   Export Excel
@@ -2028,10 +2032,6 @@ export default function PricingProposalDetail() {
                   >
                     <RotateCcw className="h-4 w-4 mr-2" />
                     Clear Pricing
-                  </Button>
-                  <Button onClick={() => setIsAddWorkItemDialogOpen(true)}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Item
                   </Button>
                 </CardContent>
               </Card>

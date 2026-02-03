@@ -396,13 +396,15 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
   burn_rate: {
     id: 'burn_rate',
     categories: ['Live'],
-    headerClassName: 'text-right min-w-[100px]',
+    headerClassName: 'text-right min-w-[70px]',
     cellClassName: (ctx) => cn(
       "text-right",
       (ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: (ctx) => (
-      <SortableHeader field="burn_rate_usd" {...ctx}>BM Burn Rate</SortableHeader>
+      <SortableHeader field="burn_rate_usd" {...ctx}>
+        <span className="text-center leading-tight">BM Burn<br/>Rate</span>
+      </SortableHeader>
     ),
     renderCell: (ctx) => {
       if (!ctx.matter.start_date) {
@@ -457,13 +459,15 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
   bm_headroom: {
     id: 'bm_headroom',
     categories: ['Live'],
-    headerClassName: 'text-right min-w-[80px]',
+    headerClassName: 'text-right min-w-[65px]',
     cellClassName: (ctx) => cn(
       "text-right",
       (ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: (ctx) => (
-      <SortableHeader field="headroom" {...ctx}>BM Headroom</SortableHeader>
+      <SortableHeader field="headroom" {...ctx}>
+        <span className="text-center leading-tight">BM<br/>Headroom</span>
+      </SortableHeader>
     ),
     renderCell: (ctx) => {
       if ((ctx.matter as any).pay_full_time_costs) {
@@ -556,10 +560,12 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
   bm_budget: {
     id: 'bm_budget',
     categories: ['Live'],
-    headerClassName: 'text-right min-w-[85px]',
+    headerClassName: 'text-right min-w-[65px]',
     cellClassName: 'text-right font-medium',
     renderHeader: (ctx) => (
-      <SortableHeader field="bm_fee" {...ctx}>BM Budget</SortableHeader>
+      <SortableHeader field="bm_fee" {...ctx}>
+        <span className="text-center leading-tight">BM<br/>Budget</span>
+      </SortableHeader>
     ),
     renderCell: (ctx) => {
       if ((ctx.matter as any).pay_full_time_costs) {

@@ -89,6 +89,13 @@ Deno.serve(async (req) => {
       const challenge = crypto.getRandomValues(new Uint8Array(32));
       const challengeBase64 = bufferToBase64url(challenge);
 
+      // Extract the registrable domain for cross-subdomain compatibility
+      const origin = req.headers.get('origin') || 'https://legalpm.lovable.app';
+      const hostname = new URL(origin).hostname;
+      const rpId = hostname.endsWith('.lovable.app') ? 'lovable.app' : hostname;
+      
+      console.log('Auth Origin:', origin, 'RP ID:', rpId);
+
       const allowCredentials = passkeys.map((pk: { credential_id: string; transports: string[] }) => ({
         id: pk.credential_id,
         type: 'public-key',
@@ -97,7 +104,7 @@ Deno.serve(async (req) => {
 
       const options = {
         challenge: challengeBase64,
-        rpId: new URL(req.headers.get('origin') || 'https://legalpm.lovable.app').hostname,
+        rpId,
         allowCredentials,
         userVerification: 'required',
         timeout: 60000,

@@ -42,9 +42,11 @@ export function useWebAuthn() {
       }
 
       const { options, challenge } = optionsData;
+      
+      console.log('WebAuthn registration options:', JSON.stringify(options, null, 2));
 
       // Start the WebAuthn registration ceremony (triggers Face ID/Touch ID)
-      const credential = await startRegistration(options);
+      const credential = await startRegistration({ optionsJSON: options });
 
       // Verify and store the credential
       const { data: verifyData, error: verifyError } = await supabase.functions.invoke('webauthn-register', {
@@ -94,8 +96,10 @@ export function useWebAuthn() {
 
       const { options, challenge, userId } = optionsData;
 
+      console.log('WebAuthn authentication options:', JSON.stringify(options, null, 2));
+
       // Start the WebAuthn authentication ceremony (triggers Face ID/Touch ID)
-      const credential = await startAuthentication(options);
+      const credential = await startAuthentication({ optionsJSON: options });
 
       // Verify the credential
       const { data: verifyData, error: verifyError } = await supabase.functions.invoke('webauthn-authenticate', {

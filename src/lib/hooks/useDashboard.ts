@@ -211,11 +211,16 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         const feeCurrency = matter.fee_currency || 'GBP';
         const budget = Number(matter.fee_amount_upper_end) || 0;
         
-        // Use proposal data if enabled, otherwise use snapshot
-        // For WIP: use net WIP (raw WIP - WIP write-off) from proposal
+        // Use proposal data if enabled for WIP display, otherwise use snapshot
+        // For WIP: use net WIP (raw WIP - WIP write-off) from proposal for display
         const rawWipAmount = showProposalData ? Number(proposal.wip_amount) : Number(snapshot?.wip_amount) || 0;
-        const wipWriteOffAmount = showProposalData ? Number(proposal.wip_write_off_amount) : Number(snapshot?.wip_write_off_amount) || 0;
-        const wipAmount = rawWipAmount - wipWriteOffAmount; // Net WIP for display
+        const proposalWipWriteOff = showProposalData ? Number(proposal.wip_write_off_amount) : 0;
+        const wipAmount = rawWipAmount - proposalWipWriteOff; // Net WIP for display (adjusted by proposals)
+        
+        // IMPORTANT: For realization rate calculation, ONLY use actual write-offs from snapshots
+        // Proposal write-offs are provisional and should not affect collection/realization rates
+        const actualWipWriteOffAmount = Number(snapshot?.wip_write_off_amount) || 0;
+        
         const billedAmount = Number(snapshot?.billed_amount) || 0;
         const paidAmount = Number(snapshot?.paid_amount) || 0;
         
@@ -235,11 +240,12 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         if (!isExcluded) {
           // Convert to USD using live rates for accuracy
           totalBmFeesUsd += convertToUsd(effectiveBmFee, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-          // Use net WIP (after write-offs) for the dashboard figure
+          // Use net WIP (after proposal write-offs) for the dashboard WIP figure
           totalWipUsd += convertToUsd(wipAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
           totalBilledUsd += convertToUsd(billedAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
           totalPaidUsd += convertToUsd(paidAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-          totalWipWriteOffUsd += convertToUsd(wipWriteOffAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          // Only use ACTUAL write-offs for realization rate - never proposal write-offs
+          totalWipWriteOffUsd += convertToUsd(actualWipWriteOffAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
         }
 
         // Budget burn = WIP + AR + Paid (each value is mutually exclusive)

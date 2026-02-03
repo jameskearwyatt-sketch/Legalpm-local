@@ -339,7 +339,10 @@ export function useMatters() {
         // LC financial data - also stored in billing currency, no conversion needed
         const effectiveLcWip = lcWip;
         const effectiveLcBilled = lcBilled;
-        const lcTotalUsed = localCounselBilling === 'Disb' ? (effectiveLcWip + effectiveLcBilled) : 0;
+        // Check if any local counsel has 'Disb' billing mode, or fallback to matter-level setting
+        const hasDisb = localCounselBilling === 'Disb' || 
+          localCounsels.some(lc => lc.billing_mode === 'Disb');
+        const lcTotalUsed = hasDisb ? (effectiveLcWip + effectiveLcBilled) : 0;
         
         // Total budget burn includes both BM and LC (when in Disb mode)
         const totalUsed = bmTotalUsed + lcTotalUsed;

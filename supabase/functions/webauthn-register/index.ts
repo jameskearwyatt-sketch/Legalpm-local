@@ -81,11 +81,19 @@ Deno.serve(async (req) => {
         transports: ['internal', 'hybrid'],
       }));
 
+      // Extract the registrable domain (e.g., lovable.app) for cross-subdomain compatibility
+      const origin = req.headers.get('origin') || 'https://legalpm.lovable.app';
+      const hostname = new URL(origin).hostname;
+      // Use the parent domain for RP ID to work across preview and published URLs
+      const rpId = hostname.endsWith('.lovable.app') ? 'lovable.app' : hostname;
+      
+      console.log('Origin:', origin, 'Hostname:', hostname, 'RP ID:', rpId);
+      
       const options = {
         challenge: challengeBase64,
         rp: {
           name: 'Legal Practice Manager',
-          id: new URL(req.headers.get('origin') || 'https://legalpm.lovable.app').hostname,
+          id: rpId,
         },
         user: {
           id: bufferToBase64url(new TextEncoder().encode(userId)),

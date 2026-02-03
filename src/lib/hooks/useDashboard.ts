@@ -42,6 +42,7 @@ export interface DashboardStats {
   trendData: TrendDataPoint[];
   liveMatters: LiveMatter[];
   pipelineMatters: PipelineMatter[];
+  hasActiveWipProposals: boolean; // Track if any WIP shaping proposals are affecting figures
 }
 
 export interface Alert {
@@ -133,6 +134,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           trendData: [],
           liveMatters: liveMattersForUI,
           pipelineMatters: pipelineMattersForUI,
+          hasActiveWipProposals: false,
         } as DashboardStats;
       }
 
@@ -146,6 +148,19 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         .select('*')
         .in('matter_id', matterIds)
         .order('as_of_date', { ascending: false }) : { data: [] };
+
+      // Get selected WIP shaping proposals for matters that have show_shaping_proposal enabled
+      const { data: wipProposals } = matterIds.length > 0 ? await supabase
+        .from('wip_shaping_proposals')
+        .select('*')
+        .in('matter_id', matterIds)
+        .eq('is_selected', true) : { data: [] };
+
+      // Create a map of matter_id to selected proposal
+      const proposalMap = new Map<string, any>();
+      wipProposals?.forEach(proposal => {
+        proposalMap.set(proposal.matter_id, proposal);
+      });
 
       // Create a map of matter_id to latest snapshot
       const snapshotMap = new Map<string, any>();
@@ -161,6 +176,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       let totalPaidUsd = 0;
       let totalWipWriteOffUsd = 0;
       let totalPipelineValueUsd = 0;
+      let hasActiveWipProposals = false; // Track if any proposals are affecting WIP
       const alerts: Alert[] = [];
       const pipelineAlerts: PipelineAlert[] = [];
 
@@ -180,17 +196,28 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
 
       liveMatters?.forEach(matter => {
         const snapshot = snapshotMap.get(matter.id);
+        const proposal = proposalMap.get(matter.id);
         const isExcluded = excludedSet.has(matter.id);
+        
+        // Check if this matter has an active WIP shaping proposal
+        const showProposalData = matter.show_shaping_proposal && proposal;
+        if (showProposalData && !isExcluded) {
+          hasActiveWipProposals = true;
+        }
         
         // Use bm_fee_component as the BM fee and convert to USD using proper conversion
         const bmFee = Number(matter.bm_fee_component) || 0;
         const exchangeRate = Number(matter.exchange_rate) || 1;
         const feeCurrency = matter.fee_currency || 'GBP';
         const budget = Number(matter.fee_amount_upper_end) || 0;
-        const wipAmount = Number(snapshot?.wip_amount) || 0;
+        
+        // Use proposal data if enabled, otherwise use snapshot
+        // For WIP: use net WIP (raw WIP - WIP write-off) from proposal
+        const rawWipAmount = showProposalData ? Number(proposal.wip_amount) : Number(snapshot?.wip_amount) || 0;
+        const wipWriteOffAmount = showProposalData ? Number(proposal.wip_write_off_amount) : Number(snapshot?.wip_write_off_amount) || 0;
+        const wipAmount = rawWipAmount - wipWriteOffAmount; // Net WIP for display
         const billedAmount = Number(snapshot?.billed_amount) || 0;
         const paidAmount = Number(snapshot?.paid_amount) || 0;
-        const wipWriteOffAmount = Number(snapshot?.wip_write_off_amount) || 0;
         
         // Calculate effective BM fee - accounts for billing currency conversion
         const differentBillingCurrency = matter.different_billing_currency || false;
@@ -208,6 +235,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         if (!isExcluded) {
           // Convert to USD using live rates for accuracy
           totalBmFeesUsd += convertToUsd(effectiveBmFee, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          // Use net WIP (after write-offs) for the dashboard figure
           totalWipUsd += convertToUsd(wipAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
           totalBilledUsd += convertToUsd(billedAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
           totalPaidUsd += convertToUsd(paidAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
@@ -505,6 +533,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         trendData: sortedTrendData,
         liveMatters: liveMattersForUI,
         pipelineMatters: pipelineMattersForUI,
+        hasActiveWipProposals,
       } as DashboardStats;
     },
     enabled: !!user,

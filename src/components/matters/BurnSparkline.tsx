@@ -241,32 +241,39 @@ export function BurnSparkline({
     }
     areaPath += ` L ${points[points.length - 1].x} ${bottomY} Z`;
 
-    // Calculate drop segment and proposal area if we have an active proposal with a difference
+    // Calculate drop segment and proposal area if we have an active proposal
     let drop = null;
     let proposalArea = '';
     
-    if (hasActiveProposal && rawBurn !== undefined && rawBurn !== currentBurn) {
+    // When proposal is active, compare the raw burn (from snapshot) with adjusted burn (currentBurn)
+    // The dataPoints use snapshot values, so the last point reflects raw burn
+    // currentBurn reflects the proposal-adjusted value
+    if (hasActiveProposal && rawBurn !== undefined) {
       const lastPoint = points[points.length - 1];
+      const rawY = scaleY(rawBurn);
       const adjustedY = scaleY(currentBurn);
       
-      // Drop segment: from last historical point down to adjusted value
-      drop = {
-        x1: lastPoint.x,
-        y1: lastPoint.y,
-        x2: lastPoint.x,
-        y2: adjustedY,
-      };
-      
-      // Create a "proposal area" that shows the adjusted fill region
-      // This is the area from bottom to the adjusted burn level
-      proposalArea = `M ${points[0].x} ${bottomY}`;
-      proposalArea += ` L ${points[0].x} ${points[0].y}`;
-      for (let i = 1; i < points.length - 1; i++) {
-        proposalArea += ` L ${points[i].x} ${points[i].y}`;
+      // Only show drop if there's a meaningful difference (more than 1 pixel)
+      if (Math.abs(rawY - adjustedY) > 1) {
+        // Drop segment: from raw burn point down to adjusted value
+        drop = {
+          x1: lastPoint.x,
+          y1: rawY,
+          x2: lastPoint.x,
+          y2: adjustedY,
+        };
+        
+        // Create a "proposal area" that shows the adjusted fill region
+        // This is the area from bottom to the adjusted burn level
+        proposalArea = `M ${points[0].x} ${bottomY}`;
+        proposalArea += ` L ${points[0].x} ${points[0].y}`;
+        for (let i = 1; i < points.length - 1; i++) {
+          proposalArea += ` L ${points[i].x} ${points[i].y}`;
+        }
+        // Connect to the adjusted endpoint
+        proposalArea += ` L ${lastPoint.x} ${adjustedY}`;
+        proposalArea += ` L ${lastPoint.x} ${bottomY} Z`;
       }
-      // Connect to the adjusted endpoint
-      proposalArea += ` L ${lastPoint.x} ${adjustedY}`;
-      proposalArea += ` L ${lastPoint.x} ${bottomY} Z`;
     }
 
     return {
@@ -384,39 +391,52 @@ export function BurnSparkline({
         <div className="cursor-pointer flex flex-col items-end">
           <svg width={width} height={height} className="overflow-visible">
             {/* Define stripe pattern for proposal areas */}
+            {/* Define stripe pattern for proposal areas - bold diagonal stripes */}
             <defs>
               <pattern
                 id={patternId}
                 patternUnits="userSpaceOnUse"
-                width="4"
-                height="4"
+                width="6"
+                height="6"
                 patternTransform="rotate(45)"
               >
+                <rect width="6" height="6" fill={colors.fill} />
                 <line
                   x1="0"
                   y1="0"
                   x2="0"
-                  y2="4"
+                  y2="6"
                   stroke={colors.stripeColor}
-                  strokeWidth="2"
-                  strokeOpacity="0.4"
+                  strokeWidth="3"
+                  strokeOpacity="0.7"
                 />
               </pattern>
             </defs>
             
             {/* Area fill - use stripes when proposal is active */}
-            {hasActiveProposal && proposalAreaD ? (
+            {hasActiveProposal ? (
               <>
-                {/* Solid fill for the adjusted (proposal) area */}
-                <path
-                  d={proposalAreaD}
-                  fill={colors.fill}
-                />
-                {/* Striped overlay for the entire historical area to indicate proposal is active */}
-                <path
-                  d={areaD}
-                  fill={`url(#${patternId})`}
-                />
+                {/* When we have a drop, show solid fill for adjusted area and stripes for the "written off" portion */}
+                {proposalAreaD ? (
+                  <>
+                    {/* Solid fill for the adjusted (proposal) area */}
+                    <path
+                      d={proposalAreaD}
+                      fill={colors.fill}
+                    />
+                    {/* Striped overlay for the entire historical area to show proposal is applied */}
+                    <path
+                      d={areaD}
+                      fill={`url(#${patternId})`}
+                    />
+                  </>
+                ) : (
+                  /* No drop segment but proposal is active - show striped fill */
+                  <path
+                    d={areaD}
+                    fill={`url(#${patternId})`}
+                  />
+                )}
               </>
             ) : (
               <path
@@ -435,27 +455,47 @@ export function BurnSparkline({
               strokeLinejoin="round"
             />
             
-            {/* Drop segment - shows the proposal adjustment */}
+            {/* Drop segment - shows the proposal adjustment with prominent styling */}
             {dropSegment && (
-              <line
-                x1={dropSegment.x1}
-                y1={dropSegment.y1}
-                x2={dropSegment.x2}
-                y2={dropSegment.y2}
-                stroke={colors.stroke}
-                strokeWidth={2}
-                strokeDasharray="2,2"
-              />
-            )}
-            
-            {/* Adjusted endpoint dot when proposal is active */}
-            {dropSegment && (
-              <circle
-                cx={dropSegment.x2}
-                cy={dropSegment.y2}
-                r={3}
-                fill={colors.stroke}
-              />
+              <>
+                {/* Background glow for visibility */}
+                <line
+                  x1={dropSegment.x1}
+                  y1={dropSegment.y1}
+                  x2={dropSegment.x2}
+                  y2={dropSegment.y2}
+                  stroke="white"
+                  strokeWidth={4}
+                  strokeOpacity={0.8}
+                />
+                {/* Main drop line - thick dashed line */}
+                <line
+                  x1={dropSegment.x1}
+                  y1={dropSegment.y1}
+                  x2={dropSegment.x2}
+                  y2={dropSegment.y2}
+                  stroke={colors.stroke}
+                  strokeWidth={2.5}
+                  strokeDasharray="3,2"
+                  strokeLinecap="round"
+                />
+                {/* Arrow head at the adjusted endpoint */}
+                <circle
+                  cx={dropSegment.x2}
+                  cy={dropSegment.y2}
+                  r={4}
+                  fill={colors.stroke}
+                  stroke="white"
+                  strokeWidth={1.5}
+                />
+                {/* Small dot at the raw burn point */}
+                <circle
+                  cx={dropSegment.x1}
+                  cy={dropSegment.y1}
+                  r={2}
+                  fill={colors.stroke}
+                />
+              </>
             )}
             
             {/* Budget threshold line */}

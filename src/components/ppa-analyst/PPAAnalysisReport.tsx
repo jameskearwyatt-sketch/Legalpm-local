@@ -272,6 +272,18 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
         is_gold_standard: false,
         template_name: null,
         template_description: null,
+        // New learning fields
+        ppa_type: (analysis as any).ppa_type || null,
+        source_text: p.source_text || null,
+        confidence: p.confidence || 'medium',
+        market_position: p.variance_notes?.includes('[ON MARKET]') ? 'on_market' 
+          : p.variance_notes?.includes('[OFF MARKET]') ? 'off_market'
+          : p.variance_notes?.includes('[WAY OFF MARKET]') ? 'way_off_market'
+          : null,
+        party_favorability: p.variance_notes?.includes('[BUYER-FRIENDLY]') ? 'buyer_friendly'
+          : p.variance_notes?.includes('[SELLER-FRIENDLY]') ? 'seller_friendly'
+          : p.variance_notes?.includes('[BALANCED]') ? 'balanced'
+          : null,
       }));
 
     try {

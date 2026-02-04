@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle, Settings2, Brain } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAAnalysisType, PPAPerspective } from '@/lib/hooks/usePPAAnalyses';
+import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAAnalysisType, PPAPerspective, PPAStructureType, PPA_STRUCTURE_LABELS } from '@/lib/hooks/usePPAAnalyses';
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
 import { PPAAnalysisReport } from './PPAAnalysisReport';
 import { generateMarketIntelligence, formatIntelligenceForPrompt } from '@/lib/ppaPrecedentIntelligence';
@@ -50,8 +50,10 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
   const [step, setStep] = useState<'upload' | 'configure' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<PPAAnalysisType>('ppa_vs_bible');
   const [perspective, setPerspective] = useState<PPAPerspective>('buyer');
+  const [ppaType, setPpaType] = useState<PPAStructureType>('vppa');
   const [jurisdiction, setJurisdiction] = useState('');
   const [projectName, setProjectName] = useState('');
+  const [counterpartyType, setCounterpartyType] = useState('');
   const [ppaFile, setPpaFile] = useState<File | null>(null);
   const [comparisonFile, setComparisonFile] = useState<File | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -166,14 +168,17 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
         precedents, 
         goldStandardPrecedents,
         jurisdiction || undefined, // Pass current jurisdiction for relevance scoring
-        perspective // Pass current perspective for relevance scoring
+        perspective, // Pass current perspective for relevance scoring
+        ppaType // Pass current PPA type for structure-specific learning
       );
       const intelligencePrompt = formatIntelligenceForPrompt(marketIntelligence);
       
       console.log(`Market Intelligence: ${marketIntelligence.totalDeals} deals, ${marketIntelligence.totalPositions} positions`);
       console.log(`  Confidence: ${marketIntelligence.intelligenceConfidence}, Data Quality: ${marketIntelligence.statisticalDepth.dataQualityScore}/100`);
-      console.log(`  Context Relevance: ${marketIntelligence.contextRelevance.relevanceScore}/100 (${marketIntelligence.contextRelevance.jurisdictionMatchCount} jurisdiction matches)`);
+      console.log(`  Context Relevance: ${marketIntelligence.contextRelevance.relevanceScore}/100 (${marketIntelligence.contextRelevance.jurisdictionMatchCount} jurisdiction, ${marketIntelligence.contextRelevance.ppaTypeMatchCount} type matches)`);
       console.log(`  Market Movement: ${marketIntelligence.temporalAnalysis.marketMovement}`);
+      console.log(`  PPA Type Intelligence: ${marketIntelligence.ppaTypeAnalysis.typeRecommendation || 'N/A'}`);
+      console.log(`  Learning Velocity: ${marketIntelligence.learningMetrics.learningVelocity}`);
       
       // Filter relevant precedents for raw comparison (exclude gold standard from regular precedents)
       const regularPrecedents = precedents.filter(p => !p.is_gold_standard);
@@ -224,6 +229,8 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
             perspective,
             jurisdiction,
             projectName,
+            ppaType, // NEW: Pass PPA structure type for type-specific analysis
+            counterpartyType: counterpartyType || null, // NEW: Pass counterparty type
             precedents: relevantPrecedents,
             goldStandardPrecedents: goldStandardForAnalysis,
             marketIntelligence: intelligencePrompt,
@@ -249,7 +256,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
 
       const { positions: extractedPositions } = analyzeResponse.data;
 
-      // Step 4: Create analysis record
+      // Step 4: Create analysis record with enhanced learning fields
       const analysisResult = await createAnalysis.mutateAsync({
         analysis_type: analysisType,
         perspective,
@@ -263,6 +270,11 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
         parent_analysis_id: null,
         version_number: 1,
         is_comparison: false,
+        // New learning fields
+        ppa_type: ppaType,
+        complexity_score: null, // Will be set after analysis
+        key_risk_areas: [],
+        counterparty_type: counterpartyType || null,
       });
 
       // Step 5: Save extracted positions
@@ -510,6 +522,38 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* PPA Structure Type */}
+            <div className="space-y-2">
+              <Label htmlFor="ppa-type">PPA Structure Type</Label>
+              <Select value={ppaType} onValueChange={(v) => setPpaType(v as PPAStructureType)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select PPA type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.entries(PPA_STRUCTURE_LABELS) as [PPAStructureType, string][]).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                This helps the system learn type-specific patterns over time
+              </p>
+            </div>
+
+            {/* Counterparty Type (optional) */}
+            <div className="space-y-2">
+              <Label htmlFor="counterparty">Counterparty Type (optional)</Label>
+              <Input
+                id="counterparty"
+                value={counterpartyType}
+                onChange={(e) => setCounterpartyType(e.target.value)}
+                placeholder="e.g., Utility, Corporate, Oil Major, Developer"
+              />
+              <p className="text-xs text-muted-foreground">
+                Helps identify counterparty-specific negotiation patterns
+              </p>
             </div>
 
             {/* Start Analysis */}

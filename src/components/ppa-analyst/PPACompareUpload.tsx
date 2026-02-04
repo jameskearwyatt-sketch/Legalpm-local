@@ -122,6 +122,11 @@ export function PPACompareUpload({
         parent_analysis_id: parentAnalysis.id,
         version_number: newVersion,
         is_comparison: true,
+        // Inherit PPA type from parent analysis
+        ppa_type: parentAnalysis.ppa_type || null,
+        complexity_score: null,
+        key_risk_areas: [],
+        counterparty_type: parentAnalysis.counterparty_type || null,
       });
 
       // Step 4: Save compared positions

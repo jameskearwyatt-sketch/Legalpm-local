@@ -83,6 +83,7 @@ export interface MarketIntelligence {
   contextRelevance: {
     jurisdictionMatchCount: number;
     perspectiveMatchCount: number;
+    ppaTypeMatchCount: number;
     relevanceScore: number; // 0-100
   };
   
@@ -103,6 +104,41 @@ export interface MarketIntelligence {
     categoriesWithTrends: number;
     averagePositionsPerCategory: number;
     dataQualityScore: number; // 0-100
+  };
+  
+  // NEW: PPA Type Intelligence
+  ppaTypeAnalysis: {
+    typeBreakdown: Array<{
+      type: string;
+      count: number;
+      percentage: number;
+    }>;
+    currentTypeMatches: number;
+    typeSpecificPatterns: Array<{
+      type: string;
+      distinctPatterns: string[];
+      commonTerms: string[];
+    }>;
+    typeRecommendation: string | null;
+  };
+  
+  // NEW: Counterparty Intelligence
+  counterpartyAnalysis: {
+    knownCounterparties: string[];
+    counterpartyPatterns: Array<{
+      counterparty: string;
+      dealCount: number;
+      tendencies: string[];
+    }>;
+  };
+  
+  // NEW: Learning acceleration metrics
+  learningMetrics: {
+    uniqueDeals: number;
+    uniqueJurisdictions: number;
+    uniquePpaTypes: number;
+    learningVelocity: 'accelerating' | 'steady' | 'slow' | 'nascent';
+    recommendedNextSteps: string[];
   };
 }
 
@@ -669,7 +705,8 @@ export function generateMarketIntelligence(
   precedents: PPAPrecedent[],
   goldStandardPrecedents: PPAPrecedent[],
   currentJurisdiction?: string,
-  currentPerspective?: 'buyer' | 'seller'
+  currentPerspective?: 'buyer' | 'seller',
+  currentPpaType?: string
 ): MarketIntelligence {
   // Exclude gold standard from regular analysis (they're templates, not market data)
   const marketPrecedents = precedents.filter(p => !p.is_gold_standard);
@@ -697,36 +734,146 @@ export function generateMarketIntelligence(
   const crossCategoryInsights = generateCrossCategoryInsights(categoryPatterns);
   const marketNormsSummary = generateMarketNormsSummary(categoryPatterns);
   
-  // NEW: Temporal analysis
+  // Temporal analysis
   const temporalAnalysis = analyzeTemporalTrends(marketPrecedents, categoryPatterns);
   
-  // NEW: Context relevance scoring
+  // Context relevance scoring (now includes PPA type)
   const jurisdictionMatchCount = currentJurisdiction 
     ? marketPrecedents.filter(p => p.jurisdiction === currentJurisdiction).length 
     : 0;
   const perspectiveMatchCount = currentPerspective 
     ? marketPrecedents.filter(p => p.perspective === currentPerspective).length 
     : 0;
+  const ppaTypeMatchCount = currentPpaType 
+    ? marketPrecedents.filter(p => p.ppa_type === currentPpaType).length 
+    : 0;
   
-  let relevanceScore = 50; // Base score
+  let relevanceScore = 40; // Base score
   if (currentJurisdiction && jurisdictionMatchCount > 0) {
-    relevanceScore += Math.min(25, jurisdictionMatchCount * 5);
+    relevanceScore += Math.min(20, jurisdictionMatchCount * 4);
   }
   if (currentPerspective && perspectiveMatchCount > 0) {
-    relevanceScore += Math.min(25, (perspectiveMatchCount / Math.max(totalPositions, 1)) * 50);
+    relevanceScore += Math.min(20, (perspectiveMatchCount / Math.max(totalPositions, 1)) * 40);
+  }
+  if (currentPpaType && ppaTypeMatchCount > 0) {
+    relevanceScore += Math.min(20, ppaTypeMatchCount * 4);
   }
   
   const contextRelevance = {
     jurisdictionMatchCount,
     perspectiveMatchCount,
+    ppaTypeMatchCount,
     relevanceScore: Math.min(100, Math.round(relevanceScore)),
   };
   
-  // NEW: Negotiation insights
+  // Negotiation insights
   const negotiationInsights = generateNegotiationInsights(categoryPatterns, currentPerspective || 'buyer');
   
-  // NEW: Statistical depth
+  // Statistical depth
   const statisticalDepth = calculateStatisticalDepth(categoryPatterns, totalPositions);
+  
+  // NEW: PPA Type Analysis
+  const ppaTypeGroups = new Map<string, PPAPrecedent[]>();
+  for (const p of marketPrecedents) {
+    const type = p.ppa_type || 'unknown';
+    if (!ppaTypeGroups.has(type)) {
+      ppaTypeGroups.set(type, []);
+    }
+    ppaTypeGroups.get(type)!.push(p);
+  }
+  
+  const typeBreakdown = Array.from(ppaTypeGroups.entries())
+    .map(([type, precs]) => ({
+      type,
+      count: new Set(precs.map(p => p.project_name)).size,
+      percentage: Math.round((precs.length / Math.max(totalPositions, 1)) * 100),
+    }))
+    .filter(t => t.type !== 'unknown')
+    .sort((a, b) => b.count - a.count);
+  
+  const typeSpecificPatterns = typeBreakdown.slice(0, 4).map(tb => {
+    const typePrecs = ppaTypeGroups.get(tb.type) || [];
+    const terms = new Map<string, number>();
+    for (const p of typePrecs) {
+      const extracted = extractKeyTerms(p.position_summary);
+      for (const t of extracted) {
+        terms.set(t, (terms.get(t) || 0) + 1);
+      }
+    }
+    const commonTerms = Array.from(terms.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([term]) => term);
+    
+    return {
+      type: tb.type,
+      distinctPatterns: [...new Set(typePrecs.slice(0, 3).map(p => p.position_summary.split('\n')[0]?.replace(/^[•\-\*]\s*/, '') || ''))],
+      commonTerms,
+    };
+  });
+  
+  let typeRecommendation: string | null = null;
+  if (currentPpaType && ppaTypeMatchCount >= 3) {
+    typeRecommendation = `Strong ${currentPpaType.toUpperCase()} precedent coverage (${ppaTypeMatchCount} matches). Type-specific patterns will be prioritized.`;
+  } else if (currentPpaType && ppaTypeMatchCount > 0) {
+    typeRecommendation = `Limited ${currentPpaType.toUpperCase()} precedents (${ppaTypeMatchCount}). Consider banking more ${currentPpaType} deals for better type-specific intelligence.`;
+  } else if (currentPpaType) {
+    typeRecommendation = `No ${currentPpaType.toUpperCase()} precedents banked yet. This analysis will use general market patterns.`;
+  }
+  
+  const ppaTypeAnalysis = {
+    typeBreakdown,
+    currentTypeMatches: ppaTypeMatchCount,
+    typeSpecificPatterns,
+    typeRecommendation,
+  };
+  
+  // NEW: Counterparty Analysis (from any stored counterparty data)
+  // For now, we'll infer from project names/positions - can be enhanced later
+  const counterpartyAnalysis = {
+    knownCounterparties: [] as string[],
+    counterpartyPatterns: [] as Array<{ counterparty: string; dealCount: number; tendencies: string[] }>,
+  };
+  
+  // NEW: Learning Metrics
+  const uniqueJurisdictions = jurisdictionCoverage.length;
+  const uniquePpaTypes = typeBreakdown.length;
+  
+  let learningVelocity: 'accelerating' | 'steady' | 'slow' | 'nascent';
+  if (totalDeals >= 10 && uniqueJurisdictions >= 3 && uniquePpaTypes >= 2) {
+    learningVelocity = 'accelerating';
+  } else if (totalDeals >= 5) {
+    learningVelocity = 'steady';
+  } else if (totalDeals >= 2) {
+    learningVelocity = 'slow';
+  } else {
+    learningVelocity = 'nascent';
+  }
+  
+  const recommendedNextSteps: string[] = [];
+  if (totalDeals < 3) {
+    recommendedNextSteps.push('Bank at least 3 agreed PPAs to enable market benchmarking');
+  }
+  if (uniqueJurisdictions < 2 && totalDeals >= 3) {
+    recommendedNextSteps.push('Add PPAs from different jurisdictions for regional pattern detection');
+  }
+  if (uniquePpaTypes < 2 && totalDeals >= 3) {
+    recommendedNextSteps.push('Bank different PPA types (VPPA, Physical, Sleeved) for structure-specific learning');
+  }
+  if (buyerCount === 0 || sellerCount === 0) {
+    recommendedNextSteps.push(`Add ${buyerCount === 0 ? 'buyer' : 'seller'}-perspective PPAs for bilateral intelligence`);
+  }
+  if (totalDeals >= 5 && statisticalDepth.categoriesWithNumericData < 10) {
+    recommendedNextSteps.push('More numeric data needed - ensure positions include specific figures (%, amounts, periods)');
+  }
+  
+  const learningMetrics = {
+    uniqueDeals: totalDeals,
+    uniqueJurisdictions,
+    uniquePpaTypes,
+    learningVelocity,
+    recommendedNextSteps,
+  };
   
   // Determine confidence level
   let intelligenceConfidence: 'low' | 'medium' | 'high' | 'very_high';
@@ -753,6 +900,9 @@ export function generateMarketIntelligence(
     contextRelevance,
     negotiationInsights,
     statisticalDepth,
+    ppaTypeAnalysis,
+    counterpartyAnalysis,
+    learningMetrics,
   };
 }
 
@@ -795,13 +945,41 @@ ${intelligence.temporalAnalysis.recentTrends.map(t => `• ${t}`).join('\n')}
 ⚠️ INSTRUCTION: Weight RECENT precedents more heavily. If market is shifting, positions that were "on_market" 12 months ago may now be "off_market".` : ''}`);
   }
 
-  // NEW: Context relevance section
-  if (intelligence.contextRelevance.jurisdictionMatchCount > 0 || intelligence.contextRelevance.perspectiveMatchCount > 0) {
+  // Context relevance section (now includes PPA type)
+  if (intelligence.contextRelevance.jurisdictionMatchCount > 0 || intelligence.contextRelevance.perspectiveMatchCount > 0 || intelligence.contextRelevance.ppaTypeMatchCount > 0) {
     sections.push(`## 🎯 CONTEXT-SPECIFIC INTELLIGENCE
 - **Matching Jurisdiction Precedents**: ${intelligence.contextRelevance.jurisdictionMatchCount}
 - **Matching Perspective Precedents**: ${intelligence.contextRelevance.perspectiveMatchCount}
+- **Matching PPA Type Precedents**: ${intelligence.contextRelevance.ppaTypeMatchCount}
 
-⚠️ INSTRUCTION: Prioritize precedents that match the current jurisdiction and perspective. ${intelligence.contextRelevance.jurisdictionMatchCount >= 3 ? 'You have STRONG jurisdiction-specific data - use it!' : 'Limited jurisdiction-specific data - rely more on general patterns.'}`);
+⚠️ INSTRUCTION: Prioritize precedents that match the current context. ${intelligence.contextRelevance.ppaTypeMatchCount >= 3 ? 'STRONG PPA type-specific data available - use structure-specific patterns!' : ''} ${intelligence.contextRelevance.jurisdictionMatchCount >= 3 ? 'Strong jurisdiction-specific data - use it!' : 'Limited jurisdiction-specific data - rely more on general patterns.'}`);
+  }
+  
+  // NEW: PPA Type Intelligence section
+  if (intelligence.ppaTypeAnalysis.typeBreakdown.length > 0) {
+    const typeInfo = intelligence.ppaTypeAnalysis;
+    sections.push(`## ⚡ PPA STRUCTURE TYPE INTELLIGENCE
+**Precedent Bank Composition**:
+${typeInfo.typeBreakdown.map(t => `• ${t.type.toUpperCase()}: ${t.count} deals (${t.percentage}%)`).join('\n')}
+
+${typeInfo.typeRecommendation ? `**Current Analysis**: ${typeInfo.typeRecommendation}` : ''}
+
+${typeInfo.typeSpecificPatterns.length > 0 ? `**Type-Specific Patterns**:
+${typeInfo.typeSpecificPatterns.map(t => `• ${t.type.toUpperCase()}: ${t.commonTerms.slice(0, 3).join(', ')}`).join('\n')}
+
+⚠️ INSTRUCTION: VPPAs, Physical PPAs, and Sleeved PPAs have DIFFERENT market norms. A position that is "on_market" for a VPPA may be "off_market" for a Physical PPA. Use type-specific patterns where available.` : ''}`);
+  }
+
+  // NEW: Learning Metrics section
+  if (intelligence.learningMetrics.recommendedNextSteps.length > 0) {
+    sections.push(`## 📈 LEARNING ACCELERATION STATUS
+**Learning Velocity**: ${intelligence.learningMetrics.learningVelocity.toUpperCase()}
+- Unique Deals: ${intelligence.learningMetrics.uniqueDeals}
+- Unique Jurisdictions: ${intelligence.learningMetrics.uniqueJurisdictions}
+- Unique PPA Types: ${intelligence.learningMetrics.uniquePpaTypes}
+
+**Recommended to Improve Intelligence**:
+${intelligence.learningMetrics.recommendedNextSteps.map(s => `• ${s}`).join('\n')}`);
   }
 
   // NEW: Negotiation insights section

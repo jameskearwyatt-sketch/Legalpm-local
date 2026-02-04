@@ -64,7 +64,7 @@ interface GroupedPrecedents {
 }
 
 export function PPAPrecedentBank() {
-  const { precedents, goldStandardPrecedents, isLoading, deletePrecedent } = usePPAPrecedentBank();
+  const { precedents, goldStandardPrecedents, isLoading, deletePrecedent, uniqueProjectCount, uniqueTemplateCount } = usePPAPrecedentBank();
   
   // Filters
   const [search, setSearch] = useState('');
@@ -394,7 +394,7 @@ export function PPAPrecedentBank() {
                   <CardTitle className="text-xl flex items-center gap-2">
                     <span>Gold Standard Templates</span>
                     <Badge variant="outline" className="border-gold-border/50 text-gold-foreground bg-gold-muted">
-                      {goldStandardPrecedents.length} positions
+                      {uniqueTemplateCount} template{uniqueTemplateCount !== 1 ? 's' : ''} · {goldStandardPrecedents.length} positions
                     </Badge>
                   </CardTitle>
                   <CardDescription>
@@ -619,8 +619,8 @@ export function PPAPrecedentBank() {
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="text-base">
-                  {filteredPrecedents.length} precedent{filteredPrecedents.length !== 1 ? 's' : ''} found
-                  {hasActiveFilters && ` (filtered from ${precedents.length})`}
+                  {uniqueProjectCount} deal{uniqueProjectCount !== 1 ? 's' : ''} · {filteredPrecedents.length} position{filteredPrecedents.length !== 1 ? 's' : ''}
+                  {hasActiveFilters && ` (filtered)`}
                 </CardTitle>
               </div>
               {viewMode === 'grouped' && Object.keys(groupedPrecedents).length > 0 && (

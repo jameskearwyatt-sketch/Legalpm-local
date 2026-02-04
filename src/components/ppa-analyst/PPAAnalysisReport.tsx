@@ -32,10 +32,31 @@ interface PPAAnalysisReportProps {
 }
 
 const confidenceConfig = {
-  high: { icon: CheckCircle2, label: 'High Confidence', color: 'text-green-600', bg: 'bg-green-100' },
-  medium: { icon: AlertCircle, label: 'Medium Confidence', color: 'text-yellow-600', bg: 'bg-yellow-100' },
-  review_required: { icon: HelpCircle, label: 'Review Required', color: 'text-red-600', bg: 'bg-red-100' },
+  high: { icon: CheckCircle2, label: 'High Confidence', color: 'text-primary', bg: 'bg-primary/10' },
+  medium: { icon: AlertCircle, label: 'Medium Confidence', color: 'text-accent-foreground', bg: 'bg-accent' },
+  review_required: { icon: HelpCircle, label: 'Review Required', color: 'text-destructive', bg: 'bg-destructive/10' },
 };
+
+const marketPositionConfig = {
+  on_market: { label: 'On Market', color: 'text-primary', bg: 'bg-primary/10 border-primary/30' },
+  off_market: { label: 'Off Market', color: 'text-accent-foreground', bg: 'bg-accent border-accent-foreground/30' },
+  way_off_market: { label: 'Way Off Market', color: 'text-destructive', bg: 'bg-destructive/10 border-destructive/30' },
+};
+
+function getMarketPositionFromNotes(notes: string | null): keyof typeof marketPositionConfig | null {
+  if (!notes) return null;
+  const match = notes.match(/\[(ON MARKET|OFF MARKET|WAY OFF MARKET)\]/i);
+  if (match) {
+    const pos = match[1].toLowerCase().replace(/ /g, '_');
+    if (pos in marketPositionConfig) return pos as keyof typeof marketPositionConfig;
+  }
+  return null;
+}
+
+function cleanVarianceNotes(notes: string | null): string | null {
+  if (!notes) return null;
+  return notes.replace(/\[(ON MARKET|OFF MARKET|WAY OFF MARKET)\]\s*/gi, '').trim() || null;
+}
 
 export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, onCompareNewDraft }: PPAAnalysisReportProps) {
   const { analyses, updateAnalysis } = usePPAAnalyses();
@@ -180,7 +201,7 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                     <Badge variant="secondary">{analysis.jurisdiction}</Badge>
                   )}
                   {analysis.is_agreed && (
-                    <Badge className="bg-green-100 text-green-800">Agreed</Badge>
+                    <Badge className="bg-primary/10 text-primary border border-primary/30">Agreed</Badge>
                   )}
                 </div>
                 <p className="text-sm">
@@ -264,6 +285,9 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                       {groupPositions.map(position => {
                         const conf = confidenceConfig[position.confidence];
                         const stats = getCategoryStats(position.category);
+                        const marketPosition = getMarketPositionFromNotes(position.variance_notes);
+                        const cleanedNotes = cleanVarianceNotes(position.variance_notes);
+                        const marketConfig = marketPosition ? marketPositionConfig[marketPosition] : null;
                         
                         return (
                           <div
@@ -285,6 +309,11 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                                       <conf.icon className={`h-3 w-3 ${conf.color}`} />
                                       <span className={conf.color}>{conf.label}</span>
                                     </div>
+                                    {marketConfig && (
+                                      <div className={`px-2 py-0.5 rounded border text-xs font-medium ${marketConfig.bg} ${marketConfig.color}`}>
+                                        {marketConfig.label}
+                                      </div>
+                                    )}
                                     {position.source_text && (
                                       <span className="text-xs text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded">
                                         {position.source_text}
@@ -294,6 +323,16 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                                   <div className="text-sm text-foreground whitespace-pre-line">
                                     {position.position_summary}
                                   </div>
+                                  {position.comparison_position && (
+                                    <div className="text-xs text-muted-foreground italic border-l-2 border-primary/30 pl-2 mt-1">
+                                      {position.comparison_position}
+                                    </div>
+                                  )}
+                                  {cleanedNotes && (
+                                    <div className="text-xs text-muted-foreground">
+                                      {cleanedNotes}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                               {stats.count > 0 && (

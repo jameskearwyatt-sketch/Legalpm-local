@@ -7,9 +7,10 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle, Settings2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { usePPAAnalyses, usePPAPositions, PPAAnalysisType, PPAPerspective } from '@/lib/hooks/usePPAAnalyses';
+import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAAnalysisType, PPAPerspective } from '@/lib/hooks/usePPAAnalyses';
+import { useUserSettings } from '@/lib/hooks/useUserSettings';
 import { PPAAnalysisReport } from './PPAAnalysisReport';
 
 interface PPAUploadAnalysisProps {
@@ -43,7 +44,8 @@ const EUROPEAN_JURISDICTIONS = [
 export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps) {
   const { createAnalysis } = usePPAAnalyses();
   const { createPositions } = usePPAPositions(null);
-  
+  const { precedents } = usePPAPrecedentBank();
+  const { ppaPrecedentThreshold } = useUserSettings();
   const [step, setStep] = useState<'upload' | 'configure' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<PPAAnalysisType>('ppa_vs_bible');
   const [perspective, setPerspective] = useState<PPAPerspective>('buyer');
@@ -155,8 +157,21 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
         setAnalysisProgress(50);
       }
 
-      // Step 3: Run AI analysis
+      // Step 3: Run AI analysis with precedents if threshold is met
       setAnalysisStatus('Analyzing PPA positions...');
+      
+      // Filter relevant precedents for comparison
+      const relevantPrecedents = precedents.length >= ppaPrecedentThreshold
+        ? precedents.map(p => ({
+            category: p.category,
+            position_summary: p.position_summary,
+            project_name: p.project_name,
+            jurisdiction: p.jurisdiction,
+            perspective: p.perspective,
+          }))
+        : [];
+      
+      console.log(`Passing ${relevantPrecedents.length} precedents for market comparison (threshold: ${ppaPrecedentThreshold})`);
       
       const analyzeResponse = await supabase.functions.invoke('analyze-ppa', {
         body: {
@@ -166,6 +181,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
           perspective,
           jurisdiction,
           projectName,
+          precedents: relevantPrecedents,
         },
       });
 
@@ -205,8 +221,8 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
             source_text: pos.source_text || null,
             confidence: pos.confidence || 'medium',
             bible_reference: pos.bible_reference || null,
-            comparison_position: pos.comparison_position || null,
-            variance_notes: pos.variance_notes || null,
+            comparison_position: pos.market_comparison || pos.comparison_position || null,
+            variance_notes: pos.market_position ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim() : (pos.variance_notes || null),
           }))
         );
       }

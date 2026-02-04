@@ -423,7 +423,7 @@ serve(async (req) => {
   }
 
   try {
-    const { ppaText, comparisonText, analysisType, perspective, jurisdiction, projectName } = await req.json();
+    const { ppaText, comparisonText, analysisType, perspective, jurisdiction, projectName, precedents } = await req.json();
 
     if (!ppaText) {
       return new Response(
@@ -431,6 +431,9 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Check if we have precedents for market comparison
+    const hasPrecedents = precedents && Array.isArray(precedents) && precedents.length > 0;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -453,11 +456,41 @@ serve(async (req) => {
       }
     }
 
+    // Build precedent context if available
+    let precedentContext = '';
+    if (hasPrecedents) {
+      const precedentsByCategory: Record<string, any[]> = {};
+      for (const p of precedents) {
+        if (!precedentsByCategory[p.category]) precedentsByCategory[p.category] = [];
+        precedentsByCategory[p.category].push(p);
+      }
+      
+      precedentContext = `\n\n## PRECEDENT BANK COMPARISON
+You have access to ${precedents.length} banked positions from agreed PPAs. For each category where precedents exist, compare the current PPA against market practice and provide a MARKET POSITION assessment.
+
+MARKET POSITION RATINGS:
+- "on_market": Position is consistent with majority of precedents (within normal range)
+- "off_market": Position deviates materially from precedents (notable but not extreme)
+- "way_off_market": Position is significantly outside precedent range (major concern, flag prominently)
+
+For each extracted position, include:
+- "market_position": "on_market" | "off_market" | "way_off_market" | null (if insufficient precedents)
+- "market_comparison": Brief explanation of how this compares to precedents (e.g., "Availability at 95% is below market range of 97-99%")
+
+PRECEDENT DATA BY CATEGORY:
+${Object.entries(precedentsByCategory).map(([cat, precs]) => {
+  return `### ${cat} (${precs.length} precedent${precs.length > 1 ? 's' : ''})
+${precs.map(p => `- ${p.project_name}${p.jurisdiction ? ` (${p.jurisdiction})` : ''}: ${p.position_summary.substring(0, 200)}...`).join('\n')}`;
+}).join('\n\n')}
+`;
+    }
+
     const systemPrompt = `You are an expert PPA (Power Purchase Agreement) analyst specializing in European renewable energy contracts.
 Your task is to extract ACTIONABLE, SPECIFIC positions from the provided PPA document.
 
 PERSPECTIVE: ${perspective === 'buyer' ? 'Buyer (Offtaker)' : 'Seller (Generator)'}
 ${jurisdiction ? `JURISDICTION: ${jurisdiction}` : ''}
+${precedentContext}
 
 ## OUTPUT REQUIREMENTS
 
@@ -470,6 +503,7 @@ For each category you MUST:
    • Be CONCLUSIVE - tell the user WHAT the contract says, not just THAT it has provisions
    • Flag gaps or unusual terms with ⚠️
 3. **Confidence**: "high" (clear clauses found), "medium" (inferred from related language), "review_required" (not found or ambiguous)
+${hasPrecedents ? `4. **Market Position**: Compare against precedent bank and provide market_position rating with brief market_comparison explanation` : ''}
 
 ## CRITICAL INSTRUCTIONS
 
@@ -505,12 +539,14 @@ Return a JSON object:
       "clause_references": "Clause X.X, Schedule Y para Z",
       "position_summary": "• Bullet point 1\\n• Bullet point 2\\n• Bullet point 3",
       "confidence": "high|medium|review_required",
-      "flags": "⚠️ Any concerns or gaps to flag (optional)"
+      "flags": "⚠️ Any concerns or gaps to flag (optional)"${hasPrecedents ? `,
+      "market_position": "on_market|off_market|way_off_market|null",
+      "market_comparison": "Brief comparison to precedent positions"` : ''}
     }
   ]
 }
 
-IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that terms exist.`;
+IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that terms exist.${hasPrecedents ? ' Include market_position for all categories where precedents exist.' : ''}`;
 
     console.log('Calling AI gateway for full PPA analysis...');
 
@@ -576,6 +612,8 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
             bible_reference: null,
             comparison_position: p.comparison_position || null,
             variance_notes: p.flags || p.variance_notes || null,
+            market_position: p.market_position || null,
+            market_comparison: p.market_comparison || null,
           };
         });
       } else {
@@ -592,6 +630,8 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
         bible_reference: null,
         comparison_position: null,
         variance_notes: null,
+        market_position: null,
+        market_comparison: null,
       }));
     }
 
@@ -607,6 +647,8 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
           bible_reference: null,
           comparison_position: null,
           variance_notes: '⚠️ Category not addressed in PPA',
+          market_position: null,
+          market_comparison: null,
         });
       }
     }

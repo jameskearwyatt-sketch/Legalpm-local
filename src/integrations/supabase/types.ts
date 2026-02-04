@@ -2746,6 +2746,7 @@ export type Database = {
           id: string
           near_budget_threshold: number
           poor_collection_threshold: number
+          ppa_precedent_threshold: number
           updated_at: string
           use_billed_only_for_burn: boolean
           user_id: string
@@ -2759,6 +2760,7 @@ export type Database = {
           id?: string
           near_budget_threshold?: number
           poor_collection_threshold?: number
+          ppa_precedent_threshold?: number
           updated_at?: string
           use_billed_only_for_burn?: boolean
           user_id: string
@@ -2772,6 +2774,7 @@ export type Database = {
           id?: string
           near_budget_threshold?: number
           poor_collection_threshold?: number
+          ppa_precedent_threshold?: number
           updated_at?: string
           use_billed_only_for_burn?: boolean
           user_id?: string

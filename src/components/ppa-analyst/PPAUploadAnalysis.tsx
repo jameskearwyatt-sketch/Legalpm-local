@@ -161,11 +161,19 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
       // Step 3: Generate Market Intelligence from precedent bank
       setAnalysisStatus('Generating market intelligence from precedent bank...');
       
-      // Generate comprehensive market intelligence
-      const marketIntelligence = generateMarketIntelligence(precedents, goldStandardPrecedents);
+      // Generate comprehensive market intelligence with context awareness
+      const marketIntelligence = generateMarketIntelligence(
+        precedents, 
+        goldStandardPrecedents,
+        jurisdiction || undefined, // Pass current jurisdiction for relevance scoring
+        perspective // Pass current perspective for relevance scoring
+      );
       const intelligencePrompt = formatIntelligenceForPrompt(marketIntelligence);
       
-      console.log(`Market Intelligence: ${marketIntelligence.totalDeals} deals, ${marketIntelligence.totalPositions} positions, confidence: ${marketIntelligence.intelligenceConfidence}`);
+      console.log(`Market Intelligence: ${marketIntelligence.totalDeals} deals, ${marketIntelligence.totalPositions} positions`);
+      console.log(`  Confidence: ${marketIntelligence.intelligenceConfidence}, Data Quality: ${marketIntelligence.statisticalDepth.dataQualityScore}/100`);
+      console.log(`  Context Relevance: ${marketIntelligence.contextRelevance.relevanceScore}/100 (${marketIntelligence.contextRelevance.jurisdictionMatchCount} jurisdiction matches)`);
+      console.log(`  Market Movement: ${marketIntelligence.temporalAnalysis.marketMovement}`);
       
       // Filter relevant precedents for raw comparison (exclude gold standard from regular precedents)
       const regularPrecedents = precedents.filter(p => !p.is_gold_standard);

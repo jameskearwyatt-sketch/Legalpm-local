@@ -198,17 +198,27 @@ export function BurnSparklineDetailedTooltip({
       adjustedValue: number;
     } | null = null;
     
-    if (hasActiveProposal && rawBurn !== undefined && rawBurn !== currentBurn && proposalWriteOff > 0) {
+    // Calculate drop based on proposal write-offs (same logic as main sparkline)
+    if (hasActiveProposal && proposalWriteOff > 0 && points.length > 0) {
       const lastPoint = points[points.length - 1];
-      // Add a small offset to the right for the proposal point
-      const proposalX = Math.min(lastPoint.x + 15, width - padding.right - 10);
+      const lastDataPoint = dataPoints[dataPoints.length - 1];
+      
+      // Get raw burn from last snapshot
+      const snapshotBurn = lastDataPoint?.burn || 0;
+      
+      // Adjusted burn is snapshot burn minus write-offs
+      const adjustedBurn = Math.max(0, snapshotBurn - proposalWriteOff);
+      
+      // Add offset to the right for the proposal point
+      const proposalX = Math.min(lastPoint.x + 20, width - padding.right - 5);
+      
       proposalDrop = {
         startX: lastPoint.x,
-        startY: scaleY(rawBurn),
+        startY: scaleY(snapshotBurn),
         endX: proposalX,
-        endY: scaleY(currentBurn),
-        rawValue: rawBurn,
-        adjustedValue: currentBurn,
+        endY: scaleY(adjustedBurn),
+        rawValue: snapshotBurn,
+        adjustedValue: adjustedBurn,
       };
     }
 

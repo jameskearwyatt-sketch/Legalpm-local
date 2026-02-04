@@ -287,16 +287,23 @@ REMEMBER: Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that te
         const parsed = JSON.parse(jsonMatch[0]);
         positions = parsed.positions || [];
         
-        // Transform to match expected format, keeping clause_references instead of source_text
-        positions = positions.map((p: any) => ({
-          category: p.category,
-          position_summary: p.position_summary,
-          source_text: p.clause_references || null, // Store clause refs in source_text field
-          confidence: p.confidence || 'review_required',
-          bible_reference: p.bible_reference || PILOT_CATEGORIES.find(c => c.label === p.category)?.bibleReference,
-          comparison_position: p.comparison_position || null,
-          variance_notes: p.flags || p.variance_notes || null,
-        }));
+        // Normalize category names to match our expected labels (case-insensitive matching)
+        positions = positions.map((p: any) => {
+          // Find matching category by case-insensitive comparison
+          const matchedCat = PILOT_CATEGORIES.find(c => 
+            c.label.toLowerCase() === (p.category || '').toLowerCase()
+          );
+          
+          return {
+            category: matchedCat?.label || p.category, // Use canonical label
+            position_summary: p.position_summary,
+            source_text: p.clause_references || null,
+            confidence: p.confidence || 'review_required',
+            bible_reference: null, // Not showing bible refs per user request
+            comparison_position: p.comparison_position || null,
+            variance_notes: p.flags || p.variance_notes || null,
+          };
+        });
       } else {
         console.error('No JSON found in response:', content.substring(0, 500));
         throw new Error('Could not parse AI response');
@@ -308,22 +315,22 @@ REMEMBER: Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that te
         position_summary: '• Failed to extract - please review document manually',
         source_text: null,
         confidence: 'review_required',
-        bible_reference: c.bibleReference,
+        bible_reference: null,
         comparison_position: null,
         variance_notes: null,
       }));
     }
 
-    // Ensure all categories have entries
-    const existingCategories = new Set(positions.map((p: any) => p.category));
+    // Ensure all categories have entries (case-insensitive check)
+    const existingCategories = new Set(positions.map((p: any) => p.category.toLowerCase()));
     for (const cat of PILOT_CATEGORIES) {
-      if (!existingCategories.has(cat.label)) {
+      if (!existingCategories.has(cat.label.toLowerCase())) {
         positions.push({
           category: cat.label,
           position_summary: '• Not found in document',
           source_text: null,
           confidence: 'review_required',
-          bible_reference: cat.bibleReference,
+          bible_reference: null,
           comparison_position: null,
           variance_notes: '⚠️ Category not addressed in PPA',
         });

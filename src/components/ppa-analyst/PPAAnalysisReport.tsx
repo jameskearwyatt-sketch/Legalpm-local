@@ -288,11 +288,6 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory }: 
                                   <div className="text-sm text-foreground whitespace-pre-line">
                                     {position.position_summary}
                                   </div>
-                                  {position.bible_reference && (
-                                    <p className="text-xs text-primary">
-                                      Bible ref: {position.bible_reference}
-                                    </p>
-                                  )}
                                 </div>
                               </div>
                               {stats.count > 0 && (

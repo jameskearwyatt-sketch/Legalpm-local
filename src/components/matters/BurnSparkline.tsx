@@ -6,7 +6,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from '@/components/ui/hover-card';
-
+import { BurnSparklineDetailedTooltip } from './BurnSparklineDetailedTooltip';
 interface SnapshotPoint {
   as_of_date: string;
   wip_amount: number;
@@ -397,13 +397,26 @@ export function BurnSparkline({
                 Budget required
               </span>
             )}
-          </div>
-        </HoverCardTrigger>
-        <HoverCardContent side="left" className="w-auto p-3">
-          {tooltipContent}
-        </HoverCardContent>
-      </HoverCard>
-    );
+        </div>
+      </HoverCardTrigger>
+      <HoverCardContent side="left" className="w-auto p-3">
+        <BurnSparklineDetailedTooltip
+          snapshots={snapshots}
+          bmBudget={bmBudget}
+          currentBurn={currentBurn}
+          currency={currency}
+          burnPercent={burnPercent}
+          usdEquivalent={usdEquivalent}
+          startDate={startDate}
+          onHoldMonths={onHoldMonths}
+          hasActiveProposal={hasActiveProposal}
+          proposalData={proposalData}
+          rawBurn={rawBurn}
+          dataPoints={dataPoints}
+        />
+      </HoverCardContent>
+    </HoverCard>
+  );
   }
 
   return (
@@ -546,7 +559,20 @@ export function BurnSparkline({
         </div>
       </HoverCardTrigger>
       <HoverCardContent side="left" className="w-auto p-3">
-        {tooltipContent}
+        <BurnSparklineDetailedTooltip
+          snapshots={snapshots}
+          bmBudget={bmBudget}
+          currentBurn={currentBurn}
+          currency={currency}
+          burnPercent={burnPercent}
+          usdEquivalent={usdEquivalent}
+          startDate={startDate}
+          onHoldMonths={onHoldMonths}
+          hasActiveProposal={hasActiveProposal}
+          proposalData={proposalData}
+          rawBurn={rawBurn}
+          dataPoints={dataPoints}
+        />
       </HoverCardContent>
     </HoverCard>
   );

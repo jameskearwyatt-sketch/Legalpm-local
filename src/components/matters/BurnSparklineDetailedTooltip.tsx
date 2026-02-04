@@ -51,10 +51,10 @@ export function BurnSparklineDetailedTooltip({
   rawBurn,
   dataPoints,
 }: BurnSparklineDetailedTooltipProps) {
-  // Larger chart dimensions
-  const width = 280;
-  const height = 140;
-  const padding = { top: 20, right: 20, bottom: 30, left: 50 };
+  // Larger chart dimensions (1.5x scale)
+  const width = 420;
+  const height = 210;
+  const padding = { top: 25, right: 30, bottom: 40, left: 60 };
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
 
@@ -231,26 +231,26 @@ export function BurnSparklineDetailedTooltip({
     : null;
 
   return (
-    <div className="flex flex-col gap-3 min-w-[300px]">
+    <div className="flex flex-col gap-4 min-w-[450px]">
       {/* Header with status */}
-      <div className={`flex items-center justify-between px-3 py-2 rounded-md ${statusColors.bg}`}>
-        <div className="flex items-center gap-2">
+      <div className={`flex items-center justify-between px-4 py-3 rounded-lg ${statusColors.bg}`}>
+        <div className="flex items-center gap-3">
           {adjustedBurnPercent > 100 ? (
-            <AlertTriangle className={`h-4 w-4 ${statusColors.text}`} />
+            <AlertTriangle className={`h-5 w-5 ${statusColors.text}`} />
           ) : (
-            <CheckCircle className={`h-4 w-4 ${statusColors.text}`} />
+            <CheckCircle className={`h-5 w-5 ${statusColors.text}`} />
           )}
-          <span className={`font-semibold ${statusColors.text}`}>
+          <span className={`text-base font-semibold ${statusColors.text}`}>
             {adjustedBurnPercent.toFixed(0)}% of Budget
           </span>
         </div>
-        <span className={`text-sm ${statusColors.text}`}>
+        <span className={`text-sm font-medium ${statusColors.text}`}>
           {adjustedBurnPercent > 100 ? 'Over Budget' : adjustedBurnPercent > 80 ? 'Nearing Limit' : 'On Track'}
         </span>
       </div>
 
       {/* Large detailed chart */}
-      <div className="bg-muted/30 rounded-md p-2">
+      <div className="bg-muted/30 rounded-lg p-3">
         <svg width={width} height={height} className="overflow-visible">
           {/* Grid lines */}
           {chartData.gridLines?.map((line, i) => (
@@ -342,8 +342,8 @@ export function BurnSparklineDetailedTooltip({
               {/* Label for proposal */}
               <text
                 x={chartData.proposalDrop.endX}
-                y={chartData.proposalDrop.endY + 12}
-                fontSize={8}
+                y={chartData.proposalDrop.endY + 16}
+                fontSize={10}
                 fill="#f59e0b"
                 textAnchor="middle"
                 fontWeight={500}
@@ -366,9 +366,9 @@ export function BurnSparklineDetailedTooltip({
                 strokeDasharray="4,3"
               />
               <text
-                x={width - padding.right + 3}
-                y={chartData.budgetLineY + 3}
-                fontSize={9}
+                x={width - padding.right + 5}
+                y={chartData.budgetLineY + 4}
+                fontSize={11}
                 fill="#dc2626"
                 fontWeight={500}
               >
@@ -381,11 +381,11 @@ export function BurnSparklineDetailedTooltip({
           {chartData.yLabels?.map((label, i) => (
             <text
               key={i}
-              x={padding.left - 5}
-              y={label.y + 3}
-              fontSize={9}
+              x={padding.left - 8}
+              y={label.y + 4}
+              fontSize={11}
               fill="currentColor"
-              opacity={0.5}
+              opacity={0.6}
               textAnchor="end"
             >
               {label.label}
@@ -397,10 +397,10 @@ export function BurnSparklineDetailedTooltip({
             <text
               key={i}
               x={label.x}
-              y={height - 5}
-              fontSize={9}
+              y={height - 8}
+              fontSize={11}
               fill="currentColor"
-              opacity={0.5}
+              opacity={0.6}
               textAnchor="middle"
             >
               {label.label}
@@ -410,50 +410,50 @@ export function BurnSparklineDetailedTooltip({
       </div>
 
       {/* Key metrics grid */}
-      <div className="grid grid-cols-2 gap-2 text-xs">
+      <div className="grid grid-cols-2 gap-3 text-sm">
         {/* Current Burn */}
-        <div className="bg-muted/50 rounded px-2 py-1.5">
-          <div className="text-muted-foreground text-[10px]">BM Burn</div>
-          <div className="font-semibold">
+        <div className="bg-muted/50 rounded-lg px-3 py-2">
+          <div className="text-muted-foreground text-xs mb-0.5">BM Burn</div>
+          <div className="font-semibold text-base">
             {formatCurrency(currentBurn, currency)}
             {hasActiveProposal && proposalWriteOff > 0 && (
-              <span className="text-muted-foreground font-normal ml-1">(adj.)</span>
+              <span className="text-muted-foreground font-normal text-sm ml-1">(adj.)</span>
             )}
           </div>
           {usdEquivalent !== undefined && currency !== 'USD' && (
-            <div className="text-muted-foreground text-[10px]">
+            <div className="text-muted-foreground text-xs">
               ≈ {formatCurrency(usdEquivalent, 'USD')}
             </div>
           )}
         </div>
 
         {/* Budget */}
-        <div className="bg-muted/50 rounded px-2 py-1.5">
-          <div className="text-muted-foreground text-[10px]">BM Budget</div>
-          <div className="font-semibold">{formatCurrency(bmBudget, currency)}</div>
-          <div className="text-muted-foreground text-[10px]">
+        <div className="bg-muted/50 rounded-lg px-3 py-2">
+          <div className="text-muted-foreground text-xs mb-0.5">BM Budget</div>
+          <div className="font-semibold text-base">{formatCurrency(bmBudget, currency)}</div>
+          <div className="text-muted-foreground text-xs">
             Remaining: {formatCurrency(Math.max(0, bmBudget - currentBurn), currency)}
           </div>
         </div>
 
         {/* Burn Rate */}
-        <div className="bg-muted/50 rounded px-2 py-1.5">
-          <div className="flex items-center gap-1 text-muted-foreground text-[10px]">
-            <TrendingUp className="h-3 w-3" />
+        <div className="bg-muted/50 rounded-lg px-3 py-2">
+          <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-0.5">
+            <TrendingUp className="h-3.5 w-3.5" />
             Burn Rate
           </div>
-          <div className="font-semibold">
+          <div className="font-semibold text-base">
             {formatCurrency(burnRatePerMonth, currency)}/mo
           </div>
         </div>
 
         {/* Runway */}
-        <div className="bg-muted/50 rounded px-2 py-1.5">
-          <div className="flex items-center gap-1 text-muted-foreground text-[10px]">
-            <Clock className="h-3 w-3" />
+        <div className="bg-muted/50 rounded-lg px-3 py-2">
+          <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-0.5">
+            <Clock className="h-3.5 w-3.5" />
             Budget Runway
           </div>
-          <div className={`font-semibold ${monthsToExhaustion <= 2 ? 'text-destructive' : monthsToExhaustion <= 6 ? 'text-warning' : 'text-success'}`}>
+          <div className={`font-semibold text-base ${monthsToExhaustion <= 2 ? 'text-destructive' : monthsToExhaustion <= 6 ? 'text-warning' : 'text-success'}`}>
             {currentBurn >= bmBudget 
               ? 'Exhausted' 
               : `${monthsToExhaustion.toFixed(1)}m left`}
@@ -463,20 +463,20 @@ export function BurnSparklineDetailedTooltip({
 
       {/* Component breakdown */}
       {latestSnapshot && (
-        <div className="border-t pt-2">
-          <div className="text-[10px] text-muted-foreground mb-1.5 font-medium">Latest Snapshot Breakdown</div>
-          <div className="grid grid-cols-3 gap-1 text-[10px]">
-            <div className="bg-blue-500/10 rounded px-1.5 py-1">
-              <div className="text-blue-600 dark:text-blue-400 font-medium">WIP</div>
-              <div>{formatCurrency(latestSnapshot.wip_amount || 0, currency)}</div>
+        <div className="border-t pt-3">
+          <div className="text-xs text-muted-foreground mb-2 font-medium">Latest Snapshot Breakdown</div>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="bg-blue-500/10 rounded-lg px-2.5 py-1.5">
+              <div className="text-blue-600 dark:text-blue-400 font-medium text-xs">WIP</div>
+              <div className="font-semibold">{formatCurrency(latestSnapshot.wip_amount || 0, currency)}</div>
             </div>
-            <div className="bg-amber-500/10 rounded px-1.5 py-1">
-              <div className="text-amber-600 dark:text-amber-400 font-medium">A/R</div>
-              <div>{formatCurrency(latestSnapshot.accounts_receivable || 0, currency)}</div>
+            <div className="bg-amber-500/10 rounded-lg px-2.5 py-1.5">
+              <div className="text-amber-600 dark:text-amber-400 font-medium text-xs">A/R</div>
+              <div className="font-semibold">{formatCurrency(latestSnapshot.accounts_receivable || 0, currency)}</div>
             </div>
-            <div className="bg-green-500/10 rounded px-1.5 py-1">
-              <div className="text-green-600 dark:text-green-400 font-medium">Paid</div>
-              <div>{formatCurrency(latestSnapshot.paid_amount || 0, currency)}</div>
+            <div className="bg-green-500/10 rounded-lg px-2.5 py-1.5">
+              <div className="text-green-600 dark:text-green-400 font-medium text-xs">Paid</div>
+              <div className="font-semibold">{formatCurrency(latestSnapshot.paid_amount || 0, currency)}</div>
             </div>
           </div>
         </div>
@@ -484,21 +484,21 @@ export function BurnSparklineDetailedTooltip({
 
       {/* Proposal info if active */}
       {hasActiveProposal && proposalWriteOff > 0 && (
-        <div className="bg-amber-500/10 border border-amber-500/20 rounded px-2 py-1.5 text-xs">
-          <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium">
-            <TrendingDown className="h-3 w-3" />
+        <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-sm">
+          <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 font-medium">
+            <TrendingDown className="h-4 w-4" />
             Active Write-off Proposal
           </div>
-          <div className="text-muted-foreground">
+          <div className="text-muted-foreground mt-0.5">
             {formatCurrency(proposalWriteOff, currency)} proposed write-off
           </div>
         </div>
       )}
 
       {/* Footer metadata */}
-      <div className="flex items-center justify-between text-[10px] text-muted-foreground border-t pt-2">
-        <div className="flex items-center gap-1">
-          <Calendar className="h-3 w-3" />
+      <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-3">
+        <div className="flex items-center gap-1.5">
+          <Calendar className="h-3.5 w-3.5" />
           {startDate ? format(parseISO(startDate), 'dd MMM yyyy') : 'No start date'}
         </div>
         <div>

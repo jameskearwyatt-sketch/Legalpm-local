@@ -390,9 +390,9 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
                 <div className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
                   <RadioGroupItem value="ppa_vs_bible" id="ppa_vs_bible" className="mt-1" />
                   <label htmlFor="ppa_vs_bible" className="flex-1 cursor-pointer">
-                    <p className="font-medium">PPA vs Bible</p>
+                    <p className="font-medium">PPA vs Knowledge & Precedent Bank</p>
                     <p className="text-sm text-muted-foreground">
-                      Analyze PPA against market standard positions from the VPPA How-To Bible
+                      Analyze against the How-To Bible framework, gold standard templates, and your banked deal precedents
                     </p>
                   </label>
                 </div>

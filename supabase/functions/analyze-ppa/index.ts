@@ -5,79 +5,150 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-// Pilot categories for extraction
+// Enhanced categories with deeper extraction requirements
 const PILOT_CATEGORIES = [
   {
     id: 'pricing_structure',
     label: 'Pricing Structure',
     bibleReference: 'Section 2.1 - Pricing Mechanisms',
-    extractionHints: 'Look for: fixed price, floating price, floor/cap, indexation, price per MWh, contract price',
+    extractionRequirements: `MUST EXTRACT:
+• Price mechanism (fixed/floating/hybrid)
+• Price per MWh (exact figure)
+• Indexation mechanism (if any) - what index, frequency, formula
+• Price floor and/or cap (if any)
+• Escalation provisions
+• Any price reopener triggers`,
   },
   {
     id: 'seller_credit_support',
     label: 'Credit Support (Seller)',
     bibleReference: 'Section 5.2 - Seller Credit Support',
-    extractionHints: 'Look for: parent company guarantee, PCG, letter of credit, performance bond, security deposit from seller',
+    extractionRequirements: `MUST EXTRACT for EACH time period:
+• Pre-COD credit support: type, amount, form (PCG/LC/bond)
+• Post-COD credit support: type, amount, form
+• If NO credit support for any period, FLAG THIS CLEARLY
+• Credit rating thresholds that trigger additional security
+• Acceptable forms of security (LC issuer requirements)
+• Release/step-down provisions`,
   },
   {
     id: 'buyer_credit_support',
     label: 'Credit Support (Buyer)',
     bibleReference: 'Section 5.3 - Buyer Credit Support',
-    extractionHints: 'Look for: buyer security, credit rating requirements, payment security, collateral, LC from buyer',
+    extractionRequirements: `MUST EXTRACT for EACH time period:
+• Pre-COD credit support: type, amount, form
+• Post-COD credit support: type, amount, form
+• If NO credit support for any period, FLAG THIS CLEARLY
+• Credit rating thresholds
+• Parent company guarantee requirements
+• Payment security arrangements`,
   },
   {
     id: 'delay_liquidated_damages',
     label: 'Delay Liquidated Damages',
     bibleReference: 'Section 3.1 - Delay LDs',
-    extractionHints: 'Look for: delay LD, daily rate for delays, pre-COD compensation, delay cap, longstop',
+    extractionRequirements: `MUST EXTRACT:
+• Daily/weekly LD rate (exact figures)
+• LD cap (as % or absolute amount)
+• Grace period before LDs accrue
+• Longstop date and consequences
+• Deemed COD provisions (if any)
+• Exclusions from delay (FM, buyer delays)`,
   },
   {
     id: 'availability_guarantee',
     label: 'Availability Guarantee',
     bibleReference: 'Section 4.1 - Availability',
-    extractionHints: 'Look for: minimum availability, availability guarantee percentage, underperformance, availability calculation',
+    extractionRequirements: `MUST EXTRACT:
+• Guaranteed availability % (annual/lifetime)
+• Availability calculation methodology
+• Consequences of underperformance (LDs, termination)
+• Availability LD rate (£/MWh shortfall)
+• Exclusions from calculation
+• Bonus provisions for over-performance (if any)`,
   },
   {
     id: 'contract_term',
     label: 'Contract Term',
     bibleReference: 'Section 1.1 - Term',
-    extractionHints: 'Look for: term, duration, years, COD, commercial operation date, start date, end date, extension',
+    extractionRequirements: `MUST EXTRACT:
+• Total term length (years)
+• Term commencement trigger (signing/COD)
+• Target COD date
+• Extension rights (who holds, conditions, length)
+• Early termination for convenience (if any)`,
   },
   {
     id: 'payment_terms',
     label: 'Payment Terms',
     bibleReference: 'Section 5.1 - Payment',
-    extractionHints: 'Look for: payment, invoice, payment period, days to pay, interest on late payment, billing cycle',
+    extractionRequirements: `MUST EXTRACT:
+• Billing frequency (monthly/quarterly)
+• Payment period (X days from invoice)
+• Interest rate on late payment
+• Disputed invoice procedure
+• Netting/set-off rights`,
   },
   {
     id: 'force_majeure',
     label: 'Force Majeure',
     bibleReference: 'Section 6.1 - Force Majeure',
-    extractionHints: 'Look for: force majeure, FM, relief event, excused performance, suspension of obligations',
+    extractionRequirements: `MUST EXTRACT:
+• Definition scope (what is/isn't FM)
+• Notification requirements
+• Duration before termination right arises
+• Financial consequences during FM period
+• Specific exclusions (grid events, price changes)`,
   },
   {
     id: 'change_in_law',
     label: 'Change in Law',
     bibleReference: 'Section 6.2 - Change in Law',
-    extractionHints: 'Look for: change in law, legislative change, regulatory change, reopener, cost allocation',
+    extractionRequirements: `MUST EXTRACT:
+• Definition of qualifying change (discriminatory/general/tax)
+• Mechanism: How do parties address it? (negotiation, adjustment formula, termination)
+• Cost allocation: Who bears what costs?
+• Timeframe for reaching agreement
+• Fallback if agreement not reached (arbitration, termination, specific formula)
+• Material adverse threshold (if any)`,
   },
   {
     id: 'curtailment',
     label: 'Curtailment',
     bibleReference: 'Section 4.2 - Curtailment',
-    extractionHints: 'Look for: curtailment, grid curtailment, dispatch down, constrained off, curtailment compensation',
+    extractionRequirements: `MUST EXTRACT:
+• Voluntary curtailment: buyer's right to curtail, compensation payable
+• Involuntary curtailment (grid/dispatch down): 
+  - Is buyer compensated? At what rate?
+  - Does it count toward volume commitments?
+  - Cap on curtailment hours/MWh
+• REGO treatment during curtailment:
+  - Does buyer still receive/pay for REGOs on curtailed volumes?
+  - Deemed generation for REGO purposes
+• Compensation formula (lost revenue, deemed price)`,
   },
   {
     id: 'termination_rights',
     label: 'Termination Rights',
     bibleReference: 'Section 8.1 - Termination',
-    extractionHints: 'Look for: termination, event of default, cure period, termination payment, early termination',
+    extractionRequirements: `MUST EXTRACT:
+• Events of default (list key triggers)
+• Cure periods for each default type
+• Termination payment calculation methodology
+• Who pays whom on termination (defaulting vs non-defaulting)
+• Specific termination triggers (prolonged FM, insolvency, material breach)`,
   },
   {
     id: 'green_certificates',
     label: 'Green Certificates / REGOs',
     bibleReference: 'Section 7.1 - Environmental Attributes',
-    extractionHints: 'Look for: REGO, green certificate, renewable certificate, environmental attribute, GOs, guarantees of origin',
+    extractionRequirements: `MUST EXTRACT:
+• What attributes transfer (REGOs, GOs, carbon credits)
+• Price bundled or separate
+• Shortfall remedies (damages, buy-out, replacement)
+• REGO shortfall price/penalty
+• Timing of transfer (when must REGOs be delivered)
+• Additionality provisions (if relevant)`,
   },
 ];
 
@@ -101,34 +172,44 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Build the extraction prompt
+    // Build enhanced extraction prompt
     const categoryList = PILOT_CATEGORIES.map(c => 
-      `- ${c.label} (id: ${c.id}): ${c.extractionHints}`
-    ).join('\n');
+      `### ${c.label} (id: ${c.id})
+${c.extractionRequirements}`
+    ).join('\n\n');
 
-    const systemPrompt = `You are an expert PPA (Power Purchase Agreement) analyst specializing in European renewable energy contracts. 
-Your task is to extract key positions from the provided PPA document for each category.
+    const systemPrompt = `You are an expert PPA (Power Purchase Agreement) analyst specializing in European renewable energy contracts.
+Your task is to extract ACTIONABLE, SPECIFIC positions from the provided PPA document.
 
-PERSPECTIVE: You are analyzing from the ${perspective === 'buyer' ? 'Buyer (Offtaker)' : 'Seller (Generator)'} perspective.
+PERSPECTIVE: ${perspective === 'buyer' ? 'Buyer (Offtaker)' : 'Seller (Generator)'}
 ${jurisdiction ? `JURISDICTION: ${jurisdiction}` : ''}
-${analysisType === 'ppa_vs_termsheet' && comparisonText ? 'You should also compare against the provided term sheet.' : ''}
 
-For each category, you must:
-1. Find the relevant clause(s) in the PPA
-2. Summarize the position in 1-3 sentences
-3. Quote a brief source excerpt (max 100 chars)
-4. Assess confidence: "high" (clear clause found), "medium" (inferred from related language), "review_required" (not found or ambiguous)
+## OUTPUT REQUIREMENTS
 
-CATEGORIES TO EXTRACT:
-${categoryList}
+For each category you MUST:
 
-IMPORTANT RULES:
-- Extract positions exactly as stated in the document - do not infer or assume
-- If a category is not addressed in the document, set confidence to "review_required" and note it wasn't found
-- Keep position summaries concise but include key numbers, percentages, and terms
-- For the Bible reference, use the provided reference for each category`;
+1. **Clause References**: List the specific clause numbers where provisions are found (e.g., "Clause 8.2, Schedule 3 para 2.1")
+2. **Position Summary**: Use SHORT BULLET POINTS, not narrative paragraphs:
+   • Each bullet = one specific provision or term
+   • Include exact figures, percentages, amounts
+   • Be CONCLUSIVE - tell the user WHAT the contract says, not just THAT it has provisions
+   • Flag gaps or unusual terms
+3. **Confidence**: "high" (clear clauses), "medium" (inferred), "review_required" (not found/ambiguous)
 
-    const userPrompt = `Please analyze the following PPA and extract positions for each category.
+## CRITICAL INSTRUCTIONS
+
+- DO NOT write narrative summaries like "The document outlines mechanisms for..."
+- DO write specific conclusions like "• Seller must provide £500k LC pre-COD; NO post-COD security required ⚠️"
+- If something is MISSING that would normally be expected, FLAG IT with ⚠️
+- For Credit Support: ALWAYS distinguish pre-COD vs post-COD periods
+- For Curtailment: ALWAYS address involuntary curtailment compensation and REGO treatment
+- For Change in Law: ALWAYS explain the actual mechanism, not just that one exists
+
+## CATEGORIES TO EXTRACT
+
+${categoryList}`;
+
+    const userPrompt = `Analyze this PPA and extract positions for each category following the requirements above.
 
 PROJECT: ${projectName}
 
@@ -140,22 +221,23 @@ TERM SHEET / COMPARISON DOCUMENT:
 ${comparisonText.substring(0, 30000)}
 ` : ''}
 
-Return a JSON object with this structure:
+Return a JSON object:
 {
   "positions": [
     {
-      "category": "category_label",
-      "position_summary": "summary of the position",
-      "source_text": "brief quote from document",
+      "category": "Category Label",
+      "clause_references": "Clause X.X, Schedule Y para Z",
+      "position_summary": "• Bullet point 1\\n• Bullet point 2\\n• Bullet point 3",
       "confidence": "high|medium|review_required",
       "bible_reference": "Section X.X - Reference",
-      "comparison_position": "if comparing, what the term sheet says",
-      "variance_notes": "if comparing, key differences"
+      "flags": "⚠️ Any concerns or gaps to flag (optional)"
     }
   ]
-}`;
+}
 
-    console.log('Calling AI gateway for PPA analysis...');
+REMEMBER: Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that terms exist.`;
+
+    console.log('Calling AI gateway for enhanced PPA analysis...');
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -169,7 +251,7 @@ Return a JSON object with this structure:
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt }
         ],
-        temperature: 0.3,
+        temperature: 0.2, // Lower temperature for more precise extraction
       }),
     });
 
@@ -200,21 +282,30 @@ Return a JSON object with this structure:
     // Parse the JSON from the response
     let positions = [];
     try {
-      // Try to extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*"positions"[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         positions = parsed.positions || [];
+        
+        // Transform to match expected format, keeping clause_references instead of source_text
+        positions = positions.map((p: any) => ({
+          category: p.category,
+          position_summary: p.position_summary,
+          source_text: p.clause_references || null, // Store clause refs in source_text field
+          confidence: p.confidence || 'review_required',
+          bible_reference: p.bible_reference || PILOT_CATEGORIES.find(c => c.label === p.category)?.bibleReference,
+          comparison_position: p.comparison_position || null,
+          variance_notes: p.flags || p.variance_notes || null,
+        }));
       } else {
         console.error('No JSON found in response:', content.substring(0, 500));
         throw new Error('Could not parse AI response');
       }
     } catch (parseError) {
       console.error('JSON parse error:', parseError);
-      // Return empty positions if parsing fails
       positions = PILOT_CATEGORIES.map(c => ({
         category: c.label,
-        position_summary: 'Failed to extract - please review document manually',
+        position_summary: '• Failed to extract - please review document manually',
         source_text: null,
         confidence: 'review_required',
         bible_reference: c.bibleReference,
@@ -229,12 +320,12 @@ Return a JSON object with this structure:
       if (!existingCategories.has(cat.label)) {
         positions.push({
           category: cat.label,
-          position_summary: 'Not found in document',
+          position_summary: '• Not found in document',
           source_text: null,
           confidence: 'review_required',
           bible_reference: cat.bibleReference,
           comparison_position: null,
-          variance_notes: null,
+          variance_notes: '⚠️ Category not addressed in PPA',
         });
       }
     }

@@ -272,25 +272,25 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory }: 
                                     onCheckedChange={() => handleToggleBankingSelection(position.id)}
                                   />
                                 )}
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-2">
+                                <div className="space-y-2">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <span className="font-medium">{position.category}</span>
                                     <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs ${conf.bg}`}>
                                       <conf.icon className={`h-3 w-3 ${conf.color}`} />
                                       <span className={conf.color}>{conf.label}</span>
                                     </div>
+                                    {position.source_text && (
+                                      <span className="text-xs text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded">
+                                        {position.source_text}
+                                      </span>
+                                    )}
                                   </div>
-                                  <p className="text-sm text-foreground">
+                                  <div className="text-sm text-foreground whitespace-pre-line">
                                     {position.position_summary}
-                                  </p>
-                                  {position.source_text && (
-                                    <p className="text-xs text-muted-foreground italic">
-                                      Source: "{position.source_text.substring(0, 200)}..."
-                                    </p>
-                                  )}
+                                  </div>
                                   {position.bible_reference && (
                                     <p className="text-xs text-primary">
-                                      Bible: {position.bible_reference}
+                                      Bible ref: {position.bible_reference}
                                     </p>
                                   )}
                                 </div>

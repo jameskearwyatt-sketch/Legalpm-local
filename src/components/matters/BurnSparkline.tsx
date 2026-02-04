@@ -399,7 +399,7 @@ export function BurnSparkline({
             )}
         </div>
       </HoverCardTrigger>
-      <HoverCardContent side="left" className="w-auto p-3">
+      <HoverCardContent side="right" className="w-auto p-3">
         <BurnSparklineDetailedTooltip
           snapshots={snapshots}
           bmBudget={bmBudget}
@@ -558,7 +558,7 @@ export function BurnSparkline({
           )}
         </div>
       </HoverCardTrigger>
-      <HoverCardContent side="left" className="w-auto p-3">
+      <HoverCardContent side="right" className="w-auto p-3">
         <BurnSparklineDetailedTooltip
           snapshots={snapshots}
           bmBudget={bmBudget}

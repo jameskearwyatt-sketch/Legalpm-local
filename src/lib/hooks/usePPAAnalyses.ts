@@ -21,9 +21,14 @@ export interface PPAAnalysis {
   is_agreed: boolean;
   agreed_at: string | null;
   notes: string | null;
+  parent_analysis_id: string | null;
+  version_number: number;
+  is_comparison: boolean;
   created_at: string;
   updated_at: string;
 }
+
+export type ChangeType = 'unchanged' | 'modified' | 'added' | 'removed';
 
 export interface PPAExtractedPosition {
   id: string;
@@ -36,6 +41,9 @@ export interface PPAExtractedPosition {
   bible_reference: string | null;
   comparison_position: string | null;
   variance_notes: string | null;
+  previous_position: string | null;
+  change_summary: string | null;
+  change_type: ChangeType | null;
   created_at: string;
 }
 

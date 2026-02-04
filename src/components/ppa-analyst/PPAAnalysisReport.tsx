@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  GitCompare,
 } from 'lucide-react';
 import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAExtractedPosition } from '@/lib/hooks/usePPAAnalyses';
 import { getCategoryById, PPA_CATEGORY_GROUPS, PPA_ALL_CATEGORIES } from '@/lib/ppaCategories';
@@ -27,6 +28,7 @@ interface PPAAnalysisReportProps {
   analysisId: string;
   onNewAnalysis?: () => void;
   onViewHistory?: () => void;
+  onCompareNewDraft?: () => void;
 }
 
 const confidenceConfig = {
@@ -35,7 +37,7 @@ const confidenceConfig = {
   review_required: { icon: HelpCircle, label: 'Review Required', color: 'text-red-600', bg: 'bg-red-100' },
 };
 
-export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory }: PPAAnalysisReportProps) {
+export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, onCompareNewDraft }: PPAAnalysisReportProps) {
   const { analyses, updateAnalysis } = usePPAAnalyses();
   const { positions, isLoading: positionsLoading } = usePPAPositions(analysisId);
   const { bankPositions, precedents, getCategoryStats } = usePPAPrecedentBank();
@@ -187,6 +189,10 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory }: 
               </CardDescription>
             </div>
             <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={onCompareNewDraft}>
+                <GitCompare className="h-4 w-4 mr-1" />
+                Compare New Draft
+              </Button>
               <Button variant="outline" size="sm" onClick={onNewAnalysis}>
                 <Plus className="h-4 w-4 mr-1" />
                 New Analysis

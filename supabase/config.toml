@@ -104,3 +104,6 @@ verify_jwt = false
 
 [functions.analyze-ppa]
 verify_jwt = false
+
+[functions.compare-ppa-drafts]
+verify_jwt = false

@@ -189,6 +189,9 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
         comparison_file_name: comparisonFile?.name || null,
         comparison_file_url: null,
         notes: null,
+        parent_analysis_id: null,
+        version_number: 1,
+        is_comparison: false,
       });
 
       // Step 5: Save extracted positions

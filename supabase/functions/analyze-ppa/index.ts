@@ -536,8 +536,13 @@ For each category you MUST:
    • Be CONCLUSIVE - tell the user WHAT the contract says, not just THAT it has provisions
    • Flag gaps or unusual terms with ⚠️
 3. **Confidence**: "high" (clear clauses found), "medium" (inferred from related language), "review_required" (not found or ambiguous)
-${hasGoldStandard ? `4. **Gold Standard Comparison**: ALWAYS compare against BM template - flag ANY deviation with gold_standard_deviation: true and explain in gold_standard_comparison` : ''}
-${hasPrecedents ? `${hasGoldStandard ? '5' : '4'}. **Market Position**: Compare against precedent bank and provide market_position rating with brief market_comparison explanation` : ''}
+4. **Party Favorability**: Assess whether each position favors buyer or seller:
+   - "buyer_friendly": Position is more protective of buyer's interests than typical/balanced
+   - "seller_friendly": Position is more protective of seller's interests than typical/balanced
+   - "balanced": Position is reasonably balanced between parties
+   - "neutral": Position doesn't materially favor either party (purely procedural)
+${hasGoldStandard ? `5. **Gold Standard Comparison**: ALWAYS compare against BM template - flag ANY deviation with gold_standard_deviation: true and explain in gold_standard_comparison` : ''}
+${hasPrecedents ? `${hasGoldStandard ? '6' : '5'}. **Market Position**: Compare against precedent bank and provide market_position rating with brief market_comparison explanation` : ''}
 
 ## CRITICAL INSTRUCTIONS
 
@@ -550,6 +555,16 @@ ${hasGoldStandard ? `- ⭐ GOLD STANDARD CHECK: For EVERY category, compare agai
 - For Change in Law: ALWAYS explain the actual mechanism, not just that one exists
 - For Termination: List specific triggers and cure periods
 - Include actual numbers, dates, percentages - not just "as specified in Schedule X"
+
+## PARTY FAVORABILITY GUIDANCE
+When assessing party_favorability, consider the perspective (${perspective === 'buyer' ? 'Buyer' : 'Seller'}):
+- Higher security requirements = buyer_friendly
+- Broader FM/extension rights for seller = seller_friendly
+- Strong cure rights = benefits the party with the obligation
+- Caps on liability = favors the party whose liability is capped
+- Delay LDs = buyer_friendly (protects against delays)
+- Broad curtailment rights without compensation = seller_friendly
+- Stringent termination triggers = benefits the non-defaulting party (typically buyer)
 
 ## CATEGORIES TO EXTRACT
 ${categoryList}`;
@@ -574,6 +589,7 @@ Return a JSON object:
       "clause_references": "Clause X.X, Schedule Y para Z",
       "position_summary": "• Bullet point 1\\n• Bullet point 2\\n• Bullet point 3",
       "confidence": "high|medium|review_required",
+      "party_favorability": "buyer_friendly|seller_friendly|balanced|neutral",
       "flags": "⚠️ Any concerns or gaps to flag (optional)"${hasGoldStandard ? `,
       "gold_standard_deviation": true|false,
       "gold_standard_comparison": "Explanation of deviation from BM template or null"` : ''}${hasPrecedents ? `,
@@ -583,7 +599,7 @@ Return a JSON object:
   ]
 }
 
-IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that terms exist.${hasGoldStandard ? ' ALWAYS check against BM gold standard template.' : ''}${hasPrecedents ? ' Include market_position for all categories where precedents exist.' : ''}`;
+IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that terms exist. ALWAYS include party_favorability assessment.${hasGoldStandard ? ' ALWAYS check against BM gold standard template.' : ''}${hasPrecedents ? ' Include market_position for all categories where precedents exist.' : ''}`;
 
     console.log('Calling AI gateway for full PPA analysis...');
 
@@ -641,6 +657,18 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
             c.label.toLowerCase() === (p.category || '').toLowerCase()
           );
           
+          // Build variance_notes with market position tag if available
+          let varianceNotes = p.flags || p.variance_notes || '';
+          if (p.market_position) {
+            const marketTag = `[${p.market_position.toUpperCase().replace(/_/g, ' ')}]`;
+            varianceNotes = `${marketTag} ${varianceNotes}`.trim();
+          }
+          // Add party favorability tag
+          if (p.party_favorability && p.party_favorability !== 'neutral') {
+            const partyTag = `[${p.party_favorability.toUpperCase().replace(/_/g, '-')}]`;
+            varianceNotes = `${partyTag} ${varianceNotes}`.trim();
+          }
+          
           return {
             category: matchedCat?.label || p.category,
             position_summary: p.position_summary,
@@ -648,11 +676,12 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
             confidence: p.confidence || 'review_required',
             bible_reference: null,
             comparison_position: p.comparison_position || null,
-            variance_notes: p.flags || p.variance_notes || null,
+            variance_notes: varianceNotes || null,
             market_position: p.market_position || null,
             market_comparison: p.market_comparison || null,
             gold_standard_deviation: p.gold_standard_deviation || false,
             gold_standard_comparison: p.gold_standard_comparison || null,
+            party_favorability: p.party_favorability || 'neutral',
           };
         });
       } else {
@@ -673,6 +702,7 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
         market_comparison: null,
         gold_standard_deviation: false,
         gold_standard_comparison: null,
+        party_favorability: 'neutral',
       }));
     }
 
@@ -692,6 +722,7 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
           market_comparison: null,
           gold_standard_deviation: false,
           gold_standard_comparison: null,
+          party_favorability: 'neutral',
         });
       }
     }

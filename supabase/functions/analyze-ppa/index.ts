@@ -423,7 +423,18 @@ serve(async (req) => {
   }
 
   try {
-    const { ppaText, comparisonText, analysisType, perspective, jurisdiction, projectName, precedents, goldStandardPrecedents } = await req.json();
+    const { 
+      ppaText, 
+      comparisonText, 
+      analysisType, 
+      perspective, 
+      jurisdiction, 
+      projectName, 
+      precedents, 
+      goldStandardPrecedents,
+      marketIntelligence,
+      intelligenceConfidence,
+    } = await req.json();
 
     if (!ppaText) {
       return new Response(
@@ -432,9 +443,12 @@ serve(async (req) => {
       );
     }
 
-    // Check if we have precedents for market comparison
+    // Check if we have market intelligence or raw precedents
+    const hasMarketIntelligence = marketIntelligence && typeof marketIntelligence === 'string' && marketIntelligence.length > 100;
     const hasPrecedents = precedents && Array.isArray(precedents) && precedents.length > 0;
     const hasGoldStandard = goldStandardPrecedents && Array.isArray(goldStandardPrecedents) && goldStandardPrecedents.length > 0;
+
+    console.log(`Analysis request: hasMarketIntelligence=${hasMarketIntelligence}, hasPrecedents=${hasPrecedents}, hasGoldStandard=${hasGoldStandard}, intelligenceConfidence=${intelligenceConfidence}`);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -488,9 +502,35 @@ ${precs.map(p => `⭐ BM TEMPLATE: ${p.position_summary}`).join('\n')}`;
 `;
     }
 
-    // Build precedent context if available (secondary comparison)
+    // Build MARKET INTELLIGENCE context (synthesized patterns from precedent bank)
+    let marketIntelligenceContext = '';
+    if (hasMarketIntelligence) {
+      marketIntelligenceContext = `\n\n## 📊 SYNTHESIZED MARKET INTELLIGENCE (CRITICAL)
+
+You have access to SYNTHESIZED MARKET INTELLIGENCE extracted from our precedent bank. This is NOT just raw precedents - it contains:
+- **Aggregated numeric ranges** (e.g., "Availability Guarantee: 95-99%, median 97%")
+- **Common market structures** and their frequency
+- **Position clusters** showing what combinations typically appear together
+- **Jurisdiction-specific patterns** where regional differences exist
+- **Buyer vs Seller tendencies** for each category
+- **Cross-category correlations** and insights
+
+⚠️ **CRITICAL INSTRUCTION**: This synthesized intelligence takes PRIORITY over raw precedent comparison. Use the ranges, medians, and frequency data to determine market position ratings with PRECISION.
+
+**Intelligence Confidence Level**: ${intelligenceConfidence?.toUpperCase() || 'UNKNOWN'}
+${intelligenceConfidence === 'very_high' ? '(Extensive data - high confidence in market benchmarks)' : ''}
+${intelligenceConfidence === 'high' ? '(Good data depth - reliable market benchmarks)' : ''}
+${intelligenceConfidence === 'medium' ? '(Moderate data - use as guidance but note limitations)' : ''}
+${intelligenceConfidence === 'low' ? '(Limited data - treat as indicative only)' : ''}
+
+${marketIntelligence}
+`;
+    }
+
+    // Build raw precedent context as backup (secondary to synthesized intelligence)
+    // Only include raw precedents if we don't have synthesized intelligence (fallback)
     let precedentContext = '';
-    if (hasPrecedents) {
+    if (hasPrecedents && !hasMarketIntelligence) {
       const precedentsByCategory: Record<string, any[]> = {};
       for (const p of precedents) {
         if (!precedentsByCategory[p.category]) precedentsByCategory[p.category] = [];
@@ -519,9 +559,11 @@ ${precs.map(p => `- ${p.project_name}${p.jurisdiction ? ` (${p.jurisdiction})` :
 
     const systemPrompt = `You are an expert PPA (Power Purchase Agreement) analyst specializing in European renewable energy contracts.
 Your task is to extract ACTIONABLE, SPECIFIC positions from the provided PPA document.
+You have been equipped with MARKET INTELLIGENCE synthesized from our precedent bank - use it to provide precise market position assessments.
 
 PERSPECTIVE: ${perspective === 'buyer' ? 'Buyer (Offtaker)' : 'Seller (Generator)'}
 ${jurisdiction ? `JURISDICTION: ${jurisdiction}` : ''}
+${marketIntelligenceContext}
 ${goldStandardContext}
 ${precedentContext}
 
@@ -541,14 +583,20 @@ For each category you MUST:
    - "seller_friendly": Position is more protective of seller's interests than typical/balanced
    - "balanced": Position is reasonably balanced between parties
    - "neutral": Position doesn't materially favor either party (purely procedural)
-${hasGoldStandard ? `5. **Gold Standard Comparison**: ALWAYS compare against BM template - flag ANY deviation with gold_standard_deviation: true and explain in gold_standard_comparison` : ''}
-${hasPrecedents ? `${hasGoldStandard ? '6' : '5'}. **Market Position**: Compare against precedent bank and provide market_position rating with brief market_comparison explanation` : ''}
+${hasMarketIntelligence ? `5. **Market Position** (PRECISION REQUIRED): Use the SYNTHESIZED MARKET INTELLIGENCE above to determine market position with precision:
+   - Compare against the NUMERIC RANGES provided (if value is outside range, it's off/way-off market)
+   - Check COMMON STRUCTURES frequency (if structure is <20% frequency, consider off-market)
+   - Consider JURISDICTION-SPECIFIC patterns if analyzing a matching jurisdiction
+   - Reference the POSITION CLUSTERS to identify standard vs unusual combinations` : ''}
+${hasGoldStandard ? `${hasMarketIntelligence ? '6' : '5'}. **Gold Standard Comparison**: ALWAYS compare against BM template - flag ANY deviation with gold_standard_deviation: true and explain in gold_standard_comparison` : ''}
+${hasPrecedents && !hasMarketIntelligence ? `${hasGoldStandard ? '6' : '5'}. **Market Position**: Compare against precedent bank and provide market_position rating with brief market_comparison explanation` : ''}
 
 ## CRITICAL INSTRUCTIONS
 
 - DO NOT write narrative summaries like "The document outlines mechanisms for..."
 - DO write specific conclusions like "• Seller must provide £500k LC pre-COD; NO post-COD security required ⚠️"
 - If something is MISSING that would normally be expected, FLAG IT with ⚠️
+${hasMarketIntelligence ? `- 📊 MARKET INTELLIGENCE: You have synthesized market data. Use the RANGES and MEDIANS to assess positions precisely. A position at the median is "on_market", near the edges is "off_market", beyond the range is "way_off_market".` : ''}
 ${hasGoldStandard ? `- ⭐ GOLD STANDARD CHECK: For EVERY category, compare against BM template. Deviation from our template is more important than market position!` : ''}
 - For Credit Support: ALWAYS distinguish pre-COD vs post-COD periods
 - For Curtailment: ALWAYS address involuntary curtailment compensation and REGO treatment
@@ -565,6 +613,13 @@ When assessing party_favorability, consider the perspective (${perspective === '
 - Delay LDs = buyer_friendly (protects against delays)
 - Broad curtailment rights without compensation = seller_friendly
 - Stringent termination triggers = benefits the non-defaulting party (typically buyer)
+${hasMarketIntelligence ? `
+## MARKET POSITION PRECISION GUIDANCE (Using Intelligence Data)
+- **on_market**: Position is within the typical range from market intelligence, uses common structures (>50% frequency)
+- **off_market**: Position is at the edge of ranges, uses less common structures (10-50% frequency), or deviates from jurisdiction norms
+- **way_off_market**: Position is OUTSIDE the stated ranges, uses rare structures (<10% frequency), or significantly deviates from all clusters
+
+When you cite market intelligence, be specific: "This 93% availability is below the market range of 95-99% (median 97%)"` : ''}
 
 ## CATEGORIES TO EXTRACT
 ${categoryList}`;
@@ -590,16 +645,16 @@ Return a JSON object:
       "position_summary": "• Bullet point 1\\n• Bullet point 2\\n• Bullet point 3",
       "confidence": "high|medium|review_required",
       "party_favorability": "buyer_friendly|seller_friendly|balanced|neutral",
-      "flags": "⚠️ Any concerns or gaps to flag (optional)"${hasGoldStandard ? `,
-      "gold_standard_deviation": true|false,
-      "gold_standard_comparison": "Explanation of deviation from BM template or null"` : ''}${hasPrecedents ? `,
+      "flags": "⚠️ Any concerns or gaps to flag (optional)"${hasMarketIntelligence || hasPrecedents ? `,
       "market_position": "on_market|off_market|way_off_market|null",
-      "market_comparison": "Brief comparison to precedent positions"` : ''}
+      "market_comparison": "Brief comparison citing specific intelligence data (e.g., 'Below market range of 95-99%')"` : ''}${hasGoldStandard ? `,
+      "gold_standard_deviation": true|false,
+      "gold_standard_comparison": "Explanation of deviation from BM template or null"` : ''}
     }
   ]
 }
 
-IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that terms exist. ALWAYS include party_favorability assessment.${hasGoldStandard ? ' ALWAYS check against BM gold standard template.' : ''}${hasPrecedents ? ' Include market_position for all categories where precedents exist.' : ''}`;
+IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that terms exist. ALWAYS include party_favorability assessment.${hasMarketIntelligence ? ' USE THE MARKET INTELLIGENCE DATA to provide PRECISE market_position ratings with specific citations.' : ''}${hasGoldStandard ? ' ALWAYS check against BM gold standard template.' : ''}${hasPrecedents && !hasMarketIntelligence ? ' Include market_position for all categories where precedents exist.' : ''}`;
 
     console.log('Calling AI gateway for full PPA analysis...');
 

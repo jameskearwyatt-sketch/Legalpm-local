@@ -70,6 +70,40 @@ export interface MarketIntelligence {
   
   // Confidence level based on data volume
   intelligenceConfidence: 'low' | 'medium' | 'high' | 'very_high';
+  
+  // NEW: Advanced intelligence features
+  temporalAnalysis: {
+    oldestPrecedent: string | null;
+    newestPrecedent: string | null;
+    recentTrends: string[];
+    marketMovement: 'stable' | 'shifting_buyer' | 'shifting_seller' | 'volatile' | 'insufficient_data';
+  };
+  
+  // Similarity scoring for current context
+  contextRelevance: {
+    jurisdictionMatchCount: number;
+    perspectiveMatchCount: number;
+    relevanceScore: number; // 0-100
+  };
+  
+  // Negotiation intelligence
+  negotiationInsights: {
+    highRiskCategories: string[];
+    commonPushbackAreas: string[];
+    suggestedPriorities: Array<{
+      category: string;
+      reason: string;
+      leverage: 'high' | 'medium' | 'low';
+    }>;
+  };
+  
+  // Statistical depth
+  statisticalDepth: {
+    categoriesWithNumericData: number;
+    categoriesWithTrends: number;
+    averagePositionsPerCategory: number;
+    dataQualityScore: number; // 0-100
+  };
 }
 
 // Numeric extraction patterns for common PPA terms
@@ -412,11 +446,230 @@ function generateMarketNormsSummary(patterns: CategoryPattern[]): string {
 }
 
 /**
+ * Analyze temporal trends in precedent data
+ */
+function analyzeTemporalTrends(
+  precedents: PPAPrecedent[],
+  categoryPatterns: CategoryPattern[]
+): MarketIntelligence['temporalAnalysis'] {
+  if (precedents.length === 0) {
+    return {
+      oldestPrecedent: null,
+      newestPrecedent: null,
+      recentTrends: [],
+      marketMovement: 'insufficient_data',
+    };
+  }
+  
+  // Sort by banked_at timestamp
+  const sorted = [...precedents].sort((a, b) => 
+    new Date(a.banked_at).getTime() - new Date(b.banked_at).getTime()
+  );
+  
+  const oldestPrecedent = sorted[0]?.banked_at || null;
+  const newestPrecedent = sorted[sorted.length - 1]?.banked_at || null;
+  
+  // Analyze trends by looking at term frequency in recent vs older precedents
+  const midpoint = Math.floor(sorted.length / 2);
+  const olderHalf = sorted.slice(0, midpoint);
+  const newerHalf = sorted.slice(midpoint);
+  
+  const recentTrends: string[] = [];
+  
+  // Compare term frequencies between periods
+  const olderTerms = new Map<string, number>();
+  const newerTerms = new Map<string, number>();
+  
+  for (const p of olderHalf) {
+    const terms = extractKeyTerms(p.position_summary);
+    for (const t of terms) {
+      olderTerms.set(t, (olderTerms.get(t) || 0) + 1);
+    }
+  }
+  
+  for (const p of newerHalf) {
+    const terms = extractKeyTerms(p.position_summary);
+    for (const t of terms) {
+      newerTerms.set(t, (newerTerms.get(t) || 0) + 1);
+    }
+  }
+  
+  // Find emerging and declining terms
+  const olderTotal = Math.max(olderHalf.length, 1);
+  const newerTotal = Math.max(newerHalf.length, 1);
+  
+  for (const [term, newCount] of newerTerms) {
+    const oldCount = olderTerms.get(term) || 0;
+    const oldRate = oldCount / olderTotal;
+    const newRate = newCount / newerTotal;
+    
+    if (newRate > oldRate * 2 && newRate >= 0.2) {
+      recentTrends.push(`📈 "${term}" increasingly common (+${Math.round((newRate - oldRate) * 100)}%)`);
+    }
+  }
+  
+  for (const [term, oldCount] of olderTerms) {
+    const newCount = newerTerms.get(term) || 0;
+    const oldRate = oldCount / olderTotal;
+    const newRate = newCount / newerTotal;
+    
+    if (oldRate > newRate * 2 && oldRate >= 0.2) {
+      recentTrends.push(`📉 "${term}" declining (-${Math.round((oldRate - newRate) * 100)}%)`);
+    }
+  }
+  
+  // Determine market movement
+  let marketMovement: MarketIntelligence['temporalAnalysis']['marketMovement'] = 'stable';
+  
+  const buyerTermsOld = ['Letter of Credit', 'Parent Company Guarantee', 'Full Curtailment Compensation'];
+  const sellerTermsOld = ['No Security Required', 'No Curtailment Compensation', 'Uncapped FM Extension'];
+  
+  let buyerShift = 0;
+  let sellerShift = 0;
+  
+  for (const term of buyerTermsOld) {
+    const oldRate = (olderTerms.get(term) || 0) / olderTotal;
+    const newRate = (newerTerms.get(term) || 0) / newerTotal;
+    if (newRate > oldRate + 0.1) buyerShift++;
+    if (newRate < oldRate - 0.1) sellerShift++;
+  }
+  
+  for (const term of sellerTermsOld) {
+    const oldRate = (olderTerms.get(term) || 0) / olderTotal;
+    const newRate = (newerTerms.get(term) || 0) / newerTotal;
+    if (newRate > oldRate + 0.1) sellerShift++;
+    if (newRate < oldRate - 0.1) buyerShift++;
+  }
+  
+  if (precedents.length < 6) {
+    marketMovement = 'insufficient_data';
+  } else if (buyerShift > sellerShift + 1) {
+    marketMovement = 'shifting_buyer';
+  } else if (sellerShift > buyerShift + 1) {
+    marketMovement = 'shifting_seller';
+  } else if (recentTrends.length > 3) {
+    marketMovement = 'volatile';
+  }
+  
+  return {
+    oldestPrecedent,
+    newestPrecedent,
+    recentTrends: recentTrends.slice(0, 5),
+    marketMovement,
+  };
+}
+
+/**
+ * Generate negotiation insights
+ */
+function generateNegotiationInsights(
+  categoryPatterns: CategoryPattern[],
+  perspective: 'buyer' | 'seller' = 'buyer'
+): MarketIntelligence['negotiationInsights'] {
+  const highRiskCategories: string[] = [];
+  const commonPushbackAreas: string[] = [];
+  const suggestedPriorities: MarketIntelligence['negotiationInsights']['suggestedPriorities'] = [];
+  
+  // Categories where positions vary most (high negotiation potential)
+  const highVarianceCategories = categoryPatterns.filter(p => {
+    const hasNumericVariance = p.numericPatterns.some(n => (n.max - n.min) / Math.max(n.median, 1) > 0.3);
+    const hasMultipleClusters = p.positionClusters.length >= 3;
+    return hasNumericVariance || hasMultipleClusters;
+  });
+  
+  for (const cat of highVarianceCategories.slice(0, 5)) {
+    highRiskCategories.push(cat.category);
+  }
+  
+  // Categories where perspective tendencies differ most
+  for (const cat of categoryPatterns) {
+    if (cat.perspectiveAnalysis.buyerTendencies.length > 0 && cat.perspectiveAnalysis.sellerTendencies.length > 0) {
+      commonPushbackAreas.push(cat.category);
+    }
+  }
+  
+  // Generate priority suggestions
+  const criticalCategories = [
+    'Credit Support (Seller)',
+    'Credit Support (Buyer)',
+    'Delay Liquidated Damages',
+    'Curtailment',
+    'Force Majeure',
+    'Termination Rights',
+    'Liability & Limitations',
+  ];
+  
+  for (const cat of categoryPatterns) {
+    if (criticalCategories.some(c => cat.category.includes(c.replace(' (Seller)', '').replace(' (Buyer)', '')))) {
+      const tendencies = perspective === 'buyer' 
+        ? cat.perspectiveAnalysis.buyerTendencies 
+        : cat.perspectiveAnalysis.sellerTendencies;
+      
+      if (tendencies.length > 0) {
+        suggestedPriorities.push({
+          category: cat.category,
+          reason: `${perspective === 'buyer' ? 'Buyer' : 'Seller'}-favorable precedents show: ${tendencies.slice(0, 2).join(', ')}`,
+          leverage: cat.uniqueDeals >= 3 ? 'high' : cat.uniqueDeals >= 2 ? 'medium' : 'low',
+        });
+      }
+    }
+  }
+  
+  return {
+    highRiskCategories,
+    commonPushbackAreas: commonPushbackAreas.slice(0, 5),
+    suggestedPriorities: suggestedPriorities.slice(0, 5),
+  };
+}
+
+/**
+ * Calculate statistical depth metrics
+ */
+function calculateStatisticalDepth(
+  categoryPatterns: CategoryPattern[],
+  totalPositions: number
+): MarketIntelligence['statisticalDepth'] {
+  const categoriesWithNumericData = categoryPatterns.filter(p => p.numericPatterns.length > 0).length;
+  const categoriesWithTrends = categoryPatterns.filter(p => p.recentTrend !== null).length;
+  const averagePositionsPerCategory = categoryPatterns.length > 0 
+    ? totalPositions / categoryPatterns.length 
+    : 0;
+  
+  // Calculate data quality score (0-100)
+  let dataQualityScore = 0;
+  
+  // Volume component (max 40 points)
+  dataQualityScore += Math.min(40, totalPositions * 2);
+  
+  // Category coverage component (max 30 points)
+  const coverageRatio = categoryPatterns.length / 27; // 27 is our standard category count
+  dataQualityScore += Math.min(30, coverageRatio * 30);
+  
+  // Numeric depth component (max 20 points)
+  const numericRatio = categoriesWithNumericData / Math.max(categoryPatterns.length, 1);
+  dataQualityScore += numericRatio * 20;
+  
+  // Consistency component (max 10 points)
+  const avgPositions = averagePositionsPerCategory;
+  if (avgPositions >= 2) dataQualityScore += 10;
+  else if (avgPositions >= 1) dataQualityScore += 5;
+  
+  return {
+    categoriesWithNumericData,
+    categoriesWithTrends,
+    averagePositionsPerCategory: Math.round(averagePositionsPerCategory * 10) / 10,
+    dataQualityScore: Math.round(dataQualityScore),
+  };
+}
+
+/**
  * Main function to generate comprehensive market intelligence from precedent bank
  */
 export function generateMarketIntelligence(
   precedents: PPAPrecedent[],
-  goldStandardPrecedents: PPAPrecedent[]
+  goldStandardPrecedents: PPAPrecedent[],
+  currentJurisdiction?: string,
+  currentPerspective?: 'buyer' | 'seller'
 ): MarketIntelligence {
   // Exclude gold standard from regular analysis (they're templates, not market data)
   const marketPrecedents = precedents.filter(p => !p.is_gold_standard);
@@ -444,6 +697,37 @@ export function generateMarketIntelligence(
   const crossCategoryInsights = generateCrossCategoryInsights(categoryPatterns);
   const marketNormsSummary = generateMarketNormsSummary(categoryPatterns);
   
+  // NEW: Temporal analysis
+  const temporalAnalysis = analyzeTemporalTrends(marketPrecedents, categoryPatterns);
+  
+  // NEW: Context relevance scoring
+  const jurisdictionMatchCount = currentJurisdiction 
+    ? marketPrecedents.filter(p => p.jurisdiction === currentJurisdiction).length 
+    : 0;
+  const perspectiveMatchCount = currentPerspective 
+    ? marketPrecedents.filter(p => p.perspective === currentPerspective).length 
+    : 0;
+  
+  let relevanceScore = 50; // Base score
+  if (currentJurisdiction && jurisdictionMatchCount > 0) {
+    relevanceScore += Math.min(25, jurisdictionMatchCount * 5);
+  }
+  if (currentPerspective && perspectiveMatchCount > 0) {
+    relevanceScore += Math.min(25, (perspectiveMatchCount / Math.max(totalPositions, 1)) * 50);
+  }
+  
+  const contextRelevance = {
+    jurisdictionMatchCount,
+    perspectiveMatchCount,
+    relevanceScore: Math.min(100, Math.round(relevanceScore)),
+  };
+  
+  // NEW: Negotiation insights
+  const negotiationInsights = generateNegotiationInsights(categoryPatterns, currentPerspective || 'buyer');
+  
+  // NEW: Statistical depth
+  const statisticalDepth = calculateStatisticalDepth(categoryPatterns, totalPositions);
+  
   // Determine confidence level
   let intelligenceConfidence: 'low' | 'medium' | 'high' | 'very_high';
   if (totalDeals >= 10 && jurisdictionCoverage.length >= 3) {
@@ -465,6 +749,10 @@ export function generateMarketIntelligence(
     crossCategoryInsights,
     marketNormsSummary,
     intelligenceConfidence,
+    temporalAnalysis,
+    contextRelevance,
+    negotiationInsights,
+    statisticalDepth,
   };
 }
 
@@ -478,42 +766,93 @@ export function formatIntelligenceForPrompt(intelligence: MarketIntelligence): s
   
   const sections: string[] = [];
   
-  // Overview
-  sections.push(`## MARKET INTELLIGENCE OVERVIEW
+  // Overview with enhanced metrics
+  sections.push(`## 📊 MARKET INTELLIGENCE OVERVIEW
 - **Total Precedent Deals**: ${intelligence.totalDeals}
 - **Total Analyzed Positions**: ${intelligence.totalPositions}
 - **Jurisdiction Coverage**: ${intelligence.jurisdictionCoverage.join(', ') || 'Various'}
 - **Perspective Balance**: ${intelligence.perspectiveBalance.buyer} buyer / ${intelligence.perspectiveBalance.seller} seller positions
 - **Intelligence Confidence**: ${intelligence.intelligenceConfidence.toUpperCase()}
+- **Data Quality Score**: ${intelligence.statisticalDepth.dataQualityScore}/100
+- **Context Relevance Score**: ${intelligence.contextRelevance.relevanceScore}/100
 - **Market Norms**: ${intelligence.marketNormsSummary}`);
+
+  // NEW: Temporal trends section
+  if (intelligence.temporalAnalysis.marketMovement !== 'insufficient_data') {
+    const movementLabel = {
+      stable: '📈 STABLE - Market positions are consistent over time',
+      shifting_buyer: '⬆️ SHIFTING BUYER-FAVORABLE - Recent deals show stronger buyer protections',
+      shifting_seller: '⬇️ SHIFTING SELLER-FAVORABLE - Recent deals show more seller-friendly terms',
+      volatile: '🔄 VOLATILE - Significant variation in recent positions',
+    };
+    
+    sections.push(`## 🕐 TEMPORAL ANALYSIS (Market Movement)
+**Market Direction**: ${movementLabel[intelligence.temporalAnalysis.marketMovement]}
+${intelligence.temporalAnalysis.recentTrends.length > 0 ? `
+**Recent Trends**:
+${intelligence.temporalAnalysis.recentTrends.map(t => `• ${t}`).join('\n')}
+
+⚠️ INSTRUCTION: Weight RECENT precedents more heavily. If market is shifting, positions that were "on_market" 12 months ago may now be "off_market".` : ''}`);
+  }
+
+  // NEW: Context relevance section
+  if (intelligence.contextRelevance.jurisdictionMatchCount > 0 || intelligence.contextRelevance.perspectiveMatchCount > 0) {
+    sections.push(`## 🎯 CONTEXT-SPECIFIC INTELLIGENCE
+- **Matching Jurisdiction Precedents**: ${intelligence.contextRelevance.jurisdictionMatchCount}
+- **Matching Perspective Precedents**: ${intelligence.contextRelevance.perspectiveMatchCount}
+
+⚠️ INSTRUCTION: Prioritize precedents that match the current jurisdiction and perspective. ${intelligence.contextRelevance.jurisdictionMatchCount >= 3 ? 'You have STRONG jurisdiction-specific data - use it!' : 'Limited jurisdiction-specific data - rely more on general patterns.'}`);
+  }
+
+  // NEW: Negotiation insights section
+  if (intelligence.negotiationInsights.suggestedPriorities.length > 0) {
+    sections.push(`## 🎲 NEGOTIATION INTELLIGENCE
+**High-Risk Categories** (significant variation in market):
+${intelligence.negotiationInsights.highRiskCategories.map(c => `• ${c}`).join('\n') || '• None identified'}
+
+**Common Pushback Areas** (buyer vs seller tension):
+${intelligence.negotiationInsights.commonPushbackAreas.map(c => `• ${c}`).join('\n') || '• None identified'}
+
+**Suggested Priorities Based on Precedents**:
+${intelligence.negotiationInsights.suggestedPriorities.map(p => `• ${p.category} (${p.leverage} leverage): ${p.reason}`).join('\n')}
+
+⚠️ INSTRUCTION: For high-risk categories, be MORE PRECISE in market position assessment. These are the areas where deviation matters most commercially.`);
+  }
   
   // Cross-category insights
   if (intelligence.crossCategoryInsights.length > 0) {
-    sections.push(`## CROSS-CATEGORY INSIGHTS
-${intelligence.crossCategoryInsights.map(i => `• ${i}`).join('\n')}`);
+    sections.push(`## 🔗 CROSS-CATEGORY CORRELATIONS
+${intelligence.crossCategoryInsights.map(i => `• ${i}`).join('\n')}
+
+⚠️ INSTRUCTION: Consider these correlations when assessing positions. If one category deviates, related categories may also show unusual patterns.`);
   }
   
   // Category-specific intelligence (top categories with good data)
   const strongCategories = intelligence.categoryPatterns.filter(p => p.uniqueDeals >= 2);
   
   if (strongCategories.length > 0) {
-    sections.push(`## CATEGORY-SPECIFIC MARKET INTELLIGENCE`);
+    sections.push(`## 📋 CATEGORY-SPECIFIC MARKET INTELLIGENCE`);
     
     for (const cat of strongCategories.slice(0, 15)) { // Top 15 categories
       const catSection: string[] = [];
       catSection.push(`### ${cat.category} (${cat.uniqueDeals} deals, ${cat.positionCount} positions)`);
       
-      // Numeric ranges
+      // Numeric ranges with statistical context
       if (cat.numericPatterns.length > 0) {
-        catSection.push(`**Market Ranges**:`);
+        catSection.push(`**Market Ranges** (USE FOR PRECISION BENCHMARKING):`);
         for (const num of cat.numericPatterns) {
-          catSection.push(`  • ${num.metric}: ${num.min}-${num.max}${num.unit} (median: ${num.median}${num.unit})`);
+          const range = num.max - num.min;
+          const rangeContext = range / Math.max(num.median, 1) > 0.3 ? '(HIGH VARIANCE ⚠️)' : '(consistent)';
+          catSection.push(`  • ${num.metric}: ${num.min}-${num.max}${num.unit} (median: ${num.median}${num.unit}) ${rangeContext}`);
         }
       }
       
-      // Common terms
+      // Common terms with actionable thresholds
       if (cat.commonTerms.length > 0) {
-        const terms = cat.commonTerms.slice(0, 5).map(t => `${t.term} (${Math.round(t.frequency * 100)}%)`);
+        const terms = cat.commonTerms.slice(0, 5).map(t => {
+          const threshold = t.frequency >= 0.7 ? '✓ STANDARD' : t.frequency >= 0.4 ? '~ COMMON' : '? LESS COMMON';
+          return `${t.term} (${Math.round(t.frequency * 100)}% ${threshold})`;
+        });
         catSection.push(`**Common Structures**: ${terms.join(', ')}`);
       }
       
@@ -548,18 +887,30 @@ ${intelligence.crossCategoryInsights.map(i => `• ${i}`).join('\n')}`);
     }
   }
   
-  // Instructions for AI
-  sections.push(`## HOW TO USE THIS INTELLIGENCE
+  // Enhanced instructions for AI
+  sections.push(`## 🎯 HOW TO USE THIS INTELLIGENCE (CRITICAL)
 
-1. **Market Position Assessment**: Compare the PPA position against the ranges and common structures above. If a position falls OUTSIDE the stated ranges or uses uncommon structures, flag as "off_market" or "way_off_market".
+### Market Position Assessment Rules:
+1. **ON_MARKET**: Position is within stated ranges, uses structures with ≥50% frequency, matches common clusters
+2. **OFF_MARKET**: Position is at edge of ranges (within 10% of min/max), uses structures with 20-50% frequency, partially matches clusters
+3. **WAY_OFF_MARKET**: Position is OUTSIDE stated ranges, uses structures with <20% frequency, matches no clusters, OR contradicts strong jurisdiction patterns
 
-2. **Jurisdiction Context**: If analyzing a PPA from a jurisdiction with specific patterns noted above, weight those patterns more heavily.
+### Precision Requirements:
+- **Cite specific data**: "This 93% availability is below the market range of 95-99% (median 97%)"
+- **Reference term frequency**: "LC requirement is standard (78% of precedents use LC)"
+- **Note jurisdiction context**: "While on-market generally, this deviates from typical UK practice"
+- **Consider temporal trends**: If market is shifting, note whether position is ahead or behind the trend
 
-3. **Perspective Awareness**: Consider whether positions align with buyer-side or seller-side tendencies. Positions that align with the OPPOSITE party's tendencies may indicate negotiating strength or weakness.
+### Negotiation Context:
+- For HIGH-RISK categories: Be precise and flag any deviation
+- For COMMON PUSHBACK areas: Note the buyer/seller tension explicitly
+- Reference the SUGGESTED PRIORITIES when relevant
 
-4. **Numeric Precision**: When the PPA contains specific figures, compare against the median and ranges. Deviations beyond the min/max are "way_off_market".
-
-5. **Pattern Clusters**: If a position matches a common market cluster, it's likely "on_market". Novel structures not matching any cluster warrant "off_market" consideration.`);
+### Statistical Confidence:
+- Data Quality: ${intelligence.statisticalDepth.dataQualityScore}/100
+- Categories with numeric benchmarks: ${intelligence.statisticalDepth.categoriesWithNumericData}
+- Average positions per category: ${intelligence.statisticalDepth.averagePositionsPerCategory}
+${intelligence.statisticalDepth.dataQualityScore < 50 ? '\n⚠️ LIMITED DATA - Market positions should be treated as indicative rather than definitive' : ''}`);
   
   return sections.join('\n\n');
 }

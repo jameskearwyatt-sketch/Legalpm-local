@@ -12,12 +12,51 @@ const PPA_CATEGORIES = [
     id: 'target_cod',
     label: 'Target COD & Milestones',
     group: 'Pre-COD / Development',
-    extractionRequirements: `MUST EXTRACT:
+    extractionRequirements: `MUST EXTRACT - FORENSIC COD TIMELINE ANALYSIS:
+
+## 1. BASE TIMELINE
 • Target COD date (exact date or "X months from signing")
-• Key milestones and longstop dates
-• Consequences of missing milestones
-• Deemed COD provisions (if any)
-• Conditions precedent to COD`,
+• Longstop Date (the absolute backstop)
+• Key intermediate milestones
+
+## 2. ⚠️ CRITICAL: ALL EXTENSION MECHANISMS (Worst-Case Analysis)
+You MUST identify EVERY mechanism by which Target COD or Longstop Date can be extended:
+
+A) FORCE MAJEURE EXTENSIONS:
+   • Day-for-day extension for FM? YES/NO
+   • Cap on FM extension period (e.g., "max 180 days")
+   • Does FM extend Longstop Date or just Target COD?
+
+B) SELLER UNILATERAL EXTENSIONS:
+   • Can Seller extend if "substantial progress" made? (COMMON TRAP ⚠️)
+   • Extension for permitting delays?
+   • Extension for grid connection delays?
+   • Extension for financing delays?
+   • Any other Seller discretionary extensions?
+   • What is the cap on each?
+
+C) BUYER-CAUSED DELAYS:
+   • Extension for Buyer's failure to perform CPs?
+   • Extension for site access issues?
+
+D) THIRD PARTY / EXTERNAL:
+   • Grid operator delay extensions
+   • Government/regulatory approval delays
+   • Interconnection delays
+
+## 3. WORST-CASE TIMELINE CALCULATION
+Calculate and state: "Under worst-case scenario (all extensions invoked), Buyer could wait up to [X months/years] past Target COD before COD is achieved or termination right arises."
+
+## 4. TERMINATION TRIGGERS
+• When can Buyer terminate for delay?
+• What compensation (if any) on delay termination?
+• Are there any "zombie project" traps where Seller can keep project alive indefinitely?
+
+## 5. FLAGS ⚠️
+• Flag if total possible extension exceeds 12 months
+• Flag if Seller has broad discretionary extensions
+• Flag if Longstop Date itself can be extended
+• Flag if NO hard cap on total extensions`,
   },
   {
     id: 'delay_liquidated_damages',
@@ -29,6 +68,12 @@ const PPA_CATEGORIES = [
 • Grace period before LDs accrue
 • Longstop date and consequences (termination right?)
 • Deemed COD provisions
+
+⚠️ COD EXTENSION INTERACTION:
+• Do LDs accrue during extension periods or are they suspended?
+• Does Longstop Date itself extend (reducing Buyer's termination protection)?
+• If FM extends Target COD, is Seller still paying LDs? Or does LD obligation suspend?
+
 • Exclusions from delay (FM, buyer delays, grid connection delays)`,
   },
   {
@@ -243,7 +288,15 @@ const PPA_CATEGORIES = [
 • Duration before termination right arises
 • Financial consequences during FM period (who bears costs)
 • Specific exclusions (grid events, price changes, weather)
-• Extension of term for FM`,
+
+⚠️ COD EXTENSION IMPACT (Critical for Pre-COD):
+• Does FM extend Target COD? Day-for-day or capped?
+• Does FM extend Longstop Date? (If yes, Buyer loses termination protection ⚠️)
+• What is the maximum FM extension period?
+• Can FM suspend Delay LDs?
+• After FM ends, how quickly must Seller achieve COD?
+
+• Extension of term for FM (post-COD)`,
   },
   {
     id: 'change_in_law',

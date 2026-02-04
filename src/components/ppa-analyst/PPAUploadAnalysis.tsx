@@ -44,7 +44,7 @@ const EUROPEAN_JURISDICTIONS = [
 export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps) {
   const { createAnalysis } = usePPAAnalyses();
   const { createPositions } = usePPAPositions(null);
-  const { precedents } = usePPAPrecedentBank();
+  const { precedents, goldStandardPrecedents } = usePPAPrecedentBank();
   const { ppaPrecedentThreshold } = useUserSettings();
   const [step, setStep] = useState<'upload' | 'configure' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<PPAAnalysisType>('ppa_vs_bible');
@@ -160,9 +160,10 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
       // Step 3: Run AI analysis with precedents if threshold is met
       setAnalysisStatus('Analyzing PPA positions...');
       
-      // Filter relevant precedents for comparison
-      const relevantPrecedents = precedents.length >= ppaPrecedentThreshold
-        ? precedents.map(p => ({
+      // Filter relevant precedents for comparison (exclude gold standard from regular precedents)
+      const regularPrecedents = precedents.filter(p => !p.is_gold_standard);
+      const relevantPrecedents = regularPrecedents.length >= ppaPrecedentThreshold
+        ? regularPrecedents.map(p => ({
             category: p.category,
             position_summary: p.position_summary,
             project_name: p.project_name,
@@ -171,7 +172,18 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
           }))
         : [];
       
+      // Always include gold standard precedents for comparison (regardless of threshold)
+      const goldStandardForAnalysis = goldStandardPrecedents.map(p => ({
+        category: p.category,
+        position_summary: p.position_summary,
+        project_name: p.project_name,
+        jurisdiction: p.jurisdiction,
+        perspective: p.perspective,
+        template_name: p.template_name,
+      }));
+      
       console.log(`Passing ${relevantPrecedents.length} precedents for market comparison (threshold: ${ppaPrecedentThreshold})`);
+      console.log(`Passing ${goldStandardForAnalysis.length} gold standard template positions`);
       
       const analyzeResponse = await supabase.functions.invoke('analyze-ppa', {
         body: {
@@ -182,6 +194,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
           jurisdiction,
           projectName,
           precedents: relevantPrecedents,
+          goldStandardPrecedents: goldStandardForAnalysis,
         },
       });
 

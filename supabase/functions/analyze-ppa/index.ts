@@ -423,7 +423,7 @@ serve(async (req) => {
   }
 
   try {
-    const { ppaText, comparisonText, analysisType, perspective, jurisdiction, projectName, precedents } = await req.json();
+    const { ppaText, comparisonText, analysisType, perspective, jurisdiction, projectName, precedents, goldStandardPrecedents } = await req.json();
 
     if (!ppaText) {
       return new Response(
@@ -434,6 +434,7 @@ serve(async (req) => {
 
     // Check if we have precedents for market comparison
     const hasPrecedents = precedents && Array.isArray(precedents) && precedents.length > 0;
+    const hasGoldStandard = goldStandardPrecedents && Array.isArray(goldStandardPrecedents) && goldStandardPrecedents.length > 0;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -456,7 +457,38 @@ serve(async (req) => {
       }
     }
 
-    // Build precedent context if available
+    // Build GOLD STANDARD template context (highest priority - always compared against)
+    let goldStandardContext = '';
+    if (hasGoldStandard) {
+      const goldByCategory: Record<string, any[]> = {};
+      for (const p of goldStandardPrecedents) {
+        if (!goldByCategory[p.category]) goldByCategory[p.category] = [];
+        goldByCategory[p.category].push(p);
+      }
+      
+      goldStandardContext = `\n\n## ⭐ GOLD STANDARD TEMPLATE COMPARISON (CRITICAL)
+You have access to positions from the Baker McKenzie EU VPPA Template - our firm's gold standard precedent document.
+This template represents best-practice positions for European VPPAs from the buyer's perspective.
+
+**CRITICAL INSTRUCTION**: For EVERY category where gold standard positions exist:
+1. You MUST compare the draft PPA against the gold standard template
+2. Flag ANY material deviation from the gold standard with "⚠️ DEVIATES FROM BM TEMPLATE:"
+3. Explain specifically how the draft differs and whether the deviation favors buyer or seller
+4. Even if a position is "on market" compared to other precedents, if it deviates from our template, FLAG IT
+
+For each extracted position, include:
+- "gold_standard_deviation": true/false (does this materially deviate from the BM template?)
+- "gold_standard_comparison": "Specific explanation of how this differs from BM template position" or null
+
+GOLD STANDARD TEMPLATE POSITIONS:
+${Object.entries(goldByCategory).map(([cat, precs]) => {
+  return `### ${cat}
+${precs.map(p => `⭐ BM TEMPLATE: ${p.position_summary}`).join('\n')}`;
+}).join('\n\n')}
+`;
+    }
+
+    // Build precedent context if available (secondary comparison)
     let precedentContext = '';
     if (hasPrecedents) {
       const precedentsByCategory: Record<string, any[]> = {};
@@ -465,7 +497,7 @@ serve(async (req) => {
         precedentsByCategory[p.category].push(p);
       }
       
-      precedentContext = `\n\n## PRECEDENT BANK COMPARISON
+      precedentContext = `\n\n## MARKET PRECEDENT COMPARISON
 You have access to ${precedents.length} banked positions from agreed PPAs. For each category where precedents exist, compare the current PPA against market practice and provide a MARKET POSITION assessment.
 
 MARKET POSITION RATINGS:
@@ -477,7 +509,7 @@ For each extracted position, include:
 - "market_position": "on_market" | "off_market" | "way_off_market" | null (if insufficient precedents)
 - "market_comparison": Brief explanation of how this compares to precedents (e.g., "Availability at 95% is below market range of 97-99%")
 
-PRECEDENT DATA BY CATEGORY:
+MARKET PRECEDENT DATA BY CATEGORY:
 ${Object.entries(precedentsByCategory).map(([cat, precs]) => {
   return `### ${cat} (${precs.length} precedent${precs.length > 1 ? 's' : ''})
 ${precs.map(p => `- ${p.project_name}${p.jurisdiction ? ` (${p.jurisdiction})` : ''}: ${p.position_summary.substring(0, 200)}...`).join('\n')}`;
@@ -490,6 +522,7 @@ Your task is to extract ACTIONABLE, SPECIFIC positions from the provided PPA doc
 
 PERSPECTIVE: ${perspective === 'buyer' ? 'Buyer (Offtaker)' : 'Seller (Generator)'}
 ${jurisdiction ? `JURISDICTION: ${jurisdiction}` : ''}
+${goldStandardContext}
 ${precedentContext}
 
 ## OUTPUT REQUIREMENTS
@@ -503,13 +536,15 @@ For each category you MUST:
    • Be CONCLUSIVE - tell the user WHAT the contract says, not just THAT it has provisions
    • Flag gaps or unusual terms with ⚠️
 3. **Confidence**: "high" (clear clauses found), "medium" (inferred from related language), "review_required" (not found or ambiguous)
-${hasPrecedents ? `4. **Market Position**: Compare against precedent bank and provide market_position rating with brief market_comparison explanation` : ''}
+${hasGoldStandard ? `4. **Gold Standard Comparison**: ALWAYS compare against BM template - flag ANY deviation with gold_standard_deviation: true and explain in gold_standard_comparison` : ''}
+${hasPrecedents ? `${hasGoldStandard ? '5' : '4'}. **Market Position**: Compare against precedent bank and provide market_position rating with brief market_comparison explanation` : ''}
 
 ## CRITICAL INSTRUCTIONS
 
 - DO NOT write narrative summaries like "The document outlines mechanisms for..."
 - DO write specific conclusions like "• Seller must provide £500k LC pre-COD; NO post-COD security required ⚠️"
 - If something is MISSING that would normally be expected, FLAG IT with ⚠️
+${hasGoldStandard ? `- ⭐ GOLD STANDARD CHECK: For EVERY category, compare against BM template. Deviation from our template is more important than market position!` : ''}
 - For Credit Support: ALWAYS distinguish pre-COD vs post-COD periods
 - For Curtailment: ALWAYS address involuntary curtailment compensation and REGO treatment
 - For Change in Law: ALWAYS explain the actual mechanism, not just that one exists
@@ -539,14 +574,16 @@ Return a JSON object:
       "clause_references": "Clause X.X, Schedule Y para Z",
       "position_summary": "• Bullet point 1\\n• Bullet point 2\\n• Bullet point 3",
       "confidence": "high|medium|review_required",
-      "flags": "⚠️ Any concerns or gaps to flag (optional)"${hasPrecedents ? `,
+      "flags": "⚠️ Any concerns or gaps to flag (optional)"${hasGoldStandard ? `,
+      "gold_standard_deviation": true|false,
+      "gold_standard_comparison": "Explanation of deviation from BM template or null"` : ''}${hasPrecedents ? `,
       "market_position": "on_market|off_market|way_off_market|null",
       "market_comparison": "Brief comparison to precedent positions"` : ''}
     }
   ]
 }
 
-IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that terms exist.${hasPrecedents ? ' Include market_position for all categories where precedents exist.' : ''}`;
+IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that terms exist.${hasGoldStandard ? ' ALWAYS check against BM gold standard template.' : ''}${hasPrecedents ? ' Include market_position for all categories where precedents exist.' : ''}`;
 
     console.log('Calling AI gateway for full PPA analysis...');
 
@@ -614,6 +651,8 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
             variance_notes: p.flags || p.variance_notes || null,
             market_position: p.market_position || null,
             market_comparison: p.market_comparison || null,
+            gold_standard_deviation: p.gold_standard_deviation || false,
+            gold_standard_comparison: p.gold_standard_comparison || null,
           };
         });
       } else {
@@ -632,6 +671,8 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
         variance_notes: null,
         market_position: null,
         market_comparison: null,
+        gold_standard_deviation: false,
+        gold_standard_comparison: null,
       }));
     }
 
@@ -649,6 +690,8 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
           variance_notes: '⚠️ Category not addressed in PPA',
           market_position: null,
           market_comparison: null,
+          gold_standard_deviation: false,
+          gold_standard_comparison: null,
         });
       }
     }

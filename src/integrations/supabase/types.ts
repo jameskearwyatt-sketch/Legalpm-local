@@ -2158,33 +2158,42 @@ export type Database = {
           banked_at: string
           category: string
           id: string
+          is_gold_standard: boolean
           jurisdiction: string | null
           perspective: Database["public"]["Enums"]["ppa_perspective"]
           position_summary: string
           project_name: string
           source_analysis_id: string | null
+          template_description: string | null
+          template_name: string | null
           user_id: string
         }
         Insert: {
           banked_at?: string
           category: string
           id?: string
+          is_gold_standard?: boolean
           jurisdiction?: string | null
           perspective: Database["public"]["Enums"]["ppa_perspective"]
           position_summary: string
           project_name: string
           source_analysis_id?: string | null
+          template_description?: string | null
+          template_name?: string | null
           user_id: string
         }
         Update: {
           banked_at?: string
           category?: string
           id?: string
+          is_gold_standard?: boolean
           jurisdiction?: string | null
           perspective?: Database["public"]["Enums"]["ppa_perspective"]
           position_summary?: string
           project_name?: string
           source_analysis_id?: string | null
+          template_description?: string | null
+          template_name?: string | null
           user_id?: string
         }
         Relationships: [

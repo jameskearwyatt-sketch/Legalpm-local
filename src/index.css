@@ -55,6 +55,12 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
 
+    /* Gold standard accent */
+    --gold: 38 92% 50%;
+    --gold-foreground: 38 92% 15%;
+    --gold-muted: 38 60% 94%;
+    --gold-border: 38 70% 70%;
+
     /* Sidebar */
     --sidebar-background: 222 47% 11%;
     --sidebar-foreground: 215 20% 85%;

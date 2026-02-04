@@ -40,6 +40,8 @@ import {
   Building2,
   FileText,
   Check,
+  Crown,
+  Star,
 } from 'lucide-react';
 import { usePPAPrecedentBank, PPAPrecedent } from '@/lib/hooks/usePPAAnalyses';
 import { PPA_ALL_CATEGORIES, PPA_CATEGORY_GROUPS, PPACategoryGroup } from '@/lib/ppaCategories';
@@ -62,7 +64,7 @@ interface GroupedPrecedents {
 }
 
 export function PPAPrecedentBank() {
-  const { precedents, isLoading, deletePrecedent } = usePPAPrecedentBank();
+  const { precedents, goldStandardPrecedents, isLoading, deletePrecedent } = usePPAPrecedentBank();
   
   // Filters
   const [search, setSearch] = useState('');
@@ -89,9 +91,12 @@ export function PPAPrecedentBank() {
     return [...new Set(precedents.map(p => p.category))].sort();
   }, [precedents]);
 
-  // Filter precedents
+  // Filter precedents (exclude gold standard from regular list)
   const filteredPrecedents = useMemo(() => {
     return precedents.filter(p => {
+      // Exclude gold standard from regular filtering
+      if (p.is_gold_standard) return false;
+      
       // Text search
       const searchLower = search.toLowerCase();
       const matchesSearch = !search || 
@@ -377,6 +382,61 @@ export function PPAPrecedentBank() {
   return (
     <>
       <div className="space-y-6">
+        {/* Gold Standard Templates Section */}
+        {goldStandardPrecedents.length > 0 && (
+          <Card className="border-gold-border/50 bg-gradient-to-br from-gold/10 via-gold-muted/50 to-transparent">
+            <CardHeader className="pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 rounded-lg bg-gold/20">
+                  <Crown className="h-6 w-6 text-gold" />
+                </div>
+                <div>
+                  <CardTitle className="text-xl flex items-center gap-2">
+                    <span>Gold Standard Templates</span>
+                    <Badge variant="outline" className="border-gold-border/50 text-gold-foreground bg-gold-muted">
+                      {goldStandardPrecedents.length} positions
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    Firm template positions used as benchmarks in every analysis
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {/* Group by template name */}
+                {(() => {
+                  const byTemplate: Record<string, typeof goldStandardPrecedents> = {};
+                  for (const p of goldStandardPrecedents) {
+                    const key = p.template_name || 'Template';
+                    if (!byTemplate[key]) byTemplate[key] = [];
+                    byTemplate[key].push(p);
+                  }
+                  return Object.entries(byTemplate).map(([templateName, templatePositions]) => (
+                    <div key={templateName} className="p-4 rounded-lg border border-gold-border/30 bg-gold-muted/50">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Star className="h-5 w-5 text-gold fill-gold" />
+                        <span className="font-semibold text-gold-foreground">{templateName}</span>
+                        <Badge variant="secondary" className="bg-gold-muted text-gold-foreground">
+                          {templatePositions.length} categories
+                        </Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {[...new Set(templatePositions.map(p => p.category))].map(cat => (
+                          <Badge key={cat} variant="outline" className="text-xs border-gold-border bg-card">
+                            {cat}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Header with stats */}
         <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
           <CardHeader className="pb-4">
@@ -394,8 +454,8 @@ export function PPAPrecedentBank() {
               </div>
               <div className="flex items-center gap-4">
                 <div className="text-right">
-                  <p className="text-2xl font-bold">{precedents.length}</p>
-                  <p className="text-xs text-muted-foreground">Total Precedents</p>
+                  <p className="text-2xl font-bold">{precedents.filter(p => !p.is_gold_standard).length}</p>
+                  <p className="text-xs text-muted-foreground">Deal Precedents</p>
                 </div>
                 <div className="h-12 w-px bg-border" />
                 <div className="text-right">

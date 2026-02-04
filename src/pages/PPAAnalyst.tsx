@@ -15,9 +15,11 @@ import { usePPAPrecedentBank } from '@/lib/hooks/usePPAAnalyses';
 export default function PPAAnalyst() {
   const [activeTab, setActiveTab] = useState('new-analysis');
   const { ppaPrecedentThreshold, updateSettings } = useUserSettings();
-  const { precedents } = usePPAPrecedentBank();
+  const { uniqueProjectCount, uniqueTemplateCount } = usePPAPrecedentBank();
   
-  const precedentCount = precedents.length;
+  // Count unique deals, not individual positions
+  const precedentCount = uniqueProjectCount;
+  const templateCount = uniqueTemplateCount;
   const marketComparisonEnabled = precedentCount >= ppaPrecedentThreshold;
 
   const handleThresholdChange = (value: string) => {

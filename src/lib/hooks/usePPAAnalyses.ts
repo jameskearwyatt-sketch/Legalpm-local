@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -265,6 +266,19 @@ export function usePPAPrecedentBank() {
     };
   };
 
+  // Count unique projects (deals) - this is the true precedent count
+  const uniqueProjectCount = useMemo(() => {
+    const regularPrecedents = precedents?.filter(p => !p.is_gold_standard) || [];
+    const uniqueProjects = new Set(regularPrecedents.map(p => p.project_name));
+    return uniqueProjects.size;
+  }, [precedents]);
+
+  // Count unique gold standard templates
+  const uniqueTemplateCount = useMemo(() => {
+    const uniqueTemplates = new Set(goldStandardPrecedents.map(p => p.template_name || p.project_name));
+    return uniqueTemplates.size;
+  }, [goldStandardPrecedents]);
+
   return {
     precedents: precedents || [],
     goldStandardPrecedents,
@@ -273,5 +287,7 @@ export function usePPAPrecedentBank() {
     bankPositions,
     deletePrecedent,
     getCategoryStats,
+    uniqueProjectCount,
+    uniqueTemplateCount,
   };
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,10 +10,23 @@ import { PPAAnalysisList } from '@/components/ppa-analyst/PPAAnalysisList';
 import { PPAPrecedentBank } from '@/components/ppa-analyst/PPAPrecedentBank';
 import { FileSearch, History, Database, Settings2 } from 'lucide-react';
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
-import { usePPAPrecedentBank } from '@/lib/hooks/usePPAAnalyses';
+import { usePPAPrecedentBank, PPAAnalysis, PPAStructureType, PPAPerspective, PPAAnalysisType } from '@/lib/hooks/usePPAAnalyses';
+import { toast } from 'sonner';
+
+// Pre-fill state for re-analysis
+interface ReanalyzePreFill {
+  projectName: string;
+  jurisdiction: string;
+  perspective: PPAPerspective;
+  analysisType: PPAAnalysisType;
+  ppaType: PPAStructureType;
+  counterpartyType: string;
+  originalFileName: string;
+}
 
 export default function PPAAnalyst() {
   const [activeTab, setActiveTab] = useState('new-analysis');
+  const [reanalyzePreFill, setReanalyzePreFill] = useState<ReanalyzePreFill | null>(null);
   const { ppaPrecedentThreshold, updateSettings } = useUserSettings();
   const { uniqueProjectCount, uniqueTemplateCount } = usePPAPrecedentBank();
   
@@ -28,6 +41,30 @@ export default function PPAAnalyst() {
       updateSettings.mutate({ ppa_precedent_threshold: num });
     }
   };
+
+  const handleReanalyze = useCallback((analysis: PPAAnalysis) => {
+    // Pre-fill the form with the existing analysis settings
+    setReanalyzePreFill({
+      projectName: analysis.project_name,
+      jurisdiction: analysis.jurisdiction || '',
+      perspective: analysis.perspective,
+      analysisType: analysis.analysis_type,
+      ppaType: (analysis as any).ppa_type || 'vppa',
+      counterpartyType: (analysis as any).counterparty_type || '',
+      originalFileName: analysis.document_file_name,
+    });
+    
+    toast.info(`Re-analyze: ${analysis.project_name}`, {
+      description: `Please upload "${analysis.document_file_name}" again to re-run with the latest intelligence engine.`,
+    });
+    
+    setActiveTab('new-analysis');
+  }, []);
+
+  const handleAnalysisComplete = useCallback(() => {
+    setReanalyzePreFill(null);
+    setActiveTab('history');
+  }, []);
 
   return (
     <AppLayout>
@@ -101,11 +138,14 @@ export default function PPAAnalyst() {
           </TabsList>
 
           <TabsContent value="new-analysis">
-            <PPAUploadAnalysis onAnalysisComplete={() => setActiveTab('history')} />
+            <PPAUploadAnalysis 
+              onAnalysisComplete={handleAnalysisComplete} 
+              preFill={reanalyzePreFill || undefined}
+            />
           </TabsContent>
 
           <TabsContent value="history">
-            <PPAAnalysisList />
+            <PPAAnalysisList onReanalyze={handleReanalyze} />
           </TabsContent>
 
           <TabsContent value="precedent-bank">

@@ -27,14 +27,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Search, MoreHorizontal, Eye, Trash2, FileText, CheckCircle2, Loader2, GitCompare } from 'lucide-react';
-import { usePPAAnalyses, usePPAPositions } from '@/lib/hooks/usePPAAnalyses';
+import { Search, MoreHorizontal, Eye, Trash2, FileText, CheckCircle2, Loader2, GitCompare, RefreshCw, Sparkles } from 'lucide-react';
+import { usePPAAnalyses, usePPAPositions, PPAAnalysis, PPA_STRUCTURE_LABELS, PPAStructureType } from '@/lib/hooks/usePPAAnalyses';
 import { format } from 'date-fns';
 import { PPAAnalysisReport } from './PPAAnalysisReport';
 import { PPACompareUpload } from './PPACompareUpload';
 import { PPAComparisonReport } from './PPAComparisonReport';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
-export function PPAAnalysisList() {
+interface PPAAnalysisListProps {
+  onReanalyze?: (analysis: PPAAnalysis) => void;
+}
+
+export function PPAAnalysisList({ onReanalyze }: PPAAnalysisListProps) {
   const { analyses, isLoading, deleteAnalysis } = usePPAAnalyses();
   const [search, setSearch] = useState('');
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
@@ -138,6 +143,7 @@ export function PPAAnalysisList() {
                 <TableRow>
                   <TableHead>Project</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>PPA Structure</TableHead>
                   <TableHead>Perspective</TableHead>
                   <TableHead>Jurisdiction</TableHead>
                   <TableHead>Status</TableHead>
@@ -171,6 +177,34 @@ export function PPAAnalysisList() {
                       <Badge variant="outline">
                         {analysis.analysis_type === 'ppa_vs_bible' ? 'vs Bible' : 'vs Term Sheet'}
                       </Badge>
+                    </TableCell>
+                    <TableCell onClick={() => setSelectedAnalysisId(analysis.id)}>
+                      {(analysis as any).ppa_type ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="outline" className="text-xs">
+                              {((analysis as any).ppa_type as string).toUpperCase()}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            {PPA_STRUCTURE_LABELS[(analysis as any).ppa_type as PPAStructureType] || (analysis as any).ppa_type}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="secondary" className="text-xs text-muted-foreground">
+                              —
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <span className="flex items-center gap-1">
+                              <Sparkles className="h-3 w-3" />
+                              Re-analyze to classify PPA type
+                            </span>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </TableCell>
                     <TableCell onClick={() => setSelectedAnalysisId(analysis.id)}>
                       <Badge variant="secondary">
@@ -209,6 +243,12 @@ export function PPAAnalysisList() {
                             <DropdownMenuItem onClick={() => setCompareAnalysisId(analysis.id)}>
                               <GitCompare className="h-4 w-4 mr-2" />
                               Compare New Draft
+                            </DropdownMenuItem>
+                          )}
+                          {onReanalyze && (
+                            <DropdownMenuItem onClick={() => onReanalyze(analysis)}>
+                              <RefreshCw className="h-4 w-4 mr-2" />
+                              Re-analyze with Latest Engine
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem

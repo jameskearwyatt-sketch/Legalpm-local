@@ -14,8 +14,20 @@ import { useUserSettings } from '@/lib/hooks/useUserSettings';
 import { PPAAnalysisReport } from './PPAAnalysisReport';
 import { generateMarketIntelligence, formatIntelligenceForPrompt } from '@/lib/ppaPrecedentIntelligence';
 
+// Pre-fill data for re-analysis
+interface PreFillData {
+  projectName: string;
+  jurisdiction: string;
+  perspective: PPAPerspective;
+  analysisType: PPAAnalysisType;
+  ppaType: PPAStructureType;
+  counterpartyType: string;
+  originalFileName: string;
+}
+
 interface PPAUploadAnalysisProps {
   onAnalysisComplete?: () => void;
+  preFill?: PreFillData;
 }
 
 const EUROPEAN_JURISDICTIONS = [
@@ -42,18 +54,18 @@ const EUROPEAN_JURISDICTIONS = [
   'Other Non-EU',
 ];
 
-export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps) {
+export function PPAUploadAnalysis({ onAnalysisComplete, preFill }: PPAUploadAnalysisProps) {
   const { createAnalysis } = usePPAAnalyses();
   const { createPositions } = usePPAPositions(null);
   const { precedents, goldStandardPrecedents } = usePPAPrecedentBank();
   const { ppaPrecedentThreshold } = useUserSettings();
   const [step, setStep] = useState<'upload' | 'configure' | 'analyzing' | 'results'>('upload');
-  const [analysisType, setAnalysisType] = useState<PPAAnalysisType>('ppa_vs_bible');
-  const [perspective, setPerspective] = useState<PPAPerspective>('buyer');
-  const [ppaType, setPpaType] = useState<PPAStructureType>('vppa');
-  const [jurisdiction, setJurisdiction] = useState('');
-  const [projectName, setProjectName] = useState('');
-  const [counterpartyType, setCounterpartyType] = useState('');
+  const [analysisType, setAnalysisType] = useState<PPAAnalysisType>(preFill?.analysisType || 'ppa_vs_bible');
+  const [perspective, setPerspective] = useState<PPAPerspective>(preFill?.perspective || 'buyer');
+  const [ppaType, setPpaType] = useState<PPAStructureType>(preFill?.ppaType || 'vppa');
+  const [jurisdiction, setJurisdiction] = useState(preFill?.jurisdiction || '');
+  const [projectName, setProjectName] = useState(preFill?.projectName || '');
+  const [counterpartyType, setCounterpartyType] = useState(preFill?.counterpartyType || '');
   const [ppaFile, setPpaFile] = useState<File | null>(null);
   const [comparisonFile, setComparisonFile] = useState<File | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -356,10 +368,16 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            Upload PPA Document
+            {preFill ? 'Re-upload Document for Re-analysis' : 'Upload PPA Document'}
           </CardTitle>
           <CardDescription>
-            Upload a Power Purchase Agreement (PDF or Word) for analysis
+            {preFill ? (
+              <span className="text-amber-600 dark:text-amber-400">
+                Re-analyzing with latest intelligence engine. Please upload: <strong>{preFill.originalFileName}</strong>
+              </span>
+            ) : (
+              'Upload a Power Purchase Agreement (PDF or Word) for analysis'
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

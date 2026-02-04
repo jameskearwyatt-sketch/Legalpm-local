@@ -57,6 +57,9 @@ export interface PPAPrecedent {
   jurisdiction: string | null;
   perspective: PPAPerspective;
   banked_at: string;
+  is_gold_standard: boolean;
+  template_name: string | null;
+  template_description: string | null;
 }
 
 export function usePPAAnalyses() {
@@ -214,7 +217,13 @@ export function usePPAPrecedentBank() {
       if (!user) throw new Error('Not authenticated');
       const { data, error } = await supabase
         .from('ppa_precedent_bank')
-        .insert(newPrecedents.map(p => ({ ...p, user_id: user.id })))
+        .insert(newPrecedents.map(p => ({ 
+          ...p, 
+          user_id: user.id,
+          is_gold_standard: p.is_gold_standard || false,
+          template_name: p.template_name || null,
+          template_description: p.template_description || null,
+        })))
         .select();
       
       if (error) throw error;
@@ -228,6 +237,9 @@ export function usePPAPrecedentBank() {
       toast.error('Failed to bank positions: ' + error.message);
     },
   });
+
+  // Get gold standard precedents (for analysis comparison)
+  const goldStandardPrecedents = precedents?.filter(p => p.is_gold_standard) || [];
 
   const deletePrecedent = useMutation({
     mutationFn: async (id: string) => {
@@ -255,6 +267,7 @@ export function usePPAPrecedentBank() {
 
   return {
     precedents: precedents || [],
+    goldStandardPrecedents,
     isLoading,
     error,
     bankPositions,

@@ -148,6 +148,9 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
         jurisdiction: analysis.jurisdiction,
         perspective: analysis.perspective,
         user_id: analysis.user_id,
+        is_gold_standard: false,
+        template_name: null,
+        template_description: null,
       }));
 
     try {

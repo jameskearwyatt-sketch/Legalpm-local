@@ -15,6 +15,7 @@ export interface UserSettings {
   use_billed_only_for_burn: boolean;
   default_rate_card: RateCard | null;
   email_signature: string | null;
+  ppa_precedent_threshold: number;
   created_at: string;
   updated_at: string;
 }
@@ -62,7 +63,7 @@ export function useUserSettings() {
 
   // Update settings
   const updateSettings = useMutation({
-    mutationFn: async (updates: Partial<Pick<UserSettings, 'default_currency' | 'near_budget_threshold' | 'poor_collection_threshold' | 'wip_warning_threshold' | 'use_billed_only_for_burn' | 'default_rate_card' | 'email_signature'>>) => {
+    mutationFn: async (updates: Partial<Pick<UserSettings, 'default_currency' | 'near_budget_threshold' | 'poor_collection_threshold' | 'wip_warning_threshold' | 'use_billed_only_for_burn' | 'default_rate_card' | 'email_signature' | 'ppa_precedent_threshold'>>) => {
       const { error } = await supabase
         .from('user_settings')
         .update(updates as any)
@@ -127,5 +128,6 @@ export function useUserSettings() {
     defaultCurrency: settingsQuery.data?.default_currency || 'GBP',
     defaultRateCard: settingsQuery.data?.default_rate_card || DEFAULT_RATE_CARD,
     emailSignature: settingsQuery.data?.email_signature || null,
+    ppaPrecedentThreshold: settingsQuery.data?.ppa_precedent_threshold ?? 3,
   };
 }

@@ -7,6 +7,14 @@ import { toast } from 'sonner';
 export type PPAAnalysisType = 'ppa_vs_bible' | 'ppa_vs_termsheet';
 export type PPAPerspective = 'buyer' | 'seller';
 export type PPAConfidenceLevel = 'high' | 'medium' | 'review_required';
+export type PPAStructureType = 'vppa' | 'physical' | 'sleeved' | 'private_wire';
+
+export const PPA_STRUCTURE_LABELS: Record<PPAStructureType, string> = {
+  vppa: 'Virtual PPA (VPPA / CFD)',
+  physical: 'Physical PPA',
+  sleeved: 'Sleeved PPA',
+  private_wire: 'Private Wire Physical PPA',
+};
 
 export interface PPAAnalysis {
   id: string;
@@ -27,6 +35,11 @@ export interface PPAAnalysis {
   is_comparison: boolean;
   created_at: string;
   updated_at: string;
+  // New learning fields
+  ppa_type: PPAStructureType | null;
+  complexity_score: number | null;
+  key_risk_areas: string[];
+  counterparty_type: string | null;
 }
 
 export type ChangeType = 'unchanged' | 'modified' | 'added' | 'removed';
@@ -61,6 +74,12 @@ export interface PPAPrecedent {
   is_gold_standard: boolean;
   template_name: string | null;
   template_description: string | null;
+  // New learning fields
+  ppa_type: PPAStructureType | null;
+  source_text: string | null;
+  confidence: PPAConfidenceLevel;
+  market_position: string | null;
+  party_favorability: string | null;
 }
 
 export function usePPAAnalyses() {

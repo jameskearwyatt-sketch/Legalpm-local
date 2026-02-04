@@ -429,7 +429,9 @@ serve(async (req) => {
       analysisType, 
       perspective, 
       jurisdiction, 
-      projectName, 
+      projectName,
+      ppaType, // NEW: PPA structure type
+      counterpartyType, // NEW: Counterparty type
       precedents, 
       goldStandardPrecedents,
       marketIntelligence,
@@ -557,12 +559,30 @@ ${precs.map(p => `- ${p.project_name}${p.jurisdiction ? ` (${p.jurisdiction})` :
 `;
     }
 
+    // Map PPA type codes to labels
+    const ppaTypeLabels: Record<string, string> = {
+      vppa: 'Virtual PPA (VPPA / CFD)',
+      physical: 'Physical PPA',
+      sleeved: 'Sleeved PPA',
+      private_wire: 'Private Wire Physical PPA',
+    };
+
     const systemPrompt = `You are an expert PPA (Power Purchase Agreement) analyst specializing in European renewable energy contracts.
 Your task is to extract ACTIONABLE, SPECIFIC positions from the provided PPA document.
 You have been equipped with MARKET INTELLIGENCE synthesized from our precedent bank - use it to provide precise market position assessments.
 
 PERSPECTIVE: ${perspective === 'buyer' ? 'Buyer (Offtaker)' : 'Seller (Generator)'}
 ${jurisdiction ? `JURISDICTION: ${jurisdiction}` : ''}
+${ppaType ? `PPA STRUCTURE TYPE: ${ppaTypeLabels[ppaType] || ppaType.toUpperCase()}
+
+⚠️ STRUCTURE-SPECIFIC ANALYSIS: This is a ${ppaTypeLabels[ppaType] || ppaType.toUpperCase()}. Different PPA structures have DIFFERENT market norms:
+- VPPAs focus on CFD/settlement mechanics, virtual delivery, and REGOs as primary deliverable
+- Physical PPAs involve actual power delivery, grid connection, and physical offtake
+- Sleeved PPAs add utility intermediary complexity and sleeving fees
+- Private Wire PPAs involve direct connection and on-site delivery considerations
+
+Apply structure-specific market benchmarks where available in the intelligence data.` : ''}
+${counterpartyType ? `COUNTERPARTY TYPE: ${counterpartyType}` : ''}
 ${marketIntelligenceContext}
 ${goldStandardContext}
 ${precedentContext}

@@ -2029,6 +2029,8 @@ export type Database = {
           analysis_type: Database["public"]["Enums"]["ppa_analysis_type"]
           comparison_file_name: string | null
           comparison_file_url: string | null
+          complexity_score: number | null
+          counterparty_type: string | null
           created_at: string
           document_file_name: string
           document_file_url: string | null
@@ -2036,9 +2038,11 @@ export type Database = {
           is_agreed: boolean
           is_comparison: boolean | null
           jurisdiction: string | null
+          key_risk_areas: string[] | null
           notes: string | null
           parent_analysis_id: string | null
           perspective: Database["public"]["Enums"]["ppa_perspective"]
+          ppa_type: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name: string
           updated_at: string
           user_id: string
@@ -2049,6 +2053,8 @@ export type Database = {
           analysis_type: Database["public"]["Enums"]["ppa_analysis_type"]
           comparison_file_name?: string | null
           comparison_file_url?: string | null
+          complexity_score?: number | null
+          counterparty_type?: string | null
           created_at?: string
           document_file_name: string
           document_file_url?: string | null
@@ -2056,9 +2062,11 @@ export type Database = {
           is_agreed?: boolean
           is_comparison?: boolean | null
           jurisdiction?: string | null
+          key_risk_areas?: string[] | null
           notes?: string | null
           parent_analysis_id?: string | null
           perspective: Database["public"]["Enums"]["ppa_perspective"]
+          ppa_type?: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name: string
           updated_at?: string
           user_id: string
@@ -2069,6 +2077,8 @@ export type Database = {
           analysis_type?: Database["public"]["Enums"]["ppa_analysis_type"]
           comparison_file_name?: string | null
           comparison_file_url?: string | null
+          complexity_score?: number | null
+          counterparty_type?: string | null
           created_at?: string
           document_file_name?: string
           document_file_url?: string | null
@@ -2076,9 +2086,11 @@ export type Database = {
           is_agreed?: boolean
           is_comparison?: boolean | null
           jurisdiction?: string | null
+          key_risk_areas?: string[] | null
           notes?: string | null
           parent_analysis_id?: string | null
           perspective?: Database["public"]["Enums"]["ppa_perspective"]
+          ppa_type?: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name?: string
           updated_at?: string
           user_id?: string
@@ -2157,13 +2169,18 @@ export type Database = {
         Row: {
           banked_at: string
           category: string
+          confidence: Database["public"]["Enums"]["ppa_confidence_level"] | null
           id: string
           is_gold_standard: boolean
           jurisdiction: string | null
+          market_position: string | null
+          party_favorability: string | null
           perspective: Database["public"]["Enums"]["ppa_perspective"]
           position_summary: string
+          ppa_type: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name: string
           source_analysis_id: string | null
+          source_text: string | null
           template_description: string | null
           template_name: string | null
           user_id: string
@@ -2171,13 +2188,20 @@ export type Database = {
         Insert: {
           banked_at?: string
           category: string
+          confidence?:
+            | Database["public"]["Enums"]["ppa_confidence_level"]
+            | null
           id?: string
           is_gold_standard?: boolean
           jurisdiction?: string | null
+          market_position?: string | null
+          party_favorability?: string | null
           perspective: Database["public"]["Enums"]["ppa_perspective"]
           position_summary: string
+          ppa_type?: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name: string
           source_analysis_id?: string | null
+          source_text?: string | null
           template_description?: string | null
           template_name?: string | null
           user_id: string
@@ -2185,13 +2209,20 @@ export type Database = {
         Update: {
           banked_at?: string
           category?: string
+          confidence?:
+            | Database["public"]["Enums"]["ppa_confidence_level"]
+            | null
           id?: string
           is_gold_standard?: boolean
           jurisdiction?: string | null
+          market_position?: string | null
+          party_favorability?: string | null
           perspective?: Database["public"]["Enums"]["ppa_perspective"]
           position_summary?: string
+          ppa_type?: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name?: string
           source_analysis_id?: string | null
+          source_text?: string | null
           template_description?: string | null
           template_name?: string | null
           user_id?: string
@@ -3073,6 +3104,7 @@ export type Database = {
       ppa_analysis_type: "ppa_vs_bible" | "ppa_vs_termsheet"
       ppa_confidence_level: "high" | "medium" | "review_required"
       ppa_perspective: "buyer" | "seller"
+      ppa_structure_type: "vppa" | "physical" | "sleeved" | "private_wire"
       task_deadline_type:
         | "this_week"
         | "next_week"
@@ -3248,6 +3280,7 @@ export const Constants = {
       ppa_analysis_type: ["ppa_vs_bible", "ppa_vs_termsheet"],
       ppa_confidence_level: ["high", "medium", "review_required"],
       ppa_perspective: ["buyer", "seller"],
+      ppa_structure_type: ["vppa", "physical", "sleeved", "private_wire"],
       task_deadline_type: [
         "this_week",
         "next_week",

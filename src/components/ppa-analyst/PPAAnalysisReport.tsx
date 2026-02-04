@@ -17,6 +17,10 @@ import {
   ChevronRight,
   Loader2,
   GitCompare,
+  Filter,
+  X,
+  User,
+  Building2,
 } from 'lucide-react';
 import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAExtractedPosition } from '@/lib/hooks/usePPAAnalyses';
 import { getCategoryById, PPA_CATEGORY_GROUPS, PPA_ALL_CATEGORIES } from '@/lib/ppaCategories';
@@ -38,9 +42,18 @@ const confidenceConfig = {
 };
 
 const marketPositionConfig = {
-  on_market: { label: 'On Market', color: 'text-primary', bg: 'bg-primary/10 border-primary/30' },
-  off_market: { label: 'Off Market', color: 'text-accent-foreground', bg: 'bg-accent border-accent-foreground/30' },
-  way_off_market: { label: 'Way Off Market', color: 'text-destructive', bg: 'bg-destructive/10 border-destructive/30' },
+  on_market: { label: 'On Market', color: 'text-muted-foreground', bg: 'bg-muted border border-border' },
+  off_market: { label: 'Off Market', color: 'text-blue-700 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-950 border border-blue-300 dark:border-blue-700' },
+  way_off_market: { label: 'Way Off Market', color: 'text-destructive', bg: 'bg-destructive/15 border-2 border-destructive' },
+};
+
+type PartyFavorability = 'buyer_friendly' | 'seller_friendly' | 'balanced' | 'unknown';
+
+const partyFavorabilityConfig: Record<PartyFavorability, { label: string; icon: typeof User; color: string; bg: string }> = {
+  buyer_friendly: { label: 'Buyer-Friendly', icon: User, color: 'text-emerald-700 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-950 border border-emerald-300 dark:border-emerald-700' },
+  seller_friendly: { label: 'Seller-Friendly', icon: Building2, color: 'text-orange-700 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-950 border border-orange-300 dark:border-orange-700' },
+  balanced: { label: 'Balanced', icon: CheckCircle2, color: 'text-muted-foreground', bg: 'bg-muted border border-border' },
+  unknown: { label: 'Unknown', icon: HelpCircle, color: 'text-muted-foreground', bg: 'bg-muted border border-border' },
 };
 
 function getMarketPositionFromNotes(notes: string | null): keyof typeof marketPositionConfig | null {
@@ -53,10 +66,41 @@ function getMarketPositionFromNotes(notes: string | null): keyof typeof marketPo
   return null;
 }
 
+function getPartyFavorabilityFromNotes(notes: string | null, summary: string | null): PartyFavorability {
+  const text = `${notes || ''} ${summary || ''}`.toLowerCase();
+  
+  // Look for explicit markers
+  if (text.includes('[buyer-friendly]') || text.includes('[buyer friendly]')) return 'buyer_friendly';
+  if (text.includes('[seller-friendly]') || text.includes('[seller friendly]')) return 'seller_friendly';
+  if (text.includes('[balanced]')) return 'balanced';
+  
+  // Infer from content
+  const buyerIndicators = ['buyer protection', 'favors buyer', 'buyer-favorable', 'buyer benefit', 'buyer right'];
+  const sellerIndicators = ['seller protection', 'favors seller', 'seller-favorable', 'seller benefit', 'seller right'];
+  
+  const hasBuyer = buyerIndicators.some(ind => text.includes(ind));
+  const hasSeller = sellerIndicators.some(ind => text.includes(ind));
+  
+  if (hasBuyer && !hasSeller) return 'buyer_friendly';
+  if (hasSeller && !hasBuyer) return 'seller_friendly';
+  if (hasBuyer && hasSeller) return 'balanced';
+  
+  return 'unknown';
+}
+
 function cleanVarianceNotes(notes: string | null): string | null {
   if (!notes) return null;
-  return notes.replace(/\[(ON MARKET|OFF MARKET|WAY OFF MARKET)\]\s*/gi, '').trim() || null;
+  return notes
+    .replace(/\[(ON MARKET|OFF MARKET|WAY OFF MARKET)\]\s*/gi, '')
+    .replace(/\[(BUYER-FRIENDLY|SELLER-FRIENDLY|BALANCED)\]\s*/gi, '')
+    .trim() || null;
 }
+
+type FilterState = {
+  confidence: Set<string>;
+  marketPosition: Set<string>;
+  partyFavorability: Set<string>;
+};
 
 export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, onCompareNewDraft }: PPAAnalysisReportProps) {
   const { analyses, updateAnalysis } = usePPAAnalyses();
@@ -65,17 +109,72 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
   
   const [selectedForBanking, setSelectedForBanking] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(PPA_CATEGORY_GROUPS));
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters] = useState<FilterState>({
+    confidence: new Set(),
+    marketPosition: new Set(),
+    partyFavorability: new Set(),
+  });
 
   const analysis = analyses.find(a => a.id === analysisId);
 
+  // Compute positions with their derived attributes
+  const positionsWithAttributes = useMemo(() => {
+    return positions.map(p => ({
+      ...p,
+      marketPosition: getMarketPositionFromNotes(p.variance_notes),
+      partyFavorability: getPartyFavorabilityFromNotes(p.variance_notes, p.position_summary),
+    }));
+  }, [positions]);
+
+  // Filter positions
+  const filteredPositions = useMemo(() => {
+    return positionsWithAttributes.filter(p => {
+      // Confidence filter
+      if (filters.confidence.size > 0 && !filters.confidence.has(p.confidence)) {
+        return false;
+      }
+      // Market position filter
+      if (filters.marketPosition.size > 0) {
+        if (!p.marketPosition || !filters.marketPosition.has(p.marketPosition)) {
+          return false;
+        }
+      }
+      // Party favorability filter
+      if (filters.partyFavorability.size > 0 && !filters.partyFavorability.has(p.partyFavorability)) {
+        return false;
+      }
+      return true;
+    });
+  }, [positionsWithAttributes, filters]);
+
+  // Compute filter counts
+  const filterCounts = useMemo(() => {
+    const counts = {
+      confidence: {} as Record<string, number>,
+      marketPosition: {} as Record<string, number>,
+      partyFavorability: {} as Record<string, number>,
+    };
+    
+    for (const p of positionsWithAttributes) {
+      counts.confidence[p.confidence] = (counts.confidence[p.confidence] || 0) + 1;
+      if (p.marketPosition) {
+        counts.marketPosition[p.marketPosition] = (counts.marketPosition[p.marketPosition] || 0) + 1;
+      }
+      counts.partyFavorability[p.partyFavorability] = (counts.partyFavorability[p.partyFavorability] || 0) + 1;
+    }
+    
+    return counts;
+  }, [positionsWithAttributes]);
+
   const positionsByGroup = useMemo(() => {
-    const grouped: Record<string, PPAExtractedPosition[]> = {};
+    const grouped: Record<string, typeof filteredPositions> = {};
     
     for (const group of PPA_CATEGORY_GROUPS) {
       grouped[group] = [];
     }
 
-    for (const position of positions) {
+    for (const position of filteredPositions) {
       const category = PPA_ALL_CATEGORIES.find(c => c.id === position.category || c.label === position.category);
       const group = category?.group || 'General';
       if (!grouped[group]) grouped[group] = [];
@@ -83,7 +182,29 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
     }
 
     return grouped;
-  }, [positions]);
+  }, [filteredPositions]);
+
+  const toggleFilter = (type: keyof FilterState, value: string) => {
+    setFilters(prev => {
+      const newSet = new Set(prev[type]);
+      if (newSet.has(value)) {
+        newSet.delete(value);
+      } else {
+        newSet.add(value);
+      }
+      return { ...prev, [type]: newSet };
+    });
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      confidence: new Set(),
+      marketPosition: new Set(),
+      partyFavorability: new Set(),
+    });
+  };
+
+  const activeFilterCount = filters.confidence.size + filters.marketPosition.size + filters.partyFavorability.size;
 
   const handleToggleGroup = (group: string) => {
     setExpandedGroups(prev => {
@@ -234,22 +355,129 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Extracted Positions</CardTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <CardTitle>Extracted Positions</CardTitle>
               <span className="text-sm text-muted-foreground">
-                {positions.length} positions extracted
+                {filteredPositions.length === positions.length 
+                  ? `${positions.length} positions` 
+                  : `${filteredPositions.length} of ${positions.length} positions`}
               </span>
             </div>
+            <Button 
+              variant={showFilters ? "secondary" : "outline"} 
+              size="sm" 
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <Filter className="h-4 w-4 mr-1" />
+              Filters
+              {activeFilterCount > 0 && (
+                <Badge variant="default" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                  {activeFilterCount}
+                </Badge>
+              )}
+            </Button>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* Filters Panel */}
+          {showFilters && (
+            <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="font-medium text-sm">Filter Positions</span>
+                {activeFilterCount > 0 && (
+                  <Button variant="ghost" size="sm" onClick={clearAllFilters}>
+                    <X className="h-3 w-3 mr-1" />
+                    Clear all
+                  </Button>
+                )}
+              </div>
+              
+              {/* Confidence Filters */}
+              <div className="space-y-2">
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Confidence Level</span>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(confidenceConfig).map(([key, config]) => {
+                    const count = filterCounts.confidence[key] || 0;
+                    const isActive = filters.confidence.has(key);
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => toggleFilter('confidence', key)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                          isActive 
+                            ? 'bg-primary text-primary-foreground' 
+                            : 'bg-background border hover:bg-accent'
+                        }`}
+                      >
+                        <config.icon className="h-3 w-3" />
+                        {config.label}
+                        <span className="opacity-70">({count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Market Position Filters */}
+              <div className="space-y-2">
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Market Position</span>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(marketPositionConfig).map(([key, config]) => {
+                    const count = filterCounts.marketPosition[key] || 0;
+                    const isActive = filters.marketPosition.has(key);
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => toggleFilter('marketPosition', key)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                          isActive 
+                            ? 'bg-primary text-primary-foreground' 
+                            : `${config.bg} ${config.color} hover:opacity-80`
+                        }`}
+                      >
+                        {config.label}
+                        <span className="opacity-70 ml-1">({count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Party Favorability Filters */}
+              <div className="space-y-2">
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Party Favorability</span>
+                <div className="flex flex-wrap gap-2">
+                  {Object.entries(partyFavorabilityConfig).map(([key, config]) => {
+                    const count = filterCounts.partyFavorability[key] || 0;
+                    if (count === 0) return null;
+                    const isActive = filters.partyFavorability.has(key);
+                    return (
+                      <button
+                        key={key}
+                        onClick={() => toggleFilter('partyFavorability', key)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                          isActive 
+                            ? 'bg-primary text-primary-foreground' 
+                            : `${config.bg} ${config.color} hover:opacity-80`
+                        }`}
+                      >
+                        <config.icon className="h-3 w-3" />
+                        {config.label}
+                        <span className="opacity-70">({count})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Legend */}
-          <div className="flex items-center gap-4 text-sm">
-            <span className="text-muted-foreground">Confidence:</span>
-            {Object.entries(confidenceConfig).map(([key, config]) => (
-              <div key={key} className="flex items-center gap-1">
-                <config.icon className={`h-4 w-4 ${config.color}`} />
-                <span>{config.label}</span>
+          <div className="flex items-center gap-4 text-sm flex-wrap">
+            <span className="text-muted-foreground">Legend:</span>
+            {Object.entries(marketPositionConfig).map(([key, config]) => (
+              <div key={key} className={`px-2 py-0.5 rounded text-xs font-medium ${config.bg} ${config.color}`}>
+                {config.label}
               </div>
             ))}
           </div>
@@ -288,9 +516,9 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                       {groupPositions.map(position => {
                         const conf = confidenceConfig[position.confidence];
                         const stats = getCategoryStats(position.category);
-                        const marketPosition = getMarketPositionFromNotes(position.variance_notes);
                         const cleanedNotes = cleanVarianceNotes(position.variance_notes);
-                        const marketConfig = marketPosition ? marketPositionConfig[marketPosition] : null;
+                        const marketConfig = position.marketPosition ? marketPositionConfig[position.marketPosition] : null;
+                        const partyConfig = partyFavorabilityConfig[position.partyFavorability];
                         
                         return (
                           <div
@@ -313,8 +541,14 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                                       <span className={conf.color}>{conf.label}</span>
                                     </div>
                                     {marketConfig && (
-                                      <div className={`px-2 py-0.5 rounded border text-xs font-medium ${marketConfig.bg} ${marketConfig.color}`}>
+                                      <div className={`px-2 py-0.5 rounded text-xs font-medium ${marketConfig.bg} ${marketConfig.color}`}>
                                         {marketConfig.label}
+                                      </div>
+                                    )}
+                                    {position.partyFavorability !== 'unknown' && (
+                                      <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${partyConfig.bg} ${partyConfig.color}`}>
+                                        <partyConfig.icon className="h-3 w-3" />
+                                        {partyConfig.label}
                                       </div>
                                     )}
                                     {position.source_text && (

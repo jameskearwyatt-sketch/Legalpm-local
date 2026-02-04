@@ -185,22 +185,45 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
       console.log(`Passing ${relevantPrecedents.length} precedents for market comparison (threshold: ${ppaPrecedentThreshold})`);
       console.log(`Passing ${goldStandardForAnalysis.length} gold standard template positions`);
       
-      const analyzeResponse = await supabase.functions.invoke('analyze-ppa', {
-        body: {
-          ppaText,
-          comparisonText,
-          analysisType,
-          perspective,
-          jurisdiction,
-          projectName,
-          precedents: relevantPrecedents,
-          goldStandardPrecedents: goldStandardForAnalysis,
-        },
-      });
-
-      if (analyzeResponse.error) {
-        throw new Error(analyzeResponse.error.message || 'Failed to analyze PPA');
+      // Use AbortController with extended timeout for complex AI analysis (5 minutes)
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+      
+      const { data: sessionData2 } = await supabase.auth.getSession();
+      const authToken = sessionData2?.session?.access_token;
+      
+      const analyzeRes = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-ppa`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`,
+          },
+          body: JSON.stringify({
+            ppaText,
+            comparisonText,
+            analysisType,
+            perspective,
+            jurisdiction,
+            projectName,
+            precedents: relevantPrecedents,
+            goldStandardPrecedents: goldStandardForAnalysis,
+          }),
+          signal: controller.signal,
+        }
+      );
+      
+      clearTimeout(timeoutId);
+      
+      if (!analyzeRes.ok) {
+        const errorData = await analyzeRes.json();
+        throw new Error(errorData.error || 'Failed to analyze PPA');
       }
+      
+      const analyzeResponse = { data: await analyzeRes.json(), error: null };
+
+      // Error already thrown above if response not ok
 
       setAnalysisProgress(80);
       setAnalysisStatus('Saving analysis results...');

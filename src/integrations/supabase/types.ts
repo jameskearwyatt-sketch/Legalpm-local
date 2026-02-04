@@ -2023,6 +2023,154 @@ export type Database = {
           },
         ]
       }
+      ppa_analyses: {
+        Row: {
+          agreed_at: string | null
+          analysis_type: Database["public"]["Enums"]["ppa_analysis_type"]
+          comparison_file_name: string | null
+          comparison_file_url: string | null
+          created_at: string
+          document_file_name: string
+          document_file_url: string | null
+          id: string
+          is_agreed: boolean
+          jurisdiction: string | null
+          notes: string | null
+          perspective: Database["public"]["Enums"]["ppa_perspective"]
+          project_name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          agreed_at?: string | null
+          analysis_type: Database["public"]["Enums"]["ppa_analysis_type"]
+          comparison_file_name?: string | null
+          comparison_file_url?: string | null
+          created_at?: string
+          document_file_name: string
+          document_file_url?: string | null
+          id?: string
+          is_agreed?: boolean
+          jurisdiction?: string | null
+          notes?: string | null
+          perspective: Database["public"]["Enums"]["ppa_perspective"]
+          project_name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          agreed_at?: string | null
+          analysis_type?: Database["public"]["Enums"]["ppa_analysis_type"]
+          comparison_file_name?: string | null
+          comparison_file_url?: string | null
+          created_at?: string
+          document_file_name?: string
+          document_file_url?: string | null
+          id?: string
+          is_agreed?: boolean
+          jurisdiction?: string | null
+          notes?: string | null
+          perspective?: Database["public"]["Enums"]["ppa_perspective"]
+          project_name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ppa_extracted_positions: {
+        Row: {
+          analysis_id: string
+          bible_reference: string | null
+          category: string
+          comparison_position: string | null
+          confidence: Database["public"]["Enums"]["ppa_confidence_level"]
+          created_at: string
+          id: string
+          position_summary: string
+          source_text: string | null
+          user_id: string
+          variance_notes: string | null
+        }
+        Insert: {
+          analysis_id: string
+          bible_reference?: string | null
+          category: string
+          comparison_position?: string | null
+          confidence?: Database["public"]["Enums"]["ppa_confidence_level"]
+          created_at?: string
+          id?: string
+          position_summary: string
+          source_text?: string | null
+          user_id: string
+          variance_notes?: string | null
+        }
+        Update: {
+          analysis_id?: string
+          bible_reference?: string | null
+          category?: string
+          comparison_position?: string | null
+          confidence?: Database["public"]["Enums"]["ppa_confidence_level"]
+          created_at?: string
+          id?: string
+          position_summary?: string
+          source_text?: string | null
+          user_id?: string
+          variance_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ppa_extracted_positions_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "ppa_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ppa_precedent_bank: {
+        Row: {
+          banked_at: string
+          category: string
+          id: string
+          jurisdiction: string | null
+          perspective: Database["public"]["Enums"]["ppa_perspective"]
+          position_summary: string
+          project_name: string
+          source_analysis_id: string | null
+          user_id: string
+        }
+        Insert: {
+          banked_at?: string
+          category: string
+          id?: string
+          jurisdiction?: string | null
+          perspective: Database["public"]["Enums"]["ppa_perspective"]
+          position_summary: string
+          project_name: string
+          source_analysis_id?: string | null
+          user_id: string
+        }
+        Update: {
+          banked_at?: string
+          category?: string
+          id?: string
+          jurisdiction?: string | null
+          perspective?: Database["public"]["Enums"]["ppa_perspective"]
+          position_summary?: string
+          project_name?: string
+          source_analysis_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ppa_precedent_bank_source_analysis_id_fkey"
+            columns: ["source_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "ppa_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pricing_proposal_afas: {
         Row: {
           afa_type: string
@@ -2884,6 +3032,9 @@ export type Database = {
         | "Lost"
       matter_status: "Open" | "On Hold" | "Closed"
       pipeline_outcome: "Won" | "Lost" | "Pending"
+      ppa_analysis_type: "ppa_vs_bible" | "ppa_vs_termsheet"
+      ppa_confidence_level: "high" | "medium" | "review_required"
+      ppa_perspective: "buyer" | "seller"
       task_deadline_type:
         | "this_week"
         | "next_week"
@@ -3056,6 +3207,9 @@ export const Constants = {
       ],
       matter_status: ["Open", "On Hold", "Closed"],
       pipeline_outcome: ["Won", "Lost", "Pending"],
+      ppa_analysis_type: ["ppa_vs_bible", "ppa_vs_termsheet"],
+      ppa_confidence_level: ["high", "medium", "review_required"],
+      ppa_perspective: ["buyer", "seller"],
       task_deadline_type: [
         "this_week",
         "next_week",

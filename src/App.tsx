@@ -23,6 +23,7 @@ import MatterPricing from "./pages/MatterPricing";
 import PricingProposalDetail from "./pages/PricingProposalDetail";
 import Contacts from "./pages/Contacts";
 import BMExpertiseMap from "./pages/BMExpertiseMap";
+import PPAAnalyst from "./pages/PPAAnalyst";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -60,6 +61,7 @@ function AppRoutes() {
       <Route path="/pricing/proposal/:proposalId" element={<ProtectedRoute><PricingProposalDetail /></ProtectedRoute>} />
       <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
       <Route path="/bm-expertise" element={<ProtectedRoute><BMExpertiseMap /></ProtectedRoute>} />
+      <Route path="/ppa-analyst" element={<ProtectedRoute><PPAAnalyst /></ProtectedRoute>} />
       <Route path="/growth" element={<ProtectedRoute><Growth /></ProtectedRoute>} />
       <Route path="/growth/:projectId" element={<ProtectedRoute><GrowthProjectDetail /></ProtectedRoute>} />
       <Route path="/flags" element={<ProtectedRoute><Flags /></ProtectedRoute>} />

@@ -22,7 +22,6 @@ import {
   LogOut,
   Menu,
   X,
-  
   Flag,
   AlertTriangle,
   Rocket,
@@ -30,6 +29,7 @@ import {
   Calculator,
   Users,
   Network,
+  FileSearch,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -41,6 +41,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Matters', href: '/matters', icon: Briefcase },
   { name: 'Pricing & Assumptions', href: '/pricing', icon: Calculator },
+  { name: 'PPA Analyst', href: '/ppa-analyst', icon: FileSearch },
   { name: 'Contacts', href: '/contacts', icon: Users },
   { name: 'BM EMI Expertise Map', href: '/bm-expertise', icon: Network },
   { name: 'Growth', href: '/growth', icon: Rocket },

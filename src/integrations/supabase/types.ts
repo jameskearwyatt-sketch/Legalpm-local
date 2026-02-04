@@ -2034,12 +2034,15 @@ export type Database = {
           document_file_url: string | null
           id: string
           is_agreed: boolean
+          is_comparison: boolean | null
           jurisdiction: string | null
           notes: string | null
+          parent_analysis_id: string | null
           perspective: Database["public"]["Enums"]["ppa_perspective"]
           project_name: string
           updated_at: string
           user_id: string
+          version_number: number | null
         }
         Insert: {
           agreed_at?: string | null
@@ -2051,12 +2054,15 @@ export type Database = {
           document_file_url?: string | null
           id?: string
           is_agreed?: boolean
+          is_comparison?: boolean | null
           jurisdiction?: string | null
           notes?: string | null
+          parent_analysis_id?: string | null
           perspective: Database["public"]["Enums"]["ppa_perspective"]
           project_name: string
           updated_at?: string
           user_id: string
+          version_number?: number | null
         }
         Update: {
           agreed_at?: string | null
@@ -2068,25 +2074,39 @@ export type Database = {
           document_file_url?: string | null
           id?: string
           is_agreed?: boolean
+          is_comparison?: boolean | null
           jurisdiction?: string | null
           notes?: string | null
+          parent_analysis_id?: string | null
           perspective?: Database["public"]["Enums"]["ppa_perspective"]
           project_name?: string
           updated_at?: string
           user_id?: string
+          version_number?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "ppa_analyses_parent_analysis_id_fkey"
+            columns: ["parent_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "ppa_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       ppa_extracted_positions: {
         Row: {
           analysis_id: string
           bible_reference: string | null
           category: string
+          change_summary: string | null
+          change_type: string | null
           comparison_position: string | null
           confidence: Database["public"]["Enums"]["ppa_confidence_level"]
           created_at: string
           id: string
           position_summary: string
+          previous_position: string | null
           source_text: string | null
           user_id: string
           variance_notes: string | null
@@ -2095,11 +2115,14 @@ export type Database = {
           analysis_id: string
           bible_reference?: string | null
           category: string
+          change_summary?: string | null
+          change_type?: string | null
           comparison_position?: string | null
           confidence?: Database["public"]["Enums"]["ppa_confidence_level"]
           created_at?: string
           id?: string
           position_summary: string
+          previous_position?: string | null
           source_text?: string | null
           user_id: string
           variance_notes?: string | null
@@ -2108,11 +2131,14 @@ export type Database = {
           analysis_id?: string
           bible_reference?: string | null
           category?: string
+          change_summary?: string | null
+          change_type?: string | null
           comparison_position?: string | null
           confidence?: Database["public"]["Enums"]["ppa_confidence_level"]
           created_at?: string
           id?: string
           position_summary?: string
+          previous_position?: string | null
           source_text?: string | null
           user_id?: string
           variance_notes?: string | null

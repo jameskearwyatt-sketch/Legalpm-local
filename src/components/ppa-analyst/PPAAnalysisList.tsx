@@ -27,16 +27,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Search, MoreHorizontal, Eye, Trash2, FileText, CheckCircle2, Loader2 } from 'lucide-react';
-import { usePPAAnalyses } from '@/lib/hooks/usePPAAnalyses';
+import { Search, MoreHorizontal, Eye, Trash2, FileText, CheckCircle2, Loader2, GitCompare } from 'lucide-react';
+import { usePPAAnalyses, usePPAPositions } from '@/lib/hooks/usePPAAnalyses';
 import { format } from 'date-fns';
 import { PPAAnalysisReport } from './PPAAnalysisReport';
+import { PPACompareUpload } from './PPACompareUpload';
+import { PPAComparisonReport } from './PPAComparisonReport';
 
 export function PPAAnalysisList() {
   const { analyses, isLoading, deleteAnalysis } = usePPAAnalyses();
   const [search, setSearch] = useState('');
   const [selectedAnalysisId, setSelectedAnalysisId] = useState<string | null>(null);
+  const [compareAnalysisId, setCompareAnalysisId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  // Get positions for the analysis being compared
+  const selectedAnalysis = analyses.find(a => a.id === (compareAnalysisId || selectedAnalysisId));
+  const { positions: selectedPositions } = usePPAPositions(compareAnalysisId || selectedAnalysisId);
 
   const filteredAnalyses = analyses.filter(analysis =>
     analysis.project_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -50,12 +57,42 @@ export function PPAAnalysisList() {
     setDeleteConfirmId(null);
   };
 
+  const handleCompareComplete = (newAnalysisId: string) => {
+    setCompareAnalysisId(null);
+    setSelectedAnalysisId(newAnalysisId);
+  };
+
+  // Show comparison upload
+  if (compareAnalysisId && selectedAnalysis) {
+    return (
+      <PPACompareUpload
+        parentAnalysis={selectedAnalysis}
+        previousPositions={selectedPositions}
+        onComplete={handleCompareComplete}
+        onCancel={() => setCompareAnalysisId(null)}
+      />
+    );
+  }
+
+  // Show comparison report if the selected analysis is a comparison
+  if (selectedAnalysisId && selectedAnalysis?.is_comparison) {
+    return (
+      <PPAComparisonReport
+        analysis={selectedAnalysis}
+        positions={selectedPositions}
+        onBack={() => setSelectedAnalysisId(null)}
+      />
+    );
+  }
+
+  // Show regular report
   if (selectedAnalysisId) {
     return (
       <PPAAnalysisReport
         analysisId={selectedAnalysisId}
         onNewAnalysis={() => setSelectedAnalysisId(null)}
         onViewHistory={() => setSelectedAnalysisId(null)}
+        onCompareNewDraft={() => setCompareAnalysisId(selectedAnalysisId)}
       />
     );
   }
@@ -115,9 +152,19 @@ export function PPAAnalysisList() {
                       className="font-medium"
                       onClick={() => setSelectedAnalysisId(analysis.id)}
                     >
-                      <div>
-                        <p>{analysis.project_name}</p>
-                        <p className="text-xs text-muted-foreground">{analysis.document_file_name}</p>
+                      <div className="flex items-center gap-2">
+                        <div>
+                          <p className="flex items-center gap-2">
+                            {analysis.project_name}
+                            {analysis.is_comparison && (
+                              <Badge variant="outline" className="gap-1 text-xs">
+                                <GitCompare className="h-3 w-3" />
+                                Comparison
+                              </Badge>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{analysis.document_file_name}</p>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell onClick={() => setSelectedAnalysisId(analysis.id)}>
@@ -158,6 +205,12 @@ export function PPAAnalysisList() {
                             <Eye className="h-4 w-4 mr-2" />
                             View Report
                           </DropdownMenuItem>
+                          {!analysis.is_comparison && (
+                            <DropdownMenuItem onClick={() => setCompareAnalysisId(analysis.id)}>
+                              <GitCompare className="h-4 w-4 mr-2" />
+                              Compare New Draft
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem
                             className="text-destructive"
                             onClick={() => setDeleteConfirmId(analysis.id)}

@@ -115,7 +115,7 @@ export function BurnSparklineDetailedTooltip({
   // Build larger chart paths
   const chartData = useMemo(() => {
     if (dataPoints.length === 0) {
-      return { linePath: '', areaPath: '', budgetLineY: 0, gridLines: [], xLabels: [], yLabels: [] };
+      return { linePath: '', areaPath: '', budgetLineY: 0, gridLines: [], xLabels: [], yLabels: [], proposalDrop: null };
     }
 
     const chartEndValue = hasActiveProposal && rawBurn !== undefined ? rawBurn : currentBurn;
@@ -169,7 +169,7 @@ export function BurnSparklineDetailedTooltip({
     }));
 
     if (points.length < 2) {
-      return { linePath: '', areaPath: '', budgetLineY, gridLines, xLabels, yLabels };
+      return { linePath: '', areaPath: '', budgetLineY, gridLines, xLabels, yLabels, proposalDrop: null };
     }
 
     let linePath = `M ${points[0].x} ${points[0].y}`;
@@ -188,8 +188,32 @@ export function BurnSparklineDetailedTooltip({
     // Data point dots (only real snapshots)
     const dots = points.filter((_, i) => !dataPoints[i].isSynthetic);
 
-    return { linePath, areaPath, budgetLineY, gridLines, xLabels, yLabels, dots };
-  }, [dataPoints, bmBudget, currentBurn, chartWidth, chartHeight, hasActiveProposal, rawBurn]);
+    // WIP proposal drop-off visualization
+    let proposalDrop: { 
+      startX: number; 
+      startY: number; 
+      endX: number; 
+      endY: number;
+      rawValue: number;
+      adjustedValue: number;
+    } | null = null;
+    
+    if (hasActiveProposal && rawBurn !== undefined && rawBurn !== currentBurn && proposalWriteOff > 0) {
+      const lastPoint = points[points.length - 1];
+      // Add a small offset to the right for the proposal point
+      const proposalX = Math.min(lastPoint.x + 15, width - padding.right - 10);
+      proposalDrop = {
+        startX: lastPoint.x,
+        startY: scaleY(rawBurn),
+        endX: proposalX,
+        endY: scaleY(currentBurn),
+        rawValue: rawBurn,
+        adjustedValue: currentBurn,
+      };
+    }
+
+    return { linePath, areaPath, budgetLineY, gridLines, xLabels, yLabels, dots, proposalDrop };
+  }, [dataPoints, bmBudget, currentBurn, chartWidth, chartHeight, hasActiveProposal, rawBurn, proposalWriteOff, width]);
 
   // WIP/AR/Paid breakdown from latest snapshot
   const latestSnapshot = snapshots.length > 0 
@@ -261,6 +285,63 @@ export function BurnSparklineDetailedTooltip({
               strokeWidth={1.5}
             />
           ))}
+
+          {/* WIP Proposal drop-off visualization */}
+          {chartData.proposalDrop && (
+            <>
+              {/* Dashed line from raw burn to adjusted burn */}
+              <line
+                x1={chartData.proposalDrop.startX}
+                y1={chartData.proposalDrop.startY}
+                x2={chartData.proposalDrop.endX}
+                y2={chartData.proposalDrop.endY}
+                stroke="#f59e0b"
+                strokeWidth={2}
+                strokeDasharray="4,2"
+                strokeLinecap="round"
+              />
+              {/* Raw burn point (hollow) */}
+              <circle
+                cx={chartData.proposalDrop.startX}
+                cy={chartData.proposalDrop.startY}
+                r={4}
+                fill="white"
+                stroke="#f59e0b"
+                strokeWidth={2}
+              />
+              {/* Adjusted burn point (filled) */}
+              <circle
+                cx={chartData.proposalDrop.endX}
+                cy={chartData.proposalDrop.endY}
+                r={5}
+                fill="#f59e0b"
+                stroke="white"
+                strokeWidth={2}
+              />
+              {/* Drop arrow indicator */}
+              <path
+                d={`M ${chartData.proposalDrop.endX - 3} ${chartData.proposalDrop.endY - 8} 
+                    L ${chartData.proposalDrop.endX} ${chartData.proposalDrop.endY - 4} 
+                    L ${chartData.proposalDrop.endX + 3} ${chartData.proposalDrop.endY - 8}`}
+                fill="none"
+                stroke="#f59e0b"
+                strokeWidth={1.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Label for proposal */}
+              <text
+                x={chartData.proposalDrop.endX}
+                y={chartData.proposalDrop.endY + 12}
+                fontSize={8}
+                fill="#f59e0b"
+                textAnchor="middle"
+                fontWeight={500}
+              >
+                Proposed
+              </text>
+            </>
+          )}
 
           {/* Budget line */}
           {bmBudget > 0 && chartData.budgetLineY > padding.top && (

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,11 +7,12 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle, Settings2 } from 'lucide-react';
+import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle, Settings2, Brain } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAAnalysisType, PPAPerspective } from '@/lib/hooks/usePPAAnalyses';
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
 import { PPAAnalysisReport } from './PPAAnalysisReport';
+import { generateMarketIntelligence, formatIntelligenceForPrompt } from '@/lib/ppaPrecedentIntelligence';
 
 interface PPAUploadAnalysisProps {
   onAnalysisComplete?: () => void;
@@ -157,10 +158,16 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
         setAnalysisProgress(50);
       }
 
-      // Step 3: Run AI analysis with precedents if threshold is met
-      setAnalysisStatus('Analyzing PPA positions...');
+      // Step 3: Generate Market Intelligence from precedent bank
+      setAnalysisStatus('Generating market intelligence from precedent bank...');
       
-      // Filter relevant precedents for comparison (exclude gold standard from regular precedents)
+      // Generate comprehensive market intelligence
+      const marketIntelligence = generateMarketIntelligence(precedents, goldStandardPrecedents);
+      const intelligencePrompt = formatIntelligenceForPrompt(marketIntelligence);
+      
+      console.log(`Market Intelligence: ${marketIntelligence.totalDeals} deals, ${marketIntelligence.totalPositions} positions, confidence: ${marketIntelligence.intelligenceConfidence}`);
+      
+      // Filter relevant precedents for raw comparison (exclude gold standard from regular precedents)
       const regularPrecedents = precedents.filter(p => !p.is_gold_standard);
       const relevantPrecedents = regularPrecedents.length >= ppaPrecedentThreshold
         ? regularPrecedents.map(p => ({
@@ -182,8 +189,10 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
         template_name: p.template_name,
       }));
       
-      console.log(`Passing ${relevantPrecedents.length} precedents for market comparison (threshold: ${ppaPrecedentThreshold})`);
+      console.log(`Passing ${relevantPrecedents.length} raw precedents + synthesized intelligence (threshold: ${ppaPrecedentThreshold})`);
       console.log(`Passing ${goldStandardForAnalysis.length} gold standard template positions`);
+      
+      setAnalysisStatus('Running AI analysis with market intelligence...');
       
       // Use AbortController with extended timeout for complex AI analysis (5 minutes)
       const controller = new AbortController();
@@ -209,6 +218,8 @@ export function PPAUploadAnalysis({ onAnalysisComplete }: PPAUploadAnalysisProps
             projectName,
             precedents: relevantPrecedents,
             goldStandardPrecedents: goldStandardForAnalysis,
+            marketIntelligence: intelligencePrompt,
+            intelligenceConfidence: marketIntelligence.intelligenceConfidence,
           }),
           signal: controller.signal,
         }

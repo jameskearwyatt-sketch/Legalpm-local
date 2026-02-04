@@ -754,7 +754,7 @@ export function PPAPrecedentBank() {
   );
 }
 
-// Individual precedent card component
+// Individual precedent card component - starts collapsed, expandable
 function PrecedentCard({ 
   precedent, 
   search, 
@@ -768,19 +768,31 @@ function PrecedentCard({
 }) {
   const [expanded, setExpanded] = useState(false);
   const summaryLines = precedent.position_summary.split('\n').filter(l => l.trim());
-  const previewLines = summaryLines.slice(0, 3);
-  const hasMore = summaryLines.length > 3;
+  
+  // Get first line as preview (truncated if needed)
+  const previewText = summaryLines[0]?.substring(0, 120) || 'No summary';
+  const hasMoreContent = summaryLines.length > 1 || (summaryLines[0]?.length || 0) > 120;
 
   return (
-    <div className="p-4 rounded-lg border bg-card hover:shadow-sm transition-shadow">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          {/* Header row */}
-          <div className="flex items-center gap-2 flex-wrap mb-2">
-            {showCategory && (
-              <Badge variant="secondary">{precedent.category}</Badge>
-            )}
-            <span className="font-medium text-sm">{highlightText(precedent.project_name, search)}</span>
+    <div 
+      className={cn(
+        "rounded-lg border bg-card transition-all",
+        expanded ? "p-4 shadow-sm" : "p-2.5 hover:bg-muted/30 cursor-pointer"
+      )}
+      onClick={!expanded ? () => setExpanded(true) : undefined}
+    >
+      {!expanded ? (
+        /* Collapsed view - compact single line */
+        <div className="flex items-center gap-3">
+          <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+          {showCategory && (
+            <Badge variant="secondary" className="shrink-0 text-xs">{precedent.category}</Badge>
+          )}
+          <span className="font-medium text-sm shrink-0">{highlightText(precedent.project_name, search)}</span>
+          <span className="text-sm text-muted-foreground truncate flex-1">
+            {highlightText(previewText, search)}{hasMoreContent && '...'}
+          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
             <Badge variant="outline" className="text-xs">
               {precedent.perspective === 'buyer' ? 'Buyer' : 'Seller'}
             </Badge>
@@ -789,41 +801,61 @@ function PrecedentCard({
                 {precedent.jurisdiction}
               </Badge>
             )}
-            <span className="text-xs text-muted-foreground">
-              {format(new Date(precedent.banked_at), 'PP')}
-            </span>
           </div>
-
-          {/* Position content */}
-          <div className="text-sm space-y-1">
-            {(expanded ? summaryLines : previewLines).map((line, i) => (
-              <p key={i} className="text-muted-foreground">
-                {highlightText(line, search)}
-              </p>
-            ))}
-          </div>
-
-          {hasMore && (
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setExpanded(!expanded)}
-              className="mt-2 h-7 text-xs text-primary"
-            >
-              {expanded ? 'Show less' : `Show ${summaryLines.length - 3} more lines`}
-            </Button>
-          )}
         </div>
+      ) : (
+        /* Expanded view - full details */
+        <div className="space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              {/* Header row */}
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0"
+                  onClick={(e) => { e.stopPropagation(); setExpanded(false); }}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </Button>
+                {showCategory && (
+                  <Badge variant="secondary">{precedent.category}</Badge>
+                )}
+                <span className="font-medium text-sm">{highlightText(precedent.project_name, search)}</span>
+                <Badge variant="outline" className="text-xs">
+                  {precedent.perspective === 'buyer' ? 'Buyer' : 'Seller'}
+                </Badge>
+                {precedent.jurisdiction && (
+                  <Badge variant="outline" className="text-xs border-primary/30 text-primary">
+                    {precedent.jurisdiction}
+                  </Badge>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  {format(new Date(precedent.banked_at), 'PP')}
+                </span>
+              </div>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-muted-foreground hover:text-destructive shrink-0"
-          onClick={onDelete}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
+              {/* Full position content */}
+              <div className="text-sm space-y-1 ml-8">
+                {summaryLines.map((line, i) => (
+                  <p key={i} className="text-muted-foreground">
+                    {highlightText(line, search)}
+                  </p>
+                ))}
+              </div>
+            </div>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-muted-foreground hover:text-destructive shrink-0"
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -108,11 +108,14 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
       );
 
       if (!parseResponse.ok) {
-        console.warn('Failed to parse document for metadata detection');
+        const errText = await parseResponse.text();
+        console.error('Failed to parse document for metadata detection:', parseResponse.status, errText);
+        toast.error('Failed to parse document - please try again');
         return;
       }
 
       const { text: documentText } = await parseResponse.json();
+      console.log('Document parsed, text length:', documentText?.length);
 
       // Now detect metadata
       const detectResponse = await fetch(
@@ -128,7 +131,9 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
       );
 
       if (!detectResponse.ok) {
-        console.warn('Failed to detect PPA metadata');
+        const errText = await detectResponse.text();
+        console.error('Failed to detect PPA metadata:', detectResponse.status, errText);
+        toast.error('Failed to detect PPA metadata - please fill in fields manually');
         return;
       }
 

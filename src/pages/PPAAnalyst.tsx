@@ -8,9 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { PPAUploadAnalysis } from '@/components/ppa-analyst/PPAUploadAnalysis';
 import { PPAAnalysisList } from '@/components/ppa-analyst/PPAAnalysisList';
 import { PPAPrecedentBank } from '@/components/ppa-analyst/PPAPrecedentBank';
-import { FileSearch, History, Database, Settings2 } from 'lucide-react';
+ import { PPALearningsTab } from '@/components/ppa-analyst/PPALearningsTab';
+ import { FileSearch, History, Database, Settings2, Brain } from 'lucide-react';
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
-import { usePPAPrecedentBank, PPAAnalysis, PPAStructureType, PPAPerspective, PPAAnalysisType } from '@/lib/hooks/usePPAAnalyses';
+ import { usePPAPrecedentBank, PPAAnalysis, PPAStructureType, PPAPerspective, PPAAnalysisType } from '@/lib/hooks/usePPAAnalyses';
+ import { usePPALearnings } from '@/lib/hooks/usePPALearnings';
 import { toast } from 'sonner';
 
 // Pre-fill state for re-analysis
@@ -29,6 +31,7 @@ export default function PPAAnalyst() {
   const [reanalyzePreFill, setReanalyzePreFill] = useState<ReanalyzePreFill | null>(null);
   const { ppaPrecedentThreshold, updateSettings } = useUserSettings();
   const { uniqueProjectCount, uniqueTemplateCount } = usePPAPrecedentBank();
+   const { activeLearnings } = usePPALearnings();
   
   // Count unique deals, not individual positions
   const precedentCount = uniqueProjectCount;
@@ -139,6 +142,15 @@ export default function PPAAnalyst() {
                 </Badge>
               )}
             </TabsTrigger>
+             <TabsTrigger value="learnings" className="gap-2">
+               <Brain className="h-4 w-4" />
+               AI Learnings
+               {activeLearnings.length > 0 && (
+                 <Badge variant="secondary" className="ml-1 h-5 px-1.5">
+                   {activeLearnings.length}
+                 </Badge>
+               )}
+             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="new-analysis">
@@ -156,6 +168,10 @@ export default function PPAAnalyst() {
           <TabsContent value="precedent-bank">
             <PPAPrecedentBank />
           </TabsContent>
+ 
+           <TabsContent value="learnings">
+             <PPALearningsTab />
+           </TabsContent>
         </Tabs>
       </div>
     </AppLayout>

@@ -436,6 +436,7 @@ serve(async (req) => {
       goldStandardPrecedents,
       marketIntelligence,
       intelligenceConfidence,
+       userLearnings, // User corrections and feedback
     } = await req.json();
 
     if (!ppaText) {
@@ -449,8 +450,9 @@ serve(async (req) => {
     const hasMarketIntelligence = marketIntelligence && typeof marketIntelligence === 'string' && marketIntelligence.length > 100;
     const hasPrecedents = precedents && Array.isArray(precedents) && precedents.length > 0;
     const hasGoldStandard = goldStandardPrecedents && Array.isArray(goldStandardPrecedents) && goldStandardPrecedents.length > 0;
+     const hasLearnings = userLearnings && typeof userLearnings === 'string' && userLearnings.length > 10;
 
-    console.log(`Analysis request: hasMarketIntelligence=${hasMarketIntelligence}, hasPrecedents=${hasPrecedents}, hasGoldStandard=${hasGoldStandard}, intelligenceConfidence=${intelligenceConfidence}`);
+     console.log(`Analysis request: hasMarketIntelligence=${hasMarketIntelligence}, hasPrecedents=${hasPrecedents}, hasGoldStandard=${hasGoldStandard}, hasLearnings=${hasLearnings}, intelligenceConfidence=${intelligenceConfidence}`);
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -586,6 +588,7 @@ ${counterpartyType ? `COUNTERPARTY TYPE: ${counterpartyType}` : ''}
 ${marketIntelligenceContext}
 ${goldStandardContext}
 ${precedentContext}
+ ${hasLearnings ? userLearnings : ''}
 
 ## OUTPUT REQUIREMENTS
 

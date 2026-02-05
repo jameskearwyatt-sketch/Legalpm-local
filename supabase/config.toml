@@ -108,5 +108,8 @@ verify_jwt = false
 [functions.compare-ppa-drafts]
 verify_jwt = false
  
- [functions.process-ppa-feedback]
- verify_jwt = false
+[functions.process-ppa-feedback]
+verify_jwt = false
+
+[functions.detect-ppa-metadata]
+verify_jwt = false

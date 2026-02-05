@@ -76,6 +76,99 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
   const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDetectingMetadata, setIsDetectingMetadata] = useState(false);
+  const [detectionNotes, setDetectionNotes] = useState<string | null>(null);
+
+  // Auto-detect PPA metadata after file upload
+  const detectPPAMetadata = useCallback(async (file: File) => {
+    setIsDetectingMetadata(true);
+    setDetectionNotes(null);
+    
+    try {
+      // First, parse the document to get text
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      const parseResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-document-text`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (!parseResponse.ok) {
+        console.warn('Failed to parse document for metadata detection');
+        return;
+      }
+
+      const { text: documentText } = await parseResponse.json();
+
+      // Now detect metadata
+      const detectResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/detect-ppa-metadata`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ documentText }),
+        }
+      );
+
+      if (!detectResponse.ok) {
+        console.warn('Failed to detect PPA metadata');
+        return;
+      }
+
+      const metadata = await detectResponse.json();
+      console.log('Auto-detected PPA metadata:', metadata);
+
+      // Auto-fill fields if detected with reasonable confidence
+      if (metadata.jurisdiction && metadata.jurisdiction_confidence !== 'low') {
+        // Map detected jurisdiction to our list
+        const matchedJurisdiction = EUROPEAN_JURISDICTIONS.find(
+          j => j.toLowerCase() === metadata.jurisdiction.toLowerCase() ||
+               metadata.jurisdiction.toLowerCase().includes(j.toLowerCase())
+        );
+        if (matchedJurisdiction) {
+          setJurisdiction(matchedJurisdiction);
+        }
+      }
+
+      if (metadata.ppa_type && metadata.ppa_type_confidence !== 'low') {
+        const validTypes: PPAStructureType[] = ['vppa', 'physical', 'sleeved', 'private_wire'];
+        if (validTypes.includes(metadata.ppa_type)) {
+          setPpaType(metadata.ppa_type);
+        }
+      }
+
+      if (metadata.counterparty_type && metadata.counterparty_type_confidence !== 'low') {
+        setCounterpartyType(metadata.counterparty_type);
+      }
+
+      if (metadata.detection_notes) {
+        setDetectionNotes(metadata.detection_notes);
+      }
+
+      toast.success('Document metadata auto-detected', {
+        description: 'Review the pre-filled fields and adjust if needed.',
+      });
+
+    } catch (err) {
+      console.warn('Error detecting PPA metadata:', err);
+      // Non-critical - just log and continue
+    } finally {
+      setIsDetectingMetadata(false);
+    }
+  }, []);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>, type: 'ppa' | 'comparison') => {
     const file = e.target.files?.[0];
@@ -98,10 +191,14 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         const nameMatch = file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
         setProjectName(nameMatch);
       }
+      // Auto-detect metadata from the document (only if not pre-filling from re-analysis)
+      if (!preFill) {
+        detectPPAMetadata(file);
+      }
     } else {
       setComparisonFile(file);
     }
-  }, [projectName]);
+  }, [projectName, preFill, detectPPAMetadata]);
 
   const handleStartAnalysis = async () => {
     if (!ppaFile) {
@@ -459,10 +556,33 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
           </div>
 
           {ppaFile && step === 'upload' && (
-            <Button onClick={() => setStep('configure')} className="w-full gap-2">
-              Continue
-              <ArrowRight className="h-4 w-4" />
-            </Button>
+            <div className="space-y-3">
+              {isDetectingMetadata && (
+                <div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                  <span className="text-sm text-muted-foreground">
+                    Scanning document to detect metadata...
+                  </span>
+                </div>
+              )}
+              <Button 
+                onClick={() => setStep('configure')} 
+                className="w-full gap-2"
+                disabled={isDetectingMetadata}
+              >
+                {isDetectingMetadata ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Detecting...
+                  </>
+                ) : (
+                  <>
+                    Continue
+                    <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -484,6 +604,17 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
               <div className="flex items-center gap-2 p-3 bg-destructive/10 text-destructive rounded-lg">
                 <AlertCircle className="h-5 w-5 flex-shrink-0" />
                 <p className="text-sm">{error}</p>
+              </div>
+            )}
+
+            {/* Auto-detection notes */}
+            {detectionNotes && !preFill && (
+              <div className="flex items-start gap-2 p-3 bg-primary/10 text-primary rounded-lg">
+                <Brain className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Auto-detected from document</p>
+                  <p className="text-xs opacity-80">{detectionNotes}</p>
+                </div>
               </div>
             )}
 

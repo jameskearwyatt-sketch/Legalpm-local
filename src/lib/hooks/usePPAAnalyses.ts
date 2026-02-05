@@ -59,6 +59,8 @@ export interface PPAExtractedPosition {
   change_summary: string | null;
   change_type: ChangeType | null;
   created_at: string;
+  // New field for "What's Market?" benchmark
+  market_benchmark: string | null;
 }
 
 export interface PPAPrecedent {

@@ -582,6 +582,13 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                                       {cleanedNotes}
                                     </div>
                                   )}
+                                  {/* What's Market? Benchmark */}
+                                  {(position as any).market_benchmark && (
+                                    <div className="mt-2 p-2 bg-primary/5 border border-primary/20 rounded text-xs">
+                                      <span className="font-medium text-primary">📊 What's Market?</span>
+                                      <span className="text-muted-foreground ml-2">{(position as any).market_benchmark}</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                               {stats.count > 0 && (

@@ -2117,6 +2117,7 @@ export type Database = {
           confidence: Database["public"]["Enums"]["ppa_confidence_level"]
           created_at: string
           id: string
+          market_benchmark: string | null
           position_summary: string
           previous_position: string | null
           source_text: string | null
@@ -2133,6 +2134,7 @@ export type Database = {
           confidence?: Database["public"]["Enums"]["ppa_confidence_level"]
           created_at?: string
           id?: string
+          market_benchmark?: string | null
           position_summary: string
           previous_position?: string | null
           source_text?: string | null
@@ -2149,6 +2151,7 @@ export type Database = {
           confidence?: Database["public"]["Enums"]["ppa_confidence_level"]
           created_at?: string
           id?: string
+          market_benchmark?: string | null
           position_summary?: string
           previous_position?: string | null
           source_text?: string | null

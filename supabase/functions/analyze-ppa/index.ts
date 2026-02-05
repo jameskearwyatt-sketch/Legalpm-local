@@ -603,13 +603,19 @@ For each category you MUST:
    - "seller_friendly": Position is more protective of seller's interests than typical/balanced
    - "balanced": Position is reasonably balanced between parties
    - "neutral": Position doesn't materially favor either party (purely procedural)
-${hasMarketIntelligence ? `5. **Market Position** (PRECISION REQUIRED): Use the SYNTHESIZED MARKET INTELLIGENCE above to determine market position with precision:
+5. **Market Benchmark** (ALWAYS REQUIRED): For EVERY position, provide the "textbook" or "ideal" market position:
+   - What would the PERFECT, bang-on-market position look like for this category?
+   - Be specific with typical ranges, percentages, durations, structures
+   - This is the "What's Market?" signpost - show what ideal looks like
+   - Even if the current position is acceptable, show what perfect would be
+   - Format: Concise statement of the ideal market standard (1-2 sentences max)
+${hasMarketIntelligence ? `6. **Market Position** (PRECISION REQUIRED): Use the SYNTHESIZED MARKET INTELLIGENCE above to determine market position with precision:
    - Compare against the NUMERIC RANGES provided (if value is outside range, it's off/way-off market)
    - Check COMMON STRUCTURES frequency (if structure is <20% frequency, consider off-market)
    - Consider JURISDICTION-SPECIFIC patterns if analyzing a matching jurisdiction
    - Reference the POSITION CLUSTERS to identify standard vs unusual combinations` : ''}
-${hasGoldStandard ? `${hasMarketIntelligence ? '6' : '5'}. **Gold Standard Comparison**: ALWAYS compare against BM template - flag ANY deviation with gold_standard_deviation: true and explain in gold_standard_comparison` : ''}
-${hasPrecedents && !hasMarketIntelligence ? `${hasGoldStandard ? '6' : '5'}. **Market Position**: Compare against precedent bank and provide market_position rating with brief market_comparison explanation` : ''}
+${hasGoldStandard ? `${hasMarketIntelligence ? '7' : '6'}. **Gold Standard Comparison**: ALWAYS compare against BM template - flag ANY deviation with gold_standard_deviation: true and explain in gold_standard_comparison` : ''}
+${hasPrecedents && !hasMarketIntelligence ? `${hasGoldStandard ? '7' : '6'}. **Market Position**: Compare against precedent bank and provide market_position rating with brief market_comparison explanation` : ''}
 
 ## CRITICAL INSTRUCTIONS
 
@@ -618,6 +624,7 @@ ${hasPrecedents && !hasMarketIntelligence ? `${hasGoldStandard ? '6' : '5'}. **M
 - If something is MISSING that would normally be expected, FLAG IT with ⚠️
 ${hasMarketIntelligence ? `- 📊 MARKET INTELLIGENCE: You have synthesized market data. Use the RANGES and MEDIANS to assess positions precisely. A position at the median is "on_market", near the edges is "off_market", beyond the range is "way_off_market".` : ''}
 ${hasGoldStandard ? `- ⭐ GOLD STANDARD CHECK: For EVERY category, compare against BM template. Deviation from our template is more important than market position!` : ''}
+- 🎯 MARKET BENCHMARK: For EVERY category, include the market_benchmark field showing the ideal/textbook position. This is mandatory.
 - For Credit Support: ALWAYS distinguish pre-COD vs post-COD periods
 - For Curtailment: ALWAYS address involuntary curtailment compensation and REGO treatment
 - For Change in Law: ALWAYS explain the actual mechanism, not just that one exists
@@ -633,6 +640,13 @@ When assessing party_favorability, consider the perspective (${perspective === '
 - Delay LDs = buyer_friendly (protects against delays)
 - Broad curtailment rights without compensation = seller_friendly
 - Stringent termination triggers = benefits the non-defaulting party (typically buyer)
+
+## MARKET BENCHMARK EXAMPLES (What's Market?)
+For each category, market_benchmark should look like:
+- Credit Support: "Market: Pre-COD LC of 10-15% contract value; post-COD PCG or LC of 6-12 months' average invoice value"
+- Availability: "Market: 95-98% P50 generation guarantee with ~80% price for underperformance"
+- Payment Terms: "Market: Monthly invoicing, 30 days payment, 2-3% late interest"
+- Force Majeure: "Market: 12-18 month FM extension cap, mutual termination right thereafter"
 ${hasMarketIntelligence ? `
 ## MARKET POSITION PRECISION GUIDANCE (Using Intelligence Data)
 - **on_market**: Position is within the typical range from market intelligence, uses common structures (>50% frequency)
@@ -665,7 +679,8 @@ Return a JSON object:
       "position_summary": "• Bullet point 1\\n• Bullet point 2\\n• Bullet point 3",
       "confidence": "high|medium|review_required",
       "party_favorability": "buyer_friendly|seller_friendly|balanced|neutral",
-      "flags": "⚠️ Any concerns or gaps to flag (optional)"${hasMarketIntelligence || hasPrecedents ? `,
+      "flags": "⚠️ Any concerns or gaps to flag (optional)",
+      "market_benchmark": "What's Market: Concise statement of the ideal/textbook market position for this category (ALWAYS REQUIRED)"${hasMarketIntelligence || hasPrecedents ? `,
       "market_position": "on_market|off_market|way_off_market|null",
       "market_comparison": "Brief comparison citing specific intelligence data (e.g., 'Below market range of 95-99%')"` : ''}${hasGoldStandard ? `,
       "gold_standard_deviation": true|false,
@@ -674,7 +689,7 @@ Return a JSON object:
   ]
 }
 
-IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that terms exist. ALWAYS include party_favorability assessment.${hasMarketIntelligence ? ' USE THE MARKET INTELLIGENCE DATA to provide PRECISE market_position ratings with specific citations.' : ''}${hasGoldStandard ? ' ALWAYS check against BM gold standard template.' : ''}${hasPrecedents && !hasMarketIntelligence ? ' Include market_position for all categories where precedents exist.' : ''}`;
+IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that terms exist. ALWAYS include party_favorability assessment. ALWAYS include market_benchmark showing the ideal/textbook market position - this is mandatory for every category.${hasMarketIntelligence ? ' USE THE MARKET INTELLIGENCE DATA to provide PRECISE market_position ratings with specific citations.' : ''}${hasGoldStandard ? ' ALWAYS check against BM gold standard template.' : ''}${hasPrecedents && !hasMarketIntelligence ? ' Include market_position for all categories where precedents exist.' : ''}`;
 
     console.log('Calling AI gateway for full PPA analysis...');
 

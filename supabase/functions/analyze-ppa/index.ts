@@ -11,14 +11,41 @@ const PPA_KNOWLEDGE_BASE = `
 ### SCOPE & PURPOSE
 A Power Purchase Agreement (PPA) is a long-term contract (typically 15-20 years) to secure revenue for a generation project. The term usually starts from the commercial operations date (COD). The PPA may have a "drop dead" date beyond which it can be terminated for non-fulfilment of conditions precedent.
 
+This PPA knowledge is based on UK onshore wind templates but applies broadly to European PPAs with jurisdiction-specific variations.
+
+### THE PARTIES
+- **Generator**: Generates electricity by operating the facility and sells the electricity
+- **Supplier/Offtaker**: Secures income for electricity by supplying to customers or selling in wholesale market
+- Note: Unlike other commercial contracts, the "Supplier" is the BUYER of electricity for onwards sale
+
 ### TERM & COMMISSIONING
 - **Typical Term**: 15-20 years depending on financing term and technology type
-- **Term Commencement**: Usually triggers from COD, not signing
-- **Commissioning**: Generator must commission the plant through testing to ensure it meets specified standards. The operational part of the PPA only commences once commissioning tests are passed.
-- **Nameplate Capacity**: PPA will describe plant's nameplate capacity and how deviations are treated.
+- **Term Commencement**: Usually triggers from COD, not signing - time between CP satisfaction and COD counts toward term
+- **Commissioning Process**:
+  - Generator must commission the plant through testing to ensure it meets specified standards
+  - Operational part only commences once commissioning tests are passed
+  - Generator provides Commissioning Plan [X] months before anticipated COD
+  - Minimum Capacity requirement must be met before Commercial Operations Requirements satisfied
+- **Nameplate Capacity**: PPA describes plant's nameplate capacity and how deviations are treated
+- **Pre-commissioning vs Commercial Operations Period**: Different payment rates may apply
+
+### CONDITIONS PRECEDENT & LONG-STOP DATES
+- **CP Long-Stop Date**: If Effective Date not achieved by this date, Supplier may terminate
+- **Commercial Operations Long-Stop Date**: If COD not achieved, Supplier may terminate
+- **Critical**: FM does NOT extend long-stop dates in standard drafting - Generator cannot use FM to extend
+- **Best/Reasonable Endeavours**: Check whether obligations are qualified and which standard applies
+
+### METER REGISTRATION (Critical for Embedded Generators)
+- **SVA Process**: Supplier becomes Registrant for Generator's meter - gives access to embedded benefits
+- **Registration Sequence**: 
+  1. Generator notifies Metering Point ready for energisation
+  2. Supplier becomes Registrant for Metering System
+  3. Supplier contracts with Data Collector and Data Aggregator
+- **Timing**: Cannot energise without meter registrant; synchronisation is last step
+- **This is only possible where Generator is exempt from generation licence or "exemptable"**
 
 ### NOMINATIONS, DELIVERY & AVAILABILITY
-- **Nominations/Scheduling/Dispatch**: Offtaker usually has the right to nominate quantity for each 30-minute settlement period, with adjustment rights within parameters based on plant characteristics and imbalance risk allocation.
+- **Nominations/Scheduling/Dispatch**: Offtaker usually has the right to nominate quantity for each 30-minute settlement period (Settlement Period as defined in BSC)
 - **Delivery Mechanisms**:
   - Physical delivery with Metered Volume Reallocation Notification (MVRN), or
   - Notification to System Operator via Energy Contract Volume Notification (ECVN)
@@ -26,88 +53,121 @@ A Power Purchase Agreement (PPA) is a long-term contract (typically 15-20 years)
   - Payment reductions
   - Liquidated damages
   - Ultimately, termination right for offtaker
-- **Allowances**: Must allow for scheduled outages (routine maintenance), acceptable unscheduled outages, and force majeure.
-- **O&M Standard**: Generator typically agrees to operate and maintain to "reasonable and prudent operator" standard.
+- **Allowances**: Must allow for scheduled outages (planned maintenance), acceptable unscheduled outages, and force majeure
+- **O&M Standard**: Generator typically agrees to operate and maintain to "Reasonable and Prudent Operator" standard
+- **Intermittent Generation**: For wind, agreement does not commit Generator to deliver "firm" output - Supplier takes imbalance risk
 
-### PAYMENT STRUCTURES
-- **Energy Payment**: £/MWh of electricity generated - should cover fuel costs and operational costs when generating
-- **Availability/Capacity Payment**: £/MW for plant being available to generate - covers fixed costs like debt service and rates
-- **Price Mechanisms**: 
-  - Fixed or variable by reference to market prices and indices (e.g., CPI)
-  - Longer terms need price indexation provisions
-- **Capacity Market Interaction**: If plant has capacity agreement, PPA must address CM risks/rewards (note: CM was suspended Nov 2018 - Oct 2019 following Tempus Energy state aid challenge)
+### PAYMENT STRUCTURES & PRICING
+- **Energy Payment**: £/MWh of electricity generated - should cover operational costs when generating
+- **Price Mechanisms**:
+  - Pass-through of market price (route to market, no fixed income)
+  - Cap and collar (upper and lower limits)
+  - Fixed price
+- **Commissioning Period vs Commercial Operations Period**: Different prices may apply
+- **Indexation**: Longer terms need price indexation provisions (e.g., CPI)
+- **Negative Pricing**: Consider mechanism for managing negative wholesale price risk
+- **Mathematical Notation**: Payment calculations often expressed as formulas - verify clarity
 
-### EMBEDDED BENEFITS & RENEWABLE ENERGY BENEFITS
-- **Embedded Benefits**: Avoided costs associated with transmission system use - sharing provisions required
-- **Renewable Energy Benefits** to be maximized and shared:
-  - Renewables Obligation Certificates (ROCs) - unless project has CFD
-  - Renewable Energy Guarantees of Origin (REGOs)
-- **Accreditation**: Generator typically required to obtain and maintain accreditation
-- **Brexit Impact**: REGOs affected by UK leaving EU
+### EMBEDDED BENEFITS (UK-Specific)
+**CRITICAL: Under ongoing Ofgem review - many benefits have been phased out or reduced**
 
-### BALANCING & ANCILLARY SERVICES
-- For larger plants, PPA may provide for:
-  - Participation in balancing mechanism
-  - Contracting with National Grid for ancillary/balancing services
-- **Income/Cost Sharing**: Parties may agree to share income or costs from balancing mechanism and ancillary services
-- **Plant Degradation**: May include limitations on nominations and impact on plant degradation from such activities
+- **Definition**: Net advantage from Facility being connected to Distribution System
+- **Types of Embedded Benefits**:
+  - Distribution Loss Benefit (LLF > 1)
+  - RCRC Benefit (may be too low to include)
+  - Transmission Loss Benefit (small amount remains)
+  - Triad Avoidance Benefit (now Embedded Export Tariff - triads no longer used for residual charges)
+  - GDUoS Charges (can be positive or negative)
+- **BSUoS Benefit**: REMOVED - no longer available since April 2021
+- **Sharing Percentages**: Negotiated between parties in Schedule
+- **Administration Charges**: Supplier may charge for being meter registrant
 
-### METERING & SETTLEMENT
-- **Meter Location**: At boundary of plant and either transmission system or distribution network
-- **Registration Options**:
-  - CVA process: Meter registered to generator, MVRN transfers electricity to offtaker's energy account
-  - SVA process: For embedded generators, meter can be registered to offtaker directly, giving access to embedded benefits
-- **Invoicing**: Monthly or daily invoices/statements, may allow payment netting
+### RENEWABLE ENERGY BENEFITS
+- **REGOs (Renewable Energy Guarantees of Origin)**:
+  - Used as evidence of renewable source
+  - Supports fuel mix disclosure obligation or green tariffs
+  - Independent market value now recorded on commercial indices
+  - Brexit impact: Continue to be issued in GB but affected by UK leaving EU
+- **ROCs (Renewables Obligation Certificates)**:
+  - Closed to new accreditations but continues until 2037
+  - Move to fixed price ROC from 2027 - parties need to consider payment flow implications
+  - Buy-Out Fund, Late Payment Fund, Mutualisation Fund sharing arrangements
+- **Accreditation**: Failure to use reasonable endeavours to obtain accreditation by COD = Event of Default
+- **New Benefits**: Include provisions capturing future schemes arising from Change in Law
 
-### CREDIT SUPPORT REQUIREMENTS
-- **Generator Requirements**: Offtaker requires credit support covering payment obligations including termination payments
-- **Offtaker Requirements**: Some credit support may be required to cover generator's LD exposure or termination payment
-- **Bankability**: Critical for project financing
+### ANCILLARY SERVICES & BALANCING MECHANISM
+- **Ancillary Services include**:
+  - Constraint on exports agreed with DNO or System Operator
+  - Generation interruption to manage negative price exposure
+  - Services under Ancillary Service Agreement
+  - Participation in Balancing Mechanism
+- **NESO Transition**: From 1 October 2024, system operator is National Energy System Operator (formerly NGESO)
+- **Benefit Sharing**: Parties may agree to share income/costs from ancillary services and balancing
 
-### REMEDIES FOR FAILURE
-- **Failure to Deliver**: Liquidated damages, payment reductions, ultimately termination (subject to FM relief)
-- **Cure Periods**: Parties usually have periods to remedy breaches
-- **Termination Payments**: May be payable on termination
+### CREDIT SUPPORT
+- **Types**:
+  - Parent Company Guarantee (PCG) - often used where guarantor has investment grade rating
+  - Bank Guarantee or Letter of Credit - required if credit rating falls below investment grade
+- **Rating Triggers**: If rating falls below investment grade, beneficiary wants bank guarantee/LC
+- **Replacement**: Provision required for replacement before expiry of bank guarantees/LCs
+- **Direct Agreement**: Lender may require direct agreement with right to step in or prevent termination
+
+### IMBALANCE COSTS
+- **Definition**: Costs under BSC where contracted volumes don't match metered volumes
+- **Risk Allocation**: Typically Supplier bears imbalance costs (especially for intermittent generation)
+- **Exception**: Generator may be liable for imbalance costs caused by its breach (e.g., failure to notify, inadequate forecasting)
+- **Calculation**: If Generator is responsible, specify calculation methodology and limitations
 
 ### FORCE MAJEURE
-**Generator FM Claims** (events beyond control preventing generation in accordance with nominations):
-- Electricity transmission constraints
-- Fuel supply disruption
-- Industrial action
-- Terrorist threat
-- Cyber-attack
-- Offtaker may also seek FM relief where unable to take delivery
-
-**FM Extensions Impact on COD**: CRITICAL - assess whether FM extends Target COD, Longstop Date, and LD accrual
-
-### LIMITATIONS OF LIABILITY
-- Generator will limit liability for:
-  - Failure to deliver in accordance with nominations
-  - Failure to commission by agreed date
-- **Standard Provisions**:
-  - Liquidated damages with cap
-  - Termination right for prolonged breach
-  - Possible termination payment
+- **Definition**: Events outside reasonable control affecting ability to perform, which could not have been prevented by Reasonable and Prudent Operator
+- **Examples**: Transmission constraints, fuel supply disruption, industrial action, terrorist threat, cyber-attack
+- **Notification**: Affected party must notify as soon as reasonably practicable
+- **Mitigation**: Must use reasonable endeavours to minimise effects
+- **CRITICAL**: FM does NOT extend Conditions Precedent Long-Stop Date or Commercial Operations Long-Stop Date
+- **Termination**: Unaffected party may terminate after continuous FM period (typically 6-18 months)
+- **Reduced Capacity**: If FM reduces capacity below threshold %, may trigger termination right
 
 ### CHANGE IN LAW
-- Usually widely-drafted to include:
-  - Changes to industry documents
-  - Power market changes impacting PPA economics
-- **Mechanisms**: Renegotiation of price/terms with expert determination or dispute resolution fallback
-- **Purpose**: Prevents frustration in event of significant change that would render performance unworkable
+- **Broad Definition includes**:
+  - New laws coming into effect
+  - Modification, repeal or replacement of existing laws
+  - Change in interpretation by Competent Authority
+  - Changes to licence conditions (Electricity Act 1989)
+  - Amendment or removal of Industry Documents
+- **Exclusions typically**:
+  - General tax changes (income tax, corporation tax, PAYE)
+  - Sanctions for breach by a party
+- **Interaction with Interpretation Clauses**: Parties may "freeze" legislative matrix at signing and deal with changes under Change in Law clause
+- **Industry Documents**: BSC, Grid Code, Distribution Code, CUSC - changes may constitute Change in Law
 
 ### EVENTS OF DEFAULT & TERMINATION
-- **Cure Periods**: Before termination can occur
-- **Liquidated Damages**: May be payable for some breaches
-- **Material Adverse Change**: Generator may terminate for MAC impacting offtaker creditworthiness
-- **Insolvency Triggers**: Subject to Corporate Insolvency and Governance Act 2020 restrictions (certain insolvency events cannot trigger termination for qualifying contracts)
-- **Termination Payment**: May be payable
+- **Common Triggers**:
+  - Failure to perform material obligation (with cure period)
+  - Failure to pay amounts exceeding Payment Default Amount (with cure period)
+  - Change of Control without consent
+  - Insolvency events
+- **Cure Periods**: Typically [X] Business Days to remedy after notice
+- **Payment Default Amount**: Threshold specified in Schedule before triggering default
+- **Change of Control**: Consider requiring prior notification (but parties often resist this)
+- **Corporate Insolvency and Governance Act 2020**: May prevent some insolvency triggers from being used
 
-### PPA STRUCTURE TYPES & KEY DIFFERENCES
-- **Physical PPA**: Actual power delivery, grid connection, physical offtake
-- **Virtual PPA (VPPA/CFD)**: CFD/settlement mechanics, virtual delivery, REGOs as primary deliverable
-- **Sleeved PPA**: Utility intermediary, sleeving fees, additional counterparty complexity
-- **Private Wire PPA**: Direct connection, on-site delivery, behind-the-meter considerations
+### CAPACITY REDUCTION SCENARIOS
+- **FM causing reduced capacity**: If Minimum Capacity met but not Contracted Capacity due to FM:
+  - Capacity installed becomes new Contracted Capacity
+  - Generator must use all reasonable endeavours to install remaining capacity
+- **Non-FM reduced capacity**: May constitute breach of reasonable endeavours obligation - requires renegotiation or termination
+
+### DISPUTE RESOLUTION
+- **Expert Determination**: Common for technical and calculation disputes
+- **Escalation**: Usually negotiation → Expert → Arbitration/Court
+- **Expert vs Arbitration**: Expert determination is faster and cheaper for defined issues
+
+### REGULATORY EVOLUTION (Monitor for Changes)
+- **Energy Act 2023**: Facilitates changes to trading mechanisms and ISOP/NESO establishment
+- **REMA (Review of Electricity Market Arrangements)**: May result in 15-minute settlement periods
+- **DUoS Significant Code Review**: Changes expected from 2025 onwards
+- **Embedded Benefits Reviews**: Continuing trend to phase out or reduce embedded benefits
+- **EU-UK Electricity Agreement**: Development will have implications for regulatory framework
 
 ### MARKET NORMS (UK/EU CONTEXT)
 - Term: 10-20 years (median ~15 years for utility-scale)
@@ -116,7 +176,16 @@ A Power Purchase Agreement (PPA) is a long-term contract (typically 15-20 years)
 - Delay LDs: Typically capped at 15-25% of contract value
 - Payment Terms: Monthly invoicing, 30 days payment, 2-4% late interest
 - FM Extension Cap: 12-24 months before termination right
-- Change in Law: Typically triggers negotiation with arbitration fallback
+- Change in Law: Typically triggers negotiation with arbitration/expert fallback
+- Best/Reasonable/All Reasonable Endeavours: Different standards - "best" is highest
+
+### DRAFTING BEST PRACTICES
+- **Definitions**: Great care needed - construction of key parts depends on them
+- **Industry Document Terms**: Ensure PPA terms are consistent with BSC, CUSC, etc.
+- **Mathematical Notation**: Use formulas to avoid uncertainty in calculations
+- **Schedules**: Expressly state that schedules form part of the agreement
+- **Headings**: Include provision that headings don't affect interpretation
+- **Legislation References**: Decide whether to "freeze" legislative references or incorporate amendments
 `;
 
 const corsHeaders = {

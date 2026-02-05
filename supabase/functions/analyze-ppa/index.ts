@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// Version marker for deploy verification - v2.1.0 - improved JSON parsing
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// Version: v1.1.0 - Force redeploy
+// Version: v1.2.0 - Switched to stable AI model (gemini-2.5-flash)
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
@@ -107,13 +107,15 @@ IMPORTANT:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Analyze this PPA document excerpt and detect the metadata:\n\n${sampleText}` },
         ],
       }),
     });
+    
+    console.log("AI gateway response status:", response.status);
 
     if (!response.ok) {
       if (response.status === 429) {

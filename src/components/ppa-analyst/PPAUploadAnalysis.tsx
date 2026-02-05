@@ -63,7 +63,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
   const { precedents, goldStandardPrecedents } = usePPAPrecedentBank();
    const { formatLearningsForPrompt, activeLearnings } = usePPALearnings();
   const { ppaPrecedentThreshold } = useUserSettings();
-  const [step, setStep] = useState<'upload' | 'configure' | 'analyzing' | 'results'>('upload');
+  const [step, setStep] = useState<'upload' | 'configure' | 'confirming' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<PPAAnalysisType>(preFill?.analysisType || 'ppa_vs_bible');
   const [perspective, setPerspective] = useState<PPAPerspective>(preFill?.perspective || 'buyer');
   const [ppaType, setPpaType] = useState<PPAStructureType>(preFill?.ppaType || 'vppa');
@@ -210,14 +210,41 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         const nameMatch = file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' ');
         setProjectName(nameMatch);
       }
-      // Auto-detect metadata from the document (only if not pre-filling from re-analysis)
-      if (!preFill) {
-        detectPPAMetadata(file);
-      }
+      // Don't auto-detect on upload - we'll do it when user clicks Start Analysis
     } else {
       setComparisonFile(file);
     }
-  }, [projectName, preFill, detectPPAMetadata]);
+  }, [projectName]);
+
+  // Handler for "Start Analysis" button - detects metadata first, then shows confirmation
+  const handleDetectAndConfirm = async () => {
+    if (!ppaFile) {
+      toast.error('Please upload a PPA document');
+      return;
+    }
+
+    if (!projectName.trim()) {
+      toast.error('Please enter a project name');
+      return;
+    }
+
+    // Move to confirming step
+    setStep('confirming');
+    setError(null);
+
+    // If we already have pre-filled data, skip detection
+    if (preFill) {
+      return;
+    }
+
+    // Auto-detect metadata from the document
+    await detectPPAMetadata(ppaFile);
+  };
+
+  // Handler for "Confirm & Start Full Analysis" button
+  const handleConfirmAndAnalyze = () => {
+    handleStartAnalysis();
+  };
 
   const handleStartAnalysis = async () => {
     if (!ppaFile) {
@@ -798,19 +825,169 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
               Party names help you search precedents by counterparty later
             </p>
 
-            {/* Start Analysis */}
+            {/* Start Analysis - triggers metadata detection first */}
             <Button 
-              onClick={handleStartAnalysis} 
+              onClick={handleDetectAndConfirm} 
               className="w-full gap-2"
-              disabled={!ppaFile || !projectName.trim() || createAnalysis.isPending}
+              disabled={!ppaFile || !projectName.trim() || isDetectingMetadata}
             >
-              {createAnalysis.isPending ? (
+              {isDetectingMetadata ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Scale className="h-4 w-4" />
               )}
-              Start Analysis
+              {isDetectingMetadata ? 'Detecting metadata...' : 'Start Analysis'}
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 3: Confirm Detected Metadata */}
+      {step === 'confirming' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5" />
+              Confirm Document Details
+            </CardTitle>
+            <CardDescription>
+              Review the auto-detected information and adjust if needed before starting analysis
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Loading state while detecting */}
+            {isDetectingMetadata && (
+              <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <div>
+                  <p className="font-medium">Scanning document...</p>
+                  <p className="text-sm text-muted-foreground">Detecting parties, structure type, and jurisdiction</p>
+                </div>
+              </div>
+            )}
+
+            {/* Detection notes */}
+            {detectionNotes && !isDetectingMetadata && (
+              <div className="flex items-start gap-2 p-3 bg-primary/10 text-primary rounded-lg">
+                <Brain className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Auto-detected from document</p>
+                  <p className="text-xs opacity-80">{detectionNotes}</p>
+                </div>
+              </div>
+            )}
+
+            {!isDetectingMetadata && (
+              <>
+                {/* PPA Structure Type */}
+                <div className="space-y-3">
+                  <Label>PPA Structure Type</Label>
+                  <RadioGroup 
+                    value={ppaType} 
+                    onValueChange={(v) => setPpaType(v as PPAStructureType)}
+                    className="grid grid-cols-2 gap-3"
+                  >
+                    <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value="vppa" id="confirm-vppa" />
+                      <label htmlFor="confirm-vppa" className="cursor-pointer text-sm">Virtual PPA</label>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value="physical" id="confirm-physical" />
+                      <label htmlFor="confirm-physical" className="cursor-pointer text-sm">Physical PPA</label>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value="sleeved" id="confirm-sleeved" />
+                      <label htmlFor="confirm-sleeved" className="cursor-pointer text-sm">Sleeved PPA</label>
+                    </div>
+                    <div className="flex items-center gap-2 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                      <RadioGroupItem value="private_wire" id="confirm-private_wire" />
+                      <label htmlFor="confirm-private_wire" className="cursor-pointer text-sm">Private Wire</label>
+                    </div>
+                  </RadioGroup>
+                </div>
+
+                {/* Jurisdiction */}
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-jurisdiction">Jurisdiction</Label>
+                  <Select value={jurisdiction} onValueChange={setJurisdiction}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select jurisdiction" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {EUROPEAN_JURISDICTIONS.map((j) => (
+                        <SelectItem key={j} value={j}>{j}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Counterparty Type */}
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-counterparty">Counterparty Type</Label>
+                  <Input
+                    id="confirm-counterparty"
+                    value={counterpartyType}
+                    onChange={(e) => setCounterpartyType(e.target.value)}
+                    placeholder="e.g., Utility, Corporate, Oil Major"
+                  />
+                </div>
+
+                {/* Party Names */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-buyer">Buyer / Offtaker</Label>
+                    <Input
+                      id="confirm-buyer"
+                      value={buyerName}
+                      onChange={(e) => setBuyerName(e.target.value)}
+                      placeholder="e.g., Statkraft, Shell"
+                    />
+                    {buyerNormalized && buyerNormalized !== buyerName && (
+                      <p className="text-xs text-muted-foreground">
+                        Will be grouped as: <span className="font-medium">{buyerNormalized}</span>
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirm-seller">Seller / Generator</Label>
+                    <Input
+                      id="confirm-seller"
+                      value={sellerName}
+                      onChange={(e) => setSellerName(e.target.value)}
+                      placeholder="e.g., Orsted, RWE"
+                    />
+                    {sellerNormalized && sellerNormalized !== sellerName && (
+                      <p className="text-xs text-muted-foreground">
+                        Will be grouped as: <span className="font-medium">{sellerNormalized}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setStep('configure')}
+                    className="flex-1"
+                  >
+                    Back
+                  </Button>
+                  <Button 
+                    onClick={handleConfirmAndAnalyze} 
+                    className="flex-1 gap-2"
+                    disabled={createAnalysis.isPending}
+                  >
+                    {createAnalysis.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Scale className="h-4 w-4" />
+                    )}
+                    Confirm & Analyze
+                  </Button>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

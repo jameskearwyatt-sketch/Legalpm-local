@@ -644,17 +644,25 @@ ${hasPrecedents && !hasMarketIntelligence ? `${hasGoldStandard ? '7' : '6'}. **M
  ## 🔍 DOCUMENT PARSING VERIFICATION (CRITICAL)
  Before concluding a provision is MISSING, you MUST triple-check:
  
- 1. **Heading exists but no content?** This is likely a PARSING ERROR, not a missing provision.
-    - If you see a section heading (e.g., "Change in Law", "Liability") but think there's no operative text, ASSUME there IS content that wasn't extracted properly.
-    - In such cases, state: "• Section heading identified but content may not have been fully extracted - recommend manual review of [Section X]"
-    - Confidence: "review_required"
-    - DO NOT flag as "NOT ADDRESSED" when the heading clearly exists
+  1. **Heading exists but no content?** This is almost certainly a PARSING ERROR - the content IS there.
+     - If you see a section heading (e.g., "Change in Law", "Liability") but think there's no operative text beneath it:
+       a) GO BACK and re-read the entire document section by section
+       b) Search for the clause number referenced in the heading
+       c) Look for the content in a different location (it may appear later or in a schedule)
+       d) Check if formatting issues caused text to appear as part of another section
+     - You MUST make a genuine second attempt to find and extract the content before concluding it's missing
+     - PPAs ALWAYS have operative provisions under their headings - if you can't find them, the problem is your parsing, not the document
+     - DO NOT just flag for manual review as a first resort - TRY HARDER to extract the actual content
  
  2. **Check related sections**: Provisions may be embedded in other clauses or schedules
  
  3. **Check definitions**: Key terms may be defined elsewhere affecting interpretation
  
- Only flag "NOT ADDRESSED" when there is genuinely NO mention of the concept anywhere in the document.
+  4. **ONLY as a last resort**: If after a thorough second pass you still cannot extract content from a section that clearly has a heading, then note:
+     "• [Category] provisions exist (Section X) but extraction was incomplete - key terms to look for: [list specific clause language that should appear]"
+     This tells the user exactly what to search for manually.
+  
+  Only flag "NOT ADDRESSED" when there is genuinely NO heading and NO mention of the concept anywhere in the document.
  
  ## ⚠️ TRUE MISSING PROVISIONS
  A provision is truly MISSING only when:

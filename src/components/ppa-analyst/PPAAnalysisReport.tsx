@@ -21,8 +21,10 @@ import {
   X,
   User,
   Building2,
+   Lightbulb,
 } from 'lucide-react';
 import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAExtractedPosition } from '@/lib/hooks/usePPAAnalyses';
+ import { PPATeachFeedbackDialog } from './PPATeachFeedbackDialog';
 import { getCategoryById, PPA_CATEGORY_GROUPS, PPA_ALL_CATEGORIES } from '@/lib/ppaCategories';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -115,6 +117,8 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
     marketPosition: new Set(),
     partyFavorability: new Set(),
   });
+   const [teachDialogPosition, setTeachDialogPosition] = useState<PPAExtractedPosition | null>(null);
+   const [positionUpdates, setPositionUpdates] = useState<Record<string, string>>({});
 
   const analysis = analyses.find(a => a.id === analysisId);
 
@@ -206,6 +210,10 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
 
   const activeFilterCount = filters.confidence.size + filters.marketPosition.size + filters.partyFavorability.size;
 
+   const handlePositionUpdated = (positionId: string, newSummary: string) => {
+     setPositionUpdates(prev => ({ ...prev, [positionId]: newSummary }));
+   };
+ 
   const handleToggleGroup = (group: string) => {
     setExpandedGroups(prev => {
       const next = new Set(prev);
@@ -570,7 +578,7 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                                     )}
                                   </div>
                                   <div className="text-sm text-foreground whitespace-pre-line">
-                                    {position.position_summary}
+                                     {positionUpdates[position.id] || position.position_summary}
                                   </div>
                                   {position.comparison_position && (
                                     <div className="text-xs text-muted-foreground italic border-l-2 border-primary/30 pl-2 mt-1">
@@ -592,10 +600,22 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                                 </div>
                               </div>
                               {stats.count > 0 && (
-                                <Badge variant="outline" className="text-xs">
-                                  {stats.count} in precedent bank
-                                </Badge>
+                                 <div className="flex flex-col items-end gap-2">
+                                   <Badge variant="outline" className="text-xs">
+                                     {stats.count} in precedent bank
+                                   </Badge>
+                                 </div>
                               )}
+                               {/* Teach AI Button */}
+                               <Button
+                                 variant="ghost"
+                                 size="sm"
+                                 className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
+                                 onClick={() => setTeachDialogPosition(position)}
+                                 title="Teach AI - Provide feedback on this analysis"
+                               >
+                                 <Lightbulb className="h-4 w-4" />
+                               </Button>
                             </div>
                           </div>
                         );
@@ -656,6 +676,22 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
           </div>
         </CardContent>
       </Card>
+       
+       {/* Teach AI Dialog */}
+       {teachDialogPosition && analysis && (
+         <PPATeachFeedbackDialog
+           open={!!teachDialogPosition}
+           onOpenChange={(open) => !open && setTeachDialogPosition(null)}
+           position={teachDialogPosition}
+           analysisId={analysisId}
+           projectName={analysis.project_name}
+           jurisdiction={analysis.jurisdiction}
+           ppaType={(analysis as any).ppa_type}
+           onPositionUpdated={(newSummary) => {
+             handlePositionUpdated(teachDialogPosition.id, newSummary);
+           }}
+         />
+       )}
     </div>
   );
 }

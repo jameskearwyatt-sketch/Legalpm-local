@@ -11,6 +11,7 @@ import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle, Settings2, B
  import { X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAAnalysisType, PPAPerspective, PPAStructureType, PPA_STRUCTURE_LABELS } from '@/lib/hooks/usePPAAnalyses';
+ import { usePPALearnings } from '@/lib/hooks/usePPALearnings';
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
 import { PPAAnalysisReport } from './PPAAnalysisReport';
 import { generateMarketIntelligence, formatIntelligenceForPrompt } from '@/lib/ppaPrecedentIntelligence';
@@ -60,6 +61,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
   const { createAnalysis } = usePPAAnalyses();
   const { createPositions } = usePPAPositions(null);
   const { precedents, goldStandardPrecedents } = usePPAPrecedentBank();
+   const { formatLearningsForPrompt, activeLearnings } = usePPALearnings();
   const { ppaPrecedentThreshold } = useUserSettings();
   const [step, setStep] = useState<'upload' | 'configure' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<PPAAnalysisType>(preFill?.analysisType || 'ppa_vs_bible');
@@ -219,6 +221,12 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
       console.log(`Passing ${relevantPrecedents.length} raw precedents + synthesized intelligence (threshold: ${ppaPrecedentThreshold})`);
       console.log(`Passing ${goldStandardForAnalysis.length} gold standard template positions`);
       
+       // Format user learnings for the AI
+       const userLearningsPrompt = formatLearningsForPrompt();
+       if (activeLearnings.length > 0) {
+         console.log(`Including ${activeLearnings.length} user learnings for AI guidance`);
+       }
+       
       setAnalysisStatus('Running AI analysis with market intelligence...');
       
       // Helper function to make the API call with retry
@@ -251,6 +259,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
                 goldStandardPrecedents: goldStandardForAnalysis,
                 marketIntelligence: intelligencePrompt,
                 intelligenceConfidence: marketIntelligence.intelligenceConfidence,
+                 userLearnings: userLearningsPrompt,
               }),
               signal: controller.signal,
             }

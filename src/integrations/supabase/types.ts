@@ -2023,6 +2023,72 @@ export type Database = {
           },
         ]
       }
+      ppa_ai_learnings: {
+        Row: {
+          category: string
+          corrected_position: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          jurisdiction: string | null
+          original_position: string
+          ppa_type: string | null
+          project_context: string | null
+          source_analysis_id: string | null
+          source_position_id: string | null
+          updated_at: string
+          user_feedback: string
+          user_id: string
+        }
+        Insert: {
+          category: string
+          corrected_position?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          jurisdiction?: string | null
+          original_position: string
+          ppa_type?: string | null
+          project_context?: string | null
+          source_analysis_id?: string | null
+          source_position_id?: string | null
+          updated_at?: string
+          user_feedback: string
+          user_id: string
+        }
+        Update: {
+          category?: string
+          corrected_position?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          jurisdiction?: string | null
+          original_position?: string
+          ppa_type?: string | null
+          project_context?: string | null
+          source_analysis_id?: string | null
+          source_position_id?: string | null
+          updated_at?: string
+          user_feedback?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ppa_ai_learnings_source_analysis_id_fkey"
+            columns: ["source_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "ppa_analyses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ppa_ai_learnings_source_position_id_fkey"
+            columns: ["source_position_id"]
+            isOneToOne: false
+            referencedRelation: "ppa_extracted_positions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ppa_analyses: {
         Row: {
           agreed_at: string | null

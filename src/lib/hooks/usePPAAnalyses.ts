@@ -43,6 +43,9 @@ export interface PPAAnalysis {
   // Party names for searching
   buyer_name: string | null;
   seller_name: string | null;
+  // Normalized names for intelligent grouping
+  buyer_normalized: string | null;
+  seller_normalized: string | null;
 }
 
 export type ChangeType = 'unchanged' | 'modified' | 'added' | 'removed';
@@ -88,6 +91,9 @@ export interface PPAPrecedent {
   // Party names for searching
   buyer_name: string | null;
   seller_name: string | null;
+  // Normalized names for intelligent grouping
+  buyer_normalized: string | null;
+  seller_normalized: string | null;
 }
 
 export function usePPAAnalyses() {

@@ -1,5 +1,123 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// Version marker for deploy verification - v2.1.0 - improved JSON parsing
+// Version marker for deploy verification - v2.2.0 - enhanced PPA knowledge base
+
+// === PPA FUNDAMENTALS KNOWLEDGE BASE ===
+// Embedded expert knowledge from Practical Law and industry best practices
+// This provides the AI with deep contextual understanding of PPA structures and market norms
+
+const PPA_KNOWLEDGE_BASE = `
+## 📚 PPA FUNDAMENTALS REFERENCE (Use this knowledge to enhance your analysis)
+
+### SCOPE & PURPOSE
+A Power Purchase Agreement (PPA) is a long-term contract (typically 15-20 years) to secure revenue for a generation project. The term usually starts from the commercial operations date (COD). The PPA may have a "drop dead" date beyond which it can be terminated for non-fulfilment of conditions precedent.
+
+### TERM & COMMISSIONING
+- **Typical Term**: 15-20 years depending on financing term and technology type
+- **Term Commencement**: Usually triggers from COD, not signing
+- **Commissioning**: Generator must commission the plant through testing to ensure it meets specified standards. The operational part of the PPA only commences once commissioning tests are passed.
+- **Nameplate Capacity**: PPA will describe plant's nameplate capacity and how deviations are treated.
+
+### NOMINATIONS, DELIVERY & AVAILABILITY
+- **Nominations/Scheduling/Dispatch**: Offtaker usually has the right to nominate quantity for each 30-minute settlement period, with adjustment rights within parameters based on plant characteristics and imbalance risk allocation.
+- **Delivery Mechanisms**:
+  - Physical delivery with Metered Volume Reallocation Notification (MVRN), or
+  - Notification to System Operator via Energy Contract Volume Notification (ECVN)
+- **Guaranteed Availability**: PPAs typically contain guaranteed availability levels. Failure to meet may result in:
+  - Payment reductions
+  - Liquidated damages
+  - Ultimately, termination right for offtaker
+- **Allowances**: Must allow for scheduled outages (routine maintenance), acceptable unscheduled outages, and force majeure.
+- **O&M Standard**: Generator typically agrees to operate and maintain to "reasonable and prudent operator" standard.
+
+### PAYMENT STRUCTURES
+- **Energy Payment**: £/MWh of electricity generated - should cover fuel costs and operational costs when generating
+- **Availability/Capacity Payment**: £/MW for plant being available to generate - covers fixed costs like debt service and rates
+- **Price Mechanisms**: 
+  - Fixed or variable by reference to market prices and indices (e.g., CPI)
+  - Longer terms need price indexation provisions
+- **Capacity Market Interaction**: If plant has capacity agreement, PPA must address CM risks/rewards (note: CM was suspended Nov 2018 - Oct 2019 following Tempus Energy state aid challenge)
+
+### EMBEDDED BENEFITS & RENEWABLE ENERGY BENEFITS
+- **Embedded Benefits**: Avoided costs associated with transmission system use - sharing provisions required
+- **Renewable Energy Benefits** to be maximized and shared:
+  - Renewables Obligation Certificates (ROCs) - unless project has CFD
+  - Renewable Energy Guarantees of Origin (REGOs)
+- **Accreditation**: Generator typically required to obtain and maintain accreditation
+- **Brexit Impact**: REGOs affected by UK leaving EU
+
+### BALANCING & ANCILLARY SERVICES
+- For larger plants, PPA may provide for:
+  - Participation in balancing mechanism
+  - Contracting with National Grid for ancillary/balancing services
+- **Income/Cost Sharing**: Parties may agree to share income or costs from balancing mechanism and ancillary services
+- **Plant Degradation**: May include limitations on nominations and impact on plant degradation from such activities
+
+### METERING & SETTLEMENT
+- **Meter Location**: At boundary of plant and either transmission system or distribution network
+- **Registration Options**:
+  - CVA process: Meter registered to generator, MVRN transfers electricity to offtaker's energy account
+  - SVA process: For embedded generators, meter can be registered to offtaker directly, giving access to embedded benefits
+- **Invoicing**: Monthly or daily invoices/statements, may allow payment netting
+
+### CREDIT SUPPORT REQUIREMENTS
+- **Generator Requirements**: Offtaker requires credit support covering payment obligations including termination payments
+- **Offtaker Requirements**: Some credit support may be required to cover generator's LD exposure or termination payment
+- **Bankability**: Critical for project financing
+
+### REMEDIES FOR FAILURE
+- **Failure to Deliver**: Liquidated damages, payment reductions, ultimately termination (subject to FM relief)
+- **Cure Periods**: Parties usually have periods to remedy breaches
+- **Termination Payments**: May be payable on termination
+
+### FORCE MAJEURE
+**Generator FM Claims** (events beyond control preventing generation in accordance with nominations):
+- Electricity transmission constraints
+- Fuel supply disruption
+- Industrial action
+- Terrorist threat
+- Cyber-attack
+- Offtaker may also seek FM relief where unable to take delivery
+
+**FM Extensions Impact on COD**: CRITICAL - assess whether FM extends Target COD, Longstop Date, and LD accrual
+
+### LIMITATIONS OF LIABILITY
+- Generator will limit liability for:
+  - Failure to deliver in accordance with nominations
+  - Failure to commission by agreed date
+- **Standard Provisions**:
+  - Liquidated damages with cap
+  - Termination right for prolonged breach
+  - Possible termination payment
+
+### CHANGE IN LAW
+- Usually widely-drafted to include:
+  - Changes to industry documents
+  - Power market changes impacting PPA economics
+- **Mechanisms**: Renegotiation of price/terms with expert determination or dispute resolution fallback
+- **Purpose**: Prevents frustration in event of significant change that would render performance unworkable
+
+### EVENTS OF DEFAULT & TERMINATION
+- **Cure Periods**: Before termination can occur
+- **Liquidated Damages**: May be payable for some breaches
+- **Material Adverse Change**: Generator may terminate for MAC impacting offtaker creditworthiness
+- **Insolvency Triggers**: Subject to Corporate Insolvency and Governance Act 2020 restrictions (certain insolvency events cannot trigger termination for qualifying contracts)
+- **Termination Payment**: May be payable
+
+### PPA STRUCTURE TYPES & KEY DIFFERENCES
+- **Physical PPA**: Actual power delivery, grid connection, physical offtake
+- **Virtual PPA (VPPA/CFD)**: CFD/settlement mechanics, virtual delivery, REGOs as primary deliverable
+- **Sleeved PPA**: Utility intermediary, sleeving fees, additional counterparty complexity
+- **Private Wire PPA**: Direct connection, on-site delivery, behind-the-meter considerations
+
+### MARKET NORMS (UK/EU CONTEXT)
+- Term: 10-20 years (median ~15 years for utility-scale)
+- Availability Guarantee: 95-99% (median ~97%)
+- Credit Support: Pre-COD LC of 10-15% contract value; Post-COD 6-12 months' invoice value
+- Delay LDs: Typically capped at 15-25% of contract value
+- Payment Terms: Monthly invoicing, 30 days payment, 2-4% late interest
+- FM Extension Cap: 12-24 months before termination right
+- Change in Law: Typically triggers negotiation with arbitration fallback
+`;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -573,6 +691,8 @@ ${precs.map(p => `- ${p.project_name}${p.jurisdiction ? ` (${p.jurisdiction})` :
     const systemPrompt = `You are an expert PPA (Power Purchase Agreement) analyst specializing in European renewable energy contracts.
 Your task is to extract ACTIONABLE, SPECIFIC positions from the provided PPA document.
 You have been equipped with MARKET INTELLIGENCE synthesized from our precedent bank - use it to provide precise market position assessments.
+
+${PPA_KNOWLEDGE_BASE}
 
 PERSPECTIVE: ${perspective === 'buyer' ? 'Buyer (Offtaker)' : 'Seller (Generator)'}
 ${jurisdiction ? `JURISDICTION: ${jurisdiction}` : ''}

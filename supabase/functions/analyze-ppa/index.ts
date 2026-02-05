@@ -619,12 +619,17 @@ ${hasPrecedents && !hasMarketIntelligence ? `${hasGoldStandard ? '7' : '6'}. **M
 
 ## CRITICAL INSTRUCTIONS
 
+- ⚠️ MISSING PROVISIONS: You MUST actively identify any categories where the PPA is SILENT or INCOMPLETE. If a material concept is missing entirely (e.g., no curtailment provisions, no change in law mechanism, no credit support), this is a MAJOR FLAG. For missing categories, still include them in the output with:
+  - position_summary: "• ⚠️ NOT ADDRESSED IN DOCUMENT - [explain what's typically expected and the risk of omission]"
+  - confidence: "review_required"
+  - A clear warning in flags about the gap and its commercial implications
 - DO NOT write narrative summaries like "The document outlines mechanisms for..."
 - DO write specific conclusions like "• Seller must provide £500k LC pre-COD; NO post-COD security required ⚠️"
 - If something is MISSING that would normally be expected, FLAG IT with ⚠️
 ${hasMarketIntelligence ? `- 📊 MARKET INTELLIGENCE: You have synthesized market data. Use the RANGES and MEDIANS to assess positions precisely. A position at the median is "on_market", near the edges is "off_market", beyond the range is "way_off_market".` : ''}
 ${hasGoldStandard ? `- ⭐ GOLD STANDARD CHECK: For EVERY category, compare against BM template. Deviation from our template is more important than market position!` : ''}
 - 🎯 MARKET BENCHMARK: For EVERY category, include the market_benchmark field showing the ideal/textbook position. This is mandatory.
+- 🚨 MISSING = MAJOR FLAG: If a category is not addressed AT ALL in the PPA, this is often more concerning than a bad position. Explicitly flag what's missing and explain the risk.
 - For Credit Support: ALWAYS distinguish pre-COD vs post-COD periods
 - For Curtailment: ALWAYS address involuntary curtailment compensation and REGO treatment
 - For Change in Law: ALWAYS explain the actual mechanism, not just that one exists

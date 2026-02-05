@@ -25,7 +25,8 @@
    projectName: string;
    jurisdiction: string | null;
    ppaType: string | null;
-   onPositionUpdated?: (newSummary: string) => void;
+  onPositionUpdated?: (newSummary: string, newVarianceNotes?: string) => void;
+  varianceNotes?: string | null;
  }
  
  export function PPATeachFeedbackDialog({
@@ -37,10 +38,12 @@
    jurisdiction,
    ppaType,
    onPositionUpdated,
+  varianceNotes,
  }: PPATeachFeedbackDialogProps) {
    const [feedback, setFeedback] = useState('');
    const [isProcessing, setIsProcessing] = useState(false);
    const [correctedPosition, setCorrectedPosition] = useState<string | null>(null);
+  const [correctedMarketPosition, setCorrectedMarketPosition] = useState<string | null>(null);
    const { createLearning } = usePPALearnings();
  
    const handleSubmitFeedback = async () => {
@@ -57,6 +60,7 @@
            positionId: position.id,
            category: position.category,
            originalPosition: position.position_summary,
+          originalVarianceNotes: varianceNotes || position.variance_notes,
            userFeedback: feedback,
            sourceText: position.source_text,
            projectName,
@@ -68,7 +72,9 @@
        if (error) throw error;
  
        const newPosition = data.corrected_position;
+      const newVarianceNotes = data.corrected_variance_notes;
        setCorrectedPosition(newPosition);
+      setCorrectedMarketPosition(data.market_position);
  
        // Save the learning to the database
        await createLearning.mutateAsync({
@@ -85,16 +91,19 @@
          is_active: true,
        });
  
-       // Update the position in the database
+      // Update the position in the database (including variance_notes for market position)
        const { error: updateError } = await supabase
          .from('ppa_extracted_positions')
-         .update({ position_summary: newPosition })
+        .update({ 
+          position_summary: newPosition,
+          variance_notes: newVarianceNotes,
+        })
          .eq('id', position.id);
  
        if (updateError) {
          console.error('Failed to update position:', updateError);
        } else if (onPositionUpdated) {
-         onPositionUpdated(newPosition);
+        onPositionUpdated(newPosition, newVarianceNotes);
        }
  
        toast.success('Position reanalyzed and learning saved!');
@@ -109,9 +118,34 @@
    const handleClose = () => {
      setFeedback('');
      setCorrectedPosition(null);
+    setCorrectedMarketPosition(null);
      onOpenChange(false);
    };
  
+  const getMarketPositionLabel = (mp: string | null) => {
+    switch (mp) {
+      case 'on_market': return 'On Market';
+      case 'off_market': return 'Off Market';
+      case 'way_off_market': return 'Way Off Market';
+      case 'not_applicable': return 'Not Applicable';
+      default: return mp;
+    }
+  };
+
+  const getMarketPositionStyle = (mp: string | null) => {
+    switch (mp) {
+      case 'on_market':
+      case 'not_applicable':
+        return 'bg-muted text-muted-foreground';
+      case 'off_market':
+        return 'bg-accent text-accent-foreground';
+      case 'way_off_market':
+        return 'bg-destructive/15 text-destructive';
+      default:
+        return 'bg-muted text-muted-foreground';
+    }
+  };
+
    return (
      <Dialog open={open} onOpenChange={handleClose}>
        <DialogContent className="max-w-2xl">
@@ -167,6 +201,14 @@
                <div className="p-3 bg-primary/10 border border-primary/30 rounded-lg text-sm whitespace-pre-line">
                  {correctedPosition}
                </div>
+              {correctedMarketPosition && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Market Position:</span>
+                  <Badge className={getMarketPositionStyle(correctedMarketPosition)}>
+                    {getMarketPositionLabel(correctedMarketPosition)}
+                  </Badge>
+                </div>
+              )}
                <Badge variant="secondary" className="text-xs">
                  ✓ Learning saved - AI will remember this for future analyses in "{position.category}"
                </Badge>

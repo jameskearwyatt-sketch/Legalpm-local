@@ -15,6 +15,7 @@
        positionId,
        category,
        originalPosition,
+      originalVarianceNotes,
        userFeedback,
        sourceText,
        projectName,
@@ -43,18 +44,35 @@
  1. Understand what was wrong with the original analysis
  2. Incorporate the user's correction
  3. Produce a corrected analysis that addresses the user's feedback
+4. Re-evaluate the market position based on the corrected understanding
  
  ## CRITICAL INSTRUCTIONS
  - Take the user's feedback seriously - they are domain experts
  - If they say something IS in the document, believe them and incorporate it
  - If they point out a misinterpretation, correct it
+- If they explain why something is APPROPRIATE for this context (e.g., a provision is correct for Private Wire), update your assessment accordingly
  - Maintain the same bullet-point format
  - Be specific and actionable
  - Include clause references if the user mentioned them
  
- ## OUTPUT FORMAT
- Return ONLY the corrected position summary in bullet-point format.
- Do NOT include any preamble or explanation - just the corrected analysis.`;
+## MARKET POSITION RE-EVALUATION
+Based on the user's feedback, you must also determine the correct market position label:
+- "on_market" - Position is standard/appropriate for this type of PPA and jurisdiction
+- "off_market" - Position deviates from typical market terms but is not severely unusual
+- "way_off_market" - Position is severely unusual or missing a critical protection
+- "not_applicable" - This provision/concept is not relevant for this PPA type (e.g., grid-related provisions for Private Wire PPAs)
+
+If the user explains that a provision is CORRECT or APPROPRIATE for the context, do NOT mark it as off-market or way off-market.
+
+## OUTPUT FORMAT
+Return a JSON object with exactly these fields:
+{
+  "corrected_position": "The corrected bullet-point analysis...",
+  "market_position": "on_market|off_market|way_off_market|not_applicable",
+  "market_position_reason": "Brief explanation of why this market position is appropriate"
+}
+
+Return ONLY the JSON object. No preamble or additional text.`;
  
      const userPrompt = `## CONTEXT
  Category: ${category}
@@ -63,14 +81,19 @@
  PPA Type: ${ppaType || 'Unknown'}
  ${sourceText ? `Source Clauses: ${sourceText}` : ''}
  
- ## ORIGINAL ANALYSIS (INCORRECT)
+## ORIGINAL ANALYSIS
  ${originalPosition}
  
+## ORIGINAL MARKET ASSESSMENT
+${originalVarianceNotes || 'No market position notes'}
+
  ## USER'S CORRECTION
  ${userFeedback}
  
  ## YOUR TASK
- Rewrite the analysis incorporating the user's correction. Output ONLY the corrected bullet-point analysis.`;
+Rewrite the analysis incorporating the user's correction and re-evaluate the market position.
+If the user is explaining that the current position is APPROPRIATE for this context, reflect that in both the analysis and the market_position field.
+Output ONLY the JSON object as specified.`;
  
      console.log('Calling AI gateway for feedback processing...');
  
@@ -110,17 +133,57 @@
      }
  
      const data = await response.json();
-     const correctedPosition = data.choices?.[0]?.message?.content?.trim() || '';
+    const rawContent = data.choices?.[0]?.message?.content?.trim() || '';
  
-     if (!correctedPosition) {
+    if (!rawContent) {
        throw new Error('AI did not return a corrected position');
      }
  
+    // Parse the JSON response
+    let parsedResponse;
+    try {
+      // Extract JSON from potential markdown code blocks
+      let jsonStr = rawContent;
+      const jsonMatch = rawContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[1];
+      }
+      parsedResponse = JSON.parse(jsonStr);
+    } catch (parseError) {
+      console.error('Failed to parse AI response as JSON:', rawContent);
+      // Fallback: treat the entire response as the corrected position
+      parsedResponse = {
+        corrected_position: rawContent,
+        market_position: 'on_market', // Default to on_market if user is correcting
+        market_position_reason: 'Updated based on user feedback',
+      };
+    }
+
+    const correctedPosition = parsedResponse.corrected_position || rawContent;
+    const marketPosition = parsedResponse.market_position || 'on_market';
+    const marketPositionReason = parsedResponse.market_position_reason || '';
+
+    // Convert market_position to the variance_notes format
+    const marketPositionLabels: Record<string, string> = {
+      'on_market': '[ON MARKET]',
+      'off_market': '[OFF MARKET]',
+      'way_off_market': '[WAY OFF MARKET]',
+      'not_applicable': '[ON MARKET]', // Treat not_applicable as on_market for display
+    };
+    const marketPositionLabel = marketPositionLabels[marketPosition] || '[ON MARKET]';
+
+    const correctedVarianceNotes = marketPositionReason 
+      ? `${marketPositionLabel} ${marketPositionReason}` 
+      : marketPositionLabel;
+
      console.log('Feedback processed successfully');
+    console.log(`Market position updated to: ${marketPosition}`);
  
      return new Response(
        JSON.stringify({ 
          corrected_position: correctedPosition,
+        corrected_variance_notes: correctedVarianceNotes,
+        market_position: marketPosition,
          original_position: originalPosition,
          category,
        }),

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle, Settings2, Brain } from 'lucide-react';
+ import { X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAAnalysisType, PPAPerspective, PPAStructureType, PPA_STRUCTURE_LABELS } from '@/lib/hooks/usePPAAnalyses';
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
@@ -28,6 +29,7 @@ interface PreFillData {
 interface PPAUploadAnalysisProps {
   onAnalysisComplete?: () => void;
   preFill?: PreFillData;
+   onClearPreFill?: () => void;
 }
 
 const EUROPEAN_JURISDICTIONS = [
@@ -54,7 +56,7 @@ const EUROPEAN_JURISDICTIONS = [
   'Other Non-EU',
 ];
 
-export function PPAUploadAnalysis({ onAnalysisComplete, preFill }: PPAUploadAnalysisProps) {
+export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill }: PPAUploadAnalysisProps) {
   const { createAnalysis } = usePPAAnalyses();
   const { createPositions } = usePPAPositions(null);
   const { precedents, goldStandardPrecedents } = usePPAPrecedentBank();
@@ -396,9 +398,17 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill }: PPAUploadAnal
           </CardTitle>
           <CardDescription>
             {preFill ? (
-              <span className="text-amber-600 dark:text-amber-400">
-                Re-analyzing with latest intelligence engine. Please upload: <strong>{preFill.originalFileName}</strong>
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-amber-600 dark:text-amber-400">
+                  Re-analyzing with latest intelligence engine. Please upload: <strong>{preFill.originalFileName}</strong>
+                </span>
+                {onClearPreFill && (
+                  <Button variant="ghost" size="sm" onClick={onClearPreFill} className="ml-2 h-6 px-2">
+                    <X className="h-3 w-3 mr-1" />
+                    Start Fresh
+                  </Button>
+                )}
+              </div>
             ) : (
               'Upload a Power Purchase Agreement (PDF or Word) for analysis'
             )}

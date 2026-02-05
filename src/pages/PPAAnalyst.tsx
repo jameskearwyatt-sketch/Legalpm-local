@@ -65,6 +65,10 @@ export default function PPAAnalyst() {
     setReanalyzePreFill(null);
     setActiveTab('history');
   }, []);
+ 
+   const handleClearPreFill = useCallback(() => {
+     setReanalyzePreFill(null);
+   }, []);
 
   return (
     <AppLayout>
@@ -141,6 +145,7 @@ export default function PPAAnalyst() {
             <PPAUploadAnalysis 
               onAnalysisComplete={handleAnalysisComplete} 
               preFill={reanalyzePreFill || undefined}
+               onClearPreFill={reanalyzePreFill ? handleClearPreFill : undefined}
             />
           </TabsContent>
 

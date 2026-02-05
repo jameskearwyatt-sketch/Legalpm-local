@@ -219,44 +219,67 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill }: PPAUploadAnal
       
       setAnalysisStatus('Running AI analysis with market intelligence...');
       
-      // Use AbortController with extended timeout for complex AI analysis (5 minutes)
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
-      
-      const { data: sessionData2 } = await supabase.auth.getSession();
-      const authToken = sessionData2?.session?.access_token;
-      
-      const analyzeRes = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-ppa`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${authToken}`,
-          },
-          body: JSON.stringify({
-            ppaText,
-            comparisonText,
-            analysisType,
-            perspective,
-            jurisdiction,
-            projectName,
-            ppaType, // NEW: Pass PPA structure type for type-specific analysis
-            counterpartyType: counterpartyType || null, // NEW: Pass counterparty type
-            precedents: relevantPrecedents,
-            goldStandardPrecedents: goldStandardForAnalysis,
-            marketIntelligence: intelligencePrompt,
-            intelligenceConfidence: marketIntelligence.intelligenceConfidence,
-          }),
-          signal: controller.signal,
+      // Helper function to make the API call with retry
+      const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minute timeout per attempt
+        
+        const { data: sessionData2 } = await supabase.auth.getSession();
+        const authToken = sessionData2?.session?.access_token;
+        
+        try {
+          const res = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-ppa`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`,
+              },
+              body: JSON.stringify({
+                ppaText,
+                comparisonText,
+                analysisType,
+                perspective,
+                jurisdiction,
+                projectName,
+                ppaType,
+                counterpartyType: counterpartyType || null,
+                precedents: relevantPrecedents,
+                goldStandardPrecedents: goldStandardForAnalysis,
+                marketIntelligence: intelligencePrompt,
+                intelligenceConfidence: marketIntelligence.intelligenceConfidence,
+              }),
+              signal: controller.signal,
+            }
+          );
+          clearTimeout(timeoutId);
+          return res;
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          // Retry on network errors (connection closed, timeout, etc.) up to 2 times
+          if (retryCount < 2 && (fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('fetch')))) {
+            console.log(`Analysis attempt ${retryCount + 1} failed, retrying...`);
+            setAnalysisStatus(`Analysis taking longer than expected, retrying (attempt ${retryCount + 2}/3)...`);
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+            return callAnalyzeApi(retryCount + 1);
+          }
+          throw fetchError;
         }
-      );
+      };
       
-      clearTimeout(timeoutId);
+      const analyzeRes = await callAnalyzeApi();
       
       if (!analyzeRes.ok) {
-        const errorData = await analyzeRes.json();
-        throw new Error(errorData.error || 'Failed to analyze PPA');
+        let errorMessage = 'Failed to analyze PPA';
+        try {
+          const errorData = await analyzeRes.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          // If we can't parse the error JSON, use the status
+          errorMessage = `Analysis failed with status ${analyzeRes.status}`;
+        }
+        throw new Error(errorMessage);
       }
       
       const analyzeResponse = { data: await analyzeRes.json(), error: null };

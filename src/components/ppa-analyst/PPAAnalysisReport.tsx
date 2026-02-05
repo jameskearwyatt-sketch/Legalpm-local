@@ -119,17 +119,25 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
   });
    const [teachDialogPosition, setTeachDialogPosition] = useState<PPAExtractedPosition | null>(null);
    const [positionUpdates, setPositionUpdates] = useState<Record<string, string>>({});
+   const [varianceNotesUpdates, setVarianceNotesUpdates] = useState<Record<string, string>>({});
 
   const analysis = analyses.find(a => a.id === analysisId);
 
   // Compute positions with their derived attributes
   const positionsWithAttributes = useMemo(() => {
-    return positions.map(p => ({
-      ...p,
-      marketPosition: getMarketPositionFromNotes(p.variance_notes),
-      partyFavorability: getPartyFavorabilityFromNotes(p.variance_notes, p.position_summary),
-    }));
-  }, [positions]);
+    return positions.map(p => {
+      // Use updated variance notes if available, otherwise use the original
+      const effectiveVarianceNotes = varianceNotesUpdates[p.id] ?? p.variance_notes;
+      const effectiveSummary = positionUpdates[p.id] ?? p.position_summary;
+      return {
+        ...p,
+        position_summary: effectiveSummary,
+        variance_notes: effectiveVarianceNotes,
+        marketPosition: getMarketPositionFromNotes(effectiveVarianceNotes),
+        partyFavorability: getPartyFavorabilityFromNotes(effectiveVarianceNotes, effectiveSummary),
+      };
+    });
+  }, [positions, positionUpdates, varianceNotesUpdates]);
 
   // Filter positions
   const filteredPositions = useMemo(() => {
@@ -210,8 +218,11 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
 
   const activeFilterCount = filters.confidence.size + filters.marketPosition.size + filters.partyFavorability.size;
 
-   const handlePositionUpdated = (positionId: string, newSummary: string) => {
+   const handlePositionUpdated = (positionId: string, newSummary: string, newVarianceNotes?: string) => {
      setPositionUpdates(prev => ({ ...prev, [positionId]: newSummary }));
+     if (newVarianceNotes !== undefined) {
+       setVarianceNotesUpdates(prev => ({ ...prev, [positionId]: newVarianceNotes }));
+     }
    };
  
   const handleToggleGroup = (group: string) => {
@@ -578,7 +589,7 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                                     )}
                                   </div>
                                   <div className="text-sm text-foreground whitespace-pre-line">
-                                     {positionUpdates[position.id] || position.position_summary}
+                                     {position.position_summary}
                                   </div>
                                   {position.comparison_position && (
                                     <div className="text-xs text-muted-foreground italic border-l-2 border-primary/30 pl-2 mt-1">
@@ -687,8 +698,9 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
            projectName={analysis.project_name}
            jurisdiction={analysis.jurisdiction}
            ppaType={(analysis as any).ppa_type}
-           onPositionUpdated={(newSummary) => {
-             handlePositionUpdated(teachDialogPosition.id, newSummary);
+           varianceNotes={teachDialogPosition.variance_notes}
+           onPositionUpdated={(newSummary, newVarianceNotes) => {
+             handlePositionUpdated(teachDialogPosition.id, newSummary, newVarianceNotes);
            }}
          />
        )}

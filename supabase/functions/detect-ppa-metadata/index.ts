@@ -49,6 +49,16 @@ Based on the document text provided, identify:
    - Look for company names and identify their sector
    - Common types: "Utility", "Corporate", "Oil Major", "Tech Company", "Industrial", "Developer", "Financial Institution", "Aggregator", "Data Center"
 
+4. **Buyer Name**: The name of the purchasing party (offtaker/buyer). Look for:
+   - Party definitions at the start (e.g., "Buyer means...", "Offtaker means...")
+   - Signature blocks
+   - References to the corporate buyer/offtaker
+
+5. **Seller Name**: The name of the selling party (generator/seller). Look for:
+   - Party definitions at the start (e.g., "Seller means...", "Generator means...")
+   - Project company names
+   - References to the developer/generator
+
 Return your analysis as JSON with this exact structure:
 {
   "jurisdiction": "string or null if uncertain",
@@ -57,6 +67,10 @@ Return your analysis as JSON with this exact structure:
   "ppa_type_confidence": "high|medium|low", 
   "counterparty_type": "string or null if uncertain",
   "counterparty_type_confidence": "high|medium|low",
+  "buyer_name": "string or null if uncertain",
+  "buyer_name_confidence": "high|medium|low",
+  "seller_name": "string or null if uncertain",
+  "seller_name_confidence": "high|medium|low",
   "detection_notes": "Brief explanation of key indicators found"
 }
 
@@ -64,7 +78,9 @@ IMPORTANT:
 - Only return JSON, no other text
 - If you cannot determine something with reasonable confidence, return null for that field
 - Focus on explicit indicators in the text, not assumptions
-- For jurisdiction, return the COUNTRY name (e.g., "United Kingdom", "Germany", "Spain")`;
+- For jurisdiction, return the COUNTRY name (e.g., "United Kingdom", "Germany", "Spain")
+- For party names, extract the actual company/entity name, not generic terms like "Buyer" or "Seller"
+- Clean up party names (remove "Limited", "Ltd", "plc", "Inc" etc. for cleaner display)`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

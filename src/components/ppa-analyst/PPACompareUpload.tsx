@@ -127,6 +127,9 @@ export function PPACompareUpload({
         complexity_score: null,
         key_risk_areas: [],
         counterparty_type: parentAnalysis.counterparty_type || null,
+        // Inherit party names from parent
+        buyer_name: parentAnalysis.buyer_name || null,
+        seller_name: parentAnalysis.seller_name || null,
       });
 
       // Step 4: Save compared positions

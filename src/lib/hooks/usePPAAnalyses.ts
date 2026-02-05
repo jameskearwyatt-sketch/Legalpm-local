@@ -40,6 +40,9 @@ export interface PPAAnalysis {
   complexity_score: number | null;
   key_risk_areas: string[];
   counterparty_type: string | null;
+  // Party names for searching
+  buyer_name: string | null;
+  seller_name: string | null;
 }
 
 export type ChangeType = 'unchanged' | 'modified' | 'added' | 'removed';
@@ -82,6 +85,9 @@ export interface PPAPrecedent {
   confidence: PPAConfidenceLevel;
   market_position: string | null;
   party_favorability: string | null;
+  // Party names for searching
+  buyer_name: string | null;
+  seller_name: string | null;
 }
 
 export function usePPAAnalyses() {

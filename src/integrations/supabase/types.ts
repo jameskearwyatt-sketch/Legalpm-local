@@ -2093,6 +2093,7 @@ export type Database = {
         Row: {
           agreed_at: string | null
           analysis_type: Database["public"]["Enums"]["ppa_analysis_type"]
+          buyer_name: string | null
           comparison_file_name: string | null
           comparison_file_url: string | null
           complexity_score: number | null
@@ -2110,6 +2111,7 @@ export type Database = {
           perspective: Database["public"]["Enums"]["ppa_perspective"]
           ppa_type: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name: string
+          seller_name: string | null
           updated_at: string
           user_id: string
           version_number: number | null
@@ -2117,6 +2119,7 @@ export type Database = {
         Insert: {
           agreed_at?: string | null
           analysis_type: Database["public"]["Enums"]["ppa_analysis_type"]
+          buyer_name?: string | null
           comparison_file_name?: string | null
           comparison_file_url?: string | null
           complexity_score?: number | null
@@ -2134,6 +2137,7 @@ export type Database = {
           perspective: Database["public"]["Enums"]["ppa_perspective"]
           ppa_type?: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name: string
+          seller_name?: string | null
           updated_at?: string
           user_id: string
           version_number?: number | null
@@ -2141,6 +2145,7 @@ export type Database = {
         Update: {
           agreed_at?: string | null
           analysis_type?: Database["public"]["Enums"]["ppa_analysis_type"]
+          buyer_name?: string | null
           comparison_file_name?: string | null
           comparison_file_url?: string | null
           complexity_score?: number | null
@@ -2158,6 +2163,7 @@ export type Database = {
           perspective?: Database["public"]["Enums"]["ppa_perspective"]
           ppa_type?: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name?: string
+          seller_name?: string | null
           updated_at?: string
           user_id?: string
           version_number?: number | null
@@ -2237,6 +2243,7 @@ export type Database = {
       ppa_precedent_bank: {
         Row: {
           banked_at: string
+          buyer_name: string | null
           category: string
           confidence: Database["public"]["Enums"]["ppa_confidence_level"] | null
           id: string
@@ -2248,6 +2255,7 @@ export type Database = {
           position_summary: string
           ppa_type: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name: string
+          seller_name: string | null
           source_analysis_id: string | null
           source_text: string | null
           template_description: string | null
@@ -2256,6 +2264,7 @@ export type Database = {
         }
         Insert: {
           banked_at?: string
+          buyer_name?: string | null
           category: string
           confidence?:
             | Database["public"]["Enums"]["ppa_confidence_level"]
@@ -2269,6 +2278,7 @@ export type Database = {
           position_summary: string
           ppa_type?: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name: string
+          seller_name?: string | null
           source_analysis_id?: string | null
           source_text?: string | null
           template_description?: string | null
@@ -2277,6 +2287,7 @@ export type Database = {
         }
         Update: {
           banked_at?: string
+          buyer_name?: string | null
           category?: string
           confidence?:
             | Database["public"]["Enums"]["ppa_confidence_level"]
@@ -2290,6 +2301,7 @@ export type Database = {
           position_summary?: string
           ppa_type?: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name?: string
+          seller_name?: string | null
           source_analysis_id?: string | null
           source_text?: string | null
           template_description?: string | null

@@ -82,6 +82,8 @@ export function PPAPrecedentBank() {
   const [selectedJurisdictions, setSelectedJurisdictions] = useState<string[]>([]);
   const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [selectedBuyers, setSelectedBuyers] = useState<string[]>([]);
+  const [selectedSellers, setSelectedSellers] = useState<string[]>([]);
   
   // UI state
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
@@ -101,19 +103,29 @@ export function PPAPrecedentBank() {
     return [...new Set(precedents.map(p => p.category))].sort();
   }, [precedents]);
 
+  const uniqueBuyers = useMemo(() => {
+    return [...new Set(precedents.map(p => p.buyer_name).filter(Boolean) as string[])].sort();
+  }, [precedents]);
+
+  const uniqueSellers = useMemo(() => {
+    return [...new Set(precedents.map(p => p.seller_name).filter(Boolean) as string[])].sort();
+  }, [precedents]);
+
   // Filter precedents (exclude gold standard from regular list)
   const filteredPrecedents = useMemo(() => {
     return precedents.filter(p => {
       // Exclude gold standard from regular filtering
       if (p.is_gold_standard) return false;
       
-      // Text search
+      // Text search - also search buyer/seller names
       const searchLower = search.toLowerCase();
       const matchesSearch = !search || 
         p.position_summary.toLowerCase().includes(searchLower) ||
         p.project_name.toLowerCase().includes(searchLower) ||
         p.category.toLowerCase().includes(searchLower) ||
-        (p.jurisdiction?.toLowerCase().includes(searchLower));
+        (p.jurisdiction?.toLowerCase().includes(searchLower)) ||
+        (p.buyer_name?.toLowerCase().includes(searchLower)) ||
+        (p.seller_name?.toLowerCase().includes(searchLower));
       
       // Category filter (OR within)
       const matchesCategory = selectedCategories.length === 0 || 
@@ -131,9 +143,17 @@ export function PPAPrecedentBank() {
       const matchesProject = selectedProjects.length === 0 || 
         selectedProjects.includes(p.project_name);
       
-      return matchesSearch && matchesCategory && matchesJurisdiction && matchesPerspective && matchesProject;
+      // Buyer filter (OR within)
+      const matchesBuyer = selectedBuyers.length === 0 || 
+        (p.buyer_name && selectedBuyers.includes(p.buyer_name));
+      
+      // Seller filter (OR within)
+      const matchesSeller = selectedSellers.length === 0 || 
+        (p.seller_name && selectedSellers.includes(p.seller_name));
+      
+      return matchesSearch && matchesCategory && matchesJurisdiction && matchesPerspective && matchesProject && matchesBuyer && matchesSeller;
     });
-  }, [precedents, search, selectedCategories, selectedJurisdictions, selectedPerspectives, selectedProjects]);
+  }, [precedents, search, selectedCategories, selectedJurisdictions, selectedPerspectives, selectedProjects, selectedBuyers, selectedSellers]);
 
   // Group by category for grouped view
   const groupedPrecedents = useMemo(() => {
@@ -169,6 +189,8 @@ export function PPAPrecedentBank() {
     selectedJurisdictions.length > 0 || 
     selectedPerspectives.length > 0 || 
     selectedProjects.length > 0 ||
+    selectedBuyers.length > 0 ||
+    selectedSellers.length > 0 ||
     search.length > 0;
 
   const clearAllFilters = () => {
@@ -177,6 +199,8 @@ export function PPAPrecedentBank() {
     setSelectedJurisdictions([]);
     setSelectedPerspectives([]);
     setSelectedProjects([]);
+    setSelectedBuyers([]);
+    setSelectedSellers([]);
   };
 
   const toggleCategory = (category: string) => {
@@ -489,7 +513,7 @@ export function PPAPrecedentBank() {
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
-                placeholder="Search across all precedents... (e.g., 'availability 95%' or 'FM extension cap')"
+                placeholder="Search precedents... (e.g., 'Statkraft', 'curtailment', or 'Shell buyer')"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-12 h-12 text-base"
@@ -539,6 +563,27 @@ export function PPAPrecedentBank() {
                 label="Project"
                 icon={<FileText className="h-4 w-4" />}
               />
+
+              {/* Buyer/Seller filters - only show if there are party names */}
+              {uniqueBuyers.length > 0 && (
+                <MultiFilter
+                  options={uniqueBuyers}
+                  selected={selectedBuyers}
+                  onChange={setSelectedBuyers}
+                  label="Buyer"
+                  icon={<Building2 className="h-4 w-4" />}
+                />
+              )}
+              
+              {uniqueSellers.length > 0 && (
+                <MultiFilter
+                  options={uniqueSellers}
+                  selected={selectedSellers}
+                  onChange={setSelectedSellers}
+                  label="Seller"
+                  icon={<Building2 className="h-4 w-4" />}
+                />
+              )}
 
               {hasActiveFilters && (
                 <>
@@ -868,6 +913,22 @@ function PrecedentCard({
                   {format(new Date(precedent.banked_at), 'PP')}
                 </span>
               </div>
+
+              {/* Party names if available */}
+              {(precedent.buyer_name || precedent.seller_name) && (
+                <div className="flex items-center gap-3 ml-8 mb-2 text-xs">
+                  {precedent.buyer_name && (
+                    <span className="text-muted-foreground">
+                      <span className="font-medium text-foreground">Buyer:</span> {highlightText(precedent.buyer_name, search)}
+                    </span>
+                  )}
+                  {precedent.seller_name && (
+                    <span className="text-muted-foreground">
+                      <span className="font-medium text-foreground">Seller:</span> {highlightText(precedent.seller_name, search)}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* Full position content */}
               <div className="text-sm space-y-1 ml-8">

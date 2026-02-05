@@ -622,22 +622,64 @@ ${hasPrecedents && !hasMarketIntelligence ? `${hasGoldStandard ? '7' : '6'}. **M
 
 ## CRITICAL INSTRUCTIONS
 
-- ⚠️ MISSING PROVISIONS: You MUST actively identify any categories where the PPA is SILENT or INCOMPLETE. If a material concept is missing entirely (e.g., no curtailment provisions, no change in law mechanism, no credit support), this is a MAJOR FLAG. For missing categories, still include them in the output with:
-  - position_summary: "• ⚠️ NOT ADDRESSED IN DOCUMENT - [explain what's typically expected and the risk of omission]"
-  - confidence: "review_required"
-  - A clear warning in flags about the gap and its commercial implications
+ ## 📝 DRAFT DOCUMENT HANDLING (CRITICAL)
+ Many PPAs are DRAFTS with commercial figures not yet finalized. This is NORMAL.
+ 
+ **Square brackets and placeholders** (e.g., "[TBD]", "[$X]", "[●]", "[INSERT]") for commercial terms are EXPECTED in drafts:
+ - ✅ DO note that figures are "to be agreed" or "placeholder in draft"
+ - ✅ DO extract the structure and mechanism even if amounts are placeholders
+ - ❌ DO NOT treat placeholder amounts as "critical gaps" or "way off market"
+ - ❌ DO NOT flag missing commercial figures (LDs, credit amounts, prices) as major deficiencies
+ 
+ The PRIMARY PURPOSE is to identify **risk allocation issues** - who bears what risk, what mechanisms exist, what protections are in place. Commercial amounts being unfilled is NOT a risk allocation issue.
+ 
+ Example - CORRECT approach for Delay LDs with placeholders:
+ "• Delay LDs: [£X]/day (amount TBD) with [Y] day cap
+ • Mechanism: Day-for-day accrual from Target COD
+ • No grace period specified ⚠️ (risk allocation concern)"
+ 
+ Example - INCORRECT approach:
+ "• ⚠️ CRITICAL GAP: No delay LD amount specified" (WRONG - this is normal for drafts)
+ 
+ ## 🔍 DOCUMENT PARSING VERIFICATION (CRITICAL)
+ Before concluding a provision is MISSING, you MUST triple-check:
+ 
+ 1. **Heading exists but no content?** This is likely a PARSING ERROR, not a missing provision.
+    - If you see a section heading (e.g., "Change in Law", "Liability") but think there's no operative text, ASSUME there IS content that wasn't extracted properly.
+    - In such cases, state: "• Section heading identified but content may not have been fully extracted - recommend manual review of [Section X]"
+    - Confidence: "review_required"
+    - DO NOT flag as "NOT ADDRESSED" when the heading clearly exists
+ 
+ 2. **Check related sections**: Provisions may be embedded in other clauses or schedules
+ 
+ 3. **Check definitions**: Key terms may be defined elsewhere affecting interpretation
+ 
+ Only flag "NOT ADDRESSED" when there is genuinely NO mention of the concept anywhere in the document.
+ 
+ ## ⚠️ TRUE MISSING PROVISIONS
+ A provision is truly MISSING only when:
+ - No section heading exists for it
+ - No related language appears anywhere in the document
+ - The concept is not addressed in schedules, definitions, or ancillary clauses
+ 
+ For genuinely missing provisions, include them in the output with:
+   - position_summary: "• ⚠️ NOT ADDRESSED IN DOCUMENT - [explain what's typically expected and the risk of omission]"
+   - confidence: "review_required"
+   - A clear warning about the gap and its commercial implications
+ 
 - DO NOT write narrative summaries like "The document outlines mechanisms for..."
 - DO write specific conclusions like "• Seller must provide £500k LC pre-COD; NO post-COD security required ⚠️"
-- If something is MISSING that would normally be expected, FLAG IT with ⚠️
+ - If a mechanism or protection is MISSING (not just amounts), FLAG IT with ⚠️
 ${hasMarketIntelligence ? `- 📊 MARKET INTELLIGENCE: You have synthesized market data. Use the RANGES and MEDIANS to assess positions precisely. A position at the median is "on_market", near the edges is "off_market", beyond the range is "way_off_market".` : ''}
 ${hasGoldStandard ? `- ⭐ GOLD STANDARD CHECK: For EVERY category, compare against BM template. Deviation from our template is more important than market position!` : ''}
 - 🎯 MARKET BENCHMARK: For EVERY category, include the market_benchmark field showing the ideal/textbook position. This is mandatory.
-- 🚨 MISSING = MAJOR FLAG: If a category is not addressed AT ALL in the PPA, this is often more concerning than a bad position. Explicitly flag what's missing and explain the risk.
+ - 🚨 TRULY MISSING = FLAG: If a category has NO mention at all in the PPA (no heading, no language), flag the omission. But if a heading exists, assume parsing issues.
 - For Credit Support: ALWAYS distinguish pre-COD vs post-COD periods
 - For Curtailment: ALWAYS address involuntary curtailment compensation and REGO treatment
 - For Change in Law: ALWAYS explain the actual mechanism, not just that one exists
 - For Termination: List specific triggers and cure periods
 - Include actual numbers, dates, percentages - not just "as specified in Schedule X"
+ - If amounts are in square brackets/placeholders, note the structure exists but amounts are TBD
 
 ## PARTY FAVORABILITY GUIDANCE
 When assessing party_favorability, consider the perspective (${perspective === 'buyer' ? 'Buyer' : 'Seller'}):

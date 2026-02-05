@@ -129,8 +129,19 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
       // Use updated variance notes if available, otherwise use the original
       const effectiveVarianceNotes = varianceNotesUpdates[p.id] ?? p.variance_notes;
       const effectiveSummary = positionUpdates[p.id] ?? p.position_summary;
+      
+      // Normalize category name - match by id or label
+      const matchedCategory = PPA_ALL_CATEGORIES.find(c => 
+        c.id === p.category || 
+        c.label === p.category ||
+        c.id.toLowerCase() === p.category?.toLowerCase() ||
+        c.label.toLowerCase() === p.category?.toLowerCase()
+      );
+      const normalizedCategory = matchedCategory?.label || p.category;
+      
       return {
         ...p,
+        category: normalizedCategory,
         position_summary: effectiveSummary,
         variance_notes: effectiveVarianceNotes,
         marketPosition: getMarketPositionFromNotes(effectiveVarianceNotes),

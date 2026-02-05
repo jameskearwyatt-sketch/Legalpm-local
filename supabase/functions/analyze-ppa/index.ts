@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// Version marker for deploy verification - v2.4.0 - force redeploy
+// Version marker for deploy verification - v2.5.0 - improved category normalization
 
 // === PPA KNOWLEDGE BASE - STRUCTURED BY APPLICABILITY ===
 // Knowledge is split into UNIVERSAL (all PPAs) and JURISDICTION/TECHNOLOGY-SPECIFIC sections
@@ -1129,7 +1129,7 @@ Return a JSON object:
 {
   "positions": [
     {
-      "category": "Category Label",
+      "category": "EXACT Category Label from the list above (e.g., 'Availability Guarantee', 'Pricing Structure', etc.)",
       "clause_references": "Clause X.X, Schedule Y para Z",
       "position_summary": "• Bullet point 1\\n• Bullet point 2\\n• Bullet point 3",
       "confidence": "high|medium|review_required",
@@ -1143,6 +1143,8 @@ Return a JSON object:
     }
   ]
 }
+
+⚠️ CRITICAL - CATEGORY NAMING: You MUST use the EXACT category labels as listed above (e.g., "Target COD & Milestones", "Delay Liquidated Damages", "Pricing Structure", etc.). Do NOT use snake_case IDs like "pricing_structure" or lowercase names. Use Title Case labels EXACTLY as shown.
 
 IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONCLUSIVE. Extract the actual terms, not just that terms exist. ALWAYS include party_favorability assessment. ALWAYS include market_benchmark showing the ideal/textbook market position - this is mandatory for every category.${hasMarketIntelligence ? ' USE THE MARKET INTELLIGENCE DATA to provide PRECISE market_position ratings with specific citations.' : ''}${hasGoldStandard ? ' ALWAYS check against BM gold standard template.' : ''}${hasPrecedents && !hasMarketIntelligence ? ' Include market_position for all categories where precedents exist.' : ''}`;
 
@@ -1242,11 +1244,31 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
       if (parsed && parsed.positions) {
         positions = parsed.positions;
         
-        // Normalize category names to match our expected labels (case-insensitive matching)
+        // Normalize category names to match our expected labels
+        // Handle both label matches (case-insensitive) AND id matches (snake_case)
         positions = positions.map((p: any) => {
-          const matchedCat = PPA_CATEGORIES.find(c => 
-            c.label.toLowerCase() === (p.category || '').toLowerCase()
+          const categoryInput = (p.category || '').toLowerCase().trim();
+          
+          // Try to match by label (case-insensitive)
+          let matchedCat = PPA_CATEGORIES.find(c => 
+            c.label.toLowerCase() === categoryInput
           );
+          
+          // If no match, try to match by id (snake_case)
+          if (!matchedCat) {
+            matchedCat = PPA_CATEGORIES.find(c => 
+              c.id.toLowerCase() === categoryInput.replace(/\s+/g, '_')
+            );
+          }
+          
+          // If still no match, try partial matching
+          if (!matchedCat) {
+            matchedCat = PPA_CATEGORIES.find(c => 
+              c.label.toLowerCase().includes(categoryInput) ||
+              categoryInput.includes(c.label.toLowerCase()) ||
+              c.id.toLowerCase().includes(categoryInput.replace(/\s+/g, '_'))
+            );
+          }
           
           // Build variance_notes with market position tag if available
           let varianceNotes = p.flags || p.variance_notes || '';

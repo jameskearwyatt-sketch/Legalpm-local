@@ -297,11 +297,12 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill }: PPAUploadAnal
             user_id: analysisResult.user_id,
             category: pos.category,
             position_summary: pos.position_summary,
-            source_text: pos.source_text || null,
+            source_text: pos.clause_references || pos.source_text || null,
             confidence: pos.confidence || 'medium',
             bible_reference: pos.bible_reference || null,
             comparison_position: pos.market_comparison || pos.comparison_position || null,
             variance_notes: pos.market_position ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim() : (pos.variance_notes || null),
+            market_benchmark: pos.market_benchmark || null,
           }))
         );
       }

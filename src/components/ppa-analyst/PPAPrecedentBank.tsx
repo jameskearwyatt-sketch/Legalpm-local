@@ -42,11 +42,21 @@ import {
   Check,
   Crown,
   Star,
+  TrendingUp,
+  TrendingDown,
+  AlertTriangle,
 } from 'lucide-react';
 import { usePPAPrecedentBank, PPAPrecedent } from '@/lib/hooks/usePPAAnalyses';
 import { PPA_ALL_CATEGORIES, PPA_CATEGORY_GROUPS, PPACategoryGroup } from '@/lib/ppaCategories';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+
+// Market position config for display
+const marketPositionConfig: Record<string, { label: string; color: string; bg: string; icon: typeof TrendingUp }> = {
+  on_market: { label: 'On Market', color: 'text-green-700', bg: 'bg-green-100', icon: TrendingUp },
+  off_market: { label: 'Off Market', color: 'text-amber-700', bg: 'bg-amber-100', icon: TrendingDown },
+  way_off_market: { label: 'Way Off Market', color: 'text-red-700', bg: 'bg-red-100', icon: AlertTriangle },
+};
 
 // Helper to highlight search matches
 function highlightText(text: string, search: string) {
@@ -793,6 +803,18 @@ function PrecedentCard({
             {highlightText(previewText, search)}{hasMoreContent && '...'}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
+            {precedent.market_position && marketPositionConfig[precedent.market_position] && (
+              <Badge 
+                variant="outline" 
+                className={cn(
+                  "text-xs font-medium",
+                  marketPositionConfig[precedent.market_position].bg,
+                  marketPositionConfig[precedent.market_position].color
+                )}
+              >
+                {marketPositionConfig[precedent.market_position].label}
+              </Badge>
+            )}
             <Badge variant="outline" className="text-xs">
               {precedent.perspective === 'buyer' ? 'Buyer' : 'Seller'}
             </Badge>
@@ -828,6 +850,18 @@ function PrecedentCard({
                 {precedent.jurisdiction && (
                   <Badge variant="outline" className="text-xs border-primary/30 text-primary">
                     {precedent.jurisdiction}
+                  </Badge>
+                )}
+                {precedent.market_position && marketPositionConfig[precedent.market_position] && (
+                  <Badge 
+                    variant="outline" 
+                    className={cn(
+                      "text-xs font-medium",
+                      marketPositionConfig[precedent.market_position].bg,
+                      marketPositionConfig[precedent.market_position].color
+                    )}
+                  >
+                    {marketPositionConfig[precedent.market_position].label}
                   </Badge>
                 )}
                 <span className="text-xs text-muted-foreground">

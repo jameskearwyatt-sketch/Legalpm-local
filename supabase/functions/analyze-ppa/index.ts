@@ -1,192 +1,387 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// Version marker for deploy verification - v2.2.0 - enhanced PPA knowledge base
+// Version marker for deploy verification - v2.3.0 - jurisdiction-aware knowledge base
 
-// === PPA FUNDAMENTALS KNOWLEDGE BASE ===
-// Embedded expert knowledge from Practical Law and industry best practices
-// This provides the AI with deep contextual understanding of PPA structures and market norms
+// === PPA KNOWLEDGE BASE - STRUCTURED BY APPLICABILITY ===
+// Knowledge is split into UNIVERSAL (all PPAs) and JURISDICTION/TECHNOLOGY-SPECIFIC sections
+// The AI should apply universal knowledge always, and specific knowledge only when relevant
 
 const PPA_KNOWLEDGE_BASE = `
-## 📚 PPA FUNDAMENTALS REFERENCE (Use this knowledge to enhance your analysis)
+## 📚 PPA KNOWLEDGE BASE - STRUCTURED FOR INTELLIGENT APPLICATION
 
-### SCOPE & PURPOSE
-A Power Purchase Agreement (PPA) is a long-term contract (typically 15-20 years) to secure revenue for a generation project. The term usually starts from the commercial operations date (COD). The PPA may have a "drop dead" date beyond which it can be terminated for non-fulfilment of conditions precedent.
+=============================================================================
+SECTION A: UNIVERSAL COMMERCIAL PRINCIPLES (Apply to ALL PPAs globally)
+=============================================================================
 
-This PPA knowledge is based on UK onshore wind templates but applies broadly to European PPAs with jurisdiction-specific variations.
+### A1. FUNDAMENTAL PPA STRUCTURE
+A Power Purchase Agreement (PPA) is a long-term contract (typically 10-25 years) to secure revenue for a generation project. Core elements apply regardless of jurisdiction or technology:
 
-### THE PARTIES
-- **Generator**: Generates electricity by operating the facility and sells the electricity
-- **Supplier/Offtaker**: Secures income for electricity by supplying to customers or selling in wholesale market
-- Note: Unlike other commercial contracts, the "Supplier" is the BUYER of electricity for onwards sale
+**THE PARTIES (Universal Terminology)**
+- **Generator/Seller**: Generates electricity by operating the facility and sells the output
+- **Offtaker/Buyer/Supplier**: Purchases electricity for own use, resale, or wholesale market
+- ⚠️ TERMINOLOGY TRAP: In some jurisdictions, the "Supplier" is the BUYER (they supply onwards to customers)
 
-### TERM & COMMISSIONING
-- **Typical Term**: 15-20 years depending on financing term and technology type
-- **Term Commencement**: Usually triggers from COD, not signing - time between CP satisfaction and COD counts toward term
-- **Commissioning Process**:
-  - Generator must commission the plant through testing to ensure it meets specified standards
-  - Operational part only commences once commissioning tests are passed
-  - Generator provides Commissioning Plan [X] months before anticipated COD
-  - Minimum Capacity requirement must be met before Commercial Operations Requirements satisfied
-- **Nameplate Capacity**: PPA describes plant's nameplate capacity and how deviations are treated
-- **Pre-commissioning vs Commercial Operations Period**: Different payment rates may apply
+**TERM MECHANICS (Universal)**
+- Term usually starts from Commercial Operations Date (COD), NOT signing date
+- Pre-COD period (signing to COD) is often excluded from the term calculation
+- "Drop dead" / "Long-stop" dates: absolute backstop beyond which parties can terminate
 
-### CONDITIONS PRECEDENT & LONG-STOP DATES
-- **CP Long-Stop Date**: If Effective Date not achieved by this date, Supplier may terminate
-- **Commercial Operations Long-Stop Date**: If COD not achieved, Supplier may terminate
-- **Critical**: FM does NOT extend long-stop dates in standard drafting - Generator cannot use FM to extend
-- **Best/Reasonable Endeavours**: Check whether obligations are qualified and which standard applies
+### A2. CONDITIONS PRECEDENT & LONG-STOP DATES (Universal Principles)
+- **CP Long-Stop Date**: If conditions not satisfied by this date, parties may terminate
+- **Commercial Operations Long-Stop Date**: If COD not achieved, buyer may terminate
+- **Risk Allocation**: Key commercial issue - who bears risk of CP failure?
+- **Best/Reasonable/All Reasonable Endeavours**: Different legal standards across jurisdictions
+  - "Best endeavours" = highest standard (do everything reasonably possible)
+  - "Reasonable endeavours" = balance of interests (consider own commercial interests)
+  - "All reasonable endeavours" = somewhere between (try multiple approaches)
 
-### METER REGISTRATION (Critical for Embedded Generators)
-- **SVA Process**: Supplier becomes Registrant for Generator's meter - gives access to embedded benefits
-- **Registration Sequence**: 
-  1. Generator notifies Metering Point ready for energisation
-  2. Supplier becomes Registrant for Metering System
-  3. Supplier contracts with Data Collector and Data Aggregator
-- **Timing**: Cannot energise without meter registrant; synchronisation is last step
-- **This is only possible where Generator is exempt from generation licence or "exemptable"**
+### A3. PRICING & PAYMENT (Universal Structures)
+**Price Mechanisms (Apply Globally)**
+- **Fixed Price**: Agreed £/$/€ per MWh - provides revenue certainty
+- **Floating/Pass-through**: Market price reference - provides market exposure
+- **Cap and Collar**: Floor price + ceiling price - balanced risk sharing
+- **Discount to Reference**: e.g., Day-Ahead Price minus X% - common in corporate PPAs
+- **Hybrid/Shaped**: Different prices for different periods or volumes
 
-### NOMINATIONS, DELIVERY & AVAILABILITY
-- **Nominations/Scheduling/Dispatch**: Offtaker usually has the right to nominate quantity for each 30-minute settlement period (Settlement Period as defined in BSC)
-- **Delivery Mechanisms**:
-  - Physical delivery with Metered Volume Reallocation Notification (MVRN), or
-  - Notification to System Operator via Energy Contract Volume Notification (ECVN)
-- **Guaranteed Availability**: PPAs typically contain guaranteed availability levels. Failure to meet may result in:
-  - Payment reductions
-  - Liquidated damages
-  - Ultimately, termination right for offtaker
-- **Allowances**: Must allow for scheduled outages (planned maintenance), acceptable unscheduled outages, and force majeure
-- **O&M Standard**: Generator typically agrees to operate and maintain to "Reasonable and Prudent Operator" standard
-- **Intermittent Generation**: For wind, agreement does not commit Generator to deliver "firm" output - Supplier takes imbalance risk
+**Payment Fundamentals (Universal)**
+- Energy Payment: £/$/€ per MWh delivered
+- Capacity Payment: Fixed payment for availability (regardless of generation)
+- Indexation: Long-term contracts need price adjustment (CPI, RPI, or custom index)
+- Negative Pricing: CRITICAL for renewables - what happens when wholesale prices go negative?
+- Payment Terms: Invoicing frequency, payment terms (typically 30 days), late payment interest
 
-### PAYMENT STRUCTURES & PRICING
-- **Energy Payment**: £/MWh of electricity generated - should cover operational costs when generating
-- **Price Mechanisms**:
-  - Pass-through of market price (route to market, no fixed income)
-  - Cap and collar (upper and lower limits)
-  - Fixed price
-- **Commissioning Period vs Commercial Operations Period**: Different prices may apply
-- **Indexation**: Longer terms need price indexation provisions (e.g., CPI)
-- **Negative Pricing**: Consider mechanism for managing negative wholesale price risk
-- **Mathematical Notation**: Payment calculations often expressed as formulas - verify clarity
+### A4. DELIVERY & AVAILABILITY (Universal Concepts)
+**Volume Mechanics**
+- **Contracted Capacity**: Nameplate/installed capacity of the facility
+- **Contracted Volume**: Expected annual/monthly delivery (may differ from capacity)
+- **Minimum Delivery Obligations**: Guaranteed minimum volumes per period
+- **Maximum Delivery Rights**: Caps on what buyer must accept
+- **Excess Generation**: Treatment of volumes above contracted amounts
 
-### EMBEDDED BENEFITS (UK-Specific)
-**CRITICAL: Under ongoing Ofgem review - many benefits have been phased out or reduced**
+**Availability Guarantees (Universal)**
+- Typical range: 95-99% (median ~97% for established technologies)
+- Calculation methodology: Time-based vs Energy-based availability
+- Allowances: Scheduled outages, acceptable unscheduled outages, force majeure
+- Consequences: Payment reductions, liquidated damages, or termination rights
+- **O&M Standard**: "Reasonable and Prudent Operator" (RPO) standard is near-universal
 
-- **Definition**: Net advantage from Facility being connected to Distribution System
-- **Types of Embedded Benefits**:
-  - Distribution Loss Benefit (LLF > 1)
-  - RCRC Benefit (may be too low to include)
-  - Transmission Loss Benefit (small amount remains)
-  - Triad Avoidance Benefit (now Embedded Export Tariff - triads no longer used for residual charges)
-  - GDUoS Charges (can be positive or negative)
-- **BSUoS Benefit**: REMOVED - no longer available since April 2021
-- **Sharing Percentages**: Negotiated between parties in Schedule
-- **Administration Charges**: Supplier may charge for being meter registrant
+### A5. CREDIT SUPPORT (Universal Mechanisms)
+**Types of Credit Support**
+- **Parent Company Guarantee (PCG)**: Guarantee from creditworthy parent
+- **Bank Guarantee/Letter of Credit**: Bank-backed security
+- **Cash Collateral/Escrow**: Actual cash deposited as security
+- **Corporate Guarantee**: Guarantee from related entity
 
-### RENEWABLE ENERGY BENEFITS
-- **REGOs (Renewable Energy Guarantees of Origin)**:
-  - Used as evidence of renewable source
-  - Supports fuel mix disclosure obligation or green tariffs
-  - Independent market value now recorded on commercial indices
-  - Brexit impact: Continue to be issued in GB but affected by UK leaving EU
-- **ROCs (Renewables Obligation Certificates)**:
-  - Closed to new accreditations but continues until 2037
-  - Move to fixed price ROC from 2027 - parties need to consider payment flow implications
-  - Buy-Out Fund, Late Payment Fund, Mutualisation Fund sharing arrangements
-- **Accreditation**: Failure to use reasonable endeavours to obtain accreditation by COD = Event of Default
-- **New Benefits**: Include provisions capturing future schemes arising from Change in Law
+**Universal Credit Principles**
+- Pre-COD credit support typically higher (development risk)
+- Post-COD credit support can step down (operational asset)
+- Rating triggers: If credit rating falls, additional security required
+- Replacement provisions: Security must be replaced before expiry
 
-### ANCILLARY SERVICES & BALANCING MECHANISM
-- **Ancillary Services include**:
-  - Constraint on exports agreed with DNO or System Operator
-  - Generation interruption to manage negative price exposure
-  - Services under Ancillary Service Agreement
-  - Participation in Balancing Mechanism
-- **NESO Transition**: From 1 October 2024, system operator is National Energy System Operator (formerly NGESO)
-- **Benefit Sharing**: Parties may agree to share income/costs from ancillary services and balancing
+**Market Norms (Guideline)**
+- Pre-COD: LC of 10-15% of contract value
+- Post-COD: 6-12 months' forecast invoice value
+- Rating threshold: Investment grade (BBB-/Baa3 or above)
 
-### CREDIT SUPPORT
-- **Types**:
-  - Parent Company Guarantee (PCG) - often used where guarantor has investment grade rating
-  - Bank Guarantee or Letter of Credit - required if credit rating falls below investment grade
-- **Rating Triggers**: If rating falls below investment grade, beneficiary wants bank guarantee/LC
-- **Replacement**: Provision required for replacement before expiry of bank guarantees/LCs
-- **Direct Agreement**: Lender may require direct agreement with right to step in or prevent termination
+### A6. FORCE MAJEURE (Universal Principles)
+**Definition Elements (Apply Everywhere)**
+- Event beyond reasonable control of affected party
+- Could not reasonably have been anticipated or prevented
+- Prevents or delays performance of obligations
+- Affected party uses reasonable efforts to mitigate
 
-### IMBALANCE COSTS
-- **Definition**: Costs under BSC where contracted volumes don't match metered volumes
-- **Risk Allocation**: Typically Supplier bears imbalance costs (especially for intermittent generation)
-- **Exception**: Generator may be liable for imbalance costs caused by its breach (e.g., failure to notify, inadequate forecasting)
-- **Calculation**: If Generator is responsible, specify calculation methodology and limitations
+**Common FM Events (Universal)**
+- Natural disasters (earthquake, flood, hurricane)
+- War, civil unrest, terrorism
+- Government actions, expropriation
+- Pandemic/epidemic (now commonly included)
 
-### FORCE MAJEURE
-- **Definition**: Events outside reasonable control affecting ability to perform, which could not have been prevented by Reasonable and Prudent Operator
-- **Examples**: Transmission constraints, fuel supply disruption, industrial action, terrorist threat, cyber-attack
-- **Notification**: Affected party must notify as soon as reasonably practicable
-- **Mitigation**: Must use reasonable endeavours to minimise effects
-- **CRITICAL**: FM does NOT extend Conditions Precedent Long-Stop Date or Commercial Operations Long-Stop Date
-- **Termination**: Unaffected party may terminate after continuous FM period (typically 6-18 months)
-- **Reduced Capacity**: If FM reduces capacity below threshold %, may trigger termination right
+**FM Mechanics (Universal Principles)**
+- Notification: Must notify other party promptly (typically 24-72 hours)
+- Mitigation: Must use reasonable endeavours to minimise impact
+- Extension: FM typically extends performance deadlines
+- ⚠️ CRITICAL ISSUE: Does FM extend Long-Stop Dates? (Often NO in buyer-friendly drafts)
+- Termination: Prolonged FM (typically 6-24 months) may trigger termination right
 
-### CHANGE IN LAW
-- **Broad Definition includes**:
-  - New laws coming into effect
-  - Modification, repeal or replacement of existing laws
-  - Change in interpretation by Competent Authority
-  - Changes to licence conditions (Electricity Act 1989)
-  - Amendment or removal of Industry Documents
-- **Exclusions typically**:
-  - General tax changes (income tax, corporation tax, PAYE)
-  - Sanctions for breach by a party
-- **Interaction with Interpretation Clauses**: Parties may "freeze" legislative matrix at signing and deal with changes under Change in Law clause
-- **Industry Documents**: BSC, Grid Code, Distribution Code, CUSC - changes may constitute Change in Law
+### A7. CHANGE IN LAW (Universal Scope)
+**What Constitutes Change in Law (Broad Definition)**
+- New legislation coming into force
+- Modification, repeal or replacement of existing laws
+- Change in official interpretation by regulatory authority
+- Changes to grid codes or industry rules
 
-### EVENTS OF DEFAULT & TERMINATION
-- **Common Triggers**:
-  - Failure to perform material obligation (with cure period)
-  - Failure to pay amounts exceeding Payment Default Amount (with cure period)
-  - Change of Control without consent
-  - Insolvency events
-- **Cure Periods**: Typically [X] Business Days to remedy after notice
-- **Payment Default Amount**: Threshold specified in Schedule before triggering default
-- **Change of Control**: Consider requiring prior notification (but parties often resist this)
-- **Corporate Insolvency and Governance Act 2020**: May prevent some insolvency triggers from being used
+**Universal Exclusions**
+- General tax changes (income tax, corporation tax) - typically excluded
+- Known/foreseeable changes as of signing date
+- Sanctions for party's own breach
 
-### CAPACITY REDUCTION SCENARIOS
-- **FM causing reduced capacity**: If Minimum Capacity met but not Contracted Capacity due to FM:
-  - Capacity installed becomes new Contracted Capacity
-  - Generator must use all reasonable endeavours to install remaining capacity
-- **Non-FM reduced capacity**: May constitute breach of reasonable endeavours obligation - requires renegotiation or termination
+**Allocation Approaches**
+- Full pass-through to one party
+- Sharing mechanism (50/50 or other split)
+- Materiality threshold before trigger
+- Renegotiation obligation with termination backstop
 
-### DISPUTE RESOLUTION
-- **Expert Determination**: Common for technical and calculation disputes
-- **Escalation**: Usually negotiation → Expert → Arbitration/Court
-- **Expert vs Arbitration**: Expert determination is faster and cheaper for defined issues
+### A8. EVENTS OF DEFAULT & TERMINATION (Universal)
+**Common Default Triggers**
+- Failure to pay amounts exceeding threshold (with cure period)
+- Material breach of obligations (with cure period)
+- Insolvency events
+- Change of control without consent
+- Cross-default to other agreements
+- Misrepresentation
 
-### REGULATORY EVOLUTION (Monitor for Changes)
-- **Energy Act 2023**: Facilitates changes to trading mechanisms and ISOP/NESO establishment
-- **REMA (Review of Electricity Market Arrangements)**: May result in 15-minute settlement periods
-- **DUoS Significant Code Review**: Changes expected from 2025 onwards
-- **Embedded Benefits Reviews**: Continuing trend to phase out or reduce embedded benefits
-- **EU-UK Electricity Agreement**: Development will have implications for regulatory framework
+**Universal Termination Mechanics**
+- Cure periods: Typically 5-30 business days
+- Notice requirements: Written notice specifying default
+- Termination payments: May include break costs, loss calculations
+- Survival: Which provisions survive termination
 
-### MARKET NORMS (UK/EU CONTEXT)
-- Term: 10-20 years (median ~15 years for utility-scale)
-- Availability Guarantee: 95-99% (median ~97%)
-- Credit Support: Pre-COD LC of 10-15% contract value; Post-COD 6-12 months' invoice value
-- Delay LDs: Typically capped at 15-25% of contract value
-- Payment Terms: Monthly invoicing, 30 days payment, 2-4% late interest
-- FM Extension Cap: 12-24 months before termination right
-- Change in Law: Typically triggers negotiation with arbitration/expert fallback
-- Best/Reasonable/All Reasonable Endeavours: Different standards - "best" is highest
+### A9. DELAY LIQUIDATED DAMAGES (Universal Principles)
+**Purpose**: Compensate buyer for delay in achieving COD without proving actual loss
 
-### DRAFTING BEST PRACTICES
-- **Definitions**: Great care needed - construction of key parts depends on them
-- **Industry Document Terms**: Ensure PPA terms are consistent with BSC, CUSC, etc.
-- **Mathematical Notation**: Use formulas to avoid uncertainty in calculations
-- **Schedules**: Expressly state that schedules form part of the agreement
-- **Headings**: Include provision that headings don't affect interpretation
-- **Legislation References**: Decide whether to "freeze" legislative references or incorporate amendments
+**Universal Elements**
+- Daily/weekly LD rate (often calibrated to buyer's hedge costs or replacement power)
+- LD cap (typically 15-25% of contract value)
+- Grace period before LDs accrue
+- Longstop date: If exceeded, buyer can terminate (not just collect LDs)
+
+**Key Commercial Issues**
+- Do LDs accrue during FM periods? (Usually suspended)
+- Interaction with extension mechanisms
+- Whether LDs are sole remedy or cumulative with damages
+
+### A10. DISPUTE RESOLUTION (Universal Options)
+- **Expert Determination**: For technical/calculation disputes - faster and cheaper
+- **Mediation**: Non-binding facilitated negotiation
+- **Arbitration**: Private, binding - common for international PPAs
+- **Litigation**: Court proceedings - may be preferred for domestic contracts
+- **Escalation**: Usually negotiation → expert → arbitration/litigation
+
+### A11. INTERMITTENT GENERATION CONSIDERATIONS (Solar/Wind - Universal)
+**Unique Features of Intermittent PPAs**
+- Generator cannot guarantee "firm" output - depends on weather/resource
+- Volume risk allocation: Who bears shortfall risk?
+- Shape risk: Renewable generation profile vs consumption profile
+- Imbalance costs: Mismatch between contracted and actual delivery
+- Curtailment: Reduction in output due to grid constraints or negative pricing
+
+**Market Standard for Imbalance**
+- Typically buyer/offtaker bears imbalance risk for intermittent generation
+- Exception: Generator liable for imbalance caused by its breach (failure to notify, poor forecasting)
+
+=============================================================================
+SECTION B: UK-SPECIFIC KNOWLEDGE (Apply when jurisdiction = UK/GB)
+=============================================================================
+
+### B1. UK EMBEDDED BENEFITS (Only for UK Embedded Generation)
+**CRITICAL: Under ongoing Ofgem review - benefits being phased out or reduced**
+
+**What are Embedded Benefits?**
+- Advantages from being connected to Distribution System (not Transmission)
+- Only available to SVA (Supplier Volume Allocation) metered generators
+- Supplier must become Registrant for Generator's meter
+
+**Current Embedded Benefits (2024-2025)**
+- **Distribution Loss Factor (LLF)**: Adjustment >1 for embedded generation
+- **RCRC Benefit**: Residual Cashflow Reallocation - often too small to include
+- **Transmission Loss Benefit**: Small amount remains
+- **Embedded Export Tariff**: Replaced Triad Avoidance (triads no longer used)
+- **GDUoS Charges**: Generation Distribution Use of System - can be positive OR negative
+
+**⚠️ REMOVED BENEFITS - NO LONGER AVAILABLE**
+- **BSUoS Benefit**: Removed April 2021 - Generators now pay BSUoS like demand
+- **Traditional Triad Avoidance**: Replaced by Embedded Export Tariff
+
+### B2. UK METER REGISTRATION (SVA Process)
+**Required for Embedded Benefits**
+- Generator must be licence-exempt or "exemptable" under Electricity Act 1989
+- Supplier becomes Registrant for Generator's metering system
+- Supplier contracts with Data Collector and Data Aggregator
+- Cannot energise without meter registrant in place
+
+**Registration Sequence**
+1. Generator notifies Metering Point ready for energisation
+2. Supplier becomes Registrant for Metering System
+3. Supplier contracts with DC and DA
+4. Synchronisation is LAST step
+
+### B3. UK RENEWABLE CERTIFICATES
+**REGOs (Renewable Energy Guarantees of Origin)**
+- Evidence of renewable source for fuel mix disclosure
+- Now traded with independent market value
+- Brexit impact: Continue in GB but no longer EU-recognised
+
+**ROCs (Renewables Obligation Certificates)**
+- Closed to new accreditations but continues until 2037
+- ⚠️ FIXED PRICE ROC from 2027: Parties must consider payment flow implications
+- Buy-Out Fund, Late Payment Fund, Mutualisation Fund arrangements
+- Failure to obtain accreditation by COD = potential Event of Default
+
+### B4. UK INDUSTRY DOCUMENTS & CODES
+**Key Industry Documents**
+- **BSC (Balancing and Settlement Code)**: Settlement periods, imbalance
+- **Grid Code**: Technical requirements for connection
+- **Distribution Code**: Distribution network requirements
+- **CUSC (Connection and Use of System Code)**: Transmission access
+
+**Changes to Industry Documents can constitute Change in Law**
+
+### B5. UK REGULATORY EVOLUTION (Monitor These)
+- **NESO Transition**: From 1 October 2024, National Energy System Operator (formerly NGESO)
+- **REMA**: May result in 15-minute settlement periods (currently 30 minutes)
+- **DUoS Significant Code Review**: Changes from 2025 onwards
+- **Energy Act 2023**: Enables trading mechanism changes
+- **Corporate Insolvency and Governance Act 2020**: May affect insolvency triggers
+
+### B6. UK IMBALANCE (BSC Framework)
+- Imbalance = difference between contracted volumes and metered volumes
+- Costs/payments under BSC for imbalance
+- System Buy Price (SBP) / System Sell Price (SSP)
+- For intermittent generation: Supplier typically bears imbalance risk
+
+=============================================================================
+SECTION C: EUROPEAN (NON-UK) GUIDANCE (Apply when jurisdiction = EU/EEA)
+=============================================================================
+
+### C1. EU RENEWABLE CERTIFICATES
+- **Guarantees of Origin (GOs)**: EU-wide recognition for renewable source
+- **RED II / RED III**: Renewable Energy Directive requirements
+- **Additionality requirements**: Some offtakers require proof of "new" capacity
+
+### C2. EU MARKET DESIGN
+- Day-ahead and intraday markets
+- Balancing responsible party (BRP) arrangements
+- Cross-border trading and coupling
+
+### C3. COMMON EU JURISDICTIONAL VARIATIONS
+- **Spain**: Specific merchant PPA structures, PVPC reference
+- **Germany**: EEG framework, direct marketing
+- **Nordic**: NordPool, El-certificates
+- **France**: Complément de rémunération, OA mechanism
+- **Netherlands**: SDE++ subsidy interaction
+
+=============================================================================
+SECTION D: TECHNOLOGY-SPECIFIC KNOWLEDGE
+=============================================================================
+
+### D1. WIND (Onshore & Offshore)
+**Specific Considerations**
+- Highly intermittent - seasonal and daily patterns
+- Longer construction periods (especially offshore)
+- Wake effect considerations for multi-turbine sites
+- Turbine technology specifications and warranties
+- Decommissioning obligations
+
+### D2. SOLAR PV
+**Specific Considerations**
+- Predictable daily pattern but weather-dependent
+- Degradation factor (typically 0.5% per year)
+- Inverter replacement requirements
+- Seasonal variation (summer peak vs winter trough)
+
+### D3. BATTERY STORAGE
+**Specific Considerations**
+- Cycling limits and degradation
+- State of charge requirements
+- Revenue stacking (multiple services)
+- Response time specifications
+
+### D4. BIOMASS/BIOGAS
+**Specific Considerations**
+- Fuel supply arrangements
+- Fuel price indexation
+- Sustainability certification
+- Dispatchable vs baseload operation
+
+=============================================================================
+SECTION E: DRAFTING BEST PRACTICES (Universal)
+=============================================================================
+
+### E1. DEFINITIONS
+- Critical for contract interpretation - invest time in reviewing
+- Ensure consistency with referenced industry documents
+- Cross-check definitions against operative provisions
+
+### E2. SCHEDULES
+- Expressly state schedules form part of the agreement
+- Commercial terms typically in schedules (easier to negotiate)
+
+### E3. MATHEMATICAL NOTATION
+- Use formulas for payment calculations to avoid ambiguity
+- Define all variables
+- Include worked examples where complex
+
+### E4. INTERPRETATION PROVISIONS
+- Headings clause (headings don't affect interpretation)
+- Legislation references: "freeze" at signing or incorporate amendments?
+- Hierarchy of documents if inconsistency
+
+### E5. COMMON DRAFTING TRAPS ⚠️
+- Endeavours standards: Best vs Reasonable vs All Reasonable
+- Time calculations: Business days vs calendar days
+- Currency and conversion timing
+- Exclusive vs non-exclusive remedies
+- "May" vs "Shall" vs "Will"
 `;
+
+// Helper function to get jurisdiction-specific context
+function getJurisdictionContext(jurisdiction: string | null): string {
+  if (!jurisdiction) return "";
+  
+  const jur = jurisdiction.toLowerCase();
+  
+  if (jur.includes('uk') || jur.includes('gb') || jur.includes('england') || jur.includes('scotland') || jur.includes('wales') || jur.includes('britain')) {
+    return `
+⚠️ UK/GB JURISDICTION DETECTED - Apply Section B (UK-Specific Knowledge):
+- Check for Embedded Benefits provisions
+- Apply BSC/Settlement Period terminology
+- Consider NESO/Ofgem regulatory context
+- ROC/REGO certificate treatment
+- SVA meter registration requirements
+`;
+  }
+  
+  if (jur.includes('spain') || jur.includes('spanish') || jur.includes('españa')) {
+    return `
+⚠️ SPAIN JURISDICTION - Apply Section C with Spanish specifics:
+- PVPC reference pricing
+- OMIE market framework
+- Spanish regulatory requirements
+`;
+  }
+  
+  if (jur.includes('german') || jur.includes('germany') || jur.includes('deutschland')) {
+    return `
+⚠️ GERMANY JURISDICTION - Apply Section C with German specifics:
+- EEG framework context
+- Direct marketing requirements
+- German balancing group arrangements
+`;
+  }
+  
+  if (jur.includes('nordic') || jur.includes('sweden') || jur.includes('norway') || jur.includes('denmark') || jur.includes('finland')) {
+    return `
+⚠️ NORDIC JURISDICTION - Apply Section C with Nordic specifics:
+- NordPool market framework
+- El-certificate system
+- Nordic balancing arrangements
+`;
+  }
+  
+  // Generic EU
+  if (jur.includes('eu') || jur.includes('europe') || jur.includes('netherlands') || jur.includes('france') || jur.includes('italy') || jur.includes('poland') || jur.includes('portugal') || jur.includes('ireland')) {
+    return `
+⚠️ EU JURISDICTION - Apply Section C (European guidance):
+- Guarantees of Origin framework
+- RED II/III context
+- EU market design principles
+`;
+  }
+  
+  return `
+⚠️ NON-UK/EU JURISDICTION: Apply universal principles from Section A. 
+Specific local regulatory knowledge may be limited - flag any jurisdiction-specific provisions for manual review.
+`;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -757,14 +952,26 @@ ${precs.map(p => `- ${p.project_name}${p.jurisdiction ? ` (${p.jurisdiction})` :
       private_wire: 'Private Wire Physical PPA',
     };
 
+    // Get jurisdiction-specific context
+    const jurisdictionContext = getJurisdictionContext(jurisdiction);
+
     const systemPrompt = `You are an expert PPA (Power Purchase Agreement) analyst specializing in European renewable energy contracts.
 Your task is to extract ACTIONABLE, SPECIFIC positions from the provided PPA document.
 You have been equipped with MARKET INTELLIGENCE synthesized from our precedent bank - use it to provide precise market position assessments.
 
 ${PPA_KNOWLEDGE_BASE}
 
+## KNOWLEDGE APPLICATION RULES
+- SECTION A (Universal): Apply to ALL PPAs regardless of jurisdiction or technology
+- SECTION B (UK-Specific): Apply ONLY when jurisdiction is UK/GB
+- SECTION C (EU): Apply to EU jurisdictions with local variations
+- SECTION D (Technology): Apply based on generation technology type
+- SECTION E (Drafting): Apply universally as best practice guidance
+
+${jurisdictionContext}
+
 PERSPECTIVE: ${perspective === 'buyer' ? 'Buyer (Offtaker)' : 'Seller (Generator)'}
-${jurisdiction ? `JURISDICTION: ${jurisdiction}` : ''}
+${jurisdiction ? `JURISDICTION: ${jurisdiction}` : 'JURISDICTION: Not specified - apply universal principles only'}
 ${ppaType ? `PPA STRUCTURE TYPE: ${ppaTypeLabels[ppaType] || ppaType.toUpperCase()}
 
 ⚠️ STRUCTURE-SPECIFIC ANALYSIS: This is a ${ppaTypeLabels[ppaType] || ppaType.toUpperCase()}. Different PPA structures have DIFFERENT market norms:

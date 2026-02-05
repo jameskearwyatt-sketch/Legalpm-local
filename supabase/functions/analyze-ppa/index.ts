@@ -794,10 +794,56 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
     // Parse the JSON from the response
     let positions = [];
     try {
-      const jsonMatch = content.match(/\{[\s\S]*"positions"[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        positions = parsed.positions || [];
+      // First, try to find the JSON block - handle markdown code blocks
+      let jsonContent = content;
+      
+      // Remove markdown code blocks if present
+      const codeBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (codeBlockMatch) {
+        jsonContent = codeBlockMatch[1].trim();
+      }
+      
+      // Try multiple extraction strategies
+      let parsed = null;
+      
+      // Strategy 1: Direct parse (if response is clean JSON)
+      try {
+        parsed = JSON.parse(jsonContent);
+      } catch (e) {
+        // Strategy 2: Find JSON object with positions array
+        const jsonMatch = jsonContent.match(/\{[\s\S]*"positions"\s*:\s*\[[\s\S]*\][\s\S]*\}/);
+        if (jsonMatch) {
+          // Clean the JSON string - remove control characters and fix common issues
+          let cleanJson = jsonMatch[0]
+            .replace(/[\x00-\x1F\x7F]/g, ' ')  // Remove control characters
+            .replace(/,\s*}/g, '}')  // Remove trailing commas before }
+            .replace(/,\s*]/g, ']'); // Remove trailing commas before ]
+          
+          try {
+            parsed = JSON.parse(cleanJson);
+          } catch (e2) {
+            console.error('Failed to parse cleaned JSON:', e2);
+          }
+        }
+        
+        // Strategy 3: Extract positions array directly
+        if (!parsed) {
+          const positionsMatch = jsonContent.match(/"positions"\s*:\s*(\[[\s\S]*?\])/);
+          if (positionsMatch) {
+            let cleanArray = positionsMatch[1]
+              .replace(/[\x00-\x1F\x7F]/g, ' ')
+              .replace(/,\s*]/g, ']');
+            try {
+              parsed = { positions: JSON.parse(cleanArray) };
+            } catch (e3) {
+              console.error('Failed to parse positions array:', e3);
+            }
+          }
+        }
+      }
+      
+      if (parsed && parsed.positions) {
+        positions = parsed.positions;
         
         // Normalize category names to match our expected labels (case-insensitive matching)
         positions = positions.map((p: any) => {
@@ -832,9 +878,11 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
             party_favorability: p.party_favorability || 'neutral',
           };
         });
+        
+        console.log(`Successfully parsed ${positions.length} positions`);
       } else {
-        console.error('No JSON found in response:', content.substring(0, 500));
-        throw new Error('Could not parse AI response');
+        console.error('No valid positions found in response. Content preview:', content.substring(0, 1000));
+        throw new Error('Could not parse AI response - no positions array found');
       }
     } catch (parseError) {
       console.error('JSON parse error:', parseError);

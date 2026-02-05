@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// Version marker for deploy verification - v2.3.0 - jurisdiction-aware knowledge base
+// Version marker for deploy verification - v2.4.0 - force redeploy
 
 // === PPA KNOWLEDGE BASE - STRUCTURED BY APPLICABILITY ===
 // Knowledge is split into UNIVERSAL (all PPAs) and JURISDICTION/TECHNOLOGY-SPECIFIC sections

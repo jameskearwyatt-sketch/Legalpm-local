@@ -59,6 +59,22 @@ Based on the document text provided, identify:
    - Project company names
    - References to the developer/generator
 
+6. **Normalized Party Names**: For BOTH buyer and seller, also provide a NORMALIZED/CANONICAL company name that strips away:
+   - Specific entity suffixes (Ltd, Limited, GmbH, AS, plc, Inc, LLC, S.A., B.V., etc.)
+   - Country/regional qualifiers (UK, Markets, Europe, Deutschland, etc.)
+   - Project-specific SPV names
+   
+   The goal is to identify the PARENT COMPANY brand. Examples:
+   - "Statkraft Markets GmbH" → "Statkraft"
+   - "Statkraft UK Limited" → "Statkraft"  
+   - "Shell Energy Europe Limited" → "Shell"
+   - "Amazon EU S.à r.l." → "Amazon"
+   - "Microsoft Ireland Operations Limited" → "Microsoft"
+   - "Ørsted Wind Power A/S" → "Ørsted"
+   - "RWE Renewables UK Swindon Limited" → "RWE"
+   - "Greencoat Solar 1 Limited" → "Greencoat"
+   - "Project Sunrise SPV Ltd" → Keep the project name if no clear parent
+
 Return your analysis as JSON with this exact structure:
 {
   "jurisdiction": "string or null if uncertain",
@@ -67,9 +83,11 @@ Return your analysis as JSON with this exact structure:
   "ppa_type_confidence": "high|medium|low", 
   "counterparty_type": "string or null if uncertain",
   "counterparty_type_confidence": "high|medium|low",
-  "buyer_name": "string or null if uncertain",
+  "buyer_name": "Full legal entity name as stated in document",
+  "buyer_normalized": "Parent company/brand name for searching (e.g., 'Statkraft')",
   "buyer_name_confidence": "high|medium|low",
-  "seller_name": "string or null if uncertain",
+  "seller_name": "Full legal entity name as stated in document",
+  "seller_normalized": "Parent company/brand name for searching (e.g., 'Orsted')",
   "seller_name_confidence": "high|medium|low",
   "detection_notes": "Brief explanation of key indicators found"
 }
@@ -80,7 +98,7 @@ IMPORTANT:
 - Focus on explicit indicators in the text, not assumptions
 - For jurisdiction, return the COUNTRY name (e.g., "United Kingdom", "Germany", "Spain")
 - For party names, extract the actual company/entity name, not generic terms like "Buyer" or "Seller"
-- Clean up party names (remove "Limited", "Ltd", "plc", "Inc" etc. for cleaner display)`;
+- The normalized name should be the recognizable BRAND/PARENT, stripping legal entity suffixes and regional qualifiers`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

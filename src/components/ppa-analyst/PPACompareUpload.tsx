@@ -130,6 +130,9 @@ export function PPACompareUpload({
         // Inherit party names from parent
         buyer_name: parentAnalysis.buyer_name || null,
         seller_name: parentAnalysis.seller_name || null,
+        // Inherit normalized names from parent
+        buyer_normalized: parentAnalysis.buyer_normalized || null,
+        seller_normalized: parentAnalysis.seller_normalized || null,
       });
 
       // Step 4: Save compared positions

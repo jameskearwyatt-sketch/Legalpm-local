@@ -103,12 +103,15 @@ export function PPAPrecedentBank() {
     return [...new Set(precedents.map(p => p.category))].sort();
   }, [precedents]);
 
+  // Use normalized names for grouping, but fall back to raw names if not available
   const uniqueBuyers = useMemo(() => {
-    return [...new Set(precedents.map(p => p.buyer_name).filter(Boolean) as string[])].sort();
+    const buyers = precedents.map(p => p.buyer_normalized || p.buyer_name).filter(Boolean) as string[];
+    return [...new Set(buyers)].sort();
   }, [precedents]);
 
   const uniqueSellers = useMemo(() => {
-    return [...new Set(precedents.map(p => p.seller_name).filter(Boolean) as string[])].sort();
+    const sellers = precedents.map(p => p.seller_normalized || p.seller_name).filter(Boolean) as string[];
+    return [...new Set(sellers)].sort();
   }, [precedents]);
 
   // Filter precedents (exclude gold standard from regular list)
@@ -117,7 +120,7 @@ export function PPAPrecedentBank() {
       // Exclude gold standard from regular filtering
       if (p.is_gold_standard) return false;
       
-      // Text search - also search buyer/seller names
+      // Text search - also search buyer/seller names (both raw and normalized)
       const searchLower = search.toLowerCase();
       const matchesSearch = !search || 
         p.position_summary.toLowerCase().includes(searchLower) ||
@@ -125,7 +128,9 @@ export function PPAPrecedentBank() {
         p.category.toLowerCase().includes(searchLower) ||
         (p.jurisdiction?.toLowerCase().includes(searchLower)) ||
         (p.buyer_name?.toLowerCase().includes(searchLower)) ||
-        (p.seller_name?.toLowerCase().includes(searchLower));
+        (p.seller_name?.toLowerCase().includes(searchLower)) ||
+        (p.buyer_normalized?.toLowerCase().includes(searchLower)) ||
+        (p.seller_normalized?.toLowerCase().includes(searchLower));
       
       // Category filter (OR within)
       const matchesCategory = selectedCategories.length === 0 || 
@@ -143,13 +148,13 @@ export function PPAPrecedentBank() {
       const matchesProject = selectedProjects.length === 0 || 
         selectedProjects.includes(p.project_name);
       
-      // Buyer filter (OR within)
+      // Buyer filter - match on normalized name (or raw name as fallback)
       const matchesBuyer = selectedBuyers.length === 0 || 
-        (p.buyer_name && selectedBuyers.includes(p.buyer_name));
+        selectedBuyers.includes(p.buyer_normalized || p.buyer_name || '');
       
-      // Seller filter (OR within)
+      // Seller filter - match on normalized name (or raw name as fallback)
       const matchesSeller = selectedSellers.length === 0 || 
-        (p.seller_name && selectedSellers.includes(p.seller_name));
+        selectedSellers.includes(p.seller_normalized || p.seller_name || '');
       
       return matchesSearch && matchesCategory && matchesJurisdiction && matchesPerspective && matchesProject && matchesBuyer && matchesSeller;
     });

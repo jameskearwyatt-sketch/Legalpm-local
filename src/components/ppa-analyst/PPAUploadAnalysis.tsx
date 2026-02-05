@@ -72,6 +72,8 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
   const [counterpartyType, setCounterpartyType] = useState(preFill?.counterpartyType || '');
   const [buyerName, setBuyerName] = useState('');
   const [sellerName, setSellerName] = useState('');
+  const [buyerNormalized, setBuyerNormalized] = useState('');
+  const [sellerNormalized, setSellerNormalized] = useState('');
   const [ppaFile, setPpaFile] = useState<File | null>(null);
   const [comparisonFile, setComparisonFile] = useState<File | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -156,13 +158,19 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         setCounterpartyType(metadata.counterparty_type);
       }
 
-      // Auto-fill buyer and seller names
+      // Auto-fill buyer and seller names (both full and normalized)
       if (metadata.buyer_name && metadata.buyer_name_confidence !== 'low') {
         setBuyerName(metadata.buyer_name);
+        if (metadata.buyer_normalized) {
+          setBuyerNormalized(metadata.buyer_normalized);
+        }
       }
 
       if (metadata.seller_name && metadata.seller_name_confidence !== 'low') {
         setSellerName(metadata.seller_name);
+        if (metadata.seller_normalized) {
+          setSellerNormalized(metadata.seller_normalized);
+        }
       }
 
       if (metadata.detection_notes) {
@@ -432,6 +440,9 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         // Party names
         buyer_name: buyerName || null,
         seller_name: sellerName || null,
+        // Normalized names for intelligent search
+        buyer_normalized: buyerNormalized || null,
+        seller_normalized: sellerNormalized || null,
       });
 
       // Step 5: Save extracted positions

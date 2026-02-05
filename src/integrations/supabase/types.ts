@@ -2094,6 +2094,7 @@ export type Database = {
           agreed_at: string | null
           analysis_type: Database["public"]["Enums"]["ppa_analysis_type"]
           buyer_name: string | null
+          buyer_normalized: string | null
           comparison_file_name: string | null
           comparison_file_url: string | null
           complexity_score: number | null
@@ -2112,6 +2113,7 @@ export type Database = {
           ppa_type: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name: string
           seller_name: string | null
+          seller_normalized: string | null
           updated_at: string
           user_id: string
           version_number: number | null
@@ -2120,6 +2122,7 @@ export type Database = {
           agreed_at?: string | null
           analysis_type: Database["public"]["Enums"]["ppa_analysis_type"]
           buyer_name?: string | null
+          buyer_normalized?: string | null
           comparison_file_name?: string | null
           comparison_file_url?: string | null
           complexity_score?: number | null
@@ -2138,6 +2141,7 @@ export type Database = {
           ppa_type?: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name: string
           seller_name?: string | null
+          seller_normalized?: string | null
           updated_at?: string
           user_id: string
           version_number?: number | null
@@ -2146,6 +2150,7 @@ export type Database = {
           agreed_at?: string | null
           analysis_type?: Database["public"]["Enums"]["ppa_analysis_type"]
           buyer_name?: string | null
+          buyer_normalized?: string | null
           comparison_file_name?: string | null
           comparison_file_url?: string | null
           complexity_score?: number | null
@@ -2164,6 +2169,7 @@ export type Database = {
           ppa_type?: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name?: string
           seller_name?: string | null
+          seller_normalized?: string | null
           updated_at?: string
           user_id?: string
           version_number?: number | null
@@ -2244,6 +2250,7 @@ export type Database = {
         Row: {
           banked_at: string
           buyer_name: string | null
+          buyer_normalized: string | null
           category: string
           confidence: Database["public"]["Enums"]["ppa_confidence_level"] | null
           id: string
@@ -2256,6 +2263,7 @@ export type Database = {
           ppa_type: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name: string
           seller_name: string | null
+          seller_normalized: string | null
           source_analysis_id: string | null
           source_text: string | null
           template_description: string | null
@@ -2265,6 +2273,7 @@ export type Database = {
         Insert: {
           banked_at?: string
           buyer_name?: string | null
+          buyer_normalized?: string | null
           category: string
           confidence?:
             | Database["public"]["Enums"]["ppa_confidence_level"]
@@ -2279,6 +2288,7 @@ export type Database = {
           ppa_type?: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name: string
           seller_name?: string | null
+          seller_normalized?: string | null
           source_analysis_id?: string | null
           source_text?: string | null
           template_description?: string | null
@@ -2288,6 +2298,7 @@ export type Database = {
         Update: {
           banked_at?: string
           buyer_name?: string | null
+          buyer_normalized?: string | null
           category?: string
           confidence?:
             | Database["public"]["Enums"]["ppa_confidence_level"]
@@ -2302,6 +2313,7 @@ export type Database = {
           ppa_type?: Database["public"]["Enums"]["ppa_structure_type"] | null
           project_name?: string
           seller_name?: string | null
+          seller_normalized?: string | null
           source_analysis_id?: string | null
           source_text?: string | null
           template_description?: string | null

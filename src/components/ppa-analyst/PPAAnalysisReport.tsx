@@ -306,6 +306,9 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
         // Party names from analysis
         buyer_name: (analysis as any).buyer_name || null,
         seller_name: (analysis as any).seller_name || null,
+        // Normalized names for intelligent search
+        buyer_normalized: (analysis as any).buyer_normalized || null,
+        seller_normalized: (analysis as any).seller_normalized || null,
       }));
 
     try {

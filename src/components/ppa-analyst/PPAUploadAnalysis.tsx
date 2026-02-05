@@ -375,7 +375,8 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
       // Helper function to make the API call with retry
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minute timeout per attempt
+        // 5 minute timeout per attempt - long enough for complex PPA analysis
+        const timeoutId = setTimeout(() => controller.abort(), 300000);
         
         const { data: sessionData2 } = await supabase.auth.getSession();
         const authToken = sessionData2?.session?.access_token;
@@ -411,11 +412,11 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
           return res;
         } catch (fetchError) {
           clearTimeout(timeoutId);
-          // Retry on network errors (connection closed, timeout, etc.) up to 2 times
-          if (retryCount < 2 && (fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('fetch')))) {
+          // Retry on network errors (connection closed, timeout, etc.) up to 3 times
+          if (retryCount < 3 && (fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('fetch')))) {
             console.log(`Analysis attempt ${retryCount + 1} failed, retrying...`);
-            setAnalysisStatus(`Analysis taking longer than expected, retrying (attempt ${retryCount + 2}/3)...`);
-            await new Promise(resolve => setTimeout(resolve, 2000)); // Wait 2 seconds before retry
+            setAnalysisStatus(`Analysis taking longer than expected, retrying (attempt ${retryCount + 2}/4)...`);
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds before retry
             return callAnalyzeApi(retryCount + 1);
           }
           throw fetchError;

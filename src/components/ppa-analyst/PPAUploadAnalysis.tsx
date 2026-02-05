@@ -70,6 +70,8 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
   const [jurisdiction, setJurisdiction] = useState(preFill?.jurisdiction || '');
   const [projectName, setProjectName] = useState(preFill?.projectName || '');
   const [counterpartyType, setCounterpartyType] = useState(preFill?.counterpartyType || '');
+  const [buyerName, setBuyerName] = useState('');
+  const [sellerName, setSellerName] = useState('');
   const [ppaFile, setPpaFile] = useState<File | null>(null);
   const [comparisonFile, setComparisonFile] = useState<File | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -152,6 +154,15 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
 
       if (metadata.counterparty_type && metadata.counterparty_type_confidence !== 'low') {
         setCounterpartyType(metadata.counterparty_type);
+      }
+
+      // Auto-fill buyer and seller names
+      if (metadata.buyer_name && metadata.buyer_name_confidence !== 'low') {
+        setBuyerName(metadata.buyer_name);
+      }
+
+      if (metadata.seller_name && metadata.seller_name_confidence !== 'low') {
+        setSellerName(metadata.seller_name);
       }
 
       if (metadata.detection_notes) {
@@ -418,6 +429,9 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         complexity_score: null, // Will be set after analysis
         key_risk_areas: [],
         counterparty_type: counterpartyType || null,
+        // Party names
+        buyer_name: buyerName || null,
+        seller_name: sellerName || null,
       });
 
       // Step 5: Save extracted positions
@@ -747,6 +761,31 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
                 Helps identify counterparty-specific negotiation patterns
               </p>
             </div>
+
+            {/* Party Names */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="buyer-name">Buyer / Offtaker</Label>
+                <Input
+                  id="buyer-name"
+                  value={buyerName}
+                  onChange={(e) => setBuyerName(e.target.value)}
+                  placeholder="e.g., Statkraft, Shell, Microsoft"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="seller-name">Seller / Generator</Label>
+                <Input
+                  id="seller-name"
+                  value={sellerName}
+                  onChange={(e) => setSellerName(e.target.value)}
+                  placeholder="e.g., Orsted, RWE, BayWa"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground -mt-3">
+              Party names help you search precedents by counterparty later
+            </p>
 
             {/* Start Analysis */}
             <Button 

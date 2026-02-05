@@ -303,6 +303,9 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
           : p.variance_notes?.includes('[SELLER-FRIENDLY]') ? 'seller_friendly'
           : p.variance_notes?.includes('[BALANCED]') ? 'balanced'
           : null,
+        // Party names from analysis
+        buyer_name: (analysis as any).buyer_name || null,
+        seller_name: (analysis as any).seller_name || null,
       }));
 
     try {

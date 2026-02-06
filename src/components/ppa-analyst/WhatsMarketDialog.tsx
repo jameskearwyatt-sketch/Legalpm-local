@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -71,15 +71,20 @@ export function WhatsMarketDialog({ open, onOpenChange, category, precedents }: 
   };
 
   // Auto-trigger analysis when dialog opens
-  const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen && !result && !isLoading) {
+  const hasTriggered = useRef(false);
+  useEffect(() => {
+    if (open && !hasTriggered.current) {
+      hasTriggered.current = true;
       handleAnalyze();
     }
-    if (!nextOpen) {
-      // Reset on close so it re-runs fresh next time
+    if (!open) {
+      hasTriggered.current = false;
       setResult(null);
       setError(null);
     }
+  }, [open]);
+
+  const handleOpenChange = (nextOpen: boolean) => {
     onOpenChange(nextOpen);
   };
 

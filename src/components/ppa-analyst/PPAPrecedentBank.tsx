@@ -45,9 +45,11 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
+  Scale,
 } from 'lucide-react';
 import { usePPAPrecedentBank, PPAPrecedent } from '@/lib/hooks/usePPAAnalyses';
 import { PPA_ALL_CATEGORIES, PPA_CATEGORY_GROUPS, PPACategoryGroup } from '@/lib/ppaCategories';
+import { WhatsMarketDialog } from './WhatsMarketDialog';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -89,6 +91,8 @@ export function PPAPrecedentBank() {
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grouped' | 'list'>('grouped');
+  const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
+  const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<PPAPrecedent[]>([]);
 
   // Derive unique values for filters
   const uniqueJurisdictions = useMemo(() => {
@@ -749,12 +753,27 @@ export function PPAPrecedentBank() {
                                 <span className="text-xs text-muted-foreground">{catInfo.group}</span>
                               )}
                             </div>
-                            <div className="flex items-center gap-1">
-                              {[...new Set(categoryPrecedents.map(p => p.jurisdiction).filter(Boolean))].slice(0, 3).map(jur => (
-                                <Badge key={jur} variant="outline" className="text-xs">
-                                  {jur}
-                                </Badge>
-                              ))}
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setWhatsMarketCategory(category);
+                                  setWhatsMarketPrecedents(categoryPrecedents);
+                                }}
+                              >
+                                <Scale className="h-3.5 w-3.5" />
+                                What's Market?
+                              </Button>
+                              <div className="flex items-center gap-1">
+                                {[...new Set(categoryPrecedents.map(p => p.jurisdiction).filter(Boolean))].slice(0, 3).map(jur => (
+                                  <Badge key={jur} variant="outline" className="text-xs">
+                                    {jur}
+                                  </Badge>
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </CollapsibleTrigger>
@@ -810,6 +829,21 @@ export function PPAPrecedentBank() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* What's Market Dialog */}
+      {whatsMarketCategory && (
+        <WhatsMarketDialog
+          open={!!whatsMarketCategory}
+          onOpenChange={(open) => {
+            if (!open) {
+              setWhatsMarketCategory(null);
+              setWhatsMarketPrecedents([]);
+            }
+          }}
+          category={whatsMarketCategory}
+          precedents={whatsMarketPrecedents}
+        />
+      )}
     </>
   );
 }

@@ -37,11 +37,16 @@ interface AppLayoutProps {
   children: ReactNode;
 }
 
-const navigation = [
+type NavItem = { name: string; href: string; icon: typeof LayoutDashboard };
+type NavSeparator = { type: 'separator' };
+type NavEntry = NavItem | NavSeparator;
+
+const navigation: NavEntry[] = [
+  { name: 'PPA Analyst', href: '/ppa-analyst', icon: FileSearch },
+  { type: 'separator' },
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Matters', href: '/matters', icon: Briefcase },
   { name: 'Pricing & Assumptions', href: '/pricing', icon: Calculator },
-  { name: 'PPA Analyst', href: '/ppa-analyst', icon: FileSearch },
   { name: 'Contacts', href: '/contacts', icon: Users },
   { name: 'BM EMI Expertise Map', href: '/bm-expertise', icon: Network },
   { name: 'Growth', href: '/growth', icon: Rocket },
@@ -83,7 +88,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 px-3 py-4">
-            {navigation.map((item) => {
+            {navigation.map((entry, index) => {
+              if ('type' in entry && entry.type === 'separator') {
+                return <div key={`sep-${index}`} className="my-2 mx-2 border-t border-dotted border-sidebar-border/60" />;
+              }
+              const item = entry as NavItem;
               const isActive = location.pathname === item.href || 
                 (item.href !== '/' && location.pathname.startsWith(item.href));
               return (
@@ -170,7 +179,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </button>
             </div>
             <nav className="space-y-1 px-3 py-4">
-              {navigation.map((item) => {
+              {navigation.map((entry, index) => {
+                if ('type' in entry && entry.type === 'separator') {
+                  return <div key={`sep-m-${index}`} className="my-2 mx-2 border-t border-dotted border-sidebar-border/60" />;
+                }
+                const item = entry as NavItem;
                 const isActive = location.pathname === item.href;
                 return (
                   <Link

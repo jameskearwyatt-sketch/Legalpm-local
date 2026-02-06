@@ -105,35 +105,30 @@ export function InternalInputDeptSelector({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "h-8 w-full px-2 justify-between font-normal",
-            value && colorStyle
-              ? `${colorStyle.bg} ${colorStyle.text} hover:${colorStyle.bg}`
-              : "text-muted-foreground hover:bg-muted"
-          )}
-        >
-          <span className="truncate text-xs">
-            {value || (
-              <span className="flex items-center gap-1">
-                <Users className="h-3 w-3" />
-                <span>Input?</span>
-              </span>
+    <div className="relative flex items-center">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              "h-8 w-full px-2 justify-start font-normal",
+              value ? "pr-7" : "",
+              value && colorStyle
+                ? `${colorStyle.bg} ${colorStyle.text} hover:${colorStyle.bg}`
+                : "text-muted-foreground hover:bg-muted"
             )}
-          </span>
-          {value && (
-            <X
-              className="h-3 w-3 ml-1 hover:text-destructive shrink-0 cursor-pointer"
-              onClick={handleClear}
-              onPointerDown={handleClear}
-            />
-          )}
-        </Button>
-      </PopoverTrigger>
+          >
+            <span className="truncate text-xs">
+              {value || (
+                <span className="flex items-center gap-1">
+                  <Users className="h-3 w-3" />
+                  <span>Input?</span>
+                </span>
+              )}
+            </span>
+          </Button>
+        </PopoverTrigger>
       <PopoverContent className="w-56 p-2" align="start">
         <div className="space-y-2">
           <Input
@@ -188,5 +183,15 @@ export function InternalInputDeptSelector({
         </div>
       </PopoverContent>
     </Popover>
+      {value && (
+        <button
+          type="button"
+          className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-destructive/20 z-10"
+          onClick={handleClear}
+        >
+          <X className="h-3 w-3 text-current hover:text-destructive shrink-0" />
+        </button>
+      )}
+    </div>
   );
 }

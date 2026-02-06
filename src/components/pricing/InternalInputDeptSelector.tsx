@@ -63,9 +63,11 @@ export function InternalInputDeptSelector({
     }
   };
 
-  const handleClear = (e: React.MouseEvent) => {
+  const handleClear = (e: React.MouseEvent | React.PointerEvent) => {
     e.stopPropagation();
+    e.preventDefault();
     onChange(null);
+    setOpen(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -125,8 +127,9 @@ export function InternalInputDeptSelector({
           </span>
           {value && (
             <X
-              className="h-3 w-3 ml-1 hover:text-destructive shrink-0"
+              className="h-3 w-3 ml-1 hover:text-destructive shrink-0 cursor-pointer"
               onClick={handleClear}
+              onPointerDown={handleClear}
             />
           )}
         </Button>

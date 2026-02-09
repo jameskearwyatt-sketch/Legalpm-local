@@ -6,8 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Tolling-specific categories
-const TOLLING_CATEGORIES = [
+// Technology-specific category sets
+const COMMON_CATEGORIES = [
   { id: 'contract_term', label: 'Contract Term & Effective Date' },
   { id: 'conditions_precedent', label: 'Conditions Precedent' },
   { id: 'representations_warranties', label: 'Representations & Warranties' },
@@ -17,19 +17,13 @@ const TOLLING_CATEGORIES = [
   { id: 'availability_guarantee', label: 'Availability Guarantee' },
   { id: 'capacity_testing', label: 'Capacity Testing & Adjustments' },
   { id: 'outages_maintenance', label: 'Outages & Scheduled Maintenance' },
-  { id: 'fuel_supply_delivery', label: 'Fuel Supply & Delivery' },
-  { id: 'fuel_specifications', label: 'Fuel Specifications & Quality' },
-  { id: 'heat_rate_guarantee', label: 'Heat Rate Guarantee' },
-  { id: 'fuel_conversion_services', label: 'Fuel Conversion Services' },
   { id: 'dispatch_rights', label: 'Dispatch Rights & Exclusivity' },
   { id: 'dispatch_procedures', label: 'Dispatch Procedures & Notices' },
   { id: 'ancillary_services', label: 'Ancillary Services' },
   { id: 'metering_measurement', label: 'Metering & Measurement' },
   { id: 'facility_utilization', label: 'Facility Utilization Planning' },
-  { id: 'environmental_compliance', label: 'Environmental Compliance' },
   { id: 'fixed_capacity_payment', label: 'Fixed Capacity Payment' },
   { id: 'variable_energy_payment', label: 'Variable Energy Payment' },
-  { id: 'start_up_charges', label: 'Start-Up Charges' },
   { id: 'payment_billing', label: 'Payment & Billing Terms' },
   { id: 'taxes_duties', label: 'Taxes & Duties' },
   { id: 'credit_support', label: 'Credit Support & Security' },
@@ -42,6 +36,46 @@ const TOLLING_CATEGORIES = [
   { id: 'indemnities', label: 'Indemnities' },
   { id: 'liability_caps', label: 'Liability Caps & Limitations' },
 ];
+
+const THERMAL_ONLY_CATEGORIES = [
+  { id: 'fuel_supply_delivery', label: 'Fuel Supply & Delivery' },
+  { id: 'fuel_specifications', label: 'Fuel Specifications & Quality' },
+  { id: 'heat_rate_guarantee', label: 'Heat Rate Guarantee' },
+  { id: 'fuel_conversion_services', label: 'Fuel Conversion Services' },
+  { id: 'environmental_compliance', label: 'Environmental Compliance' },
+  { id: 'start_up_charges', label: 'Start-Up Charges' },
+];
+
+const BESS_ONLY_CATEGORIES = [
+  { id: 'storage_capacity', label: 'Storage Capacity (MWh) & Duration' },
+  { id: 'round_trip_efficiency', label: 'Round-Trip Efficiency Guarantee' },
+  { id: 'state_of_charge', label: 'State of Charge Management' },
+  { id: 'cycle_degradation', label: 'Cycle Degradation & Throughput Limits' },
+  { id: 'augmentation', label: 'Augmentation Obligations' },
+  { id: 'charging_arrangements', label: 'Charging Arrangements & Grid Import' },
+  { id: 'revenue_sharing', label: 'Revenue Sharing & Optimisation' },
+];
+
+const CONSTRUCTION_CATEGORIES = [
+  { id: 'construction_milestones', label: 'Construction Milestones & COD' },
+  { id: 'performance_testing', label: 'Performance Testing at COD' },
+  { id: 'delay_liquidated_damages', label: 'Delay Liquidated Damages' },
+  { id: 'commissioning', label: 'Commissioning & Takeover' },
+];
+
+function getCategoriesForContext(tollingType: string, facilityStage: string) {
+  const isBess = tollingType === 'bess';
+  const isThermal = ['gas_ccgt', 'gas_ocgt', 'coal', 'biomass'].includes(tollingType);
+  const isPreOperating = ['development', 'construction'].includes(facilityStage);
+
+  let categories = [...COMMON_CATEGORIES];
+  if (isThermal) categories = categories.concat(THERMAL_ONLY_CATEGORIES);
+  if (isBess) categories = categories.concat(BESS_ONLY_CATEGORIES);
+  if (!isThermal && !isBess) categories = categories.concat(THERMAL_ONLY_CATEGORIES); // default fallback
+  if (isPreOperating) categories = categories.concat(CONSTRUCTION_CATEGORIES);
+
+  return categories;
+}
 
 const TOLLING_KNOWLEDGE_BASE = `
 ## 📚 TOLLING AGREEMENT KNOWLEDGE BASE - GAS CCGT FOCUS
@@ -218,54 +252,133 @@ SECTION B: KEY COMMERCIAL TERMS - MARKET STANDARDS
 - Tax indemnity split: Offtaker (fuel transport, output delivery), Generator (facility, income)
 - Employee claims: not limited by workers' comp
 - 2-year survival post-termination
-
-### B12. INSURANCE
-**Generator Insurance Requirements:**
-- "A" rated or better by Best's Insurance Guide
-- Offtaker named as additional insured
-- Primary insurance (not contributory with Offtaker's)
-- 30 days notice of cancellation (10 days for non-payment)
-- Subrogation waiver against Offtaker
-- Reasonable deductibles; shared if Offtaker at fault
-
-### B13. DISPUTE RESOLUTION
-**Multi-tier Process:**
-1. CEO negotiation (30 days)
-2. Board Chairman negotiation (15 days)
-3. Technical disputes: Independent Engineer consideration
-4. Binding arbitration (AAA rules, 3 arbitrators)
-- Appeal rights preserved for conclusions of law
-- No authority to modify Agreement terms
-- Costs: each party bears own costs; third arbitrator shared
-
-=============================================================================
-SECTION C: BAKER MCKENZIE DRAFTING INSIGHTS
-=============================================================================
-
-### C1. STRUCTURAL SAFEGUARDS
-- Exclusive nature clause prevents Generator from dealing with third parties
-- Capacity cannot be reduced during Term
-- Facility assets restricted to facility-related purposes only
-- Compliance with law covenants by both parties
-
-### C2. LENDER PROTECTION
-- Consent and Agreement protects lender step-in rights
-- Lender notice before termination for Generator default
-- Collateral assignment without consent
-- Termination payments cover outstanding Facility Debt
-
-### C3. PERFORMANCE REGIME
-- Availability Adjustment is sole remedy for capacity shortfall (except termination)
-- Heat Rate Guarantee with annual true-up mechanism
-- Start-up charges incentivize efficient dispatch
-- Minimum run times prevent uneconomic cycling
-
-### C4. RISK ALLOCATION PRINCIPLES
-- Generator bears: facility performance, environmental compliance, maintenance
-- Offtaker bears: fuel supply, transmission, marketing, fuel quality
-- Shared: Force Majeure (neither party bears), Change in Law (varies)
-- Key negotiation: who bears risk of government/regulatory change?
 `;
+
+const BESS_KNOWLEDGE_BASE = `
+## 📚 BESS TOLLING KNOWLEDGE BASE - BATTERY ENERGY STORAGE SYSTEMS
+
+=============================================================================
+SECTION D: BESS-SPECIFIC COMMERCIAL TERMS
+=============================================================================
+
+### D1. WHAT IS A BESS TOLLING AGREEMENT?
+A BESS Tolling Agreement is a contract where:
+- The **Facility Owner** owns and operates the battery storage system
+- The **Offtaker/Optimizer** has the right to charge and discharge the battery
+- The Offtaker controls dispatch strategy to optimize revenue across multiple markets
+- Revenue streams include: wholesale arbitrage, frequency response, capacity market, balancing mechanism
+
+**Key Distinction from Gas Tolling:**
+- No fuel supply - electricity is imported from the grid for charging
+- No heat rate - instead, Round-Trip Efficiency (RTE) is the key performance metric
+- No start-up costs in the traditional sense - but cycling and degradation are critical
+- Revenue optimization across multiple stacked markets is central
+- Battery degradation is a fundamental commercial risk that doesn't exist in gas
+
+### D2. STORAGE CAPACITY & DURATION
+- Capacity defined in both MW (power) and MWh (energy/duration)
+- Duration typically 1-4 hours for grid-scale
+- Capacity may degrade over time - augmentation obligations critical
+- Nameplate vs guaranteed capacity distinction important
+- Temperature-dependent performance adjustments
+
+### D3. ROUND-TRIP EFFICIENCY (RTE)
+- Replaces Heat Rate as the key performance metric
+- Typical range: 85-92% for lithium-ion
+- Measured as energy out / energy in over a cycle
+- Degrades over time and with cycling
+- Guaranteed minimum RTE with consequences for underperformance
+- Measurement methodology must be clearly defined
+
+### D4. STATE OF CHARGE (SOC) MANAGEMENT
+- Offtaker dispatch must respect SOC constraints
+- Minimum/maximum SOC limits to protect battery health
+- SOC management directly impacts battery longevity
+- Who bears responsibility for SOC management?
+- Real-time SOC reporting requirements
+
+### D5. CYCLE DEGRADATION & THROUGHPUT
+- Battery capacity degrades with use (cycling) and time (calendar aging)
+- Annual throughput limits (MWh or equivalent full cycles)
+- Excess cycling penalties or degradation compensation
+- Warranty alignment with cycling assumptions
+- Technology-specific degradation curves (lithium-ion chemistries differ)
+- Augmentation trigger thresholds
+
+### D6. AUGMENTATION OBLIGATIONS
+- Battery modules must be replaced/added as capacity degrades
+- Who bears augmentation cost? (critical commercial negotiation)
+- Augmentation schedule and trigger events
+- Performance guarantee through augmentation
+- Impact on availability during augmentation works
+
+### D7. CHARGING ARRANGEMENTS
+- Grid import charges for charging (who bears cost?)
+- BSUoS/TNUoS implications of charging
+- Renewable source charging requirements (for green credentials)
+- Charging optimization vs grid constraints
+- Behind-the-meter vs grid-connected charging
+
+### D8. REVENUE SHARING & OPTIMISATION
+- Multiple revenue streams: arbitrage, ancillary services, capacity market, balancing
+- Revenue sharing mechanisms between owner and offtaker
+- Floor/cap structures on revenue sharing
+- Optimization strategy and who controls dispatch
+- Market access rights and registrations (BMU registration, FFR contracts)
+- Reporting and transparency on revenue optimization
+
+### D9. BESS-SPECIFIC RISK ALLOCATION
+- Thermal runaway and fire risk
+- Technology obsolescence risk
+- Grid connection constraints
+- Capacity market penalty risk
+- Revenue cannibalisation as more BESS deployed
+`;
+
+const CONSTRUCTION_KNOWLEDGE_BASE = `
+## 📚 CONSTRUCTION & DEVELOPMENT STAGE KNOWLEDGE BASE
+
+=============================================================================
+SECTION E: PRE-OPERATING TOLLING AGREEMENTS
+=============================================================================
+
+### E1. DEVELOPMENT-STAGE TOLLING
+When a tolling agreement is entered into pre-construction:
+- Primary purpose: enhance project bankability and secure debt financing
+- Tolling agreement serves as the revenue contract underpinning the project finance structure
+- Lender requirements heavily influence commercial terms
+- Conditions Precedent include construction-related milestones
+- Contract term must cover debt tenor plus tail
+
+### E2. CONSTRUCTION MILESTONES & COD
+- Target Commercial Operation Date (COD) definition
+- Longstop Date for COD (termination right if missed)
+- COD achievement conditions (performance tests, permits, etc.)
+- Interim milestone reporting obligations
+- Right to inspect during construction
+- Delay consequences and notification obligations
+
+### E3. PERFORMANCE TESTING AT COD
+- Capacity verification test at commissioning
+- For Gas: Heat Rate test, emissions compliance test
+- For BESS: Storage capacity test, RTE test, response time test
+- Retesting rights and procedures
+- Deemed COD provisions
+
+### E4. DELAY LIQUIDATED DAMAGES
+- Pre-agreed damages for late COD
+- Cap on delay LDs (typically percentage of project cost)
+- Relationship between delay LDs and termination rights
+- Force Majeure carve-outs from delay LDs
+- Interaction with EPC contractor delay LDs
+
+### E5. COMMISSIONING & TAKEOVER
+- Handover process from construction to operations
+- Snagging/defects lists and rectification
+- Operational readiness requirements
+- Transition from construction insurance to operational insurance
+`;
+
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -286,6 +399,7 @@ serve(async (req) => {
       jurisdiction,
       projectName,
       tollingType,
+      facilityStage,
       counterpartyType,
       precedents,
       goldStandardPrecedents,
@@ -299,16 +413,36 @@ serve(async (req) => {
       );
     }
 
-    console.log(`Analyzing tolling agreement: ${projectName}, type: ${analysisType}, perspective: ${perspective}`);
+    const effectiveTollingType = tollingType || 'gas_ccgt';
+    const effectiveStage = facilityStage || 'operating';
+    const isBess = effectiveTollingType === 'bess';
+    const isThermal = ['gas_ccgt', 'gas_ocgt', 'coal', 'biomass'].includes(effectiveTollingType);
+    const isPreOperating = ['development', 'construction'].includes(effectiveStage);
 
+    console.log(`Analyzing tolling agreement: ${projectName}, type: ${analysisType}, tech: ${effectiveTollingType}, stage: ${effectiveStage}, perspective: ${perspective}`);
+
+    const ACTIVE_CATEGORIES = getCategoriesForContext(effectiveTollingType, effectiveStage);
     const hasPrecedents = precedents && precedents.length > 0;
     const hasGoldStandard = goldStandardPrecedents && goldStandardPrecedents.length > 0;
 
-    const categoryList = TOLLING_CATEGORIES.map(c => `- "${c.label}"`).join('\n');
+    const categoryList = ACTIVE_CATEGORIES.map(c => `- "${c.label}"`).join('\n');
 
-    const systemPrompt = `You are an expert energy lawyer specializing in gas-fired power tolling agreements, capacity sale agreements, and fuel conversion services contracts. You have deep expertise in CCGT project finance structures.
+    // Build technology-specific knowledge base
+    let knowledgeBase = TOLLING_KNOWLEDGE_BASE;
+    if (isBess) knowledgeBase += '\n\n' + BESS_KNOWLEDGE_BASE;
+    if (isPreOperating) knowledgeBase += '\n\n' + CONSTRUCTION_KNOWLEDGE_BASE;
 
-${TOLLING_KNOWLEDGE_BASE}
+    const technologyContext = isBess
+      ? 'battery energy storage system (BESS) tolling agreements, storage optimization contracts, and battery capacity sale agreements. You understand lithium-ion degradation, round-trip efficiency, state of charge management, and multi-market revenue optimization.'
+      : 'gas-fired power tolling agreements, capacity sale agreements, and fuel conversion services contracts. You have deep expertise in CCGT project finance structures.';
+
+    const stageContext = isPreOperating
+      ? `\n\nIMPORTANT: This is a ${effectiveStage === 'development' ? 'development-stage' : 'construction-stage'} project. The tolling agreement has been entered into to support project bankability. You MUST analyze construction milestones, COD provisions, delay LDs, and the interface between the tolling agreement and the project finance structure.`
+      : '';
+
+    const systemPrompt = `You are an expert energy lawyer specializing in ${technologyContext}${stageContext}
+
+${knowledgeBase}
 
 ${userLearnings || ''}
 
@@ -317,8 +451,9 @@ Your task is to perform a comprehensive forensic analysis of this tolling agreem
     let userPrompt = `Analyze the following ${analysisType === 'tolling_vs_bible' ? 'tolling agreement' : 'term sheet'} from the ${perspective === 'offtaker' ? 'Offtaker/Power Co' : 'Generator/COGEN'} perspective.
 
 Project: ${projectName}
+Technology: ${effectiveTollingType.replace(/_/g, ' ').toUpperCase()}${isBess ? ' (Battery Energy Storage System)' : ''}
+Facility Stage: ${effectiveStage.charAt(0).toUpperCase() + effectiveStage.slice(1)}
 ${jurisdiction ? `Jurisdiction: ${jurisdiction}` : ''}
-${tollingType ? `Facility Type: ${tollingType}` : ''}
 ${counterpartyType ? `Counterparty Type: ${counterpartyType}` : ''}
 
 DOCUMENT TEXT:
@@ -330,16 +465,16 @@ ${hasPrecedents ? `\nPRECEDENT BANK (${precedents.length} positions from previou
 
 ${hasGoldStandard ? `\nGOLD STANDARD TEMPLATE POSITIONS:\n${JSON.stringify(goldStandardPrecedents.slice(0, 50), null, 1)}` : ''}
 
-Extract positions for ALL ${TOLLING_CATEGORIES.length} categories:
+Extract positions for ALL ${ACTIVE_CATEGORIES.length} categories:
 ${categoryList}
 
 For EACH category, you MUST provide:
 1. **position_summary**: Detailed bullet-point analysis of the actual terms found (not just "terms exist"). Use note-form bullets starting with •
 2. **clause_references**: Specific clause/section numbers referenced
 3. **confidence**: "high" (clear drafting found), "medium" (inferred or partial), "review_required" (not found/unclear)
-4. **market_position**: "on_market", "off_market", or "way_off_market" based on market standards
+4. **market_position**: "on_market", "off_market", or "way_off_market" based on market standards for ${isBess ? 'BESS' : 'thermal gas'} tolling
 5. **party_favorability**: "offtaker_friendly", "generator_friendly", "balanced"
-6. **market_benchmark**: The IDEAL market standard position for this provision (always provide this regardless of what the document says)
+6. **market_benchmark**: The IDEAL market standard position for this provision in a ${isBess ? 'BESS' : effectiveTollingType.replace(/_/g, ' ')} context (always provide this regardless of what the document says)
 ${hasPrecedents ? '7. **market_comparison**: How this compares to banked precedents' : ''}
 ${hasGoldStandard ? '8. **gold_standard_deviation**: true/false - does this deviate from BM template?\n9. **gold_standard_comparison**: Explanation of deviation or null' : ''}
 
@@ -349,6 +484,8 @@ IMPORTANT ANALYSIS RULES:
 - If a category heading exists but no text found, perform a SECOND PASS before marking as missing
 - For ${analysisType === 'tolling_vs_termsheet' ? 'term sheets' : 'full agreements'}, adjust expectations accordingly
 - Assess party favorability from the ${perspective} perspective
+${isBess ? '- For BESS: focus on RTE guarantees, degradation mechanics, augmentation obligations, and revenue sharing - NOT fuel supply or heat rate\n- Capacity means MW AND MWh duration' : ''}
+${isPreOperating ? '- For development/construction stage: scrutinise COD provisions, delay LDs, performance testing requirements, and bankability features' : ''}
 
 Return ONLY valid JSON:
 {
@@ -424,9 +561,9 @@ Return ONLY valid JSON:
       if (parsed?.positions) {
         positions = parsed.positions.map((p: any) => {
           const catInput = (p.category || '').toLowerCase().trim();
-          let matched = TOLLING_CATEGORIES.find(c => c.label.toLowerCase() === catInput);
-          if (!matched) matched = TOLLING_CATEGORIES.find(c => c.id.toLowerCase() === catInput.replace(/\s+/g, '_'));
-          if (!matched) matched = TOLLING_CATEGORIES.find(c => c.label.toLowerCase().includes(catInput) || catInput.includes(c.label.toLowerCase()));
+          let matched = ACTIVE_CATEGORIES.find(c => c.label.toLowerCase() === catInput);
+          if (!matched) matched = ACTIVE_CATEGORIES.find(c => c.id.toLowerCase() === catInput.replace(/\s+/g, '_'));
+          if (!matched) matched = ACTIVE_CATEGORIES.find(c => c.label.toLowerCase().includes(catInput) || catInput.includes(c.label.toLowerCase()));
 
           let varianceNotes = p.flags || p.variance_notes || '';
           if (p.market_position) varianceNotes = `[${p.market_position.toUpperCase().replace(/_/g, ' ')}] ${varianceNotes}`.trim();
@@ -451,7 +588,7 @@ Return ONLY valid JSON:
       }
     } catch (parseError) {
       console.error('Parse error:', parseError);
-      positions = TOLLING_CATEGORIES.map(c => ({
+      positions = ACTIVE_CATEGORIES.map(c => ({
         category: c.label,
         position_summary: '• Failed to extract - please review document manually',
         source_text: null,
@@ -463,9 +600,9 @@ Return ONLY valid JSON:
       }));
     }
 
-    // Ensure all categories present
+    // Ensure all active categories present
     const existing = new Set(positions.map((p: any) => (p.category || '').toLowerCase()));
-    for (const cat of TOLLING_CATEGORIES) {
+    for (const cat of ACTIVE_CATEGORIES) {
       if (!existing.has(cat.label.toLowerCase())) {
         positions.push({
           category: cat.label,

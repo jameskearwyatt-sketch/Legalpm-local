@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Collapsible, CollapsibleContent, CollapsibleTrigger,
 } from '@/components/ui/collapsible';
@@ -11,12 +12,14 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Search, Database, Trash2, Loader2, ChevronDown, ChevronRight, X,
+  Search, Database, Trash2, Loader2, ChevronDown, ChevronRight, X, AlertTriangle,
 } from 'lucide-react';
 import { useTollingPrecedentBank, TollingPrecedent } from '@/lib/hooks/useTollingAnalyses';
-import { TOLLING_ALL_CATEGORIES } from '@/lib/tollingCategories';
+import { TOLLING_ALL_CATEGORIES, TOLLING_TECHNOLOGY_TYPES, TOLLING_FACILITY_STAGES } from '@/lib/tollingCategories';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+
+const MIN_DEALS_FOR_BENCHMARKING = 3;
 
 export function TollingPrecedentBank() {
   const { precedents, isLoading, deletePrecedent, uniqueProjectCount } = useTollingPrecedentBank();
@@ -24,10 +27,30 @@ export function TollingPrecedentBank() {
   const [search, setSearch] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<string[]>([]);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [technologyFilter, setTechnologyFilter] = useState<string>('all');
+  const [stageFilter, setStageFilter] = useState<string>('all');
+
+  // Compute technology/stage statistics
+  const stats = useMemo(() => {
+    const regular = precedents.filter(p => !p.is_gold_standard);
+    const byTech: Record<string, Set<string>> = {};
+    const byStage: Record<string, Set<string>> = {};
+    for (const p of regular) {
+      const tech = p.tolling_type || 'unknown';
+      const stage = p.facility_stage || 'unknown';
+      if (!byTech[tech]) byTech[tech] = new Set();
+      if (!byStage[stage]) byStage[stage] = new Set();
+      byTech[tech].add(p.project_name);
+      byStage[stage].add(p.project_name);
+    }
+    return { byTech, byStage };
+  }, [precedents]);
 
   const filteredPrecedents = useMemo(() => {
     return precedents.filter(p => {
       if (p.is_gold_standard) return false;
+      if (technologyFilter !== 'all' && p.tolling_type !== technologyFilter) return false;
+      if (stageFilter !== 'all' && p.facility_stage !== stageFilter) return false;
       const searchLower = search.toLowerCase();
       return !search ||
         p.position_summary.toLowerCase().includes(searchLower) ||
@@ -37,7 +60,11 @@ export function TollingPrecedentBank() {
         (p.offtaker_name?.toLowerCase().includes(searchLower)) ||
         (p.generator_name?.toLowerCase().includes(searchLower));
     });
-  }, [precedents, search]);
+  }, [precedents, search, technologyFilter, stageFilter]);
+
+  const filteredUniqueDeals = useMemo(() => {
+    return new Set(filteredPrecedents.map(p => p.project_name)).size;
+  }, [filteredPrecedents]);
 
   const groupedPrecedents = useMemo(() => {
     const grouped: Record<string, TollingPrecedent[]> = {};
@@ -63,6 +90,8 @@ export function TollingPrecedentBank() {
     setDeleteConfirmId(null);
   };
 
+  const hasActiveFilters = technologyFilter !== 'all' || stageFilter !== 'all';
+
   return (
     <>
       <div className="space-y-6">
@@ -86,7 +115,7 @@ export function TollingPrecedentBank() {
                 </div>
                 <div className="h-12 w-px bg-border" />
                 <div className="text-right">
-                  <p className="text-2xl font-bold">{uniqueProjectCount}</p>
+                  <p className="text-2xl font-bold">{hasActiveFilters ? filteredUniqueDeals : uniqueProjectCount}</p>
                   <p className="text-xs text-muted-foreground">Projects</p>
                 </div>
               </div>
@@ -94,9 +123,37 @@ export function TollingPrecedentBank() {
           </CardHeader>
         </Card>
 
-        {/* Search */}
+        {/* Benchmarking readiness by technology */}
+        {Object.keys(stats.byTech).length > 0 && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-sm font-medium">Precedent Coverage by Technology</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(stats.byTech).map(([tech, deals]) => {
+                  const techLabel = TOLLING_TECHNOLOGY_TYPES.find(t => t.id === tech)?.label || tech;
+                  const dealCount = deals.size;
+                  const isReady = dealCount >= MIN_DEALS_FOR_BENCHMARKING;
+                  return (
+                    <div key={tech} className={cn(
+                      'flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border',
+                      isReady ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-muted border-border text-muted-foreground'
+                    )}>
+                      {!isReady && <AlertTriangle className="h-3 w-3" />}
+                      {techLabel}: {dealCount} deal{dealCount !== 1 ? 's' : ''}
+                      {!isReady && <span className="opacity-70">(need {MIN_DEALS_FOR_BENCHMARKING}+ for benchmarking)</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Search & Filters */}
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 space-y-4">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
               <Input
@@ -111,6 +168,35 @@ export function TollingPrecedentBank() {
                 </Button>
               )}
             </div>
+            <div className="flex items-center gap-3">
+              <Select value={technologyFilter} onValueChange={setTechnologyFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="All Technologies" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Technologies</SelectItem>
+                  {TOLLING_TECHNOLOGY_TYPES.map(t => (
+                    <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={stageFilter} onValueChange={setStageFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="All Stages" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Stages</SelectItem>
+                  {TOLLING_FACILITY_STAGES.map(s => (
+                    <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={() => { setTechnologyFilter('all'); setStageFilter('all'); }}>
+                  <X className="h-3 w-3 mr-1" /> Clear filters
+                </Button>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -119,7 +205,7 @@ export function TollingPrecedentBank() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">
-                {uniqueProjectCount} deal{uniqueProjectCount !== 1 ? 's' : ''} · {filteredPrecedents.length} position{filteredPrecedents.length !== 1 ? 's' : ''}
+                {filteredUniqueDeals} deal{filteredUniqueDeals !== 1 ? 's' : ''} · {filteredPrecedents.length} position{filteredPrecedents.length !== 1 ? 's' : ''}
               </CardTitle>
               {Object.keys(groupedPrecedents).length > 0 && (
                 <div className="flex items-center gap-2">
@@ -138,11 +224,11 @@ export function TollingPrecedentBank() {
               <div className="text-center py-12">
                 <Database className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
                 <p className="text-lg font-medium text-muted-foreground">
-                  {search ? 'No precedents match your search' : 'No precedents banked yet'}
+                  {search || hasActiveFilters ? 'No precedents match your filters' : 'No precedents banked yet'}
                 </p>
                 <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-                  {search
-                    ? "Try adjusting your search"
+                  {search || hasActiveFilters
+                    ? 'Try adjusting your search or filters'
                     : 'Mark tolling agreements as "Agreed" and bank positions to build your library'
                   }
                 </p>
@@ -210,6 +296,8 @@ function PrecedentCard({ precedent, onDelete }: { precedent: TollingPrecedent; o
   const summaryLines = precedent.position_summary.split('\n').filter(l => l.trim());
   const previewText = summaryLines[0]?.substring(0, 120) || 'No summary';
   const hasMoreContent = summaryLines.length > 1 || (summaryLines[0]?.length || 0) > 120;
+  const techLabel = TOLLING_TECHNOLOGY_TYPES.find(t => t.id === precedent.tolling_type)?.label;
+  const stageLabel = TOLLING_FACILITY_STAGES.find(s => s.id === precedent.facility_stage)?.label;
 
   return (
     <div
@@ -224,6 +312,7 @@ function PrecedentCard({ precedent, onDelete }: { precedent: TollingPrecedent; o
             {previewText}{hasMoreContent && '...'}
           </span>
           <div className="flex items-center gap-1.5 shrink-0">
+            {techLabel && <Badge variant="outline" className="text-xs">{techLabel}</Badge>}
             <Badge variant="outline" className="text-xs">
               {precedent.perspective === 'offtaker' ? 'Offtaker' : 'Generator'}
             </Badge>
@@ -241,6 +330,8 @@ function PrecedentCard({ precedent, onDelete }: { precedent: TollingPrecedent; o
                   <ChevronDown className="h-4 w-4" />
                 </Button>
                 <span className="font-medium text-sm">{precedent.project_name}</span>
+                {techLabel && <Badge variant="outline" className="text-xs">{techLabel}</Badge>}
+                {stageLabel && <Badge variant="secondary" className="text-xs">{stageLabel}</Badge>}
                 <Badge variant="outline" className="text-xs">{precedent.perspective === 'offtaker' ? 'Offtaker' : 'Generator'}</Badge>
                 {precedent.jurisdiction && <Badge variant="outline" className="text-xs border-primary/30 text-primary">{precedent.jurisdiction}</Badge>}
                 <span className="text-xs text-muted-foreground">{format(new Date(precedent.banked_at), 'PP')}</span>

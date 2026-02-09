@@ -2827,6 +2827,7 @@ export type Database = {
           created_at: string
           document_file_name: string
           document_file_url: string | null
+          facility_stage: string | null
           generator_name: string | null
           generator_normalized: string | null
           id: string
@@ -2855,6 +2856,7 @@ export type Database = {
           created_at?: string
           document_file_name?: string
           document_file_url?: string | null
+          facility_stage?: string | null
           generator_name?: string | null
           generator_normalized?: string | null
           id?: string
@@ -2883,6 +2885,7 @@ export type Database = {
           created_at?: string
           document_file_name?: string
           document_file_url?: string | null
+          facility_stage?: string | null
           generator_name?: string | null
           generator_normalized?: string | null
           id?: string
@@ -3025,6 +3028,7 @@ export type Database = {
           banked_at: string
           category: string
           confidence: string
+          facility_stage: string | null
           generator_name: string | null
           generator_normalized: string | null
           id: string
@@ -3048,6 +3052,7 @@ export type Database = {
           banked_at?: string
           category: string
           confidence?: string
+          facility_stage?: string | null
           generator_name?: string | null
           generator_normalized?: string | null
           id?: string
@@ -3071,6 +3076,7 @@ export type Database = {
           banked_at?: string
           category?: string
           confidence?: string
+          facility_stage?: string | null
           generator_name?: string | null
           generator_normalized?: string | null
           id?: string

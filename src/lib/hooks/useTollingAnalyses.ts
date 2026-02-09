@@ -26,6 +26,7 @@ export interface TollingAnalysis {
   version_number: number;
   is_comparison: boolean;
   tolling_type: string | null;
+  facility_stage: string | null;
   complexity_score: number | null;
   key_risk_areas: string[];
   counterparty_type: string | null;
@@ -69,6 +70,7 @@ export interface TollingPrecedent {
   template_name: string | null;
   template_description: string | null;
   tolling_type: string | null;
+  facility_stage: string | null;
   source_text: string | null;
   confidence: TollingConfidenceLevel;
   market_position: string | null;

@@ -27,13 +27,7 @@ const JURISDICTIONS = [
   'Other',
 ];
 
-const TOLLING_TYPE_LABELS: Record<string, string> = {
-  gas_ccgt: 'Gas CCGT',
-  gas_ocgt: 'Gas OCGT',
-  coal: 'Coal',
-  biomass: 'Biomass',
-  other: 'Other',
-};
+import { TOLLING_TECHNOLOGY_TYPES, TOLLING_FACILITY_STAGES, type TollingFacilityStage } from '@/lib/tollingCategories';
 
 interface TollingUploadAnalysisProps {
   onAnalysisComplete?: () => void;
@@ -49,6 +43,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
   const [analysisType, setAnalysisType] = useState<TollingAnalysisType>('tolling_vs_bible');
   const [perspective, setPerspective] = useState<TollingPerspective>('offtaker');
   const [tollingType, setTollingType] = useState('gas_ccgt');
+  const [facilityStage, setFacilityStage] = useState<TollingFacilityStage>('operating');
   const [jurisdiction, setJurisdiction] = useState('');
   const [projectName, setProjectName] = useState('');
   const [counterpartyType, setCounterpartyType] = useState('');
@@ -196,6 +191,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
                 jurisdiction,
                 projectName,
                 tollingType,
+                facilityStage,
                 counterpartyType: counterpartyType || null,
                 precedents: relevantPrecedents,
                 userLearnings: userLearningsPrompt,
@@ -250,6 +246,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         version_number: 1,
         is_comparison: false,
         tolling_type: tollingType,
+        facility_stage: facilityStage,
         complexity_score: null,
         key_risk_areas: [],
         counterparty_type: counterpartyType || null,
@@ -500,19 +497,46 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
               </Select>
             </div>
 
-            {/* Tolling Type */}
+            {/* Technology Type */}
             <div className="space-y-2">
-              <Label htmlFor="tolling-type">Tolling Type</Label>
+              <Label htmlFor="tolling-type">Technology Type</Label>
               <Select value={tollingType} onValueChange={setTollingType}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select tolling type" />
+                  <SelectValue placeholder="Select technology type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(TOLLING_TYPE_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                  {TOLLING_TECHNOLOGY_TYPES.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Technology type determines which analysis categories are used. Gas CCGT and BESS agreements look very different.
+              </p>
+            </div>
+
+            {/* Facility Stage */}
+            <div className="space-y-2">
+              <Label htmlFor="facility-stage">Facility Stage</Label>
+              <Select value={facilityStage} onValueChange={(v) => setFacilityStage(v as TollingFacilityStage)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select facility stage" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TOLLING_FACILITY_STAGES.map((s) => (
+                    <SelectItem key={s.id} value={s.id}>
+                      <div className="flex flex-col">
+                        <span>{s.label}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {facilityStage === 'development' ? 'Tolling agreement entered into to support project bankability. Construction & development categories will be analysed.' :
+                 facilityStage === 'construction' ? 'Facility under construction. Construction milestones and COD provisions will be analysed.' :
+                 'Facility already operational. Analysis focuses on operational commercial terms.'}
+              </p>
             </div>
 
             {/* Counterparty Type */}

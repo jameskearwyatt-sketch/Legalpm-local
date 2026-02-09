@@ -59,6 +59,7 @@ export interface DraftLineItem {
   lc_firm_name?: string;
   is_optional?: boolean;
   is_included?: boolean;
+  is_capped?: boolean;
   category?: string | null;
   wip_amount?: number;
   wip_write_off?: number;
@@ -477,6 +478,25 @@ export function useBudgetVersions(matterId?: string) {
     },
   });
 
+  // Update is_capped flag for a line item
+  const updateLineItemCapped = useMutation({
+    mutationFn: async ({ lineItemId, isCapped }: { lineItemId: string; isCapped: boolean }) => {
+      const { error } = await supabase
+        .from('budget_line_items')
+        .update({ is_capped: isCapped })
+        .eq('id', lineItemId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budget-line-items'] });
+      queryClient.invalidateQueries({ queryKey: ['budget-versions', matterId] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to update cap status', description: error.message, variant: 'destructive' });
+    },
+  });
+
   return {
     versions: versionsQuery.data || [],
     latestVersion,
@@ -489,5 +509,6 @@ export function useBudgetVersions(matterId?: string) {
     fetchLineItems,
     toggleLineItemIncluded,
     updateLineItemOptional,
+    updateLineItemCapped,
   };
 }

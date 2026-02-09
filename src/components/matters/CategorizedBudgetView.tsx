@@ -69,6 +69,7 @@ interface CategorizedBudgetViewProps {
   originalItems: DraftLineItem[];
   updateLineItemOptional: any;
   toggleLineItemIncluded: any;
+  updateLineItemCapped: any;
   matterId: string;
 }
 
@@ -93,6 +94,7 @@ export function CategorizedBudgetView({
   originalItems,
   updateLineItemOptional,
   toggleLineItemIncluded,
+  updateLineItemCapped,
   matterId,
 }: CategorizedBudgetViewProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -511,6 +513,7 @@ export function CategorizedBudgetView({
                         originalItem={originalItems.find(orig => orig.id === item.id)}
                         updateLineItemOptional={updateLineItemOptional}
                         toggleLineItemIncluded={toggleLineItemIncluded}
+                        updateLineItemCapped={updateLineItemCapped}
                         canDelete={items.length > 1}
                       />
                     );

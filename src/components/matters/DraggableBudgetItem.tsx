@@ -60,6 +60,7 @@ interface DraggableBudgetItemProps {
   originalItem?: DraftLineItem;
   updateLineItemOptional: any;
   toggleLineItemIncluded: any;
+  updateLineItemCapped: any;
   canDelete: boolean;
 }
 
@@ -85,6 +86,7 @@ export function DraggableBudgetItem({
   originalItem,
   updateLineItemOptional,
   toggleLineItemIncluded,
+  updateLineItemCapped,
   canDelete,
 }: DraggableBudgetItemProps) {
   const {
@@ -346,7 +348,10 @@ export function DraggableBudgetItem({
         ) : (
           <div className="text-right min-w-[80px]">
             <div className="text-xs text-muted-foreground">Estimate</div>
-            <div className="font-medium text-sm">
+            <div className={cn(
+              "font-medium text-sm",
+              item.is_capped && "text-blue-600 dark:text-blue-400"
+            )}>
               {formatCurrency(displayAmount, displayCurrency)}
             </div>
           </div>
@@ -417,6 +422,31 @@ export function DraggableBudgetItem({
           </SelectContent>
         </Select>
       </div>
+
+      {/* Cap? checkbox - only show when budget exists */}
+      {hasExistingBudget && item.id && (
+        <div className="flex items-center gap-1">
+          <Checkbox
+            id={`capped-${item.id}`}
+            checked={item.is_capped ?? false}
+            onCheckedChange={(checked) => {
+              updateLineItemCapped.mutate({ 
+                lineItemId: item.id!, 
+                isCapped: checked === true 
+              });
+            }}
+            className={cn(
+              item.is_capped && "border-blue-600 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 dark:border-blue-400 dark:data-[state=checked]:bg-blue-500 dark:data-[state=checked]:border-blue-500"
+            )}
+          />
+          <label htmlFor={`capped-${item.id}`} className={cn(
+            "text-xs cursor-pointer",
+            item.is_capped ? "text-blue-600 dark:text-blue-400 font-medium" : "text-muted-foreground"
+          )}>
+            Cap?
+          </label>
+        </div>
+      )}
 
       {/* Optional checkbox - only show when budget exists */}
       {hasExistingBudget && item.id && (

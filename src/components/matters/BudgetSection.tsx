@@ -77,6 +77,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     fetchLineItems,
     toggleLineItemIncluded,
     updateLineItemOptional,
+    updateLineItemCapped,
   } = useBudgetVersions(matterId);
   
   const { localCounsels, syncLocalCounselsFromBudget } = useLocalCounsels(matterId);
@@ -1088,6 +1089,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
               originalItems={originalItems}
               updateLineItemOptional={updateLineItemOptional}
               toggleLineItemIncluded={toggleLineItemIncluded}
+              updateLineItemCapped={updateLineItemCapped}
               matterId={matterId}
             />
           </CollapsibleContent>

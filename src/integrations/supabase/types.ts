@@ -235,6 +235,7 @@ export type Database = {
           created_at: string
           fee_amount: number
           id: string
+          is_capped: boolean
           is_included: boolean
           is_optional: boolean
           lc_country: string | null
@@ -257,6 +258,7 @@ export type Database = {
           created_at?: string
           fee_amount?: number
           id?: string
+          is_capped?: boolean
           is_included?: boolean
           is_optional?: boolean
           lc_country?: string | null
@@ -279,6 +281,7 @@ export type Database = {
           created_at?: string
           fee_amount?: number
           id?: string
+          is_capped?: boolean
           is_included?: boolean
           is_optional?: boolean
           lc_country?: string | null

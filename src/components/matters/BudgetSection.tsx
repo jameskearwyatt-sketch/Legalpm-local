@@ -169,6 +169,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         lc_firm_name: item.lc_firm_name || undefined,
         is_optional: item.is_optional,
         is_included: item.is_included,
+        is_capped: item.is_capped,
         category: item.category || undefined,
         wip_amount: item.wip_amount,
         wip_write_off: item.wip_write_off,

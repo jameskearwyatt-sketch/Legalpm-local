@@ -15,6 +15,7 @@ export interface BudgetLineItem {
   lc_firm_name: string | null;
   is_optional: boolean;
   is_included: boolean;
+  is_capped: boolean;
   category: string | null;
   wip_amount: number;
   wip_write_off: number;

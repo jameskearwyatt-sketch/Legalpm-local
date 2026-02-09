@@ -726,7 +726,12 @@ export function PPAPrecedentBank() {
               /* Grouped View */
               <div className="space-y-3">
                 {Object.entries(groupedPrecedents)
-                  .sort((a, b) => b[1].length - a[1].length)
+                  .sort((a, b) => {
+                    const indexA = PPA_ALL_CATEGORIES.findIndex(c => c.label === a[0]);
+                    const indexB = PPA_ALL_CATEGORIES.findIndex(c => c.label === b[0]);
+                    // Unknown categories go to the end
+                    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+                  })
                   .map(([category, categoryPrecedents]) => {
                     const isExpanded = expandedCategories.includes(category);
                     const catInfo = PPA_ALL_CATEGORIES.find(c => c.label === category);

@@ -21,10 +21,12 @@ import {
   X,
   User,
   Building2,
-   Lightbulb,
+  Lightbulb,
+  Scale,
 } from 'lucide-react';
 import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAExtractedPosition } from '@/lib/hooks/usePPAAnalyses';
- import { PPATeachFeedbackDialog } from './PPATeachFeedbackDialog';
+import { PPATeachFeedbackDialog } from './PPATeachFeedbackDialog';
+import { WhatsMarketDialog } from './WhatsMarketDialog';
 import { getCategoryById, PPA_CATEGORY_GROUPS, PPA_ALL_CATEGORIES } from '@/lib/ppaCategories';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -117,9 +119,10 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
     marketPosition: new Set(),
     partyFavorability: new Set(),
   });
-   const [teachDialogPosition, setTeachDialogPosition] = useState<PPAExtractedPosition | null>(null);
-   const [positionUpdates, setPositionUpdates] = useState<Record<string, string>>({});
-   const [varianceNotesUpdates, setVarianceNotesUpdates] = useState<Record<string, string>>({});
+  const [teachDialogPosition, setTeachDialogPosition] = useState<PPAExtractedPosition | null>(null);
+  const [positionUpdates, setPositionUpdates] = useState<Record<string, string>>({});
+  const [varianceNotesUpdates, setVarianceNotesUpdates] = useState<Record<string, string>>({});
+  const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
 
   const analysis = analyses.find(a => a.id === analysisId);
 
@@ -634,16 +637,31 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                                    </Badge>
                                  </div>
                               )}
-                               {/* Teach AI Button */}
-                               <Button
-                                 variant="ghost"
-                                 size="sm"
-                                 className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
-                                 onClick={() => setTeachDialogPosition(position)}
-                                 title="Teach AI - Provide feedback on this analysis"
-                               >
-                                 <Lightbulb className="h-4 w-4" />
-                               </Button>
+                              <div className="flex items-center gap-1">
+                                {/* What's Market? Button */}
+                                {stats.count >= 1 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2 text-primary hover:text-primary hover:bg-primary/10"
+                                    onClick={() => setWhatsMarketCategory(position.category)}
+                                    title="What's Market? — Synthesize precedent bank for this category"
+                                  >
+                                    <Scale className="h-4 w-4 mr-1" />
+                                    <span className="text-xs">Market</span>
+                                  </Button>
+                                )}
+                                {/* Teach AI Button */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
+                                  onClick={() => setTeachDialogPosition(position)}
+                                  title="Teach AI - Provide feedback on this analysis"
+                                >
+                                  <Lightbulb className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
                           </div>
                         );
@@ -719,6 +737,16 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
            onPositionUpdated={(newSummary, newVarianceNotes) => {
              handlePositionUpdated(teachDialogPosition.id, newSummary, newVarianceNotes);
            }}
+         />
+       )}
+
+       {/* What's Market? Dialog */}
+       {whatsMarketCategory && (
+         <WhatsMarketDialog
+           open={!!whatsMarketCategory}
+           onOpenChange={(open) => !open && setWhatsMarketCategory(null)}
+           category={whatsMarketCategory}
+           precedents={precedents.filter(p => p.category === whatsMarketCategory)}
          />
        )}
     </div>

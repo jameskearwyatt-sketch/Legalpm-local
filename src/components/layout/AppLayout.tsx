@@ -30,8 +30,15 @@ import {
   Users,
   Network,
   FileSearch,
+  ChevronDown,
+  FlaskConical,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -39,10 +46,16 @@ interface AppLayoutProps {
 
 type NavItem = { name: string; href: string; icon: typeof LayoutDashboard };
 type NavSeparator = { type: 'separator' };
-type NavEntry = NavItem | NavSeparator;
+type NavGroup = { type: 'group'; name: string; icon: typeof LayoutDashboard; children: NavItem[] };
+type NavEntry = NavItem | NavSeparator | NavGroup;
+
+const analystChildren: NavItem[] = [
+  { name: 'PPA Analyst', href: '/ppa-analyst', icon: FileSearch },
+  { name: 'Tolling Analyst', href: '/tolling-analyst', icon: FlaskConical },
+];
 
 const navigation: NavEntry[] = [
-  { name: 'PPA Analyst', href: '/ppa-analyst', icon: FileSearch },
+  { type: 'group', name: 'Analyst', icon: FileSearch, children: analystChildren },
   { type: 'separator' },
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Matters', href: '/matters', icon: Briefcase },
@@ -71,6 +84,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const userInitials = user?.email?.slice(0, 2).toUpperCase() || 'U';
 
+  const [analystOpen, setAnalystOpen] = useState(() =>
+    analystChildren.some(c => location.pathname.startsWith(c.href))
+  );
+
   return (
     <div className="min-h-screen bg-background">
       {/* Desktop sidebar */}
@@ -91,6 +108,44 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {navigation.map((entry, index) => {
               if ('type' in entry && entry.type === 'separator') {
                 return <div key={`sep-${index}`} className="my-2 mx-2 border-t border-dotted border-sidebar-border/60" />;
+              }
+              if ('type' in entry && entry.type === 'group') {
+                const group = entry as NavGroup;
+                const groupActive = group.children.some(c => location.pathname.startsWith(c.href));
+                return (
+                  <Collapsible key={group.name} open={analystOpen} onOpenChange={setAnalystOpen}>
+                    <CollapsibleTrigger className={cn(
+                      'flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                      groupActive
+                        ? 'text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                    )}>
+                      <group.icon className="h-5 w-5" />
+                      {group.name}
+                      <ChevronDown className={cn('ml-auto h-4 w-4 transition-transform', analystOpen && 'rotate-180')} />
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="pl-4 space-y-0.5 mt-0.5">
+                      {group.children.map(child => {
+                        const childActive = location.pathname === child.href || location.pathname.startsWith(child.href);
+                        return (
+                          <Link
+                            key={child.name}
+                            to={child.href}
+                            className={cn(
+                              'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
+                              childActive
+                                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                            )}
+                          >
+                            <child.icon className="h-4 w-4" />
+                            {child.name}
+                          </Link>
+                        );
+                      })}
+                    </CollapsibleContent>
+                  </Collapsible>
+                );
               }
               const item = entry as NavItem;
               const isActive = location.pathname === item.href || 
@@ -182,6 +237,35 @@ export default function AppLayout({ children }: AppLayoutProps) {
               {navigation.map((entry, index) => {
                 if ('type' in entry && entry.type === 'separator') {
                   return <div key={`sep-m-${index}`} className="my-2 mx-2 border-t border-dotted border-sidebar-border/60" />;
+                }
+                if ('type' in entry && entry.type === 'group') {
+                  const group = entry as NavGroup;
+                  return (
+                    <div key={group.name} className="space-y-0.5">
+                      <div className="px-3 py-2 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
+                        {group.name}
+                      </div>
+                      {group.children.map(child => {
+                        const childActive = location.pathname.startsWith(child.href);
+                        return (
+                          <Link
+                            key={child.name}
+                            to={child.href}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={cn(
+                              'flex items-center gap-3 px-3 pl-6 py-2 rounded-lg text-sm font-medium transition-colors',
+                              childActive
+                                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                            )}
+                          >
+                            <child.icon className="h-4 w-4" />
+                            {child.name}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  );
                 }
                 const item = entry as NavItem;
                 const isActive = location.pathname === item.href;

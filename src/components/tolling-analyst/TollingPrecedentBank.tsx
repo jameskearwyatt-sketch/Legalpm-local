@@ -12,9 +12,10 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import {
-  Search, Database, Trash2, Loader2, ChevronDown, ChevronRight, X, AlertTriangle,
+  Search, Database, Trash2, Loader2, ChevronDown, ChevronRight, X, AlertTriangle, Scale,
 } from 'lucide-react';
 import { useTollingPrecedentBank, TollingPrecedent } from '@/lib/hooks/useTollingAnalyses';
+import { TollingWhatsMarketDialog } from './TollingWhatsMarketDialog';
 import { TOLLING_ALL_CATEGORIES, TOLLING_TECHNOLOGY_TYPES, TOLLING_FACILITY_STAGES } from '@/lib/tollingCategories';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -29,6 +30,8 @@ export function TollingPrecedentBank() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [technologyFilter, setTechnologyFilter] = useState<string>('all');
   const [stageFilter, setStageFilter] = useState<string>('all');
+  const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
+  const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<TollingPrecedent[]>([]);
 
   // Compute technology/stage statistics
   const stats = useMemo(() => {
@@ -257,6 +260,21 @@ export function TollingPrecedentBank() {
                               </div>
                               {catInfo && <span className="text-xs text-muted-foreground">{catInfo.group}</span>}
                             </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 text-xs gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setWhatsMarketCategory(category);
+                                  setWhatsMarketPrecedents(categoryPrecedents);
+                                }}
+                              >
+                                <Scale className="h-3.5 w-3.5" />
+                                What's Market?
+                              </Button>
+                            </div>
                           </div>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
@@ -287,6 +305,21 @@ export function TollingPrecedentBank() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* What's Market? Dialog */}
+      {whatsMarketCategory && (
+        <TollingWhatsMarketDialog
+          open={!!whatsMarketCategory}
+          onOpenChange={(open) => {
+            if (!open) {
+              setWhatsMarketCategory(null);
+              setWhatsMarketPrecedents([]);
+            }
+          }}
+          category={whatsMarketCategory}
+          precedents={whatsMarketPrecedents}
+        />
+      )}
     </>
   );
 }

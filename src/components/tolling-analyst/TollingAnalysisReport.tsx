@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useTollingAnalyses, useTollingPositions, useTollingPrecedentBank, TollingExtractedPosition } from '@/lib/hooks/useTollingAnalyses';
 import { TollingTeachFeedbackDialog } from './TollingTeachFeedbackDialog';
+import { TollingWhatsMarketDialog } from './TollingWhatsMarketDialog';
 import { TOLLING_CATEGORY_GROUPS, TOLLING_ALL_CATEGORIES } from '@/lib/tollingCategories';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -59,7 +60,7 @@ type FilterState = {
 export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory }: TollingAnalysisReportProps) {
   const { analyses, updateAnalysis } = useTollingAnalyses();
   const { positions, isLoading: positionsLoading } = useTollingPositions(analysisId);
-  const { bankPositions, getCategoryStats } = useTollingPrecedentBank();
+  const { bankPositions, getCategoryStats, precedents: bankPrecedents } = useTollingPrecedentBank();
 
   const [selectedForBanking, setSelectedForBanking] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(TOLLING_CATEGORY_GROUPS.map(g => g)));
@@ -68,6 +69,7 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
   const [teachDialogPosition, setTeachDialogPosition] = useState<TollingExtractedPosition | null>(null);
   const [positionUpdates, setPositionUpdates] = useState<Record<string, string>>({});
   const [varianceNotesUpdates, setVarianceNotesUpdates] = useState<Record<string, string>>({});
+  const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
 
   const analysis = analyses.find(a => a.id === analysisId);
 
@@ -429,6 +431,18 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
                                 {stats.count > 0 && (
                                   <Badge variant="outline" className="text-xs">{stats.count} in bank</Badge>
                                 )}
+                                {stats.count >= 1 && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-8 px-2 text-primary hover:text-primary hover:bg-primary/10"
+                                    onClick={() => setWhatsMarketCategory(position.category)}
+                                    title="What's Market? — Synthesize precedent bank for this category"
+                                  >
+                                    <Scale className="h-4 w-4 mr-1" />
+                                    <span className="text-xs">Market</span>
+                                  </Button>
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -502,6 +516,16 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
           onPositionUpdated={(newSummary, newVarianceNotes) => {
             handlePositionUpdated(teachDialogPosition.id, newSummary, newVarianceNotes);
           }}
+        />
+      )}
+
+      {/* What's Market? Dialog */}
+      {whatsMarketCategory && (
+        <TollingWhatsMarketDialog
+          open={!!whatsMarketCategory}
+          onOpenChange={(open) => !open && setWhatsMarketCategory(null)}
+          category={whatsMarketCategory}
+          precedents={(bankPrecedents || []).filter(p => p.category === whatsMarketCategory)}
         />
       )}
     </div>

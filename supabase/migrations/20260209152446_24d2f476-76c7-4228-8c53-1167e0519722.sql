@@ -1,0 +1,1 @@
+ALTER TABLE public.budget_line_items ADD COLUMN is_capped boolean NOT NULL DEFAULT false;

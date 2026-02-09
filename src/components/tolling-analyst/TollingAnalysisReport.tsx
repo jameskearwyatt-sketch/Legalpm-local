@@ -187,6 +187,7 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
         template_name: null,
         template_description: null,
         tolling_type: analysis.tolling_type || null,
+        facility_stage: analysis.facility_stage || null,
         source_text: p.source_text || null,
         confidence: p.confidence || 'medium',
         market_position: p.variance_notes?.includes('[ON MARKET]') ? 'on_market'
@@ -240,7 +241,8 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
                     {analysis.perspective === 'offtaker' ? 'Offtaker' : 'Generator'} Perspective
                   </Badge>
                   {analysis.jurisdiction && <Badge variant="secondary">{analysis.jurisdiction}</Badge>}
-                  {analysis.tolling_type && <Badge variant="outline">{analysis.tolling_type.toUpperCase()}</Badge>}
+                  {analysis.tolling_type && <Badge variant="outline">{analysis.tolling_type.replace(/_/g, ' ').toUpperCase()}</Badge>}
+                  {analysis.facility_stage && <Badge variant="outline" className="border-accent">{analysis.facility_stage.charAt(0).toUpperCase() + analysis.facility_stage.slice(1)}</Badge>}
                   {analysis.is_agreed && (
                     <Badge className="bg-primary/10 text-primary border border-primary/30">Agreed</Badge>
                   )}

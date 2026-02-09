@@ -85,7 +85,8 @@ export function TollingAnalysisList() {
                 <TableRow>
                   <TableHead>Project</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Tolling Type</TableHead>
+                  <TableHead>Technology</TableHead>
+                  <TableHead>Stage</TableHead>
                   <TableHead>Perspective</TableHead>
                   <TableHead>Jurisdiction</TableHead>
                   <TableHead>Status</TableHead>
@@ -110,7 +111,14 @@ export function TollingAnalysisList() {
                     <TableCell onClick={() => setSelectedAnalysisId(analysis.id)}>
                       {analysis.tolling_type ? (
                         <Badge variant="outline" className="text-xs">
-                          {analysis.tolling_type.toUpperCase().replace('_', ' ')}
+                          {analysis.tolling_type.replace(/_/g, ' ').toUpperCase()}
+                        </Badge>
+                      ) : '—'}
+                    </TableCell>
+                    <TableCell onClick={() => setSelectedAnalysisId(analysis.id)}>
+                      {analysis.facility_stage ? (
+                        <Badge variant="secondary" className="text-xs">
+                          {analysis.facility_stage.charAt(0).toUpperCase() + analysis.facility_stage.slice(1)}
                         </Badge>
                       ) : '—'}
                     </TableCell>

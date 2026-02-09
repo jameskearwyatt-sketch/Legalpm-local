@@ -15,98 +15,179 @@ function toBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
-// Extract text from DOCX by parsing the XML directly (DOCX is a ZIP file)
-async function extractTextFromDocx(arrayBuffer: ArrayBuffer): Promise<string> {
-  const bytes = new Uint8Array(arrayBuffer);
-  
-  // Find local file headers in ZIP and locate word/document.xml
-  let documentXmlData: Uint8Array | null = null;
+// Decompress a single ZIP entry
+async function decompressEntry(fileData: Uint8Array, compressionMethod: number): Promise<Uint8Array | null> {
+  if (compressionMethod === 0) return fileData; // stored
+  if (compressionMethod !== 8) return null; // only deflate supported
+  try {
+    const ds = new DecompressionStream('deflate-raw');
+    const writer = ds.writable.getWriter();
+    const reader = ds.readable.getReader();
+    writer.write(fileData);
+    writer.close();
+    const chunks: Uint8Array[] = [];
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+    }
+    const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
+    const result = new Uint8Array(totalLength);
+    let pos = 0;
+    for (const chunk of chunks) { result.set(chunk, pos); pos += chunk.length; }
+    return result;
+  } catch (e) {
+    console.error('Decompression failed:', e);
+    return null;
+  }
+}
+
+// Extract ALL matching XML files from a DOCX ZIP archive
+async function extractZipEntries(bytes: Uint8Array, targetNames: string[]): Promise<Map<string, string>> {
+  const results = new Map<string, string>();
+  const targetSet = new Set(targetNames);
   let offset = 0;
-  
+
   while (offset < bytes.length - 30) {
-    // Local file header signature: PK\x03\x04
-    if (bytes[offset] === 0x50 && bytes[offset + 1] === 0x4b && 
+    if (bytes[offset] === 0x50 && bytes[offset + 1] === 0x4b &&
         bytes[offset + 2] === 0x03 && bytes[offset + 3] === 0x04) {
-      
       const compressionMethod = bytes[offset + 8] | (bytes[offset + 9] << 8);
-      const compressedSize = bytes[offset + 18] | (bytes[offset + 19] << 8) | 
+      const compressedSize = bytes[offset + 18] | (bytes[offset + 19] << 8) |
                             (bytes[offset + 20] << 16) | (bytes[offset + 21] << 24);
-      const uncompressedSize = bytes[offset + 22] | (bytes[offset + 23] << 8) | 
-                              (bytes[offset + 24] << 16) | (bytes[offset + 25] << 24);
       const nameLength = bytes[offset + 26] | (bytes[offset + 27] << 8);
       const extraLength = bytes[offset + 28] | (bytes[offset + 29] << 8);
-      
       const nameStart = offset + 30;
-      const nameBytes = bytes.slice(nameStart, nameStart + nameLength);
-      const fileName = new TextDecoder().decode(nameBytes);
-      
+      const fileName = new TextDecoder().decode(bytes.slice(nameStart, nameStart + nameLength));
       const dataStart = nameStart + nameLength + extraLength;
-      
-      if (fileName === 'word/document.xml') {
+
+      if (targetSet.has(fileName)) {
         const fileData = bytes.slice(dataStart, dataStart + compressedSize);
-        
-        // Decompress if needed (method 8 = deflate)
-        if (compressionMethod === 8) {
-          try {
-            const ds = new DecompressionStream('deflate-raw');
-            const writer = ds.writable.getWriter();
-            const reader = ds.readable.getReader();
-            
-            writer.write(fileData);
-            writer.close();
-            
-            const chunks: Uint8Array[] = [];
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              chunks.push(value);
-            }
-            
-            const totalLength = chunks.reduce((acc, c) => acc + c.length, 0);
-            documentXmlData = new Uint8Array(totalLength);
-            let pos = 0;
-            for (const chunk of chunks) {
-              documentXmlData.set(chunk, pos);
-              pos += chunk.length;
-            }
-          } catch (e) {
-            console.error('Decompression failed:', e);
-          }
-        } else if (compressionMethod === 0) {
-          // Stored (uncompressed)
-          documentXmlData = fileData;
+        const decompressed = await decompressEntry(fileData, compressionMethod);
+        if (decompressed) {
+          results.set(fileName, new TextDecoder().decode(decompressed));
         }
-        break;
       }
-      
       offset = dataStart + compressedSize;
     } else {
       offset++;
     }
   }
-  
-  if (!documentXmlData) {
-    throw new Error('Could not find document.xml in DOCX');
-  }
-  
-  const xmlContent = new TextDecoder().decode(documentXmlData);
-  
-  // Extract text from paragraphs
+  return results;
+}
+
+// Decode XML entities
+function decodeXmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, num) => String.fromCharCode(parseInt(num)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+}
+
+// Extract text from OOXML content, handling paragraphs, tables, tabs, breaks
+function extractTextFromXml(xmlContent: string): string {
+  const lines: string[] = [];
+
+  // Process paragraph by paragraph
   const paragraphs = xmlContent.split(/<\/w:p>/);
-  let result = '';
-  
   for (const para of paragraphs) {
-    const texts = para.match(/<w:t[^>]*>([^<]*)<\/w:t>/g) || [];
-    const paraText = texts
-      .map(t => t.replace(/<w:t[^>]*>([^<]*)<\/w:t>/, '$1'))
-      .join('');
-    
+    let paraText = '';
+
+    // Process each run and text element in order
+    // Split by run boundaries to maintain order
+    const segments = para.split(/<w:r[ >]/);
+    for (const segment of segments) {
+      // Handle tabs -> insert tab character
+      if (segment.includes('<w:tab/>') || segment.includes('<w:tab />')) {
+        paraText += '\t';
+      }
+      // Handle line breaks
+      if (segment.includes('<w:br')) {
+        paraText += '\n';
+      }
+
+      // Extract all <w:t> text (handles xml:space="preserve" and regular)
+      const textMatches = segment.matchAll(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g);
+      for (const m of textMatches) {
+        paraText += decodeXmlEntities(m[1]);
+      }
+    }
+
+    // Also catch any <w:t> outside of runs (rare but possible)
+    if (!paraText.trim()) {
+      const fallbackMatches = para.matchAll(/<w:t[^>]*>([\s\S]*?)<\/w:t>/g);
+      for (const m of fallbackMatches) {
+        paraText += decodeXmlEntities(m[1]);
+      }
+    }
+
     if (paraText.trim()) {
-      result += paraText + '\n';
+      lines.push(paraText);
     }
   }
-  
-  return result.trim();
+
+  return lines.join('\n');
+}
+
+// Extract text from DOCX by parsing all relevant XML parts
+async function extractTextFromDocx(arrayBuffer: ArrayBuffer): Promise<string> {
+  const bytes = new Uint8Array(arrayBuffer);
+
+  // Extract from all content-bearing parts of the DOCX
+  const targetFiles = [
+    'word/document.xml',
+    'word/header1.xml', 'word/header2.xml', 'word/header3.xml',
+    'word/footer1.xml', 'word/footer2.xml', 'word/footer3.xml',
+    'word/footnotes.xml', 'word/endnotes.xml',
+  ];
+
+  const xmlEntries = await extractZipEntries(bytes, targetFiles);
+
+  if (!xmlEntries.has('word/document.xml')) {
+    throw new Error('Could not find document.xml in DOCX');
+  }
+
+  // Build output: headers first, then main body, then footnotes/endnotes
+  const sections: string[] = [];
+
+  // Headers
+  for (const key of ['word/header1.xml', 'word/header2.xml', 'word/header3.xml']) {
+    const xml = xmlEntries.get(key);
+    if (xml) {
+      const text = extractTextFromXml(xml).trim();
+      if (text) sections.push(text);
+    }
+  }
+
+  // Main document body
+  const mainText = extractTextFromXml(xmlEntries.get('word/document.xml')!).trim();
+  if (mainText) sections.push(mainText);
+
+  // Footers
+  for (const key of ['word/footer1.xml', 'word/footer2.xml', 'word/footer3.xml']) {
+    const xml = xmlEntries.get(key);
+    if (xml) {
+      const text = extractTextFromXml(xml).trim();
+      if (text) sections.push(text);
+    }
+  }
+
+  // Footnotes & endnotes (skip default entries which are usually empty)
+  for (const key of ['word/footnotes.xml', 'word/endnotes.xml']) {
+    const xml = xmlEntries.get(key);
+    if (xml) {
+      const text = extractTextFromXml(xml).trim();
+      // Footnotes/endnotes files always have a couple of empty default entries
+      if (text && text.length > 10) sections.push(text);
+    }
+  }
+
+  const result = sections.join('\n\n');
+  console.log(`DOCX extraction: ${xmlEntries.size} XML parts processed, ${result.length} chars extracted`);
+  return result;
 }
 
 serve(async (req) => {

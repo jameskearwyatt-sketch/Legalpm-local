@@ -2816,6 +2816,290 @@ export type Database = {
         }
         Relationships: []
       }
+      tolling_analyses: {
+        Row: {
+          agreed_at: string | null
+          analysis_type: string
+          comparison_file_name: string | null
+          comparison_file_url: string | null
+          complexity_score: number | null
+          counterparty_type: string | null
+          created_at: string
+          document_file_name: string
+          document_file_url: string | null
+          generator_name: string | null
+          generator_normalized: string | null
+          id: string
+          is_agreed: boolean
+          is_comparison: boolean
+          jurisdiction: string | null
+          key_risk_areas: string[] | null
+          notes: string | null
+          offtaker_name: string | null
+          offtaker_normalized: string | null
+          parent_analysis_id: string | null
+          perspective: string
+          project_name: string
+          tolling_type: string | null
+          updated_at: string
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          agreed_at?: string | null
+          analysis_type?: string
+          comparison_file_name?: string | null
+          comparison_file_url?: string | null
+          complexity_score?: number | null
+          counterparty_type?: string | null
+          created_at?: string
+          document_file_name?: string
+          document_file_url?: string | null
+          generator_name?: string | null
+          generator_normalized?: string | null
+          id?: string
+          is_agreed?: boolean
+          is_comparison?: boolean
+          jurisdiction?: string | null
+          key_risk_areas?: string[] | null
+          notes?: string | null
+          offtaker_name?: string | null
+          offtaker_normalized?: string | null
+          parent_analysis_id?: string | null
+          perspective?: string
+          project_name: string
+          tolling_type?: string | null
+          updated_at?: string
+          user_id: string
+          version_number?: number
+        }
+        Update: {
+          agreed_at?: string | null
+          analysis_type?: string
+          comparison_file_name?: string | null
+          comparison_file_url?: string | null
+          complexity_score?: number | null
+          counterparty_type?: string | null
+          created_at?: string
+          document_file_name?: string
+          document_file_url?: string | null
+          generator_name?: string | null
+          generator_normalized?: string | null
+          id?: string
+          is_agreed?: boolean
+          is_comparison?: boolean
+          jurisdiction?: string | null
+          key_risk_areas?: string[] | null
+          notes?: string | null
+          offtaker_name?: string | null
+          offtaker_normalized?: string | null
+          parent_analysis_id?: string | null
+          perspective?: string
+          project_name?: string
+          tolling_type?: string | null
+          updated_at?: string
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tolling_analyses_parent_analysis_id_fkey"
+            columns: ["parent_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "tolling_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tolling_extracted_positions: {
+        Row: {
+          analysis_id: string
+          bible_reference: string | null
+          category: string
+          change_summary: string | null
+          change_type: string | null
+          comparison_position: string | null
+          confidence: string
+          created_at: string
+          id: string
+          market_benchmark: string | null
+          position_summary: string
+          previous_position: string | null
+          source_text: string | null
+          user_id: string
+          variance_notes: string | null
+        }
+        Insert: {
+          analysis_id: string
+          bible_reference?: string | null
+          category: string
+          change_summary?: string | null
+          change_type?: string | null
+          comparison_position?: string | null
+          confidence?: string
+          created_at?: string
+          id?: string
+          market_benchmark?: string | null
+          position_summary: string
+          previous_position?: string | null
+          source_text?: string | null
+          user_id: string
+          variance_notes?: string | null
+        }
+        Update: {
+          analysis_id?: string
+          bible_reference?: string | null
+          category?: string
+          change_summary?: string | null
+          change_type?: string | null
+          comparison_position?: string | null
+          confidence?: string
+          created_at?: string
+          id?: string
+          market_benchmark?: string | null
+          position_summary?: string
+          previous_position?: string | null
+          source_text?: string | null
+          user_id?: string
+          variance_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tolling_extracted_positions_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "tolling_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tolling_learnings: {
+        Row: {
+          analysis_id: string | null
+          category: string
+          corrected_position: string
+          correction_reason: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          original_position: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analysis_id?: string | null
+          category: string
+          corrected_position: string
+          correction_reason?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          original_position: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analysis_id?: string | null
+          category?: string
+          corrected_position?: string
+          correction_reason?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          original_position?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tolling_learnings_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "tolling_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tolling_precedent_bank: {
+        Row: {
+          banked_at: string
+          category: string
+          confidence: string
+          generator_name: string | null
+          generator_normalized: string | null
+          id: string
+          is_gold_standard: boolean
+          jurisdiction: string | null
+          market_position: string | null
+          offtaker_name: string | null
+          offtaker_normalized: string | null
+          party_favorability: string | null
+          perspective: string
+          position_summary: string
+          project_name: string
+          source_analysis_id: string | null
+          source_text: string | null
+          template_description: string | null
+          template_name: string | null
+          tolling_type: string | null
+          user_id: string
+        }
+        Insert: {
+          banked_at?: string
+          category: string
+          confidence?: string
+          generator_name?: string | null
+          generator_normalized?: string | null
+          id?: string
+          is_gold_standard?: boolean
+          jurisdiction?: string | null
+          market_position?: string | null
+          offtaker_name?: string | null
+          offtaker_normalized?: string | null
+          party_favorability?: string | null
+          perspective?: string
+          position_summary: string
+          project_name: string
+          source_analysis_id?: string | null
+          source_text?: string | null
+          template_description?: string | null
+          template_name?: string | null
+          tolling_type?: string | null
+          user_id: string
+        }
+        Update: {
+          banked_at?: string
+          category?: string
+          confidence?: string
+          generator_name?: string | null
+          generator_normalized?: string | null
+          id?: string
+          is_gold_standard?: boolean
+          jurisdiction?: string | null
+          market_position?: string | null
+          offtaker_name?: string | null
+          offtaker_normalized?: string | null
+          party_favorability?: string | null
+          perspective?: string
+          position_summary?: string
+          project_name?: string
+          source_analysis_id?: string | null
+          source_text?: string | null
+          template_description?: string | null
+          template_name?: string | null
+          tolling_type?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tolling_precedent_bank_source_analysis_id_fkey"
+            columns: ["source_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "tolling_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_report_formats: {
         Row: {
           column_mappings: Json

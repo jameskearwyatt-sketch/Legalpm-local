@@ -119,3 +119,6 @@ verify_jwt = false
 
 [functions.whats-market]
 verify_jwt = false
+
+[functions.analyze-tolling]
+verify_jwt = false

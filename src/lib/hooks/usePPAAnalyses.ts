@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 
-export type PPAAnalysisType = 'ppa_vs_bible' | 'ppa_vs_termsheet';
+export type PPAAnalysisType = 'ppa_vs_bible' | 'ppa_vs_termsheet' | 'termsheet_vs_bible';
 export type PPAPerspective = 'buyer' | 'seller';
 export type PPAConfidenceLevel = 'high' | 'medium' | 'review_required';
 export type PPAStructureType = 'vppa' | 'physical' | 'sleeved' | 'private_wire';

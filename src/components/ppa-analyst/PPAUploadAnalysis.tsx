@@ -535,7 +535,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
     return (
       <Card className="max-w-2xl mx-auto">
         <CardHeader className="text-center">
-          <CardTitle>Analyzing PPA</CardTitle>
+          <CardTitle>Analyzing {analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'PPA'}</CardTitle>
           <CardDescription>{analysisStatus}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -558,7 +558,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Upload className="h-5 w-5" />
-            {preFill ? 'Re-upload Document for Re-analysis' : 'Upload PPA Document'}
+            {preFill ? 'Re-upload Document for Re-analysis' : (analysisType === 'termsheet_vs_bible' ? 'Upload Term Sheet' : 'Upload PPA Document')}
           </CardTitle>
           <CardDescription>
             {preFill ? (
@@ -574,7 +574,9 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
                 )}
               </div>
             ) : (
-              'Upload a Power Purchase Agreement (PDF or Word) for analysis'
+              analysisType === 'termsheet_vs_bible' 
+                ? 'Upload a term sheet or heads of terms (PDF or Word) for analysis against market standard PPA positions'
+                : 'Upload a Power Purchase Agreement (PDF or Word) for analysis'
             )}
           </CardDescription>
         </CardHeader>
@@ -696,7 +698,16 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
                   <label htmlFor="ppa_vs_bible" className="flex-1 cursor-pointer">
                     <p className="font-medium">PPA vs Knowledge & Precedent Bank</p>
                     <p className="text-sm text-muted-foreground">
-                      Analyze against the How-To Bible framework, gold standard templates, and your banked deal precedents
+                      Analyze a long-form PPA against the How-To Bible framework, gold standard templates, and your banked deal precedents
+                    </p>
+                  </label>
+                </div>
+                <div className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                  <RadioGroupItem value="termsheet_vs_bible" id="termsheet_vs_bible" className="mt-1" />
+                  <label htmlFor="termsheet_vs_bible" className="flex-1 cursor-pointer">
+                    <p className="font-medium">Term Sheet vs Knowledge & Precedent Bank</p>
+                    <p className="text-sm text-muted-foreground">
+                      Analyze a term sheet or heads of terms against market standard PPA positions — identifies gaps and flags where the term sheet is on/off market
                     </p>
                   </label>
                 </div>
@@ -705,7 +716,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
                   <label htmlFor="ppa_vs_termsheet" className="flex-1 cursor-pointer">
                     <p className="font-medium">PPA vs Term Sheet</p>
                     <p className="text-sm text-muted-foreground">
-                      Compare PPA draft against a term sheet or heads of terms
+                      Compare a long-form PPA draft against a term sheet to check commercial alignment
                     </p>
                   </label>
                 </div>

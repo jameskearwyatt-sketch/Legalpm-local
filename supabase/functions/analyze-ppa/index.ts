@@ -822,6 +822,8 @@ serve(async (req) => {
        userLearnings, // User corrections and feedback
     } = await req.json();
 
+    const isTermSheetAnalysis = analysisType === 'termsheet_vs_bible';
+
     if (!ppaText) {
       return new Response(
         JSON.stringify({ error: 'PPA text is required' }),
@@ -956,7 +958,15 @@ ${precs.map(p => `- ${p.project_name}${p.jurisdiction ? ` (${p.jurisdiction})` :
     const jurisdictionContext = getJurisdictionContext(jurisdiction);
 
     const systemPrompt = `You are an expert PPA (Power Purchase Agreement) analyst specializing in European renewable energy contracts.
-Your task is to extract ACTIONABLE, SPECIFIC positions from the provided PPA document.
+${isTermSheetAnalysis ? `Your task is to analyze a TERM SHEET (or Heads of Terms) against the same categories used for full PPA analysis. Term sheets are shorter, pre-contractual documents that set out the key commercial terms before long-form documentation is drafted.
+
+## TERM SHEET ANALYSIS RULES
+- A term sheet will NOT cover all categories — this is EXPECTED and NORMAL
+- For categories NOT addressed in the term sheet: note "Not addressed in term sheet" with a brief explanation of what a long-form PPA would typically include, and flag whether this is a gap the parties should negotiate before going to long-form
+- For categories that ARE addressed: analyze the position as you would for a full PPA, assessing market position, party favorability, and benchmarks
+- Be especially vigilant about vague or ambiguous language in term sheets — flag where the term sheet lacks sufficient detail to protect either party
+- Identify any "silent" areas that could become contentious in long-form negotiations
+- DO NOT penalize the term sheet for being shorter than a full PPA — focus on whether the positions it DOES take are on-market and well-drafted` : `Your task is to extract ACTIONABLE, SPECIFIC positions from the provided PPA document.`}
 You have been equipped with MARKET INTELLIGENCE synthesized from our precedent bank - use it to provide precise market position assessments.
 
 ${PPA_KNOWLEDGE_BASE}
@@ -1113,16 +1123,19 @@ When you cite market intelligence, be specific: "This 93% availability is below 
 ## CATEGORIES TO EXTRACT
 ${categoryList}`;
 
-    const userPrompt = `Analyze this PPA and extract positions for each category following the requirements above.
+    const userPrompt = `Analyze this ${isTermSheetAnalysis ? 'TERM SHEET' : 'PPA'} and extract positions for each category following the requirements above.
 
 PROJECT: ${projectName}
 
-PPA DOCUMENT TEXT:
+${isTermSheetAnalysis ? 'TERM SHEET' : 'PPA'} DOCUMENT TEXT:
 ${ppaText.substring(0, 100000)}
 
 ${comparisonText ? `
 TERM SHEET / COMPARISON DOCUMENT:
 ${comparisonText.substring(0, 30000)}
+` : ''}
+${isTermSheetAnalysis ? `
+IMPORTANT: This is a TERM SHEET, not a full PPA. Many categories may not be addressed — for those, note what would typically be expected in a long-form PPA and whether the omission is normal for a term sheet or represents a gap that should be addressed before going to long-form.
 ` : ''}
 
 Return a JSON object:

@@ -3194,7 +3194,10 @@ export type Database = {
         | "Lost"
       matter_status: "Open" | "On Hold" | "Closed"
       pipeline_outcome: "Won" | "Lost" | "Pending"
-      ppa_analysis_type: "ppa_vs_bible" | "ppa_vs_termsheet"
+      ppa_analysis_type:
+        | "ppa_vs_bible"
+        | "ppa_vs_termsheet"
+        | "termsheet_vs_bible"
       ppa_confidence_level: "high" | "medium" | "review_required"
       ppa_perspective: "buyer" | "seller"
       ppa_structure_type: "vppa" | "physical" | "sleeved" | "private_wire"
@@ -3370,7 +3373,11 @@ export const Constants = {
       ],
       matter_status: ["Open", "On Hold", "Closed"],
       pipeline_outcome: ["Won", "Lost", "Pending"],
-      ppa_analysis_type: ["ppa_vs_bible", "ppa_vs_termsheet"],
+      ppa_analysis_type: [
+        "ppa_vs_bible",
+        "ppa_vs_termsheet",
+        "termsheet_vs_bible",
+      ],
       ppa_confidence_level: ["high", "medium", "review_required"],
       ppa_perspective: ["buyer", "seller"],
       ppa_structure_type: ["vppa", "physical", "sleeved", "private_wire"],

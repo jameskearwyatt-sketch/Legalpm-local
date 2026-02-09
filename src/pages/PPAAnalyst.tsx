@@ -80,7 +80,7 @@ export default function PPAAnalyst() {
           <div>
             <h1 className="text-2xl font-heading font-bold text-foreground">PPA Analyst</h1>
             <p className="text-muted-foreground mt-1">
-              Analyze PPAs against the Bible or compare with term sheets
+              Analyze PPAs and term sheets against market standards and precedents
             </p>
           </div>
           

@@ -265,8 +265,8 @@ export function DraggableBudgetItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'grid gap-2 items-center rounded-md py-1 px-1 transition-colors',
-        hasExistingBudget ? 'grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto_auto_auto]' : 'grid-cols-12',
+        'grid gap-2 items-center rounded-md py-1 px-1 transition-colors min-w-[900px]',
+        hasExistingBudget ? 'grid-cols-[auto_1fr_auto_auto_auto_auto_auto_auto_auto_auto_auto]' : 'grid-cols-12',
         isDragging && 'opacity-50',
         isAiSuggested && 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700',
         item.is_optional && !item.is_included && hasExistingBudget && 'opacity-50',

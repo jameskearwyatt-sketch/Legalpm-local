@@ -182,7 +182,7 @@ export function CategoryGroup({
 
       {/* Category Items */}
       {!isCollapsed && (
-        <div className="p-2 space-y-1 bg-background/50">
+        <div className="p-2 space-y-1 bg-background/50 overflow-x-auto">
           {children}
         </div>
       )}

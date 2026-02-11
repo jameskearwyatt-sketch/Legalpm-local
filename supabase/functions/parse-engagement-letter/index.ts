@@ -57,28 +57,34 @@ serve(async (req) => {
 
     console.log("Parsing engagement letter text, length:", text.length);
 
-    const systemPrompt = `You are an expert legal billing analyst. Your task is to parse engagement letter or fee arrangement text and extract budget line items WITH FULL DETAIL.
+    const systemPrompt = `You are an expert legal billing analyst. Your task is to parse ANY text describing legal work and extract ALL identifiable work items as budget line items.
 
-CRITICAL - DETAIL PRESERVATION (HIGHEST PRIORITY):
+CRITICAL EXTRACTION RULE (HIGHEST PRIORITY):
+- You MUST extract work items even from minimal, sparse, or informal text
+- A numbered list like "1. Non-binding term sheet  2. Tolling agreement  3. Miscellaneous" contains THREE work items - extract ALL of them
+- Even a SINGLE LINE describing a deliverable or task is a work item
+- If the text mentions ANY legal document, agreement, review, analysis, negotiation, or deliverable, it IS a work item
+- When in doubt, EXTRACT IT. It is FAR better to extract too many items than too few
+- NEVER return an empty items array if the text contains ANY reference to legal work or deliverables
+
+DETAIL PRESERVATION:
 The "detail" field MUST contain the COMPLETE, VERBATIM, WORD-FOR-WORD text describing each work item from the source document.
 - DO NOT summarize, shorten, or paraphrase the detail - COPY IT EXACTLY AS WRITTEN
 - If the source says "Review and analysis of all material contracts including customer agreements, supplier contracts, distribution agreements, licensing arrangements, and any contracts with change of control provisions" - that ENTIRE text goes in detail VERBATIM
 - The detail field should contain the FULL original text, not a condensed version
 - If the source provides bullet points or sub-items, include ALL of them in detail
 - The work_item field is a SHORT summary (max 50 chars), the detail field is the FULL ORIGINAL TEXT
-- NEVER leave detail empty if there is descriptive text about the work item
+- If the source text is very short (e.g., just "Non-binding term sheet"), use that as both work_item AND detail
 
-PHASE DETECTION (VERY IMPORTANT):
-- Look for EXPLICIT phase indicators in the text: "Phase 1", "Phase 2", "PILOT PHASE", "MAIN PROGRAM PHASE", "Main Transaction", "Initial Phase", "Completion Phase", etc.
-- Phases are often marked with headings in CAPS, bold formatting indicators, or numbered sections
-- If you see text like "PILOT PHASE" followed by work items, then "MAIN PROGRAM PHASE" followed by more work items, those are TWO DISTINCT PHASES
-- Create a phase entry for EACH distinct phase mentioned and assign work items to the correct phase
-- Only leave phases empty if the document truly has NO phase structure (just one continuous list of work)
+PHASE DETECTION:
+- Look for EXPLICIT phase indicators in the text: "Phase 1", "Phase 2", "PILOT PHASE", "MAIN PROGRAM PHASE", etc.
+- Only create phases if the document explicitly mentions them
+- Only leave phases empty if the document truly has NO phase structure
 
 CATEGORY ASSIGNMENT (STRICT - USE ONLY THESE):
-You MUST use ONLY these exact category values - no variations, no synonyms, no invented categories:
+You MUST use ONLY these exact category values:
 - "Due Diligence" (for review, analysis, investigation work)
-- "Documentation" (for drafting, reviewing transaction documents, agreements)
+- "Documentation" (for drafting, reviewing transaction documents, agreements, term sheets)
 - "Negotiations" (for negotiation support, term sheet work)
 - "Meetings" (for calls, meetings, coordination)
 - "Regulatory" (for regulatory filings, approvals, compliance)
@@ -87,29 +93,23 @@ You MUST use ONLY these exact category values - no variations, no synonyms, no i
 - "Legal Opinions" (for formal legal opinions)
 - "Other" (ONLY if none of the above fit)
 
-DO NOT invent categories like "Transaction Documents", "Project Management", "Employment", "IP", etc. - map these to the closest valid category or use "Other".
-
-WORK_ITEM vs DETAIL:
-- work_item: SHORT heading only (max 50 chars) - e.g., "Due diligence on contracts"
-- detail: The FULL, VERBATIM, UNEDITED text from source describing this work item
-
 PROVIDER DETECTION:
-- "Baker McKenzie" for main firm work
+- Default to "Baker McKenzie" unless text explicitly mentions local counsel
 - "Local Counsel" for local law firm, in-country counsel, domestic counsel references
 
 FEE EXTRACTION:
 - For ranges like "$50,000 - $75,000", use the UPPER END (75000)
-- If fees are percentages or hourly, estimate or use 0`;
+- If fees are percentages or hourly, estimate or use 0
+- If NO fee information is provided, use 0`;
 
-    const userPrompt = `Parse the following engagement letter/fee arrangement and extract budget line items.
+    const userPrompt = `Parse the following text and extract ALL work items. Even if the text is short or sparse, extract every identifiable deliverable, document, agreement, or task as a separate work item. A simple numbered list of items should result in one work item per numbered entry.
 
-CRITICAL INSTRUCTIONS - READ CAREFULLY:
+CRITICAL: Do NOT return an empty items array. If you see text like "1. Term sheet  2. Agreement  3. Review" - those are THREE work items.
 
-1. DETAIL FIELD: For EACH work item, COPY THE EXACT ORIGINAL TEXT into the "detail" field. Do NOT summarize or shorten. The detail must be the VERBATIM text from the source document. If the source says "Comprehensive review of all target company material contracts, including but not limited to customer agreements, vendor contracts, and licensing arrangements, with particular focus on change of control provisions and assignability", that ENTIRE sentence goes in detail WORD FOR WORD.
-
-2. PHASES: Look for phase headings like "PILOT PHASE", "MAIN PROGRAM PHASE", "Phase 1", "Phase 2", etc. If you see these, create separate phase entries and assign each work item to its correct phase. The text structure shows which items belong to which phase.
-
-3. CATEGORIES: Use ONLY these exact values: "Due Diligence", "Documentation", "Negotiations", "Meetings", "Regulatory", "Closing", "Tax", "Legal Opinions", "Other". Do NOT use any other category names.
+INSTRUCTIONS:
+1. DETAIL FIELD: Copy the EXACT ORIGINAL TEXT into the "detail" field for each item.
+2. PHASES: Only create phases if the text explicitly mentions them.
+3. CATEGORIES: Use ONLY: "Due Diligence", "Documentation", "Negotiations", "Meetings", "Regulatory", "Closing", "Tax", "Legal Opinions", "Other"
 
 Currency context: ${currency || 'GBP'}
 
@@ -118,7 +118,7 @@ Text to parse:
 ${text}
 ---
 
-Remember: The detail field must contain the COMPLETE original text, not a summary. Copy it exactly.`;
+Remember: Extract EVERY work item. Even minimal text like "Non-binding term sheet" is a valid work item.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

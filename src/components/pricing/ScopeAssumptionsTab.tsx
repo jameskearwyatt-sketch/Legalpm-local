@@ -152,8 +152,8 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
   },
   {
     id: 'no_regulatory',
-    label: 'No regulatory filings',
-    description: 'Excludes government/regulatory submissions',
+    label: 'No regulatory advice or filings',
+    description: 'Excludes government/regulatory advice or filing submissions',
     category: 'scope',
     sectionType: 'general',
     requiresInput: false,

@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 
-export type TollingAnalysisType = 'tolling_vs_bible' | 'tolling_vs_termsheet';
+export type TollingAnalysisType = 'tolling_vs_bible' | 'tolling_vs_termsheet' | 'termsheet_vs_bible';
 export type TollingPerspective = 'offtaker' | 'generator';
 export type TollingConfidenceLevel = 'high' | 'medium' | 'review_required';
 

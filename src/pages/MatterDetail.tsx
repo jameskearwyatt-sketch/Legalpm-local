@@ -306,6 +306,8 @@ export default function MatterDetail() {
   const [hasChanges, setHasChanges] = useState(false);
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isAutoSavingRef = useRef(false);
+  const hasChangesRef = useRef(false);
+  const performAutoSaveRef = useRef<(() => Promise<void>) | null>(null);
   const [showFinancialUpdateDialog, setShowFinancialUpdateDialog] = useState(false);
   const [showSnapshotHistory, setShowSnapshotHistory] = useState(false);
   const [showProposalDialog, setShowProposalDialog] = useState(false);
@@ -455,12 +457,10 @@ export default function MatterDetail() {
     setIsSaving(true);
     
     try {
-      // Compute status based on checkboxes: Open if all complete, ATTN (attention needed) otherwise
       const computedStatus = formData.aml_kyc_complete && formData.assignment_letter_signed && formData.matter_open
         ? 'Open' as const
-        : 'On Hold' as const; // Database stores 'On Hold', displayed as 'ATTN'
+        : 'On Hold' as const;
 
-      // Clean up empty date strings to null
       const cleanData = { ...formData };
       const dateFields = ['start_date', 'target_close_date', 'opportunity_receipt_date', 'clarifications_date', 'submission_deadline', 'decision_date', 'lc_last_updated'];
       dateFields.forEach(field => {
@@ -478,6 +478,7 @@ export default function MatterDetail() {
       });
       
       setHasChanges(false);
+      hasChangesRef.current = false;
     } catch (error) {
       toast.error('Failed to auto-save changes');
       console.error(error);
@@ -487,21 +488,27 @@ export default function MatterDetail() {
     }
   }, [matter, formData, updateMatter]);
 
+  // Keep refs in sync for unmount save
+  useEffect(() => {
+    performAutoSaveRef.current = performAutoSave;
+  }, [performAutoSave]);
+
+  useEffect(() => {
+    hasChangesRef.current = hasChanges;
+  }, [hasChanges]);
+
   // Debounced auto-save effect - triggers 1 second after changes stop
   useEffect(() => {
     if (!hasChanges || !isFormInitialized) return;
     
-    // Clear any existing timeout
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
     
-    // Set new timeout for auto-save
     autoSaveTimeoutRef.current = setTimeout(() => {
       performAutoSave();
     }, 1000);
     
-    // Cleanup on unmount or when dependencies change
     return () => {
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
@@ -509,11 +516,14 @@ export default function MatterDetail() {
     };
   }, [hasChanges, isFormInitialized, performAutoSave]);
 
-  // Cleanup timeout on unmount
+  // Flush pending changes on unmount — prevents data loss when navigating away
   useEffect(() => {
     return () => {
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
+      }
+      if (hasChangesRef.current && performAutoSaveRef.current) {
+        performAutoSaveRef.current();
       }
     };
   }, []);

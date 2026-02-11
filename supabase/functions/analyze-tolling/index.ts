@@ -519,21 +519,33 @@ Return ONLY valid JSON:
 
     console.log('Calling AI for tolling analysis...');
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt }
-        ],
-        temperature: 0.2,
-      }),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
+
+    let response;
+    try {
+      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-pro",
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt }
+          ],
+          temperature: 0.2,
+        }),
+        signal: controller.signal,
+      });
+    } catch (fetchErr) {
+      clearTimeout(timeoutId);
+      console.error('Fetch error:', fetchErr);
+      throw new Error('Connection to AI timed out. Please try again.');
+    }
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -546,7 +558,22 @@ Return ONLY valid JSON:
 
     let data;
     try {
-      const responseText = await response.text();
+      // Read response as stream chunks to avoid body read timeout
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('No response body');
+      const chunks: Uint8Array[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) chunks.push(value);
+      }
+      const fullBuffer = new Uint8Array(chunks.reduce((acc, c) => acc + c.length, 0));
+      let offset = 0;
+      for (const chunk of chunks) {
+        fullBuffer.set(chunk, offset);
+        offset += chunk.length;
+      }
+      const responseText = new TextDecoder().decode(fullBuffer);
       if (!responseText || responseText.trim().length === 0) {
         throw new Error('Empty response from AI gateway');
       }

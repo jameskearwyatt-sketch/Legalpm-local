@@ -440,15 +440,26 @@ serve(async (req) => {
       ? `\n\nIMPORTANT: This is a ${effectiveStage === 'development' ? 'development-stage' : 'construction-stage'} project. The tolling agreement has been entered into to support project bankability. You MUST analyze construction milestones, COD provisions, delay LDs, and the interface between the tolling agreement and the project finance structure.`
       : '';
 
+    const isTermSheet = analysisType === 'termsheet_vs_bible';
+
     const systemPrompt = `You are an expert energy lawyer specializing in ${technologyContext}${stageContext}
 
 ${knowledgeBase}
 
 ${userLearnings || ''}
 
-Your task is to perform a comprehensive forensic analysis of this tolling agreement.`;
+${isTermSheet ? `IMPORTANT - TERM SHEET ANALYSIS MODE:
+You are analyzing a TERM SHEET or HEADS OF TERMS, NOT a long-form tolling agreement.
+- Term sheets are pre-contractual documents that outline key commercial terms
+- Many categories will NOT be addressed in a term sheet - this is NORMAL and expected
+- For missing categories: acknowledge they are not covered but flag if their absence is a CRITICAL GAP that must be negotiated before proceeding to long-form drafting
+- For categories that ARE addressed: analyze the positions against market standards as rigorously as for a full agreement
+- Focus on identifying: (1) terms that are on/off market, (2) critical gaps that need negotiation, (3) ambiguities that could cause issues in long-form drafting
+- Do NOT penalise the term sheet for lacking the level of detail found in a full agreement - that is the nature of the document` : ''}
 
-    let userPrompt = `Analyze the following ${analysisType === 'tolling_vs_bible' ? 'tolling agreement' : 'term sheet'} from the ${perspective === 'offtaker' ? 'Offtaker/Power Co' : 'Generator/COGEN'} perspective.
+Your task is to perform a comprehensive forensic analysis of this ${isTermSheet ? 'term sheet' : 'tolling agreement'}.`;
+
+    let userPrompt = `Analyze the following ${isTermSheet ? 'term sheet / heads of terms' : analysisType === 'tolling_vs_termsheet' ? 'term sheet' : 'tolling agreement'} from the ${perspective === 'offtaker' ? 'Offtaker/Power Co' : 'Generator/COGEN'} perspective.
 
 Project: ${projectName}
 Technology: ${effectiveTollingType.replace(/_/g, ' ').toUpperCase()}${isBess ? ' (Battery Energy Storage System)' : ''}
@@ -482,7 +493,7 @@ IMPORTANT ANALYSIS RULES:
 - Extract ACTUAL TERMS with specific numbers, thresholds, and conditions
 - Flag placeholder values ([brackets], TBD) as standard for drafts - do NOT treat as gaps
 - If a category heading exists but no text found, perform a SECOND PASS before marking as missing
-- For ${analysisType === 'tolling_vs_termsheet' ? 'term sheets' : 'full agreements'}, adjust expectations accordingly
+- For ${isTermSheet ? 'term sheets: flag missing categories as "not addressed" and note whether this is a critical gap or expected for the stage of negotiations. Confidence should be "review_required" for categories not covered.' : analysisType === 'tolling_vs_termsheet' ? 'term sheets' : 'full agreements'}, adjust expectations accordingly
 - Assess party favorability from the ${perspective} perspective
 ${isBess ? '- For BESS: focus on RTE guarantees, degradation mechanics, augmentation obligations, and revenue sharing - NOT fuel supply or heat rate\n- Capacity means MW AND MWh duration' : ''}
 ${isPreOperating ? '- For development/construction stage: scrutinise COD provisions, delay LDs, performance testing requirements, and bankability features' : ''}

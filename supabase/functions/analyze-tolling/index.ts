@@ -544,9 +544,19 @@ Return ONLY valid JSON:
       throw new Error(`AI error: ${response.status}`);
     }
 
-    const data = await response.json();
+    let data;
+    try {
+      const responseText = await response.text();
+      if (!responseText || responseText.trim().length === 0) {
+        throw new Error('Empty response from AI gateway');
+      }
+      data = JSON.parse(responseText);
+    } catch (jsonErr) {
+      console.error('Failed to parse AI gateway response:', jsonErr);
+      throw new Error('AI returned an invalid or truncated response. Please try again.');
+    }
     const content = data.choices?.[0]?.message?.content || '';
-    console.log('AI response received, parsing...');
+    console.log('AI response received, length:', content.length, 'parsing...');
 
     let positions = [];
     try {

@@ -13,37 +13,40 @@ type BudgetCategory = typeof BUDGET_CATEGORIES[number];
 // Category color maps for summary boxes
 const categoryBgColors: Record<BudgetCategory, string> = {
   'Due Diligence': 'bg-blue-100 dark:bg-blue-900/40',
+  'Term Sheets': 'bg-cyan-100 dark:bg-cyan-900/40',
   'Documentation': 'bg-purple-100 dark:bg-purple-900/40',
-  'Negotiations': 'bg-amber-100 dark:bg-amber-900/40',
-  'Meetings': 'bg-green-100 dark:bg-green-900/40',
   'Regulatory': 'bg-red-100 dark:bg-red-900/40',
-  'Closing': 'bg-teal-100 dark:bg-teal-900/40',
   'Tax': 'bg-orange-100 dark:bg-orange-900/40',
   'Legal Opinions': 'bg-indigo-100 dark:bg-indigo-900/40',
+  'Negotiations': 'bg-amber-100 dark:bg-amber-900/40',
+  'Meetings': 'bg-green-100 dark:bg-green-900/40',
+  'Closing': 'bg-teal-100 dark:bg-teal-900/40',
   'Other': 'bg-gray-100 dark:bg-gray-800/50',
 };
 
 const categoryTextColors: Record<BudgetCategory, string> = {
   'Due Diligence': 'text-blue-700 dark:text-blue-300',
+  'Term Sheets': 'text-cyan-700 dark:text-cyan-300',
   'Documentation': 'text-purple-700 dark:text-purple-300',
-  'Negotiations': 'text-amber-700 dark:text-amber-300',
-  'Meetings': 'text-green-700 dark:text-green-300',
   'Regulatory': 'text-red-700 dark:text-red-300',
-  'Closing': 'text-teal-700 dark:text-teal-300',
   'Tax': 'text-orange-700 dark:text-orange-300',
   'Legal Opinions': 'text-indigo-700 dark:text-indigo-300',
+  'Negotiations': 'text-amber-700 dark:text-amber-300',
+  'Meetings': 'text-green-700 dark:text-green-300',
+  'Closing': 'text-teal-700 dark:text-teal-300',
   'Other': 'text-gray-700 dark:text-gray-300',
 };
 
 const categoryBorderColors: Record<BudgetCategory, string> = {
   'Due Diligence': 'border-blue-300 dark:border-blue-700',
+  'Term Sheets': 'border-cyan-300 dark:border-cyan-700',
   'Documentation': 'border-purple-300 dark:border-purple-700',
-  'Negotiations': 'border-amber-300 dark:border-amber-700',
-  'Meetings': 'border-green-300 dark:border-green-700',
   'Regulatory': 'border-red-300 dark:border-red-700',
-  'Closing': 'border-teal-300 dark:border-teal-700',
   'Tax': 'border-orange-300 dark:border-orange-700',
   'Legal Opinions': 'border-indigo-300 dark:border-indigo-700',
+  'Negotiations': 'border-amber-300 dark:border-amber-700',
+  'Meetings': 'border-green-300 dark:border-green-700',
+  'Closing': 'border-teal-300 dark:border-teal-700',
   'Other': 'border-gray-300 dark:border-gray-600',
 };
 

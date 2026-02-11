@@ -26,13 +26,14 @@ export interface BudgetLineItem {
 
 export const BUDGET_CATEGORIES = [
   'Due Diligence',
+  'Term Sheets',
   'Documentation',
-  'Negotiations', 
-  'Meetings',
   'Regulatory',
-  'Closing',
   'Tax',
   'Legal Opinions',
+  'Negotiations',
+  'Meetings',
+  'Closing',
   'Other'
 ] as const;
 

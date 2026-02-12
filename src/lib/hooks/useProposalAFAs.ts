@@ -14,7 +14,8 @@ export type AFAType =
   | 'milestone'
   | 'monthly_retainer'
   | 'discounted_rates'
-  | 'success_fee';
+  | 'success_fee'
+  | 'abort_discount';
 
 export const AFA_TYPE_LABELS: Record<AFAType, string> = {
   fee_cap: 'Fee Cap',
@@ -26,6 +27,7 @@ export const AFA_TYPE_LABELS: Record<AFAType, string> = {
   monthly_retainer: 'Monthly Retainer',
   discounted_rates: 'Discounted Rates',
   success_fee: 'Success Fee / Uplift',
+  abort_discount: 'Abort Discount',
 };
 
 export const AFA_TYPE_DESCRIPTIONS: Record<AFAType, string> = {
@@ -38,6 +40,7 @@ export const AFA_TYPE_DESCRIPTIONS: Record<AFAType, string> = {
   monthly_retainer: 'Fixed monthly fee covering defined scope',
   discounted_rates: 'Discount applied to standard rates',
   success_fee: 'Optional uplift linked to defined outcome (add-on only)',
+  abort_discount: 'Percentage of WIP to be written off if the transaction aborts',
 };
 
 // Configuration interfaces for each AFA type
@@ -103,6 +106,10 @@ export interface SuccessFeeConfig {
   upliftAmount: number;
 }
 
+export interface AbortDiscountConfig {
+  discountPercent: number;
+}
+
 export type AFAConfig = 
   | FeeCapConfig
   | BlendedRateConfig
@@ -112,7 +119,8 @@ export type AFAConfig =
   | MilestoneConfig
   | MonthlyRetainerConfig
   | DiscountedRatesConfig
-  | SuccessFeeConfig;
+  | SuccessFeeConfig
+  | AbortDiscountConfig;
 
 export interface ProposalAFA {
   id: string;
@@ -189,6 +197,8 @@ export function getDefaultConfig(afaType: AFAType): AFAConfig {
       return { discountPercent: 10 };
     case 'success_fee':
       return { baseAfaType: null, successCondition: '', upliftPercent: 10, upliftAmount: 0 };
+    case 'abort_discount':
+      return { discountPercent: 25 };
   }
 }
 

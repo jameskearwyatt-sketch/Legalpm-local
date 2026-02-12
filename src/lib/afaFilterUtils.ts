@@ -14,6 +14,7 @@ import {
   FixedFeeWholeConfig,
   FixedFeePhaseConfig,
   SuccessFeeConfig,
+  AbortDiscountConfig,
 } from '@/lib/hooks/useProposalAFAs';
 
 export interface AFAFilteredItem extends DraftProposalItem {
@@ -569,6 +570,23 @@ export function applyAFAFilters(
       : `Success fee: ${currencySymbol}${roundedUpliftAmount.toLocaleString()} on successful completion`;
   }
 
+  // Handle abort discount (add-on)
+  const abortDiscountAFA = enabledAFAs.find(a => a.afa_type === 'abort_discount');
+  if (abortDiscountAFA) {
+    const config = abortDiscountAFA.config as AbortDiscountConfig;
+    appliedAFAs.push({
+      type: 'abort_discount',
+      label: AFA_TYPE_LABELS['abort_discount'],
+      description: `Abort discount: ${config.discountPercent}% of total WIP to be written off in the event the transaction aborts`,
+      clientPrice: 0,
+    });
+    
+    const abortComment = `Abort discount of ${config.discountPercent}% of total WIP agreed in the event the transaction does not complete.`;
+    globalComment = globalComment 
+      ? `${globalComment}. ${abortComment}`
+      : abortComment;
+  }
+
   // Calculate total adjustment
   const newTotal = filteredItems
     .filter(item => item.is_included !== false || !item.is_optional)
@@ -616,6 +634,10 @@ function generateAFADescription(afa: ProposalAFA, currencySymbol: string): strin
     case 'success_fee': {
       const config = afa.config as SuccessFeeConfig;
       return `${config.upliftPercent}% success fee (${currencySymbol}${smartRound(config.upliftAmount).toLocaleString()})`;
+    }
+    case 'abort_discount': {
+      const config = afa.config as AbortDiscountConfig;
+      return `${config.discountPercent}% abort discount on total WIP`;
     }
     default:
       return `${AFA_TYPE_LABELS[afa.afa_type]}: ${currencySymbol}${roundedClientPrice.toLocaleString()}`;

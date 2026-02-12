@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { BUDGET_CATEGORIES } from './useBudgetVersions';
 import { Json } from '@/integrations/supabase/types';
 import { applyAFAFilters } from '@/lib/afaFilterUtils';
-import { ProposalAFA } from './useProposalAFAs';
+import { ProposalAFA, AbortDiscountConfig } from './useProposalAFAs';
 
 export interface RateCardEntry {
   rate: number;
@@ -798,12 +798,12 @@ export function usePricingProposal(proposalId?: string) {
         // Fetch current matter to check for different billing currency
         const { data: currentMatter } = await supabase
           .from('matters')
-          .select('different_billing_currency, agreed_billing_amount, fee_amount_upper_end')
+          .select('different_billing_currency, agreed_billing_amount, fee_amount_upper_end, budget_notes')
           .eq('id', matterId)
           .single();
 
         // Build update object with rounded totals
-        const matterUpdate: Record<string, number> = {
+        const matterUpdate: Record<string, any> = {
           fee_amount_upper_end: roundedTotal,
           bm_fee_component: roundedBmTotal,
           local_counsel_fee: roundedLcTotal,
@@ -815,6 +815,17 @@ export function usePricingProposal(proposalId?: string) {
             currentMatter.fee_amount_upper_end > 0) {
           const mandatedRate = currentMatter.agreed_billing_amount / currentMatter.fee_amount_upper_end;
           matterUpdate.agreed_billing_amount = roundedTotal * mandatedRate;
+        }
+
+        // Check for abort discount and add to budget notes
+        const abortDiscountAFA = enabledAFAs.find(a => a.afa_type === 'abort_discount');
+        if (abortDiscountAFA) {
+          const abortConfig = abortDiscountAFA.config as AbortDiscountConfig;
+          const abortNote = `Abort discount agreed: ${abortConfig.discountPercent}% of total WIP to be written off in the event the transaction does not complete.`;
+          const existingNotes = currentMatter?.budget_notes;
+          matterUpdate.budget_notes = existingNotes 
+            ? `${existingNotes}\n\n${abortNote}`
+            : abortNote;
         }
 
         // Update matter totals

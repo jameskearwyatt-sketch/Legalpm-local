@@ -48,6 +48,7 @@ import {
   MonthlyRetainerConfig,
   DiscountedRatesConfig,
   SuccessFeeConfig,
+  AbortDiscountConfig,
   ProposalAFA,
 } from '@/lib/hooks/useProposalAFAs';
 import { DraftProposalItem, BUDGET_CATEGORIES, RateCard, ProposalAssumptions } from '@/lib/hooks/usePricingProposals';
@@ -106,7 +107,7 @@ const AFA_GROUPS = [
     label: 'Add-ons',
     description: 'Can be combined with any pricing model above.',
     icon: 'Plus',
-    types: ['success_fee'] as AFAType[],
+    types: ['success_fee', 'abort_discount'] as AFAType[],
   },
 ];
 
@@ -301,6 +302,12 @@ export function AFATab({
         const basePrice = currentAdjustedBaseline.total;
         const uplift = cfg.upliftAmount || Math.round(basePrice * (cfg.upliftPercent / 100));
         return basePrice + uplift;
+      }
+      case 'abort_discount': {
+        // Abort discount doesn't change the client price - it's a contingent arrangement
+        // We store the potential write-off amount for display purposes
+        const cfg = config as AbortDiscountConfig;
+        return currentAdjustedBaseline.total * (cfg.discountPercent / 100);
       }
       default:
         return baseline;
@@ -1180,6 +1187,54 @@ export function AFATab({
     );
   };
 
+  // Render Abort Discount configuration
+  const renderAbortDiscountConfig = (afa: ProposalAFA | undefined) => {
+    const config = (afa?.config || getDefaultConfig('abort_discount')) as AbortDiscountConfig;
+    const writeOffAmount = adjustedBaseline.total * (config.discountPercent / 100);
+    
+    return (
+      <div className="space-y-4">
+        <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 border border-amber-200 dark:border-amber-800">
+          <p className="text-sm text-amber-800 dark:text-amber-200 flex items-center gap-2">
+            <Info className="h-4 w-4" />
+            If the transaction aborts, this percentage of total WIP would be written off as a discount to the client.
+          </p>
+        </div>
+        
+        <div className="space-y-2">
+          <Label>Abort Discount Percentage</Label>
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              value={config.discountPercent}
+              onChange={(e) => handleConfigChange('abort_discount', { ...config, discountPercent: parseFloat(e.target.value) || 0 })}
+              className="w-24"
+              min={0}
+              max={100}
+            />
+            <span className="text-muted-foreground">% of total WIP</span>
+          </div>
+        </div>
+        
+        <div className="bg-muted/50 rounded-lg p-4 space-y-2">
+          <div className="flex justify-between text-sm">
+            <span>Current baseline estimate</span>
+            <span>{formatCurrency(adjustedBaseline.total)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span>Potential write-off on abort</span>
+            <span className="text-amber-600">-{formatCurrency(writeOffAmount)}</span>
+          </div>
+          <Separator />
+          <div className="flex justify-between font-bold">
+            <span>Client would pay on abort</span>
+            <span>{formatCurrency(adjustedBaseline.total - writeOffAmount)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // Render config for an AFA type
   const renderConfig = (type: AFAType) => {
     const afa = getAFA(type);
@@ -1194,6 +1249,7 @@ export function AFATab({
       case 'monthly_retainer': return renderMonthlyRetainerConfig(afa);
       case 'discounted_rates': return renderDiscountedRatesConfig(afa);
       case 'success_fee': return renderSuccessFeeConfig(afa);
+      case 'abort_discount': return renderAbortDiscountConfig(afa);
       default: return null;
     }
   };
@@ -1210,6 +1266,7 @@ export function AFATab({
       case 'monthly_retainer': return Clock;
       case 'discounted_rates': return Percent;
       case 'success_fee': return TrendingUp;
+      case 'abort_discount': return TrendingDown;
       default: return DollarSign;
     }
   };

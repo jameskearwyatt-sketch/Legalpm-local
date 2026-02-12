@@ -49,9 +49,24 @@ type NavSeparator = { type: 'separator' };
 type NavGroup = { type: 'group'; name: string; icon: typeof LayoutDashboard; children: NavItem[] };
 type NavEntry = NavItem | NavSeparator | NavGroup;
 
+import { Leaf } from 'lucide-react';
+
 const analystChildren: NavItem[] = [
   { name: 'PPA Analyst', href: '/ppa-analyst', icon: FileSearch },
   { name: 'Tolling Analyst', href: '/tolling-analyst', icon: FlaskConical },
+];
+
+type NavSubGroup = { type: 'subgroup'; name: string; children: NavItem[] };
+type NavGroupChild = NavItem | NavSubGroup;
+
+const carbonRemovalsChildren: NavItem[] = [
+  { name: 'Carbon Credit Offtake', href: '/carbon-credit-analyst', icon: Leaf },
+];
+
+const analystNavigation: (NavGroupChild)[] = [
+  { name: 'PPA Analyst', href: '/ppa-analyst', icon: FileSearch },
+  { name: 'Tolling Analyst', href: '/tolling-analyst', icon: FlaskConical },
+  { type: 'subgroup', name: 'Carbon Removals Suite', children: carbonRemovalsChildren },
 ];
 
 const navigation: NavEntry[] = [

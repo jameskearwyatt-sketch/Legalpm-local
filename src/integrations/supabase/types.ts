@@ -347,6 +347,288 @@ export type Database = {
         }
         Relationships: []
       }
+      carbon_analyses: {
+        Row: {
+          agreed_at: string | null
+          analysis_type: string
+          buyer_name: string | null
+          buyer_normalized: string | null
+          carbon_type: string | null
+          comparison_file_name: string | null
+          comparison_file_url: string | null
+          complexity_score: number | null
+          counterparty_type: string | null
+          created_at: string
+          document_file_name: string
+          document_file_url: string | null
+          id: string
+          is_agreed: boolean
+          is_comparison: boolean
+          jurisdiction: string | null
+          key_risk_areas: string[]
+          notes: string | null
+          parent_analysis_id: string | null
+          perspective: string
+          project_name: string
+          project_stage: string | null
+          seller_name: string | null
+          seller_normalized: string | null
+          updated_at: string
+          user_id: string
+          version_number: number
+        }
+        Insert: {
+          agreed_at?: string | null
+          analysis_type?: string
+          buyer_name?: string | null
+          buyer_normalized?: string | null
+          carbon_type?: string | null
+          comparison_file_name?: string | null
+          comparison_file_url?: string | null
+          complexity_score?: number | null
+          counterparty_type?: string | null
+          created_at?: string
+          document_file_name: string
+          document_file_url?: string | null
+          id?: string
+          is_agreed?: boolean
+          is_comparison?: boolean
+          jurisdiction?: string | null
+          key_risk_areas?: string[]
+          notes?: string | null
+          parent_analysis_id?: string | null
+          perspective?: string
+          project_name: string
+          project_stage?: string | null
+          seller_name?: string | null
+          seller_normalized?: string | null
+          updated_at?: string
+          user_id: string
+          version_number?: number
+        }
+        Update: {
+          agreed_at?: string | null
+          analysis_type?: string
+          buyer_name?: string | null
+          buyer_normalized?: string | null
+          carbon_type?: string | null
+          comparison_file_name?: string | null
+          comparison_file_url?: string | null
+          complexity_score?: number | null
+          counterparty_type?: string | null
+          created_at?: string
+          document_file_name?: string
+          document_file_url?: string | null
+          id?: string
+          is_agreed?: boolean
+          is_comparison?: boolean
+          jurisdiction?: string | null
+          key_risk_areas?: string[]
+          notes?: string | null
+          parent_analysis_id?: string | null
+          perspective?: string
+          project_name?: string
+          project_stage?: string | null
+          seller_name?: string | null
+          seller_normalized?: string | null
+          updated_at?: string
+          user_id?: string
+          version_number?: number
+        }
+        Relationships: []
+      }
+      carbon_extracted_positions: {
+        Row: {
+          analysis_id: string
+          bible_reference: string | null
+          category: string
+          change_summary: string | null
+          change_type: string | null
+          comparison_position: string | null
+          confidence: string
+          created_at: string
+          id: string
+          market_benchmark: string | null
+          position_summary: string
+          previous_position: string | null
+          source_text: string | null
+          user_id: string
+          variance_notes: string | null
+        }
+        Insert: {
+          analysis_id: string
+          bible_reference?: string | null
+          category: string
+          change_summary?: string | null
+          change_type?: string | null
+          comparison_position?: string | null
+          confidence?: string
+          created_at?: string
+          id?: string
+          market_benchmark?: string | null
+          position_summary: string
+          previous_position?: string | null
+          source_text?: string | null
+          user_id: string
+          variance_notes?: string | null
+        }
+        Update: {
+          analysis_id?: string
+          bible_reference?: string | null
+          category?: string
+          change_summary?: string | null
+          change_type?: string | null
+          comparison_position?: string | null
+          confidence?: string
+          created_at?: string
+          id?: string
+          market_benchmark?: string | null
+          position_summary?: string
+          previous_position?: string | null
+          source_text?: string | null
+          user_id?: string
+          variance_notes?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carbon_extracted_positions_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "carbon_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      carbon_learnings: {
+        Row: {
+          analysis_id: string | null
+          category: string
+          corrected_position: string
+          correction_reason: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          original_position: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          analysis_id?: string | null
+          category: string
+          corrected_position: string
+          correction_reason?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          original_position: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          analysis_id?: string | null
+          category?: string
+          corrected_position?: string
+          correction_reason?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          original_position?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carbon_learnings_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "carbon_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      carbon_precedent_bank: {
+        Row: {
+          banked_at: string
+          buyer_name: string | null
+          buyer_normalized: string | null
+          carbon_type: string | null
+          category: string
+          confidence: string
+          id: string
+          is_gold_standard: boolean
+          jurisdiction: string | null
+          market_position: string | null
+          party_favorability: string | null
+          perspective: string
+          position_summary: string
+          project_name: string
+          project_stage: string | null
+          seller_name: string | null
+          seller_normalized: string | null
+          source_analysis_id: string | null
+          source_text: string | null
+          template_description: string | null
+          template_name: string | null
+          user_id: string
+        }
+        Insert: {
+          banked_at?: string
+          buyer_name?: string | null
+          buyer_normalized?: string | null
+          carbon_type?: string | null
+          category: string
+          confidence?: string
+          id?: string
+          is_gold_standard?: boolean
+          jurisdiction?: string | null
+          market_position?: string | null
+          party_favorability?: string | null
+          perspective?: string
+          position_summary: string
+          project_name: string
+          project_stage?: string | null
+          seller_name?: string | null
+          seller_normalized?: string | null
+          source_analysis_id?: string | null
+          source_text?: string | null
+          template_description?: string | null
+          template_name?: string | null
+          user_id: string
+        }
+        Update: {
+          banked_at?: string
+          buyer_name?: string | null
+          buyer_normalized?: string | null
+          carbon_type?: string | null
+          category?: string
+          confidence?: string
+          id?: string
+          is_gold_standard?: boolean
+          jurisdiction?: string | null
+          market_position?: string | null
+          party_favorability?: string | null
+          perspective?: string
+          position_summary?: string
+          project_name?: string
+          project_stage?: string | null
+          seller_name?: string | null
+          seller_normalized?: string | null
+          source_analysis_id?: string | null
+          source_text?: string | null
+          template_description?: string | null
+          template_name?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "carbon_precedent_bank_source_analysis_id_fkey"
+            columns: ["source_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "carbon_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           billing_contact: string | null

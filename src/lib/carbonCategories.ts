@@ -6,17 +6,35 @@ export interface CarbonCategory {
   group: CarbonCategoryGroup;
 }
 
-export const CARBON_PROJECT_TYPES = [
-  { id: 'dac', label: 'Direct Air Capture (DAC)' },
-  { id: 'beccs', label: 'BECCS' },
-  { id: 'biochar', label: 'Biochar' },
-  { id: 'enhanced_weathering', label: 'Enhanced Weathering' },
-  { id: 'ocean_based', label: 'Ocean-Based Removal' },
-  { id: 'afforestation', label: 'Afforestation / Reforestation' },
-  { id: 'soil_carbon', label: 'Soil Carbon Sequestration' },
-  { id: 'avoidance', label: 'Avoidance / Reduction Credits' },
-  { id: 'other', label: 'Other' },
+export type CarbonCreditClass = 'industrial' | 'nature_based';
+
+export const CARBON_CREDIT_CLASSES = [
+  { id: 'industrial' as CarbonCreditClass, label: 'Industrial / Engineered', description: 'Credits from engineered carbon capture & removal (DAC, BECCS, biochar, enhanced weathering, mineralisation)' },
+  { id: 'nature_based' as CarbonCreditClass, label: 'Nature-Based', description: 'Credits from natural carbon sequestration (forestry, soil carbon, blue carbon, mangroves, peatland restoration)' },
 ] as const;
+
+export const CARBON_PROJECT_TYPES = [
+  // Industrial / Engineered
+  { id: 'dac', label: 'Direct Air Capture (DAC)', creditClass: 'industrial' as CarbonCreditClass },
+  { id: 'beccs', label: 'BECCS', creditClass: 'industrial' as CarbonCreditClass },
+  { id: 'biochar', label: 'Biochar', creditClass: 'industrial' as CarbonCreditClass },
+  { id: 'enhanced_weathering', label: 'Enhanced Weathering', creditClass: 'industrial' as CarbonCreditClass },
+  { id: 'mineralisation', label: 'Mineralisation / Geological Storage', creditClass: 'industrial' as CarbonCreditClass },
+  { id: 'ocean_based', label: 'Ocean-Based Removal (Engineered)', creditClass: 'industrial' as CarbonCreditClass },
+  // Nature-Based
+  { id: 'afforestation', label: 'Afforestation / Reforestation', creditClass: 'nature_based' as CarbonCreditClass },
+  { id: 'redd_plus', label: 'REDD+ (Avoided Deforestation)', creditClass: 'nature_based' as CarbonCreditClass },
+  { id: 'soil_carbon', label: 'Soil Carbon Sequestration', creditClass: 'nature_based' as CarbonCreditClass },
+  { id: 'blue_carbon', label: 'Blue Carbon (Mangroves, Seagrass)', creditClass: 'nature_based' as CarbonCreditClass },
+  { id: 'peatland', label: 'Peatland Restoration', creditClass: 'nature_based' as CarbonCreditClass },
+  { id: 'avoidance', label: 'Avoidance / Reduction Credits', creditClass: 'nature_based' as CarbonCreditClass },
+  { id: 'other', label: 'Other', creditClass: 'industrial' as CarbonCreditClass },
+] as const;
+
+export function getCreditClassForType(typeId: string): CarbonCreditClass {
+  const found = CARBON_PROJECT_TYPES.find(t => t.id === typeId);
+  return found?.creditClass ?? 'industrial';
+}
 
 export type CarbonProjectType = typeof CARBON_PROJECT_TYPES[number]['id'];
 

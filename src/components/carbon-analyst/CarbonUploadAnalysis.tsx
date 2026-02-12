@@ -12,7 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCarbonAnalyses, useCarbonPositions, useCarbonPrecedentBank, CarbonAnalysisType, CarbonPerspective } from '@/lib/hooks/useCarbonAnalyses';
 import { useCarbonLearnings } from '@/lib/hooks/useCarbonLearnings';
 import { CarbonAnalysisReport } from './CarbonAnalysisReport';
-import { CARBON_PROJECT_TYPES, CARBON_PROJECT_STAGES, type CarbonProjectStage } from '@/lib/carbonCategories';
+import { CARBON_PROJECT_TYPES, CARBON_PROJECT_STAGES, CARBON_CREDIT_CLASSES, getCreditClassForType, type CarbonProjectStage, type CarbonCreditClass } from '@/lib/carbonCategories';
 
 const JURISDICTIONS = [
   'United Kingdom', 'United States', 'European Union', 'Switzerland',
@@ -101,6 +101,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
             body: JSON.stringify({
               documentText, analysisType, perspective, jurisdiction, projectName,
               carbonType, projectStage, counterpartyType: counterpartyType || null,
+              creditClass: getCreditClassForType(carbonType),
               precedents: relevantPrecedents, userLearnings: userLearningsPrompt,
             }),
             signal: controller.signal,
@@ -280,9 +281,22 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
               <Label>Carbon Removal / Credit Type</Label>
               <Select value={carbonType} onValueChange={setCarbonType}>
                 <SelectTrigger><SelectValue placeholder="Select credit type" /></SelectTrigger>
-                <SelectContent>{CARBON_PROJECT_TYPES.map(t => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}</SelectContent>
+                <SelectContent>
+                  {CARBON_CREDIT_CLASSES.map(cls => (
+                    <div key={cls.id}>
+                      <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{cls.label}</div>
+                      {CARBON_PROJECT_TYPES.filter(t => t.creditClass === cls.id).map(t => (
+                        <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+                      ))}
+                    </div>
+                  ))}
+                </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">Credit type determines which analysis categories and market standards are applied.</p>
+              {carbonType && (
+                <p className="text-xs text-muted-foreground">
+                  Classification: <span className="font-medium">{getCreditClassForType(carbonType) === 'industrial' ? 'Industrial / Engineered' : 'Nature-Based'}</span> — analysis will be contextually adapted.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Project Stage</Label>

@@ -178,19 +178,57 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const { documentText, analysisType, perspective, jurisdiction, projectName, carbonType, projectStage, counterpartyType, precedents, userLearnings } = await req.json();
+    const { documentText, analysisType, perspective, jurisdiction, projectName, carbonType, projectStage, counterpartyType, creditClass, precedents, userLearnings } = await req.json();
 
     if (!documentText) {
       return new Response(JSON.stringify({ error: "No document text provided" }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    console.log(`Analyzing carbon credit offtake: ${projectName}, type: ${analysisType}, credit: ${carbonType}, stage: ${projectStage}, perspective: ${perspective}`);
+    console.log(`Analyzing carbon credit offtake: ${projectName}, type: ${analysisType}, credit: ${carbonType}, class: ${creditClass || 'auto-detect'}, stage: ${projectStage}, perspective: ${perspective}`);
 
     const hasPrecedents = precedents && precedents.length > 0;
     const isTermSheet = analysisType === 'termsheet_vs_bible';
     const categoryList = CARBON_CATEGORIES.map(c => `- "${c.label}"`).join('\n');
 
-    const systemPrompt = `You are an expert carbon markets lawyer specializing in carbon credit offtake agreements, emissions trading, and voluntary/compliance carbon market transactions. You have deep expertise in:
+    const isIndustrial = creditClass === 'industrial';
+    const isNatureBased = creditClass === 'nature_based';
+
+    const creditClassInstructions = isIndustrial
+      ? `
+⚠️ CRITICAL CONTEXT — INDUSTRIAL / ENGINEERED CARBON REMOVAL:
+This is an INDUSTRIAL-BASED carbon credit offtake agreement. The carbon credits are generated through engineered/technological means (e.g., Direct Air Capture, BECCS, biochar, enhanced weathering, mineralisation, geological storage).
+
+CONTEXTUAL ANALYSIS RULES FOR INDUSTRIAL PROJECTS:
+- DO NOT flag the absence of comprehensive field-based Monitoring, Reporting & Verification (MRV) procedures as a gap — industrial projects use equipment-based measurement, not ecological monitoring
+- DO NOT flag the absence of biodiversity safeguards, community consultation, or FPIC (Free Prior and Informed Consent) — these are nature-based project requirements
+- DO NOT expect provisions on deforestation risk, land tenure, forest fire, drought, or biological permanence risks — these do not apply
+- DO expect and focus on: equipment performance guarantees, capture rate specifications, geological storage integrity, technology risk allocation, pre-delivery financing (common for capital-intensive engineered projects), and facility operational requirements
+- Permanence analysis should focus on GEOLOGICAL permanence (1,000+ years for geological storage) rather than biological permanence (25-40 years)
+- Buffer pool analysis: industrial projects may use insurance or guarantees instead of registry buffer pools
+- Reversal risk: focus on equipment failure, injection site leakage, not wildfire/disease/land-use change
+- Verification: focus on metered/measured capture volumes, not ecological surveys
+`
+      : isNatureBased
+      ? `
+⚠️ CRITICAL CONTEXT — NATURE-BASED CARBON REMOVAL:
+This is a NATURE-BASED carbon credit offtake agreement. The carbon credits are generated through natural carbon sequestration (e.g., afforestation, REDD+, soil carbon, blue carbon, peatland restoration).
+
+CONTEXTUAL ANALYSIS RULES FOR NATURE-BASED PROJECTS:
+- DO expect comprehensive Monitoring, Reporting & Verification (MRV) procedures — these are essential for nature-based projects
+- DO expect provisions on biodiversity safeguards, community impacts, FPIC, and SDG alignment
+- DO expect land tenure and access rights provisions — these are critical for nature-based projects
+- DO flag the absence of buffer pool contributions as a significant gap — nature-based projects typically require 10-20% buffer
+- Permanence analysis should focus on BIOLOGICAL permanence risks: fire, disease, drought, land-use change, with typical durability periods of 25-40 years
+- Reversal risk: focus on natural events (wildfire, pest, drought), illegal logging, land-use change
+- Additionality: heightened scrutiny — baseline scenario assessment is critical
+- Vintage requirements may be more complex due to variable sequestration rates
+- Leakage risk (displacement of emissions) is a material concern for nature-based projects
+`
+      : `
+NOTE: Credit class not specified. You must AUTO-DETECT from the document text whether this is an industrial/engineered or nature-based carbon credit offtake agreement, and state your determination prominently in the Credit Type & Methodology category. Apply the appropriate contextual rules based on your determination.
+`;
+
+    const systemPrompt = `You are an expert carbon markets lawyer specialising in carbon credit offtake agreements, emissions trading, and voluntary/compliance carbon market transactions. You have deep expertise in:
 - Carbon removal technologies (DAC, BECCS, biochar, enhanced weathering)
 - Nature-based solutions (REDD+, afforestation, soil carbon, blue carbon)
 - Verification standards (Verra VCS, Gold Standard, Puro.earth, ACR)
@@ -199,6 +237,8 @@ serve(async (req) => {
 - Carbon credit registry operations and retirement procedures
 
 ${CARBON_KNOWLEDGE_BASE}
+
+${creditClassInstructions}
 
 ${userLearnings || ''}
 
@@ -214,6 +254,7 @@ Your task is to perform a comprehensive forensic analysis of this ${isTermSheet 
     let userPrompt = `Analyze the following ${isTermSheet ? 'term sheet' : 'carbon credit offtake agreement'} from the ${perspective === 'buyer' ? 'Buyer/Offtaker' : 'Seller/Project Developer'} perspective.
 
 Project: ${projectName}
+Credit Class: ${isIndustrial ? 'INDUSTRIAL / ENGINEERED' : isNatureBased ? 'NATURE-BASED' : 'AUTO-DETECT from document'}
 Credit Type: ${carbonType || 'Not specified'}
 Project Stage: ${projectStage || 'Not specified'}
 ${jurisdiction ? `Jurisdiction: ${jurisdiction}` : ''}

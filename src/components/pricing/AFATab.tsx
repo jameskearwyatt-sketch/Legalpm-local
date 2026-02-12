@@ -48,6 +48,7 @@ import {
   MonthlyRetainerConfig,
   DiscountedRatesConfig,
   SuccessFeeConfig,
+  SuccessFeeCommitment,
   AbortDiscountConfig,
   ProposalAFA,
 } from '@/lib/hooks/useProposalAFAs';
@@ -1118,6 +1119,8 @@ export function AFATab({
   const renderSuccessFeeConfig = (afa: ProposalAFA | undefined) => {
     const config = (afa?.config || getDefaultConfig('success_fee')) as SuccessFeeConfig;
     const upliftAmount = config.upliftAmount || Math.round(baselineTotals.total * (config.upliftPercent / 100));
+    const commitmentType: SuccessFeeCommitment = config.commitmentType || 'firm_agreed';
+    const isClientOption = commitmentType === 'client_option';
     
     return (
       <div className="space-y-4">
@@ -1126,6 +1129,39 @@ export function AFATab({
             <Info className="h-4 w-4" />
             Success fee added to baseline estimate of {formatCurrency(baselineTotals.total)}
           </p>
+        </div>
+
+        {/* Commitment Type */}
+        <div className="space-y-2">
+          <Label>Commitment Type</Label>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => handleConfigChange('success_fee', { ...config, commitmentType: 'firm_agreed' as SuccessFeeCommitment })}
+              className={cn(
+                "flex-1 p-3 rounded-lg border text-left transition-colors text-sm",
+                !isClientOption
+                  ? "border-primary bg-primary/5 ring-1 ring-primary"
+                  : "border-border hover:bg-muted/50"
+              )}
+            >
+              <p className="font-medium">Firm Agreed</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Success fee is agreed in the engagement letter and payable on completion</p>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleConfigChange('success_fee', { ...config, commitmentType: 'client_option' as SuccessFeeCommitment })}
+              className={cn(
+                "flex-1 p-3 rounded-lg border text-left transition-colors text-sm",
+                isClientOption
+                  ? "border-primary bg-primary/5 ring-1 ring-primary"
+                  : "border-border hover:bg-muted/50"
+              )}
+            >
+              <p className="font-medium">Client Option</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Presented as an optional uplift for the client to consider if the transaction completes successfully</p>
+            </button>
+          </div>
         </div>
         
         <div className="space-y-2">
@@ -1174,14 +1210,19 @@ export function AFATab({
             <span>{formatCurrency(baselineTotals.total)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span>Success fee uplift</span>
+            <span>{isClientOption ? 'Optional success fee uplift' : 'Success fee uplift'}</span>
             <span className="text-green-600">+{formatCurrency(upliftAmount)}</span>
           </div>
           <Separator />
           <div className="flex justify-between font-bold">
-            <span>Total on success</span>
+            <span>{isClientOption ? 'Total if client elects uplift' : 'Total on success'}</span>
             <span>{formatCurrency(baselineTotals.total + upliftAmount)}</span>
           </div>
+          {isClientOption && (
+            <p className="text-xs text-muted-foreground italic mt-1">
+              This will be presented as an optional consideration, not a binding commitment.
+            </p>
+          )}
         </div>
       </div>
     );

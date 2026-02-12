@@ -558,16 +558,22 @@ export function applyAFAFilters(
   if (successFeeAFA) {
     const config = successFeeAFA.config as SuccessFeeConfig;
     const roundedUpliftAmount = smartRound(config.upliftAmount);
+    const isClientOption = config.commitmentType === 'client_option';
+    const commitLabel = isClientOption ? 'Optional success fee (client option)' : 'Success fee (firm agreed)';
     appliedAFAs.push({
       type: 'success_fee',
-      label: AFA_TYPE_LABELS['success_fee'],
-      description: `Success fee: ${currencySymbol}${roundedUpliftAmount.toLocaleString()} (${config.upliftPercent}% uplift) on successful completion${config.successCondition ? ` - ${config.successCondition}` : ''}`,
+      label: commitLabel,
+      description: isClientOption
+        ? `Optional success fee for client consideration: ${currencySymbol}${roundedUpliftAmount.toLocaleString()} (${config.upliftPercent}% uplift) if the transaction completes successfully${config.successCondition ? ` — ${config.successCondition}` : ''}`
+        : `Success fee: ${currencySymbol}${roundedUpliftAmount.toLocaleString()} (${config.upliftPercent}% uplift) on successful completion${config.successCondition ? ` — ${config.successCondition}` : ''}`,
       clientPrice: roundedUpliftAmount,
     });
     
     globalComment = globalComment 
-      ? `${globalComment}. Success fee of ${currencySymbol}${roundedUpliftAmount.toLocaleString()} payable on completion.`
-      : `Success fee: ${currencySymbol}${roundedUpliftAmount.toLocaleString()} on successful completion`;
+      ? `${globalComment}. ${isClientOption ? `Optional success fee of ${currencySymbol}${roundedUpliftAmount.toLocaleString()} for client consideration on successful completion.` : `Success fee of ${currencySymbol}${roundedUpliftAmount.toLocaleString()} payable on completion.`}`
+      : isClientOption
+        ? `Optional success fee: ${currencySymbol}${roundedUpliftAmount.toLocaleString()} for client consideration on successful completion`
+        : `Success fee: ${currencySymbol}${roundedUpliftAmount.toLocaleString()} on successful completion`;
   }
 
   // Handle abort discount (add-on)
@@ -633,7 +639,10 @@ function generateAFADescription(afa: ProposalAFA, currencySymbol: string): strin
     }
     case 'success_fee': {
       const config = afa.config as SuccessFeeConfig;
-      return `${config.upliftPercent}% success fee (${currencySymbol}${smartRound(config.upliftAmount).toLocaleString()})`;
+      const isClientOption = config.commitmentType === 'client_option';
+      return isClientOption
+        ? `${config.upliftPercent}% optional success fee for client consideration (${currencySymbol}${smartRound(config.upliftAmount).toLocaleString()})`
+        : `${config.upliftPercent}% success fee — firm agreed (${currencySymbol}${smartRound(config.upliftAmount).toLocaleString()})`;
     }
     case 'abort_discount': {
       const config = afa.config as AbortDiscountConfig;

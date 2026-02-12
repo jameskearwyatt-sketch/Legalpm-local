@@ -105,8 +105,40 @@ function SortableHeader({
   );
 }
 
-// Helper to get fee type label
-const getFeeTypeLabel = (feeType: string | null) => {
+// Helper to get fee type label from structured fields (rate_modifier + pricing_model)
+const getFeeTypeLabel = (matter: any) => {
+  const rateModifier = matter.rate_modifier;
+  const pricingModel = matter.pricing_model;
+  
+  // Build label from the new structured fields
+  const parts: string[] = [];
+  
+  if (rateModifier === 'discounted_rates') {
+    const pct = matter.rate_modifier_value;
+    parts.push(pct ? `${pct}% Discount` : 'Discounted');
+  } else if (rateModifier === 'blended_hourly_rate') {
+    const rate = matter.rate_modifier_value;
+    parts.push(rate ? `Blended ${rate}/hr` : 'Blended');
+  } else if (rateModifier === 'rack_rates') {
+    parts.push('Rack');
+  }
+  
+  if (pricingModel) {
+    const modelLabels: Record<string, string> = {
+      fixed_fee: 'Fixed Fee',
+      fixed_fee_by_phase: 'Fixed (Phased)',
+      fee_cap: 'Cap',
+      fee_collar: 'Collar',
+      milestone_based: 'Milestone',
+      monthly_retainer: 'Retainer',
+    };
+    parts.push(modelLabels[pricingModel] || pricingModel);
+  }
+  
+  if (parts.length > 0) return parts.join(' · ');
+  
+  // Fallback to legacy fee_type field
+  const feeType = matter.fee_type;
   if (!feeType) return null;
   if (feeType.includes('Cap')) return 'Cap';
   if (feeType.includes('Estimate')) return 'Estimate';
@@ -519,11 +551,14 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
       const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
       return (
         <div className="flex flex-col items-end gap-0.5">
-          {ctx.matter.fee_type && (
-            <span className="text-[10px] text-muted-foreground">
-              {getFeeTypeLabel(ctx.matter.fee_type)}
-            </span>
-          )}
+          {(() => {
+            const label = getFeeTypeLabel(ctx.matter);
+            return label ? (
+              <span className="text-[10px] text-muted-foreground">
+                {label}
+              </span>
+            ) : null;
+          })()}
           <span className="font-medium">
             {formatCurrency((ctx.matter as any).effective_fee_upper_end ?? ctx.matter.fee_amount_upper_end, currency)}
           </span>

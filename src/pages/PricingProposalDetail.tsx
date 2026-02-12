@@ -165,7 +165,9 @@ export default function PricingProposalDetail() {
   // rateCard stores TEAM RATES (base rates in user's default currency)
   const [rateCard, setRateCard] = useState<RateCard>(DEFAULT_RATE_CARD);
   // feeRateCard stores FEE RATES (rates in proposal's fee currency, used for calculations)
-  const [feeRateCard, setFeeRateCard] = useState<RateCard>(DEFAULT_RATE_CARD);
+  // NOTE: setFeeRateCard is kept for direct overrides from EditableRateCard;
+  // the default derivation is done via useMemo to avoid one-render-behind issues.
+  const [feeRateCardOverride, setFeeRateCardOverride] = useState<RateCard | null>(null);
   const [assumptions, setAssumptions] = useState<ProposalAssumptions>(DEFAULT_ASSUMPTIONS);
   const [scopeAssumptions, setScopeAssumptions] = useState<ScopeAssumptionsState | null>(null);
   const [scopeAssumptionsInitialized, setScopeAssumptionsInitialized] = useState(false);
@@ -632,6 +634,44 @@ export default function PricingProposalDetail() {
     return STANDARD_LABELS[key] || key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').replace(/^./, s => s.toUpperCase()).trim();
   }, []);
 
+  // Currency and exchange rate (needed before feeRateCard derivation)
+  const currencySymbol = getCurrencySymbol(proposal?.currency || 'GBP');
+  const teamRateCurrency = proposal?.team_rate_currency || proposal?.currency || 'GBP';
+  const feeCurrency = proposal?.currency || 'GBP';
+  
+  const teamToFeeExchangeRate = useMemo(() => {
+    if (teamRateCurrency === feeCurrency) return 1;
+    const rates = exchangeRatesData?.rates;
+    if (!rates) return 1;
+    const teamRate = rates[teamRateCurrency];
+    const feeRate = rates[feeCurrency];
+    if (!teamRate || teamRate === 0 || !feeRate || feeRate === 0) return 1;
+    return feeRate / teamRate;
+  }, [teamRateCurrency, feeCurrency, exchangeRatesData?.rates]);
+
+  // Derive feeRateCard synchronously (useMemo prevents one-render-behind issues
+  // that were causing custom team members' hours to be wiped on page load)
+  const derivedFeeRateCard = useMemo(() => {
+    const convertedRateCard: RateCard = {} as RateCard;
+    Object.keys(rateCard).forEach(key => {
+      const entry = (rateCard as any)[key];
+      if (entry && typeof entry === 'object' && 'rate' in entry) {
+        (convertedRateCard as any)[key] = {
+          rate: Math.round(entry.rate * teamToFeeExchangeRate),
+          cost: entry.cost || 0,
+          label: entry.label,
+        };
+      }
+    });
+    return convertedRateCard;
+  }, [rateCard, teamToFeeExchangeRate]);
+
+  const feeRateCard = feeRateCardOverride || derivedFeeRateCard;
+
+  useEffect(() => {
+    setFeeRateCardOverride(null);
+  }, [rateCard, teamToFeeExchangeRate]);
+
   // Derive team members from feeRateCard (source of truth for team composition)
   const teamMembers = useMemo(() => {
     return Object.entries(feeRateCard)
@@ -846,48 +886,6 @@ export default function PricingProposalDetail() {
     };
   }, [teamMembers, summaryHours, summaryLocks, bmUpperTarget]);
 
-  const currencySymbol = getCurrencySymbol(proposal?.currency || 'GBP');
-  
-  // Get the team rate currency (defaults to fee currency if not set)
-  const teamRateCurrency = proposal?.team_rate_currency || proposal?.currency || 'GBP';
-  const feeCurrency = proposal?.currency || 'GBP';
-  
-  // Calculate exchange rate from team currency to fee currency
-  // If currencies are the same, rate is 1
-  // Otherwise, we need to convert: team rate * exchangeRate = fee rate
-  const teamToFeeExchangeRate = useMemo(() => {
-    if (teamRateCurrency === feeCurrency) return 1;
-    const rates = exchangeRatesData?.rates;
-    if (!rates) return 1;
-    
-    // Rates are expressed as "1 USD = X units of currency"
-    // To convert teamCurrency to feeCurrency:
-    // If team is GBP and fee is USD: we need (1 USD / 0.79 GBP) = 1.266 USD per GBP
-    const teamRate = rates[teamRateCurrency];
-    const feeRate = rates[feeCurrency];
-    
-    if (!teamRate || teamRate === 0 || !feeRate || feeRate === 0) return 1;
-    
-    // fee_amount = team_amount * (feeRate / teamRate)
-    return feeRate / teamRate;
-  }, [teamRateCurrency, feeCurrency, exchangeRatesData?.rates]);
-
-  // Derive feeRateCard from rateCard when exchange rate or rateCard changes
-  useEffect(() => {
-    const convertedRateCard: RateCard = {} as RateCard;
-    // Convert all entries including custom ones, preserving labels
-    Object.keys(rateCard).forEach(key => {
-      const entry = (rateCard as any)[key];
-      if (entry && typeof entry === 'object' && 'rate' in entry) {
-        (convertedRateCard as any)[key] = {
-          rate: Math.round(entry.rate * teamToFeeExchangeRate),
-          cost: entry.cost || 0,
-          label: entry.label,
-        };
-      }
-    });
-    setFeeRateCard(convertedRateCard);
-  }, [rateCard, teamToFeeExchangeRate]);
 
   const formatCurrency = (value: number) => {
     return `${currencySymbol}${new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)}`;
@@ -2807,7 +2805,7 @@ export default function PricingProposalDetail() {
               exchangeRate={teamToFeeExchangeRate}
               onSave={async (newTeamRateCard, newFeeRateCard) => {
                 setRateCard(newTeamRateCard);
-                setFeeRateCard(newFeeRateCard);
+                setFeeRateCardOverride(newFeeRateCard);
                 await updateProposal.mutateAsync({ rate_card: newTeamRateCard });
                 toast({ title: 'Rate card saved' });
               }}

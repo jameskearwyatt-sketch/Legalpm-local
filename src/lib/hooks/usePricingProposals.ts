@@ -7,11 +7,18 @@ import { Json } from '@/integrations/supabase/types';
 import { applyAFAFilters } from '@/lib/afaFilterUtils';
 import { ProposalAFA } from './useProposalAFAs';
 
+export interface RateCardEntry {
+  rate: number;
+  cost: number;
+  label?: string;
+}
+
 export interface RateCard {
-  partner: { rate: number; cost: number };
-  seniorAssociate: { rate: number; cost: number };
-  associate: { rate: number; cost: number };
-  trainee: { rate: number; cost: number };
+  partner: RateCardEntry;
+  seniorAssociate: RateCardEntry;
+  associate: RateCardEntry;
+  trainee: RateCardEntry;
+  [key: string]: RateCardEntry;
 }
 
 export interface WorkPhase {
@@ -49,6 +56,9 @@ export interface ProposalAssumptions {
   excelExportFigures?: ExportFigureSettings | null;
   afaBaseFigure?: FigureType | null;
   sendToMatterFigure?: SendToMatterFigure | null;
+  // Summary tab: persisted hours and lock states per team member
+  summaryHours?: Record<string, number>;
+  summaryLocks?: Record<string, boolean>;
 }
 
 // Check if figure settings are complete (all three must be set)

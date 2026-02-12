@@ -70,7 +70,7 @@ const analystNavigation: (NavGroupChild)[] = [
 ];
 
 const navigation: NavEntry[] = [
-  { type: 'group', name: 'Analyst', icon: FileSearch, children: analystChildren },
+  { type: 'group', name: 'Analyst', icon: FileSearch, children: analystNavigation as any },
   { type: 'separator' },
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Matters', href: '/matters', icon: Briefcase },
@@ -99,8 +99,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const userInitials = user?.email?.slice(0, 2).toUpperCase() || 'U';
 
+  const allAnalystHrefs: string[] = analystNavigation.flatMap(c =>
+    'type' in c && c.type === 'subgroup' ? c.children.map(sc => sc.href) : [(c as NavItem).href]
+  );
   const [analystOpen, setAnalystOpen] = useState(() =>
-    analystChildren.some(c => location.pathname.startsWith(c.href))
+    allAnalystHrefs.some(h => location.pathname.startsWith(h))
   );
 
   return (
@@ -140,12 +143,40 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       <ChevronDown className={cn('ml-auto h-4 w-4 transition-transform', analystOpen && 'rotate-180')} />
                     </CollapsibleTrigger>
                     <CollapsibleContent className="pl-4 space-y-0.5 mt-0.5">
-                      {group.children.map(child => {
-                        const childActive = location.pathname === child.href || location.pathname.startsWith(child.href);
+                      {(analystNavigation as NavGroupChild[]).map((child, ci) => {
+                        if ('type' in child && child.type === 'subgroup') {
+                          return (
+                            <div key={child.name} className="mt-1.5">
+                              <div className="px-3 py-1.5 text-[11px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+                                {child.name}
+                              </div>
+                              {child.children.map(sc => {
+                                const scActive = location.pathname === sc.href || location.pathname.startsWith(sc.href);
+                                return (
+                                  <Link
+                                    key={sc.name}
+                                    to={sc.href}
+                                    className={cn(
+                                      'flex items-center gap-3 px-3 pl-5 py-2 rounded-lg text-sm font-medium transition-colors',
+                                      scActive
+                                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                                    )}
+                                  >
+                                    <sc.icon className="h-4 w-4" />
+                                    {sc.name}
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          );
+                        }
+                        const item = child as NavItem;
+                        const childActive = location.pathname === item.href || location.pathname.startsWith(item.href);
                         return (
                           <Link
-                            key={child.name}
-                            to={child.href}
+                            key={item.name}
+                            to={item.href}
                             className={cn(
                               'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
                               childActive
@@ -153,8 +184,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                 : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
                             )}
                           >
-                            <child.icon className="h-4 w-4" />
-                            {child.name}
+                            <item.icon className="h-4 w-4" />
+                            {item.name}
                           </Link>
                         );
                       })}
@@ -253,19 +284,48 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 if ('type' in entry && entry.type === 'separator') {
                   return <div key={`sep-m-${index}`} className="my-2 mx-2 border-t border-dotted border-sidebar-border/60" />;
                 }
-                if ('type' in entry && entry.type === 'group') {
+                  if ('type' in entry && entry.type === 'group') {
                   const group = entry as NavGroup;
                   return (
                     <div key={group.name} className="space-y-0.5">
                       <div className="px-3 py-2 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
                         {group.name}
                       </div>
-                      {group.children.map(child => {
-                        const childActive = location.pathname.startsWith(child.href);
+                      {(analystNavigation as NavGroupChild[]).map((child, ci) => {
+                        if ('type' in child && child.type === 'subgroup') {
+                          return (
+                            <div key={child.name} className="mt-1">
+                              <div className="px-3 pl-6 py-1.5 text-[11px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
+                                {child.name}
+                              </div>
+                              {child.children.map(sc => {
+                                const scActive = location.pathname.startsWith(sc.href);
+                                return (
+                                  <Link
+                                    key={sc.name}
+                                    to={sc.href}
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className={cn(
+                                      'flex items-center gap-3 px-3 pl-8 py-2 rounded-lg text-sm font-medium transition-colors',
+                                      scActive
+                                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+                                    )}
+                                  >
+                                    <sc.icon className="h-4 w-4" />
+                                    {sc.name}
+                                  </Link>
+                                );
+                              })}
+                            </div>
+                          );
+                        }
+                        const item = child as NavItem;
+                        const childActive = location.pathname.startsWith(item.href);
                         return (
                           <Link
-                            key={child.name}
-                            to={child.href}
+                            key={item.name}
+                            to={item.href}
                             onClick={() => setMobileMenuOpen(false)}
                             className={cn(
                               'flex items-center gap-3 px-3 pl-6 py-2 rounded-lg text-sm font-medium transition-colors',
@@ -274,8 +334,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                 : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
                             )}
                           >
-                            <child.icon className="h-4 w-4" />
-                            {child.name}
+                            <item.icon className="h-4 w-4" />
+                            {item.name}
                           </Link>
                         );
                       })}

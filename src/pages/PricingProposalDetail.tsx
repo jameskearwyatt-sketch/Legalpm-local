@@ -250,6 +250,10 @@ export default function PricingProposalDetail() {
         associate_hours: item.associate_hours || 0,
         num_turns: item.num_turns || 1,
         item_type: item.item_type || 'documentation',
+        assumption_linked: (item as any).assumption_linked ?? false,
+        assumption_text: (item as any).assumption_text || null,
+        alt_fee_lower: (item as any).alt_fee_lower ?? 0,
+        alt_fee_upper: (item as any).alt_fee_upper ?? 0,
       })));
 
       // Extract custom categories from saved items
@@ -1681,6 +1685,10 @@ export default function PricingProposalDetail() {
       associate_hours: item.associate_hours || 0,
       num_turns: item.num_turns || 1,
       item_type: item.item_type || 'documentation',
+      assumption_linked: (item as any).assumption_linked ?? false,
+      assumption_text: (item as any).assumption_text || null,
+      alt_fee_lower: (item as any).alt_fee_lower ?? 0,
+      alt_fee_upper: (item as any).alt_fee_upper ?? 0,
     })));
     setIsViewingHistory(true);
     setHasUnsavedChanges(false);
@@ -1713,6 +1721,10 @@ export default function PricingProposalDetail() {
       associate_hours: item.associate_hours || 0,
       num_turns: item.num_turns || 1,
       item_type: item.item_type || 'documentation',
+      assumption_linked: (item as any).assumption_linked ?? false,
+      assumption_text: (item as any).assumption_text || null,
+      alt_fee_lower: (item as any).alt_fee_lower ?? 0,
+      alt_fee_upper: (item as any).alt_fee_upper ?? 0,
     })));
     setSelectedVersionId(null);
     setIsViewingHistory(false);

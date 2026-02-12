@@ -305,10 +305,10 @@ export function AFATab({
         return basePrice + uplift;
       }
       case 'abort_discount': {
-        // Abort discount doesn't change the client price - it's a contingent arrangement
-        // We store the potential write-off amount for display purposes
+        // Abort discount: client pays the budget minus the write-off amount on abort
         const cfg = config as AbortDiscountConfig;
-        return currentAdjustedBaseline.total * (cfg.discountPercent / 100);
+        const writeOff = currentAdjustedBaseline.total * (cfg.discountPercent / 100);
+        return currentAdjustedBaseline.total - writeOff;
       }
       default:
         return baseline;

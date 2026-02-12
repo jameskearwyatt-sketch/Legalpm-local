@@ -72,6 +72,7 @@ interface PhasedWorkItemsViewProps {
   customCategories: string[];
   onAddCustomCategory: (category: string) => void;
   existingInputDepts: string[]; // Unique list of departments used across all items
+  assumptionNarratives?: string[]; // Scope assumption narratives for linking
 }
 
 // Expose methods for external navigation
@@ -95,6 +96,7 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
   customCategories,
   onAddCustomCategory,
   existingInputDepts,
+  assumptionNarratives = [],
 }, ref) {
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(() => 
     new Set(['unassigned', ...phases.map(p => p.id)])
@@ -630,6 +632,25 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
                             <TableHead className="w-[50px] text-center">Calc</TableHead>
                             <TableHead className="text-right w-[100px]">Lower Est.</TableHead>
                             <TableHead className="text-right w-[100px]">Upper Est.</TableHead>
+                            <TableHead className="w-[50px] text-center">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center justify-center gap-1 cursor-help">
+                                      <span className="text-xs">Assn?</span>
+                                      <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top" className="max-w-xs">
+                                    <p className="text-xs">
+                                      <strong>Assumption?</strong> – Is this estimate dependent on a particular 
+                                      assumption being true? If so, link the assumption and provide alternative 
+                                      estimates that would apply if the assumption is not true.
+                                    </p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </TableHead>
                             <TableHead className="w-[60px] text-center">
                               <TooltipProvider>
                                 <Tooltip>
@@ -732,6 +753,7 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
                                           onAddCustomCategory={onAddCustomCategory}
                                           phases={phases}
                                           existingInputDepts={existingInputDepts}
+                                          assumptionNarratives={assumptionNarratives}
                                         />
                                       </TableRow>
                                     );
@@ -973,6 +995,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Label } from '@/components/ui/label';
 import { CountryCombobox } from './CountryCombobox';
+import { AssumptionLinkDialog } from './AssumptionLinkDialog';
 
 interface PhasedItemCellsProps {
   item: DraftProposalItem;
@@ -987,6 +1010,7 @@ interface PhasedItemCellsProps {
   onAddCustomCategory: (category: string) => void;
   phases: ProposalPhase[];
   existingInputDepts: string[];
+  assumptionNarratives: string[];
 }
 
 // Memoized to prevent re-renders when parent state changes but item data hasn't
@@ -1003,7 +1027,9 @@ const PhasedItemCells = memo(function PhasedItemCells({
   onAddCustomCategory,
   phases,
   existingInputDepts,
+  assumptionNarratives,
 }: PhasedItemCellsProps) {
+  const [isAssumptionDialogOpen, setIsAssumptionDialogOpen] = useState(false);
   const {
     attributes,
     listeners,
@@ -1231,6 +1257,71 @@ const PhasedItemCells = memo(function PhasedItemCells({
         )}
       </TableCell>
 
+      {/* Assumption? checkbox */}
+      <TableCell className="text-center">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div>
+                <Checkbox
+                  checked={item.assumption_linked === true}
+                  onCheckedChange={(checked) => {
+                    if (checked) {
+                      setIsAssumptionDialogOpen(true);
+                    } else {
+                      onUpdate(index, {
+                        assumption_linked: false,
+                        assumption_text: null,
+                        alt_fee_lower: undefined,
+                        alt_fee_upper: undefined,
+                      });
+                    }
+                  }}
+                  disabled={viewingHistoricalVersion}
+                  className={cn(item.assumption_linked && "border-amber-500 data-[state=checked]:bg-amber-600")}
+                />
+              </div>
+            </TooltipTrigger>
+            {item.assumption_linked && item.assumption_text && (
+              <TooltipContent side="top" className="max-w-xs">
+                <p className="text-xs font-medium">Linked Assumption:</p>
+                <p className="text-xs">{item.assumption_text}</p>
+                <p className="text-xs mt-1">
+                  Alt: {formatCurrency(item.alt_fee_lower || 0)} – {formatCurrency(item.alt_fee_upper || 0)}
+                </p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </TooltipProvider>
+        <AssumptionLinkDialog
+          open={isAssumptionDialogOpen}
+          onOpenChange={setIsAssumptionDialogOpen}
+          currentAssumptionText={item.assumption_text || null}
+          currentAltLower={item.alt_fee_lower || 0}
+          currentAltUpper={item.alt_fee_upper || 0}
+          assumptionNarratives={assumptionNarratives}
+          formatCurrency={formatCurrency}
+          baseLower={item.fee_lower ?? item.fee_amount ?? 0}
+          baseUpper={item.fee_upper ?? item.fee_amount ?? 0}
+          onSave={(data) => {
+            onUpdate(index, {
+              assumption_linked: true,
+              assumption_text: data.assumption_text,
+              alt_fee_lower: data.alt_fee_lower,
+              alt_fee_upper: data.alt_fee_upper,
+            });
+          }}
+          onRemove={() => {
+            onUpdate(index, {
+              assumption_linked: false,
+              assumption_text: null,
+              alt_fee_lower: undefined,
+              alt_fee_upper: undefined,
+            });
+          }}
+        />
+      </TableCell>
+
       {/* PC Sum checkbox */}
       <TableCell className="text-center">
         <Checkbox
@@ -1292,7 +1383,11 @@ const PhasedItemCells = memo(function PhasedItemCells({
     prevItem.lc_country !== nextItem.lc_country ||
     prevItem.is_pc_sum !== nextItem.is_pc_sum ||
     prevItem.internal_input_dept !== nextItem.internal_input_dept ||
-    prevItem.is_included !== nextItem.is_included
+    prevItem.is_included !== nextItem.is_included ||
+    prevItem.assumption_linked !== nextItem.assumption_linked ||
+    prevItem.assumption_text !== nextItem.assumption_text ||
+    prevItem.alt_fee_lower !== nextItem.alt_fee_lower ||
+    prevItem.alt_fee_upper !== nextItem.alt_fee_upper
   ) {
     return false;
   }

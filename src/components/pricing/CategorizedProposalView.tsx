@@ -1,6 +1,8 @@
 import { useMemo, useState, useCallback } from 'react';
-import { Loader2, Wand2, Pencil } from 'lucide-react';
+import { Loader2, Wand2, Pencil, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -58,12 +60,15 @@ interface CategorizedProposalViewProps {
   currencySymbol: string;
   customCategories?: string[];
   onNavigateToCategory?: (phaseId: string | null, category: string) => void;
+  showAssumptionsNotTrue?: boolean;
+  onToggleAssumptionsNotTrue?: (value: boolean) => void;
 }
 
 // Helper function to calculate category totals from a list of items using fee_upper
 function calculateCategoryTotals(
   items: DraftProposalItem[],
-  allCategories: string[]
+  allCategories: string[],
+  useAltEstimates: boolean = false
 ): Record<string, number> {
   const totals: Record<string, number> = {};
   
@@ -80,8 +85,13 @@ function calculateCategoryTotals(
       if (totals[category] === undefined) {
         totals[category] = 0;
       }
-      // Use fee_upper for upper estimate pricing
-      totals[category] += item.fee_upper ?? item.fee_amount ?? 0;
+      // Use alt estimates if toggled and item has assumption-linked alt values
+      if (useAltEstimates && item.assumption_linked && item.alt_fee_upper) {
+        totals[category] += item.alt_fee_upper;
+      } else {
+        // Use fee_upper for upper estimate pricing
+        totals[category] += item.fee_upper ?? item.fee_amount ?? 0;
+      }
     }
   });
   
@@ -137,6 +147,8 @@ export function CategorizedProposalView({
   currencySymbol,
   customCategories = [],
   onNavigateToCategory,
+  showAssumptionsNotTrue = false,
+  onToggleAssumptionsNotTrue,
 }: CategorizedProposalViewProps) {
   const [isCategorizing, setIsCategorizing] = useState(false);
   
@@ -163,21 +175,26 @@ export function CategorizedProposalView({
     
     return includedPhases.map(phase => {
       const phaseItems = items.filter(item => item.phase_id === phase.id);
-      const totals = calculateCategoryTotals(phaseItems, allCategories);
+      const totals = calculateCategoryTotals(phaseItems, allCategories, showAssumptionsNotTrue);
       const grandTotal = Object.values(totals).reduce((sum, val) => sum + val, 0);
       return { phase, totals, grandTotal };
     });
-  }, [items, includedPhases, allCategories]);
+  }, [items, includedPhases, allCategories, showAssumptionsNotTrue]);
 
   // Calculate aggregate totals (always shown)
   const categoryTotals = useMemo(() => {
-    return calculateCategoryTotals(items, allCategories);
-  }, [items, allCategories]);
+    return calculateCategoryTotals(items, allCategories, showAssumptionsNotTrue);
+  }, [items, allCategories, showAssumptionsNotTrue]);
 
   // Grand total
   const grandTotal = useMemo(() => {
     return Object.values(categoryTotals).reduce((sum, val) => sum + val, 0);
   }, [categoryTotals]);
+
+  // Check if any items have assumption-linked alt estimates
+  const hasAssumptionLinkedItems = useMemo(() => {
+    return items.some(item => item.assumption_linked && item.alt_fee_upper);
+  }, [items]);
 
   // Count uncategorized items
   const uncategorizedCount = items.filter(item => !item.category && item.work_item.trim()).length;
@@ -480,6 +497,38 @@ export function CategorizedProposalView({
           )}
         </Button>
       </div>
+
+      {/* Assumptions Not All True toggle */}
+      {hasAssumptionLinkedItems && onToggleAssumptionsNotTrue && (
+        <div className="flex items-center gap-2 px-1">
+          <Checkbox
+            checked={showAssumptionsNotTrue}
+            onCheckedChange={(checked) => onToggleAssumptionsNotTrue(!!checked)}
+            className="border-amber-500 data-[state=checked]:bg-amber-600"
+          />
+          <label className="text-sm font-medium cursor-pointer" onClick={() => onToggleAssumptionsNotTrue(!showAssumptionsNotTrue)}>
+            Assumptions Not All True?
+          </label>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs">
+                <p className="text-xs">
+                  Toggle this to see estimates that apply when one or more linked assumptions 
+                  are not true. Items without linked assumptions are unchanged.
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+          {showAssumptionsNotTrue && (
+            <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-300 text-xs">
+              Showing alt estimates
+            </Badge>
+          )}
+        </div>
+      )}
 
       {/* Per-Phase Breakdowns (if multiple phases) */}
       {phaseBreakdowns && phaseBreakdowns.length > 1 && (

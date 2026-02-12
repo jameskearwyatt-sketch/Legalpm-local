@@ -170,6 +170,7 @@ export default function PricingProposalDetail() {
   const [scopeAssumptions, setScopeAssumptions] = useState<ScopeAssumptionsState | null>(null);
   const [scopeAssumptionsInitialized, setScopeAssumptionsInitialized] = useState(false);
   const [summaryInitialized, setSummaryInitialized] = useState(false);
+  const [showAssumptionsNotTrue, setShowAssumptionsNotTrue] = useState(false);
 
   // Iterative pricing dialog state
   const [iterativeDialogOpen, setIterativeDialogOpen] = useState(false);
@@ -2133,6 +2134,8 @@ export default function PricingProposalDetail() {
                     currencySymbol={currencySymbol}
                     customCategories={customCategories}
                     onNavigateToCategory={handleNavigateToCategory}
+                    showAssumptionsNotTrue={showAssumptionsNotTrue}
+                    onToggleAssumptionsNotTrue={setShowAssumptionsNotTrue}
                   />
                 </CardContent>
               </Card>
@@ -2177,6 +2180,7 @@ export default function PricingProposalDetail() {
                   customCategories={customCategories}
                   onAddCustomCategory={addCustomCategory}
                   existingInputDepts={existingInputDepts}
+                  assumptionNarratives={getAssumptionNarratives(scopeAssumptions)}
                 />
               </CardContent>
             </Card>

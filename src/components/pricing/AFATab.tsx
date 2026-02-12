@@ -1081,10 +1081,16 @@ export function AFATab({
         <div className="text-sm text-muted-foreground space-y-1">
           <p>Discounted rates by grade:</p>
           <ul className="list-disc list-inside ml-2">
-            <li>Partner: {currencySymbol}{Math.round(rateCard.partner.rate * (1 - config.discountPercent / 100))}/hr</li>
-            <li>Senior Associate: {currencySymbol}{Math.round(rateCard.seniorAssociate.rate * (1 - config.discountPercent / 100))}/hr</li>
-            <li>Associate: {currencySymbol}{Math.round(rateCard.associate.rate * (1 - config.discountPercent / 100))}/hr</li>
-            <li>Trainee: {currencySymbol}{Math.round(rateCard.trainee.rate * (1 - config.discountPercent / 100))}/hr</li>
+            {Object.entries(rateCard)
+              .filter(([_, entry]) => entry && typeof entry === 'object' && 'rate' in entry && entry.rate > 0)
+              .sort((a, b) => (b[1] as any).rate - (a[1] as any).rate)
+              .map(([key, entry]) => {
+                const e = entry as { rate: number; label?: string };
+                const label = e.label || key.replace(/([A-Z])/g, ' $1').replace(/^./, s => s.toUpperCase()).trim();
+                return (
+                  <li key={key}>{label}: {currencySymbol}{Math.round(e.rate * (1 - config.discountPercent / 100))}/hr</li>
+                );
+              })}
           </ul>
         </div>
       </div>

@@ -247,6 +247,11 @@ export interface DraftProposalItem {
   associate_hours?: number;
   num_turns?: number;
   item_type?: 'documentation' | 'negotiation' | 'due_diligence' | 'meeting';
+  // Assumption-linked alternative estimates
+  assumption_linked?: boolean;
+  assumption_text?: string | null; // The assumption text (from scope assumptions or free text)
+  alt_fee_lower?: number;
+  alt_fee_upper?: number;
 }
 
 // Phase definition for grouping work items

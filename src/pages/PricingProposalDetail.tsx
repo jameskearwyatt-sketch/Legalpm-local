@@ -507,6 +507,50 @@ export default function PricingProposalDetail() {
     };
   }, [draftItems, assumptions.afaBaseFigure]);
 
+  // Calculate "Assumptions Not All True" alternative totals
+  const altTotals = useMemo(() => {
+    const includedItems = draftItems.filter(item => item.is_included !== false);
+    const hasAnyAlt = includedItems.some(item => item.assumption_linked && (item.alt_fee_lower || item.alt_fee_upper));
+    if (!hasAnyAlt) return null;
+
+    const altLowerTotal = includedItems.reduce((sum, item) => {
+      if (item.assumption_linked && item.alt_fee_lower != null) {
+        return sum + item.alt_fee_lower;
+      }
+      return sum + getItemFeeByFigureType(item, 'lower');
+    }, 0);
+    const altUpperTotal = includedItems.reduce((sum, item) => {
+      if (item.assumption_linked && item.alt_fee_upper != null) {
+        return sum + item.alt_fee_upper;
+      }
+      return sum + getItemFeeByFigureType(item, 'upper');
+    }, 0);
+    const altBmTotal = includedItems
+      .filter(item => item.provider === 'Baker McKenzie')
+      .reduce((sum, item) => {
+        if (item.assumption_linked && item.alt_fee_upper != null) {
+          return sum + item.alt_fee_upper;
+        }
+        return sum + getItemFeeByFigureType(item, assumptions.afaBaseFigure || 'midpoint');
+      }, 0);
+    const altLcTotal = includedItems
+      .filter(item => item.provider === 'Local Counsel')
+      .reduce((sum, item) => {
+        if (item.assumption_linked && item.alt_fee_upper != null) {
+          return sum + item.alt_fee_upper;
+        }
+        return sum + getItemFeeByFigureType(item, assumptions.afaBaseFigure || 'midpoint');
+      }, 0);
+
+    return {
+      lowerTotal: altLowerTotal,
+      upperTotal: altUpperTotal,
+      bmTotal: altBmTotal,
+      lcTotal: altLcTotal,
+      total: altBmTotal + altLcTotal,
+    };
+  }, [draftItems, assumptions.afaBaseFigure]);
+
   const enabledAFAs = useMemo(() => {
     return proposalAFAs.filter(a => a.is_enabled);
   }, [proposalAFAs]);
@@ -1788,6 +1832,11 @@ export default function PricingProposalDetail() {
                         <p className="text-sm text-muted-foreground">
                           BM: {formatCurrency(workItemTotals.bmTotal)} • LC: {formatCurrency(workItemTotals.localCounselTotal)}
                         </p>
+                        {showAssumptionsNotTrue && altTotals && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                            If not all true: {formatCurrency(altTotals.total)}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <DialogFooter>
@@ -1936,18 +1985,33 @@ export default function PricingProposalDetail() {
                 <CardContent className="pt-6">
                   <p className="text-sm font-medium text-muted-foreground">Estimated Range</p>
                   <p className="text-2xl font-bold">{formatCurrency(workItemTotals.lowerTotal)} - {formatCurrency(workItemTotals.upperTotal)}</p>
+                  {showAssumptionsNotTrue && altTotals && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      If not all true: {formatCurrency(altTotals.lowerTotal)} - {formatCurrency(altTotals.upperTotal)}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-6">
                   <p className="text-sm font-medium text-muted-foreground">Baker McKenzie</p>
                   <p className="text-2xl font-bold">{formatCurrency(workItemTotals.bmTotal)}</p>
+                  {showAssumptionsNotTrue && altTotals && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      If not all true: {formatCurrency(altTotals.bmTotal)}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-6">
                   <p className="text-sm font-medium text-muted-foreground">Local Counsel</p>
                   <p className="text-2xl font-bold">{formatCurrency(workItemTotals.localCounselTotal)}</p>
+                  {showAssumptionsNotTrue && altTotals && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      If not all true: {formatCurrency(altTotals.lcTotal)}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
               <Card>
@@ -2146,9 +2210,16 @@ export default function PricingProposalDetail() {
                 <CardTitle className="flex items-center justify-between">
                   <span>Work Items</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-normal text-muted-foreground">
-                      {formatCurrency(workItemTotals.lowerTotal)} – {formatCurrency(workItemTotals.upperTotal)}
-                    </span>
+                    <div className="text-right">
+                      <span className="text-sm font-normal text-muted-foreground">
+                        {formatCurrency(workItemTotals.lowerTotal)} – {formatCurrency(workItemTotals.upperTotal)}
+                      </span>
+                      {showAssumptionsNotTrue && altTotals && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400">
+                          If not all true: {formatCurrency(altTotals.lowerTotal)} – {formatCurrency(altTotals.upperTotal)}
+                        </p>
+                      )}
+                    </div>
                     {viewingHistoricalVersion && (
                       <Badge variant="secondary" className="ml-2">
                         Read-only (historical)
@@ -2248,6 +2319,11 @@ export default function PricingProposalDetail() {
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Upper Estimate (Target)</p>
                       <p className="text-2xl font-bold">{formatCurrency(summary.bmUpperTarget)}</p>
+                      {showAssumptionsNotTrue && altTotals && (
+                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                          If not all true: {formatCurrency(altTotals.bmTotal)}
+                        </p>
+                      )}
                     </div>
                     <Target className="h-8 w-8 text-muted-foreground/30" />
                   </div>
@@ -2377,6 +2453,11 @@ export default function PricingProposalDetail() {
                           <span className="text-xs font-normal text-muted-foreground">
                             Target: {formatCurrency(summary.bmUpperTarget)}
                           </span>
+                          {showAssumptionsNotTrue && altTotals && (
+                            <span className="text-xs text-amber-600 dark:text-amber-400">
+                              If not all true: {formatCurrency(altTotals.bmTotal)}
+                            </span>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

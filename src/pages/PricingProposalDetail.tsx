@@ -674,7 +674,11 @@ export default function PricingProposalDetail() {
     setAssumptions(prevAssumptions => {
       const hours = { ...(prevAssumptions.summaryHours || {}) };
       Object.keys(hours).forEach(key => {
-        hours[key] = Math.round((hours[key] * ratio) * 2) / 2;
+        if (hours[key] > 0) {
+          // Scale ratably but never zero-out a member who had hours
+          const scaled = Math.round((hours[key] * ratio) * 2) / 2;
+          hours[key] = Math.max(0.5, scaled);
+        }
       });
       return { ...prevAssumptions, summaryHours: hours };
     });
@@ -810,12 +814,7 @@ export default function PricingProposalDetail() {
 
   // Derive feeRateCard from rateCard when exchange rate or rateCard changes
   useEffect(() => {
-    const convertedRateCard: RateCard = {
-      partner: { rate: 0, cost: 0 },
-      seniorAssociate: { rate: 0, cost: 0 },
-      associate: { rate: 0, cost: 0 },
-      trainee: { rate: 0, cost: 0 },
-    };
+    const convertedRateCard: RateCard = {} as RateCard;
     // Convert all entries including custom ones, preserving labels
     Object.keys(rateCard).forEach(key => {
       const entry = (rateCard as any)[key];

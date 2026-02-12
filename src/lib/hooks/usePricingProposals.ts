@@ -554,6 +554,10 @@ export function usePricingProposal(proposalId?: string) {
             associate_hours: item.associate_hours ?? 0,
             num_turns: item.num_turns ?? 1,
             item_type: item.item_type ?? 'documentation',
+            assumption_linked: item.assumption_linked ?? false,
+            assumption_text: item.assumption_text || null,
+            alt_fee_lower: item.alt_fee_lower ?? 0,
+            alt_fee_upper: item.alt_fee_upper ?? 0,
           };
         });
 
@@ -653,6 +657,10 @@ export function usePricingProposal(proposalId?: string) {
             associate_hours: item.associate_hours ?? 0,
             num_turns: item.num_turns ?? 1,
             item_type: item.item_type ?? 'documentation',
+            assumption_linked: item.assumption_linked ?? false,
+            assumption_text: item.assumption_text || null,
+            alt_fee_lower: item.alt_fee_lower ?? 0,
+            alt_fee_upper: item.alt_fee_upper ?? 0,
           };
         });
 

@@ -75,6 +75,14 @@ interface AFATabProps {
   };
   customCategories?: string[];
   onDiscountChange?: (discountPercent: number) => void;
+  showAssumptionsNotTrue?: boolean;
+  altTotals?: {
+    lowerTotal: number;
+    upperTotal: number;
+    bmTotal: number;
+    lcTotal: number;
+    total: number;
+  } | null;
 }
 
 // Grouped AFA types matching the layering logic
@@ -115,6 +123,8 @@ export function AFATab({
   baselineTotals,
   customCategories = [],
   onDiscountChange,
+  showAssumptionsNotTrue = false,
+  altTotals,
 }: AFATabProps) {
   const { afas, isLoading, upsertAFA, toggleAFA, selectForExport } = useProposalAFAs(proposalId);
   const [expandedTypes, setExpandedTypes] = useState<string[]>([]);
@@ -1231,7 +1241,14 @@ export function AFATab({
               </CardDescription>
             </div>
             <Badge variant="outline" className="text-lg px-4 py-1">
-              {formatCurrency(baselineTotals.total)}
+              <div className="text-right">
+                <span>{formatCurrency(baselineTotals.total)}</span>
+                {showAssumptionsNotTrue && altTotals && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 font-normal">
+                    If assumptions not all true: {formatCurrency(altTotals.total)}
+                  </p>
+                )}
+              </div>
             </Badge>
           </div>
         </CardHeader>
@@ -1240,10 +1257,20 @@ export function AFATab({
             <div>
               <p className="text-muted-foreground">BM Fees</p>
               <p className="font-medium">{formatCurrency(baselineTotals.bmTotal)}</p>
+              {showAssumptionsNotTrue && altTotals && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  {formatCurrency(altTotals.bmTotal)}
+                </p>
+              )}
             </div>
             <div>
               <p className="text-muted-foreground">Local Counsel</p>
               <p className="font-medium">{formatCurrency(baselineTotals.localCounselTotal)}</p>
+              {showAssumptionsNotTrue && altTotals && (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  {formatCurrency(altTotals.lcTotal)}
+                </p>
+              )}
             </div>
             <div>
               <p className="text-muted-foreground">Total Hours</p>

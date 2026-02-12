@@ -1834,7 +1834,7 @@ export default function PricingProposalDetail() {
                         </p>
                         {showAssumptionsNotTrue && altTotals && (
                           <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                            If not all true: {formatCurrency(altTotals.total)}
+                            If assumptions not all true: {formatCurrency(altTotals.total)}
                           </p>
                         )}
                       </div>
@@ -1987,7 +1987,7 @@ export default function PricingProposalDetail() {
                   <p className="text-2xl font-bold">{formatCurrency(workItemTotals.lowerTotal)} - {formatCurrency(workItemTotals.upperTotal)}</p>
                   {showAssumptionsNotTrue && altTotals && (
                     <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      If not all true: {formatCurrency(altTotals.lowerTotal)} - {formatCurrency(altTotals.upperTotal)}
+                      If assumptions not all true: {formatCurrency(altTotals.lowerTotal)} - {formatCurrency(altTotals.upperTotal)}
                     </p>
                   )}
                 </CardContent>
@@ -1998,7 +1998,7 @@ export default function PricingProposalDetail() {
                   <p className="text-2xl font-bold">{formatCurrency(workItemTotals.bmTotal)}</p>
                   {showAssumptionsNotTrue && altTotals && (
                     <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      If not all true: {formatCurrency(altTotals.bmTotal)}
+                      If assumptions not all true: {formatCurrency(altTotals.bmTotal)}
                     </p>
                   )}
                 </CardContent>
@@ -2009,7 +2009,7 @@ export default function PricingProposalDetail() {
                   <p className="text-2xl font-bold">{formatCurrency(workItemTotals.localCounselTotal)}</p>
                   {showAssumptionsNotTrue && altTotals && (
                     <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                      If not all true: {formatCurrency(altTotals.lcTotal)}
+                      If assumptions not all true: {formatCurrency(altTotals.lcTotal)}
                     </p>
                   )}
                 </CardContent>
@@ -2216,7 +2216,7 @@ export default function PricingProposalDetail() {
                       </span>
                       {showAssumptionsNotTrue && altTotals && (
                         <p className="text-xs text-amber-600 dark:text-amber-400">
-                          If not all true: {formatCurrency(altTotals.lowerTotal)} – {formatCurrency(altTotals.upperTotal)}
+                          If assumptions not all true: {formatCurrency(altTotals.lowerTotal)} – {formatCurrency(altTotals.upperTotal)}
                         </p>
                       )}
                     </div>
@@ -2306,6 +2306,8 @@ export default function PricingProposalDetail() {
                 }}
                 customCategories={customCategories}
                 onDiscountChange={setAfaDiscountPercent}
+                showAssumptionsNotTrue={showAssumptionsNotTrue}
+                altTotals={altTotals}
               />
             </div>
           </TabsContent>
@@ -2321,7 +2323,7 @@ export default function PricingProposalDetail() {
                       <p className="text-2xl font-bold">{formatCurrency(summary.bmUpperTarget)}</p>
                       {showAssumptionsNotTrue && altTotals && (
                         <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                          If not all true: {formatCurrency(altTotals.bmTotal)}
+                          If assumptions not all true: {formatCurrency(altTotals.bmTotal)}
                         </p>
                       )}
                     </div>
@@ -2455,7 +2457,7 @@ export default function PricingProposalDetail() {
                           </span>
                           {showAssumptionsNotTrue && altTotals && (
                             <span className="text-xs text-amber-600 dark:text-amber-400">
-                              If not all true: {formatCurrency(altTotals.bmTotal)}
+                              If assumptions not all true: {formatCurrency(altTotals.bmTotal)}
                             </span>
                           )}
                         </div>

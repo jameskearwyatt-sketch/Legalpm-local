@@ -2333,20 +2333,34 @@ export default function PricingProposalDetail() {
                         </TableCell>
                         <TableCell className="font-medium">{member.label}</TableCell>
                         <TableCell className="text-right">
-                          <Input
-                            type="number"
-                            step="0.5"
-                            min="0"
-                            value={(member.hours || 0).toFixed(1)}
-                            onChange={(e) => {
-                              const val = Math.max(0, parseFloat(e.target.value) || 0);
-                              handleSummaryHoursChange(member.key, val);
-                            }}
-                            className={cn(
-                              "w-20 h-7 text-right text-sm ml-auto",
-                              member.isLocked && "bg-amber-50 dark:bg-amber-950/20 border-amber-300"
-                            )}
-                          />
+                          <div className="flex flex-col items-end gap-1">
+                            <Input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              value={(member.hours || 0).toFixed(1)}
+                              onChange={(e) => {
+                                const val = Math.max(0, parseFloat(e.target.value) || 0);
+                                handleSummaryHoursChange(member.key, val);
+                              }}
+                              className={cn(
+                                "w-20 h-7 text-right text-sm ml-auto",
+                                member.isLocked && "bg-amber-50 dark:bg-amber-950/20 border-amber-300"
+                              )}
+                            />
+                            <input
+                              type="range"
+                              min="0"
+                              max={Math.max(200, (member.hours || 0) * 2)}
+                              step="0.5"
+                              value={member.hours || 0}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value) || 0;
+                                handleSummaryHoursChange(member.key, val);
+                              }}
+                              className="w-20 h-2 accent-primary cursor-pointer"
+                            />
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">{formatCurrency(member.rate)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(member.revenue)}</TableCell>

@@ -82,12 +82,7 @@ function generateKey(level: string, label: string): string {
 // Convert array back to RateCard format
 // We store the TEAM RATE in the rate card (the user's base rates)
 function arrayToRateCard(feeEarners: FeeEarner[]): RateCard {
-  const result: RateCard = {
-    partner: { rate: 0, cost: 0 },
-    seniorAssociate: { rate: 0, cost: 0 },
-    associate: { rate: 0, cost: 0 },
-    trainee: { rate: 0, cost: 0 },
-  };
+  const result: RateCard = {} as RateCard;
   feeEarners.forEach(earner => {
     (result as any)[earner.key] = { rate: earner.teamRate, cost: 0, label: earner.label };
   });
@@ -96,12 +91,7 @@ function arrayToRateCard(feeEarners: FeeEarner[]): RateCard {
 
 // Build a rate card with FEE RATES for use in pricing calculations
 function arrayToFeeRateCard(feeEarners: FeeEarner[]): RateCard {
-  const result: RateCard = {
-    partner: { rate: 0, cost: 0 },
-    seniorAssociate: { rate: 0, cost: 0 },
-    associate: { rate: 0, cost: 0 },
-    trainee: { rate: 0, cost: 0 },
-  };
+  const result: RateCard = {} as RateCard;
   feeEarners.forEach(earner => {
     (result as any)[earner.key] = { rate: earner.feeRate, cost: 0, label: earner.label };
   });

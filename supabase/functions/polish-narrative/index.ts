@@ -97,7 +97,7 @@ Guidelines:
 - Use proper legal terminology where appropriate
 - Ensure perfect grammar, spelling, and punctuation
 - Write in third person or passive voice as is standard in legal billing
-- Expand abbreviations and shorthand into full professional descriptions
+- Expand common shorthand (e.g. "re" → "regarding", "w" → "with", "tmrw" → "tomorrow") but NEVER expand acronyms — leave all acronyms exactly as the user wrote them (e.g. keep "SPA", "NDA", "IP", "AML", "KYC", "CDD", "LC" unchanged)
 - Keep the core meaning and work performed, but make it presentation-ready
 - Do not add work that wasn't mentioned - only polish what's there
 - Typical length should be 1-3 sentences

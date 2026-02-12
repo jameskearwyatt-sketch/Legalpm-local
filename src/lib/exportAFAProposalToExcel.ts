@@ -842,7 +842,7 @@ export async function exportAFAProposalToExcel({
     const altDelta = altGrandTotal - grandTotal;
 
     const altTotalRow = worksheet.getRow(currentRow);
-    altTotalRow.values = ['', 'IF ASSUMPTIONS NOT ALL TRUE', '', '', smartRound(altGrandTotal), '', ''];
+    altTotalRow.values = ['', 'IF IDENTIFIED ASSUMPTIONS ARE NOT TRUE', '', '', smartRound(altGrandTotal), '', ''];
     altTotalRow.getCell(5).numFmt = '#,##0';
     altTotalRow.getCell(5).alignment = { horizontal: 'right' };
     altTotalRow.getCell(5).font = { bold: true, size: 11, color: { argb: 'FFB45309' } };
@@ -886,11 +886,11 @@ export async function exportAFAProposalToExcel({
     worksheet.getRow(currentRow).height = 30;
     currentRow++;
 
-    // Table header row
+    // Table header row - use columns B, C, D for Team Member, Rate, Hours, Fee
     const teamTableHeader = worksheet.getRow(currentRow);
-    teamTableHeader.values = ['', 'Team Member', '', `Rate (${teamCurrencySymbol}/hr)`, 'Estimated Hours', 'Estimated Fee', '', ''];
+    teamTableHeader.values = ['', 'Team Member', `Rate (${teamCurrencySymbol}/hr)`, 'Estimated Hours', 'Estimated Fee'];
     teamTableHeader.eachCell((cell, colNumber) => {
-      if (colNumber >= 2 && colNumber <= 6) {
+      if (colNumber >= 2 && colNumber <= 5) {
         cell.font = { bold: true, size: 10, color: { argb: 'FF374151' } };
         cell.fill = {
           type: 'pattern',
@@ -900,11 +900,9 @@ export async function exportAFAProposalToExcel({
         cell.border = {
           bottom: { style: 'thin', color: { argb: borderColor } },
         };
-        cell.alignment = { horizontal: colNumber >= 4 ? 'center' : 'left', vertical: 'middle' };
+        cell.alignment = { horizontal: colNumber >= 3 ? 'center' : 'left', vertical: 'middle' };
       }
     });
-    // Merge Team Member across B-C
-    worksheet.mergeCells(`B${currentRow}:C${currentRow}`);
     teamTableHeader.height = 24;
     currentRow++;
 
@@ -917,21 +915,18 @@ export async function exportAFAProposalToExcel({
 
     for (const member of sortedTeam) {
       const memberRow = worksheet.getRow(currentRow);
-      memberRow.values = ['', member.label, '', member.rate, member.hours, smartRound(member.revenue), '', ''];
-      
-      // Merge B-C for member name
-      worksheet.mergeCells(`B${currentRow}:C${currentRow}`);
+      memberRow.values = ['', member.label, member.rate, member.hours, smartRound(member.revenue)];
       
       memberRow.getCell(2).font = { size: 10 };
-      memberRow.getCell(4).numFmt = '#,##0';
+      memberRow.getCell(3).numFmt = '#,##0';
+      memberRow.getCell(3).alignment = { horizontal: 'center' };
+      memberRow.getCell(3).font = { size: 10, color: { argb: 'FF6B7280' } };
+      memberRow.getCell(4).numFmt = '#,##0.0';
       memberRow.getCell(4).alignment = { horizontal: 'center' };
-      memberRow.getCell(4).font = { size: 10, color: { argb: 'FF6B7280' } };
-      memberRow.getCell(5).numFmt = '#,##0.0';
+      memberRow.getCell(4).font = { size: 10 };
+      memberRow.getCell(5).numFmt = '#,##0';
       memberRow.getCell(5).alignment = { horizontal: 'center' };
-      memberRow.getCell(5).font = { size: 10 };
-      memberRow.getCell(6).numFmt = '#,##0';
-      memberRow.getCell(6).alignment = { horizontal: 'center' };
-      memberRow.getCell(6).font = { size: 10, bold: true };
+      memberRow.getCell(5).font = { size: 10, bold: true };
 
       // Alternating row colors
       if (currentRow % 2 === 0) {
@@ -955,15 +950,14 @@ export async function exportAFAProposalToExcel({
 
     // Totals row
     const teamTotalRow = worksheet.getRow(currentRow);
-    teamTotalRow.values = ['', 'TOTAL', '', '', totalHours, smartRound(totalRevenue), '', ''];
-    worksheet.mergeCells(`B${currentRow}:C${currentRow}`);
+    teamTotalRow.values = ['', 'TOTAL', '', totalHours, smartRound(totalRevenue)];
     teamTotalRow.getCell(2).font = { bold: true, size: 11, color: { argb: primaryColor } };
-    teamTotalRow.getCell(5).numFmt = '#,##0.0';
+    teamTotalRow.getCell(4).numFmt = '#,##0.0';
+    teamTotalRow.getCell(4).alignment = { horizontal: 'center' };
+    teamTotalRow.getCell(4).font = { bold: true, size: 11, color: { argb: primaryColor } };
+    teamTotalRow.getCell(5).numFmt = '#,##0';
     teamTotalRow.getCell(5).alignment = { horizontal: 'center' };
     teamTotalRow.getCell(5).font = { bold: true, size: 11, color: { argb: primaryColor } };
-    teamTotalRow.getCell(6).numFmt = '#,##0';
-    teamTotalRow.getCell(6).alignment = { horizontal: 'center' };
-    teamTotalRow.getCell(6).font = { bold: true, size: 11, color: { argb: primaryColor } };
     teamTotalRow.eachCell((cell) => {
       cell.border = {
         top: { style: 'medium', color: { argb: primaryColor } },
@@ -977,8 +971,7 @@ export async function exportAFAProposalToExcel({
     if (totalHours > 0) {
       const blendedRate = totalRevenue / totalHours;
       const blendedRow = worksheet.getRow(currentRow);
-      blendedRow.values = ['', `Blended Rate: ${teamCurrencySymbol}${Math.round(blendedRate).toLocaleString()}/hr`, '', '', '', '', '', ''];
-      worksheet.mergeCells(`B${currentRow}:C${currentRow}`);
+      blendedRow.values = ['', `Blended Rate: ${teamCurrencySymbol}${Math.round(blendedRate).toLocaleString()}/hr`];
       blendedRow.getCell(2).font = { size: 10, italic: true, color: { argb: 'FF6B7280' } };
       currentRow++;
     }

@@ -30,6 +30,14 @@ interface WorkPhase {
   is_included?: boolean;
 }
 
+interface TeamMemberSummary {
+  key: string;
+  label: string;
+  rate: number;
+  hours: number;
+  revenue: number;
+}
+
 interface ExportAFAProposalOptions {
   items: DraftProposalItem[];
   enabledAFAs: ProposalAFA[];
@@ -49,6 +57,10 @@ interface ExportAFAProposalOptions {
   // Internal input department highlighting
   includeInputDeptHighlighting?: boolean;
   existingInputDepts?: string[];
+  // Team member breakdown
+  includeTeamBreakdown?: boolean;
+  teamMembers?: TeamMemberSummary[];
+  teamCurrency?: string;
 }
 
 export async function exportAFAProposalToExcel({
@@ -66,6 +78,9 @@ export async function exportAFAProposalToExcel({
   workPhases,
   includeInputDeptHighlighting = false,
   existingInputDepts = [],
+  includeTeamBreakdown = false,
+  teamMembers: teamMemberData = [],
+  teamCurrency,
 }: ExportAFAProposalOptions): Promise<void> {
   const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency;
   
@@ -551,6 +566,43 @@ export async function exportAFAProposalToExcel({
       });
 
       currentRow++;
+
+      // If assumption-linked with alt pricing, add an indented amber row showing impact
+      if (item.assumption_linked && (item.alt_fee_upper || item.alt_fee_lower)) {
+        const altFee = smartRound(item.alt_fee_upper || item.alt_fee_lower || 0);
+        const baseFee = smartRound(feeAmount);
+        const delta = altFee - baseFee;
+        const altRow = worksheet.getRow(currentRow);
+        const altRowValues: (string | number)[] = [
+          '',
+          `  ↳ If assumption not true`,
+          item.assumption_text || '',
+          '',
+          altFee,
+          '',
+        ];
+        if (includeInputDeptHighlighting) altRowValues.push('');
+        altRowValues.push(delta > 0 ? `+${smartRound(delta).toLocaleString()} increase` : `${smartRound(delta).toLocaleString()} change`);
+        altRow.values = altRowValues;
+        altRow.getCell(2).font = { size: 9, italic: true, color: { argb: 'FFB45309' } };
+        altRow.getCell(3).font = { size: 9, italic: true, color: { argb: 'FF92400E' } };
+        altRow.getCell(3).alignment = { wrapText: true, vertical: 'top' };
+        altRow.getCell(5).numFmt = '#,##0';
+        altRow.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
+        altRow.getCell(5).font = { size: 9, bold: true, color: { argb: 'FFB45309' } };
+        altRow.getCell(notesColumnIndex).font = { size: 9, italic: true, color: { argb: 'FFB45309' } };
+        altRow.eachCell((cell) => {
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFFFBEB' }, // Amber-50
+          };
+          cell.border = {
+            bottom: { style: 'hair', color: { argb: borderColor } },
+          };
+        });
+        currentRow++;
+      }
     }
 
     // Category subtotal - now fee column is at index 5
@@ -774,6 +826,162 @@ export async function exportAFAProposalToExcel({
         bottom: { style: 'double', color: { argb: primaryColor } },
       };
     });
+  }
+
+  // "If assumptions not all true" alternative total
+  const hasAnyAltPricing = validItems.some(item => item.assumption_linked && (item.alt_fee_upper || item.alt_fee_lower));
+  if (hasAnyAltPricing) {
+    currentRow++;
+    // Calculate alternative total (using alt pricing where available, otherwise standard upper)
+    const altGrandTotal = validItems.reduce((sum, item) => {
+      if (item.assumption_linked && (item.alt_fee_upper || item.alt_fee_lower)) {
+        return sum + smartRound(item.alt_fee_upper || item.alt_fee_lower || 0);
+      }
+      return sum + (item.fee_amount || 0);
+    }, 0);
+    const altDelta = altGrandTotal - grandTotal;
+
+    const altTotalRow = worksheet.getRow(currentRow);
+    altTotalRow.values = ['', 'IF ASSUMPTIONS NOT ALL TRUE', '', '', smartRound(altGrandTotal), '', ''];
+    altTotalRow.getCell(5).numFmt = '#,##0';
+    altTotalRow.getCell(5).alignment = { horizontal: 'right' };
+    altTotalRow.getCell(5).font = { bold: true, size: 11, color: { argb: 'FFB45309' } };
+    altTotalRow.getCell(2).font = { bold: true, size: 11, color: { argb: 'FFB45309' } };
+    altTotalRow.eachCell((cell) => {
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFFBEB' },
+      };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'FFB45309' } },
+        bottom: { style: 'thin', color: { argb: 'FFB45309' } },
+      };
+    });
+    // Show delta in notes column
+    const altNotesCell = altTotalRow.getCell(notesColumnIndex);
+    altNotesCell.value = altDelta > 0 ? `+${smartRound(altDelta).toLocaleString()} vs base` : `${smartRound(altDelta).toLocaleString()} vs base`;
+    altNotesCell.font = { size: 9, italic: true, color: { argb: 'FFB45309' } };
+    altTotalRow.height = 24;
+    currentRow++;
+  }
+
+  // Team Member Breakdown section (optional)
+  if (includeTeamBreakdown && teamMemberData && teamMemberData.length > 0) {
+    const teamCurrencySymbol = teamCurrency === 'GBP' ? '£' : teamCurrency === 'USD' ? '$' : teamCurrency === 'EUR' ? '€' : (teamCurrency || currencySymbol);
+    
+    currentRow += 2;
+    
+    // Section header
+    worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+    const teamHeaderCell = worksheet.getCell(`A${currentRow}`);
+    teamHeaderCell.value = '👥 Team Composition & Allocation';
+    teamHeaderCell.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+    teamHeaderCell.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: primaryColor },
+    };
+    teamHeaderCell.alignment = { vertical: 'middle' };
+    worksheet.getRow(currentRow).height = 30;
+    currentRow++;
+
+    // Table header row
+    const teamTableHeader = worksheet.getRow(currentRow);
+    teamTableHeader.values = ['', 'Team Member', '', `Rate (${teamCurrencySymbol}/hr)`, 'Estimated Hours', 'Estimated Fee', '', ''];
+    teamTableHeader.eachCell((cell, colNumber) => {
+      if (colNumber >= 2 && colNumber <= 6) {
+        cell.font = { bold: true, size: 10, color: { argb: 'FF374151' } };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FFF3F4F6' },
+        };
+        cell.border = {
+          bottom: { style: 'thin', color: { argb: borderColor } },
+        };
+        cell.alignment = { horizontal: colNumber >= 4 ? 'center' : 'left', vertical: 'middle' };
+      }
+    });
+    // Merge Team Member across B-C
+    worksheet.mergeCells(`B${currentRow}:C${currentRow}`);
+    teamTableHeader.height = 24;
+    currentRow++;
+
+    // Team member rows
+    let totalHours = 0;
+    let totalRevenue = 0;
+
+    // Sort by rate descending (most senior first)
+    const sortedTeam = [...teamMemberData].sort((a, b) => b.rate - a.rate);
+
+    for (const member of sortedTeam) {
+      const memberRow = worksheet.getRow(currentRow);
+      memberRow.values = ['', member.label, '', member.rate, member.hours, smartRound(member.revenue), '', ''];
+      
+      // Merge B-C for member name
+      worksheet.mergeCells(`B${currentRow}:C${currentRow}`);
+      
+      memberRow.getCell(2).font = { size: 10 };
+      memberRow.getCell(4).numFmt = '#,##0';
+      memberRow.getCell(4).alignment = { horizontal: 'center' };
+      memberRow.getCell(4).font = { size: 10, color: { argb: 'FF6B7280' } };
+      memberRow.getCell(5).numFmt = '#,##0.0';
+      memberRow.getCell(5).alignment = { horizontal: 'center' };
+      memberRow.getCell(5).font = { size: 10 };
+      memberRow.getCell(6).numFmt = '#,##0';
+      memberRow.getCell(6).alignment = { horizontal: 'center' };
+      memberRow.getCell(6).font = { size: 10, bold: true };
+
+      // Alternating row colors
+      if (currentRow % 2 === 0) {
+        memberRow.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+        });
+      } else {
+        memberRow.eachCell((cell) => {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: lightGray } };
+        });
+      }
+
+      memberRow.eachCell((cell) => {
+        cell.border = { bottom: { style: 'hair', color: { argb: borderColor } } };
+      });
+
+      totalHours += member.hours;
+      totalRevenue += member.revenue;
+      currentRow++;
+    }
+
+    // Totals row
+    const teamTotalRow = worksheet.getRow(currentRow);
+    teamTotalRow.values = ['', 'TOTAL', '', '', totalHours, smartRound(totalRevenue), '', ''];
+    worksheet.mergeCells(`B${currentRow}:C${currentRow}`);
+    teamTotalRow.getCell(2).font = { bold: true, size: 11, color: { argb: primaryColor } };
+    teamTotalRow.getCell(5).numFmt = '#,##0.0';
+    teamTotalRow.getCell(5).alignment = { horizontal: 'center' };
+    teamTotalRow.getCell(5).font = { bold: true, size: 11, color: { argb: primaryColor } };
+    teamTotalRow.getCell(6).numFmt = '#,##0';
+    teamTotalRow.getCell(6).alignment = { horizontal: 'center' };
+    teamTotalRow.getCell(6).font = { bold: true, size: 11, color: { argb: primaryColor } };
+    teamTotalRow.eachCell((cell) => {
+      cell.border = {
+        top: { style: 'medium', color: { argb: primaryColor } },
+        bottom: { style: 'double', color: { argb: primaryColor } },
+      };
+    });
+    teamTotalRow.height = 24;
+    currentRow++;
+
+    // Blended rate
+    if (totalHours > 0) {
+      const blendedRate = totalRevenue / totalHours;
+      const blendedRow = worksheet.getRow(currentRow);
+      blendedRow.values = ['', `Blended Rate: ${teamCurrencySymbol}${Math.round(blendedRate).toLocaleString()}/hr`, '', '', '', '', '', ''];
+      worksheet.mergeCells(`B${currentRow}:C${currentRow}`);
+      blendedRow.getCell(2).font = { size: 10, italic: true, color: { argb: 'FF6B7280' } };
+      currentRow++;
+    }
   }
 
   // Footer notes

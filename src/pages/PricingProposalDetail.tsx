@@ -1545,9 +1545,10 @@ export default function PricingProposalDetail() {
   // Check if figure settings are complete
   const figureSettingsComplete = areFigureSettingsComplete(assumptions);
 
-  // Export dialog state for internal input highlighting
+  // Export dialog state
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [includeInputHighlighting, setIncludeInputHighlighting] = useState(true);
+  const [includeTeamBreakdown, setIncludeTeamBreakdown] = useState(false);
 
   // Check if any items have internal input dept assigned
   const hasInternalInputDepts = useMemo(() => {
@@ -1566,17 +1567,21 @@ export default function PricingProposalDetail() {
       return;
     }
 
-    // If there are items with internal input dept, show dialog
-    if (hasInternalInputDepts) {
-      setIsExportDialogOpen(true);
-    } else {
-      // No input depts, export directly
-      performExport(false);
-    }
+    // Always show dialog for export options
+    setIsExportDialogOpen(true);
   };
 
-  const performExport = async (includeHighlighting: boolean) => {
+  const performExport = async () => {
     setIsExportDialogOpen(false);
+
+    // Build team member summary data for export
+    const teamMemberSummaryData = summary.teamMembers.map(m => ({
+      key: m.key,
+      label: m.label,
+      rate: m.rate,
+      hours: m.hours,
+      revenue: m.revenue,
+    }));
     
     await exportAFAProposalToExcel({
       items: draftItems,
@@ -1591,8 +1596,11 @@ export default function PricingProposalDetail() {
       scopeAssumptionNarratives: getAssumptionNarratives(scopeAssumptions),
       groupedAssumptionNarratives: getGroupedAssumptionNarratives(scopeAssumptions),
       workPhases: phases.filter(p => p.is_included !== false),
-      includeInputDeptHighlighting: includeHighlighting,
+      includeInputDeptHighlighting: hasInternalInputDepts && includeInputHighlighting,
       existingInputDepts: existingInputDepts,
+      includeTeamBreakdown,
+      teamMembers: teamMemberSummaryData,
+      teamCurrency: proposal?.currency || 'GBP',
     });
     
     toast({ 
@@ -3007,35 +3015,54 @@ export default function PricingProposalDetail() {
           onApply={applyIterativePricing}
         />
 
-        {/* Export Dialog for Internal Input Highlighting */}
+        {/* Export Options Dialog */}
         <Dialog open={isExportDialogOpen} onOpenChange={setIsExportDialogOpen}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Export Options</DialogTitle>
               <DialogDescription>
-                Some work items have internal BM input requests assigned. Would you like to include department highlighting in the Excel export?
+                Choose what to include in the Excel export.
               </DialogDescription>
             </DialogHeader>
-            <div className="py-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="include-highlighting"
-                  checked={includeInputHighlighting}
-                  onCheckedChange={(checked) => setIncludeInputHighlighting(!!checked)}
-                />
-                <label htmlFor="include-highlighting" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                  Include department highlighting and column in export
-                </label>
+            <div className="py-4 space-y-4">
+              {hasInternalInputDepts && (
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="include-highlighting"
+                      checked={includeInputHighlighting}
+                      onCheckedChange={(checked) => setIncludeInputHighlighting(!!checked)}
+                    />
+                    <label htmlFor="include-highlighting" className="text-sm font-medium leading-none">
+                      Include department highlighting
+                    </label>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 ml-6">
+                    Adds color-coded rows and a "BM Input From" column.
+                  </p>
+                </div>
+              )}
+              <div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="include-team-breakdown"
+                    checked={includeTeamBreakdown}
+                    onCheckedChange={(checked) => setIncludeTeamBreakdown(!!checked)}
+                  />
+                  <label htmlFor="include-team-breakdown" className="text-sm font-medium leading-none">
+                    Include team member breakdown
+                  </label>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 ml-6">
+                  Adds a section showing each team member, their rate, allocated hours, and estimated fees.
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                This will add color-coded rows and a "BM Input From" column showing which departments you've requested input from.
-              </p>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setIsExportDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={() => performExport(includeInputHighlighting)}>
+              <Button onClick={() => performExport()}>
                 <FileDown className="h-4 w-4 mr-2" />
                 Export Excel
               </Button>

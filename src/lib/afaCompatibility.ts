@@ -41,6 +41,7 @@ export const AFA_CATEGORIES: Record<AFAType, AFACategory> = {
   milestone: 'pricing_model',
   monthly_retainer: 'pricing_model',
   success_fee: 'add_on',
+  abort_discount: 'add_on',
 };
 
 // Groups of mutually exclusive AFAs
@@ -52,7 +53,7 @@ const FEE_CAP_TYPES: AFAType[] = ['fee_cap', 'fee_collar'];
 const CAN_USE_RATE_BASIS: AFAType[] = ['fixed_fee_whole', 'fixed_fee_phase'];
 
 // AFAs that are always available as add-ons
-const ALWAYS_AVAILABLE: AFAType[] = ['success_fee'];
+const ALWAYS_AVAILABLE: AFAType[] = ['success_fee', 'abort_discount'];
 
 export interface AFACompatibilityResult {
   isAvailable: boolean;
@@ -211,6 +212,7 @@ export function getAvailableAFAs(enabledAFAs: AFAType[]): AFAType[] {
     'monthly_retainer',
     'discounted_rates',
     'success_fee',
+    'abort_discount',
   ];
 
   return allTypes.filter(type => {

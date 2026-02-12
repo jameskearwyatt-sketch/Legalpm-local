@@ -1374,15 +1374,35 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                           )}
                         </div>
                         
-                        {!isEditing && assumption.narrative && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 shrink-0"
-                            onClick={() => startEditingNarrative(assumption.assumptionId, assumption.narrative)}
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
+                        {!isEditing && (
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            {assumption.narrative && (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                onClick={() => startEditingNarrative(assumption.assumptionId, assumption.narrative)}
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                            )}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => {
+                                const updated = state.simpleAssumptions.map(a =>
+                                  a.assumptionId === assumption.assumptionId
+                                    ? { ...a, enabled: false, narrative: '', inputValue: undefined }
+                                    : a
+                                );
+                                setState(prev => ({ ...prev, simpleAssumptions: updated }));
+                              }}
+                              title="Remove assumption"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1455,14 +1475,33 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                       </div>
                       
                       {editingNarrative !== 'process' && combinedProcessNarrative && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-7 w-7 shrink-0"
-                          onClick={() => startEditingNarrative('process', combinedProcessNarrative)}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7"
+                            onClick={() => startEditingNarrative('process', combinedProcessNarrative)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            onClick={() => {
+                              const combinableIds = ['single_counterparty', 'single_signing', 'virtual_completion', 'counterparty_experienced_counsel', 'counterparty_reasonable_conduct', 'client_timely_provision', 'no_technical_meetings'];
+                              const updated = state.simpleAssumptions.map(a =>
+                                combinableIds.includes(a.assumptionId)
+                                  ? { ...a, enabled: false, narrative: '', inputValue: undefined }
+                                  : a
+                              );
+                              setState(prev => ({ ...prev, simpleAssumptions: updated, processNarrativeOverride: undefined }));
+                            }}
+                            title="Remove process assumptions"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1518,14 +1557,29 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                         </div>
                         
                         {!isEditing && narrative && (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-7 w-7 shrink-0"
-                            onClick={() => startEditingNarrative(`doc-${index}`, narrative)}
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              onClick={() => startEditingNarrative(`doc-${index}`, narrative)}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                              onClick={() => {
+                                const updated = [...(state.documentNarratives || [])];
+                                updated.splice(index, 1);
+                                setState(prev => ({ ...prev, documentNarratives: updated }));
+                              }}
+                              title="Remove assumption"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
                         )}
                       </div>
                     </div>

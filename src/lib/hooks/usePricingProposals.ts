@@ -485,10 +485,10 @@ export function usePricingProposal(proposalId?: string) {
       );
       const bmTotal = includedItems
         .filter(item => item.provider === 'Baker McKenzie')
-        .reduce((sum, item) => sum + item.fee_amount, 0);
+        .reduce((sum, item) => sum + (item.fee_upper ?? item.fee_amount), 0);
       const localCounselTotal = includedItems
         .filter(item => item.provider === 'Local Counsel')
-        .reduce((sum, item) => sum + item.fee_amount, 0);
+        .reduce((sum, item) => sum + (item.fee_upper ?? item.fee_amount), 0);
       const totalAmount = bmTotal + localCounselTotal;
 
       // Update version totals and notes
@@ -588,10 +588,10 @@ export function usePricingProposal(proposalId?: string) {
       );
       const bmTotal = includedItems
         .filter(item => item.provider === 'Baker McKenzie')
-        .reduce((sum, item) => sum + item.fee_amount, 0);
+        .reduce((sum, item) => sum + (item.fee_upper ?? item.fee_amount), 0);
       const localCounselTotal = includedItems
         .filter(item => item.provider === 'Local Counsel')
-        .reduce((sum, item) => sum + item.fee_amount, 0);
+        .reduce((sum, item) => sum + (item.fee_upper ?? item.fee_amount), 0);
       const totalAmount = bmTotal + localCounselTotal;
 
       // Create new version
@@ -722,8 +722,8 @@ export function usePricingProposal(proposalId?: string) {
         const currency = proposalQuery.data?.currency || 'GBP';
         const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency;
         
-        // Calculate baseline total from items
-        const baselineTotal = items.reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+        // Calculate baseline total from items (using upper estimate)
+        const baselineTotal = items.reduce((sum, item) => sum + (item.fee_upper || item.fee_amount || 0), 0);
         
         // Apply AFA filters to get adjusted items (with discounts, etc. applied)
         const filterResult = applyAFAFilters(items, enabledAFAs, baselineTotal, currencySymbol);

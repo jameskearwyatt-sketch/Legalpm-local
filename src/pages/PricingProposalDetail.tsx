@@ -312,9 +312,9 @@ export default function PricingProposalDetail() {
         const { error: versionError } = await supabase
           .from('pricing_proposal_versions')
           .update({
-            total_amount: itemsToSave.filter(i => i.is_included !== false).reduce((sum, i) => sum + i.fee_amount, 0),
-            bm_total: itemsToSave.filter(i => i.provider === 'Baker McKenzie' && i.is_included !== false).reduce((sum, i) => sum + i.fee_amount, 0),
-            local_counsel_total: itemsToSave.filter(i => i.provider === 'Local Counsel' && i.is_included !== false).reduce((sum, i) => sum + i.fee_amount, 0),
+            total_amount: itemsToSave.filter(i => i.is_included !== false).reduce((sum, i) => sum + (i.fee_upper || i.fee_amount), 0),
+            bm_total: itemsToSave.filter(i => i.provider === 'Baker McKenzie' && i.is_included !== false).reduce((sum, i) => sum + (i.fee_upper || i.fee_amount), 0),
+            local_counsel_total: itemsToSave.filter(i => i.provider === 'Local Counsel' && i.is_included !== false).reduce((sum, i) => sum + (i.fee_upper || i.fee_amount), 0),
           })
           .eq('id', latestVersionRef.current!.id);
         

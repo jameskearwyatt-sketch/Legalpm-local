@@ -42,7 +42,6 @@ const DEFAULT_LABELS: Record<string, string> = {
 // rateCard stores rates in TEAM CURRENCY
 function rateCardToArray(rateCard: RateCard, exchangeRate: number): FeeEarner[] {
   return Object.entries(rateCard).map(([key, value]) => {
-    // Try to determine level from key
     let level: LevelValue = "associate";
     if (key.includes("partner") || key.startsWith("partner")) level = "partner";
     else if (key.includes("counsel") || key.startsWith("counsel")) level = "counsel";
@@ -56,7 +55,7 @@ function rateCardToArray(rateCard: RateCard, exchangeRate: number): FeeEarner[] 
     return {
       key,
       level,
-      label: DEFAULT_LABELS[key] || formatLabel(key),
+      label: value.label || DEFAULT_LABELS[key] || formatLabel(key),
       teamRate,
       feeRate,
       feeRateOverridden: false,
@@ -74,9 +73,10 @@ function formatLabel(key: string): string {
 function generateKey(level: string, label: string): string {
   const baseKey = label
     .toLowerCase()
-    .replace(/\s+/g, '')
-    .replace(/[^a-z0-9]/g, '');
-  return `${level}_${baseKey}_${Date.now()}`;
+    .replace(/\s+/g, '_')
+    .replace(/[^a-z0-9_]/g, '');
+  const suffix = Math.random().toString(36).substring(2, 6);
+  return `${level}_${baseKey}_${suffix}`;
 }
 
 // Convert array back to RateCard format
@@ -89,14 +89,12 @@ function arrayToRateCard(feeEarners: FeeEarner[]): RateCard {
     trainee: { rate: 0, cost: 0 },
   };
   feeEarners.forEach(earner => {
-    // Store teamRate as the base rate
-    (result as any)[earner.key] = { rate: earner.teamRate, cost: 0 };
+    (result as any)[earner.key] = { rate: earner.teamRate, cost: 0, label: earner.label };
   });
   return result;
 }
 
-// NEW: Build a rate card with FEE RATES for use in pricing calculations
-// This is what actually gets used downstream
+// Build a rate card with FEE RATES for use in pricing calculations
 function arrayToFeeRateCard(feeEarners: FeeEarner[]): RateCard {
   const result: RateCard = {
     partner: { rate: 0, cost: 0 },
@@ -105,8 +103,7 @@ function arrayToFeeRateCard(feeEarners: FeeEarner[]): RateCard {
     trainee: { rate: 0, cost: 0 },
   };
   feeEarners.forEach(earner => {
-    // Store feeRate for calculations
-    (result as any)[earner.key] = { rate: earner.feeRate, cost: 0 };
+    (result as any)[earner.key] = { rate: earner.feeRate, cost: 0, label: earner.label };
   });
   return result;
 }

@@ -39,7 +39,7 @@ export const AFA_TYPE_DESCRIPTIONS: Record<AFAType, string> = {
   milestone: 'Fees payable on defined deliverables',
   monthly_retainer: 'Fixed monthly fee covering defined scope',
   discounted_rates: 'Discount applied to standard rates',
-  success_fee: 'Optional uplift linked to defined outcome (add-on only)',
+  success_fee: 'Optional uplift linked to defined outcome — firm agreed or client option (add-on only)',
   abort_discount: 'Percentage of WIP to be written off if the transaction aborts',
 };
 
@@ -99,11 +99,14 @@ export interface DiscountedRatesConfig {
   discountPercent: number;
 }
 
+export type SuccessFeeCommitment = 'firm_agreed' | 'client_option';
+
 export interface SuccessFeeConfig {
   baseAfaType: AFAType | null;
   successCondition: string;
   upliftPercent: number;
   upliftAmount: number;
+  commitmentType: SuccessFeeCommitment;
 }
 
 export interface AbortDiscountConfig {
@@ -196,7 +199,7 @@ export function getDefaultConfig(afaType: AFAType): AFAConfig {
     case 'discounted_rates':
       return { discountPercent: 10 };
     case 'success_fee':
-      return { baseAfaType: null, successCondition: '', upliftPercent: 10, upliftAmount: 0 };
+      return { baseAfaType: null, successCondition: '', upliftPercent: 10, upliftAmount: 0, commitmentType: 'firm_agreed' as SuccessFeeCommitment };
     case 'abort_discount':
       return { discountPercent: 25 };
   }

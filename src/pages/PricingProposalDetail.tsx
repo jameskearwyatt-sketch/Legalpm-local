@@ -657,6 +657,28 @@ export default function PricingProposalDetail() {
     });
   }, [teamMembers, summaryInitialized, summaryHours, bmUpperTarget]);
 
+  // When budget target changes, scale ALL members' hours ratably (ignoring locks)
+  const prevBmUpperTargetRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!summaryInitialized || teamMembers.length === 0) return;
+
+    const prev = prevBmUpperTargetRef.current;
+    prevBmUpperTargetRef.current = bmUpperTarget;
+
+    // Skip initial set or if target hasn't actually changed
+    if (prev === null || prev === bmUpperTarget || prev === 0) return;
+
+    const ratio = bmUpperTarget / prev;
+
+    setAssumptions(prevAssumptions => {
+      const hours = { ...(prevAssumptions.summaryHours || {}) };
+      Object.keys(hours).forEach(key => {
+        hours[key] = Math.round((hours[key] * ratio) * 2) / 2;
+      });
+      return { ...prevAssumptions, summaryHours: hours };
+    });
+  }, [bmUpperTarget, summaryInitialized, teamMembers.length]);
+
   // Handle user editing hours — auto-rebalance unlocked members
   const handleSummaryHoursChange = useCallback((memberKey: string, newHours: number) => {
     setAssumptions(prev => {

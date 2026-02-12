@@ -2392,7 +2392,11 @@ export type Database = {
       pricing_proposal_items: {
         Row: {
           ai_rationale: string | null
+          alt_fee_lower: number
+          alt_fee_upper: number
           associate_hours: number
+          assumption_linked: boolean
+          assumption_text: string | null
           category: string | null
           created_at: string
           detail: string | null
@@ -2423,7 +2427,11 @@ export type Database = {
         }
         Insert: {
           ai_rationale?: string | null
+          alt_fee_lower?: number
+          alt_fee_upper?: number
           associate_hours?: number
+          assumption_linked?: boolean
+          assumption_text?: string | null
           category?: string | null
           created_at?: string
           detail?: string | null
@@ -2454,7 +2462,11 @@ export type Database = {
         }
         Update: {
           ai_rationale?: string | null
+          alt_fee_lower?: number
+          alt_fee_upper?: number
           associate_hours?: number
+          assumption_linked?: boolean
+          assumption_text?: string | null
           category?: string | null
           created_at?: string
           detail?: string | null

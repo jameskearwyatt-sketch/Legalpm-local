@@ -122,3 +122,6 @@ verify_jwt = false
 
 [functions.analyze-tolling]
 verify_jwt = false
+
+[functions.detect-carbon-metadata]
+verify_jwt = false

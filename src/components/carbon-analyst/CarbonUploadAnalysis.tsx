@@ -7,7 +7,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle, Leaf } from 'lucide-react';
+import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle, Leaf, Brain } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCarbonAnalyses, useCarbonPositions, useCarbonPrecedentBank, CarbonAnalysisType, CarbonPerspective } from '@/lib/hooks/useCarbonAnalyses';
 import { useCarbonLearnings } from '@/lib/hooks/useCarbonLearnings';
@@ -29,7 +29,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
   const { precedents } = useCarbonPrecedentBank();
   const { formatLearningsForPrompt, activeLearnings } = useCarbonLearnings();
 
-  const [step, setStep] = useState<'upload' | 'configure' | 'analyzing' | 'results'>('upload');
+  const [step, setStep] = useState<'upload' | 'configure' | 'confirming' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<CarbonAnalysisType>('carbon_vs_bible');
   const [perspective, setPerspective] = useState<CarbonPerspective>('buyer');
   const [carbonType, setCarbonType] = useState('dac');
@@ -39,11 +39,117 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
   const [counterpartyType, setCounterpartyType] = useState('');
   const [buyerName, setBuyerName] = useState('');
   const [sellerName, setSellerName] = useState('');
+  const [buyerNormalized, setBuyerNormalized] = useState('');
+  const [sellerNormalized, setSellerNormalized] = useState('');
   const [carbonFile, setCarbonFile] = useState<File | null>(null);
   const [analysisProgress, setAnalysisProgress] = useState(0);
   const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isDetectingMetadata, setIsDetectingMetadata] = useState(false);
+  const [detectionNotes, setDetectionNotes] = useState<string | null>(null);
+  const [detectedFramework, setDetectedFramework] = useState<string | null>(null);
+
+  // Auto-detect carbon metadata after clicking Start Analysis
+  const detectCarbonMetadata = useCallback(async (file: File) => {
+    setIsDetectingMetadata(true);
+    setDetectionNotes(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      const parseResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-document-text`,
+        { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData }
+      );
+
+      if (!parseResponse.ok) {
+        console.error('Failed to parse document for metadata detection');
+        toast.error('Failed to parse document - please fill in fields manually');
+        return;
+      }
+
+      const { text: documentText } = await parseResponse.json();
+
+      const detectResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/detect-carbon-metadata`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ documentText }),
+        }
+      );
+
+      if (!detectResponse.ok) {
+        console.error('Failed to detect carbon metadata');
+        toast.error('Failed to detect metadata - please fill in fields manually');
+        return;
+      }
+
+      const metadata = await detectResponse.json();
+      console.log('Auto-detected carbon metadata:', metadata);
+
+      // Auto-fill fields
+      if (metadata.project_name && metadata.project_name_confidence !== 'low') {
+        setProjectName(metadata.project_name);
+      }
+
+      if (metadata.carbon_type && metadata.carbon_type_confidence !== 'low') {
+        const validTypes = CARBON_PROJECT_TYPES.map(t => t.id);
+        if (validTypes.includes(metadata.carbon_type)) {
+          setCarbonType(metadata.carbon_type);
+        }
+      }
+
+      if (metadata.project_stage && metadata.project_stage_confidence !== 'low') {
+        const validStages = CARBON_PROJECT_STAGES.map(s => s.id);
+        if (validStages.includes(metadata.project_stage)) {
+          setProjectStage(metadata.project_stage as CarbonProjectStage);
+        }
+      }
+
+      if (metadata.jurisdiction && metadata.jurisdiction_confidence !== 'low') {
+        const matchedJurisdiction = JURISDICTIONS.find(
+          j => j.toLowerCase() === metadata.jurisdiction.toLowerCase() ||
+               metadata.jurisdiction.toLowerCase().includes(j.toLowerCase())
+        );
+        if (matchedJurisdiction) setJurisdiction(matchedJurisdiction);
+      }
+
+      if (metadata.buyer_name && metadata.buyer_name_confidence !== 'low') {
+        setBuyerName(metadata.buyer_name);
+        if (metadata.buyer_normalized) setBuyerNormalized(metadata.buyer_normalized);
+      }
+
+      if (metadata.seller_name && metadata.seller_name_confidence !== 'low') {
+        setSellerName(metadata.seller_name);
+        if (metadata.seller_normalized) setSellerNormalized(metadata.seller_normalized);
+      }
+
+      if (metadata.counterparty_type && metadata.counterparty_type_confidence !== 'low') {
+        setCounterpartyType(metadata.counterparty_type);
+      }
+
+      if (metadata.framework) {
+        setDetectedFramework(metadata.framework);
+      }
+
+      if (metadata.detection_notes) {
+        setDetectionNotes(metadata.detection_notes);
+      }
+
+      toast.success('Document metadata auto-detected', {
+        description: 'Review the pre-filled fields and adjust if needed.',
+      });
+    } catch (err) {
+      console.warn('Error detecting carbon metadata:', err);
+    } finally {
+      setIsDetectingMetadata(false);
+    }
+  }, []);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -53,6 +159,23 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
     setCarbonFile(file);
     if (!projectName) setProjectName(file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' '));
   }, [projectName]);
+
+  // Handler for "Start Analysis" button - detects metadata first, then shows confirmation
+  const handleDetectAndConfirm = async () => {
+    if (!carbonFile) { toast.error('Please upload a carbon credit offtake agreement'); return; }
+    if (!projectName.trim()) { toast.error('Please enter a project name'); return; }
+
+    setStep('confirming');
+    setError(null);
+
+    // Auto-detect metadata from the document
+    await detectCarbonMetadata(carbonFile);
+  };
+
+  // Handler for "Confirm & Start Full Analysis" button
+  const handleConfirmAndAnalyze = () => {
+    handleStartAnalysis();
+  };
 
   const handleStartAnalysis = async () => {
     if (!carbonFile) { toast.error('Please upload a carbon credit offtake agreement'); return; }
@@ -140,7 +263,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
         carbon_type: carbonType, project_stage: projectStage, complexity_score: null,
         key_risk_areas: [], counterparty_type: counterpartyType || null,
         buyer_name: buyerName || null, seller_name: sellerName || null,
-        buyer_normalized: buyerName || null, seller_normalized: sellerName || null,
+        buyer_normalized: buyerNormalized || buyerName || null, seller_normalized: sellerNormalized || sellerName || null,
       });
 
       if (extractedPositions && extractedPositions.length > 0) {
@@ -320,9 +443,149 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
               </div>
             </div>
             <p className="text-xs text-muted-foreground -mt-3">Party names help search precedents by counterparty later</p>
-            <Button onClick={handleStartAnalysis} className="w-full gap-2" disabled={!carbonFile || !projectName.trim()}>
-              <Scale className="h-4 w-4" />Start Analysis
+            <Button onClick={handleDetectAndConfirm} className="w-full gap-2" disabled={!carbonFile || !projectName.trim() || isDetectingMetadata}>
+              {isDetectingMetadata ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Scale className="h-4 w-4" />
+              )}
+              {isDetectingMetadata ? 'Detecting metadata...' : 'Start Analysis'}
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Step 3: Confirm Detected Metadata */}
+      {step === 'confirming' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="h-5 w-5" />
+              Confirm Document Details
+            </CardTitle>
+            <CardDescription>
+              Review the auto-detected information and adjust if needed before starting analysis
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Loading state while detecting */}
+            {isDetectingMetadata && (
+              <div className="flex items-center gap-3 p-4 bg-muted rounded-lg">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <div>
+                  <p className="font-medium">Scanning document...</p>
+                  <p className="text-sm text-muted-foreground">Detecting project type, parties, jurisdiction, and framework</p>
+                </div>
+              </div>
+            )}
+
+            {/* Detection notes */}
+            {detectionNotes && !isDetectingMetadata && (
+              <div className="flex items-start gap-2 p-3 bg-primary/10 text-primary rounded-lg">
+                <Brain className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium">Auto-detected from document</p>
+                  <p className="text-xs opacity-80">{detectionNotes}</p>
+                  {detectedFramework && detectedFramework !== 'Custom' && (
+                    <p className="text-xs font-medium mt-1">Framework: {detectedFramework}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {!isDetectingMetadata && (
+              <>
+                {/* Project Name */}
+                <div className="space-y-2">
+                  <Label>Project Name</Label>
+                  <Input value={projectName} onChange={(e) => setProjectName(e.target.value)} placeholder="e.g., Climeworks DAC Credits 2026" />
+                </div>
+
+                {/* Carbon Type */}
+                <div className="space-y-2">
+                  <Label>Carbon Removal / Credit Type</Label>
+                  <Select value={carbonType} onValueChange={setCarbonType}>
+                    <SelectTrigger><SelectValue placeholder="Select credit type" /></SelectTrigger>
+                    <SelectContent>
+                      {CARBON_CREDIT_CLASSES.map(cls => (
+                        <div key={cls.id}>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{cls.label}</div>
+                          {CARBON_PROJECT_TYPES.filter(t => t.creditClass === cls.id).map(t => (
+                            <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>
+                          ))}
+                        </div>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {carbonType && (
+                    <p className="text-xs text-muted-foreground">
+                      Classification: <span className="font-medium">{getCreditClassForType(carbonType) === 'industrial' ? 'Industrial / Engineered' : 'Nature-Based'}</span>
+                    </p>
+                  )}
+                </div>
+
+                {/* Project Stage */}
+                <div className="space-y-2">
+                  <Label>Project Stage</Label>
+                  <Select value={projectStage} onValueChange={(v) => setProjectStage(v as CarbonProjectStage)}>
+                    <SelectTrigger><SelectValue placeholder="Select project stage" /></SelectTrigger>
+                    <SelectContent>{CARBON_PROJECT_STAGES.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+
+                {/* Jurisdiction */}
+                <div className="space-y-2">
+                  <Label>Jurisdiction</Label>
+                  <Select value={jurisdiction} onValueChange={setJurisdiction}>
+                    <SelectTrigger><SelectValue placeholder="Select jurisdiction" /></SelectTrigger>
+                    <SelectContent>{JURISDICTIONS.map(j => <SelectItem key={j} value={j}>{j}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+
+                {/* Counterparty Type */}
+                <div className="space-y-2">
+                  <Label>Counterparty Type</Label>
+                  <Input value={counterpartyType} onChange={(e) => setCounterpartyType(e.target.value)} placeholder="e.g., Corporate Buyer, Compliance Entity, Trading House" />
+                </div>
+
+                {/* Party Names */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Buyer (Offtaker)</Label>
+                    <Input value={buyerName} onChange={(e) => setBuyerName(e.target.value)} placeholder="e.g., Microsoft, Stripe" />
+                    {buyerNormalized && buyerNormalized !== buyerName && (
+                      <p className="text-xs text-muted-foreground">
+                        Will be grouped as: <span className="font-medium">{buyerNormalized}</span>
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Seller (Project Developer)</Label>
+                    <Input value={sellerName} onChange={(e) => setSellerName(e.target.value)} placeholder="e.g., Climeworks, CarbonCure" />
+                    {sellerNormalized && sellerNormalized !== sellerName && (
+                      <p className="text-xs text-muted-foreground">
+                        Will be grouped as: <span className="font-medium">{sellerNormalized}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-2">
+                  <Button variant="outline" onClick={() => setStep('configure')} className="flex-1">
+                    Back
+                  </Button>
+                  <Button onClick={handleConfirmAndAnalyze} className="flex-1 gap-2" disabled={createAnalysis.isPending}>
+                    {createAnalysis.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Scale className="h-4 w-4" />
+                    )}
+                    Confirm & Analyze
+                  </Button>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

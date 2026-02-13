@@ -34,27 +34,25 @@ Based on the document text provided, identify:
 
 1. **Project Name**: The name of the carbon removal or credit project.
 
-2. **Carbon Removal / Credit Type**: Identify the technology or methodology:
+2. **Carbon Removal / Credit Type**: Identify the technology or methodology. You MUST use one of these exact IDs:
    - "dac" (Direct Air Capture)
    - "beccs" (Bioenergy with CCS)
    - "biochar" (Biochar)
    - "enhanced_weathering" (Enhanced Rock Weathering)
-   - "mineralization" (Carbon Mineralization)
-   - "ocean_cdr" (Ocean CDR / mCDR)
+   - "mineralisation" (Carbon Mineralization / Geological Storage)
+   - "ocean_based" (Ocean-Based Removal, Engineered)
    - "soil_carbon" (Soil Carbon Sequestration)
    - "afforestation" (Afforestation / Reforestation)
-   - "mangrove" (Mangrove / Blue Carbon)
-   - "avoided_deforestation" (Avoided Deforestation / REDD+)
-   - "grassland" (Grassland Management)
+   - "redd_plus" (Avoided Deforestation / REDD+)
+   - "blue_carbon" (Blue Carbon - Mangroves, Seagrass, Kelp)
    - "peatland" (Peatland Restoration)
-   - "kelp" (Kelp / Seaweed Cultivation)
+   - "avoidance" (Avoidance / Reduction Credits)
+   - "other" (Other / Unknown)
 
-3. **Project Stage**: 
+3. **Project Stage** (use exact ID):
    - "pre_development" (Pre-Development / Feasibility)
-   - "development" (Development / Permitting)
-   - "construction" (Under Construction)
+   - "development" (In Development / Permitting / Under Construction)
    - "operational" (Operational / Generating Credits)
-   - "expansion" (Expansion / Scale-up)
 
 4. **Jurisdiction**: The country or region where the project is located or the governing law applies.
 

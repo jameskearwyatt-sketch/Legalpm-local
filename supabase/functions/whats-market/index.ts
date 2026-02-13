@@ -13,7 +13,8 @@ serve(async (req) => {
   }
 
   try {
-    const { category, precedents, jurisdiction } = await req.json();
+    const { category, precedents, jurisdiction, context } = await req.json();
+    const isCarbon = context === 'carbon';
 
     if (!category || !precedents || !Array.isArray(precedents) || precedents.length === 0) {
       return new Response(
@@ -34,7 +35,9 @@ serve(async (req) => {
       const parts = [`${i + 1}. Project: ${p.project_name || 'Unknown'}`];
       if (p.jurisdiction) parts.push(`   Jurisdiction: ${p.jurisdiction}`);
       if (p.perspective) parts.push(`   Perspective: ${p.perspective}`);
-      if (p.ppa_type) parts.push(`   PPA Type: ${p.ppa_type}`);
+      if (p.ppa_type && !isCarbon) parts.push(`   PPA Type: ${p.ppa_type}`);
+      if (p.carbon_type && isCarbon) parts.push(`   Carbon Type: ${p.carbon_type}`);
+
       if (p.market_position) parts.push(`   Market Position: ${p.market_position}`);
       if (p.party_favorability) parts.push(`   Party Favorability: ${p.party_favorability}`);
       if (p.buyer_name) parts.push(`   Buyer: ${p.buyer_name}`);
@@ -47,9 +50,15 @@ serve(async (req) => {
       ? `The user is particularly interested in the ${jurisdiction} market, but synthesize across all available data.`
       : 'Synthesize across all available jurisdictions.';
 
-    const systemPrompt = `You are an expert energy lawyer and PPA (Power Purchase Agreement) market analyst with deep knowledge of European renewable energy markets. Your role is to synthesize banked deal precedents into authoritative "What's Market?" guidance.
+    const domainDescription = isCarbon
+      ? `You are an expert carbon markets lawyer and carbon credit offtake analyst with deep knowledge of voluntary carbon markets, compliance markets, Article 6, Frontier, and OSCAR frameworks. Your role is to synthesize banked deal precedents into authoritative "What's Market?" guidance for carbon credit offtake agreements.
 
-You will be given a set of agreed PPA positions for a specific commercial category. Your task is to produce THREE distinct market position summaries:
+You will be given a set of agreed carbon credit offtake positions for a specific commercial category. Your task is to produce THREE distinct market position summaries:`
+      : `You are an expert energy lawyer and PPA (Power Purchase Agreement) market analyst with deep knowledge of European renewable energy markets. Your role is to synthesize banked deal precedents into authoritative "What's Market?" guidance.
+
+You will be given a set of agreed PPA positions for a specific commercial category. Your task is to produce THREE distinct market position summaries:`;
+
+    const systemPrompt = `${domainDescription}
 
 1. **BALANCED** - The true market standard: what a reasonable, well-advised party on either side would expect. This is the default, fair position.
 2. **BUYER-FRIENDLY** - A position that legitimately favors the buyer/offtaker while still being within the range of market-acceptable terms (NOT off-market or aggressive).
@@ -65,6 +74,7 @@ CRITICAL RULES:
 - Each section should be 3-8 bullet points of substantive detail
 - Use professional legal/commercial language but be clear and direct
 - Focus on the KEY commercial terms within this category, not every minor detail
+${isCarbon ? '- NEVER refer to these agreements as PPAs or Power Purchase Agreements. They are carbon credit offtake agreements.' : ''}
 
 ${jurisdictionContext}`;
 

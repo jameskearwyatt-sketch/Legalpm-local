@@ -32,8 +32,8 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
   const [step, setStep] = useState<'upload' | 'configure' | 'confirming' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<CarbonAnalysisType>('carbon_vs_bible');
   const [perspective, setPerspective] = useState<CarbonPerspective>('buyer');
-  const [carbonType, setCarbonType] = useState('dac');
-  const [projectStage, setProjectStage] = useState<CarbonProjectStage>('operational');
+  const [carbonType, setCarbonType] = useState('');
+  const [projectStage, setProjectStage] = useState<CarbonProjectStage | ''>('');
   const [jurisdiction, setJurisdiction] = useState('');
   const [projectName, setProjectName] = useState('');
   const [counterpartyType, setCounterpartyType] = useState('');
@@ -295,6 +295,9 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
   const handleReset = () => {
     setStep('upload'); setCarbonFile(null); setProjectName(''); setJurisdiction('');
     setAnalysisType('carbon_vs_bible'); setPerspective('buyer'); setCreatedAnalysisId(null); setError(null);
+    setCarbonType(''); setProjectStage('' as any); setCounterpartyType('');
+    setBuyerName(''); setSellerName(''); setBuyerNormalized(''); setSellerNormalized('');
+    setDetectionNotes(null); setDetectedFramework(null);
   };
 
   if (step === 'results' && createdAnalysisId) {

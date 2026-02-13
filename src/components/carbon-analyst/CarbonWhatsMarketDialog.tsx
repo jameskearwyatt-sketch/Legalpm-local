@@ -32,7 +32,7 @@ export function CarbonWhatsMarketDialog({ open, onOpenChange, category, preceden
     setIsLoading(true); setError(null);
     try {
       const { data, error: fnError } = await supabase.functions.invoke('whats-market', {
-        body: { category, precedents: precedents.map(p => ({ project_name: p.project_name, jurisdiction: p.jurisdiction, perspective: p.perspective, position_summary: p.position_summary, ppa_type: p.carbon_type || null, market_position: p.market_position || null, party_favorability: p.party_favorability || null, buyer_name: p.buyer_name || null, seller_name: p.seller_name || null })) },
+        body: { category, context: 'carbon', precedents: precedents.map(p => ({ project_name: p.project_name, jurisdiction: p.jurisdiction, perspective: p.perspective, position_summary: p.position_summary, carbon_type: p.carbon_type || null, market_position: p.market_position || null, party_favorability: p.party_favorability || null, buyer_name: p.buyer_name || null, seller_name: p.seller_name || null })) },
       });
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);

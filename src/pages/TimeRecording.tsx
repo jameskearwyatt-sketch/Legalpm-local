@@ -590,22 +590,67 @@ export default function TimeRecording() {
         description: `You've recorded ${totalHours.toFixed(1)}h. Add ${toIdeal.toFixed(1)}h more to hit the ideal ${hoursIdeal}h target.`,
       });
     }
+
+    // Get entries with hours > 0
+    const activeEntries = gridEntries.filter(e => e.hours > 0);
+    
+    if (activeEntries.length === 0) {
+      toast({
+        title: "No entries",
+        description: "Please add hours to at least one entry.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // HARD GATE: Validate that all matter entries with budget items have fully allocated hours
+    const unallocatedMatters: string[] = [];
+
+    for (const entry of activeEntries) {
+      if (entry.type !== 'matter' || !entry.matterId) continue;
+      const budgetItems = matterBudgetItems[entry.matterId];
+      if (!budgetItems || budgetItems.length === 0) continue; // No budget items = no allocation required
+
+      if (mode === 'single') {
+        const allocatedTotal = entry.workItemAllocations.reduce((sum, a) => sum + a.hours, 0);
+        if (entry.workItemAllocations.length === 0 || Math.abs(allocatedTotal - entry.hours) > 0.01) {
+          unallocatedMatters.push(entry.matterName || entry.matterNumber || 'Unknown matter');
+        }
+      } else {
+        // Multi-day: check each selected day
+        for (const day of entry.selectedDays) {
+          const dateKey = format(day, 'yyyy-MM-dd');
+          const dayAllocations = entry.dayWorkItemAllocations[dateKey] || [];
+          // For multi-day, hours are spread across days — we need to check allocation totals match per-day hours
+          // The day hours come from spreadTimeAcrossDays, but at validation time we just need to check
+          // that at least some allocations exist for each day with time on it
+          if (dayAllocations.length === 0) {
+            unallocatedMatters.push(`${entry.matterName || entry.matterNumber || 'Unknown matter'} (${format(day, 'd MMM')})`);
+          } else {
+            const dayAllocTotal = dayAllocations.reduce((sum, a) => sum + a.hours, 0);
+            // For multi-day, the per-day hours are derived from the total — check the allocations sum to something > 0
+            if (dayAllocTotal <= 0) {
+              unallocatedMatters.push(`${entry.matterName || entry.matterNumber || 'Unknown matter'} (${format(day, 'd MMM')})`);
+            }
+          }
+        }
+      }
+    }
+
+    if (unallocatedMatters.length > 0) {
+      const matterList = unallocatedMatters.slice(0, 3).join(', ');
+      const suffix = unallocatedMatters.length > 3 ? ` and ${unallocatedMatters.length - 3} more` : '';
+      toast({
+        title: "⛔ Unallocated Hours",
+        description: `All hours must be allocated to task codes before processing. Please allocate hours for: ${matterList}${suffix}`,
+        variant: "destructive"
+      });
+      return;
+    }
     
     setIsProcessing(true);
     
     try {
-      // Get entries with hours > 0
-      const activeEntries = gridEntries.filter(e => e.hours > 0);
-      
-      if (activeEntries.length === 0) {
-        toast({
-          title: "No entries",
-          description: "Please add hours to at least one entry.",
-          variant: "destructive"
-        });
-        setIsProcessing(false);
-        return;
-      }
 
       if (mode === 'single') {
         // Single day: polish narratives and output

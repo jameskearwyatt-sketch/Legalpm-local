@@ -5,6 +5,13 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { StatusBadge } from '@/components/ui/status-badge';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -815,64 +822,72 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     renderCell: (ctx) => ctx.matter.decision_date ? format(parseISO(ctx.matter.decision_date), 'dd MMM yy') : '-',
   },
 
-  // Submitted - Pipeline only (editable)
+  // Submitted - Pipeline only (editable dropdown)
   submitted: {
     id: 'submitted',
     categories: ['Pipeline'],
-    headerClassName: 'min-w-[60px]',
+    headerClassName: 'min-w-[80px]',
     cellClassName: '',
     renderHeader: () => <span>Sent</span>,
     renderCell: (ctx) => (
-      <button
-        type="button"
-        onClick={async () => {
+      <Select
+        value={ctx.matter.submitted ? 'yes' : 'no'}
+        onValueChange={async (value) => {
           await ctx.updateMatter.mutateAsync({
             id: ctx.matter.id,
-            submitted: !ctx.matter.submitted,
+            submitted: value === 'yes',
           });
         }}
-        className={cn(
-          "text-xs font-medium px-2 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity",
-          ctx.matter.submitted ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-        )}
       >
-        {ctx.matter.submitted ? 'Yes' : 'No'}
-      </button>
+        <SelectTrigger className={cn(
+          "h-7 w-[70px] text-xs font-medium border-0 shadow-none px-2",
+          ctx.matter.submitted 
+            ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" 
+            : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+        )}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent className="bg-popover z-50">
+          <SelectItem value="yes">Yes</SelectItem>
+          <SelectItem value="no">No</SelectItem>
+        </SelectContent>
+      </Select>
     ),
   },
 
-  // Outcome - Pipeline only (editable)
+  // Outcome - Pipeline only (editable dropdown)
   outcome: {
     id: 'outcome',
     categories: ['Pipeline'],
-    headerClassName: 'min-w-[65px]',
+    headerClassName: 'min-w-[90px]',
     cellClassName: '',
     renderHeader: () => <span>Outcome</span>,
     renderCell: (ctx) => {
       const outcome = (ctx.matter as any).pipeline_outcome || 'Pending';
-      const options = ['Pending', 'Won', 'Lost'];
-      const currentIndex = options.indexOf(outcome);
-      const nextOutcome = options[(currentIndex + 1) % options.length];
-      
       return (
-        <button
-          type="button"
-          onClick={async () => {
+        <Select
+          value={outcome}
+          onValueChange={async (value) => {
             await ctx.updateMatter.mutateAsync({
               id: ctx.matter.id,
-              pipeline_outcome: nextOutcome,
+              pipeline_outcome: value,
             });
           }}
-          className={cn(
-            "text-xs font-medium px-2 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity",
+        >
+          <SelectTrigger className={cn(
+            "h-7 w-[85px] text-xs font-medium border-0 shadow-none px-2",
             outcome === 'Won' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
             outcome === 'Lost' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
             outcome === 'Pending' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-          )}
-          title={`Click to change to ${nextOutcome}`}
-        >
-          {outcome}
-        </button>
+          )}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-popover z-50">
+            <SelectItem value="Pending">Pending</SelectItem>
+            <SelectItem value="Won">Won</SelectItem>
+            <SelectItem value="Lost">Lost</SelectItem>
+          </SelectContent>
+        </Select>
       );
     },
   },

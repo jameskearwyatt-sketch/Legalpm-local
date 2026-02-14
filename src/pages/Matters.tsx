@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useQueryClient, useQuery } from '@tanstack/react-query';
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -506,6 +506,7 @@ function ClientRowWithDelete({ client, updateClient, showDelete, onDelete, isDel
 export default function Matters() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const location = useLocation();
   const { matters, isLoading, updateMatter } = useMatters();
   const { clients, updateClient, deleteClient, isLoading: clientsLoading } = useClients();
   const { upsertTodaySnapshot } = useSnapshots();
@@ -514,7 +515,12 @@ export default function Matters() {
     const saved = localStorage.getItem('matters-search');
     return saved || '';
   });
-  const [tabFilter, setTabFilter] = useState<TabFilter>('Live');
+  const [tabFilter, setTabFilter] = useState<TabFilter>(() => {
+    // If navigating back from a pipeline matter, open Pipeline tab
+    const navState = location.state as { tab?: string } | null;
+    if (navState?.tab === 'Pipeline') return 'Pipeline';
+    return 'Live';
+  });
   const [clientFilter, setClientFilter] = useState<string>(() => {
     const saved = localStorage.getItem('matters-client-filter');
     return saved || 'all';

@@ -815,7 +815,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     renderCell: (ctx) => ctx.matter.decision_date ? format(parseISO(ctx.matter.decision_date), 'dd MMM yy') : '-',
   },
 
-  // Submitted - Pipeline only
+  // Submitted - Pipeline only (editable)
   submitted: {
     id: 'submitted',
     categories: ['Pipeline'],
@@ -823,16 +823,25 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     cellClassName: '',
     renderHeader: () => <span>Sent</span>,
     renderCell: (ctx) => (
-      <span className={cn(
-        "text-xs font-medium px-2 py-1 rounded",
-        ctx.matter.submitted ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
-      )}>
+      <button
+        type="button"
+        onClick={async () => {
+          await ctx.updateMatter.mutateAsync({
+            id: ctx.matter.id,
+            submitted: !ctx.matter.submitted,
+          });
+        }}
+        className={cn(
+          "text-xs font-medium px-2 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity",
+          ctx.matter.submitted ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400"
+        )}
+      >
         {ctx.matter.submitted ? 'Yes' : 'No'}
-      </span>
+      </button>
     ),
   },
 
-  // Outcome - Pipeline only
+  // Outcome - Pipeline only (editable)
   outcome: {
     id: 'outcome',
     categories: ['Pipeline'],
@@ -840,17 +849,30 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     cellClassName: '',
     renderHeader: () => <span>Outcome</span>,
     renderCell: (ctx) => {
-      const outcome = (ctx.matter as any).pipeline_outcome;
-      if (!outcome) return <span className="text-muted-foreground">-</span>;
+      const outcome = (ctx.matter as any).pipeline_outcome || 'Pending';
+      const options = ['Pending', 'Won', 'Lost'];
+      const currentIndex = options.indexOf(outcome);
+      const nextOutcome = options[(currentIndex + 1) % options.length];
+      
       return (
-        <span className={cn(
-          "text-xs font-medium px-2 py-1 rounded",
-          outcome === 'Won' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
-          outcome === 'Lost' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
-          outcome === 'Pending' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
-        )}>
+        <button
+          type="button"
+          onClick={async () => {
+            await ctx.updateMatter.mutateAsync({
+              id: ctx.matter.id,
+              pipeline_outcome: nextOutcome,
+            });
+          }}
+          className={cn(
+            "text-xs font-medium px-2 py-1 rounded cursor-pointer hover:opacity-80 transition-opacity",
+            outcome === 'Won' && "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
+            outcome === 'Lost' && "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
+            outcome === 'Pending' && "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+          )}
+          title={`Click to change to ${nextOutcome}`}
+        >
           {outcome}
-        </span>
+        </button>
       );
     },
   },

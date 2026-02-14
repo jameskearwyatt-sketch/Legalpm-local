@@ -710,7 +710,7 @@ export default function MatterDetail() {
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div className="flex items-start gap-4">
             <Button variant="ghost" size="icon" asChild className="-ml-2">
-              <Link to="/matters">
+              <Link to="/matters" state={{ tab: matter?.category === 'Pipeline' ? 'Pipeline' : undefined }}>
                 <ArrowLeft className="h-5 w-5" />
               </Link>
             </Button>

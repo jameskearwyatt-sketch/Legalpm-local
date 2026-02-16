@@ -32,6 +32,8 @@ import {
   FileSearch,
   ChevronDown,
   FlaskConical,
+  Cpu,
+  Cloud,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -63,10 +65,16 @@ const carbonRemovalsChildren: NavItem[] = [
   { name: 'Carbon Credit Offtake', href: '/carbon-credit-analyst', icon: Leaf },
 ];
 
+const dataCenterSuiteChildren: NavItem[] = [
+  { name: 'IT Supply Analyst', href: '/it-supply-analyst', icon: Cpu },
+  { name: 'Cloud Compute Services', href: '/cloud-compute-analyst', icon: Cloud },
+];
+
 const analystNavigation: (NavGroupChild)[] = [
   { name: 'PPA Analyst', href: '/ppa-analyst', icon: FileSearch },
   { name: 'Tolling Analyst', href: '/tolling-analyst', icon: FlaskConical },
   { type: 'subgroup', name: 'Carbon Removals Suite', children: carbonRemovalsChildren },
+  { type: 'subgroup', name: 'Data Center Suite', children: dataCenterSuiteChildren },
 ];
 
 const navigation: NavEntry[] = [

@@ -26,6 +26,8 @@ import BMExpertiseMap from "./pages/BMExpertiseMap";
 import PPAAnalyst from "./pages/PPAAnalyst";
 import TollingAnalyst from "./pages/TollingAnalyst";
 import CarbonCreditAnalyst from "./pages/CarbonCreditAnalyst";
+import ITSupplyAnalyst from "./pages/ITSupplyAnalyst";
+import CloudComputeAnalyst from "./pages/CloudComputeAnalyst";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -66,6 +68,8 @@ function AppRoutes() {
       <Route path="/ppa-analyst" element={<ProtectedRoute><PPAAnalyst /></ProtectedRoute>} />
       <Route path="/tolling-analyst" element={<ProtectedRoute><TollingAnalyst /></ProtectedRoute>} />
       <Route path="/carbon-credit-analyst" element={<ProtectedRoute><CarbonCreditAnalyst /></ProtectedRoute>} />
+      <Route path="/it-supply-analyst" element={<ProtectedRoute><ITSupplyAnalyst /></ProtectedRoute>} />
+      <Route path="/cloud-compute-analyst" element={<ProtectedRoute><CloudComputeAnalyst /></ProtectedRoute>} />
       <Route path="/growth" element={<ProtectedRoute><Growth /></ProtectedRoute>} />
       <Route path="/growth/:projectId" element={<ProtectedRoute><GrowthProjectDetail /></ProtectedRoute>} />
       <Route path="/flags" element={<ProtectedRoute><Flags /></ProtectedRoute>} />

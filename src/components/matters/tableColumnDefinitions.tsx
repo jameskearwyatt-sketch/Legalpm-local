@@ -868,10 +868,14 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
         <Select
           value={outcome}
           onValueChange={async (value) => {
-            await ctx.updateMatter.mutateAsync({
+            const updateData: any = {
               id: ctx.matter.id,
               pipeline_outcome: value,
-            });
+            };
+            if (value === 'Lost') {
+              updateData.category = 'Lost';
+            }
+            await ctx.updateMatter.mutateAsync(updateData);
           }}
         >
           <SelectTrigger className={cn(

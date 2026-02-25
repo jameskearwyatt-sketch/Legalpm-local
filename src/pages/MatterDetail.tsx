@@ -574,18 +574,28 @@ export default function MatterDetail() {
   // If showing proposal, use proposal values; otherwise use snapshot values
   // IMPORTANT: For proposals, wip_amount is RAW and we subtract write-off to get NET
   // For snapshots (imported data), wip_amount IS already NET - write-off is tracked separately for realization only
+  
+  // For fixed_target proposals, dynamically recalculate write-off from current snapshot WIP
+  const isFixedTargetProposal = showProposalValues && (selectedProposal as any).write_off_mode === 'fixed_target';
+  const currentSnapshotWip = latestSnapshot?.wip_amount || 0;
+  const proposalTargetWip = isFixedTargetProposal ? ((selectedProposal as any).wip_target_amount || 0) : 0;
+  
   const wipWriteOffAmount = showProposalValues 
-    ? selectedProposal.wip_write_off_amount 
+    ? (isFixedTargetProposal 
+        ? Math.max(0, currentSnapshotWip - proposalTargetWip) // Dynamic: current WIP - target
+        : selectedProposal.wip_write_off_amount)              // Fixed: stored amount
     : (latestSnapshot?.wip_write_off_amount || 0);
   
   // For proposals: wip_amount is RAW, need to subtract write-off
   // For snapshots: wip_amount IS NET (report already reduced it), don't subtract again
   const wipAmount = showProposalValues 
-    ? selectedProposal.wip_amount - selectedProposal.wip_write_off_amount
+    ? (isFixedTargetProposal
+        ? proposalTargetWip  // Fixed target: always show the target
+        : selectedProposal.wip_amount - selectedProposal.wip_write_off_amount)
     : (latestSnapshot?.wip_amount || 0);
   // For display purposes, rawWipAmount for proposals is the stored value; for snapshots it's wip + write-off
   const rawWipAmount = showProposalValues 
-    ? selectedProposal.wip_amount 
+    ? (isFixedTargetProposal ? currentSnapshotWip : selectedProposal.wip_amount)
     : (latestSnapshot?.wip_amount || 0) + wipWriteOffAmount;
   
   // AR write-off is separate - applies to accounts receivable
@@ -1603,12 +1613,16 @@ export default function MatterDetail() {
                 await updateProposal.mutateAsync({
                   id: editingProposal.id,
                   ...data,
+                  write_off_mode: data.write_off_mode,
+                  wip_target_amount: data.wip_target_amount,
                 });
                 proposalId = editingProposal.id;
               } else {
                 const newProposal = await createProposal.mutateAsync({
                   matter_id: id!,
                   ...data,
+                  write_off_mode: data.write_off_mode,
+                  wip_target_amount: data.wip_target_amount,
                 });
                 proposalId = newProposal.id;
               }

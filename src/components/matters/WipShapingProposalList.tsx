@@ -73,6 +73,7 @@ export function WipShapingProposalList({
   };
 
   const renderProposalCard = (proposal: WipShapingProposal, isArchived = false) => {
+    const isFixedTarget = (proposal as any).write_off_mode === 'fixed_target';
     const netWip = proposal.wip_amount - proposal.wip_write_off_amount;
     const rawAr = proposal.accounts_receivable + proposal.ar_write_off_amount;
     const netAr = proposal.accounts_receivable;
@@ -106,6 +107,11 @@ export function WipShapingProposalList({
                   Archived
                 </Badge>
               )}
+              {isFixedTarget && (
+                <Badge variant="outline" className="text-xs border-primary/40 text-primary">
+                  Fixed Target
+                </Badge>
+              )}
             </div>
             <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
               {proposal.notes}
@@ -119,14 +125,28 @@ export function WipShapingProposalList({
                   <span className="text-muted-foreground">Raw WIP:</span>
                   <span>{formatCurrency(proposal.wip_amount, currency)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-destructive">WIP W/O:</span>
-                  <span className="text-destructive">({formatCurrency(proposal.wip_write_off_amount, currency)})</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground font-medium">Net WIP:</span>
-                  <span className="font-medium">{formatCurrency(netWip, currency)}</span>
-                </div>
+                {isFixedTarget ? (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-primary font-medium">Target WIP:</span>
+                      <span className="text-primary font-medium">{formatCurrency((proposal as any).wip_target_amount || 0, currency)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-xs text-muted-foreground italic">Write-off auto-adjusts</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-destructive">WIP W/O:</span>
+                      <span className="text-destructive">({formatCurrency(proposal.wip_write_off_amount, currency)})</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground font-medium">Net WIP:</span>
+                      <span className="font-medium">{formatCurrency(netWip, currency)}</span>
+                    </div>
+                  </>
+                )}
               </div>
               
               {/* Right column: AR figures */}

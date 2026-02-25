@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
 
+export type WriteOffMode = 'fixed_writeoff' | 'fixed_target';
+
 export interface WipShapingProposal {
   id: string;
   matter_id: string;
@@ -17,6 +19,8 @@ export interface WipShapingProposal {
   accounts_receivable: number;
   lc_wip_amount: number;
   lc_billed_amount: number;
+  write_off_mode: WriteOffMode;
+  wip_target_amount: number;
   status: 'active' | 'archived';
   is_selected: boolean;
   created_at: string;
@@ -34,6 +38,8 @@ export interface CreateProposalInput {
   accounts_receivable: number;
   lc_wip_amount: number;
   lc_billed_amount: number;
+  write_off_mode?: WriteOffMode;
+  wip_target_amount?: number;
 }
 
 export interface UpdateProposalInput {
@@ -47,6 +53,8 @@ export interface UpdateProposalInput {
   accounts_receivable?: number;
   lc_wip_amount?: number;
   lc_billed_amount?: number;
+  write_off_mode?: WriteOffMode;
+  wip_target_amount?: number;
   status?: 'active' | 'archived';
   is_selected?: boolean;
 }

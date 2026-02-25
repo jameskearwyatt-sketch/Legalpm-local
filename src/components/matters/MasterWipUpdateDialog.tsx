@@ -80,7 +80,36 @@ interface ImportedMatterData {
   paidDisbursement?: number;
 }
 
-type Step = 'upload' | 'training' | 'confirm-matches' | 'review' | 'disbursement-review';
+interface PotentialAggregation {
+  matterName: string;
+  rows: Array<{
+    rowIndex: number;
+    matterNumber: string;
+    clientName: string;
+    wip: number;
+    wipWriteOff: number;
+    accountsReceivable: number;
+    totalBilled: number;
+    totalPaid: number;
+    wipDisbursement: number;
+    arDisbursement: number;
+    paidDisbursement: number;
+    matchedMatterId: string | null;
+    matchedMatterName: string | null;
+    confidence: string;
+  }>;
+  totalWip: number;
+  totalWipWriteOff: number;
+  totalAr: number;
+  totalBilled: number;
+  totalPaid: number;
+  // User decision: 'aggregate' | 'separate' | null (pending)
+  decision?: 'aggregate' | 'separate' | null;
+  // If aggregating, which matter to map to
+  targetMatterId?: string | null;
+}
+
+type Step = 'upload' | 'training' | 'aggregate-confirm' | 'confirm-matches' | 'review' | 'disbursement-review';
 
 export function MasterWipUpdateDialog({
   isOpen,
@@ -107,6 +136,9 @@ export function MasterWipUpdateDialog({
   const [showUnchanged, setShowUnchanged] = useState(false);
   const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Multi-client aggregation state
+  const [potentialAggregations, setPotentialAggregations] = useState<PotentialAggregation[]>([]);
   
   // Manual data overwrite confirmation state
   const [showManualOverwriteConfirm, setShowManualOverwriteConfirm] = useState(false);
@@ -382,8 +414,20 @@ export function MasterWipUpdateDialog({
       setLowConfidenceData(lowConf);
       setUnmatchedData(unmatched);
 
-      // If there are low confidence matches, show confirmation step first
-      if (lowConf.length > 0) {
+      // Store potential aggregations from edge function
+      const aggCandidates: PotentialAggregation[] = (data.potentialAggregations || []).map((a: any) => ({
+        ...a,
+        decision: null,
+        targetMatterId: null,
+      }));
+      setPotentialAggregations(aggCandidates);
+
+      // If there are potential aggregations, show that step first
+      if (aggCandidates.length > 0) {
+        setStep('aggregate-confirm');
+        toast.info(`${aggCandidates.length} potential multi-client group(s) detected — please review`);
+      } else if (lowConf.length > 0) {
+        // If there are low confidence matches, show confirmation step
         setStep('confirm-matches');
         toast.info(`${lowConf.length} matter(s) need your confirmation for matching`);
       } else {
@@ -862,7 +906,103 @@ export function MasterWipUpdateDialog({
     setMatterLocalCounsels({});
     setShowManualOverwriteConfirm(false);
     setMattersWithManualData([]);
+    setPotentialAggregations([]);
     onClose();
+  };
+
+  // Handle aggregation decisions
+  const setAggregationDecision = (index: number, decision: 'aggregate' | 'separate') => {
+    setPotentialAggregations(prev => prev.map((agg, i) => 
+      i === index ? { ...agg, decision } : agg
+    ));
+  };
+
+  const setAggregationTarget = (index: number, matterId: string) => {
+    setPotentialAggregations(prev => prev.map((agg, i) => 
+      i === index ? { ...agg, targetMatterId: matterId } : agg
+    ));
+  };
+
+  const proceedFromAggregation = () => {
+    // Apply aggregation decisions to importedData
+    for (const agg of potentialAggregations) {
+      if (agg.decision === 'aggregate' && agg.targetMatterId) {
+        // Find the target matter
+        const targetMatter = matters.find(m => m.id === agg.targetMatterId);
+        if (!targetMatter) continue;
+
+        const snapshot = targetMatter.latest_snapshot;
+        const rowIndices = agg.rows.map(r => r.rowIndex);
+        const clientNames = agg.rows.map(r => r.clientName).filter(Boolean);
+
+        // Remove individual rows from importedData, lowConfidenceData, unmatchedData
+        setImportedData(prev => prev.filter(d => !rowIndices.includes(d.rowIndex)));
+        setLowConfidenceData(prev => prev.filter(d => !rowIndices.includes(d.rowIndex)));
+        setUnmatchedData(prev => prev.filter(d => !rowIndices.includes(d.rowIndex)));
+
+        // Create aggregated row
+        const aggregatedItem: ImportedMatterData = {
+          rowIndex: agg.rows[0].rowIndex,
+          rowIndices,
+          matterNumber: agg.rows[0].matterNumber,
+          matterName: agg.matterName,
+          clientName: clientNames.join(', '),
+          clientNames: clientNames.length > 1 ? clientNames : undefined,
+          matchedMatterId: agg.targetMatterId,
+          matchedMatterName: targetMatter.matter_name,
+          matchConfidence: 'high',
+          needsConfirmation: false,
+          isMultiClientAggregate: true,
+          currency: (targetMatter as any).effective_currency ?? targetMatter.fee_currency,
+          wip: {
+            value: agg.totalWip,
+            current: snapshot?.wip_amount || 0,
+            changed: Math.abs(agg.totalWip - (snapshot?.wip_amount || 0)) > 0.001,
+            selected: Math.abs(agg.totalWip - (snapshot?.wip_amount || 0)) > 0.001,
+          },
+          wipWriteOff: {
+            value: agg.totalWipWriteOff,
+            current: snapshot?.wip_write_off_amount || 0,
+            changed: Math.abs(agg.totalWipWriteOff - (snapshot?.wip_write_off_amount || 0)) > 0.001,
+            selected: Math.abs(agg.totalWipWriteOff - (snapshot?.wip_write_off_amount || 0)) > 0.001,
+          },
+          accountsReceivable: {
+            value: agg.totalAr,
+            current: snapshot?.accounts_receivable || 0,
+            changed: Math.abs(agg.totalAr - (snapshot?.accounts_receivable || 0)) > 0.001,
+            selected: Math.abs(agg.totalAr - (snapshot?.accounts_receivable || 0)) > 0.001,
+          },
+          totalBilled: {
+            value: agg.totalBilled,
+            current: snapshot?.billed_amount || 0,
+            changed: Math.abs(agg.totalBilled - (snapshot?.billed_amount || 0)) > 0.001,
+            selected: Math.abs(agg.totalBilled - (snapshot?.billed_amount || 0)) > 0.001,
+          },
+          totalPaid: {
+            value: agg.totalPaid,
+            current: snapshot?.paid_amount || 0,
+            changed: Math.abs(agg.totalPaid - (snapshot?.paid_amount || 0)) > 0.001,
+            selected: Math.abs(agg.totalPaid - (snapshot?.paid_amount || 0)) > 0.001,
+          },
+          selected: true,
+          wipDisbursement: agg.rows.reduce((s, r) => s + r.wipDisbursement, 0),
+          arDisbursement: agg.rows.reduce((s, r) => s + r.arDisbursement, 0),
+          paidDisbursement: agg.rows.reduce((s, r) => s + r.paidDisbursement, 0),
+        };
+
+        // Add to importedData
+        setImportedData(prev => [...prev, aggregatedItem]);
+      }
+      // If 'separate', the rows stay as-is (already in their respective lists)
+    }
+
+    // Move to next step
+    if (lowConfidenceData.length > 0) {
+      setStep('confirm-matches');
+      toast.info(`${lowConfidenceData.length} matter(s) need your confirmation for matching`);
+    } else {
+      setStep('review');
+    }
   };
 
   // Handle confirming a low-confidence match
@@ -1273,6 +1413,116 @@ export function MasterWipUpdateDialog({
                 </Button>
               </DialogFooter>
             </>
+          )}
+
+          {step === 'aggregate-confirm' && (
+            <div className="flex flex-col flex-1 overflow-hidden space-y-4">
+              <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                <Users className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0" />
+                <div>
+                  <p className="font-medium text-blue-800 dark:text-blue-200">
+                    Potential Multi-Client Matters Detected ({potentialAggregations.length})
+                  </p>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
+                    These rows share the same matter name but have different matter numbers or client names. Should they be aggregated into a single matter, or kept as separate entries?
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto border rounded-lg">
+                <div className="divide-y">
+                  {potentialAggregations.map((agg, aggIndex) => (
+                    <div key={aggIndex} className="p-4 space-y-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <span className="font-medium">{agg.matterName}</span>
+                          <div className="text-sm text-muted-foreground mt-1">
+                            {agg.rows.length} rows • Total WIP: {formatCurrency(agg.totalWip, 'GBP')}
+                            {agg.totalWipWriteOff > 0 && ` • Write-offs: ${formatCurrency(agg.totalWipWriteOff, 'GBP')}`}
+                            {agg.totalBilled > 0 && ` • Billed: ${formatCurrency(agg.totalBilled, 'GBP')}`}
+                          </div>
+                        </div>
+                        <Badge 
+                          variant={agg.decision === 'aggregate' ? 'default' : agg.decision === 'separate' ? 'secondary' : 'outline'}
+                          className="text-xs"
+                        >
+                          {agg.decision === 'aggregate' ? 'Will aggregate' : agg.decision === 'separate' ? 'Keep separate' : 'Pending'}
+                        </Badge>
+                      </div>
+
+                      {/* Show individual rows */}
+                      <div className="ml-4 space-y-1 border-l-2 border-muted pl-3">
+                        {agg.rows.map((row, rowIdx) => (
+                          <div key={rowIdx} className="text-sm flex items-center gap-3">
+                            <span className="text-muted-foreground w-28 truncate" title={row.matterNumber}>
+                              {row.matterNumber || '(no number)'}
+                            </span>
+                            <span className="text-muted-foreground w-36 truncate" title={row.clientName}>
+                              {row.clientName || '(no client)'}
+                            </span>
+                            <span className="font-mono">{formatCurrency(row.wip, 'GBP')}</span>
+                            {row.matchedMatterName && (
+                              <Badge variant="outline" className="text-xs">
+                                → {row.matchedMatterName}
+                              </Badge>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Decision buttons */}
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant={agg.decision === 'aggregate' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setAggregationDecision(aggIndex, 'aggregate')}
+                        >
+                          <Users className="h-3.5 w-3.5 mr-1" />
+                          Aggregate into one matter
+                        </Button>
+                        <Button
+                          variant={agg.decision === 'separate' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => setAggregationDecision(aggIndex, 'separate')}
+                        >
+                          Keep separate
+                        </Button>
+                        
+                        {agg.decision === 'aggregate' && (
+                          <Select
+                            value={agg.targetMatterId || ''}
+                            onValueChange={(value) => setAggregationTarget(aggIndex, value)}
+                          >
+                            <SelectTrigger className="flex-1 max-w-xs">
+                              <SelectValue placeholder="Select target matter..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {matters.map((m) => (
+                                <SelectItem key={m.id} value={m.id}>
+                                  {m.matter_name} ({m.matter_number})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setStep('upload')}>
+                  Back
+                </Button>
+                <Button 
+                  onClick={proceedFromAggregation}
+                  disabled={potentialAggregations.some(a => a.decision === null || a.decision === undefined || (a.decision === 'aggregate' && !a.targetMatterId))}
+                >
+                  Continue
+                </Button>
+              </DialogFooter>
+            </div>
           )}
 
           {step === 'confirm-matches' && (

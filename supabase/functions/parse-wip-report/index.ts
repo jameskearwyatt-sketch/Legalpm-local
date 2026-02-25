@@ -326,6 +326,93 @@ serve(async (req) => {
       });
     }
 
+    // NEW: Detect potential multi-client aggregation candidates
+    // Look for rows with identical (normalized) matter names but different matter numbers or client names
+    // These are rows that the user might want to aggregate
+    const nameGroups = new Map<string, RowMatch[]>();
+    for (const match of rowMatches) {
+      const normName = normalizeString(match.parsed.matterName);
+      if (!normName) continue;
+      if (!nameGroups.has(normName)) {
+        nameGroups.set(normName, []);
+      }
+      nameGroups.get(normName)!.push(match);
+    }
+
+    // Identify groups where rows share the same matter name but have different matter numbers or client names
+    // AND are NOT already matched to a multi-client matter
+    interface PotentialAggregation {
+      matterName: string;
+      rows: Array<{
+        rowIndex: number;
+        matterNumber: string;
+        clientName: string;
+        wip: number;
+        wipWriteOff: number;
+        accountsReceivable: number;
+        totalBilled: number;
+        totalPaid: number;
+        wipDisbursement: number;
+        arDisbursement: number;
+        paidDisbursement: number;
+        matchedMatterId: string | null;
+        matchedMatterName: string | null;
+        confidence: string;
+      }>;
+      totalWip: number;
+      totalWipWriteOff: number;
+      totalAr: number;
+      totalBilled: number;
+      totalPaid: number;
+    }
+
+    const potentialAggregations: PotentialAggregation[] = [];
+    const autoAggregatedRowIndices = new Set<number>();
+
+    for (const [normName, group] of nameGroups) {
+      if (group.length < 2) continue;
+
+      // Check that at least some rows have different matter numbers or client names
+      const matterNumbers = new Set(group.map(g => normalizeString(g.parsed.matterNumber)).filter(Boolean));
+      const clientNames = new Set(group.map(g => normalizeString(g.parsed.clientName)).filter(Boolean));
+      
+      // If all rows have the exact same matter number AND client name, they're duplicates not multi-client
+      if (matterNumbers.size <= 1 && clientNames.size <= 1) continue;
+
+      // Check if any of these are already matched to a multi-client matter
+      const allMatchedToSameMultiClient = group.every(g => 
+        g.matterId && g.matter?.is_multi_client && g.matterId === group[0].matterId
+      );
+      if (allMatchedToSameMultiClient) continue; // Already handled by existing logic
+
+      // This is a potential aggregation candidate - flag it for user decision
+      const agg: PotentialAggregation = {
+        matterName: group[0].parsed.matterName,
+        rows: group.map(g => ({
+          rowIndex: g.parsed.rowIndex,
+          matterNumber: g.parsed.matterNumber,
+          clientName: g.parsed.clientName,
+          wip: g.parsed.wip,
+          wipWriteOff: g.parsed.wipWriteOff,
+          accountsReceivable: g.parsed.accountsReceivable,
+          totalBilled: g.parsed.totalBilled,
+          totalPaid: g.parsed.totalPaid,
+          wipDisbursement: g.parsed.wipDisbursement,
+          arDisbursement: g.parsed.arDisbursement,
+          paidDisbursement: g.parsed.paidDisbursement,
+          matchedMatterId: g.matterId,
+          matchedMatterName: g.matterName,
+          confidence: g.confidence,
+        })),
+        totalWip: group.reduce((s, g) => s + g.parsed.wip, 0),
+        totalWipWriteOff: group.reduce((s, g) => s + g.parsed.wipWriteOff, 0),
+        totalAr: group.reduce((s, g) => s + g.parsed.accountsReceivable, 0),
+        totalBilled: group.reduce((s, g) => s + g.parsed.totalBilled, 0),
+        totalPaid: group.reduce((s, g) => s + g.parsed.totalPaid, 0),
+      };
+      potentialAggregations.push(agg);
+    }
+
     // Second pass: aggregate rows that match the same multi-client matter
     const matterAggregates = new Map<string, {
       rowIndices: number[];
@@ -560,6 +647,7 @@ serve(async (req) => {
 
     console.log(`Matched: ${matchedData.length}, Low confidence: ${lowConfidenceData.length}, Unmatched: ${unmatchedData.length}`);
     console.log(`Multi-client aggregations: ${[...matterAggregates.values()].filter(a => a.rowIndices.length > 1).length}`);
+    console.log(`Potential aggregations detected: ${potentialAggregations.length}`);
 
     return new Response(
       JSON.stringify({
@@ -567,6 +655,7 @@ serve(async (req) => {
         matchedData,
         lowConfidenceData,
         unmatchedData,
+        potentialAggregations,
         summary: {
           totalRows: rows.length,
           matched: matchedData.length,
@@ -577,6 +666,7 @@ serve(async (req) => {
             d.totalBilled.changed || d.totalPaid.changed
           ).length,
           multiClientAggregations: [...matterAggregates.values()].filter(a => a.rowIndices.length > 1).length,
+          potentialAggregations: potentialAggregations.length,
         },
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

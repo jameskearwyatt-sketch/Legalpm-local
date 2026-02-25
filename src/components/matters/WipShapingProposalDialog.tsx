@@ -16,7 +16,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Loader2, Info, Lightbulb, Sparkles, ChevronDown, ChevronUp, Building2 } from 'lucide-react';
 import { formatCurrency, getCurrencySymbol } from '@/lib/currencyUtils';
-import { WipShapingProposal } from '@/lib/hooks/useWipShapingProposals';
+import { WipShapingProposal, WriteOffMode } from '@/lib/hooks/useWipShapingProposals';
 import { LocalCounsel } from '@/lib/hooks/useLocalCounsels';
 import { LocalCounselProposalData, initializeProposalLcData, proposalLcToFormData, ProposalLocalCounsel } from '@/lib/hooks/useProposalLocalCounsels';
 import { supabase } from '@/integrations/supabase/client';
@@ -35,6 +35,8 @@ interface WipShapingProposalDialogProps {
     lc_wip_amount: number;
     lc_billed_amount: number;
     notes: string;
+    write_off_mode: WriteOffMode;
+    wip_target_amount: number;
   }, localCounselData: LocalCounselProposalData[]) => Promise<void>;
   currency: string;
   currentValues?: {
@@ -77,6 +79,7 @@ export function WipShapingProposalDialog({
   const [showAiHelper, setShowAiHelper] = useState(false);
   const [pastedText, setPastedText] = useState('');
   const [entryMode, setEntryMode] = useState<EntryMode>('writeoff');
+  const [writeOffMode, setWriteOffMode] = useState<WriteOffMode>('fixed_writeoff');
   
   // Use strings for controlled inputs to avoid number parsing issues
   const [formData, setFormData] = useState({
@@ -118,6 +121,7 @@ export function WipShapingProposalDialog({
     if (isOpen && !isInitialized) {
       if (existingProposal) {
         // Editing existing proposal - use stored values directly
+        setWriteOffMode((existingProposal as any).write_off_mode || 'fixed_writeoff');
         const rawWip = roundTo2(existingProposal.wip_amount);
         const wipWriteOff = roundTo2(existingProposal.wip_write_off_amount);
         // Use the stored ar_write_off_amount directly instead of recalculating
@@ -167,6 +171,7 @@ export function WipShapingProposalDialog({
         setLcFormData(initializeProposalLcData(localCounsels));
       }
       setEntryMode('writeoff');
+      setWriteOffMode('fixed_writeoff');
       setPastedText('');
       setShowAiHelper(false);
       setIsInitialized(true);
@@ -288,6 +293,8 @@ export function WipShapingProposalDialog({
         lc_wip_amount: lcTotals.totalProposedWip,
         lc_billed_amount: lcTotals.totalProposedBilled,
         notes: formData.notes.trim(),
+        write_off_mode: writeOffMode,
+        wip_target_amount: writeOffMode === 'fixed_target' ? calculatedValues.adjustedWip : 0,
       }, lcFormData);
       onClose();
     } catch (error) {
@@ -419,6 +426,32 @@ export function WipShapingProposalDialog({
                 <Label htmlFor="mode-adjusted" className="text-xs cursor-pointer">Enter Revised Amounts</Label>
               </div>
             </RadioGroup>
+          </div>
+
+          {/* Write-off Mode Toggle */}
+          <div className="p-3 bg-muted/30 rounded-lg border space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">WIP Write-off Type</span>
+              <RadioGroup
+                value={writeOffMode}
+                onValueChange={(value) => setWriteOffMode(value as WriteOffMode)}
+                className="flex items-center gap-4"
+              >
+                <div className="flex items-center space-x-1.5">
+                  <RadioGroupItem value="fixed_writeoff" id="mode-fixed-wo" className="h-3 w-3" />
+                  <Label htmlFor="mode-fixed-wo" className="text-xs cursor-pointer">Fixed Write-off</Label>
+                </div>
+                <div className="flex items-center space-x-1.5">
+                  <RadioGroupItem value="fixed_target" id="mode-fixed-target" className="h-3 w-3" />
+                  <Label htmlFor="mode-fixed-target" className="text-xs cursor-pointer">Fixed Target WIP</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {writeOffMode === 'fixed_writeoff' 
+                ? 'The write-off amount stays fixed. If WIP grows, the adjusted WIP increases too.'
+                : 'The adjusted WIP stays at the target level. If WIP grows, the write-off automatically increases to maintain the target.'}
+            </p>
           </div>
 
           {/* Baker McKenzie Section */}

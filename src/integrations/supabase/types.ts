@@ -4250,7 +4250,9 @@ export type Database = {
           updated_at: string
           user_id: string
           wip_amount: number
+          wip_target_amount: number | null
           wip_write_off_amount: number
+          write_off_mode: string
         }
         Insert: {
           accounts_receivable?: number
@@ -4269,7 +4271,9 @@ export type Database = {
           updated_at?: string
           user_id: string
           wip_amount?: number
+          wip_target_amount?: number | null
           wip_write_off_amount?: number
+          write_off_mode?: string
         }
         Update: {
           accounts_receivable?: number
@@ -4288,7 +4292,9 @@ export type Database = {
           updated_at?: string
           user_id?: string
           wip_amount?: number
+          wip_target_amount?: number | null
           wip_write_off_amount?: number
+          write_off_mode?: string
         }
         Relationships: [
           {

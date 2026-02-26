@@ -399,10 +399,11 @@ function extractDocumentName(workItemName: string): string {
   return result.trim();
 }
 
-// Generate amalgamated narrative for a document
-function generateDocumentNarrative(config: DocumentConfig): string {
+// Generate amalgamated narrative for a document (excludes turns — those are consolidated separately for export)
+function generateDocumentNarrative(config: DocumentConfig, options?: { includeTurns?: boolean }): string {
   const parts: string[] = [];
   const docName = extractDocumentName(config.workItemName);
+  const includeTurns = options?.includeTurns ?? true;
   
   // Who drafts
   if (config.whoDrafts === 'we_draft') {
@@ -420,8 +421,8 @@ function generateDocumentNarrative(config: DocumentConfig): string {
     }
   }
   
-  // Turns
-  if (config.turns !== undefined && config.turns > 0) {
+  // Turns (only if includeTurns is true — for export we consolidate separately)
+  if (includeTurns && config.turns !== undefined && config.turns > 0) {
     if (parts.length > 0) {
       if (config.turns === 1) {
         parts[parts.length - 1] += `, with a single review round (no negotiation)`;
@@ -439,6 +440,18 @@ function generateDocumentNarrative(config: DocumentConfig): string {
   
   if (parts.length === 0) return '';
   return parts.join('. ') + '.';
+}
+
+// Generate a single consolidated turns narrative for all documents that have turns configured
+function generateConsolidatedTurnsNarrative(configs: DocumentConfig[]): string {
+  const docsWithTurns = configs.filter(c => c.turns !== undefined && c.turns > 0);
+  if (docsWithTurns.length === 0) return '';
+  
+  const docList = docsWithTurns
+    .map(c => `${extractDocumentName(c.workItemName)} (${c.turns})`)
+    .join(', ');
+  
+  return `It is assumed that each of the following documents will require no more than the relevant number of turns of negotiation stipulated in brackets, as applicable: ${docList}.`;
 }
 
 // Generate a combined process assumption narrative from enabled process assumptions
@@ -546,7 +559,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
     // Only regenerate if narratives are empty or configs changed
     const newNarratives = docAssumptions.configs
       .filter(c => c.turns !== undefined || c.whoDrafts !== undefined || c.clientForm)
-      .map(generateDocumentNarrative)
+      .map(c => generateDocumentNarrative(c))
       .filter(n => n.length > 0);
     
     if (JSON.stringify(newNarratives) !== JSON.stringify(state.documentNarratives || [])) {
@@ -1662,10 +1675,32 @@ export function getGroupedAssumptionNarratives(state: ScopeAssumptionsState | nu
   }
   
   // Document narratives go under documentation
-  const docNarratives = state.documentNarratives || [];
-  if (docNarratives.length > 0) {
+  // For export: generate per-document narratives WITHOUT turns, then add one consolidated turns narrative
+  const docAssumptions = state.documentAssumptions;
+  if (docAssumptions && docAssumptions.configs?.length > 0) {
     if (!grouped['documentation']) grouped['documentation'] = [];
-    grouped['documentation'].push(...docNarratives);
+    
+    // Per-document narratives (who drafts, client form) — excluding turns
+    const perDocNarratives = docAssumptions.configs
+      .filter(c => c.whoDrafts !== undefined || c.clientForm)
+      .map(c => generateDocumentNarrative(c, { includeTurns: false }))
+      .filter(n => n.length > 0);
+    grouped['documentation'].push(...perDocNarratives);
+    
+    // Single consolidated turns narrative
+    if (docAssumptions.turnsEnabled) {
+      const turnsNarrative = generateConsolidatedTurnsNarrative(docAssumptions.configs);
+      if (turnsNarrative) {
+        grouped['documentation'].push(turnsNarrative);
+      }
+    }
+  } else {
+    // Fallback to stored flat narratives if no configs available
+    const docNarratives = state.documentNarratives || [];
+    if (docNarratives.length > 0) {
+      if (!grouped['documentation']) grouped['documentation'] = [];
+      grouped['documentation'].push(...docNarratives);
+    }
   }
   
   // Custom assumptions go under "other"

@@ -31,6 +31,7 @@ export const BUDGET_CATEGORIES = [
   'Regulatory',
   'Tax',
   'Legal Opinions',
+  'Structuring Advice',
   'Negotiations',
   'Meetings',
   'Closing',

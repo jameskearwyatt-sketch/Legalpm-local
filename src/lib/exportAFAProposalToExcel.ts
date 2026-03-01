@@ -61,6 +61,7 @@ interface ExportAFAProposalOptions {
   includeTeamBreakdown?: boolean;
   teamMembers?: TeamMemberSummary[];
   teamCurrency?: string;
+  hideUpperAndPcSum?: boolean;
 }
 
 export async function exportAFAProposalToExcel({
@@ -81,13 +82,14 @@ export async function exportAFAProposalToExcel({
   includeTeamBreakdown = false,
   teamMembers: teamMemberData = [],
   teamCurrency,
+  hideUpperAndPcSum = false,
 }: ExportAFAProposalOptions): Promise<void> {
   const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency;
   
   // Determine which columns to export
   const exportLower = excelExportFigures?.lower ?? false;
   const exportMidpoint = excelExportFigures?.midpoint ?? true; // Default to midpoint if no settings
-  const exportUpper = excelExportFigures?.upper ?? false;
+  const exportUpper = hideUpperAndPcSum ? false : (excelExportFigures?.upper ?? false);
   
   // Calculate how many fee columns we need
   const feeColumnCount = [exportLower, exportMidpoint, exportUpper].filter(Boolean).length;
@@ -129,7 +131,9 @@ export async function exportAFAProposalToExcel({
   if (exportMidpoint) columns.push({ key: 'feeMidpoint', width: 16 });
   if (exportUpper) columns.push({ key: 'feeUpper', width: 16 });
   
-  columns.push({ key: 'pcSum', width: 10 }); // PC Sum column after fee columns
+  if (!hideUpperAndPcSum) {
+    columns.push({ key: 'pcSum', width: 10 }); // PC Sum column after fee columns
+  }
   
   // Add Internal Input column if highlighting is enabled
   if (includeInputDeptHighlighting) {
@@ -348,7 +352,7 @@ export async function exportAFAProposalToExcel({
   if (exportLower) headerValues.push(`Lower Range (${currency})`);
   if (exportMidpoint) headerValues.push(`Midpoint (${currency})`);
   if (exportUpper) headerValues.push(`Upper Range (${currency})`);
-  headerValues.push('PC Sum?');
+  if (!hideUpperAndPcSum) headerValues.push('PC Sum?');
   
   // Add Internal Input header if highlighting is enabled
   if (includeInputDeptHighlighting) {
@@ -364,7 +368,7 @@ export async function exportAFAProposalToExcel({
   if (exportLower) feeColumnIndices.push(colIdx++);
   if (exportMidpoint) feeColumnIndices.push(colIdx++);
   if (exportUpper) feeColumnIndices.push(colIdx++);
-  const pcSumColumnIndex = colIdx++; // PC Sum column comes after fee columns
+  const pcSumColumnIndex = !hideUpperAndPcSum ? colIdx++ : -1; // PC Sum column comes after fee columns
   const internalInputColumnIndex = includeInputDeptHighlighting ? colIdx++ : -1;
   const notesColumnIndex = colIdx;
   
@@ -477,8 +481,10 @@ export async function exportAFAProposalToExcel({
         item.detail || '',
         providerDisplay,
         feeAmount,
-        item.is_pc_sum ? 'Yes' : '',
       ];
+      if (!hideUpperAndPcSum) {
+        rowValues.push(item.is_pc_sum ? 'Yes' : '');
+      }
       
       // Add internal input column if enabled
       if (includeInputDeptHighlighting) {
@@ -499,9 +505,11 @@ export async function exportAFAProposalToExcel({
       dataRow.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' };
       dataRow.getCell(5).numFmt = '#,##0';
       dataRow.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
-      dataRow.getCell(6).alignment = { horizontal: 'center', vertical: 'middle' };
-      if (item.is_pc_sum) {
-        dataRow.getCell(6).font = { size: 10, color: { argb: 'FF7C3AED' }, bold: true };
+      if (pcSumColumnIndex > 0) {
+        dataRow.getCell(pcSumColumnIndex).alignment = { horizontal: 'center', vertical: 'middle' };
+        if (item.is_pc_sum) {
+          dataRow.getCell(pcSumColumnIndex).font = { size: 10, color: { argb: 'FF7C3AED' }, bold: true };
+        }
       }
       
       // Style internal input column if present
@@ -1004,7 +1012,7 @@ export async function exportAFAProposalToExcel({
   }
 
   // PC Sum explanatory note (only if there are PC Sum items)
-  if (hasPcSumItems) {
+  if (hasPcSumItems && !hideUpperAndPcSum) {
     currentRow++;
     worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
     const pcSumHeaderCell = worksheet.getCell(`A${currentRow}`);

@@ -175,7 +175,7 @@ export async function exportAFAProposalToExcel({
   // Title section
   worksheet.mergeCells(`A1:${lastColLetter}1`);
   const titleCell = worksheet.getCell('A1');
-  titleCell.value = 'Fee Proposal';
+  titleCell.value = hideUpperAndPcSum ? 'Scope Proposal' : 'Fee Proposal';
   titleCell.font = titleFont;
   titleCell.alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.getRow(1).height = 36;
@@ -491,7 +491,7 @@ export async function exportAFAProposalToExcel({
         rowValues.push(item.internal_input_dept || '');
       }
       
-      rowValues.push(item.afa_comment || '');
+      rowValues.push(hideUpperAndPcSum ? '' : (item.afa_comment || ''));
       
       dataRow.values = rowValues;
 
@@ -590,7 +590,7 @@ export async function exportAFAProposalToExcel({
           '',
         ];
         if (includeInputDeptHighlighting) altRowValues.push('');
-        altRowValues.push(delta > 0 ? `+${smartRound(delta).toLocaleString()} increase` : `${smartRound(delta).toLocaleString()} change`);
+        altRowValues.push(hideUpperAndPcSum ? '' : (delta > 0 ? `+${smartRound(delta).toLocaleString()} increase` : `${smartRound(delta).toLocaleString()} change`));
         altRow.values = altRowValues;
         altRow.getCell(2).font = { size: 9, italic: true, color: { argb: 'FFB45309' } };
         altRow.getCell(3).font = { size: 9, italic: true, color: { argb: 'FF92400E' } };
@@ -866,10 +866,12 @@ export async function exportAFAProposalToExcel({
         bottom: { style: 'thin', color: { argb: 'FFB45309' } },
       };
     });
-    // Show delta in notes column
-    const altNotesCell = altTotalRow.getCell(notesColumnIndex);
-    altNotesCell.value = altDelta > 0 ? `+${smartRound(altDelta).toLocaleString()} vs base` : `${smartRound(altDelta).toLocaleString()} vs base`;
-    altNotesCell.font = { size: 9, italic: true, color: { argb: 'FFB45309' } };
+    // Show delta in notes column (only for fee proposals)
+    if (!hideUpperAndPcSum) {
+      const altNotesCell = altTotalRow.getCell(notesColumnIndex);
+      altNotesCell.value = altDelta > 0 ? `+${smartRound(altDelta).toLocaleString()} vs base` : `${smartRound(altDelta).toLocaleString()} vs base`;
+      altNotesCell.font = { size: 9, italic: true, color: { argb: 'FFB45309' } };
+    }
     altTotalRow.height = 24;
     currentRow++;
   }

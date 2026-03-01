@@ -1555,6 +1555,7 @@ export default function PricingProposalDetail() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [includeInputHighlighting, setIncludeInputHighlighting] = useState(true);
   const [includeTeamBreakdown, setIncludeTeamBreakdown] = useState(false);
+  const [hideUpperAndPcSum, setHideUpperAndPcSum] = useState(false);
 
   // Check if any items have internal input dept assigned
   const hasInternalInputDepts = useMemo(() => {
@@ -1607,6 +1608,7 @@ export default function PricingProposalDetail() {
       includeTeamBreakdown,
       teamMembers: teamMemberSummaryData,
       teamCurrency: proposal?.currency || 'GBP',
+      hideUpperAndPcSum,
     });
     
     toast({ 
@@ -3069,6 +3071,21 @@ export default function PricingProposalDetail() {
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 ml-6">
                   Adds a section showing each team member, their rate, allocated hours, and estimated fees.
+                </p>
+              </div>
+              <div>
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="hide-upper-pc-sum"
+                    checked={hideUpperAndPcSum}
+                    onCheckedChange={(checked) => setHideUpperAndPcSum(!!checked)}
+                  />
+                  <label htmlFor="hide-upper-pc-sum" className="text-sm font-medium leading-none">
+                    Hide Upper Range &amp; PC Sum columns
+                  </label>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1 ml-6">
+                  Removes the "Upper Range" and "PC Sum?" columns from the exported file.
                 </p>
               </div>
             </div>

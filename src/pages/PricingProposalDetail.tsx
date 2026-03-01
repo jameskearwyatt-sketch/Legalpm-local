@@ -3081,11 +3081,11 @@ export default function PricingProposalDetail() {
                     onCheckedChange={(checked) => setHideUpperAndPcSum(!!checked)}
                   />
                   <label htmlFor="hide-upper-pc-sum" className="text-sm font-medium leading-none">
-                    Hide Upper Range &amp; PC Sum columns
+                    Hide Estimate &amp; PC Sum columns
                   </label>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 ml-6">
-                  Removes the "Upper Range" and "PC Sum?" columns from the exported file.
+                  Removes the "Estimate" and "PC Sum?" columns from the exported file.
                 </p>
               </div>
             </div>

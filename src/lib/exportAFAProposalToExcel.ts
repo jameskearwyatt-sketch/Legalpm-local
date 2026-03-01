@@ -351,7 +351,7 @@ export async function exportAFAProposalToExcel({
   const headerValues: string[] = ['Item #', 'Scope of Work', 'Detail', 'Provider'];
   if (exportLower) headerValues.push(`Lower Range (${currency})`);
   if (exportMidpoint) headerValues.push(`Midpoint (${currency})`);
-  if (exportUpper) headerValues.push(`Upper Range (${currency})`);
+  if (exportUpper) headerValues.push(`Estimate (${currency})`);
   if (!hideUpperAndPcSum) headerValues.push('PC Sum?');
   
   // Add Internal Input header if highlighting is enabled
@@ -1038,7 +1038,8 @@ export async function exportAFAProposalToExcel({
   const safeClientName = clientName.replace(/[^a-zA-Z0-9]/g, '_');
   const safeProposalName = proposalName.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
   const dateStr = new Date().toISOString().split('T')[0];
-  link.download = `Fee_Proposal_${safeClientName}_${safeProposalName}_${dateStr}.xlsx`;
+  const filePrefix = hideUpperAndPcSum ? 'Scope_Proposal' : 'Fee_Proposal';
+  link.download = `${filePrefix}_${safeClientName}_${safeProposalName}_${dateStr}.xlsx`;
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);

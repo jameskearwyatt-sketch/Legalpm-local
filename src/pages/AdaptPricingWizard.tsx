@@ -192,56 +192,247 @@ export default function AdaptPricingWizard() {
     }
   }, [selectedBaseId, answers, freeDescription, newName, selectedClientId, clients, fetchBaseData, toast]);
 
-  // Step 4 → 5: Refine and prepare final
+  // Build final items and phases from accepted changes (client-side logic)
+  type ProviderType = "Baker McKenzie" | "Local Counsel";
+  const asProvider = (p: string | undefined): ProviderType => 
+    p === "Local Counsel" ? "Local Counsel" : "Baker McKenzie";
+
+  const buildFinalFromDecisions = useCallback(async () => {
+    const baseData = await fetchBaseData(selectedBaseId);
+    if (!baseData) throw new Error("Could not load base proposal");
+    const baseItems = baseData.items || [];
+    const basePhases: ProposalPhase[] = ((baseData.proposal.work_phases || []) as unknown as ProposalPhase[]).map(p => ({ ...p, is_included: p.is_included ?? true }));
+
+    // --- Build final phases ---
+    // Start with base phases, apply accepted phase changes
+    const removedPhaseIds = new Set(
+      phaseChanges.filter(p => p.action === "removed" && p.accepted).map(p => p.basePhaseId)
+    );
+    const renamedPhaseMap = new Map(
+      phaseChanges.filter(p => p.action === "renamed" && p.accepted).map(p => [p.basePhaseId, p.newName])
+    );
+    const addedPhases = phaseChanges.filter(p => p.action === "added" && p.accepted);
+
+    const fp: ProposalPhase[] = [
+      ...basePhases
+        .filter(p => !removedPhaseIds.has(p.id))
+        .map(p => ({
+          ...p,
+          name: renamedPhaseMap.get(p.id) || p.name,
+        })),
+      ...addedPhases.map(p => ({
+        id: `phase-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        name: p.newName || "New Phase",
+        is_included: true,
+      })),
+    ];
+
+    // --- Build final items ---
+    // Process each item change based on accept/reject decisions
+    const fi: DraftProposalItem[] = [];
+
+    for (const change of itemChanges) {
+      if (change.action === "removed") {
+        // If accepted → skip (item removed). If rejected → keep original.
+        if (!change.accepted) {
+          // User rejected the removal → keep the original base item
+          const baseItem = baseItems.find((bi: any) => bi.id === change.baseItemId);
+          if (baseItem) {
+            fi.push({
+              work_item: baseItem.work_item,
+              detail: baseItem.detail || null,
+              provider: asProvider(baseItem.provider),
+              fee_amount: baseItem.fee_amount || 0,
+              fee_lower: baseItem.fee_lower || baseItem.fee_amount || 0,
+              fee_upper: baseItem.fee_upper || baseItem.fee_amount || 0,
+              pricing_method: "manual" as const,
+              category: baseItem.category || null,
+              phase_id: removedPhaseIds.has(baseItem.phase_id) ? null : baseItem.phase_id,
+              is_optional: false,
+              is_included: true,
+              ai_rationale: null,
+              partner_hours: 0,
+              associate_hours: 0,
+              num_turns: 1,
+              item_type: "documentation" as const,
+            });
+          }
+        }
+        // If accepted, item is removed — don't add it
+        continue;
+      }
+
+      if (change.action === "added") {
+        // If accepted → include new item. If rejected → skip.
+        if (change.accepted) {
+          fi.push({
+            work_item: change.newWorkItem || "New Work Item",
+            detail: change.newDetail || null,
+            provider: asProvider(change.provider),
+            fee_amount: change.fee_amount || 0,
+            fee_lower: change.fee_lower || change.fee_amount || 0,
+            fee_upper: change.fee_upper || change.fee_amount || 0,
+            pricing_method: "manual" as const,
+            category: change.newCategory || null,
+            phase_id: change.newPhaseId || null,
+            is_optional: false,
+            is_included: true,
+            ai_rationale: change.rationale || null,
+            partner_hours: 0,
+            associate_hours: 0,
+            num_turns: 1,
+            item_type: "documentation" as const,
+          });
+        }
+        continue;
+      }
+
+      if (change.action === "modified") {
+        // If accepted → use new text. If rejected → keep original.
+        const baseItem = baseItems.find((bi: any) => bi.id === change.baseItemId);
+        if (change.accepted) {
+          fi.push({
+            work_item: change.newWorkItem || change.originalWorkItem || "Work Item",
+            detail: change.newDetail || change.originalDetail || null,
+            provider: asProvider(change.provider || baseItem?.provider),
+            fee_amount: change.fee_amount ?? baseItem?.fee_amount ?? 0,
+            fee_lower: change.fee_lower ?? baseItem?.fee_lower ?? 0,
+            fee_upper: change.fee_upper ?? baseItem?.fee_upper ?? 0,
+            pricing_method: "manual" as const,
+            category: change.newCategory || baseItem?.category || null,
+            phase_id: change.newPhaseId || baseItem?.phase_id || null,
+            is_optional: false,
+            is_included: true,
+            ai_rationale: change.rationale || null,
+            partner_hours: 0,
+            associate_hours: 0,
+            num_turns: 1,
+            item_type: "documentation" as const,
+          });
+        } else {
+          // Rejected modification → keep original
+          if (baseItem) {
+            fi.push({
+              work_item: baseItem.work_item,
+              detail: baseItem.detail || null,
+              provider: asProvider(baseItem.provider),
+              fee_amount: baseItem.fee_amount || 0,
+              fee_lower: baseItem.fee_lower || baseItem.fee_amount || 0,
+              fee_upper: baseItem.fee_upper || baseItem.fee_amount || 0,
+              pricing_method: "manual" as const,
+              category: baseItem.category || null,
+              phase_id: removedPhaseIds.has(baseItem.phase_id) ? null : baseItem.phase_id,
+              is_optional: false,
+              is_included: true,
+              ai_rationale: null,
+              partner_hours: 0,
+              associate_hours: 0,
+              num_turns: 1,
+              item_type: "documentation" as const,
+            });
+          }
+        }
+        continue;
+      }
+
+      // "unchanged" — always keep the original
+      const baseItem = baseItems.find((bi: any) => bi.id === change.baseItemId);
+      if (baseItem) {
+        fi.push({
+          work_item: baseItem.work_item,
+          detail: baseItem.detail || null,
+          provider: asProvider(baseItem.provider),
+          fee_amount: baseItem.fee_amount || 0,
+          fee_lower: baseItem.fee_lower || baseItem.fee_amount || 0,
+          fee_upper: baseItem.fee_upper || baseItem.fee_amount || 0,
+          pricing_method: "manual" as const,
+          category: baseItem.category || null,
+          phase_id: removedPhaseIds.has(baseItem.phase_id) ? null : baseItem.phase_id,
+          is_optional: false,
+          is_included: true,
+          ai_rationale: null,
+          partner_hours: 0,
+          associate_hours: 0,
+          num_turns: 1,
+          item_type: "documentation" as const,
+        });
+      }
+    }
+
+    return { fp, fi };
+  }, [selectedBaseId, phaseChanges, itemChanges, fetchBaseData]);
+
+  // Step 4 → 5: Build final from user decisions
   const refineDraft = useCallback(async () => {
     setIsRefining(true);
     try {
-      const baseData = await fetchBaseData(selectedBaseId);
-      if (!baseData) throw new Error("Could not load base proposal");
+      const { fp, fi } = await buildFinalFromDecisions();
 
-      const { data, error } = await supabase.functions.invoke("adapt-pricing-proposal", {
-        body: {
-          mode: "refine",
-          proposal: baseData.proposal,
-          items: baseData.items,
-          structuredAnswers: answers.filter(a => !a.skipped && a.answer !== null),
-          freeDescription,
-          phaseChanges: phaseChanges.map(p => ({ ...p })),
-          itemChanges: itemChanges.map(i => ({ ...i })),
-          scopeChanges: scopeChanges.map(s => ({ ...s })),
-          generalComment,
-          newName,
-          newClientName: clients.find(c => c.id === selectedClientId)?.name || "",
-        },
-      });
+      // If there are rejected items with comments OR a general comment, 
+      // optionally do an AI refine pass for those specific items
+      const hasRejectedWithComments = itemChanges.some(i => !i.accepted && i.comment);
+      const hasGeneralFeedback = generalComment.trim().length > 0;
 
-      if (error) throw error;
+      if (hasRejectedWithComments || hasGeneralFeedback) {
+        // Do a targeted AI pass only for items that need rethinking
+        try {
+          const baseData = await fetchBaseData(selectedBaseId);
+          if (baseData) {
+            const { data, error } = await supabase.functions.invoke("adapt-pricing-proposal", {
+              body: {
+                mode: "refine",
+                proposal: baseData.proposal,
+                items: baseData.items,
+                structuredAnswers: answers.filter(a => !a.skipped && a.answer !== null),
+                freeDescription,
+                phaseChanges: phaseChanges,
+                itemChanges: itemChanges,
+                scopeChanges: scopeChanges,
+                generalComment,
+                newName,
+                newClientName: clients.find(c => c.id === selectedClientId)?.name || "",
+                // Send the current built items so the AI can see what we have
+                currentFinalItems: fi,
+                currentFinalPhases: fp,
+              },
+            });
 
-      // Build final items and phases
-      const fp: ProposalPhase[] = (data.finalPhases || []).map((p: any) => ({
-        id: p.id || `phase-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        name: p.name,
-        is_included: true,
-      }));
-
-      const fi: DraftProposalItem[] = (data.finalItems || []).map((item: any, idx: number) => ({
-        work_item: item.work_item,
-        detail: item.detail || null,
-        provider: item.provider || "Baker McKenzie",
-        fee_amount: item.fee_amount || 0,
-        fee_lower: item.fee_lower || item.fee_amount || 0,
-        fee_upper: item.fee_upper || item.fee_amount || 0,
-        pricing_method: "manual" as const,
-        category: item.category || null,
-        phase_id: item.phase_id || null,
-        is_optional: false,
-        is_included: true,
-        ai_rationale: item.rationale || null,
-        partner_hours: 0,
-        associate_hours: 0,
-        num_turns: 1,
-        item_type: "documentation" as const,
-      }));
+            if (!error && data?.finalItems?.length > 0) {
+              // Use AI-refined items if the AI returned them
+              const refinedItems: DraftProposalItem[] = data.finalItems.map((item: any) => ({
+                work_item: item.work_item,
+                detail: item.detail || null,
+                provider: asProvider(item.provider),
+                fee_amount: item.fee_amount || 0,
+                fee_lower: item.fee_lower || item.fee_amount || 0,
+                fee_upper: item.fee_upper || item.fee_amount || 0,
+                pricing_method: "manual" as const,
+                category: item.category || null,
+                phase_id: item.phase_id || null,
+                is_optional: false,
+                is_included: true,
+                ai_rationale: item.rationale || null,
+                partner_hours: 0,
+                associate_hours: 0,
+                num_turns: 1,
+                item_type: "documentation" as const,
+              }));
+              const refinedPhases: ProposalPhase[] = (data.finalPhases || fp).map((p: any) => ({
+                id: p.id || `phase-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+                name: p.name,
+                is_included: true,
+              }));
+              setFinalPhases(refinedPhases);
+              setFinalItems(refinedItems);
+              setStep(4);
+              return;
+            }
+          }
+        } catch {
+          // If AI refine fails, fall through to use client-built items
+          console.warn("AI refine pass failed, using client-built items");
+        }
+      }
 
       setFinalPhases(fp);
       setFinalItems(fi);
@@ -252,7 +443,7 @@ export default function AdaptPricingWizard() {
     } finally {
       setIsRefining(false);
     }
-  }, [selectedBaseId, answers, freeDescription, phaseChanges, itemChanges, scopeChanges, generalComment, newName, selectedClientId, clients, fetchBaseData, toast]);
+  }, [buildFinalFromDecisions, itemChanges, generalComment, selectedBaseId, answers, freeDescription, phaseChanges, scopeChanges, newName, selectedClientId, clients, fetchBaseData, toast]);
 
   // Step 5: Create the proposal
   const createProposal = useCallback(async () => {

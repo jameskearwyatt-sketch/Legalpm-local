@@ -91,46 +91,63 @@ ${freeDescription || "No additional description provided"}
 Please produce the complete adaptation.`;
     } else {
       // Refine mode
-      const decisionsText = (userItemDecisions || [])
-        .filter((d: any) => !d.accepted || d.comment)
-        .map((d: any) => `Item "${d.originalWorkItem || d.newWorkItem}": ${d.accepted ? "ACCEPTED" : "REJECTED"}${d.comment ? ` — Comment: ${d.comment}` : ""}`)
+      const allItemChangesText = (userItemDecisions || [])
+        .map((d: any) => {
+          const status = d.accepted ? "ACCEPTED" : "REJECTED";
+          const comment = d.comment ? ` — User comment: ${d.comment}` : "";
+          if (d.action === "unchanged") return `[UNCHANGED] "${d.originalWorkItem}"${comment}`;
+          if (d.action === "removed") return `[REMOVED - ${status}] "${d.originalWorkItem}" — Rationale: ${d.rationale}${comment}`;
+          if (d.action === "added") return `[ADDED - ${status}] "${d.newWorkItem}" — Detail: ${d.newDetail || "none"} — Rationale: ${d.rationale}${comment}`;
+          return `[MODIFIED - ${status}] "${d.originalWorkItem}" → "${d.newWorkItem}" — New detail: ${d.newDetail || "none"} — Rationale: ${d.rationale}${comment}`;
+        })
         .join("\n");
 
       const phaseDecisionsText = (userPhaseDecisions || [])
-        .filter((d: any) => !d.accepted || d.comment)
-        .map((d: any) => `Phase "${d.originalName || d.newName}": ${d.accepted ? "ACCEPTED" : "REJECTED"}${d.comment ? ` — Comment: ${d.comment}` : ""}`)
+        .map((d: any) => {
+          const status = d.accepted ? "ACCEPTED" : "REJECTED";
+          const comment = d.comment ? ` — User comment: ${d.comment}` : "";
+          if (d.action === "unchanged") return `[UNCHANGED] "${d.originalName}"`;
+          return `[${d.action.toUpperCase()} - ${status}] "${d.originalName || ""}" → "${d.newName || ""}"${comment}`;
+        })
+        .join("\n");
+
+      // Include the current built items so AI can see the baseline
+      const currentItemsSummary = (body.currentFinalItems || [])
+        .map((item: any, idx: number) => `${idx + 1}. [${item.provider}] ${item.work_item}${item.detail ? ` — ${item.detail}` : ""} | Fee: ${item.fee_amount}`)
         .join("\n");
 
       systemPrompt = `You are refining a pricing proposal adaptation based on user feedback.
 
 The user has reviewed the initial AI-proposed changes and made accept/reject decisions with comments.
+The client-side logic has already applied the basic accept/reject decisions to produce a draft item list.
 
-Your job is to produce the FINAL list of work items and phases for the new proposal, incorporating:
-- All accepted changes as-is
-- Adjustments based on rejected changes and user comments
-- Any improvements based on the general feedback
+Your job is to IMPROVE the draft by:
+- Addressing any user comments on rejected items (they may want an alternative approach rather than keeping the original)
+- Incorporating general feedback to adjust items
+- Ensuring coherence across all items after the accept/reject decisions
 
-Return the complete final item list (not just changes) with all fields populated.`;
+Return the complete final item list with all fields populated. The items you return will REPLACE the current draft entirely.
+Do NOT simply copy the base items — use the current draft as your starting point and refine it.`;
 
       userPrompt = `ORIGINAL BASE: "${proposal.name}"
 NEW DEAL: "${newName}" for ${newClientName}
 
-USER DECISIONS ON ITEM CHANGES:
-${decisionsText || "All changes accepted without comments"}
+ALL ITEM CHANGES AND USER DECISIONS:
+${allItemChangesText || "No item changes"}
 
-USER DECISIONS ON PHASE CHANGES:
-${phaseDecisionsText || "All phase changes accepted"}
+PHASE CHANGES AND USER DECISIONS:
+${phaseDecisionsText || "No phase changes"}
 
 GENERAL FEEDBACK:
 ${generalComment || "No general feedback"}
 
-BASE ITEMS FOR REFERENCE:
-${itemsSummary}
+CURRENT DRAFT ITEMS (after applying accept/reject):
+${currentItemsSummary || "No items"}
 
 BASE PHASES:
 ${phasesSummary}
 
-Please produce the final proposal items and phases.`;
+Please produce the refined final proposal items and phases.`;
     }
 
     // Different tool schemas for initial vs refine

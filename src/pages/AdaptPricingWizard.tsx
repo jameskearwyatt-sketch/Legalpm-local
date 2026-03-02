@@ -228,16 +228,36 @@ export default function AdaptPricingWizard() {
     ];
 
     // --- Build final items ---
+    // Helper: find base item by ID first, then by work_item text match
+    const findBaseItem = (change: ItemChange) => {
+      if (change.baseItemId) {
+        const byId = baseItems.find((bi: any) => bi.id === change.baseItemId);
+        if (byId) return byId;
+      }
+      if (change.originalWorkItem) {
+        const byName = baseItems.find((bi: any) => bi.work_item === change.originalWorkItem);
+        if (byName) return byName;
+        // Fuzzy: check if base work_item is contained in originalWorkItem or vice versa
+        const byPartial = baseItems.find((bi: any) => 
+          bi.work_item && change.originalWorkItem &&
+          (bi.work_item.toLowerCase().includes(change.originalWorkItem.toLowerCase()) ||
+           change.originalWorkItem.toLowerCase().includes(bi.work_item.toLowerCase()))
+        );
+        if (byPartial) return byPartial;
+      }
+      return null;
+    };
+
     // Process each item change based on accept/reject decisions
     const fi: DraftProposalItem[] = [];
+    const usedBaseIds = new Set<string>();
 
     for (const change of itemChanges) {
       if (change.action === "removed") {
-        // If accepted → skip (item removed). If rejected → keep original.
         if (!change.accepted) {
-          // User rejected the removal → keep the original base item
-          const baseItem = baseItems.find((bi: any) => bi.id === change.baseItemId);
+          const baseItem = findBaseItem(change);
           if (baseItem) {
+            usedBaseIds.add(baseItem.id);
             fi.push({
               work_item: baseItem.work_item,
               detail: baseItem.detail || null,
@@ -258,12 +278,10 @@ export default function AdaptPricingWizard() {
             });
           }
         }
-        // If accepted, item is removed — don't add it
         continue;
       }
 
       if (change.action === "added") {
-        // If accepted → include new item. If rejected → skip.
         if (change.accepted) {
           fi.push({
             work_item: change.newWorkItem || "New Work Item",
@@ -288,19 +306,23 @@ export default function AdaptPricingWizard() {
       }
 
       if (change.action === "modified") {
-        // If accepted → use new text. If rejected → keep original.
-        const baseItem = baseItems.find((bi: any) => bi.id === change.baseItemId);
+        const baseItem = findBaseItem(change);
         if (change.accepted) {
+          // Use new text from AI, but ALWAYS inherit fees & category from base if AI didn't provide them
+          const workItemLabel = change.newWorkItem && change.newWorkItem !== "Work Item" 
+            ? change.newWorkItem 
+            : (change.originalWorkItem || baseItem?.work_item || "Work Item");
+          if (baseItem) usedBaseIds.add(baseItem.id);
           fi.push({
-            work_item: change.newWorkItem || change.originalWorkItem || "Work Item",
-            detail: change.newDetail || change.originalDetail || null,
+            work_item: workItemLabel,
+            detail: change.newDetail || change.originalDetail || baseItem?.detail || null,
             provider: asProvider(change.provider || baseItem?.provider),
             fee_amount: change.fee_amount ?? baseItem?.fee_amount ?? 0,
-            fee_lower: change.fee_lower ?? baseItem?.fee_lower ?? 0,
-            fee_upper: change.fee_upper ?? baseItem?.fee_upper ?? 0,
+            fee_lower: change.fee_lower ?? baseItem?.fee_lower ?? baseItem?.fee_amount ?? 0,
+            fee_upper: change.fee_upper ?? baseItem?.fee_upper ?? baseItem?.fee_amount ?? 0,
             pricing_method: "manual" as const,
             category: change.newCategory || baseItem?.category || null,
-            phase_id: change.newPhaseId || baseItem?.phase_id || null,
+            phase_id: change.newPhaseId || (baseItem?.phase_id && !removedPhaseIds.has(baseItem.phase_id) ? baseItem.phase_id : null),
             is_optional: false,
             is_included: true,
             ai_rationale: change.rationale || null,
@@ -310,8 +332,8 @@ export default function AdaptPricingWizard() {
             item_type: "documentation" as const,
           });
         } else {
-          // Rejected modification → keep original
           if (baseItem) {
+            usedBaseIds.add(baseItem.id);
             fi.push({
               work_item: baseItem.work_item,
               detail: baseItem.detail || null,
@@ -335,9 +357,10 @@ export default function AdaptPricingWizard() {
         continue;
       }
 
-      // "unchanged" — always keep the original
-      const baseItem = baseItems.find((bi: any) => bi.id === change.baseItemId);
+      // "unchanged" — always keep the original base item data
+      const baseItem = findBaseItem(change);
       if (baseItem) {
+        usedBaseIds.add(baseItem.id);
         fi.push({
           work_item: baseItem.work_item,
           detail: baseItem.detail || null,

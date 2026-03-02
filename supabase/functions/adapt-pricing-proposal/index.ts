@@ -31,7 +31,7 @@ serve(async (req) => {
     } = body;
 
     const itemsSummary = (items || [])
-      .map((i: any, idx: number) => `${idx + 1}. [${i.provider}] ${i.work_item}${i.detail ? ` — ${i.detail}` : ""} | Category: ${i.category || "none"} | Phase: ${i.phase_id || "none"} | Fee: ${i.fee_lower}-${i.fee_upper}`)
+      .map((i: any, idx: number) => `${idx + 1}. ID: ${i.id} | [${i.provider}] ${i.work_item}${i.detail ? ` — ${i.detail}` : ""} | Category: ${i.category || "none"} | Phase: ${i.phase_id || "none"} | Fee: ${i.fee_lower}-${i.fee_upper} | fee_amount: ${i.fee_amount}`)
       .join("\n");
 
     const phasesSummary = (proposal.work_phases || [])
@@ -69,7 +69,13 @@ Be intelligent about:
 - Removing workstreams the user indicated are not needed
 - Adding workstreams for the new deal structure
 
-IMPORTANT: Preserve original fee amounts for unchanged and modified items. Only set fees for newly added items (estimate based on similar items in the base).`;
+CRITICAL RULES:
+1. baseItemId: For "unchanged", "modified", and "removed" items, you MUST set baseItemId to the exact ID from the base item list. This is essential for matching.
+2. originalWorkItem: ALWAYS populate this with the exact work_item text from the base proposal for unchanged/modified/removed items.
+3. newWorkItem: For "modified" items, ALWAYS provide a clear, descriptive work item label (never leave blank or use generic text like "Work Item").
+4. Fees: For "unchanged" and "modified" items, ALWAYS copy fee_amount, fee_lower, and fee_upper from the base item. Only estimate fees for newly "added" items.
+5. phase_id: For "unchanged" items, preserve the original phase_id. For "modified" items, preserve unless explicitly changing phases.
+6. category: Always preserve the base item's category unless explicitly changing it.`;
 
       userPrompt = `BASE PROPOSAL: "${proposal.name}" for ${proposal.client?.name || "Unknown"}
 Currency: ${proposal.currency}

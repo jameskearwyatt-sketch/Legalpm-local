@@ -168,22 +168,20 @@ export function CategorizedProposalView({
     return [...BUDGET_CATEGORIES, ...customCategories];
   }, [customCategories]);
 
-  // Get included phases (for determining if we show per-phase breakdowns)
-  const includedPhases = useMemo(() => {
-    return phases.filter(p => p.is_included);
-  }, [phases]);
-
-  // Calculate per-phase category totals
+  // Calculate per-phase category totals (show all phases, item-level is_included controls counting)
   const phaseBreakdowns = useMemo(() => {
-    if (includedPhases.length <= 1) return null;
+    if (phases.length <= 1) return null;
     
-    return includedPhases.map(phase => {
+    const breakdowns = phases.map(phase => {
       const phaseItems = items.filter(item => item.phase_id === phase.id);
       const totals = calculateCategoryTotals(phaseItems, allCategories, showAssumptionsNotTrue);
       const grandTotal = Object.values(totals).reduce((sum, val) => sum + val, 0);
       return { phase, totals, grandTotal };
     });
-  }, [items, includedPhases, allCategories, showAssumptionsNotTrue]);
+    
+    // Only show phases that have at least one non-zero category
+    return breakdowns.filter(b => b.grandTotal > 0);
+  }, [items, phases, allCategories, showAssumptionsNotTrue]);
 
   // Calculate aggregate totals (always shown)
   const categoryTotals = useMemo(() => {

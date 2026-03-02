@@ -35,7 +35,7 @@ function textSimilarity(a: string, b: string): number {
 
 function smartRound(amount: number): number {
   if (amount <= 0) return 0;
-  if (amount < 10000) return Math.round(amount / 100) * 100;
+  if (amount < 2500) return Math.round(amount / 500) * 500;
   return Math.round(amount / 1000) * 1000;
 }
 

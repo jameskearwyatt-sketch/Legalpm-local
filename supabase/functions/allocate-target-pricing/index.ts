@@ -35,7 +35,7 @@ function textSimilarity(a: string, b: string): number {
 
 function smartRound(amount: number): number {
   if (amount <= 0) return 0;
-  if (amount < 10000) return Math.round(amount / 100) * 100;
+  if (amount < 2500) return Math.round(amount / 500) * 500;
   return Math.round(amount / 1000) * 1000;
 }
 
@@ -389,7 +389,7 @@ Return your best estimate of what each is worth. Do NOT try to hit any target to
 
     if (Math.abs(remainder) > 0) {
       // Determine increment size based on deal size
-      const increment = targetAmount >= 100000 ? 1000 : 100;
+      const increment = targetAmount >= 50000 ? 1000 : 500;
 
       // Sort indices by fee descending for distribution
       const sortedIndices = allocations

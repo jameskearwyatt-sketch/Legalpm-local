@@ -1,10 +1,47 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Version: v3.0.0 — Two-phase: AI base prices + deterministic scaling
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function normalize(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[''`]/g, "'")
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\b(a|an|the|of|and|or|in|to|for|with|on)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function significantWords(text: string): Set<string> {
+  return new Set(normalize(text).split(' ').filter(w => w.length > 2));
+}
+
+function textSimilarity(a: string, b: string): number {
+  const wordsA = significantWords(a);
+  const wordsB = significantWords(b);
+  if (wordsA.size === 0 || wordsB.size === 0) return 0;
+  let overlap = 0;
+  for (const w of wordsA) if (wordsB.has(w)) overlap++;
+  return overlap / Math.max(wordsA.size, wordsB.size);
+}
+
+function smartRound(amount: number): number {
+  if (amount <= 0) return 0;
+  if (amount < 10000) return Math.round(amount / 100) * 100;
+  return Math.round(amount / 1000) * 1000;
+}
+
+const MINIMUM_ITEM_FEE = 500;
+
+// ── Main handler ─────────────────────────────────────────────────────────────
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,7 +49,6 @@ serve(async (req) => {
   }
 
   try {
-    // Verify authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
@@ -38,10 +74,9 @@ serve(async (req) => {
 
     const userId = claimsData.user.id;
     const { items, targetAmount, currency, phaseName } = await req.json();
-    
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY is not configured');
       return new Response(
         JSON.stringify({ error: 'Service temporarily unavailable' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -49,236 +84,362 @@ serve(async (req) => {
     }
 
     if (!items || items.length === 0) {
-      return new Response(
-        JSON.stringify({ error: 'No items provided for allocation' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'No items provided' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-
     if (!targetAmount || targetAmount <= 0) {
-      return new Response(
-        JSON.stringify({ error: 'Target amount must be greater than 0' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Target amount must be > 0' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    console.log(`Allocating ${targetAmount} ${currency} across ${items.length} items for user ${userId}`);
+    const targetCurrency = currency || 'GBP';
+    console.log(`allocate-target v3: ${targetAmount} ${targetCurrency} across ${items.length} items, user=${userId}`);
 
-    // Fetch historical data for context
-    const [budgetLineItemsResult, proposalItemsResult] = await Promise.all([
+    // ── Phase 1: Fetch historical data WITH currency ────────────────────────
+
+    const [budgetResult, proposalResult, mattersResult, ratesResult] = await Promise.all([
       supabase
         .from('budget_line_items')
-        .select('work_item, category, provider, fee_amount')
+        .select('work_item, category, provider, fee_amount, matter_id')
         .eq('user_id', userId)
         .gt('fee_amount', 0)
         .order('created_at', { ascending: false })
-        .limit(300),
-      
+        .limit(500),
       supabase
         .from('pricing_proposal_items')
-        .select('work_item, category, provider, fee_amount, fee_lower, fee_upper')
+        .select('work_item, detail, category, provider, fee_amount, pricing_proposals(currency)')
         .eq('user_id', userId)
         .gt('fee_amount', 0)
         .order('created_at', { ascending: false })
-        .limit(300),
+        .limit(500),
+      supabase
+        .from('matters')
+        .select('id, currency')
+        .eq('user_id', userId),
+      supabase
+        .from('exchange_rates')
+        .select('currency_code, rate_to_usd')
+        .order('fetched_at', { ascending: false })
+        .limit(20),
     ]);
 
-    // Process historical data
-    const budgetItems = (budgetLineItemsResult.data || []).map((item: any) => ({
-      work_item: item.work_item,
-      category: item.category || 'Uncategorized',
-      provider: item.provider,
-      fee: item.fee_amount,
-      source: 'finalized_budget'
-    }));
+    // Build matter currency lookup
+    const matterCurrency: Record<string, string> = {};
+    for (const m of (mattersResult.data || [])) {
+      matterCurrency[m.id] = m.currency || 'GBP';
+    }
 
-    const proposalItems = (proposalItemsResult.data || []).map((item: any) => ({
-      work_item: item.work_item,
-      category: item.category || 'Uncategorized',
-      provider: item.provider,
-      fee: item.fee_amount,
-      source: 'pricing_proposal'
-    }));
+    // Build FX lookup
+    const fxRates: Record<string, number> = { USD: 1 };
+    for (const r of (ratesResult.data || [])) {
+      if (r.currency_code && r.rate_to_usd) fxRates[r.currency_code] = r.rate_to_usd;
+    }
+    if (!fxRates['GBP']) fxRates['GBP'] = 0.79;
+    if (!fxRates['EUR']) fxRates['EUR'] = 0.92;
 
-    const allHistoricalData = [...budgetItems, ...proposalItems];
+    const convertToTarget = (amount: number, srcCurrency: string): number => {
+      if (srcCurrency === targetCurrency) return amount;
+      const srcRate = fxRates[srcCurrency] || 1;
+      const tgtRate = fxRates[targetCurrency] || 1;
+      return amount * (tgtRate / srcRate);
+    };
 
-    // Group by category for statistics
-    const categoryStats: Record<string, { items: any[], avgFee: number, totalFee: number }> = {};
-    for (const item of allHistoricalData) {
-      const cat = item.category;
-      if (!categoryStats[cat]) {
-        categoryStats[cat] = { items: [], avgFee: 0, totalFee: 0 };
+    // Build historical items with converted fees
+    interface HistItem { work_item: string; detail: string | null; category: string; provider: string; feeConverted: number; source: string; }
+
+    const allHistorical: HistItem[] = [];
+    for (const item of (budgetResult.data || [])) {
+      const srcCur = matterCurrency[item.matter_id] || 'GBP';
+      allHistorical.push({
+        work_item: item.work_item,
+        detail: null,
+        category: item.category || 'Uncategorized',
+        provider: item.provider,
+        feeConverted: convertToTarget(item.fee_amount, srcCur),
+        source: 'budget',
+      });
+    }
+    for (const item of (proposalResult.data || [])) {
+      const srcCur = (item as any).pricing_proposals?.currency || 'GBP';
+      allHistorical.push({
+        work_item: item.work_item,
+        detail: (item as any).detail || null,
+        category: item.category || 'Uncategorized',
+        provider: item.provider,
+        feeConverted: convertToTarget(item.fee_amount, srcCur),
+        source: 'proposal',
+      });
+    }
+
+    console.log(`Historical data: ${allHistorical.length} items`);
+
+    // ── Phase 2: Get UNCONSTRAINED base prices ──────────────────────────────
+    // Step A: Precedent matching
+    interface BasePrice { work_item: string; baseFee: number; rationale: string; }
+    const basePrices: BasePrice[] = [];
+    const unmatchedIndices: number[] = [];
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      let bestMatch: HistItem | null = null;
+      let bestScore = 0;
+
+      for (const hist of allHistorical) {
+        const catMatch = !item.category || !hist.category || hist.category === 'Uncategorized' || hist.category === item.category;
+        if (!catMatch) continue;
+        let score = textSimilarity(item.work_item, hist.work_item);
+        if (item.detail && hist.detail) score = score * 0.6 + textSimilarity(item.detail, hist.detail) * 0.4;
+        if (item.provider === hist.provider) score += 0.1;
+        if (item.category && hist.category === item.category) score += 0.15;
+        if (score > bestScore) { bestScore = score; bestMatch = hist; }
       }
-      categoryStats[cat].items.push(item);
-      categoryStats[cat].totalFee += item.fee;
+
+      if (bestMatch && bestScore >= 0.5) {
+        basePrices.push({
+          work_item: item.work_item,
+          baseFee: Math.max(smartRound(bestMatch.feeConverted), MINIMUM_ITEM_FEE),
+          rationale: `Precedent: "${bestMatch.work_item}" (score ${(bestScore * 100).toFixed(0)}%)`,
+        });
+      } else {
+        basePrices.push({ work_item: item.work_item, baseFee: 0, rationale: '' });
+        unmatchedIndices.push(i);
+      }
     }
-    
-    for (const cat of Object.keys(categoryStats)) {
-      const fees = categoryStats[cat].items.map(i => i.fee);
-      categoryStats[cat].avgFee = Math.round(fees.reduce((a, b) => a + b, 0) / fees.length);
-    }
 
-    const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
+    console.log(`Precedent matched: ${items.length - unmatchedIndices.length}, sending ${unmatchedIndices.length} to AI`);
 
-    let historicalContext = '';
-    if (allHistoricalData.length > 0) {
-      historicalContext = `\n\n## HISTORICAL PRICING DATA
-Use this data to understand relative complexity and value of different work item types:
+    // Step B: AI pricing for unmatched items
+    if (unmatchedIndices.length > 0) {
+      const currencySymbol = targetCurrency === 'GBP' ? '£' : targetCurrency === 'USD' ? '$' : '€';
 
-### Category Statistics:
-${Object.entries(categoryStats).map(([cat, stats]) => 
-  `- ${cat}: ${stats.items.length} items, avg ${currencySymbol}${stats.avgFee.toLocaleString()}`
+      // Category stats for context
+      const catStats: Record<string, { count: number; avg: number }> = {};
+      for (const h of allHistorical) {
+        if (!catStats[h.category]) catStats[h.category] = { count: 0, avg: 0 };
+        catStats[h.category].count++;
+        catStats[h.category].avg += h.feeConverted;
+      }
+      for (const cat of Object.keys(catStats)) {
+        catStats[cat].avg = Math.round(catStats[cat].avg / catStats[cat].count);
+      }
+
+      const unmatchedItems = unmatchedIndices.map(i => items[i]);
+
+      const systemPrompt = `You are a legal fee proposal expert. Suggest UNCONSTRAINED base prices for work items. Do NOT try to hit any target — just estimate what each item is worth based on complexity and category.
+
+All fees in ${targetCurrency} (${currencySymbol}). Minimum ${currencySymbol}${MINIMUM_ITEM_FEE} per item. All fees MUST be positive.
+
+CATEGORY AVERAGES (${targetCurrency}):
+${Object.entries(catStats).map(([c, s]) => `- ${c}: avg ${currencySymbol}${s.avg.toLocaleString()} (${s.count} items)`).join('\n')}
+
+SAMPLE HISTORICAL (${targetCurrency}):
+${allHistorical.slice(0, 25).map(h => `- "${h.work_item}" (${h.category}, ${h.provider}): ${currencySymbol}${Math.round(h.feeConverted).toLocaleString()}`).join('\n')}`;
+
+      const userPrompt = `Suggest base prices for these ${unmatchedItems.length} items:
+
+${unmatchedItems.map((item: any, i: number) =>
+  `${i + 1}. "${item.work_item}"${item.detail ? ` — ${item.detail.substring(0, 200)}` : ''} (${item.provider}, ${item.category || 'Uncategorized'})`
 ).join('\n')}
 
-### Sample Historical Work Items:
-${allHistoricalData.slice(0, 30).map(item => 
-  `- "${item.work_item}" (${item.category}, ${item.provider}): ${currencySymbol}${item.fee.toLocaleString()}`
-).join('\n')}
-`;
-    }
+Return your best estimate of what each is worth. Do NOT try to hit any target total.`;
 
-    const systemPrompt = `You are a legal fee proposal expert for Baker McKenzie. Your task is to ALLOCATE a specific target budget across work items intelligently.
-
-CRITICAL: The total of all allocations MUST equal exactly ${currencySymbol}${targetAmount.toLocaleString()}.
-
-ALLOCATION METHODOLOGY:
-1. Consider the relative complexity of each work item
-2. Use historical data to understand typical pricing relationships between different types of work
-3. Baker McKenzie items typically command higher fees than Local Counsel items
-4. Due Diligence and Documentation work often has higher value than administrative tasks
-5. Consider the category of each item when determining relative allocation
-
-Round each amount to a sensible figure (nearest 100 for smaller amounts, nearest 1000 for larger).
-
-${historicalContext}`;
-
-    const userPrompt = `Please allocate exactly ${currencySymbol}${targetAmount.toLocaleString()} across the following ${items.length} work items${phaseName ? ` for "${phaseName}"` : ''}:
-
-${items.map((item: any, i: number) => `${i + 1}. "${item.work_item}" (${item.provider}${item.category ? `, ${item.category}` : ''})`).join('\n')}
-
-REQUIREMENTS:
-1. The sum of all fee_amount values MUST equal exactly ${targetAmount}
-2. Allocate proportionally based on relative complexity and historical pricing patterns
-3. Each item must receive a positive amount
-4. Return sensible rounded figures
-
-Return allocations for ALL ${items.length} items.`;
-
-    console.log(`Sending ${items.length} items to AI for target allocation of ${targetAmount}...`);
-
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        tools: [{
-          type: 'function',
-          function: {
-            name: 'allocate_pricing',
-            description: 'Return allocated pricing for each work item that sums to the target',
-            parameters: {
-              type: 'object',
-              properties: {
-                allocations: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      work_item: { type: 'string', description: 'The work item description (must match input exactly)' },
-                      fee_amount: { type: 'number', description: 'Allocated fee amount' },
-                      rationale: { type: 'string', description: 'Brief explanation for this allocation' },
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+          ],
+          tools: [{
+            type: 'function',
+            function: {
+              name: 'suggest_base_prices',
+              description: 'Return unconstrained base prices',
+              parameters: {
+                type: 'object',
+                properties: {
+                  prices: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        work_item: { type: 'string' },
+                        fee_amount: { type: 'number', minimum: 0 },
+                        rationale: { type: 'string' },
+                      },
+                      required: ['work_item', 'fee_amount', 'rationale'],
                     },
-                    required: ['work_item', 'fee_amount', 'rationale'],
                   },
                 },
-                total_allocated: { type: 'number', description: 'Sum of all allocations (must equal target)' },
+                required: ['prices'],
               },
-              required: ['allocations', 'total_allocated'],
             },
-          },
-        }],
-        tool_choice: { type: 'function', function: { name: 'allocate_pricing' } },
-      }),
-    });
+          }],
+          tool_choice: { type: 'function', function: { name: 'suggest_base_prices' } },
+        }),
+      });
 
-    if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: 'Rate limit exceeded, please try again later' }), {
-          status: 429,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      if (!response.ok) {
+        if (response.status === 429) {
+          return new Response(JSON.stringify({ error: 'Rate limit exceeded' }),
+            { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        if (response.status === 402) {
+          return new Response(JSON.stringify({ error: 'Payment required' }),
+            { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        const errorText = await response.text();
+        console.error('AI error:', response.status, errorText);
+        throw new Error(`AI gateway error: ${response.status}`);
       }
-      if (response.status === 402) {
-        return new Response(JSON.stringify({ error: 'Payment required, please add credits' }), {
-          status: 402,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+
+      const data = await response.json();
+      const toolCalls = data.choices?.[0]?.message?.tool_calls || [];
+
+      // Map AI results back to unmatched items
+      const aiResults: { work_item: string; fee_amount: number; rationale: string }[] = [];
+      for (const tc of toolCalls) {
+        if (tc.function?.name === 'suggest_base_prices') {
+          try {
+            const parsed = JSON.parse(tc.function.arguments);
+            if (parsed.prices) aiResults.push(...parsed.prices);
+          } catch (e) { console.error('Parse error:', e); }
+        }
       }
-      const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
-    }
 
-    const data = await response.json();
-    console.log('AI response received');
+      // Match AI results to unmatched items
+      for (let j = 0; j < unmatchedIndices.length; j++) {
+        const idx = unmatchedIndices[j];
+        const item = items[idx];
 
-    // Handle tool calls
-    const toolCalls = data.choices?.[0]?.message?.tool_calls || [];
-    if (toolCalls.length === 0) {
-      throw new Error('No tool calls in AI response');
-    }
+        // Find best AI match
+        const aiMatch = aiResults.find(r =>
+          r.work_item === item.work_item ||
+          r.work_item?.startsWith(item.work_item) ||
+          item.work_item?.startsWith(r.work_item) ||
+          textSimilarity(r.work_item, item.work_item) > 0.6
+        );
 
-    // Get allocations from tool call
-    let allocations: any[] = [];
-    let totalAllocated = 0;
-    
-    for (const toolCall of toolCalls) {
-      if (toolCall.function?.name === 'allocate_pricing') {
-        try {
-          const parsed = JSON.parse(toolCall.function.arguments);
-          if (parsed.allocations && Array.isArray(parsed.allocations)) {
-            allocations = parsed.allocations;
-            totalAllocated = parsed.total_allocated || allocations.reduce((sum: number, a: any) => sum + (a.fee_amount || 0), 0);
-          }
-        } catch (parseErr) {
-          console.error('Failed to parse tool call arguments:', parseErr);
+        if (aiMatch && aiMatch.fee_amount > 0) {
+          basePrices[idx] = {
+            work_item: item.work_item,
+            baseFee: Math.max(smartRound(aiMatch.fee_amount), MINIMUM_ITEM_FEE),
+            rationale: aiMatch.rationale || 'AI estimated',
+          };
+        } else {
+          // Fallback: use category average or a default
+          const catAvg = catStats[item.category]?.avg;
+          const fallbackFee = catAvg ? smartRound(catAvg) : 5000;
+          basePrices[idx] = {
+            work_item: item.work_item,
+            baseFee: Math.max(fallbackFee, MINIMUM_ITEM_FEE),
+            rationale: catAvg ? `Category average (${item.category})` : 'Default estimate',
+          };
         }
       }
     }
 
-    // Validate and adjust if needed
-    const calculatedTotal = allocations.reduce((sum: number, a: any) => sum + (a.fee_amount || 0), 0);
-    const difference = targetAmount - calculatedTotal;
-    
-    if (Math.abs(difference) > 1 && allocations.length > 0) {
-      // Adjust the largest item to make the total exact
-      console.log(`Adjusting allocations: calculated ${calculatedTotal}, target ${targetAmount}, difference ${difference}`);
-      const largestIndex = allocations.reduce((maxIdx: number, curr: any, idx: number, arr: any[]) => 
-        curr.fee_amount > arr[maxIdx].fee_amount ? idx : maxIdx, 0);
-      allocations[largestIndex].fee_amount += difference;
-      allocations[largestIndex].rationale += ' (adjusted to match target total)';
+    // ── Phase 3: Deterministic scaling to hit target ────────────────────────
+
+    const totalBaseFee = basePrices.reduce((sum, p) => sum + p.baseFee, 0);
+
+    if (totalBaseFee <= 0) {
+      // Edge case: all items got minimum fees, distribute evenly
+      const evenFee = smartRound(targetAmount / items.length);
+      const allocations = basePrices.map(p => ({
+        work_item: p.work_item,
+        fee_amount: evenFee,
+        rationale: 'Evenly distributed (no precedent data)',
+      }));
+      // Adjust last item for exact total
+      const totalEven = evenFee * items.length;
+      if (totalEven !== targetAmount) {
+        allocations[allocations.length - 1].fee_amount += (targetAmount - totalEven);
+      }
+      return new Response(JSON.stringify({ allocations, targetAmount, historicalDataUsed: allHistorical.length, scaleFactor: null }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    console.log(`Returning ${allocations.length} allocations totaling ${targetAmount}`);
+    const scaleFactor = targetAmount / totalBaseFee;
+    console.log(`Base total: ${totalBaseFee}, target: ${targetAmount}, scale factor: ${(scaleFactor * 100).toFixed(1)}%`);
 
-    return new Response(JSON.stringify({ 
+    // Scale all items
+    const scaled = basePrices.map(p => ({
+      work_item: p.work_item,
+      rawScaled: p.baseFee * scaleFactor,
+      rationale: p.rationale,
+    }));
+
+    // Smart round each item, enforcing minimum
+    const allocations = scaled.map(s => ({
+      work_item: s.work_item,
+      fee_amount: Math.max(smartRound(s.rawScaled), MINIMUM_ITEM_FEE),
+      rationale: s.rationale + (scaleFactor !== 1 ? ` (scaled ${(scaleFactor * 100).toFixed(0)}%)` : ''),
+    }));
+
+    // ── Distribute rounding error ───────────────────────────────────────────
+
+    let currentTotal = allocations.reduce((sum, a) => sum + a.fee_amount, 0);
+    let remainder = targetAmount - currentTotal;
+
+    if (Math.abs(remainder) > 0) {
+      // Determine increment size based on deal size
+      const increment = targetAmount >= 100000 ? 1000 : 100;
+
+      // Sort indices by fee descending for distribution
+      const sortedIndices = allocations
+        .map((_, i) => i)
+        .sort((a, b) => allocations[b].fee_amount - allocations[a].fee_amount);
+
+      let safetyCounter = 0;
+      const maxIterations = items.length * 20;
+
+      while (Math.abs(remainder) >= increment && safetyCounter < maxIterations) {
+        for (const idx of sortedIndices) {
+          if (Math.abs(remainder) < increment) break;
+          if (remainder > 0) {
+            allocations[idx].fee_amount += increment;
+            remainder -= increment;
+          } else {
+            // Only subtract if it won't go below minimum
+            if (allocations[idx].fee_amount - increment >= MINIMUM_ITEM_FEE) {
+              allocations[idx].fee_amount -= increment;
+              remainder += increment;
+            }
+          }
+        }
+        safetyCounter++;
+      }
+
+      // Handle any tiny remainder left (less than increment) — add to largest item
+      if (Math.abs(remainder) > 0 && Math.abs(remainder) < increment) {
+        const largestIdx = sortedIndices[0];
+        allocations[largestIdx].fee_amount += remainder;
+        remainder = 0;
+      }
+    }
+
+    const finalTotal = allocations.reduce((sum, a) => sum + a.fee_amount, 0);
+    console.log(`Final total: ${finalTotal} (target: ${targetAmount}, diff: ${targetAmount - finalTotal})`);
+
+    return new Response(JSON.stringify({
       allocations,
       targetAmount,
-      historicalDataUsed: allHistoricalData.length 
+      historicalDataUsed: allHistorical.length,
+      scaleFactor: Math.round(scaleFactor * 100),
+      baseEstimate: totalBaseFee,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: unknown) {
     console.error('Error in allocate-target-pricing:', error);
-    return new Response(JSON.stringify({ error: 'An error occurred processing your request. Please try again.' }), {
+    return new Response(JSON.stringify({ error: 'An error occurred. Please try again.' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

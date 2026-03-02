@@ -1339,12 +1339,16 @@ export default function PricingProposalDetail() {
         body: {
           items: itemsNeedingPricing.map(i => ({
             work_item: i.work_item,
+            detail: i.detail || null,
             provider: i.provider,
             category: i.category,
           })),
           currency: proposal?.currency,
-          proposalId, // Current proposal ID to exclude from historical data
-          pricedItemsInProposal, // Already priced items in this proposal for reference
+          proposalId,
+          pricedItemsInProposal: pricedItemsInProposal.map(p => ({
+            ...p,
+            detail: draftItems.find(d => d.work_item === p.work_item)?.detail || null,
+          })),
         },
       });
 
@@ -1459,6 +1463,7 @@ export default function PricingProposalDetail() {
         body: {
           items: itemsToPrice.map(i => ({
             work_item: i.work_item,
+            detail: i.detail || null,
             provider: i.provider,
             category: i.category,
           })),
@@ -1471,6 +1476,12 @@ export default function PricingProposalDetail() {
       if (error) throw error;
 
       if (data.allocations) {
+        // Validate: reject if any allocation is negative
+        const hasNegative = data.allocations.some((a: any) => (a.fee_amount || 0) < 0);
+        if (hasNegative) {
+          throw new Error('AI returned negative fee amounts. Please try again.');
+        }
+
         // Build updated items with allocated pricing
         const updatedItems = [...draftItems];
         
@@ -1484,7 +1495,7 @@ export default function PricingProposalDetail() {
           });
           
           if (matchIdx !== undefined) {
-            const feeUpper = allocation.fee_amount || 0;
+            const feeUpper = Math.max(allocation.fee_amount || 0, 0);
             // Calculate fee_lower based on category risk (10-20% spread)
             const category = draftItems[matchIdx]?.category;
             const { fee_lower, fee_amount } = calculateFeeRange(feeUpper, category);
@@ -1514,9 +1525,10 @@ export default function PricingProposalDetail() {
         setIsTargetPricingDialogOpen(false);
         setTargetPricingAmount("");
         
+        const scaleInfo = data.scaleFactor ? ` (base estimate scaled ${data.scaleFactor}%)` : '';
         toast({ 
           title: 'Target pricing allocated and saved', 
-          description: `Allocated ${currencySymbol}${targetAmount.toLocaleString()} across ${itemsToPriceIndices.length} item(s)`
+          description: `Allocated ${currencySymbol}${targetAmount.toLocaleString()} across ${itemsToPriceIndices.length} item(s)${scaleInfo}`
         });
       }
     } catch (error: any) {

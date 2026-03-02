@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Version: v3.0.0 — Currency-aware precedent matching + negative-fee guards
+// Version: v4.0.0 — Scope-aware pricing intelligence with percentile-based anchoring
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,14 +39,76 @@ function smartRound(amount: number): number {
   return Math.round(amount / 1000) * 1000;
 }
 
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function percentile(values: number[], p: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = (p / 100) * (sorted.length - 1);
+  const lower = Math.floor(index);
+  const frac = index - lower;
+  if (lower + 1 >= sorted.length) return sorted[lower];
+  return sorted[lower] + frac * (sorted[lower + 1] - sorted[lower]);
+}
+
+// ── Scope Classification ─────────────────────────────────────────────────────
+
+const BROAD_INDICATORS = /\b(report|comprehensive|full|all project|covering|review of all|package|suite|multi|portfolio|across|various|range of|complete|extensive|wide|broad|overall|summary|overview|entire|whole|master|global|general)\b/i;
+
+const NARROW_INDICATORS = /\b(colombian|brazilian|chilean|peruvian|mexican|argentine|uruguayan|paraguayan|ecuadorian|bolivian|venezuelan|panamanian|costa rican|honduran|salvadoran|guatemalan|nicaraguan|dominican|cuban|jamaican|trinidadian|bvi|cayman|bermuda|bahamas|singapore|hong kong|thailand|vietnam|indonesia|malaysia|philippines|taiwan|korean|japanese|indian|chinese|australian|zealand|canadian|south african|nigerian|kenyan|ghanaian|tanzanian|ugandan|mozambican|zambian|zimbabwean|namibian|botswanan|angolan|congolese|senegalese|ivorian|cameroonian|ethiopian|egyptian|moroccan|tunisian|algerian|libyan|english|scottish|irish|welsh|french|german|spanish|italian|portuguese|dutch|belgian|swiss|austrian|swedish|norwegian|danish|finnish|polish|czech|hungarian|romanian|bulgarian|croatian|serbian|slovenian|slovak|greek|turkish|russian|ukrainian|estonian|latvian|lithuanian|cypriot|maltese|luxembourgish|icelandic)\b/i;
+
+function classifyScope(workItem: string, detail: string | null): 'narrow' | 'moderate' | 'broad' {
+  const combined = `${workItem} ${detail || ''}`;
+  const detailLen = (detail || '').length;
+  
+  let score = 0;
+  
+  // Detail length signals
+  if (detailLen > 250) score += 2;
+  else if (detailLen > 150) score += 1;
+  else if (detailLen < 80) score -= 1;
+  
+  // Keyword signals
+  const broadMatches = combined.match(BROAD_INDICATORS);
+  if (broadMatches) score += 2;
+  
+  const narrowMatches = workItem.match(NARROW_INDICATORS);
+  if (narrowMatches) score -= 2;
+  
+  // Generic work_item (short, no proper nouns) signals broad
+  const words = significantWords(workItem);
+  const hasProperNoun = /[A-Z][a-z]{2,}/.test(workItem.replace(/^[A-Z]/, 'x')); // ignore first letter
+  if (words.size <= 4 && !hasProperNoun && !narrowMatches) score += 1;
+  
+  if (score >= 3) return 'broad';
+  if (score <= -1) return 'narrow';
+  return 'moderate';
+}
+
 interface HistoricalItem {
   work_item: string;
   detail: string | null;
   category: string;
   provider: string;
-  fee: number;           // in original currency
-  feeConverted: number;  // in target currency
+  fee: number;
+  feeConverted: number;
   source: string;
+}
+
+interface CategoryPercentiles {
+  count: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+  min: number;
+  max: number;
+  fees: number[];
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
@@ -92,12 +154,11 @@ serve(async (req) => {
     }
 
     const targetCurrency = currency || 'GBP';
-    console.log(`suggest-pricing v3: ${items.length} items, currency=${targetCurrency}, user=${userId}`);
+    console.log(`suggest-pricing v4: ${items.length} items, currency=${targetCurrency}, user=${userId}`);
 
     // ── Phase 1: Fetch historical data WITH currency ────────────────────────
 
     const [budgetResult, proposalResult, mattersResult, ratesResult] = await Promise.all([
-      // Budget line items
       supabase
         .from('budget_line_items')
         .select('work_item, category, provider, fee_amount, matter_id')
@@ -105,8 +166,6 @@ serve(async (req) => {
         .gt('fee_amount', 0)
         .order('created_at', { ascending: false })
         .limit(500),
-
-      // Proposal items joined to proposals for currency + detail
       supabase
         .from('pricing_proposal_items')
         .select('work_item, detail, category, provider, fee_amount, fee_lower, fee_upper, proposal_id, pricing_proposals(currency)')
@@ -114,14 +173,10 @@ serve(async (req) => {
         .gt('fee_amount', 0)
         .order('created_at', { ascending: false })
         .limit(500),
-
-      // Matters for currency lookup
       supabase
         .from('matters')
         .select('id, currency')
         .eq('user_id', userId),
-
-      // Exchange rates (table may not exist — handled gracefully)
       supabase
         .from('exchange_rates')
         .select('currency_code, rate_to_usd')
@@ -129,20 +184,15 @@ serve(async (req) => {
         .limit(20),
     ]);
 
-    // Build matter currency lookup
     const matterCurrency: Record<string, string> = {};
     for (const m of (mattersResult.data || [])) {
       matterCurrency[m.id] = m.currency || 'GBP';
     }
 
-    // Build FX lookup (currency → rate relative to USD)
     const fxRates: Record<string, number> = { USD: 1 };
     for (const r of (ratesResult.data || [])) {
-      if (r.currency_code && r.rate_to_usd) {
-        fxRates[r.currency_code] = r.rate_to_usd;
-      }
+      if (r.currency_code && r.rate_to_usd) fxRates[r.currency_code] = r.rate_to_usd;
     }
-    // Fallbacks
     if (!fxRates['GBP']) fxRates['GBP'] = 0.79;
     if (!fxRates['EUR']) fxRates['EUR'] = 0.92;
 
@@ -150,13 +200,9 @@ serve(async (req) => {
       if (sourceCurrency === targetCurrency) return amount;
       const srcRate = fxRates[sourceCurrency] || 1;
       const tgtRate = fxRates[targetCurrency] || 1;
-      // Convert: amount in source → USD → target
-      // If 1 USD = srcRate source, then amount source = amount/srcRate USD
-      // Then amount/srcRate USD × tgtRate = amount in target
       return amount * (tgtRate / srcRate);
     };
 
-    // Process budget items
     const budgetItems: HistoricalItem[] = (budgetResult.data || []).map((item: any) => {
       const srcCurrency = matterCurrency[item.matter_id] || 'GBP';
       return {
@@ -170,7 +216,6 @@ serve(async (req) => {
       };
     });
 
-    // Process proposal items (exclude current proposal)
     const proposalItems: HistoricalItem[] = (proposalResult.data || [])
       .filter((item: any) => !proposalId || item.proposal_id !== proposalId)
       .map((item: any) => {
@@ -186,21 +231,41 @@ serve(async (req) => {
         };
       });
 
-    // Already-priced items from current proposal
     const currentProposalPriced: HistoricalItem[] = (pricedItemsInProposal || []).map((item: any) => ({
       work_item: item.work_item,
       detail: item.detail || null,
       category: item.category || 'Uncategorized',
       provider: item.provider,
       fee: item.fee_amount,
-      feeConverted: item.fee_amount, // already in target currency
+      feeConverted: item.fee_amount,
       source: 'current_proposal',
     }));
 
     const allHistorical = [...budgetItems, ...proposalItems, ...currentProposalPriced];
     console.log(`Historical: ${budgetItems.length} budget, ${proposalItems.length} proposal, ${currentProposalPriced.length} current`);
 
-    // ── Phase 2: Server-side precedent matching ─────────────────────────────
+    // ── Build category percentile stats ─────────────────────────────────────
+
+    const categoryPercentiles: Record<string, CategoryPercentiles> = {};
+    for (const h of allHistorical) {
+      const cat = h.category;
+      if (!categoryPercentiles[cat]) {
+        categoryPercentiles[cat] = { count: 0, p25: 0, p50: 0, p75: 0, p90: 0, min: Infinity, max: 0, fees: [] };
+      }
+      categoryPercentiles[cat].fees.push(h.feeConverted);
+      categoryPercentiles[cat].count++;
+      categoryPercentiles[cat].min = Math.min(categoryPercentiles[cat].min, h.feeConverted);
+      categoryPercentiles[cat].max = Math.max(categoryPercentiles[cat].max, h.feeConverted);
+    }
+    for (const cat of Object.keys(categoryPercentiles)) {
+      const cp = categoryPercentiles[cat];
+      cp.p25 = percentile(cp.fees, 25);
+      cp.p50 = median(cp.fees);
+      cp.p75 = percentile(cp.fees, 75);
+      cp.p90 = percentile(cp.fees, 90);
+    }
+
+    // ── Phase 2: Tiered precedent matching ──────────────────────────────────
 
     interface PriceResult {
       work_item: string;
@@ -213,30 +278,22 @@ serve(async (req) => {
     const unmatchedItems: any[] = [];
 
     for (const item of items) {
-      // Find best match: same category + similar text
+      // Find best text match (Tier 1)
       let bestMatch: HistoricalItem | null = null;
       let bestScore = 0;
 
       for (const hist of allHistorical) {
-        // Category must match (or be uncategorized)
         const catMatch = !item.category || !hist.category ||
           hist.category === 'Uncategorized' ||
           hist.category === item.category;
         if (!catMatch) continue;
 
-        // Text similarity on work_item
         let score = textSimilarity(item.work_item, hist.work_item);
-        
-        // Boost if detail text also matches
         if (item.detail && hist.detail) {
           const detailScore = textSimilarity(item.detail, hist.detail);
           score = score * 0.6 + detailScore * 0.4;
         }
-
-        // Bonus for same provider
         if (item.provider === hist.provider) score += 0.1;
-
-        // Bonus for same category match
         if (item.category && hist.category === item.category) score += 0.15;
 
         if (score > bestScore) {
@@ -245,6 +302,7 @@ serve(async (req) => {
         }
       }
 
+      // Tier 1: Strong text match
       if (bestMatch && bestScore >= 0.5) {
         const convertedFee = smartRound(bestMatch.feeConverted);
         matchedResults.push({
@@ -253,56 +311,94 @@ serve(async (req) => {
           rationale: `Based on precedent "${bestMatch.work_item}" (${bestMatch.source}, score ${(bestScore * 100).toFixed(0)}%)`,
           matched: true,
         });
-      } else {
-        unmatchedItems.push(item);
+        continue;
       }
+
+      // Tier 2: Category match with scope-aware percentile pricing
+      const catStats = item.category ? categoryPercentiles[item.category] : null;
+      if (catStats && catStats.count >= 2) {
+        const scope = classifyScope(item.work_item, item.detail || null);
+        let scopeFee: number;
+        let scopeLabel: string;
+        
+        if (scope === 'broad') {
+          scopeFee = percentile(catStats.fees, 80);
+          scopeLabel = 'broad scope → 80th percentile';
+        } else if (scope === 'narrow') {
+          scopeFee = catStats.p25;
+          scopeLabel = 'narrow scope → 25th percentile';
+        } else {
+          scopeFee = catStats.p50;
+          scopeLabel = 'moderate scope → median';
+        }
+        
+        const roundedFee = smartRound(scopeFee);
+        matchedResults.push({
+          work_item: item.work_item,
+          fee_amount: Math.max(roundedFee, 500),
+          rationale: `${item.category} ${scopeLabel} (${catStats.count} precedents, range ${Math.round(catStats.min).toLocaleString()}-${Math.round(catStats.max).toLocaleString()})`,
+          matched: true,
+        });
+        console.log(`Tier 2 scope-aware: "${item.work_item}" → scope=${scope}, fee=${roundedFee}`);
+        continue;
+      }
+
+      // Tier 3: No category data → send to AI
+      unmatchedItems.push(item);
     }
 
-    console.log(`Precedent matched: ${matchedResults.length}, sending ${unmatchedItems.length} to AI`);
+    console.log(`Tier 1 matched: ${matchedResults.length - unmatchedItems.length}, Tier 2 scope-aware: ${matchedResults.length}, Tier 3 to AI: ${unmatchedItems.length}`);
 
-    // ── Phase 3: AI pricing for unmatched items ─────────────────────────────
+    // ── Phase 3: AI pricing for Tier 3 items ────────────────────────────────
 
     let aiPrices: PriceResult[] = [];
 
     if (unmatchedItems.length > 0) {
-      // Build category stats for AI context (using converted fees)
-      const categoryStats: Record<string, { count: number; avg: number; min: number; max: number }> = {};
-      for (const h of allHistorical) {
-        const cat = h.category;
-        if (!categoryStats[cat]) categoryStats[cat] = { count: 0, avg: 0, min: Infinity, max: 0 };
-        categoryStats[cat].count++;
-        categoryStats[cat].avg += h.feeConverted;
-        categoryStats[cat].min = Math.min(categoryStats[cat].min, h.feeConverted);
-        categoryStats[cat].max = Math.max(categoryStats[cat].max, h.feeConverted);
-      }
-      for (const cat of Object.keys(categoryStats)) {
-        categoryStats[cat].avg = Math.round(categoryStats[cat].avg / categoryStats[cat].count);
-      }
-
       const currencySymbol = targetCurrency === 'GBP' ? '£' : targetCurrency === 'USD' ? '$' : '€';
+
+      // Build category-relevant context per unmatched item
+      const categoryContext: string[] = [];
+      for (const item of unmatchedItems) {
+        const cat = item.category || 'Uncategorized';
+        const catItems = allHistorical.filter(h => h.category === cat);
+        const cp = categoryPercentiles[cat];
+        
+        if (catItems.length > 0 && cp) {
+          // Top 5 highest and 5 lowest from category
+          const sorted = [...catItems].sort((a, b) => b.feeConverted - a.feeConverted);
+          const top5 = sorted.slice(0, 5);
+          const bottom5 = sorted.slice(-5);
+          const scope = classifyScope(item.work_item, item.detail || null);
+
+          categoryContext.push(`\nItem: "${item.work_item}"${item.detail ? ` — ${item.detail.substring(0, 300)}` : ''}
+Provider: ${item.provider}, Category: ${cat}, Scope: ${scope.toUpperCase()}
+${cat} percentiles: 25th=${currencySymbol}${Math.round(cp.p25).toLocaleString()}, median=${currencySymbol}${Math.round(cp.p50).toLocaleString()}, 75th=${currencySymbol}${Math.round(cp.p75).toLocaleString()}, 90th=${currencySymbol}${Math.round(cp.p90).toLocaleString()}
+${scope === 'broad' ? '→ Price at 75th-90th percentile given broad scope.' : scope === 'narrow' ? '→ Price at 25th percentile given narrow scope.' : '→ Price around the median.'}
+Highest in category: ${top5.map(h => `"${h.work_item}" ${currencySymbol}${Math.round(h.feeConverted).toLocaleString()}`).join('; ')}
+Lowest in category: ${bottom5.map(h => `"${h.work_item}" ${currencySymbol}${Math.round(h.feeConverted).toLocaleString()}`).join('; ')}`);
+        } else {
+          categoryContext.push(`\nItem: "${item.work_item}"${item.detail ? ` — ${item.detail.substring(0, 300)}` : ''} (${item.provider}, ${cat}) — no historical data for this category`);
+        }
+      }
 
       const systemPrompt = `You are a legal fee proposal expert for Baker McKenzie. Suggest fee amounts for work items that have no direct historical precedent.
 
 All amounts must be in ${targetCurrency} (${currencySymbol}).
 All fees must be POSITIVE (minimum ${currencySymbol}500).
+Round all fees to the nearest ${currencySymbol}1,000 (or ${currencySymbol}500 for small items under ${currencySymbol}2,500).
 
-CATEGORY STATISTICS (converted to ${targetCurrency}):
-${Object.entries(categoryStats).map(([cat, s]) =>
-  `- ${cat}: ${s.count} items, avg ${currencySymbol}${s.avg.toLocaleString()}, range ${currencySymbol}${Math.round(s.min).toLocaleString()}-${currencySymbol}${Math.round(s.max).toLocaleString()}`
-).join('\n')}
+IMPORTANT: Pay close attention to each item's SCOPE classification:
+- BROAD scope items (comprehensive reports, full packages, multi-jurisdiction work) should be priced at the HIGH END of their category range (75th-90th percentile).
+- NARROW scope items (single entity, single jurisdiction, specific tasks) should be priced at the LOW END (25th percentile).
+- MODERATE scope items should be priced around the MEDIAN.
 
-SAMPLE HISTORICAL (converted to ${targetCurrency}):
-${allHistorical.slice(0, 30).map(h =>
-  `- "${h.work_item}" (${h.category}, ${h.provider}): ${currencySymbol}${Math.round(h.feeConverted).toLocaleString()}`
-).join('\n')}
-
-Base your estimates on category averages and item complexity. Baker McKenzie items typically cost more than Local Counsel items.`;
-
-      const userPrompt = `Suggest fees for these ${unmatchedItems.length} items (no strong precedent found):
-
-${unmatchedItems.map((item: any, i: number) =>
-  `${i + 1}. "${item.work_item}"${item.detail ? ` — ${item.detail.substring(0, 200)}` : ''} (${item.provider}, ${item.category || 'Uncategorized'})`
+OVERALL CATEGORY STATISTICS (${targetCurrency}):
+${Object.entries(categoryPercentiles).map(([cat, cp]) =>
+  `- ${cat}: ${cp.count} items, 25th=${currencySymbol}${Math.round(cp.p25).toLocaleString()}, median=${currencySymbol}${Math.round(cp.p50).toLocaleString()}, 75th=${currencySymbol}${Math.round(cp.p75).toLocaleString()}, 90th=${currencySymbol}${Math.round(cp.p90).toLocaleString()}`
 ).join('\n')}`;
+
+      const userPrompt = `Suggest fees for these ${unmatchedItems.length} items:
+${categoryContext.join('\n')}`;
 
       const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
@@ -389,12 +485,11 @@ ${unmatchedItems.map((item: any, i: number) =>
 
     const allPrices = [...matchedResults, ...aiPrices];
 
-    // Final guard: ensure no negative fees
     for (const p of allPrices) {
       if (p.fee_amount < 0) p.fee_amount = 500;
     }
 
-    console.log(`Returning ${allPrices.length} prices (${matchedResults.length} matched, ${aiPrices.length} AI)`);
+    console.log(`Returning ${allPrices.length} prices (${matchedResults.length} matched/scope-aware, ${aiPrices.length} AI)`);
 
     return new Response(JSON.stringify({
       prices: allPrices,

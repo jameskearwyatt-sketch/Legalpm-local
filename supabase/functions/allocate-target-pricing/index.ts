@@ -1,20 +1,25 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
-  type HistoricalItem, type FXRateSet, type ItemToPrice,
+  type HistoricalItem, type FXRateSet, type PricingResult, type ItemToPrice,
   convertToGBP, convertFromGBP, smartRound, minimumFee,
   priceItem, buildAIContextForItem, buildAISystemPrompt, currencySymbol,
   textSimilarity, classifyComplexity, targetPercentileFromComplexity,
-  buildCategoryPercentiles, computeConfidence, findSimilarityMatches,
-  isFallbackFX, FALLBACK_FX_RATES, MINIMUM_ITEM_FEE_GBP,
+  buildCategoryPercentiles, interpolateAtPercentile, computeConfidence,
+  findSimilarityMatches, isFallbackFX,
+  FALLBACK_FX_RATES, TIER1_SIMILARITY_THRESHOLD,
 } from "../_shared/pricingEngine.ts";
 
-// Version: v5.0.0 — Scope-aware base pricing + deterministic scaling, shared engine
+// Version: v6.0.0 — Two-stage target allocation: Stage 1 baseline via shared engine, Stage 2 pro-rata scaling
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+/** Configurable: extreme scaling factor thresholds */
+const EXTREME_SCALE_LOW = 0.5;
+const EXTREME_SCALE_HIGH = 2.0;
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -66,10 +71,12 @@ serve(async (req) => {
     }
 
     const pricingCurrency = currency || 'GBP';
-    const currencyWarning = !currency ? 'No currency specified — defaulting to GBP.' : null;
-    console.log(`allocate-target v5: ${targetAmount} ${pricingCurrency} across ${items.length} items, user=${userId}`);
+    const currencyWarning = !currency ? 'No currency specified — defaulting to GBP. Confidence reduced.' : null;
+    console.log(`allocate-target v6: ${targetAmount} ${pricingCurrency} across ${items.length} items, user=${userId}`);
 
-    // ── Phase 1: Fetch historical data ──────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+    // FETCH HISTORICAL DATA (identical to suggest-pricing)
+    // ══════════════════════════════════════════════════════════════════════════
 
     const [budgetResult, proposalResult, mattersResult, ratesResult] = await Promise.all([
       supabase.from('budget_line_items')
@@ -103,10 +110,7 @@ serve(async (req) => {
     const mergedRates = { ...FALLBACK_FX_RATES, ...dbRates };
     const fx: FXRateSet = { rates: mergedRates, source: fxSource, timestamp: fxTimestamp };
 
-    // ── Build historical items (normalised to GBP) ──────────────────────────
-
     const allHistorical: HistoricalItem[] = [];
-
     for (const item of (budgetResult.data || [])) {
       const srcCcy = matterCurrency[item.matter_id] || 'GBP';
       const { amountGBP } = convertToGBP(item.fee_amount, srcCcy, fx);
@@ -130,12 +134,13 @@ serve(async (req) => {
 
     console.log(`Historical data: ${allHistorical.length} items`);
 
-    // ── Phase 2: Get unconstrained base prices using tiered engine ───────────
+    // ══════════════════════════════════════════════════════════════════════════
+    // STAGE 1 — BASELINE PRICING (identical engine to suggest-pricing)
+    // ══════════════════════════════════════════════════════════════════════════
 
     const minFee = minimumFee(pricingCurrency, fx);
-    interface BasePrice { work_item: string; baseFee: number; rationale: string; tier: string; }
-    const basePrices: BasePrice[] = [];
-    const unmatchedIndices: number[] = [];
+    const baselineResults: PricingResult[] = [];
+    const tier3Items: { item: ItemToPrice; index: number }[] = [];
 
     for (let i = 0; i < items.length; i++) {
       const inputItem: ItemToPrice = {
@@ -147,33 +152,28 @@ serve(async (req) => {
 
       const result = priceItem(inputItem, allHistorical, pricingCurrency, fx);
       if (result) {
-        basePrices.push({
-          work_item: inputItem.work_item,
-          baseFee: result.suggestedPrice,
-          rationale: result.explanation,
-          tier: result.tierUsed,
-        });
+        if (currencyWarning && result.confidence !== 'LOW') {
+          result.confidence = result.confidence === 'HIGH' ? 'MEDIUM' : 'LOW';
+        }
+        baselineResults.push(result);
       } else {
-        basePrices.push({ work_item: inputItem.work_item, baseFee: 0, rationale: '', tier: 'TIER_3' });
-        unmatchedIndices.push(i);
+        // Placeholder — will be filled by AI
+        baselineResults.push(null as any);
+        tier3Items.push({ item: inputItem, index: i });
       }
     }
 
-    console.log(`Tier 1+2 matched: ${items.length - unmatchedIndices.length}, Tier 3 to AI: ${unmatchedIndices.length}`);
+    const tier1Count = baselineResults.filter(r => r?.tierUsed === 'TIER_1').length;
+    const tier2Count = baselineResults.filter(r => r?.tierUsed === 'TIER_2').length;
+    console.log(`Stage 1: Tier 1=${tier1Count}, Tier 2=${tier2Count}, Tier 3 to AI=${tier3Items.length}`);
 
-    // Step B: AI pricing for Tier 3 items
-    if (unmatchedIndices.length > 0) {
+    // AI pricing for Tier 3 items
+    if (tier3Items.length > 0) {
       const systemPrompt = buildAISystemPrompt(pricingCurrency, allHistorical, fx, true);
-      const unmatchedItems = unmatchedIndices.map(i => items[i]);
-
-      const itemContexts = unmatchedItems.map((item: any) =>
-        buildAIContextForItem(
-          { work_item: item.work_item, detail: item.detail || null, category: item.category || 'Uncategorized', provider: item.provider },
-          allHistorical, pricingCurrency, fx
-        )
+      const itemContexts = tier3Items.map(({ item }) =>
+        buildAIContextForItem(item, allHistorical, pricingCurrency, fx)
       );
-
-      const userPrompt = `Suggest base prices for these ${unmatchedItems.length} items:\n${itemContexts.join('\n\n')}\n\nReturn your best estimate of what each is worth. Do NOT try to hit any target total.`;
+      const userPrompt = `Suggest base prices for these ${tier3Items.length} items:\n${itemContexts.join('\n\n')}\n\nReturn your best estimate of what each is worth. Do NOT try to hit any target total.`;
 
       const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
         method: 'POST',
@@ -218,11 +218,11 @@ serve(async (req) => {
 
       if (!response.ok) {
         if (response.status === 429) {
-          return new Response(JSON.stringify({ error: 'Rate limit exceeded' }),
+          return new Response(JSON.stringify({ error: 'Rate limit exceeded, please try again later' }),
             { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
         if (response.status === 402) {
-          return new Response(JSON.stringify({ error: 'Payment required' }),
+          return new Response(JSON.stringify({ error: 'Payment required, please add credits' }),
             { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
         const errorText = await response.text();
@@ -242,9 +242,16 @@ serve(async (req) => {
         }
       }
 
-      for (let j = 0; j < unmatchedIndices.length; j++) {
-        const idx = unmatchedIndices[j];
-        const item = items[idx];
+      for (const { item, index } of tier3Items) {
+        const complexity = classifyComplexity(item.work_item, item.detail);
+        const tgtPctl = targetPercentileFromComplexity(complexity.complexityScore);
+        const catData = buildCategoryPercentiles(allHistorical, item.category);
+        const matches = findSimilarityMatches(item, allHistorical, pricingCurrency, fx, 3);
+        const bandLow = Math.max(0.05, tgtPctl - 0.10);
+        const bandHigh = Math.min(0.95, tgtPctl + 0.10);
+        const bandLowGBP = interpolateAtPercentile(catData.feesGBP, bandLow);
+        const bandHighGBP = interpolateAtPercentile(catData.feesGBP, bandHigh);
+        const statsGBP = catData.stats;
 
         const aiMatch = aiResults.find(r =>
           r.work_item === item.work_item ||
@@ -253,122 +260,209 @@ serve(async (req) => {
           textSimilarity(r.work_item, item.work_item).score > 0.6
         );
 
+        let suggestedPrice: number;
+        let suggestedPriceBaseGBP: number;
+        let explanation: string;
+
         if (aiMatch && aiMatch.fee_amount > 0) {
-          basePrices[idx] = {
-            work_item: item.work_item,
-            baseFee: Math.max(smartRound(aiMatch.fee_amount, pricingCurrency), minFee),
-            rationale: aiMatch.rationale || 'AI estimated',
-            tier: 'TIER_3',
-          };
+          suggestedPrice = Math.max(smartRound(aiMatch.fee_amount, pricingCurrency), minFee);
+          suggestedPriceBaseGBP = smartRound(convertToGBP(suggestedPrice, pricingCurrency, fx).amountGBP, 'GBP');
+          explanation = aiMatch.rationale || 'AI estimated';
         } else {
-          const complexity = classifyComplexity(item.work_item, item.detail || null);
           const fallbackGBP = complexity.scope === 'broad' ? 25000 : complexity.scope === 'narrow' ? 5000 : 10000;
-          basePrices[idx] = {
-            work_item: item.work_item,
-            baseFee: Math.max(smartRound(convertFromGBP(fallbackGBP, pricingCurrency, fx), pricingCurrency), minFee),
-            rationale: `Default estimate (${complexity.scope} scope)`,
-            tier: 'TIER_3',
-          };
+          suggestedPriceBaseGBP = smartRound(fallbackGBP, 'GBP');
+          suggestedPrice = Math.max(smartRound(convertFromGBP(fallbackGBP, pricingCurrency, fx), pricingCurrency), minFee);
+          explanation = `Default estimate (${complexity.scope} scope, no AI match)`;
         }
+
+        let confidence = computeConfidence('TIER_3', 0, catData, fx, pricingCurrency);
+        if (currencyWarning && confidence !== 'LOW') {
+          confidence = confidence === 'HIGH' ? 'MEDIUM' : 'LOW';
+        }
+
+        baselineResults[index] = {
+          workItem: item.work_item,
+          suggestedPrice,
+          pricingCurrency,
+          suggestedPriceBaseGBP,
+          tierUsed: 'TIER_3',
+          confidence,
+          scope: complexity.scope,
+          complexityScore: complexity.complexityScore,
+          signals: complexity.signals,
+          percentileStats: {
+            p25: smartRound(convertFromGBP(statsGBP.p25, pricingCurrency, fx), pricingCurrency),
+            p50: smartRound(convertFromGBP(statsGBP.p50, pricingCurrency, fx), pricingCurrency),
+            p75: smartRound(convertFromGBP(statsGBP.p75, pricingCurrency, fx), pricingCurrency),
+            p90: smartRound(convertFromGBP(statsGBP.p90, pricingCurrency, fx), pricingCurrency),
+            n: statsGBP.n,
+            IQR: smartRound(convertFromGBP(statsGBP.IQR, pricingCurrency, fx), pricingCurrency),
+          },
+          targetPercentile: tgtPctl,
+          permittedBand: {
+            lowPercentile: bandLow, highPercentile: bandHigh,
+            lowValuePricingCcy: Math.max(smartRound(convertFromGBP(bandLowGBP, pricingCurrency, fx), pricingCurrency), minFee),
+            highValuePricingCcy: Math.max(smartRound(convertFromGBP(bandHighGBP, pricingCurrency, fx), pricingCurrency), minFee),
+            lowValueGBP: bandLowGBP, highValueGBP: bandHighGBP,
+          },
+          similarityMatches: matches,
+          explanation,
+          diagnostics: {
+            fxRateUsed: convertToGBP(1, pricingCurrency, fx).fxInfo.rateUsed,
+            fxSource: isFallbackFX(fx, pricingCurrency) ? 'fallback' : fx.source,
+            fxTimestamp: fx.timestamp,
+            categoryCount: statsGBP.n,
+            outlierMethod: 'none',
+            sparseCategory: catData.sparse,
+          },
+        };
       }
     }
 
-    // ── Phase 3: Deterministic scaling to hit target ────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+    // STAGE 2 — PRO-RATA SCALING TO HIT TARGET (pure maths, no re-matching)
+    // ══════════════════════════════════════════════════════════════════════════
 
-    const totalBaseFee = basePrices.reduce((sum, p) => sum + p.baseFee, 0);
+    const baselineTotal = baselineResults.reduce((sum, r) => sum + r.suggestedPrice, 0);
 
-    if (totalBaseFee <= 0) {
-      const evenFee = smartRound(targetAmount / items.length, pricingCurrency);
-      const allocations = basePrices.map(p => ({
-        work_item: p.work_item,
-        fee_amount: evenFee,
-        rationale: 'Evenly distributed (no precedent data)',
-      }));
-      const totalEven = evenFee * items.length;
-      if (totalEven !== targetAmount) {
-        allocations[allocations.length - 1].fee_amount += (targetAmount - totalEven);
-      }
-      return new Response(JSON.stringify({ allocations, targetAmount, pricingCurrency, historicalDataUsed: allHistorical.length, scaleFactor: null }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (baselineTotal <= 0) {
+      return new Response(JSON.stringify({
+        error: 'Cannot scale to target because baseline total is zero or invalid. Please run baseline pricing first or check selected items.',
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const scaleFactor = targetAmount / totalBaseFee;
-    console.log(`Base total: ${totalBaseFee}, target: ${targetAmount}, scale factor: ${(scaleFactor * 100).toFixed(1)}%`);
+    const scalingFactor = targetAmount / baselineTotal;
+    console.log(`Stage 2: baselineTotal=${baselineTotal}, target=${targetAmount}, scalingFactor=${scalingFactor.toFixed(4)}`);
 
-    const allocations = basePrices.map(p => ({
-      work_item: p.work_item,
-      fee_amount: Math.max(smartRound(p.baseFee * scaleFactor, pricingCurrency), minFee),
-      rationale: p.rationale + (scaleFactor !== 1 ? ` (scaled ${(scaleFactor * 100).toFixed(0)}%)` : ''),
-    }));
+    // 6) Apply pro-rata scaling
+    const scaledRaw = baselineResults.map(r => r.suggestedPrice * scalingFactor);
 
-    // ── Distribute rounding error ───────────────────────────────────────────
+    // 7) Currency-specific rounding
+    const roundedScaled = scaledRaw.map(v => smartRound(v, pricingCurrency));
 
-    let currentTotal = allocations.reduce((sum, a) => sum + a.fee_amount, 0);
-    let remainder = targetAmount - currentTotal;
+    // 8) Reconciliation
+    const roundedTotal = roundedScaled.reduce((s, v) => s + v, 0);
+    let residual = targetAmount - roundedTotal;
 
-    if (Math.abs(remainder) > 0) {
-      // Determine increment based on currency + deal size
-      let increment: number;
-      if (pricingCurrency === 'USD') {
-        increment = targetAmount >= 250000 ? 5000 : targetAmount >= 50000 ? 2500 : 1000;
-      } else if (pricingCurrency === 'GBP') {
-        increment = targetAmount >= 100000 ? 5000 : targetAmount >= 25000 ? 1000 : 500;
-      } else {
-        increment = 1000;
-      }
+    // Apply residual to largest item(s)
+    const finalPrices = [...roundedScaled];
 
-      const sortedIndices = allocations
+    if (Math.abs(residual) > 0) {
+      // Sort indices by finalPrice descending
+      const sortedIndices = finalPrices
         .map((_, i) => i)
-        .sort((a, b) => allocations[b].fee_amount - allocations[a].fee_amount);
+        .sort((a, b) => finalPrices[b] - finalPrices[a]);
 
-      let safetyCounter = 0;
-      const maxIterations = items.length * 20;
-
-      while (Math.abs(remainder) >= increment && safetyCounter < maxIterations) {
-        for (const idx of sortedIndices) {
-          if (Math.abs(remainder) < increment) break;
-          if (remainder > 0) {
-            allocations[idx].fee_amount += increment;
-            remainder -= increment;
-          } else {
-            if (allocations[idx].fee_amount - increment >= minFee) {
-              allocations[idx].fee_amount -= increment;
-              remainder += increment;
-            }
-          }
+      for (const idx of sortedIndices) {
+        if (Math.abs(residual) < 0.01) break;
+        const adjusted = finalPrices[idx] + residual;
+        if (adjusted >= 0) {
+          finalPrices[idx] = adjusted;
+          residual = 0;
+          break;
         }
-        safetyCounter++;
-      }
-
-      if (Math.abs(remainder) > 0 && Math.abs(remainder) < increment) {
-        allocations[sortedIndices[0]].fee_amount += remainder;
-        remainder = 0;
+        // Would go negative — skip to next largest
       }
     }
 
-    const finalTotal = allocations.reduce((sum, a) => sum + a.fee_amount, 0);
-    console.log(`Final total: ${finalTotal} (target: ${targetAmount}, diff: ${targetAmount - finalTotal})`);
+    // Find which item was adjusted
+    let itemAdjustedForResidual: string | null = null;
+    for (let i = 0; i < finalPrices.length; i++) {
+      if (finalPrices[i] !== roundedScaled[i]) {
+        itemAdjustedForResidual = baselineResults[i].workItem;
+        break;
+      }
+    }
+
+    // Verify exact total
+    const finalTotal = finalPrices.reduce((s, v) => s + v, 0);
+    console.log(`Final total: ${finalTotal} (target: ${targetAmount}, match: ${finalTotal === targetAmount})`);
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // BUILD OUTPUT
+    // ══════════════════════════════════════════════════════════════════════════
+
+    // Warnings
+    const warnings: string[] = [];
+    if (currencyWarning) warnings.push(currencyWarning);
+    const extremeScale = scalingFactor < EXTREME_SCALE_LOW || scalingFactor > EXTREME_SCALE_HIGH;
+    if (extremeScale) {
+      warnings.push(`Target materially deviates from baseline estimate (scaling factor ${scalingFactor.toFixed(2)}×).`);
+    }
+
+    // Per-item allocations with full baseline + scaled data
+    const allocations = baselineResults.map((baseline, i) => {
+      // Determine per-item confidence: if extreme scale, downgrade by one level
+      let itemConfidence = baseline.confidence;
+      if (extremeScale && itemConfidence !== 'LOW') {
+        itemConfidence = itemConfidence === 'HIGH' ? 'MEDIUM' : 'LOW';
+      }
+
+      return {
+        work_item: baseline.workItem,
+        // Baseline data
+        baselinePrice: baseline.suggestedPrice,
+        // Scaled data
+        scaledPriceBeforeRounding: Math.round(scaledRaw[i] * 100) / 100,
+        roundedScaledPrice: roundedScaled[i],
+        finalPrice: finalPrices[i],
+        // For backward compat — front-end reads fee_amount
+        fee_amount: finalPrices[i],
+        // Baseline engine output
+        tierUsed: baseline.tierUsed,
+        confidence: itemConfidence,
+        baselineConfidence: baseline.confidence,
+        explanation: baseline.explanation,
+        scalingNote: `Scaled pro-rata by factor ${scalingFactor.toFixed(4)} to meet target total.`,
+        // Complexity
+        scope: baseline.scope,
+        complexityScore: baseline.complexityScore,
+        signals: baseline.signals,
+        // Stats
+        percentileStats: baseline.percentileStats,
+        targetPercentile: baseline.targetPercentile,
+        permittedBand: baseline.permittedBand,
+        // Matches
+        similarityMatches: baseline.similarityMatches,
+        // Diagnostics
+        diagnostics: baseline.diagnostics,
+        // Backward compat
+        rationale: baseline.explanation + ` | Scaled ${(scalingFactor * 100).toFixed(0)}% to meet target.`,
+        matched: baseline.tierUsed !== 'TIER_3',
+      };
+    });
 
     return new Response(JSON.stringify({
       allocations,
-      targetAmount,
+      // Aggregate-level data
+      baselineTotal,
+      targetTotal: targetAmount,
+      scalingFactor: Math.round(scalingFactor * 10000) / 10000,
+      roundedTotalBeforeReconciliation: roundedTotal,
+      residual: targetAmount - roundedTotal,
+      itemAdjustedForResidual,
+      // Metadata
       pricingCurrency,
       historicalDataUsed: allHistorical.length,
-      scaleFactor: Math.round(scaleFactor * 100),
-      baseEstimate: totalBaseFee,
+      precedentMatched: tier1Count + tier2Count,
+      aiPriced: tier3Items.length,
       fxInfo: {
         rateUsed: convertToGBP(1, pricingCurrency, fx).fxInfo.rateUsed,
         source: fx.source,
         timestamp: fx.timestamp,
       },
-      ...(currencyWarning ? { warning: currencyWarning } : {}),
+      ...(warnings.length > 0 ? { warnings } : {}),
+      // Backward compat: targetAmount
+      targetAmount,
+      scaleFactor: Math.round(scalingFactor * 100),
+      baseEstimate: baselineTotal,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: unknown) {
     console.error('Error in allocate-target-pricing:', error);
-    return new Response(JSON.stringify({ error: 'An error occurred' }), {
+    return new Response(JSON.stringify({ error: 'An error occurred processing your request. Please try again.' }), {
       status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }

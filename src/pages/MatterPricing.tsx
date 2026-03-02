@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, FileText, Trash2, Calendar, Building, DollarSign } from "lucide-react";
+import { Plus, FileText, Trash2, Calendar, Building, DollarSign, Copy } from "lucide-react";
 import { usePricingProposals } from "@/lib/hooks/usePricingProposals";
 import { useClients } from "@/lib/hooks/useClients";
 import { useUserSettings } from "@/lib/hooks/useUserSettings";
@@ -66,13 +66,18 @@ export default function MatterPricing() {
               Create and manage pricing proposals for client matters
             </p>
           </div>
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                New Proposal
-              </Button>
-            </DialogTrigger>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate("/pricing/adapt")}>
+              <Copy className="h-4 w-4 mr-2" />
+              New from Precedent
+            </Button>
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Proposal
+                </Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Create New Proposal</DialogTitle>
@@ -130,7 +135,8 @@ export default function MatterPricing() {
                 </Button>
               </DialogFooter>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         </div>
 
         {isLoading ? (

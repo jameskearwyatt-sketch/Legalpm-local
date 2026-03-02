@@ -28,6 +28,7 @@ import TollingAnalyst from "./pages/TollingAnalyst";
 import CarbonCreditAnalyst from "./pages/CarbonCreditAnalyst";
 import ITSupplyAnalyst from "./pages/ITSupplyAnalyst";
 import CloudComputeAnalyst from "./pages/CloudComputeAnalyst";
+import AdaptPricingWizard from "./pages/AdaptPricingWizard";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -63,6 +64,7 @@ function AppRoutes() {
       <Route path="/time-recording" element={<ProtectedRoute><TimeRecording /></ProtectedRoute>} />
       <Route path="/pricing" element={<ProtectedRoute><MatterPricing /></ProtectedRoute>} />
       <Route path="/pricing/proposal/:proposalId" element={<ProtectedRoute><PricingProposalDetail /></ProtectedRoute>} />
+      <Route path="/pricing/adapt" element={<ProtectedRoute><AdaptPricingWizard /></ProtectedRoute>} />
       <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
       <Route path="/bm-expertise" element={<ProtectedRoute><BMExpertiseMap /></ProtectedRoute>} />
       <Route path="/ppa-analyst" element={<ProtectedRoute><PPAAnalyst /></ProtectedRoute>} />

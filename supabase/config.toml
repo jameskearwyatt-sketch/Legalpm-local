@@ -125,3 +125,9 @@ verify_jwt = false
 
 [functions.detect-carbon-metadata]
 verify_jwt = false
+
+[functions.generate-adapt-questions]
+verify_jwt = false
+
+[functions.adapt-pricing-proposal]
+verify_jwt = false

@@ -172,15 +172,12 @@ export function CategorizedProposalView({
   const phaseBreakdowns = useMemo(() => {
     if (phases.length <= 1) return null;
     
-    const breakdowns = phases.map(phase => {
+    return phases.map(phase => {
       const phaseItems = items.filter(item => item.phase_id === phase.id);
       const totals = calculateCategoryTotals(phaseItems, allCategories, showAssumptionsNotTrue);
       const grandTotal = Object.values(totals).reduce((sum, val) => sum + val, 0);
       return { phase, totals, grandTotal };
     });
-    
-    // Only show phases that have at least one non-zero category
-    return breakdowns.filter(b => b.grandTotal > 0);
   }, [items, phases, allCategories, showAssumptionsNotTrue]);
 
   // Calculate aggregate totals (always shown)

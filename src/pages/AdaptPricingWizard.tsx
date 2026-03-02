@@ -197,6 +197,10 @@ export default function AdaptPricingWizard() {
   const asProvider = (p: string | undefined): ProviderType => 
     p === "Local Counsel" ? "Local Counsel" : "Baker McKenzie";
 
+  // Helper: strip "[Baker McKenzie] " or "[Local Counsel] " prefixes from work item labels
+  const stripProviderPrefix = (label: string) =>
+    label.replace(/^\[(?:Baker McKenzie|Local Counsel)\]\s*/i, "");
+
   const buildFinalFromDecisions = useCallback(async () => {
     const baseData = await fetchBaseData(selectedBaseId);
     if (!baseData) throw new Error("Could not load base proposal");
@@ -226,6 +230,7 @@ export default function AdaptPricingWizard() {
         is_included: true,
       })),
     ];
+
 
     // --- Build final items ---
     // Helper: find base item by ID first, then by work_item text match
@@ -284,7 +289,7 @@ export default function AdaptPricingWizard() {
       if (change.action === "added") {
         if (change.accepted) {
           fi.push({
-            work_item: change.newWorkItem || "New Work Item",
+            work_item: stripProviderPrefix(change.newWorkItem || "New Work Item"),
             detail: change.newDetail || null,
             provider: asProvider(change.provider),
             fee_amount: change.fee_amount || 0,
@@ -310,8 +315,8 @@ export default function AdaptPricingWizard() {
         if (change.accepted) {
           // Use new text from AI, but ALWAYS inherit fees & category from base if AI didn't provide them
           const workItemLabel = change.newWorkItem && change.newWorkItem !== "Work Item" 
-            ? change.newWorkItem 
-            : (change.originalWorkItem || baseItem?.work_item || "Work Item");
+            ? stripProviderPrefix(change.newWorkItem) 
+            : stripProviderPrefix(change.originalWorkItem || baseItem?.work_item || "Work Item");
           if (baseItem) usedBaseIds.add(baseItem.id);
           fi.push({
             work_item: workItemLabel,
@@ -423,7 +428,7 @@ export default function AdaptPricingWizard() {
             if (!error && data?.finalItems?.length > 0) {
               // Use AI-refined items if the AI returned them
               const refinedItems: DraftProposalItem[] = data.finalItems.map((item: any) => ({
-                work_item: item.work_item,
+                work_item: stripProviderPrefix(item.work_item),
                 detail: item.detail || null,
                 provider: asProvider(item.provider),
                 fee_amount: item.fee_amount || 0,

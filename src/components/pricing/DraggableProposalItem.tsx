@@ -535,7 +535,9 @@ function arePropsEqual(
     prevItem.lc_firm_name !== nextItem.lc_firm_name ||
     prevItem.lc_country !== nextItem.lc_country ||
     prevItem.is_optional !== nextItem.is_optional ||
-    prevItem.is_included !== nextItem.is_included
+    prevItem.is_included !== nextItem.is_included ||
+    prevItem.is_multiplied !== nextItem.is_multiplied ||
+    prevItem.multiplier_qty !== nextItem.multiplier_qty
   ) {
     return false;
   }

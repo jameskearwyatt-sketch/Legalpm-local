@@ -97,10 +97,11 @@ export async function exportAFAProposalToExcel({
   // Use afaBaseFigure for AFA calculations, default to midpoint
   const baseFigure: FigureType = afaBaseFigure || 'midpoint';
   
-  // Calculate baseline total using the selected figure type
-  const calculatedBaselineTotal = items.reduce((sum, item) => 
-    sum + getItemFeeByFigureType(item, baseFigure), 0
-  );
+  // Calculate baseline total using the selected figure type (with multipliers)
+  const calculatedBaselineTotal = items.reduce((sum, item) => {
+    const mult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
+    return sum + getItemFeeByFigureType(item, baseFigure) * mult;
+  }, 0);
   
   // Apply AFA filters to get adjusted items (using the base figure)
   const filterResult = applyAFAFilters(items, enabledAFAs, calculatedBaselineTotal, currencySymbol, baseFigure);
@@ -441,7 +442,8 @@ export async function exportAFAProposalToExcel({
 
     // Add items
     for (const item of categoryItems) {
-      const feeAmount = item.fee_amount || 0;
+      const mult = (item.is_multiplied && item.multiplier_qty && item.multiplier_qty > 1) ? item.multiplier_qty : 1;
+      const feeAmount = (item.fee_amount || 0) * mult;
       categoryTotal += feeAmount;
       grandTotal += feeAmount;
       
@@ -474,11 +476,18 @@ export async function exportAFAProposalToExcel({
         }
       }
       
+      // Build detail with multiplier narrative
+      let detailDisplay = item.detail || '';
+      if (mult > 1) {
+        const multNarrative = `For the purposes of this estimate, we have assumed ${mult} instances of this item.`;
+        detailDisplay = detailDisplay ? `${detailDisplay}\n\n${multNarrative}` : multNarrative;
+      }
+      
       // Build row values dynamically based on columns (Item # is first column)
       const rowValues: (string | number)[] = [
         itemNumber++, // Sequential item number
         workItemDisplay,
-        item.detail || '',
+        detailDisplay,
         providerDisplay,
       ];
       if (exportLower) rowValues.push(feeAmount); // TODO: use lower fee if available

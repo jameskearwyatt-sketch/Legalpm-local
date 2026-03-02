@@ -252,6 +252,9 @@ export interface DraftProposalItem {
   assumption_text?: string | null; // The assumption text (from scope assumptions or free text)
   alt_fee_lower?: number;
   alt_fee_upper?: number;
+  // Multiplier for repeated instances (e.g., multiple identical security documents)
+  is_multiplied?: boolean;
+  multiplier_qty?: number;
 }
 
 // Phase definition for grouping work items
@@ -485,10 +488,18 @@ export function usePricingProposal(proposalId?: string) {
       );
       const bmTotal = includedItems
         .filter(item => item.provider === 'Baker McKenzie')
-        .reduce((sum, item) => sum + (item.fee_upper ?? item.fee_amount), 0);
+        .reduce((sum, item) => {
+          const base = item.fee_upper ?? item.fee_amount;
+          const mult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
+          return sum + base * mult;
+        }, 0);
       const localCounselTotal = includedItems
         .filter(item => item.provider === 'Local Counsel')
-        .reduce((sum, item) => sum + (item.fee_upper ?? item.fee_amount), 0);
+        .reduce((sum, item) => {
+          const base = item.fee_upper ?? item.fee_amount;
+          const mult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
+          return sum + base * mult;
+        }, 0);
       const totalAmount = bmTotal + localCounselTotal;
 
       // Update version totals and notes
@@ -558,6 +569,8 @@ export function usePricingProposal(proposalId?: string) {
             assumption_text: item.assumption_text || null,
             alt_fee_lower: item.alt_fee_lower ?? 0,
             alt_fee_upper: item.alt_fee_upper ?? 0,
+            is_multiplied: item.is_multiplied ?? false,
+            multiplier_qty: item.multiplier_qty ?? 1,
           };
         });
 
@@ -592,10 +605,18 @@ export function usePricingProposal(proposalId?: string) {
       );
       const bmTotal = includedItems
         .filter(item => item.provider === 'Baker McKenzie')
-        .reduce((sum, item) => sum + (item.fee_upper ?? item.fee_amount), 0);
+        .reduce((sum, item) => {
+          const base = item.fee_upper ?? item.fee_amount;
+          const mult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
+          return sum + base * mult;
+        }, 0);
       const localCounselTotal = includedItems
         .filter(item => item.provider === 'Local Counsel')
-        .reduce((sum, item) => sum + (item.fee_upper ?? item.fee_amount), 0);
+        .reduce((sum, item) => {
+          const base = item.fee_upper ?? item.fee_amount;
+          const mult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
+          return sum + base * mult;
+        }, 0);
       const totalAmount = bmTotal + localCounselTotal;
 
       // Create new version
@@ -661,6 +682,8 @@ export function usePricingProposal(proposalId?: string) {
             assumption_text: item.assumption_text || null,
             alt_fee_lower: item.alt_fee_lower ?? 0,
             alt_fee_upper: item.alt_fee_upper ?? 0,
+            is_multiplied: item.is_multiplied ?? false,
+            multiplier_qty: item.multiplier_qty ?? 1,
           };
         });
 

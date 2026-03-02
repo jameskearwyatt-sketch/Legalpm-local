@@ -88,12 +88,13 @@ function calculateCategoryTotals(
       if (totals[category] === undefined) {
         totals[category] = 0;
       }
+      const mult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
       // Use alt estimates if toggled and item has assumption-linked alt values
       if (useAltEstimates && item.assumption_linked && item.alt_fee_upper) {
-        totals[category] += item.alt_fee_upper;
+        totals[category] += item.alt_fee_upper * mult;
       } else {
         // Use fee_upper for upper estimate pricing
-        totals[category] += item.fee_upper ?? item.fee_amount ?? 0;
+        totals[category] += (item.fee_upper ?? item.fee_amount ?? 0) * mult;
       }
     }
   });

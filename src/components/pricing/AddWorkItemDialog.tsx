@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -52,6 +53,8 @@ export function AddWorkItemDialog({
   const [feeLower, setFeeLower] = useState<string>('0');
   const [feeUpper, setFeeUpper] = useState<string>('0');
   const [lcCountry, setLcCountry] = useState<string>('');
+  const [isMultiplied, setIsMultiplied] = useState(false);
+  const [multiplierQty, setMultiplierQty] = useState(2);
   
   // Custom category dialog state
   const [isCustomCategoryDialogOpen, setIsCustomCategoryDialogOpen] = useState(false);
@@ -68,6 +71,8 @@ export function AddWorkItemDialog({
       setFeeLower('0');
       setFeeUpper('0');
       setLcCountry('');
+      setIsMultiplied(false);
+      setMultiplierQty(2);
     }
   }, [open]);
 
@@ -105,6 +110,8 @@ export function AddWorkItemDialog({
       associate_hours: 0,
       num_turns: 1,
       item_type: 'documentation',
+      is_multiplied: isMultiplied,
+      multiplier_qty: isMultiplied ? multiplierQty : 1,
       ...(provider === 'Local Counsel' && lcCountry ? {
         lc_country: lcCountry,
       } : {}),
@@ -281,6 +288,30 @@ export function AddWorkItemDialog({
                   className="text-right"
                 />
               </div>
+            </div>
+
+            {/* Multiplier */}
+            <div className="flex items-center gap-3">
+              <Checkbox
+                id="is-multiplied"
+                checked={isMultiplied}
+                onCheckedChange={(checked) => setIsMultiplied(!!checked)}
+              />
+              <Label htmlFor="is-multiplied" className="text-sm">
+                Mult. – multiple instances of this item
+              </Label>
+              {isMultiplied && (
+                <div className="flex items-center gap-1">
+                  <Label className="text-xs text-muted-foreground">Qty:</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={multiplierQty}
+                    onChange={(e) => setMultiplierQty(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="h-8 w-16 text-center"
+                  />
+                </div>
+              )}
             </div>
           </div>
 

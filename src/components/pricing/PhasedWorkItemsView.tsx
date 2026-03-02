@@ -278,8 +278,9 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
         categoryItems.forEach(({ item }) => {
           totalCount++;
           if (item.is_included !== false) {
-            lower += item.fee_lower ?? item.fee_amount ?? 0;
-            upper += item.fee_upper ?? item.fee_amount ?? 0;
+            const mult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
+            lower += (item.fee_lower ?? item.fee_amount ?? 0) * mult;
+            upper += (item.fee_upper ?? item.fee_amount ?? 0) * mult;
             includedCount++;
           }
         });
@@ -1058,7 +1059,7 @@ const PhasedItemCells = memo(function PhasedItemCells({
         )}
       </TableCell>
 
-      {/* Delete & Duplicate Buttons */}
+      {/* Delete, Duplicate & Mult. Buttons */}
       <TableCell className="py-2 w-[40px]">
         {!viewingHistoricalVersion && (
           <div className="flex items-center gap-0.5">
@@ -1080,6 +1081,44 @@ const PhasedItemCells = memo(function PhasedItemCells({
             >
               <Trash2 className="h-3.5 w-3.5 text-destructive" />
             </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center gap-0.5">
+                    <Checkbox
+                      checked={item.is_multiplied === true}
+                      onCheckedChange={(checked) => {
+                        onUpdate(index, {
+                          is_multiplied: !!checked,
+                          multiplier_qty: checked ? (item.multiplier_qty && item.multiplier_qty > 1 ? item.multiplier_qty : 2) : 1,
+                        });
+                      }}
+                      className={cn("h-4 w-4", item.is_multiplied && "border-emerald-500 data-[state=checked]:bg-emerald-600")}
+                    />
+                    <span className="text-[10px] text-muted-foreground leading-none">Mult.</span>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs">
+                  <p className="text-xs">
+                    <strong>Multiplier</strong> – Enable when there may be multiple instances of this item
+                    (e.g., multiple security documents). Set the assumed quantity and fees will be multiplied accordingly.
+                  </p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            {item.is_multiplied && (
+              <Input
+                type="number"
+                min={1}
+                value={item.multiplier_qty ?? 1}
+                onChange={(e) => {
+                  const qty = Math.max(1, parseInt(e.target.value) || 1);
+                  onUpdate(index, { multiplier_qty: qty });
+                }}
+                className="h-6 w-[46px] text-xs text-center px-1"
+                title="Number of instances"
+              />
+            )}
           </div>
         )}
       </TableCell>
@@ -1387,7 +1426,9 @@ const PhasedItemCells = memo(function PhasedItemCells({
     prevItem.assumption_linked !== nextItem.assumption_linked ||
     prevItem.assumption_text !== nextItem.assumption_text ||
     prevItem.alt_fee_lower !== nextItem.alt_fee_lower ||
-    prevItem.alt_fee_upper !== nextItem.alt_fee_upper
+    prevItem.alt_fee_upper !== nextItem.alt_fee_upper ||
+    prevItem.is_multiplied !== nextItem.is_multiplied ||
+    prevItem.multiplier_qty !== nextItem.multiplier_qty
   ) {
     return false;
   }

@@ -3252,6 +3252,7 @@ export type Database = {
           id: string
           internal_input_dept: string | null
           is_included: boolean
+          is_multiplied: boolean
           is_optional: boolean
           is_pc_sum: boolean
           item_type: string
@@ -3259,6 +3260,7 @@ export type Database = {
           lc_currency: string | null
           lc_firm_name: string | null
           lc_library_id: string | null
+          multiplier_qty: number
           num_turns: number
           partner_hours: number
           phase_id: string | null
@@ -3287,6 +3289,7 @@ export type Database = {
           id?: string
           internal_input_dept?: string | null
           is_included?: boolean
+          is_multiplied?: boolean
           is_optional?: boolean
           is_pc_sum?: boolean
           item_type?: string
@@ -3294,6 +3297,7 @@ export type Database = {
           lc_currency?: string | null
           lc_firm_name?: string | null
           lc_library_id?: string | null
+          multiplier_qty?: number
           num_turns?: number
           partner_hours?: number
           phase_id?: string | null
@@ -3322,6 +3326,7 @@ export type Database = {
           id?: string
           internal_input_dept?: string | null
           is_included?: boolean
+          is_multiplied?: boolean
           is_optional?: boolean
           is_pc_sum?: boolean
           item_type?: string
@@ -3329,6 +3334,7 @@ export type Database = {
           lc_currency?: string | null
           lc_firm_name?: string | null
           lc_library_id?: string | null
+          multiplier_qty?: number
           num_turns?: number
           partner_hours?: number
           phase_id?: string | null

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -12,6 +12,11 @@ interface VoiceInputButtonProps {
 export function VoiceInputButton({ onTranscript, disabled }: VoiceInputButtonProps) {
   const [isRecording, setIsRecording] = useState(false);
   const recognitionRef = useRef<any>(null);
+  const onTranscriptRef = useRef(onTranscript);
+
+  useEffect(() => {
+    onTranscriptRef.current = onTranscript;
+  }, [onTranscript]);
 
   const SpeechRecognition =
     typeof window !== "undefined"
@@ -41,7 +46,7 @@ export function VoiceInputButton({ onTranscript, disabled }: VoiceInputButtonPro
           transcript += event.results[i][0].transcript;
         }
       }
-      if (transcript) onTranscript(transcript);
+      if (transcript) onTranscriptRef.current(transcript);
     };
 
     recognition.onerror = () => setIsRecording(false);
@@ -50,7 +55,7 @@ export function VoiceInputButton({ onTranscript, disabled }: VoiceInputButtonPro
     recognitionRef.current = recognition;
     recognition.start();
     setIsRecording(true);
-  }, [isRecording, supported, onTranscript]);
+  }, [isRecording, supported]);
 
   if (!supported) {
     return (

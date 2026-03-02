@@ -77,7 +77,9 @@ const actionBadgeVariant: Record<string, string> = {
 function ChangeRow({
   action,
   original,
+  originalDetail,
   updated,
+  updatedDetail,
   rationale,
   accepted,
   comment,
@@ -86,7 +88,9 @@ function ChangeRow({
 }: {
   action: string;
   original?: string;
+  originalDetail?: string;
   updated?: string;
+  updatedDetail?: string;
   rationale: string;
   accepted: boolean;
   comment: string;
@@ -96,28 +100,12 @@ function ChangeRow({
   const [showComment, setShowComment] = useState(false);
 
   return (
-    <div className="border rounded-lg p-3 space-y-2">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1 space-y-1">
-          <div className="flex items-center gap-2">
-            <Badge variant="outline" className={cn("text-xs capitalize", actionBadgeVariant[action])}>
-              {action}
-            </Badge>
-          </div>
-          {action === "modified" || action === "renamed" ? (
-            <div className="text-sm space-y-1">
-              <div className="line-through text-muted-foreground">{original}</div>
-              <div className="font-medium">{updated}</div>
-            </div>
-          ) : action === "removed" ? (
-            <div className="text-sm line-through text-muted-foreground">{original}</div>
-          ) : action === "added" ? (
-            <div className="text-sm font-medium">{updated}</div>
-          ) : (
-            <div className="text-sm">{original}</div>
-          )}
-          <p className="text-xs text-muted-foreground italic">{rationale}</p>
-        </div>
+    <div className="border rounded-lg p-4 space-y-3">
+      {/* Header row: badge + accept/reject */}
+      <div className="flex items-center justify-between gap-4">
+        <Badge variant="outline" className={cn("text-xs capitalize", actionBadgeVariant[action])}>
+          {action}
+        </Badge>
         <div className="flex items-center gap-2 shrink-0">
           <Button
             variant="ghost"
@@ -137,6 +125,55 @@ function ChangeRow({
           )}
         </div>
       </div>
+
+      {/* Content: show full work item name + detail/narrative */}
+      {action === "modified" || action === "renamed" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="bg-red-50 dark:bg-red-950/20 rounded-md p-3 space-y-1 border border-red-200 dark:border-red-900">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Original</p>
+            <p className="text-sm font-medium line-through decoration-red-400">{original}</p>
+            {originalDetail && (
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">{originalDetail}</p>
+            )}
+          </div>
+          <div className="bg-green-50 dark:bg-green-950/20 rounded-md p-3 space-y-1 border border-green-200 dark:border-green-900">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Adapted</p>
+            <p className="text-sm font-semibold">{updated}</p>
+            {updatedDetail && (
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">{updatedDetail}</p>
+            )}
+          </div>
+        </div>
+      ) : action === "removed" ? (
+        <div className="bg-red-50 dark:bg-red-950/20 rounded-md p-3 space-y-1 border border-red-200 dark:border-red-900">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Removed</p>
+          <p className="text-sm font-medium line-through decoration-red-400">{original}</p>
+          {originalDetail && (
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">{originalDetail}</p>
+          )}
+        </div>
+      ) : action === "added" ? (
+        <div className="bg-green-50 dark:bg-green-950/20 rounded-md p-3 space-y-1 border border-green-200 dark:border-green-900">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">New Item</p>
+          <p className="text-sm font-semibold">{updated}</p>
+          {updatedDetail && (
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">{updatedDetail}</p>
+          )}
+        </div>
+      ) : (
+        <div className="bg-muted/30 rounded-md p-3 space-y-1 border">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Unchanged</p>
+          <p className="text-sm font-medium">{original}</p>
+          {originalDetail && (
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap mt-1">{originalDetail}</p>
+          )}
+        </div>
+      )}
+
+      {/* Rationale */}
+      <p className="text-xs text-muted-foreground italic pl-1">{rationale}</p>
+
+      {/* Comment input */}
       {showComment && (
         <Input
           value={comment}
@@ -212,13 +249,15 @@ export function StepReviewChanges({
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">Work Item Changes</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-3">
           {itemChanges.map(ic => (
             <ChangeRow
               key={ic.id}
               action={ic.action}
               original={ic.originalWorkItem}
+              originalDetail={ic.originalDetail}
               updated={ic.newWorkItem}
+              updatedDetail={ic.newDetail}
               rationale={ic.rationale}
               accepted={ic.accepted}
               comment={ic.comment}

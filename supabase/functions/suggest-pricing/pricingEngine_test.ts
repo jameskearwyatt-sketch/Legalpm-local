@@ -12,6 +12,7 @@ import {
   computeConfidence,
   type FXRateSet,
   type HistoricalItem,
+  type PricingResult,
   FALLBACK_FX_RATES,
   SPARSE_CATEGORY_THRESHOLD,
 } from "../_shared/pricingEngine.ts";
@@ -42,7 +43,6 @@ function makeHistoricalItem(overrides: Partial<HistoricalItem>): HistoricalItem 
 }
 
 function makeDDHistorical(): HistoricalItem[] {
-  // Create a realistic spread of DD items
   const items: HistoricalItem[] = [];
   const ddFees = [7400, 10000, 12000, 14000, 15000, 15000, 16000, 17000, 18000, 20000,
     22000, 25000, 26000, 30000, 35000, 45000, 55000, 80000, 120000, 287500];
@@ -64,6 +64,54 @@ function makeDDHistorical(): HistoricalItem[] {
     }));
   }
   return items;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Simulate Stage 2 scaling logic (mirrors allocate-target-pricing)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function stage2Scale(
+  baselinePrices: number[],
+  targetTotal: number,
+  pricingCurrency: string
+): {
+  scalingFactor: number;
+  scaledRaw: number[];
+  roundedScaled: number[];
+  finalPrices: number[];
+  residual: number;
+  itemAdjustedIndex: number | null;
+} {
+  const baselineTotal = baselinePrices.reduce((s, v) => s + v, 0);
+  if (baselineTotal <= 0) throw new Error('Baseline total <= 0');
+
+  const scalingFactor = targetTotal / baselineTotal;
+  const scaledRaw = baselinePrices.map(p => p * scalingFactor);
+  const roundedScaled = scaledRaw.map(v => smartRound(v, pricingCurrency));
+  const roundedTotal = roundedScaled.reduce((s, v) => s + v, 0);
+  let residual = targetTotal - roundedTotal;
+
+  const finalPrices = [...roundedScaled];
+  let itemAdjustedIndex: number | null = null;
+
+  if (Math.abs(residual) > 0) {
+    const sortedIndices = finalPrices
+      .map((_, i) => i)
+      .sort((a, b) => finalPrices[b] - finalPrices[a]);
+
+    for (const idx of sortedIndices) {
+      if (Math.abs(residual) < 0.01) break;
+      const adjusted = finalPrices[idx] + residual;
+      if (adjusted >= 0) {
+        finalPrices[idx] = adjusted;
+        itemAdjustedIndex = idx;
+        residual = 0;
+        break;
+      }
+    }
+  }
+
+  return { scalingFactor, scaledRaw, roundedScaled, finalPrices, residual: targetTotal - roundedTotal, itemAdjustedIndex };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -97,10 +145,6 @@ Deno.test("classifyComplexity: moderate DD task", () => {
   assertEquals(result.scope, "moderate");
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Test: Security package vs single agreement
-// ═══════════════════════════════════════════════════════════════════════════════
-
 Deno.test("classifyComplexity: full security package", () => {
   const result = classifyComplexity(
     "Security package",
@@ -117,10 +161,6 @@ Deno.test("classifyComplexity: single security agreement", () => {
   assertEquals(result.scope, "narrow");
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Test: Multi-jurisdiction opinion
-// ═══════════════════════════════════════════════════════════════════════════════
-
 Deno.test("classifyComplexity: multi-jurisdiction opinion", () => {
   const result = classifyComplexity(
     "Legal opinion",
@@ -136,13 +176,8 @@ Deno.test("classifyComplexity: single jurisdiction opinion", () => {
     "English law legal opinion",
     "Opinion on capacity and enforceability under English law"
   );
-  // Should be narrow or moderate (single jurisdiction)
   if (result.scope === 'broad') throw new Error("Single jurisdiction opinion should not be broad");
 });
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Test: FX conversion
-// ═══════════════════════════════════════════════════════════════════════════════
 
 Deno.test("convertToGBP: identity for GBP", () => {
   const { amountGBP } = convertToGBP(10000, 'GBP', defaultFX);
@@ -151,14 +186,12 @@ Deno.test("convertToGBP: identity for GBP", () => {
 
 Deno.test("convertToGBP: USD to GBP", () => {
   const { amountGBP, fxInfo } = convertToGBP(10000, 'USD', defaultFX);
-  // 10000 USD * (0.79 GBP/USD) = 7900 GBP
   assertAlmostEquals(amountGBP, 7900, 100);
   assertEquals(fxInfo.source, 'db_table');
 });
 
 Deno.test("convertFromGBP: GBP to USD", () => {
   const amountUSD = convertFromGBP(10000, 'USD', defaultFX);
-  // 10000 GBP / 0.79 * 1 ≈ 12658 USD
   assertAlmostEquals(amountUSD, 12658, 200);
 });
 
@@ -175,10 +208,6 @@ Deno.test("FX round-trip consistency", () => {
   assertAlmostEquals(amountGBP, originalGBP, 10);
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Test: Sparse category fallback
-// ═══════════════════════════════════════════════════════════════════════════════
-
 Deno.test("buildCategoryPercentiles: sparse category", () => {
   const items = [
     makeHistoricalItem({ category: 'Rare Category', feeGBP: 5000 }),
@@ -194,13 +223,8 @@ Deno.test("buildCategoryPercentiles: empty category falls back to all items", ()
   const items = makeDDHistorical();
   const result = buildCategoryPercentiles(items, 'NonExistent Category');
   assertEquals(result.sparse, true);
-  // Should fall back to all items
   if (result.stats.n === 0) throw new Error("Should fall back to all-items percentiles");
 });
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Test: Currency-specific rounding
-// ═══════════════════════════════════════════════════════════════════════════════
 
 Deno.test("smartRound: GBP rules", () => {
   assertEquals(smartRound(3200, 'GBP'), 3000);
@@ -222,10 +246,6 @@ Deno.test("smartRound: EUR rules", () => {
   assertEquals(smartRound(45400, 'EUR'), 45000);
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Test: Percentile computation
-// ═══════════════════════════════════════════════════════════════════════════════
-
 Deno.test("computePercentileStats: basic", () => {
   const values = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
   const stats = computePercentileStats(values);
@@ -234,35 +254,23 @@ Deno.test("computePercentileStats: basic", () => {
   if (stats.IQR <= 0) throw new Error("IQR should be positive");
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Test: Continuous percentile targeting
-// ═══════════════════════════════════════════════════════════════════════════════
-
 Deno.test("targetPercentileFromComplexity: broad", () => {
   const pctl = targetPercentileFromComplexity(5);
-  // 0.25 + 5*0.08 = 0.65
   assertAlmostEquals(pctl, 0.65, 0.01);
 });
 
 Deno.test("targetPercentileFromComplexity: narrow", () => {
   const pctl = targetPercentileFromComplexity(-2);
-  // clamp(0.25 + (-2)*0.08, 0.20, 0.90) = clamp(0.09, 0.20, 0.90) = 0.20
   assertEquals(pctl, 0.20);
 });
 
 Deno.test("targetPercentileFromComplexity: very broad capped at 0.90", () => {
   const pctl = targetPercentileFromComplexity(10);
-  // 0.25 + 10*0.08 = 1.05 → capped at 0.90
   assertEquals(pctl, 0.90);
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Test: Similarity matching
-// ═══════════════════════════════════════════════════════════════════════════════
-
 Deno.test("textSimilarity: identical strings return object with score", () => {
   const result = textSimilarity("corporate diligence review land title", "corporate diligence review land title");
-  // Verify it returns the expected shape
   if (typeof result.score !== 'number') throw new Error("Expected score to be a number");
   if (!Array.isArray(result.matchSignals)) throw new Error("Expected matchSignals array");
 });
@@ -277,10 +285,6 @@ Deno.test("textSimilarity: unrelated strings", () => {
   if (result.score > 0.5) throw new Error(`Expected low similarity, got ${result.score}`);
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Test: Deduplication
-// ═══════════════════════════════════════════════════════════════════════════════
-
 Deno.test("normalisedFeeSeries: deduplicates same matter+work_item", () => {
   const items = [
     makeHistoricalItem({ matterId: 'm1', work_item: 'Colombian DD', feeGBP: 15000 }),
@@ -288,14 +292,9 @@ Deno.test("normalisedFeeSeries: deduplicates same matter+work_item", () => {
     makeHistoricalItem({ matterId: 'm2', work_item: 'Colombian DD', feeGBP: 14000 }),
   ];
   const series = normalisedFeeSeries(items, 'Due Diligence');
-  // Should deduplicate m1 entries, keeping first (most recent)
   assertEquals(series.count, 2);
   assertEquals(series.diagnostics.deduplicatedCount, 2);
 });
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Test: priceItem — Tier 2 broad DD gets high percentile
-// ═══════════════════════════════════════════════════════════════════════════════
 
 Deno.test("priceItem: broad DD report priced at high percentile (Tier 2)", () => {
   const historical = makeDDHistorical();
@@ -306,19 +305,12 @@ Deno.test("priceItem: broad DD report priced at high percentile (Tier 2)", () =>
       category: "Due Diligence",
       provider: "Baker McKenzie",
     },
-    historical,
-    'GBP',
-    defaultFX
+    historical, 'GBP', defaultFX
   );
-
   if (!result) throw new Error("Expected Tier 2 result, got null (Tier 3)");
   assertEquals(result.tierUsed, 'TIER_2');
   assertEquals(result.scope, 'broad');
-  // Should be at high percentile — well above median of ~18500
-  // Should be above median (~18500) — broad scope pushes to higher percentile
-  if (result.suggestedPrice < 20000) {
-    throw new Error(`Broad DD should be priced above median. Got £${result.suggestedPrice}`);
-  }
+  if (result.suggestedPrice < 20000) throw new Error(`Broad DD should be above median. Got £${result.suggestedPrice}`);
 });
 
 Deno.test("priceItem: narrow DD task priced at low percentile (Tier 2)", () => {
@@ -330,22 +322,11 @@ Deno.test("priceItem: narrow DD task priced at low percentile (Tier 2)", () => {
       category: "Due Diligence",
       provider: "Local Counsel",
     },
-    historical,
-    'GBP',
-    defaultFX
+    historical, 'GBP', defaultFX
   );
-
-  // Could be Tier 1 (exact match) or Tier 2
   if (!result) throw new Error("Expected priced result");
-  // Should be at low end — below median
-  if (result.suggestedPrice > 25000) {
-    throw new Error(`Narrow DD should be priced below median. Got £${result.suggestedPrice}`);
-  }
+  if (result.suggestedPrice > 25000) throw new Error(`Narrow DD should be below median. Got £${result.suggestedPrice}`);
 });
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// Test: priceItem — USD deal with FX conversion
-// ═══════════════════════════════════════════════════════════════════════════════
 
 Deno.test("priceItem: USD deal returns price in USD", () => {
   const historical = makeDDHistorical();
@@ -356,40 +337,22 @@ Deno.test("priceItem: USD deal returns price in USD", () => {
       category: "Due Diligence",
       provider: "Baker McKenzie",
     },
-    historical,
-    'USD',
-    defaultFX
+    historical, 'USD', defaultFX
   );
-
   if (!result) throw new Error("Expected result");
   assertEquals(result.pricingCurrency, 'USD');
-  // USD price should be higher than GBP price (1 GBP ≈ 1.27 USD)
   if (result.suggestedPrice <= result.suggestedPriceBaseGBP) {
     throw new Error(`USD price ($${result.suggestedPrice}) should be higher than GBP base (£${result.suggestedPriceBaseGBP})`);
   }
 });
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// Test: Output structure completeness
-// ═══════════════════════════════════════════════════════════════════════════════
-
 Deno.test("priceItem: returns complete output structure", () => {
   const historical = makeDDHistorical();
   const result = priceItem(
-    {
-      work_item: "Tax DD review",
-      detail: "Review of tax structure",
-      category: "Due Diligence",
-      provider: "Baker McKenzie",
-    },
-    historical,
-    'GBP',
-    defaultFX
+    { work_item: "Tax DD review", detail: "Review of tax structure", category: "Due Diligence", provider: "Baker McKenzie" },
+    historical, 'GBP', defaultFX
   );
-
   if (!result) throw new Error("Expected result");
-
-  // Check all required fields exist
   if (result.suggestedPrice === undefined) throw new Error("Missing suggestedPrice");
   if (result.pricingCurrency === undefined) throw new Error("Missing pricingCurrency");
   if (result.suggestedPriceBaseGBP === undefined) throw new Error("Missing suggestedPriceBaseGBP");
@@ -404,17 +367,110 @@ Deno.test("priceItem: returns complete output structure", () => {
   if (!result.similarityMatches) throw new Error("Missing similarityMatches");
   if (!result.explanation) throw new Error("Missing explanation");
   if (!result.diagnostics) throw new Error("Missing diagnostics");
-
-  // Check percentileStats fields
   const ps = result.percentileStats;
-  if (ps.p25 === undefined || ps.p50 === undefined || ps.p75 === undefined || ps.p90 === undefined) {
-    throw new Error("Missing percentile stat field");
-  }
+  if (ps.p25 === undefined || ps.p50 === undefined || ps.p75 === undefined || ps.p90 === undefined) throw new Error("Missing percentile stat field");
   if (ps.n === undefined || ps.IQR === undefined) throw new Error("Missing n or IQR");
-
-  // Check diagnostics
   const d = result.diagnostics;
   if (d.fxRateUsed === undefined) throw new Error("Missing fxRateUsed");
   if (d.fxSource === undefined) throw new Error("Missing fxSource");
   if (d.categoryCount === undefined) throw new Error("Missing categoryCount");
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NEW: Target allocation Stage 2 tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+Deno.test("Stage 2: exact total matching after rounding + reconciliation (GBP)", () => {
+  const baselines = [15000, 25000, 35000, 10000, 5000];
+  const target = 120000;
+  const result = stage2Scale(baselines, target, 'GBP');
+  const finalTotal = result.finalPrices.reduce((s, v) => s + v, 0);
+  assertEquals(finalTotal, target, `Final total ${finalTotal} must equal target ${target}`);
+});
+
+Deno.test("Stage 2: exact total matching (USD)", () => {
+  const baselines = [12000, 30000, 45000, 8000];
+  const target = 150000;
+  const result = stage2Scale(baselines, target, 'USD');
+  const finalTotal = result.finalPrices.reduce((s, v) => s + v, 0);
+  assertEquals(finalTotal, target, `Final total ${finalTotal} must equal target ${target}`);
+});
+
+Deno.test("Stage 2: exact total matching (EUR)", () => {
+  const baselines = [20000, 40000, 60000];
+  const target = 200000;
+  const result = stage2Scale(baselines, target, 'EUR');
+  const finalTotal = result.finalPrices.reduce((s, v) => s + v, 0);
+  assertEquals(finalTotal, target, `Final total ${finalTotal} must equal target ${target}`);
+});
+
+Deno.test("Stage 2: baselineTotal <= 0 throws error", () => {
+  let threw = false;
+  try {
+    stage2Scale([0, 0, 0], 100000, 'GBP');
+  } catch {
+    threw = true;
+  }
+  assertEquals(threw, true, "Should throw when baseline total is zero");
+});
+
+Deno.test("Stage 2: largest-item residual adjustment", () => {
+  const baselines = [50000, 30000, 20000];
+  const target = 110000;
+  const result = stage2Scale(baselines, target, 'GBP');
+  const finalTotal = result.finalPrices.reduce((s, v) => s + v, 0);
+  assertEquals(finalTotal, target);
+  // The largest item should have been adjusted
+  if (result.itemAdjustedIndex !== null) {
+    // The adjusted item should be the one with the largest rounded price
+    const maxRounded = Math.max(...result.roundedScaled);
+    const maxIdx = result.roundedScaled.indexOf(maxRounded);
+    assertEquals(result.itemAdjustedIndex, maxIdx, "Residual should be applied to largest item");
+  }
+});
+
+Deno.test("Stage 2: no item goes negative", () => {
+  // Small baselines with large target → should still work
+  const baselines = [500, 500, 500];
+  const target = 5000;
+  const result = stage2Scale(baselines, target, 'GBP');
+  for (const p of result.finalPrices) {
+    if (p < 0) throw new Error(`Item price ${p} went negative`);
+  }
+  const finalTotal = result.finalPrices.reduce((s, v) => s + v, 0);
+  assertEquals(finalTotal, target);
+});
+
+Deno.test("Stage 2: extreme scaling factor < 0.5", () => {
+  const baselines = [50000, 100000, 80000]; // total 230k
+  const target = 80000; // factor ≈ 0.35
+  const result = stage2Scale(baselines, target, 'GBP');
+  if (result.scalingFactor >= 0.5) throw new Error(`Expected extreme low factor, got ${result.scalingFactor}`);
+  const finalTotal = result.finalPrices.reduce((s, v) => s + v, 0);
+  assertEquals(finalTotal, target);
+});
+
+Deno.test("Stage 2: extreme scaling factor > 2.0", () => {
+  const baselines = [10000, 15000, 5000]; // total 30k
+  const target = 100000; // factor ≈ 3.33
+  const result = stage2Scale(baselines, target, 'GBP');
+  if (result.scalingFactor <= 2.0) throw new Error(`Expected extreme high factor, got ${result.scalingFactor}`);
+  const finalTotal = result.finalPrices.reduce((s, v) => s + v, 0);
+  assertEquals(finalTotal, target);
+});
+
+Deno.test("Stage 2: scaling factor 1.0 (target equals baseline)", () => {
+  const baselines = [10000, 20000, 30000];
+  const target = 60000;
+  const result = stage2Scale(baselines, target, 'GBP');
+  assertAlmostEquals(result.scalingFactor, 1.0, 0.001);
+  const finalTotal = result.finalPrices.reduce((s, v) => s + v, 0);
+  assertEquals(finalTotal, target);
+});
+
+Deno.test("Stage 2: single item — price equals target exactly", () => {
+  const baselines = [25000];
+  const target = 75000;
+  const result = stage2Scale(baselines, target, 'GBP');
+  assertEquals(result.finalPrices[0], target);
 });

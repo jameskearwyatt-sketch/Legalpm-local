@@ -753,8 +753,11 @@ export function usePricingProposal(proposalId?: string) {
         const currency = proposalQuery.data?.currency || 'GBP';
         const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency;
         
-        // Calculate baseline total from items (using upper estimate)
-        const baselineTotal = items.reduce((sum, item) => sum + (item.fee_upper || item.fee_amount || 0), 0);
+        // Calculate baseline total from items (using upper estimate), including multiplier
+        const baselineTotal = items.reduce((sum, item: any) => {
+          const mult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
+          return sum + (item.fee_upper || item.fee_amount || 0) * mult;
+        }, 0);
         
         // Apply AFA filters to get adjusted items (with discounts, etc. applied)
         const filterResult = applyAFAFilters(items, enabledAFAs, baselineTotal, currencySymbol);

@@ -195,11 +195,14 @@ export function applyAFAFilters(
   currencySymbol: string = '£',
   baseFigure: FigureType = 'midpoint'
 ): AFAFilterResult {
-  // Get fee amounts based on selected figure type
-  const itemsWithBaseFee = draftItems.map(item => ({
-    ...item,
-    fee_amount: getItemFeeByFigureType(item, baseFigure),
-  }));
+  // Get fee amounts based on selected figure type, applying multiplier
+  const itemsWithBaseFee = draftItems.map(item => {
+    const mult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
+    return {
+      ...item,
+      fee_amount: getItemFeeByFigureType(item, baseFigure) * mult,
+    };
+  });
 
   // Helper function to apply largest remainder rounding to a group of items
   // This ensures line items sum exactly to the rounded aggregate

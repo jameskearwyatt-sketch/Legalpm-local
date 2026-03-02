@@ -499,21 +499,23 @@ export default function PricingProposalDetail() {
     // Use the afaBaseFigure setting to determine which fee to use for BM items
     const baseFigure: FigureType = assumptions.afaBaseFigure || 'midpoint';
     
+    const getMult = (item: DraftProposalItem) => (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
+    
     const bmTotal = includedItems
       .filter(item => item.provider === 'Baker McKenzie')
-      .reduce((sum, item) => sum + getItemFeeByFigureType(item, baseFigure), 0);
+      .reduce((sum, item) => sum + getItemFeeByFigureType(item, baseFigure) * getMult(item), 0);
     
     // Local counsel always uses fee_amount (handled by getItemFeeByFigureType)
     const localCounselTotal = includedItems
       .filter(item => item.provider === 'Local Counsel')
-      .reduce((sum, item) => sum + getItemFeeByFigureType(item, baseFigure), 0);
+      .reduce((sum, item) => sum + getItemFeeByFigureType(item, baseFigure) * getMult(item), 0);
     
     // Also calculate the explicit lower/upper totals for reference
     const lowerTotal = includedItems.reduce((sum, item) => {
-      return sum + getItemFeeByFigureType(item, 'lower');
+      return sum + getItemFeeByFigureType(item, 'lower') * getMult(item);
     }, 0);
     const upperTotal = includedItems.reduce((sum, item) => {
-      return sum + getItemFeeByFigureType(item, 'upper');
+      return sum + getItemFeeByFigureType(item, 'upper') * getMult(item);
     }, 0);
     
     return {
@@ -531,33 +533,39 @@ export default function PricingProposalDetail() {
     const hasAnyAlt = includedItems.some(item => item.assumption_linked && (item.alt_fee_lower || item.alt_fee_upper));
     if (!hasAnyAlt) return null;
 
+    const getMult = (item: DraftProposalItem) => (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
+    
     const altLowerTotal = includedItems.reduce((sum, item) => {
+      const mult = getMult(item);
       if (item.assumption_linked && item.alt_fee_lower != null) {
-        return sum + item.alt_fee_lower;
+        return sum + item.alt_fee_lower * mult;
       }
-      return sum + getItemFeeByFigureType(item, 'lower');
+      return sum + getItemFeeByFigureType(item, 'lower') * mult;
     }, 0);
     const altUpperTotal = includedItems.reduce((sum, item) => {
+      const mult = getMult(item);
       if (item.assumption_linked && item.alt_fee_upper != null) {
-        return sum + item.alt_fee_upper;
+        return sum + item.alt_fee_upper * mult;
       }
-      return sum + getItemFeeByFigureType(item, 'upper');
+      return sum + getItemFeeByFigureType(item, 'upper') * mult;
     }, 0);
     const altBmTotal = includedItems
       .filter(item => item.provider === 'Baker McKenzie')
       .reduce((sum, item) => {
+        const mult = getMult(item);
         if (item.assumption_linked && item.alt_fee_upper != null) {
-          return sum + item.alt_fee_upper;
+          return sum + item.alt_fee_upper * mult;
         }
-        return sum + getItemFeeByFigureType(item, assumptions.afaBaseFigure || 'midpoint');
+        return sum + getItemFeeByFigureType(item, assumptions.afaBaseFigure || 'midpoint') * mult;
       }, 0);
     const altLcTotal = includedItems
       .filter(item => item.provider === 'Local Counsel')
       .reduce((sum, item) => {
+        const mult = getMult(item);
         if (item.assumption_linked && item.alt_fee_upper != null) {
-          return sum + item.alt_fee_upper;
+          return sum + item.alt_fee_upper * mult;
         }
-        return sum + getItemFeeByFigureType(item, assumptions.afaBaseFigure || 'midpoint');
+        return sum + getItemFeeByFigureType(item, assumptions.afaBaseFigure || 'midpoint') * mult;
       }, 0);
 
     return {

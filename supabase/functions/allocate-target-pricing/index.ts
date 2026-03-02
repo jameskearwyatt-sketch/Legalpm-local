@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Version: v3.0.0 — Two-phase: AI base prices + deterministic scaling
+// Version: v4.0.0 — Scope-aware base pricing + deterministic scaling
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -39,7 +39,64 @@ function smartRound(amount: number): number {
   return Math.round(amount / 1000) * 1000;
 }
 
+function median(values: number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
+function percentile(values: number[], p: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = (p / 100) * (sorted.length - 1);
+  const lower = Math.floor(index);
+  const frac = index - lower;
+  if (lower + 1 >= sorted.length) return sorted[lower];
+  return sorted[lower] + frac * (sorted[lower + 1] - sorted[lower]);
+}
+
+// ── Scope Classification ─────────────────────────────────────────────────────
+
+const BROAD_INDICATORS = /\b(report|comprehensive|full|all project|covering|review of all|package|suite|multi|portfolio|across|various|range of|complete|extensive|wide|broad|overall|summary|overview|entire|whole|master|global|general)\b/i;
+
+const NARROW_INDICATORS = /\b(colombian|brazilian|chilean|peruvian|mexican|argentine|uruguayan|paraguayan|ecuadorian|bolivian|venezuelan|panamanian|costa rican|honduran|salvadoran|guatemalan|nicaraguan|dominican|cuban|jamaican|trinidadian|bvi|cayman|bermuda|bahamas|singapore|hong kong|thailand|vietnam|indonesia|malaysia|philippines|taiwan|korean|japanese|indian|chinese|australian|zealand|canadian|south african|nigerian|kenyan|ghanaian|tanzanian|ugandan|mozambican|zambian|zimbabwean|namibian|botswanan|angolan|congolese|senegalese|ivorian|cameroonian|ethiopian|egyptian|moroccan|tunisian|algerian|libyan|english|scottish|irish|welsh|french|german|spanish|italian|portuguese|dutch|belgian|swiss|austrian|swedish|norwegian|danish|finnish|polish|czech|hungarian|romanian|bulgarian|croatian|serbian|slovenian|slovak|greek|turkish|russian|ukrainian|estonian|latvian|lithuanian|cypriot|maltese|luxembourgish|icelandic)\b/i;
+
+function classifyScope(workItem: string, detail: string | null): 'narrow' | 'moderate' | 'broad' {
+  const combined = `${workItem} ${detail || ''}`;
+  const detailLen = (detail || '').length;
+  
+  let score = 0;
+  
+  if (detailLen > 250) score += 2;
+  else if (detailLen > 150) score += 1;
+  else if (detailLen < 80) score -= 1;
+  
+  const broadMatches = combined.match(BROAD_INDICATORS);
+  if (broadMatches) score += 2;
+  
+  const narrowMatches = workItem.match(NARROW_INDICATORS);
+  if (narrowMatches) score -= 2;
+  
+  const words = significantWords(workItem);
+  const hasProperNoun = /[A-Z][a-z]{2,}/.test(workItem.replace(/^[A-Z]/, 'x'));
+  if (words.size <= 4 && !hasProperNoun && !narrowMatches) score += 1;
+  
+  if (score >= 3) return 'broad';
+  if (score <= -1) return 'narrow';
+  return 'moderate';
+}
+
 const MINIMUM_ITEM_FEE = 500;
+
+interface CategoryPercentiles {
+  count: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+  fees: number[];
+}
 
 // ── Main handler ─────────────────────────────────────────────────────────────
 
@@ -93,7 +150,7 @@ serve(async (req) => {
     }
 
     const targetCurrency = currency || 'GBP';
-    console.log(`allocate-target v3: ${targetAmount} ${targetCurrency} across ${items.length} items, user=${userId}`);
+    console.log(`allocate-target v4: ${targetAmount} ${targetCurrency} across ${items.length} items, user=${userId}`);
 
     // ── Phase 1: Fetch historical data WITH currency ────────────────────────
 
@@ -123,13 +180,11 @@ serve(async (req) => {
         .limit(20),
     ]);
 
-    // Build matter currency lookup
     const matterCurrency: Record<string, string> = {};
     for (const m of (mattersResult.data || [])) {
       matterCurrency[m.id] = m.currency || 'GBP';
     }
 
-    // Build FX lookup
     const fxRates: Record<string, number> = { USD: 1 };
     for (const r of (ratesResult.data || [])) {
       if (r.currency_code && r.rate_to_usd) fxRates[r.currency_code] = r.rate_to_usd;
@@ -144,7 +199,6 @@ serve(async (req) => {
       return amount * (tgtRate / srcRate);
     };
 
-    // Build historical items with converted fees
     interface HistItem { work_item: string; detail: string | null; category: string; provider: string; feeConverted: number; source: string; }
 
     const allHistorical: HistItem[] = [];
@@ -173,8 +227,27 @@ serve(async (req) => {
 
     console.log(`Historical data: ${allHistorical.length} items`);
 
+    // ── Build category percentile stats ─────────────────────────────────────
+
+    const categoryPercentiles: Record<string, CategoryPercentiles> = {};
+    for (const h of allHistorical) {
+      const cat = h.category;
+      if (!categoryPercentiles[cat]) {
+        categoryPercentiles[cat] = { count: 0, p25: 0, p50: 0, p75: 0, p90: 0, fees: [] };
+      }
+      categoryPercentiles[cat].fees.push(h.feeConverted);
+      categoryPercentiles[cat].count++;
+    }
+    for (const cat of Object.keys(categoryPercentiles)) {
+      const cp = categoryPercentiles[cat];
+      cp.p25 = percentile(cp.fees, 25);
+      cp.p50 = median(cp.fees);
+      cp.p75 = percentile(cp.fees, 75);
+      cp.p90 = percentile(cp.fees, 90);
+    }
+
     // ── Phase 2: Get UNCONSTRAINED base prices ──────────────────────────────
-    // Step A: Precedent matching
+    // Step A: Tiered precedent matching (Tier 1: text match, Tier 2: scope-aware category)
     interface BasePrice { work_item: string; baseFee: number; rationale: string; }
     const basePrices: BasePrice[] = [];
     const unmatchedIndices: number[] = [];
@@ -194,52 +267,94 @@ serve(async (req) => {
         if (score > bestScore) { bestScore = score; bestMatch = hist; }
       }
 
+      // Tier 1: Strong text match
       if (bestMatch && bestScore >= 0.5) {
         basePrices.push({
           work_item: item.work_item,
           baseFee: Math.max(smartRound(bestMatch.feeConverted), MINIMUM_ITEM_FEE),
           rationale: `Precedent: "${bestMatch.work_item}" (score ${(bestScore * 100).toFixed(0)}%)`,
         });
-      } else {
-        basePrices.push({ work_item: item.work_item, baseFee: 0, rationale: '' });
-        unmatchedIndices.push(i);
+        continue;
       }
+
+      // Tier 2: Category match with scope-aware percentile pricing
+      const catStats = item.category ? categoryPercentiles[item.category] : null;
+      if (catStats && catStats.count >= 2) {
+        const scope = classifyScope(item.work_item, item.detail || null);
+        let scopeFee: number;
+        let scopeLabel: string;
+        
+        if (scope === 'broad') {
+          scopeFee = percentile(catStats.fees, 80);
+          scopeLabel = `broad scope → 80th pctl`;
+        } else if (scope === 'narrow') {
+          scopeFee = catStats.p25;
+          scopeLabel = `narrow scope → 25th pctl`;
+        } else {
+          scopeFee = catStats.p50;
+          scopeLabel = `moderate scope → median`;
+        }
+        
+        basePrices.push({
+          work_item: item.work_item,
+          baseFee: Math.max(smartRound(scopeFee), MINIMUM_ITEM_FEE),
+          rationale: `${item.category} ${scopeLabel} (${catStats.count} precedents)`,
+        });
+        console.log(`Tier 2 scope-aware: "${item.work_item}" → scope=${scope}, fee=${smartRound(scopeFee)}`);
+        continue;
+      }
+
+      // Tier 3: No match → send to AI
+      basePrices.push({ work_item: item.work_item, baseFee: 0, rationale: '' });
+      unmatchedIndices.push(i);
     }
 
-    console.log(`Precedent matched: ${items.length - unmatchedIndices.length}, sending ${unmatchedIndices.length} to AI`);
+    console.log(`Tier 1+2 matched: ${items.length - unmatchedIndices.length}, Tier 3 to AI: ${unmatchedIndices.length}`);
 
-    // Step B: AI pricing for unmatched items
+    // Step B: AI pricing for Tier 3 items
     if (unmatchedIndices.length > 0) {
       const currencySymbol = targetCurrency === 'GBP' ? '£' : targetCurrency === 'USD' ? '$' : '€';
 
-      // Category stats for context
-      const catStats: Record<string, { count: number; avg: number }> = {};
-      for (const h of allHistorical) {
-        if (!catStats[h.category]) catStats[h.category] = { count: 0, avg: 0 };
-        catStats[h.category].count++;
-        catStats[h.category].avg += h.feeConverted;
-      }
-      for (const cat of Object.keys(catStats)) {
-        catStats[cat].avg = Math.round(catStats[cat].avg / catStats[cat].count);
-      }
-
       const unmatchedItems = unmatchedIndices.map(i => items[i]);
+
+      // Build category-relevant context
+      const categoryContext: string[] = [];
+      for (const item of unmatchedItems) {
+        const cat = item.category || 'Uncategorized';
+        const catItems = allHistorical.filter(h => h.category === cat);
+        const cp = categoryPercentiles[cat];
+        
+        if (catItems.length > 0 && cp) {
+          const sorted = [...catItems].sort((a, b) => b.feeConverted - a.feeConverted);
+          const top5 = sorted.slice(0, 5);
+          const bottom5 = sorted.slice(-5);
+          const scope = classifyScope(item.work_item, item.detail || null);
+
+          categoryContext.push(`\nItem: "${item.work_item}"${item.detail ? ` — ${item.detail.substring(0, 300)}` : ''}
+Provider: ${item.provider}, Category: ${cat}, Scope: ${scope.toUpperCase()}
+${cat} percentiles: 25th=${currencySymbol}${Math.round(cp.p25).toLocaleString()}, median=${currencySymbol}${Math.round(cp.p50).toLocaleString()}, 75th=${currencySymbol}${Math.round(cp.p75).toLocaleString()}, 90th=${currencySymbol}${Math.round(cp.p90).toLocaleString()}
+${scope === 'broad' ? '→ Price at 75th-90th percentile given broad scope.' : scope === 'narrow' ? '→ Price at 25th percentile given narrow scope.' : '→ Price around the median.'}
+Highest: ${top5.map(h => `"${h.work_item}" ${currencySymbol}${Math.round(h.feeConverted).toLocaleString()}`).join('; ')}
+Lowest: ${bottom5.map(h => `"${h.work_item}" ${currencySymbol}${Math.round(h.feeConverted).toLocaleString()}`).join('; ')}`);
+        } else {
+          categoryContext.push(`\nItem: "${item.work_item}"${item.detail ? ` — ${item.detail.substring(0, 300)}` : ''} (${item.provider}, ${cat}) — no category data`);
+        }
+      }
 
       const systemPrompt = `You are a legal fee proposal expert. Suggest UNCONSTRAINED base prices for work items. Do NOT try to hit any target — just estimate what each item is worth based on complexity and category.
 
 All fees in ${targetCurrency} (${currencySymbol}). Minimum ${currencySymbol}${MINIMUM_ITEM_FEE} per item. All fees MUST be positive.
+Round all fees to the nearest ${currencySymbol}1,000 (or ${currencySymbol}500 for small items under ${currencySymbol}2,500).
 
-CATEGORY AVERAGES (${targetCurrency}):
-${Object.entries(catStats).map(([c, s]) => `- ${c}: avg ${currencySymbol}${s.avg.toLocaleString()} (${s.count} items)`).join('\n')}
+IMPORTANT: Pay close attention to each item's SCOPE classification and price accordingly within the percentile range.
 
-SAMPLE HISTORICAL (${targetCurrency}):
-${allHistorical.slice(0, 25).map(h => `- "${h.work_item}" (${h.category}, ${h.provider}): ${currencySymbol}${Math.round(h.feeConverted).toLocaleString()}`).join('\n')}`;
+OVERALL CATEGORY STATISTICS (${targetCurrency}):
+${Object.entries(categoryPercentiles).map(([cat, cp]) =>
+  `- ${cat}: ${cp.count} items, 25th=${currencySymbol}${Math.round(cp.p25).toLocaleString()}, median=${currencySymbol}${Math.round(cp.p50).toLocaleString()}, 75th=${currencySymbol}${Math.round(cp.p75).toLocaleString()}, 90th=${currencySymbol}${Math.round(cp.p90).toLocaleString()}`
+).join('\n')}`;
 
       const userPrompt = `Suggest base prices for these ${unmatchedItems.length} items:
-
-${unmatchedItems.map((item: any, i: number) =>
-  `${i + 1}. "${item.work_item}"${item.detail ? ` — ${item.detail.substring(0, 200)}` : ''} (${item.provider}, ${item.category || 'Uncategorized'})`
-).join('\n')}
+${categoryContext.join('\n')}
 
 Return your best estimate of what each is worth. Do NOT try to hit any target total.`;
 
@@ -301,7 +416,6 @@ Return your best estimate of what each is worth. Do NOT try to hit any target to
       const data = await response.json();
       const toolCalls = data.choices?.[0]?.message?.tool_calls || [];
 
-      // Map AI results back to unmatched items
       const aiResults: { work_item: string; fee_amount: number; rationale: string }[] = [];
       for (const tc of toolCalls) {
         if (tc.function?.name === 'suggest_base_prices') {
@@ -312,12 +426,10 @@ Return your best estimate of what each is worth. Do NOT try to hit any target to
         }
       }
 
-      // Match AI results to unmatched items
       for (let j = 0; j < unmatchedIndices.length; j++) {
         const idx = unmatchedIndices[j];
         const item = items[idx];
 
-        // Find best AI match
         const aiMatch = aiResults.find(r =>
           r.work_item === item.work_item ||
           r.work_item?.startsWith(item.work_item) ||
@@ -332,13 +444,13 @@ Return your best estimate of what each is worth. Do NOT try to hit any target to
             rationale: aiMatch.rationale || 'AI estimated',
           };
         } else {
-          // Fallback: use category average or a default
-          const catAvg = catStats[item.category]?.avg;
-          const fallbackFee = catAvg ? smartRound(catAvg) : 5000;
+          // Fallback: scope-aware default
+          const scope = classifyScope(item.work_item, item.detail || null);
+          const fallbackFee = scope === 'broad' ? 25000 : scope === 'narrow' ? 5000 : 10000;
           basePrices[idx] = {
             work_item: item.work_item,
-            baseFee: Math.max(fallbackFee, MINIMUM_ITEM_FEE),
-            rationale: catAvg ? `Category average (${item.category})` : 'Default estimate',
+            baseFee: fallbackFee,
+            rationale: `Default estimate (${scope} scope)`,
           };
         }
       }
@@ -349,14 +461,12 @@ Return your best estimate of what each is worth. Do NOT try to hit any target to
     const totalBaseFee = basePrices.reduce((sum, p) => sum + p.baseFee, 0);
 
     if (totalBaseFee <= 0) {
-      // Edge case: all items got minimum fees, distribute evenly
       const evenFee = smartRound(targetAmount / items.length);
       const allocations = basePrices.map(p => ({
         work_item: p.work_item,
         fee_amount: evenFee,
         rationale: 'Evenly distributed (no precedent data)',
       }));
-      // Adjust last item for exact total
       const totalEven = evenFee * items.length;
       if (totalEven !== targetAmount) {
         allocations[allocations.length - 1].fee_amount += (targetAmount - totalEven);
@@ -368,14 +478,12 @@ Return your best estimate of what each is worth. Do NOT try to hit any target to
     const scaleFactor = targetAmount / totalBaseFee;
     console.log(`Base total: ${totalBaseFee}, target: ${targetAmount}, scale factor: ${(scaleFactor * 100).toFixed(1)}%`);
 
-    // Scale all items
     const scaled = basePrices.map(p => ({
       work_item: p.work_item,
       rawScaled: p.baseFee * scaleFactor,
       rationale: p.rationale,
     }));
 
-    // Smart round each item, enforcing minimum
     const allocations = scaled.map(s => ({
       work_item: s.work_item,
       fee_amount: Math.max(smartRound(s.rawScaled), MINIMUM_ITEM_FEE),
@@ -388,10 +496,8 @@ Return your best estimate of what each is worth. Do NOT try to hit any target to
     let remainder = targetAmount - currentTotal;
 
     if (Math.abs(remainder) > 0) {
-      // Determine increment size based on deal size
       const increment = targetAmount >= 50000 ? 1000 : 500;
 
-      // Sort indices by fee descending for distribution
       const sortedIndices = allocations
         .map((_, i) => i)
         .sort((a, b) => allocations[b].fee_amount - allocations[a].fee_amount);
@@ -406,7 +512,6 @@ Return your best estimate of what each is worth. Do NOT try to hit any target to
             allocations[idx].fee_amount += increment;
             remainder -= increment;
           } else {
-            // Only subtract if it won't go below minimum
             if (allocations[idx].fee_amount - increment >= MINIMUM_ITEM_FEE) {
               allocations[idx].fee_amount -= increment;
               remainder += increment;
@@ -416,7 +521,6 @@ Return your best estimate of what each is worth. Do NOT try to hit any target to
         safetyCounter++;
       }
 
-      // Handle any tiny remainder left (less than increment) — add to largest item
       if (Math.abs(remainder) > 0 && Math.abs(remainder) < increment) {
         const largestIdx = sortedIndices[0];
         allocations[largestIdx].fee_amount += remainder;
@@ -439,7 +543,7 @@ Return your best estimate of what each is worth. Do NOT try to hit any target to
 
   } catch (error: unknown) {
     console.error('Error in allocate-target-pricing:', error);
-    return new Response(JSON.stringify({ error: 'An error occurred. Please try again.' }), {
+    return new Response(JSON.stringify({ error: 'An error occurred' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

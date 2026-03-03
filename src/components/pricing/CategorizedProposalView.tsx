@@ -65,6 +65,8 @@ interface CategorizedProposalViewProps {
   onNavigateToCategory?: (phaseId: string | null, category: string) => void;
   showAssumptionsNotTrue?: boolean;
   onToggleAssumptionsNotTrue?: (value: boolean) => void;
+  lockedCategories?: Set<string>;
+  onToggleLock?: (key: string) => void;
 }
 
 // Helper function to calculate category totals from a list of items using fee_upper

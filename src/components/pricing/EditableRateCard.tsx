@@ -300,7 +300,7 @@ export function EditableRateCard({
                   value={earner.level}
                   onValueChange={(v) => setFeeEarners(prev => prev.map(e => e.key === earner.key ? { ...e, level: v as LevelValue } : e))}
                 >
-                  <SelectTrigger className="h-7 text-xs px-1.5 w-[100px]">
+                  <SelectTrigger className="h-7 text-xs px-1.5 w-[100px] [&>span]:text-left">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

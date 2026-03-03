@@ -61,8 +61,7 @@ function distributeProRataLRM(
     discrepancy > 0 ? b.remainder - a.remainder : a.remainder - b.remainder
   );
 
-  const avgAmount = targetTotal / items.length;
-  const increment = avgAmount >= 10000 ? 1000 : 100;
+  const increment = 1000;
 
   sortedByRemainder.forEach(share => {
     if (Math.abs(discrepancy) >= increment) {

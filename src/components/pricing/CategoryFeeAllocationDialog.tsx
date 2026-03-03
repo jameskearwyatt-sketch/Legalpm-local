@@ -13,12 +13,8 @@ import { Label } from '@/components/ui/label';
 import { ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Smart rounding: nearest 100 for <10k, nearest 1000 for >=10k
+// Rounding: always nearest 1,000
 function smartRound(value: number): number {
-  const absValue = Math.abs(value);
-  if (absValue < 10000) {
-    return Math.round(value / 100) * 100;
-  }
   return Math.round(value / 1000) * 1000;
 }
 
@@ -74,9 +70,8 @@ function distributeProRata(
     discrepancy > 0 ? b.remainder - a.remainder : a.remainder - b.remainder
   );
   
-  // Determine increment based on amounts
-  const avgAmount = targetTotal / items.length;
-  const increment = avgAmount >= 10000 ? 1000 : 100;
+  // Always use 1000 increment for discrepancy adjustment
+  const increment = 1000;
   
   // Adjust items to eliminate discrepancy
   sortedByRemainder.forEach(share => {

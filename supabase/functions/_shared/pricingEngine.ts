@@ -602,7 +602,6 @@ export function smartRound(amount: number, currency: string): number {
 
   switch (currency) {
     case 'GBP':
-      if (amount < 25000) return Math.round(amount / 500) * 500;
       if (amount <= 100000) return Math.round(amount / 1000) * 1000;
       return Math.round(amount / 5000) * 5000;
 

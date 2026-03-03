@@ -155,6 +155,8 @@ export function CategorizedProposalView({
   onNavigateToCategory,
   showAssumptionsNotTrue = false,
   onToggleAssumptionsNotTrue,
+  lockedCategories = new Set(),
+  onToggleLock,
 }: CategorizedProposalViewProps) {
   const [isCategorizing, setIsCategorizing] = useState(false);
   

@@ -2316,6 +2316,8 @@ export default function PricingProposalDetail() {
                     onNavigateToCategory={handleNavigateToCategory}
                     showAssumptionsNotTrue={showAssumptionsNotTrue}
                     onToggleAssumptionsNotTrue={setShowAssumptionsNotTrue}
+                    lockedCategories={lockedCategories}
+                    onToggleLock={handleToggleCategoryLock}
                   />
                 </CardContent>
               </Card>

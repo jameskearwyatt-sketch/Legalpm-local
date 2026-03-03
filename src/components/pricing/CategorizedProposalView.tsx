@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -69,6 +70,11 @@ interface CategorizedProposalViewProps {
   onToggleLock?: (key: string) => void;
 }
 
+// Helper to get fee_upper from item
+function getFeeUpper(item: DraftProposalItem): number {
+  return item.fee_upper ?? item.fee_amount ?? 0;
+}
+
 // Helper function to calculate category totals from a list of items using fee_upper
 function calculateCategoryTotals(
   items: DraftProposalItem[],
@@ -86,17 +92,14 @@ function calculateCategoryTotals(
     const category = item.category || 'Other';
     const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
     if (isIncluded) {
-      // Ensure category exists in totals
       if (totals[category] === undefined) {
         totals[category] = 0;
       }
       const mult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
-      // Use alt estimates if toggled and item has assumption-linked alt values
       if (useAltEstimates && item.assumption_linked && item.alt_fee_upper) {
         totals[category] += item.alt_fee_upper * mult;
       } else {
-        // Use fee_upper for upper estimate pricing
-        totals[category] += (item.fee_upper ?? item.fee_amount ?? 0) * mult;
+        totals[category] += getFeeUpper(item) * mult;
       }
     }
   });
@@ -108,7 +111,7 @@ function calculateCategoryTotals(
 function getItemsForPhaseCategory(
   items: DraftProposalItem[],
   phaseId: string | null,
-  category: string | null, // null means all categories in phase (for subtotal)
+  category: string | null,
   phases: ProposalPhase[]
 ): { index: number; workItem: string; currentFee: number; category: string }[] {
   const validPhaseIds = new Set(phases.map(p => p.id));
@@ -116,22 +119,17 @@ function getItemsForPhaseCategory(
   return items
     .map((item, index) => ({ item, index }))
     .filter(({ item }) => {
-      // Check if included
       const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
       if (!isIncluded) return false;
       
-      // Check category match (null = all categories)
       if (category !== null) {
         const itemCategory = item.category || 'Other';
         if (itemCategory !== category) return false;
       }
       
-      // Check phase match
       if (phaseId === null) {
-        // Aggregate - include all
         return true;
       } else if (phaseId === 'unassigned') {
-        // Unassigned items (no phase_id or orphaned phase_id)
         return !item.phase_id || !validPhaseIds.has(item.phase_id);
       } else {
         return item.phase_id === phaseId;
@@ -140,7 +138,7 @@ function getItemsForPhaseCategory(
     .map(({ item, index }) => ({
       index,
       workItem: item.work_item,
-      currentFee: item.fee_upper ?? item.fee_amount ?? 0,
+      currentFee: getFeeUpper(item),
       category: item.category || 'Other',
     }));
 }
@@ -162,17 +160,22 @@ export function CategorizedProposalView({
   
   // Allocation dialog state
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null); // null for subtotal
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
   const [selectedPhaseName, setSelectedPhaseName] = useState<string | null>(null);
   const [isSubtotalEdit, setIsSubtotalEdit] = useState(false);
+  
+  // Lock override state
+  const [showLockPrompt, setShowLockPrompt] = useState(false);
+  const [includeLocked, setIncludeLocked] = useState(false);
+  const [pendingEditAction, setPendingEditAction] = useState<(() => void) | null>(null);
 
   // Combine standard and custom categories for display
   const allCategories = useMemo(() => {
     return [...BUDGET_CATEGORIES, ...customCategories];
   }, [customCategories]);
 
-  // Calculate per-phase category totals (show all phases, item-level is_included controls counting)
+  // Calculate per-phase category totals
   const phaseBreakdowns = useMemo(() => {
     if (phases.length <= 1) return null;
     
@@ -184,7 +187,7 @@ export function CategorizedProposalView({
     });
   }, [items, phases, allCategories, showAssumptionsNotTrue]);
 
-  // Calculate aggregate totals (always shown)
+  // Calculate aggregate totals
   const categoryTotals = useMemo(() => {
     return calculateCategoryTotals(items, allCategories, showAssumptionsNotTrue);
   }, [items, allCategories, showAssumptionsNotTrue]);
@@ -209,6 +212,29 @@ export function CategorizedProposalView({
     }
   }, [onNavigateToCategory]);
   
+  // Check if locked items exist in scope and prompt if needed
+  const checkLockedAndProceed = useCallback((
+    phaseId: string | null,
+    category: string | null,
+    openAction: () => void
+  ) => {
+    // Check if there are locked items in the scope
+    const allItems = getItemsForPhaseCategory(items, phaseId, category, phases);
+    const hasLocked = allItems.some(item => {
+      const pId = phaseId || 'global';
+      const lockKey = `${pId}:${item.category}`;
+      return lockedCategories.has(lockKey);
+    });
+
+    if (hasLocked) {
+      setPendingEditAction(() => openAction);
+      setShowLockPrompt(true);
+    } else {
+      setIncludeLocked(false);
+      openAction();
+    }
+  }, [items, phases, lockedCategories]);
+  
   // Handle edit click for fee allocation (category level)
   const handleEditClick = useCallback((
     e: React.MouseEvent,
@@ -216,12 +242,19 @@ export function CategorizedProposalView({
     phaseName: string | null,
     category: string
   ) => {
-    e.stopPropagation(); // Prevent tile navigation
-    setSelectedPhaseId(phaseId);
-    setSelectedPhaseName(phaseName);
-    setSelectedCategory(category);
-    setIsSubtotalEdit(false);
-    setAllocationDialogOpen(true);
+    e.stopPropagation();
+    const openAction = () => {
+      setSelectedPhaseId(phaseId);
+      setSelectedPhaseName(phaseName);
+      setSelectedCategory(category);
+      setIsSubtotalEdit(false);
+      setAllocationDialogOpen(true);
+    };
+    // Category-level edit: check if locked items exist in the broader scope
+    // For a single category click, the category itself shouldn't be locked (pencil hidden),
+    // but for subtotal edits we need to check. For category edits, just open directly.
+    setIncludeLocked(false);
+    openAction();
   }, []);
   
   // Handle subtotal edit click (phase level - all categories)
@@ -231,36 +264,43 @@ export function CategorizedProposalView({
     phaseName: string
   ) => {
     e.stopPropagation();
-    setSelectedPhaseId(phaseId);
-    setSelectedPhaseName(phaseName);
-    setSelectedCategory(null); // null = all categories
-    setIsSubtotalEdit(true);
-    setAllocationDialogOpen(true);
-  }, []);
+    const openAction = () => {
+      setSelectedPhaseId(phaseId);
+      setSelectedPhaseName(phaseName);
+      setSelectedCategory(null);
+      setIsSubtotalEdit(true);
+      setAllocationDialogOpen(true);
+    };
+    checkLockedAndProceed(phaseId, null, openAction);
+  }, [checkLockedAndProceed]);
   
-  // Get affected items for the dialog (excluding locked items)
+  // Get affected items for the dialog (respecting lock override choice, excluding zero-fee)
   const affectedItems = useMemo(() => {
     if (!allocationDialogOpen) return [];
     const allItems = getItemsForPhaseCategory(items, selectedPhaseId, selectedCategory, phases);
-    // Filter out items in locked categories
     return allItems.filter(item => {
-      const phaseId = selectedPhaseId || 'global';
-      const lockKey = `${phaseId}:${item.category}`;
-      return !lockedCategories.has(lockKey);
+      // Exclude zero-fee items
+      if (item.currentFee === 0) return false;
+      // Filter locked items unless user chose to include them
+      if (!includeLocked) {
+        const phaseId = selectedPhaseId || 'global';
+        const lockKey = `${phaseId}:${item.category}`;
+        if (lockedCategories.has(lockKey)) return false;
+      }
+      return true;
     });
-  }, [allocationDialogOpen, items, selectedPhaseId, selectedCategory, phases, lockedCategories]);
+  }, [allocationDialogOpen, items, selectedPhaseId, selectedCategory, phases, lockedCategories, includeLocked]);
   
   // Current total for selected category/subtotal
   const selectedCategoryTotal = useMemo(() => {
     return affectedItems.reduce((sum, item) => sum + item.currentFee, 0);
   }, [affectedItems]);
   
-  // Apply fee allocations - now includes risk-based lower estimate calculation
+  // Apply fee allocations
   const handleApplyAllocations = useCallback((allocations: Map<number, number>) => {
     const newItems = items.map((item, index) => {
       const newFeeUpper = allocations.get(index);
       if (newFeeUpper !== undefined) {
-        // Calculate fee_lower and fee_amount based on category risk
         const { fee_lower, fee_amount } = calculateFeeRange(newFeeUpper, item.category);
         return {
           ...item,
@@ -308,7 +348,6 @@ export function CategorizedProposalView({
         return;
       }
 
-      // Apply categorizations
       const updatedItems = [...items];
       
       categorizations.forEach((cat: { index: number; category: string }) => {
@@ -317,7 +356,6 @@ export function CategorizedProposalView({
         }
       });
       
-      // Sort items by category order, uncategorized at end
       const categoryOrder = Object.fromEntries(
         BUDGET_CATEGORIES.map((cat, idx) => [cat, idx])
       );
@@ -325,13 +363,9 @@ export function CategorizedProposalView({
       updatedItems.sort((a, b) => {
         const catA = a.category || '';
         const catB = b.category || '';
-        
-        // Uncategorized items go to the end
         if (!catA && catB) return 1;
         if (catA && !catB) return -1;
         if (!catA && !catB) return 0;
-        
-        // Sort by category order
         const orderA = categoryOrder[catA] ?? 999;
         const orderB = categoryOrder[catB] ?? 999;
         return orderA - orderB;
@@ -348,7 +382,6 @@ export function CategorizedProposalView({
   };
 
   // Helper to render a category breakdown section
-  // isAggregate = true means this is the aggregate totals row (no navigation/editing)
   const renderCategoryBreakdown = (
     totals: Record<string, number>,
     total: number,
@@ -368,13 +401,11 @@ export function CategorizedProposalView({
             const categoryTotal = totals[category];
             if (categoryTotal === 0) return null;
             
-            // Get colors - use 'Other' colors as fallback for custom categories
             const isStandardCategory = (BUDGET_CATEGORIES as readonly string[]).includes(category);
             const bgColor = isStandardCategory ? categoryBgColors[category as BudgetCategory] : 'bg-slate-100 dark:bg-slate-800/50';
             const textColor = isStandardCategory ? categoryTextColors[category as BudgetCategory] : 'text-slate-700 dark:text-slate-300';
             const borderColor = isStandardCategory ? categoryBorderColors[category as BudgetCategory] : 'border-slate-300 dark:border-slate-600';
             
-            // Aggregate row: no interactivity
             if (isAggregate) {
               return (
                 <div
@@ -395,7 +426,6 @@ export function CategorizedProposalView({
               );
             }
             
-            // Phase row: navigation + edit + lock
             const lockKey = `${phaseId || 'global'}:${category}`;
             const isLocked = lockedCategories.has(lockKey);
             
@@ -512,6 +542,37 @@ export function CategorizedProposalView({
 
   return (
     <div className="space-y-4">
+      {/* Lock override prompt for subtotal edits */}
+      <AlertDialog open={showLockPrompt} onOpenChange={setShowLockPrompt}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Locked Categories Detected</AlertDialogTitle>
+            <AlertDialogDescription>
+              Some items belong to locked categories. Would you like to include locked items in this adjustment?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => {
+              setIncludeLocked(false);
+              setShowLockPrompt(false);
+              // Still open the dialog, just without locked items
+              if (pendingEditAction) pendingEditAction();
+              setPendingEditAction(null);
+            }}>
+              No, skip locked items
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              setIncludeLocked(true);
+              setShowLockPrompt(false);
+              if (pendingEditAction) pendingEditAction();
+              setPendingEditAction(null);
+            }}>
+              Yes, include locked items
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Auto-categorize button row */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
@@ -583,7 +644,7 @@ export function CategorizedProposalView({
             </div>
           ))}
           
-          {/* Aggregate Total - isAggregate = true (no interactivity) */}
+          {/* Aggregate Total */}
           <div className="pt-2 border-t">
             {renderCategoryBreakdown(categoryTotals, grandTotal, null, 'Aggregate Total', true)}
           </div>

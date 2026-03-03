@@ -398,10 +398,13 @@ export default function PricingProposalDetail() {
         if (insertError) throw insertError;
       }
       
-      // Save phases to proposal
+      // Save phases and locked categories to proposal
       const { error: proposalError } = await supabase
         .from('pricing_proposals')
-        .update({ work_phases: phasesToSave as any })
+        .update({ 
+          work_phases: phasesToSave as any,
+          locked_categories: Array.from(lockedCategoriesRef.current) as any,
+        })
         .eq('id', proposalId!);
       
       if (proposalError) throw proposalError;

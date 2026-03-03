@@ -2491,7 +2491,7 @@ export default function PricingProposalDetail() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Upper Estimate (Target)</p>
-                      <p className="text-2xl font-bold">{formatCurrency(summary.bmUpperTarget)}</p>
+                      <p className="text-2xl font-bold tabular-nums">{formatCurrency(summary.bmUpperTarget)}</p>
                       {showAssumptionsNotTrue && altTotals && (
                         <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                           If assumptions not all true: {formatCurrency(altTotals.bmTotal)}
@@ -2507,7 +2507,7 @@ export default function PricingProposalDetail() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Total Hours</p>
-                      <p className="text-2xl font-bold">{formatHours(summary.totalHours)}</p>
+                      <p className="text-2xl font-bold tabular-nums">{formatHours(summary.totalHours)}</p>
                     </div>
                     <Clock className="h-8 w-8 text-muted-foreground/30" />
                   </div>
@@ -2518,7 +2518,7 @@ export default function PricingProposalDetail() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Blended Rate</p>
-                      <p className="text-2xl font-bold">{formatCurrency(summary.blendedRate)}</p>
+                      <p className="text-2xl font-bold tabular-nums">{formatCurrency(summary.blendedRate)}</p>
                     </div>
                     <TrendingUp className="h-8 w-8 text-muted-foreground/30" />
                   </div>

@@ -86,6 +86,7 @@ import { LocalCounselPanel } from "@/components/pricing/LocalCounselPanel";
 import { AFATab } from "@/components/pricing/AFATab";
 import { ScalePricingWizard } from "@/components/pricing/ScalePricingWizard";
 import { ScopeAssumptionsTab, ScopeAssumptionsState, getAssumptionNarratives, getGroupedAssumptionNarratives } from "@/components/pricing/ScopeAssumptionsTab";
+import SummaryPyramid from "@/components/pricing/SummaryPyramid";
 import { exportAFAProposalToExcel } from "@/lib/exportAFAProposalToExcel";
 import { applyAFAFilters, getAFASummary } from "@/lib/afaFilterUtils";
 import {

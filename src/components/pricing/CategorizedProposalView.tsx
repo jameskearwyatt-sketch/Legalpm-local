@@ -415,22 +415,85 @@ export function CategorizedProposalView({
             const borderColor = isStandardCategory ? categoryBorderColors[category as BudgetCategory] : 'border-slate-300 dark:border-slate-600';
             
             if (isAggregate) {
+              // Aggregate category tiles: interactive with pencil + lock (operates across all phases)
+              const isLockedInAllPhases = phases.length > 0 && phases.every(p => lockedCategories.has(`${p.id}:${category}`));
+              const isLockedInSomePhases = phases.some(p => lockedCategories.has(`${p.id}:${category}`));
+              
               return (
-                <div
-                  key={category}
-                  className={cn(
-                    'rounded-md px-3 py-2 border',
-                    bgColor,
-                    borderColor
-                  )}
-                >
-                  <div className={cn('text-xs font-medium', textColor)}>
-                    {category}
+                <TooltipProvider key={category}>
+                  <div
+                    className={cn(
+                      'rounded-md px-3 py-2 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
+                      bgColor,
+                      borderColor,
+                      isLockedInAllPhases && 'opacity-75 border-dashed'
+                    )}
+                    onClick={() => handleTileClick(null, category)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        handleTileClick(null, category);
+                      }
+                    }}
+                  >
+                    <div className={cn('text-xs font-medium flex items-center gap-1', textColor)}>
+                      <span>{category}</span>
+                      {isLockedInAllPhases && (
+                        <Lock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                      )}
+                      {isLockedInSomePhases && !isLockedInAllPhases && (
+                        <Lock className="h-3 w-3 text-amber-400 dark:text-amber-500 opacity-60" />
+                      )}
+                    </div>
+                    <div className={cn('text-sm font-semibold flex items-center gap-1', textColor)}>
+                      <span>{formatCurrency(categoryTotal)}</span>
+                      {/* Lock/unlock button - toggles across all phases */}
+                      {onToggleLock && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              className={cn(
+                                'transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10',
+                                isLockedInAllPhases ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                              )}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Toggle lock for this category across ALL phases
+                                onToggleLock(`aggregate:${category}`);
+                              }}
+                            >
+                              {isLockedInAllPhases ? (
+                                <Lock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                              ) : (
+                                <LockOpen className="h-3 w-3" />
+                              )}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{isLockedInAllPhases ? 'Unlock category in all phases' : 'Lock category in all phases'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {/* Edit button - hidden when locked in all phases */}
+                      {!isLockedInAllPhases && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
+                              onClick={(e) => handleEditClick(e, null, 'All Phases', category)}
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Adjust fee across all phases and distribute pro-rata</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
                   </div>
-                  <div className={cn('text-sm font-semibold', textColor)}>
-                    {formatCurrency(categoryTotal)}
-                  </div>
-                </div>
+                </TooltipProvider>
               );
             }
             

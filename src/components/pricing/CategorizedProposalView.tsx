@@ -395,14 +395,18 @@ export function CategorizedProposalView({
               );
             }
             
-            // Phase row: navigation + edit
+            // Phase row: navigation + edit + lock
+            const lockKey = `${phaseId || 'global'}:${category}`;
+            const isLocked = lockedCategories.has(lockKey);
+            
             return (
               <TooltipProvider key={category}>
                 <div
                   className={cn(
                     'rounded-md px-3 py-2 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
                     bgColor,
-                    borderColor
+                    borderColor,
+                    isLocked && 'opacity-75 border-dashed'
                   )}
                   onClick={() => handleTileClick(phaseId, category)}
                   role="button"
@@ -413,24 +417,56 @@ export function CategorizedProposalView({
                     }
                   }}
                 >
-                  <div className={cn('text-xs font-medium', textColor)}>
-                    {category}
+                  <div className={cn('text-xs font-medium flex items-center gap-1', textColor)}>
+                    <span>{category}</span>
+                    {isLocked && (
+                      <Lock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                    )}
                   </div>
                   <div className={cn('text-sm font-semibold flex items-center gap-1', textColor)}>
                     <span>{formatCurrency(categoryTotal)}</span>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
-                          onClick={(e) => handleEditClick(e, phaseId, phaseName, category)}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Adjust fee and distribute pro-rata</p>
-                      </TooltipContent>
-                    </Tooltip>
+                    {/* Lock/unlock button */}
+                    {onToggleLock && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className={cn(
+                              'transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10',
+                              isLocked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleLock(lockKey);
+                            }}
+                          >
+                            {isLocked ? (
+                              <Lock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                            ) : (
+                              <LockOpen className="h-3 w-3" />
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{isLocked ? 'Unlock category (allow automated pricing)' : 'Lock category (protect from automated pricing)'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {/* Edit button - hidden when locked */}
+                    {!isLocked && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
+                            onClick={(e) => handleEditClick(e, phaseId, phaseName, category)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Adjust fee and distribute pro-rata</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
               </TooltipProvider>

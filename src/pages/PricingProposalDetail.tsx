@@ -1532,7 +1532,7 @@ export default function PricingProposalDetail() {
             provider: i.provider,
             category: i.category,
           })),
-          targetAmount,
+          targetAmount: adjustedTarget,
           currency: proposal?.currency,
           phaseName,
         },

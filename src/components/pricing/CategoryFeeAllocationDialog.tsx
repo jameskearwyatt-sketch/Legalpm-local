@@ -13,12 +13,8 @@ import { Label } from '@/components/ui/label';
 import { ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-// Smart rounding: nearest 100 for <10k, nearest 1000 for >=10k
+// Rounding: always nearest 1,000
 function smartRound(value: number): number {
-  const absValue = Math.abs(value);
-  if (absValue < 10000) {
-    return Math.round(value / 100) * 100;
-  }
   return Math.round(value / 1000) * 1000;
 }
 

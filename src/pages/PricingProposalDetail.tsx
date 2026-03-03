@@ -155,6 +155,7 @@ export default function PricingProposalDetail() {
   const [targetPricingAmount, setTargetPricingAmount] = useState<string>("");
   const [isAllocatingTargetPricing, setIsAllocatingTargetPricing] = useState(false);
   const [isAddWorkItemDialogOpen, setIsAddWorkItemDialogOpen] = useState(false);
+  const [isScalePricingOpen, setIsScalePricingOpen] = useState(false);
   
   const [isDeletingVersion, setIsDeletingVersion] = useState(false);
   const [isSendToMatterOpen, setIsSendToMatterOpen] = useState(false);

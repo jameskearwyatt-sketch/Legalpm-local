@@ -259,10 +259,10 @@ export function CategorizedProposalView({
     }
   }, [phases, checkLockedAndProceed]);
   
-  // Handle subtotal edit click (phase level - all categories)
+  // Handle subtotal edit click (phase level or aggregate total - all categories)
   const handleSubtotalEditClick = useCallback((
     e: React.MouseEvent,
-    phaseId: string,
+    phaseId: string | null,
     phaseName: string
   ) => {
     e.stopPropagation();

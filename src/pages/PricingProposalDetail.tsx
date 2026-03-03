@@ -2621,8 +2621,8 @@ export default function PricingProposalDetail() {
                     <TableRow className="font-bold bg-muted/50">
                       <TableCell></TableCell>
                       <TableCell>Total</TableCell>
-                      <TableCell className="text-right">{formatHours(summary.totalHours)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(summary.blendedRate)} (blended)</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatHours(summary.totalHours)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrency(summary.blendedRate)} (blended)</TableCell>
                       <TableCell className="text-right">
                         <div className="flex flex-col items-end">
                           <span>{formatCurrency(summary.totalRevenue)}</span>

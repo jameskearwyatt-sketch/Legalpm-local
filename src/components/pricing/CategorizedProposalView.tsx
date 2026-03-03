@@ -579,14 +579,14 @@ export function CategorizedProposalView({
             <TooltipProvider>
               <div className={cn(
                 'rounded-md px-3 py-2 border bg-primary/10 border-primary/30',
-                isPhaseRow && 'group'
+                (isPhaseRow || isAggregate) && 'group'
               )}>
                 <div className="text-xs font-medium text-primary">
                   {isAggregate ? 'Total' : 'Subtotal'}
                 </div>
                 <div className="text-sm font-semibold text-primary flex items-center gap-1">
                   <span>{formatCurrency(total)}</span>
-                  {/* Subtotal edit button - only for phase rows */}
+                  {/* Subtotal/Total edit button - for phase rows and aggregate */}
                   {isPhaseRow && phaseId && phaseName && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -599,6 +599,21 @@ export function CategorizedProposalView({
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>Adjust phase subtotal and distribute across categories</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  {isAggregate && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-primary/20"
+                          onClick={(e) => handleSubtotalEditClick(e, null, 'Aggregate Total')}
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Adjust total and distribute across all phases and categories</p>
                       </TooltipContent>
                     </Tooltip>
                   )}

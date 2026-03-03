@@ -1326,21 +1326,39 @@ export default function PricingProposalDetail() {
     return lockedCategories.has(`${phaseId}:${category}`);
   }, [lockedCategories]);
 
-  // Toggle lock on a category
+  // Toggle lock on a category (supports aggregate: prefix to toggle across all phases)
   const handleToggleCategoryLock = useCallback((key: string) => {
     setLockedCategories(prev => {
       const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
+      
+      // Aggregate lock: toggle this category across ALL phases
+      if (key.startsWith('aggregate:')) {
+        const category = key.slice('aggregate:'.length);
+        // Check if ALL phases are currently locked for this category
+        const allLocked = phases.length > 0 && phases.every(p => next.has(`${p.id}:${category}`));
+        phases.forEach(p => {
+          const phaseKey = `${p.id}:${category}`;
+          if (allLocked) {
+            next.delete(phaseKey);
+          } else {
+            next.add(phaseKey);
+          }
+        });
       } else {
-        next.add(key);
+        // Standard single-key toggle
+        if (next.has(key)) {
+          next.delete(key);
+        } else {
+          next.add(key);
+        }
       }
+      
       // Mark as needing save
       pendingChangesRef.current = true;
       return next;
     });
     setHasUnsavedChanges(true);
-  }, []);
+  }, [phases]);
 
   // Generate AI pricing for selected items only (respects user's manual pricing on unselected items)
   const generateAiPricing = async () => {

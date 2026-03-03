@@ -1,70 +1,142 @@
 
 
-# Scale Up / Scale Down Wizard
+# Scope-Aware Pricing Intelligence
 
-## What It Does
+## Problem
 
-A new "Scale Pricing" button alongside the existing AI pricing buttons. Opens a multi-step wizard dialog where the user:
+The system cannot distinguish between:
+- A **single DD task** like "Colombian DD (incl land)" (~GBP 15-26k)
+- A **comprehensive DD report** covering dozens of project documents (~GBP 100-287k)
 
-1. **Selects items** — by ticking individual work items, whole categories, or whole phases
-2. **Sees the current aggregate** for the selection (auto-calculated)
-3. **Enters a new target price** — the system computes the scaling factor and shows a preview
-4. **Confirms** — all selected items are scaled pro-rata, rounded to the nearest 1,000
+Both fall into the "Due Diligence" category. The current matching either finds an exact text match (unlikely for broad items) or falls back to a flat category median (~GBP 17k), which is wildly wrong for a comprehensive report.
 
-No AI is involved. This is purely mathematical scaling. Locked categories are respected (excluded from scaling).
+This is not unique to DD -- the same problem exists across categories (e.g., a single security agreement vs. a full security package; a simple legal opinion vs. a multi-jurisdiction opinion covering 10 topics).
 
-## Wizard Steps
+## Solution: Scope Classification + Complexity-Weighted Percentile Pricing
 
-### Step 1: Select Items
-- Three selection modes via tabs or toggles: **By Phase**, **By Category**, **By Item**
-- Phase tab: checkboxes for each phase (selecting a phase selects all its unlocked, included items)
-- Category tab: checkboxes for each category across all phases
-- Item tab: flat list of all included, unlocked items with checkboxes
-- Selecting a phase/category auto-ticks all child items; partial selection shown as indeterminate
-- Current aggregate total for selected items displayed prominently and updates live
+### Core Idea
 
-### Step 2: Set Target & Preview
-- Shows: "Current total: £X" and an input for "New target: £___"
-- Auto-computes and displays the scaling factor (e.g., "×1.25 — 25% increase")
-- Warning badge if factor is extreme (< 0.5 or > 2.0)
-- Preview table showing each selected item: current fee → scaled fee (rounded to nearest 1,000)
-- Residual reconciliation applied to largest item (same logic as target pricing) so total matches exactly
-- "Back" button to adjust selection
+Before pricing, classify each item's **scope** using signals already available in the data:
 
-### Step 3: Confirm & Apply
-- User clicks "Apply Scaling" — fees are updated in `draftItems`, `hasUnsavedChanges` set to true
-- Toast confirmation: "Scaled X items by factor Y.YY to hit £Z target"
+1. **Detail text length** -- a comprehensive DD report will have a 300+ character detail describing all the areas covered; a single task will have a short or empty detail
+2. **Keyword indicators** -- words like "comprehensive", "full", "report", "review of all", "covering", "including" signal broad scope; words like a single country/entity name signal narrow scope
+3. **The item's own work_item label** -- "Due diligence report" (generic/broad) vs. "Colombian DD (incl land)" (specific/narrow)
 
-## Rounding
+Use this to place the item on a **percentile scale within its category**, rather than always using the median.
 
-All scaled fees rounded to nearest 1,000 (as requested). Residual from rounding drift applied to the largest item to ensure exact target match.
+### Changes to `suggest-pricing/index.ts`
 
-## Interaction with Locks
+**Add scope classification function:**
 
-Locked category items are visually greyed out and cannot be selected in the wizard. They are excluded from the current total calculation and from scaling.
+```text
+classifyScope(workItem, detail) -> 'narrow' | 'moderate' | 'broad'
 
-## Files to Change
+Signals for 'broad':
+  - detail length > 250 chars
+  - Keywords in work_item or detail: "report", "comprehensive", "full", 
+    "all project", "covering", "review of all", "package", "suite",
+    "multi", "portfolio"
+  - Generic work_item with no specific entity/country name
+  
+Signals for 'narrow':
+  - detail length < 80 chars or no detail
+  - Specific entity/country in work_item (e.g., "Colombian", "BVI", "Singapore")
+  - Single-topic keywords: specific contract type names
+  
+Default: 'moderate'
+```
 
-### 1. New: `src/components/pricing/ScalePricingWizard.tsx`
-The wizard dialog component containing all three steps. Props:
-- `items: DraftProposalItem[]`
-- `phases: ProposalPhase[]`
-- `currencySymbol: string`
-- `lockedCategories: Set<string>`
-- `isItemLocked: (item) => boolean`
-- `onApply: (scaledItems: { index: number; fee_upper: number; fee_lower: number; fee_amount: number }[]) => void`
-- `open / onOpenChange`
+**Replace flat category stats with percentile-based pricing:**
 
-Internal state manages step navigation, selection set, and target amount. The scaling math is done client-side — no edge function needed.
+Currently when an item has no text match, it falls through to AI with only a category average. Instead:
 
-### 2. `src/pages/PricingProposalDetail.tsx`
-- Import `ScalePricingWizard`
-- Add `isScalePricingOpen` state
-- Add a "Scale Pricing" button (using `TrendingUp` or `ArrowUpDown` icon) next to the existing AI buttons
-- Wire `onApply` callback to update `draftItems` and set `hasUnsavedChanges`
-- The callback updates `fee_upper` to the scaled value, then derives `fee_lower` and `fee_amount` using the existing `calculateFeeRange` utility
+1. Compute **percentiles** (25th, 50th, 75th, 90th) for each category from historical data
+2. Map scope to percentile:
+   - `narrow` -> 25th percentile
+   - `moderate` -> 50th percentile (median)
+   - `broad` -> 75th-90th percentile
+3. Use this as a **strong anchor** -- either as the direct precedent price (Tier 2) or as explicit guidance to the AI
 
-## No Edge Function Changes
+**Improve AI prompt for remaining unmatched items:**
 
-All logic is client-side arithmetic. No backend changes required.
+When items still go to AI, include the scope classification and the percentile range in the prompt so the AI knows where in the range to price:
 
+```text
+Item: "Due diligence report"
+Scope: BROAD (detail covers 15+ topics across multiple document types)
+Category: Due Diligence
+Historical range for Due Diligence: 25th=GBP 15,000, median=GBP 23,000, 75th=GBP 65,000, 90th=GBP 114,000
+-> Price this at the 75th-90th percentile given its broad scope.
+```
+
+vs.
+
+```text
+Item: "Corporate DD on BVI entity"  
+Scope: NARROW (single entity, single jurisdiction)
+Category: Due Diligence
+-> Price this at the 25th percentile.
+```
+
+**Better category-relevant context for AI:**
+
+Instead of sending `allHistorical.slice(0, 30)` (arbitrary first 30), for each unmatched item send:
+- Top 5 highest-fee items from the same category (so the AI sees the range ceiling)
+- 5 lowest-fee items from the same category (so it sees the floor)
+- The percentile stats
+
+### Changes to `allocate-target-pricing/index.ts`
+
+Apply the same scope classification and percentile-based pricing to the base price generation step (Phase 2). The deterministic scaling in Phase 3 remains unchanged.
+
+### Implementation Detail
+
+**Percentile helper functions:**
+
+```text
+median(values[]) -> number
+percentile(values[], p) -> number  // p = 25, 75, 90
+```
+
+**Scope classifier:**
+
+```text
+function classifyScope(workItem: string, detail: string | null): 'narrow' | 'moderate' | 'broad'
+
+broadIndicators = /\b(report|comprehensive|full|all project|covering|review of all|
+  package|suite|multi|portfolio|across|various|range of|complete|
+  extensive|wide|broad|overall|summary|overview)\b/i
+
+narrowIndicators = specific country/entity names, short detail, 
+  single contract type references
+
+Logic:
+  score = 0
+  if detail length > 250: score += 2
+  if detail length > 150: score += 1  
+  if broadIndicators match in workItem or detail: score += 2
+  if narrowIndicators match: score -= 2
+  if workItem is very generic (< 5 significant words, no proper nouns): score += 1
+  
+  score >= 3 -> 'broad'
+  score <= -1 -> 'narrow'
+  else -> 'moderate'
+```
+
+**Pricing by scope:**
+
+```text
+For Tier 2 (category match, no text match):
+  narrow  -> percentile(categoryFees, 25)
+  moderate -> percentile(categoryFees, 50)  
+  broad   -> percentile(categoryFees, 80)
+```
+
+### Files to Modify
+
+1. **`supabase/functions/suggest-pricing/index.ts`** -- Add `classifyScope()`, `median()`, `percentile()` helpers; replace flat category average with scope-aware percentile pricing; improve AI context with category-relevant items and scope guidance
+2. **`supabase/functions/allocate-target-pricing/index.ts`** -- Same scope classification and percentile logic for base price generation
+
+### What This Achieves
+
+A "Due diligence report" with a long detail covering many topics will be classified as `broad` and priced at the 80th percentile of DD items (~GBP 80-100k+ depending on data), while "Colombian DD (incl land)" will be classified as `narrow` and priced at the 25th percentile (~GBP 15k). This matches the user's intuitive understanding and requires no additional data -- it uses signals already present in the work item label and detail text.

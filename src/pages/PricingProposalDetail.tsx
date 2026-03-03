@@ -83,6 +83,7 @@ import { PhasedWorkItemsView, PhasedWorkItemsViewRef } from "@/components/pricin
 import { AddWorkItemDialog } from "@/components/pricing/AddWorkItemDialog";
 import { LocalCounselPanel } from "@/components/pricing/LocalCounselPanel";
 import { AFATab } from "@/components/pricing/AFATab";
+import { ScalePricingWizard } from "@/components/pricing/ScalePricingWizard";
 import { ScopeAssumptionsTab, ScopeAssumptionsState, getAssumptionNarratives, getGroupedAssumptionNarratives } from "@/components/pricing/ScopeAssumptionsTab";
 import { exportAFAProposalToExcel } from "@/lib/exportAFAProposalToExcel";
 import { applyAFAFilters, getAFASummary } from "@/lib/afaFilterUtils";
@@ -154,6 +155,7 @@ export default function PricingProposalDetail() {
   const [targetPricingAmount, setTargetPricingAmount] = useState<string>("");
   const [isAllocatingTargetPricing, setIsAllocatingTargetPricing] = useState(false);
   const [isAddWorkItemDialogOpen, setIsAddWorkItemDialogOpen] = useState(false);
+  const [isScalePricingOpen, setIsScalePricingOpen] = useState(false);
   
   const [isDeletingVersion, setIsDeletingVersion] = useState(false);
   const [isSendToMatterOpen, setIsSendToMatterOpen] = useState(false);
@@ -2237,6 +2239,14 @@ export default function PricingProposalDetail() {
                     )}
                     AI Price to Target
                   </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsScalePricingOpen(true)}
+                    disabled={draftItems.filter(i => i.is_included && (i.fee_upper ?? i.fee_amount ?? 0) > 0).length === 0}
+                  >
+                    <Scale className="h-4 w-4 mr-2" />
+                    Scale Pricing
+                  </Button>
                   <Button 
                     variant="outline" 
                     onClick={() => {
@@ -2274,7 +2284,31 @@ export default function PricingProposalDetail() {
               currencySymbol={currencySymbol}
             />
 
-            {/* Category Summary with Auto-Categorize */}
+            {/* Scale Pricing Wizard */}
+            <ScalePricingWizard
+              open={isScalePricingOpen}
+              onOpenChange={setIsScalePricingOpen}
+              items={draftItems}
+              phases={phases}
+              currencySymbol={currencySymbol}
+              lockedCategories={lockedCategories}
+              isItemLocked={isItemLocked}
+              onApply={(scaledItems) => {
+                setDraftItems(prev => {
+                  const next = [...prev];
+                  scaledItems.forEach(({ index, fee_upper, fee_lower, fee_amount }) => {
+                    next[index] = { ...next[index], fee_upper, fee_lower, fee_amount, pricing_method: 'manual' as const };
+                  });
+                  return next;
+                });
+                setHasUnsavedChanges(true);
+                toast({
+                  title: `Scaled ${scaledItems.length} item${scaledItems.length !== 1 ? 's' : ''}`,
+                  description: `Factor ×${(scaledItems.length > 0 ? (scaledItems[0].fee_upper / (draftItems[scaledItems[0].index].fee_upper || draftItems[scaledItems[0].index].fee_amount || 1)) : 1).toFixed(2)}`,
+                });
+              }}
+            />
+
             {draftItems.length > 0 && !viewingHistoricalVersion && (
               <Card>
                 <CardHeader className="pb-3">

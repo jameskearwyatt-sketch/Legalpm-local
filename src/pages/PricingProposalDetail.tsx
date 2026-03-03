@@ -256,6 +256,8 @@ export default function PricingProposalDetail() {
         assumption_text: (item as any).assumption_text || null,
         alt_fee_lower: (item as any).alt_fee_lower ?? 0,
         alt_fee_upper: (item as any).alt_fee_upper ?? 0,
+        is_multiplied: (item as any).is_multiplied ?? false,
+        multiplier_qty: (item as any).multiplier_qty ?? 1,
       })));
 
       // Extract custom categories from saved items
@@ -371,6 +373,8 @@ export default function PricingProposalDetail() {
           assumption_text: item.assumption_text || null,
           alt_fee_lower: item.alt_fee_lower ?? 0,
           alt_fee_upper: item.alt_fee_upper ?? 0,
+          is_multiplied: item.is_multiplied ?? false,
+          multiplier_qty: item.multiplier_qty ?? 1,
         }));
         
         const { error: insertError } = await supabase

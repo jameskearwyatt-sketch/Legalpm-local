@@ -250,12 +250,14 @@ export function CategorizedProposalView({
       setIsSubtotalEdit(false);
       setAllocationDialogOpen(true);
     };
-    // Category-level edit: check if locked items exist in the broader scope
-    // For a single category click, the category itself shouldn't be locked (pencil hidden),
-    // but for subtotal edits we need to check. For category edits, just open directly.
-    setIncludeLocked(false);
-    openAction();
-  }, []);
+    // For aggregate category edits (phaseId === null), check locked items across all phases
+    if (phaseId === null && phases.length > 1) {
+      checkLockedAndProceed(null, category, openAction);
+    } else {
+      setIncludeLocked(false);
+      openAction();
+    }
+  }, [phases, checkLockedAndProceed]);
   
   // Handle subtotal edit click (phase level - all categories)
   const handleSubtotalEditClick = useCallback((

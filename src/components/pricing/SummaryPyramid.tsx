@@ -8,6 +8,7 @@ interface TeamMember {
   rate: number;
   revenue: number;
   memberCost: number;
+  level?: string;
 }
 
 interface SummaryPyramidProps {

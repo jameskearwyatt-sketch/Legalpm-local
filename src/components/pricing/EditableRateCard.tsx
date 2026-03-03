@@ -296,9 +296,21 @@ export function EditableRateCard({
           <div className="space-y-1">
             {sortedEarners.map((earner) => (
               <div key={earner.key} className={`grid ${getGridCols()} items-center gap-2 py-1`}>
-                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded text-center truncate">
-                  {getLevelBadge(earner.level)}
-                </span>
+                <Select
+                  value={earner.level}
+                  onValueChange={(v) => setFeeEarners(prev => prev.map(e => e.key === earner.key ? { ...e, level: v as LevelValue } : e))}
+                >
+                  <SelectTrigger className="h-7 text-xs px-1.5 w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LEVELS.map((level) => (
+                      <SelectItem key={level.value} value={level.value} className="text-xs">
+                        {level.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Input
                   value={earner.label}
                   onChange={(e) => updateFeeEarnerLabel(earner.key, e.target.value)}

@@ -11,6 +11,7 @@ export interface RateCardEntry {
   rate: number;
   cost: number;
   label?: string;
+  level?: string;
 }
 
 export interface RateCard {

@@ -108,6 +108,7 @@ interface EditableRateCardProps {
   exchangeRate: number; // team currency to fee currency (e.g., 1.25 for GBP->USD)
   onSave: (teamRateCard: RateCard, feeRateCard: RateCard) => Promise<void>;
   onSaveAsDefault?: (rateCard: RateCard) => Promise<void>;
+  onChange?: (teamRateCard: RateCard, feeRateCard: RateCard) => void;
   isSaving?: boolean;
   isSavingDefault?: boolean;
   afaDiscount?: number;

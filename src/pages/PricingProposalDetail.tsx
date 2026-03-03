@@ -221,6 +221,12 @@ export default function PricingProposalDetail() {
         setPhases(loadedPhases);
         setPhasesInitialized(true);
       }
+      // Load locked categories from proposal (only once)
+      if ((proposal as any).locked_categories && lockedCategories.size === 0) {
+        const loaded = new Set<string>((proposal as any).locked_categories as string[]);
+        setLockedCategories(loaded);
+        lockedCategoriesRef.current = loaded;
+      }
     }
   }, [proposal]);
 

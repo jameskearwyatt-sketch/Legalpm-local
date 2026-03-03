@@ -113,7 +113,7 @@ function getItemsForPhaseCategory(
   phaseId: string | null,
   category: string | null,
   phases: ProposalPhase[]
-): { index: number; workItem: string; currentFee: number; category: string }[] {
+): { index: number; workItem: string; currentFee: number; category: string; phaseId: string | null }[] {
   const validPhaseIds = new Set(phases.map(p => p.id));
   
   return items
@@ -140,6 +140,7 @@ function getItemsForPhaseCategory(
       workItem: item.work_item,
       currentFee: getFeeUpper(item),
       category: item.category || 'Other',
+      phaseId: item.phase_id || null,
     }));
 }
 

@@ -42,12 +42,15 @@ const DEFAULT_LABELS: Record<string, string> = {
 // rateCard stores rates in TEAM CURRENCY
 function rateCardToArray(rateCard: RateCard, exchangeRate: number): FeeEarner[] {
   return Object.entries(rateCard).map(([key, value]) => {
-    let level: LevelValue = "associate";
-    if (key.includes("partner") || key.startsWith("partner")) level = "partner";
-    else if (key.includes("counsel") || key.startsWith("counsel")) level = "counsel";
-    else if (key.includes("seniorAssociate") || key.startsWith("seniorAssociate")) level = "seniorAssociate";
-    else if (key.includes("trainee") || key.startsWith("trainee")) level = "trainee";
-    else if (key.includes("associate") || key.startsWith("associate")) level = "associate";
+    // Use stored level if available, otherwise auto-detect from key
+    let level: LevelValue = (value.level as LevelValue) || "associate";
+    if (!value.level) {
+      if (key.includes("partner") || key.startsWith("partner")) level = "partner";
+      else if (key.includes("counsel") || key.startsWith("counsel")) level = "counsel";
+      else if (key.includes("seniorAssociate") || key.startsWith("seniorAssociate")) level = "seniorAssociate";
+      else if (key.includes("trainee") || key.startsWith("trainee")) level = "trainee";
+      else if (key.includes("associate") || key.startsWith("associate")) level = "associate";
+    }
     
     const teamRate = value.rate;
     const feeRate = Math.round(teamRate * exchangeRate);

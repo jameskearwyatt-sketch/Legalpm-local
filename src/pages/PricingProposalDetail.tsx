@@ -2921,6 +2921,10 @@ export default function PricingProposalDetail() {
               feeCurrency={feeCurrency}
               teamRateCurrency={teamRateCurrency}
               exchangeRate={teamToFeeExchangeRate}
+              onChange={(newTeamRateCard, newFeeRateCard) => {
+                setRateCard(newTeamRateCard);
+                setFeeRateCardOverride(newFeeRateCard);
+              }}
               onSave={async (newTeamRateCard, newFeeRateCard) => {
                 setRateCard(newTeamRateCard);
                 setFeeRateCardOverride(newFeeRateCard);

@@ -152,8 +152,12 @@ export function EditableRateCard({
       };
     }));
   }, [exchangeRate]);
+  // Notify parent of live changes for real-time preview (e.g., pyramid)
+  useEffect(() => {
+    onChange?.(arrayToRateCard(feeEarners), arrayToFeeRateCard(feeEarners));
+  }, [feeEarners, onChange]);
 
-  // Sort by fee rate descending
+
   const sortedEarners = useMemo(() => 
     [...feeEarners].sort((a, b) => b.feeRate - a.feeRate),
     [feeEarners]

@@ -74,7 +74,7 @@ function buildTiers(members: TeamMember[]): Tier[] {
     associates: [],
     juniors: [],
   };
-  members.forEach((m) => groups[classifyTier(m.key)].push(m));
+  members.forEach((m) => groups[classifyTier(m)].push(m));
 
   return [
     { key: "partners", label: "Partners", emptyLabel: "No Partners", members: groups.partners },

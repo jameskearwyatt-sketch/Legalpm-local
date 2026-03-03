@@ -927,7 +927,7 @@ export default function PricingProposalDetail() {
     setFeeRateCardOverride(newFeeRateCard);
   }, []);
 
-
+  const formatCurrency = (value: number) => {
     return `${currencySymbol}${new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)}`;
   };
 

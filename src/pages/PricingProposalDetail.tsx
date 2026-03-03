@@ -144,6 +144,10 @@ export default function PricingProposalDetail() {
   const [pastedText, setPastedText] = useState("");
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   
+  // Category lock state - locked categories are protected from automated pricing changes
+  const [lockedCategories, setLockedCategories] = useState<Set<string>>(new Set());
+  const lockedCategoriesRef = useRef<Set<string>>(new Set());
+  
   // Target pricing dialog state
   const [isTargetPricingDialogOpen, setIsTargetPricingDialogOpen] = useState(false);
   const [targetPricingPhaseId, setTargetPricingPhaseId] = useState<string>("all");

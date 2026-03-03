@@ -2531,6 +2531,12 @@ export default function PricingProposalDetail() {
               </Card>
             </div>
 
+            <SummaryPyramid
+              teamMembers={summary.teamMembers}
+              formatCurrency={formatCurrency}
+              formatHours={formatHours}
+            />
+
             {/* Fixed-height container — never shifts layout */}
             <div className="min-h-[52px]">
               <Alert className={cn(

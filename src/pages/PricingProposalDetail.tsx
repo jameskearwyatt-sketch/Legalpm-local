@@ -144,6 +144,10 @@ export default function PricingProposalDetail() {
   const [pastedText, setPastedText] = useState("");
   const [customCategories, setCustomCategories] = useState<string[]>([]);
   
+  // Category lock state - locked categories are protected from automated pricing changes
+  const [lockedCategories, setLockedCategories] = useState<Set<string>>(new Set());
+  const lockedCategoriesRef = useRef<Set<string>>(new Set());
+  
   // Target pricing dialog state
   const [isTargetPricingDialogOpen, setIsTargetPricingDialogOpen] = useState(false);
   const [targetPricingPhaseId, setTargetPricingPhaseId] = useState<string>("all");
@@ -216,6 +220,12 @@ export default function PricingProposalDetail() {
         }));
         setPhases(loadedPhases);
         setPhasesInitialized(true);
+      }
+      // Load locked categories from proposal (only once)
+      if ((proposal as any).locked_categories && lockedCategories.size === 0) {
+        const loaded = new Set<string>((proposal as any).locked_categories as string[]);
+        setLockedCategories(loaded);
+        lockedCategoriesRef.current = loaded;
       }
     }
   }, [proposal]);
@@ -303,6 +313,10 @@ export default function PricingProposalDetail() {
   }, [phases]);
   
   useEffect(() => {
+    lockedCategoriesRef.current = lockedCategories;
+  }, [lockedCategories]);
+  
+  useEffect(() => {
     isInitializedRef.current = isInitialized;
   }, [isInitialized]);
   
@@ -384,10 +398,13 @@ export default function PricingProposalDetail() {
         if (insertError) throw insertError;
       }
       
-      // Save phases to proposal
+      // Save phases and locked categories to proposal
       const { error: proposalError } = await supabase
         .from('pricing_proposals')
-        .update({ work_phases: phasesToSave as any })
+        .update({ 
+          work_phases: phasesToSave as any,
+          locked_categories: Array.from(lockedCategoriesRef.current) as any,
+        })
         .eq('id', proposalId!);
       
       if (proposalError) throw proposalError;
@@ -1300,6 +1317,29 @@ export default function PricingProposalDetail() {
     }
   };
 
+  // Helper: check if an item belongs to a locked category
+  const isItemLocked = useCallback((item: DraftProposalItem): boolean => {
+    const category = item.category || 'Other';
+    const phaseId = item.phase_id || 'global';
+    return lockedCategories.has(`${phaseId}:${category}`);
+  }, [lockedCategories]);
+
+  // Toggle lock on a category
+  const handleToggleCategoryLock = useCallback((key: string) => {
+    setLockedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      // Mark as needing save
+      pendingChangesRef.current = true;
+      return next;
+    });
+    setHasUnsavedChanges(true);
+  }, []);
+
   // Generate AI pricing for selected items only (respects user's manual pricing on unselected items)
   const generateAiPricing = async () => {
     setIsGeneratingAiPricing(true);
@@ -1307,8 +1347,9 @@ export default function PricingProposalDetail() {
       // Only apply AI pricing to items that are:
       // 1. Selected (is_included = true) - user explicitly wants to price these
       // 2. Have no existing price (fee_amount = 0) - don't overwrite manual pricing
+      // 3. NOT in a locked category - locked items are protected from automated changes
       const itemsNeedingPricing = draftItems.filter(i => 
-        i.is_included && (!i.fee_amount || i.fee_amount === 0)
+        i.is_included && (!i.fee_amount || i.fee_amount === 0) && !isItemLocked(i)
       );
       
       const selectedCount = draftItems.filter(i => i.is_included).length;
@@ -1361,8 +1402,8 @@ export default function PricingProposalDetail() {
       if (data.prices) {
         // Build updated items with AI pricing applied
         const updatedItems = draftItems.map(item => {
-          // Only update items that are selected AND have no price
-          if (item.is_included && (!item.fee_amount || item.fee_amount === 0)) {
+          // Only update items that are selected AND have no price AND not locked
+          if (item.is_included && (!item.fee_amount || item.fee_amount === 0) && !isItemLocked(item)) {
             // Match by checking if the AI response work_item contains or starts with the original work_item
             const priceInfo = data.prices.find((p: any) => 
               p.work_item === item.work_item || 
@@ -1426,25 +1467,45 @@ export default function PricingProposalDetail() {
 
     setIsAllocatingTargetPricing(true);
     try {
-      // Get items to price based on phase selection
+      // Get items to price based on phase selection, excluding locked items
       let itemsToPriceIndices: number[] = [];
+      let lockedFeeTotal = 0;
       
       if (targetPricingPhaseId === 'all') {
         // All selected items across all phases
-        itemsToPriceIndices = draftItems
-          .map((item, idx) => item.is_included ? idx : -1)
-          .filter(idx => idx !== -1);
+        draftItems.forEach((item, idx) => {
+          if (item.is_included) {
+            if (isItemLocked(item)) {
+              lockedFeeTotal += item.fee_upper ?? item.fee_amount ?? 0;
+            } else {
+              itemsToPriceIndices.push(idx);
+            }
+          }
+        });
       } else if (targetPricingPhaseId === 'unassigned') {
-        // Selected items with no phase assignment
-        itemsToPriceIndices = draftItems
-          .map((item, idx) => (item.is_included && !item.phase_id) ? idx : -1)
-          .filter(idx => idx !== -1);
+        draftItems.forEach((item, idx) => {
+          if (item.is_included && !item.phase_id) {
+            if (isItemLocked(item)) {
+              lockedFeeTotal += item.fee_upper ?? item.fee_amount ?? 0;
+            } else {
+              itemsToPriceIndices.push(idx);
+            }
+          }
+        });
       } else {
-        // Selected items in specific phase
-        itemsToPriceIndices = draftItems
-          .map((item, idx) => (item.is_included && item.phase_id === targetPricingPhaseId) ? idx : -1)
-          .filter(idx => idx !== -1);
+        draftItems.forEach((item, idx) => {
+          if (item.is_included && item.phase_id === targetPricingPhaseId) {
+            if (isItemLocked(item)) {
+              lockedFeeTotal += item.fee_upper ?? item.fee_amount ?? 0;
+            } else {
+              itemsToPriceIndices.push(idx);
+            }
+          }
+        });
       }
+
+      // Subtract locked fees from target - unlocked items must absorb the remainder
+      const adjustedTarget = Math.max(0, targetAmount - lockedFeeTotal);
 
       if (itemsToPriceIndices.length === 0) {
         toast({ 
@@ -1471,7 +1532,7 @@ export default function PricingProposalDetail() {
             provider: i.provider,
             category: i.category,
           })),
-          targetAmount,
+          targetAmount: adjustedTarget,
           currency: proposal?.currency,
           phaseName,
         },
@@ -2255,6 +2316,8 @@ export default function PricingProposalDetail() {
                     onNavigateToCategory={handleNavigateToCategory}
                     showAssumptionsNotTrue={showAssumptionsNotTrue}
                     onToggleAssumptionsNotTrue={setShowAssumptionsNotTrue}
+                    lockedCategories={lockedCategories}
+                    onToggleLock={handleToggleCategoryLock}
                   />
                 </CardContent>
               </Card>

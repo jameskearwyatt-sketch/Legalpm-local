@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'react';
-import { Loader2, Wand2, Pencil, HelpCircle } from 'lucide-react';
+import { Loader2, Wand2, Pencil, HelpCircle, Lock, LockOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -65,6 +65,8 @@ interface CategorizedProposalViewProps {
   onNavigateToCategory?: (phaseId: string | null, category: string) => void;
   showAssumptionsNotTrue?: boolean;
   onToggleAssumptionsNotTrue?: (value: boolean) => void;
+  lockedCategories?: Set<string>;
+  onToggleLock?: (key: string) => void;
 }
 
 // Helper function to calculate category totals from a list of items using fee_upper
@@ -153,6 +155,8 @@ export function CategorizedProposalView({
   onNavigateToCategory,
   showAssumptionsNotTrue = false,
   onToggleAssumptionsNotTrue,
+  lockedCategories = new Set(),
+  onToggleLock,
 }: CategorizedProposalViewProps) {
   const [isCategorizing, setIsCategorizing] = useState(false);
   
@@ -234,12 +238,17 @@ export function CategorizedProposalView({
     setAllocationDialogOpen(true);
   }, []);
   
-  // Get affected items for the dialog
+  // Get affected items for the dialog (excluding locked items)
   const affectedItems = useMemo(() => {
     if (!allocationDialogOpen) return [];
-    // For subtotal edit, pass null category to get all items in phase
-    return getItemsForPhaseCategory(items, selectedPhaseId, selectedCategory, phases);
-  }, [allocationDialogOpen, items, selectedPhaseId, selectedCategory, phases]);
+    const allItems = getItemsForPhaseCategory(items, selectedPhaseId, selectedCategory, phases);
+    // Filter out items in locked categories
+    return allItems.filter(item => {
+      const phaseId = selectedPhaseId || 'global';
+      const lockKey = `${phaseId}:${item.category}`;
+      return !lockedCategories.has(lockKey);
+    });
+  }, [allocationDialogOpen, items, selectedPhaseId, selectedCategory, phases, lockedCategories]);
   
   // Current total for selected category/subtotal
   const selectedCategoryTotal = useMemo(() => {
@@ -386,14 +395,18 @@ export function CategorizedProposalView({
               );
             }
             
-            // Phase row: navigation + edit
+            // Phase row: navigation + edit + lock
+            const lockKey = `${phaseId || 'global'}:${category}`;
+            const isLocked = lockedCategories.has(lockKey);
+            
             return (
               <TooltipProvider key={category}>
                 <div
                   className={cn(
                     'rounded-md px-3 py-2 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
                     bgColor,
-                    borderColor
+                    borderColor,
+                    isLocked && 'opacity-75 border-dashed'
                   )}
                   onClick={() => handleTileClick(phaseId, category)}
                   role="button"
@@ -404,24 +417,56 @@ export function CategorizedProposalView({
                     }
                   }}
                 >
-                  <div className={cn('text-xs font-medium', textColor)}>
-                    {category}
+                  <div className={cn('text-xs font-medium flex items-center gap-1', textColor)}>
+                    <span>{category}</span>
+                    {isLocked && (
+                      <Lock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                    )}
                   </div>
                   <div className={cn('text-sm font-semibold flex items-center gap-1', textColor)}>
                     <span>{formatCurrency(categoryTotal)}</span>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
-                          onClick={(e) => handleEditClick(e, phaseId, phaseName, category)}
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Adjust fee and distribute pro-rata</p>
-                      </TooltipContent>
-                    </Tooltip>
+                    {/* Lock/unlock button */}
+                    {onToggleLock && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className={cn(
+                              'transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10',
+                              isLocked ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                            )}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onToggleLock(lockKey);
+                            }}
+                          >
+                            {isLocked ? (
+                              <Lock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                            ) : (
+                              <LockOpen className="h-3 w-3" />
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{isLocked ? 'Unlock category (allow automated pricing)' : 'Lock category (protect from automated pricing)'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {/* Edit button - hidden when locked */}
+                    {!isLocked && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10"
+                            onClick={(e) => handleEditClick(e, phaseId, phaseName, category)}
+                          >
+                            <Pencil className="h-3 w-3" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Adjust fee and distribute pro-rata</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
               </TooltipProvider>

@@ -3418,6 +3418,7 @@ export type Database = {
           description: string | null
           id: string
           linked_matter_id: string | null
+          locked_categories: Json | null
           name: string
           rate_card: Json | null
           scope_assumptions: Json | null
@@ -3436,6 +3437,7 @@ export type Database = {
           description?: string | null
           id?: string
           linked_matter_id?: string | null
+          locked_categories?: Json | null
           name: string
           rate_card?: Json | null
           scope_assumptions?: Json | null
@@ -3454,6 +3456,7 @@ export type Database = {
           description?: string | null
           id?: string
           linked_matter_id?: string | null
+          locked_categories?: Json | null
           name?: string
           rate_card?: Json | null
           scope_assumptions?: Json | null

@@ -1,0 +1,1 @@
+ALTER TABLE public.pricing_proposals ADD COLUMN locked_categories jsonb DEFAULT '[]'::jsonb;

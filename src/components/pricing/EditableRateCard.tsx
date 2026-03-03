@@ -42,12 +42,15 @@ const DEFAULT_LABELS: Record<string, string> = {
 // rateCard stores rates in TEAM CURRENCY
 function rateCardToArray(rateCard: RateCard, exchangeRate: number): FeeEarner[] {
   return Object.entries(rateCard).map(([key, value]) => {
-    let level: LevelValue = "associate";
-    if (key.includes("partner") || key.startsWith("partner")) level = "partner";
-    else if (key.includes("counsel") || key.startsWith("counsel")) level = "counsel";
-    else if (key.includes("seniorAssociate") || key.startsWith("seniorAssociate")) level = "seniorAssociate";
-    else if (key.includes("trainee") || key.startsWith("trainee")) level = "trainee";
-    else if (key.includes("associate") || key.startsWith("associate")) level = "associate";
+    // Use stored level if available, otherwise auto-detect from key
+    let level: LevelValue = (value.level as LevelValue) || "associate";
+    if (!value.level) {
+      if (key.includes("partner") || key.startsWith("partner")) level = "partner";
+      else if (key.includes("counsel") || key.startsWith("counsel")) level = "counsel";
+      else if (key.includes("seniorAssociate") || key.startsWith("seniorAssociate")) level = "seniorAssociate";
+      else if (key.includes("trainee") || key.startsWith("trainee")) level = "trainee";
+      else if (key.includes("associate") || key.startsWith("associate")) level = "associate";
+    }
     
     const teamRate = value.rate;
     const feeRate = Math.round(teamRate * exchangeRate);
@@ -84,7 +87,7 @@ function generateKey(level: string, label: string): string {
 function arrayToRateCard(feeEarners: FeeEarner[]): RateCard {
   const result: RateCard = {} as RateCard;
   feeEarners.forEach(earner => {
-    (result as any)[earner.key] = { rate: earner.teamRate, cost: 0, label: earner.label };
+    (result as any)[earner.key] = { rate: earner.teamRate, cost: 0, label: earner.label, level: earner.level };
   });
   return result;
 }
@@ -93,7 +96,7 @@ function arrayToRateCard(feeEarners: FeeEarner[]): RateCard {
 function arrayToFeeRateCard(feeEarners: FeeEarner[]): RateCard {
   const result: RateCard = {} as RateCard;
   feeEarners.forEach(earner => {
-    (result as any)[earner.key] = { rate: earner.feeRate, cost: 0, label: earner.label };
+    (result as any)[earner.key] = { rate: earner.feeRate, cost: 0, label: earner.label, level: earner.level };
   });
   return result;
 }
@@ -293,9 +296,21 @@ export function EditableRateCard({
           <div className="space-y-1">
             {sortedEarners.map((earner) => (
               <div key={earner.key} className={`grid ${getGridCols()} items-center gap-2 py-1`}>
-                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded text-center truncate">
-                  {getLevelBadge(earner.level)}
-                </span>
+                <Select
+                  value={earner.level}
+                  onValueChange={(v) => setFeeEarners(prev => prev.map(e => e.key === earner.key ? { ...e, level: v as LevelValue } : e))}
+                >
+                  <SelectTrigger className="h-7 text-xs px-1.5 w-[100px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LEVELS.map((level) => (
+                      <SelectItem key={level.value} value={level.value} className="text-xs">
+                        {level.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Input
                   value={earner.label}
                   onChange={(e) => updateFeeEarnerLabel(earner.key, e.target.value)}

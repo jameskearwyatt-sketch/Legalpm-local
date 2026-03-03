@@ -714,6 +714,7 @@ export default function PricingProposalDetail() {
         label: formatTeamMemberLabel(key, entry),
         rate: entry.rate,
         cost: entry.cost || 0,
+        level: entry.level,
       }))
       .sort((a, b) => b.rate - a.rate);
   }, [feeRateCard, formatTeamMemberLabel]);

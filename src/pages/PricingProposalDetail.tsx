@@ -2526,7 +2526,10 @@ export default function PricingProposalDetail() {
               </Card>
             </div>
 
-            {Math.abs(summary.delta) >= 100 && (
+            <div className={cn(
+              "transition-opacity duration-200",
+              Math.abs(summary.delta) >= 100 ? "opacity-100" : "opacity-0 pointer-events-none h-0 overflow-hidden"
+            )}>
               <Alert className={cn(
                 "border",
                 summary.delta > 0
@@ -2541,7 +2544,7 @@ export default function PricingProposalDetail() {
                   }
                 </AlertDescription>
               </Alert>
-            )}
+            </div>
 
             <Card>
               <CardHeader>

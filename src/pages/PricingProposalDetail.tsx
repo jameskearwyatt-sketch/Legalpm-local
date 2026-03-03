@@ -2596,16 +2596,16 @@ export default function PricingProposalDetail() {
                                 handleSummaryHoursChange(member.key, val);
                               }}
                               className={cn(
-                                "w-20 h-7 text-right text-sm ml-auto",
+                                "w-20 h-7 text-right text-sm ml-auto tabular-nums",
                                 member.isLocked && "bg-amber-50 dark:bg-amber-950/20 border-amber-300"
                               )}
                             />
                             <input
                               type="range"
                               min="0"
-                              max={Math.max(200, (member.hours || 0) * 2)}
+                              max="500"
                               step="0.5"
-                              value={member.hours || 0}
+                              value={Math.min(member.hours || 0, 500)}
                               onChange={(e) => {
                                 const val = parseFloat(e.target.value) || 0;
                                 handleSummaryHoursChange(member.key, val);
@@ -2614,8 +2614,8 @@ export default function PricingProposalDetail() {
                             />
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">{formatCurrency(member.rate)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(member.revenue)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatCurrency(member.rate)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatCurrency(member.revenue)}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="font-bold bg-muted/50">

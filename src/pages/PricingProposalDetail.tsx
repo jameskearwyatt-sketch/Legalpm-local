@@ -693,6 +693,7 @@ export default function PricingProposalDetail() {
           rate: Math.round(entry.rate * teamToFeeExchangeRate),
           cost: entry.cost || 0,
           label: entry.label,
+          level: entry.level,
         };
       }
     });

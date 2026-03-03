@@ -222,8 +222,9 @@ export function CategorizedProposalView({
     // Check if there are locked items in the scope
     const allItems = getItemsForPhaseCategory(items, phaseId, category, phases);
     const hasLocked = allItems.some(item => {
-      const pId = phaseId || 'global';
-      const lockKey = `${pId}:${item.category}`;
+      // For aggregate edits (phaseId === null), check each item's own phase
+      const itemPhaseKey = item.phaseId || 'global';
+      const lockKey = `${phaseId !== null ? phaseId : itemPhaseKey}:${item.category}`;
       return lockedCategories.has(lockKey);
     });
 

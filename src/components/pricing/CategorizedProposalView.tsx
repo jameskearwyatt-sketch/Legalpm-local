@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'react';
-import { Loader2, Wand2, Pencil, HelpCircle } from 'lucide-react';
+import { Loader2, Wand2, Pencil, HelpCircle, Lock, LockOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';

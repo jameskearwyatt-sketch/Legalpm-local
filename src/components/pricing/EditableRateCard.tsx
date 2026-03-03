@@ -121,6 +121,7 @@ export function EditableRateCard({
   exchangeRate,
   onSave,
   onSaveAsDefault,
+  onChange,
   isSaving = false,
   isSavingDefault = false,
   afaDiscount = 0,

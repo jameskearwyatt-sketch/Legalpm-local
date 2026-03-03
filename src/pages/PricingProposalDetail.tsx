@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import SummarySliderRow from "@/components/pricing/SummarySliderRow";
 import { useParams, useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -2489,14 +2490,17 @@ export default function PricingProposalDetail() {
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="min-w-[140px]">
                       <p className="text-sm font-medium text-muted-foreground">Upper Estimate (Target)</p>
                       <p className="text-2xl font-bold tabular-nums">{formatCurrency(summary.bmUpperTarget)}</p>
-                      {showAssumptionsNotTrue && altTotals && (
-                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                          If assumptions not all true: {formatCurrency(altTotals.bmTotal)}
-                        </p>
-                      )}
+                      <p className={cn(
+                        "text-xs mt-1 min-h-[1rem]",
+                        showAssumptionsNotTrue && altTotals ? "text-amber-600 dark:text-amber-400" : "invisible"
+                      )}>
+                        {showAssumptionsNotTrue && altTotals
+                          ? `If assumptions not all true: ${formatCurrency(altTotals.bmTotal)}`
+                          : '\u00A0'}
+                      </p>
                     </div>
                     <Target className="h-8 w-8 text-muted-foreground/30" />
                   </div>
@@ -2505,7 +2509,7 @@ export default function PricingProposalDetail() {
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="min-w-[140px]">
                       <p className="text-sm font-medium text-muted-foreground">Total Hours</p>
                       <p className="text-2xl font-bold tabular-nums">{formatHours(summary.totalHours)}</p>
                     </div>
@@ -2516,7 +2520,7 @@ export default function PricingProposalDetail() {
               <Card>
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
-                    <div>
+                    <div className="min-w-[140px]">
                       <p className="text-sm font-medium text-muted-foreground">Blended Rate</p>
                       <p className="text-2xl font-bold tabular-nums">{formatCurrency(summary.blendedRate)}</p>
                     </div>
@@ -2526,12 +2530,11 @@ export default function PricingProposalDetail() {
               </Card>
             </div>
 
-            <div className={cn(
-              "transition-opacity duration-200",
-              Math.abs(summary.delta) >= 100 ? "opacity-100" : "opacity-0 pointer-events-none h-0 overflow-hidden"
-            )}>
+            {/* Fixed-height container — never shifts layout */}
+            <div className="min-h-[52px]">
               <Alert className={cn(
-                "border",
+                "border transition-opacity duration-200",
+                Math.abs(summary.delta) < 100 && "opacity-0 pointer-events-none",
                 summary.delta > 0
                   ? "border-amber-500 bg-amber-50 dark:bg-amber-950/20"
                   : "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
@@ -2567,56 +2570,18 @@ export default function PricingProposalDetail() {
                   </TableHeader>
                   <TableBody>
                     {summary.teamMembers.map((member) => (
-                      <TableRow key={member.key}>
-                        <TableCell className="pr-0">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                            onClick={() => toggleSummaryLock(member.key)}
-                            title={member.isLocked ? 'Unlock hours' : 'Lock hours'}
-                          >
-                            {member.isLocked ? (
-                              <Lock className="h-3.5 w-3.5 text-amber-600" />
-                            ) : (
-                              <Unlock className="h-3.5 w-3.5 text-muted-foreground/50" />
-                            )}
-                          </Button>
-                        </TableCell>
-                        <TableCell className="font-medium">{member.label}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex flex-col items-end gap-1">
-                            <Input
-                              type="number"
-                              step="0.5"
-                              min="0"
-                              value={(member.hours || 0).toFixed(1)}
-                              onChange={(e) => {
-                                const val = Math.max(0, parseFloat(e.target.value) || 0);
-                                handleSummaryHoursChange(member.key, val);
-                              }}
-                              className={cn(
-                                "w-20 h-7 text-right text-sm ml-auto tabular-nums",
-                                member.isLocked && "bg-amber-50 dark:bg-amber-950/20 border-amber-300"
-                              )}
-                            />
-                            <input
-                              type="range"
-                              min="0"
-                              max="500"
-                              step="0.5"
-                              value={Math.min(member.hours || 0, 500)}
-                              onChange={(e) => {
-                                const val = parseFloat(e.target.value) || 0;
-                                handleSummaryHoursChange(member.key, val);
-                              }}
-                              className="w-20 h-2 accent-primary cursor-pointer"
-                            />
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">{formatCurrency(member.rate)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{formatCurrency(member.revenue)}</TableCell>
-                      </TableRow>
+                      <SummarySliderRow
+                        key={member.key}
+                        memberKey={member.key}
+                        label={member.label}
+                        hours={member.hours}
+                        rate={member.rate}
+                        revenue={member.revenue}
+                        isLocked={member.isLocked}
+                        formatCurrency={formatCurrency}
+                        onHoursCommit={handleSummaryHoursChange}
+                        onToggleLock={toggleSummaryLock}
+                      />
                     ))}
                     <TableRow className="font-bold bg-muted/50">
                       <TableCell></TableCell>
@@ -2625,12 +2590,12 @@ export default function PricingProposalDetail() {
                       <TableCell className="text-right tabular-nums">{formatCurrency(summary.blendedRate)} (blended)</TableCell>
                       <TableCell className="text-right">
                         <div className="flex flex-col items-end">
-                          <span>{formatCurrency(summary.totalRevenue)}</span>
-                          <span className="text-xs font-normal text-muted-foreground">
+                          <span className="tabular-nums">{formatCurrency(summary.totalRevenue)}</span>
+                          <span className="text-xs font-normal text-muted-foreground tabular-nums">
                             Target: {formatCurrency(summary.bmUpperTarget)}
                           </span>
                           {showAssumptionsNotTrue && altTotals && (
-                            <span className="text-xs text-amber-600 dark:text-amber-400">
+                            <span className="text-xs text-amber-600 dark:text-amber-400 tabular-nums">
                               If assumptions not all true: {formatCurrency(altTotals.bmTotal)}
                             </span>
                           )}

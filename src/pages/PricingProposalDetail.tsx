@@ -921,8 +921,13 @@ export default function PricingProposalDetail() {
     };
   }, [teamMembers, summaryHours, summaryLocks, bmUpperTarget]);
 
+  // Live rate card changes (for real-time pyramid updates)
+  const handleRateCardChange = useCallback((newTeamRateCard: RateCard, newFeeRateCard: RateCard) => {
+    setRateCard(newTeamRateCard);
+    setFeeRateCardOverride(newFeeRateCard);
+  }, []);
 
-  const formatCurrency = (value: number) => {
+
     return `${currencySymbol}${new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)}`;
   };
 

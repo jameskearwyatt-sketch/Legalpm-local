@@ -285,9 +285,15 @@ export function CategorizedProposalView({
       if (item.currentFee === 0) return false;
       // Filter locked items unless user chose to include them
       if (!includeLocked) {
-        const phaseId = selectedPhaseId || 'global';
-        const lockKey = `${phaseId}:${item.category}`;
-        if (lockedCategories.has(lockKey)) return false;
+        // For aggregate edits (selectedPhaseId === null), check all phase lock keys for this category
+        if (selectedPhaseId === null && phases.length > 1) {
+          const isLockedInAnyPhase = phases.some(p => lockedCategories.has(`${p.id}:${item.category}`));
+          if (isLockedInAnyPhase) return false;
+        } else {
+          const phaseId = selectedPhaseId || 'global';
+          const lockKey = `${phaseId}:${item.category}`;
+          if (lockedCategories.has(lockKey)) return false;
+        }
       }
       return true;
     });

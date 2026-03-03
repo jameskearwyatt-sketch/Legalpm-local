@@ -693,6 +693,7 @@ export default function PricingProposalDetail() {
           rate: Math.round(entry.rate * teamToFeeExchangeRate),
           cost: entry.cost || 0,
           label: entry.label,
+          level: entry.level,
         };
       }
     });
@@ -920,6 +921,11 @@ export default function PricingProposalDetail() {
     };
   }, [teamMembers, summaryHours, summaryLocks, bmUpperTarget]);
 
+  // Live rate card changes (for real-time pyramid updates)
+  const handleRateCardChange = useCallback((newTeamRateCard: RateCard, newFeeRateCard: RateCard) => {
+    setRateCard(newTeamRateCard);
+    setFeeRateCardOverride(newFeeRateCard);
+  }, []);
 
   const formatCurrency = (value: number) => {
     return `${currencySymbol}${new Intl.NumberFormat('en-GB', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)}`;
@@ -2920,6 +2926,7 @@ export default function PricingProposalDetail() {
               feeCurrency={feeCurrency}
               teamRateCurrency={teamRateCurrency}
               exchangeRate={teamToFeeExchangeRate}
+              onChange={handleRateCardChange}
               onSave={async (newTeamRateCard, newFeeRateCard) => {
                 setRateCard(newTeamRateCard);
                 setFeeRateCardOverride(newFeeRateCard);

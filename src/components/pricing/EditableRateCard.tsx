@@ -108,6 +108,7 @@ interface EditableRateCardProps {
   exchangeRate: number; // team currency to fee currency (e.g., 1.25 for GBP->USD)
   onSave: (teamRateCard: RateCard, feeRateCard: RateCard) => Promise<void>;
   onSaveAsDefault?: (rateCard: RateCard) => Promise<void>;
+  onChange?: (teamRateCard: RateCard, feeRateCard: RateCard) => void;
   isSaving?: boolean;
   isSavingDefault?: boolean;
   afaDiscount?: number;
@@ -120,6 +121,7 @@ export function EditableRateCard({
   exchangeRate,
   onSave,
   onSaveAsDefault,
+  onChange,
   isSaving = false,
   isSavingDefault = false,
   afaDiscount = 0,
@@ -150,8 +152,12 @@ export function EditableRateCard({
       };
     }));
   }, [exchangeRate]);
+  // Notify parent of live changes for real-time preview (e.g., pyramid)
+  useEffect(() => {
+    onChange?.(arrayToRateCard(feeEarners), arrayToFeeRateCard(feeEarners));
+  }, [feeEarners, onChange]);
 
-  // Sort by fee rate descending
+
   const sortedEarners = useMemo(() => 
     [...feeEarners].sort((a, b) => b.feeRate - a.feeRate),
     [feeEarners]

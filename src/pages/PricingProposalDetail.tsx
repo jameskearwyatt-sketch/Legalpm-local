@@ -1317,6 +1317,29 @@ export default function PricingProposalDetail() {
     }
   };
 
+  // Helper: check if an item belongs to a locked category
+  const isItemLocked = useCallback((item: DraftProposalItem): boolean => {
+    const category = item.category || 'Other';
+    const phaseId = item.phase_id || 'global';
+    return lockedCategories.has(`${phaseId}:${category}`);
+  }, [lockedCategories]);
+
+  // Toggle lock on a category
+  const handleToggleCategoryLock = useCallback((key: string) => {
+    setLockedCategories(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      // Mark as needing save
+      pendingChangesRef.current = true;
+      return next;
+    });
+    setHasUnsavedChanges(true);
+  }, []);
+
   // Generate AI pricing for selected items only (respects user's manual pricing on unselected items)
   const generateAiPricing = async () => {
     setIsGeneratingAiPricing(true);
@@ -1324,8 +1347,9 @@ export default function PricingProposalDetail() {
       // Only apply AI pricing to items that are:
       // 1. Selected (is_included = true) - user explicitly wants to price these
       // 2. Have no existing price (fee_amount = 0) - don't overwrite manual pricing
+      // 3. NOT in a locked category - locked items are protected from automated changes
       const itemsNeedingPricing = draftItems.filter(i => 
-        i.is_included && (!i.fee_amount || i.fee_amount === 0)
+        i.is_included && (!i.fee_amount || i.fee_amount === 0) && !isItemLocked(i)
       );
       
       const selectedCount = draftItems.filter(i => i.is_included).length;

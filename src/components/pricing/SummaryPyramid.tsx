@@ -49,8 +49,17 @@ const TIER_COLORS: Record<TierKey, { bg: string; border: string; text: string }>
   },
 };
 
-function classifyTier(key: string): TierKey {
-  const k = key.toLowerCase();
+function classifyTier(member: TeamMember): TierKey {
+  // Use stored level if available
+  if (member.level) {
+    const lvl = member.level.toLowerCase();
+    if (lvl === "partner") return "partners";
+    if (lvl === "counsel" || lvl === "seniorassociate") return "senior";
+    if (lvl === "associate") return "associates";
+    if (lvl === "trainee") return "juniors";
+  }
+  // Fallback: auto-detect from key
+  const k = member.key.toLowerCase();
   if (k.includes("partner")) return "partners";
   if (k.includes("counsel") || k.includes("seniorassociate") || k.includes("senior_associate") || k.includes("senior associate"))
     return "senior";

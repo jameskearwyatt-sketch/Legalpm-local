@@ -93,7 +93,7 @@ function arrayToRateCard(feeEarners: FeeEarner[]): RateCard {
 function arrayToFeeRateCard(feeEarners: FeeEarner[]): RateCard {
   const result: RateCard = {} as RateCard;
   feeEarners.forEach(earner => {
-    (result as any)[earner.key] = { rate: earner.feeRate, cost: 0, label: earner.label };
+    (result as any)[earner.key] = { rate: earner.feeRate, cost: 0, label: earner.label, level: earner.level };
   });
   return result;
 }

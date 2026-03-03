@@ -83,6 +83,7 @@ import { PhasedWorkItemsView, PhasedWorkItemsViewRef } from "@/components/pricin
 import { AddWorkItemDialog } from "@/components/pricing/AddWorkItemDialog";
 import { LocalCounselPanel } from "@/components/pricing/LocalCounselPanel";
 import { AFATab } from "@/components/pricing/AFATab";
+import { ScalePricingWizard } from "@/components/pricing/ScalePricingWizard";
 import { ScopeAssumptionsTab, ScopeAssumptionsState, getAssumptionNarratives, getGroupedAssumptionNarratives } from "@/components/pricing/ScopeAssumptionsTab";
 import { exportAFAProposalToExcel } from "@/lib/exportAFAProposalToExcel";
 import { applyAFAFilters, getAFASummary } from "@/lib/afaFilterUtils";

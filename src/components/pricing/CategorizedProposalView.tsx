@@ -238,12 +238,17 @@ export function CategorizedProposalView({
     setAllocationDialogOpen(true);
   }, []);
   
-  // Get affected items for the dialog
+  // Get affected items for the dialog (excluding locked items)
   const affectedItems = useMemo(() => {
     if (!allocationDialogOpen) return [];
-    // For subtotal edit, pass null category to get all items in phase
-    return getItemsForPhaseCategory(items, selectedPhaseId, selectedCategory, phases);
-  }, [allocationDialogOpen, items, selectedPhaseId, selectedCategory, phases]);
+    const allItems = getItemsForPhaseCategory(items, selectedPhaseId, selectedCategory, phases);
+    // Filter out items in locked categories
+    return allItems.filter(item => {
+      const phaseId = selectedPhaseId || 'global';
+      const lockKey = `${phaseId}:${item.category}`;
+      return !lockedCategories.has(lockKey);
+    });
+  }, [allocationDialogOpen, items, selectedPhaseId, selectedCategory, phases, lockedCategories]);
   
   // Current total for selected category/subtotal
   const selectedCategoryTotal = useMemo(() => {

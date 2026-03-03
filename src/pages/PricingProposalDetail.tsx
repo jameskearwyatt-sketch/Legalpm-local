@@ -313,6 +313,10 @@ export default function PricingProposalDetail() {
   }, [phases]);
   
   useEffect(() => {
+    lockedCategoriesRef.current = lockedCategories;
+  }, [lockedCategories]);
+  
+  useEffect(() => {
     isInitializedRef.current = isInitialized;
   }, [isInitialized]);
   

@@ -1402,8 +1402,8 @@ export default function PricingProposalDetail() {
       if (data.prices) {
         // Build updated items with AI pricing applied
         const updatedItems = draftItems.map(item => {
-          // Only update items that are selected AND have no price
-          if (item.is_included && (!item.fee_amount || item.fee_amount === 0)) {
+          // Only update items that are selected AND have no price AND not locked
+          if (item.is_included && (!item.fee_amount || item.fee_amount === 0) && !isItemLocked(item)) {
             // Match by checking if the AI response work_item contains or starts with the original work_item
             const priceInfo = data.prices.find((p: any) => 
               p.work_item === item.work_item || 

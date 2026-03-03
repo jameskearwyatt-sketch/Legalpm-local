@@ -2239,6 +2239,14 @@ export default function PricingProposalDetail() {
                     )}
                     AI Price to Target
                   </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsScalePricingOpen(true)}
+                    disabled={draftItems.filter(i => i.is_included && (i.fee_upper ?? i.fee_amount ?? 0) > 0).length === 0}
+                  >
+                    <Scale className="h-4 w-4 mr-2" />
+                    Scale Pricing
+                  </Button>
                   <Button 
                     variant="outline" 
                     onClick={() => {

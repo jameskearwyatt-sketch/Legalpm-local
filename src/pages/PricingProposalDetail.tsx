@@ -2491,7 +2491,7 @@ export default function PricingProposalDetail() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Upper Estimate (Target)</p>
-                      <p className="text-2xl font-bold">{formatCurrency(summary.bmUpperTarget)}</p>
+                      <p className="text-2xl font-bold tabular-nums">{formatCurrency(summary.bmUpperTarget)}</p>
                       {showAssumptionsNotTrue && altTotals && (
                         <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                           If assumptions not all true: {formatCurrency(altTotals.bmTotal)}
@@ -2507,7 +2507,7 @@ export default function PricingProposalDetail() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Total Hours</p>
-                      <p className="text-2xl font-bold">{formatHours(summary.totalHours)}</p>
+                      <p className="text-2xl font-bold tabular-nums">{formatHours(summary.totalHours)}</p>
                     </div>
                     <Clock className="h-8 w-8 text-muted-foreground/30" />
                   </div>
@@ -2518,7 +2518,7 @@ export default function PricingProposalDetail() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm font-medium text-muted-foreground">Blended Rate</p>
-                      <p className="text-2xl font-bold">{formatCurrency(summary.blendedRate)}</p>
+                      <p className="text-2xl font-bold tabular-nums">{formatCurrency(summary.blendedRate)}</p>
                     </div>
                     <TrendingUp className="h-8 w-8 text-muted-foreground/30" />
                   </div>
@@ -2596,16 +2596,16 @@ export default function PricingProposalDetail() {
                                 handleSummaryHoursChange(member.key, val);
                               }}
                               className={cn(
-                                "w-20 h-7 text-right text-sm ml-auto",
+                                "w-20 h-7 text-right text-sm ml-auto tabular-nums",
                                 member.isLocked && "bg-amber-50 dark:bg-amber-950/20 border-amber-300"
                               )}
                             />
                             <input
                               type="range"
                               min="0"
-                              max={Math.max(200, (member.hours || 0) * 2)}
+                              max="500"
                               step="0.5"
-                              value={member.hours || 0}
+                              value={Math.min(member.hours || 0, 500)}
                               onChange={(e) => {
                                 const val = parseFloat(e.target.value) || 0;
                                 handleSummaryHoursChange(member.key, val);
@@ -2614,15 +2614,15 @@ export default function PricingProposalDetail() {
                             />
                           </div>
                         </TableCell>
-                        <TableCell className="text-right">{formatCurrency(member.rate)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(member.revenue)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatCurrency(member.rate)}</TableCell>
+                        <TableCell className="text-right tabular-nums">{formatCurrency(member.revenue)}</TableCell>
                       </TableRow>
                     ))}
                     <TableRow className="font-bold bg-muted/50">
                       <TableCell></TableCell>
                       <TableCell>Total</TableCell>
-                      <TableCell className="text-right">{formatHours(summary.totalHours)}</TableCell>
-                      <TableCell className="text-right">{formatCurrency(summary.blendedRate)} (blended)</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatHours(summary.totalHours)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrency(summary.blendedRate)} (blended)</TableCell>
                       <TableCell className="text-right">
                         <div className="flex flex-col items-end">
                           <span>{formatCurrency(summary.totalRevenue)}</span>

@@ -84,12 +84,7 @@ const SummarySliderRow = React.memo(function SummarySliderRow({
             onMouseDown={() => { isDragging.current = true; }}
             onTouchStart={() => { isDragging.current = true; }}
             onChange={(e) => {
-              const val = parseFloat(e.target.value) || 0;
-              if (isDragging.current) {
-                setLocalHours(val);
-              } else {
-                commitValue(val);
-              }
+              setLocalHours(parseFloat(e.target.value) || 0);
             }}
             onMouseUp={(e) => commitValue(parseFloat((e.target as HTMLInputElement).value) || 0)}
             onTouchEnd={(e) => commitValue(parseFloat((e.target as HTMLInputElement).value) || 0)}

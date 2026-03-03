@@ -113,7 +113,7 @@ function getItemsForPhaseCategory(
   phaseId: string | null,
   category: string | null,
   phases: ProposalPhase[]
-): { index: number; workItem: string; currentFee: number; category: string }[] {
+): { index: number; workItem: string; currentFee: number; category: string; phaseId: string | null }[] {
   const validPhaseIds = new Set(phases.map(p => p.id));
   
   return items
@@ -140,6 +140,7 @@ function getItemsForPhaseCategory(
       workItem: item.work_item,
       currentFee: getFeeUpper(item),
       category: item.category || 'Other',
+      phaseId: item.phase_id || null,
     }));
 }
 
@@ -221,8 +222,9 @@ export function CategorizedProposalView({
     // Check if there are locked items in the scope
     const allItems = getItemsForPhaseCategory(items, phaseId, category, phases);
     const hasLocked = allItems.some(item => {
-      const pId = phaseId || 'global';
-      const lockKey = `${pId}:${item.category}`;
+      // For aggregate edits (phaseId === null), check each item's own phase
+      const itemPhaseKey = item.phaseId || 'global';
+      const lockKey = `${phaseId !== null ? phaseId : itemPhaseKey}:${item.category}`;
       return lockedCategories.has(lockKey);
     });
 
@@ -285,15 +287,10 @@ export function CategorizedProposalView({
       if (item.currentFee === 0) return false;
       // Filter locked items unless user chose to include them
       if (!includeLocked) {
-        // For aggregate edits (selectedPhaseId === null), check all phase lock keys for this category
-        if (selectedPhaseId === null && phases.length > 1) {
-          const isLockedInAnyPhase = phases.some(p => lockedCategories.has(`${p.id}:${item.category}`));
-          if (isLockedInAnyPhase) return false;
-        } else {
-          const phaseId = selectedPhaseId || 'global';
-          const lockKey = `${phaseId}:${item.category}`;
-          if (lockedCategories.has(lockKey)) return false;
-        }
+        // Use the item's own phase for lock key lookup
+        const itemPhaseKey = selectedPhaseId !== null ? selectedPhaseId : (item.phaseId || 'global');
+        const lockKey = `${itemPhaseKey}:${item.category}`;
+        if (lockedCategories.has(lockKey)) return false;
       }
       return true;
     });

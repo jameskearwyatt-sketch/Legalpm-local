@@ -70,9 +70,8 @@ function distributeProRata(
     discrepancy > 0 ? b.remainder - a.remainder : a.remainder - b.remainder
   );
   
-  // Determine increment based on amounts
-  const avgAmount = targetTotal / items.length;
-  const increment = avgAmount >= 10000 ? 1000 : 100;
+  // Always use 1000 increment for discrepancy adjustment
+  const increment = 1000;
   
   // Adjust items to eliminate discrepancy
   sortedByRemainder.forEach(share => {

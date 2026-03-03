@@ -88,13 +88,9 @@ export function calculateFeeRange(
 }
 
 /**
- * Smart rounding for fees: nearest 100 for <10k, nearest 1000 for >=10k
+ * Smart rounding for fees: always nearest 1,000
  */
 export function smartRoundFee(value: number): number {
-  const absValue = Math.abs(value);
-  if (absValue < 10000) {
-    return Math.round(value / 100) * 100;
-  }
   return Math.round(value / 1000) * 1000;
 }
 

@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ArrowLeft, ArrowRight, AlertTriangle, Check, Lock } from "lucide-react";
 import { DraftProposalItem, ProposalPhase } from "@/lib/hooks/usePricingProposals";
-import { calculateFeeRange } from "@/lib/feeSpreadUtils";
+import { calculateFeeRange, smartRoundFee } from "@/lib/feeSpreadUtils";
 import { cn } from "@/lib/utils";
 
 interface ScalePricingWizardProps {
@@ -25,12 +26,61 @@ interface ScalePricingWizardProps {
   onApply: (scaledItems: { index: number; fee_upper: number; fee_lower: number; fee_amount: number }[]) => void;
 }
 
-function roundTo1000(value: number): number {
-  return Math.round(value / 1000) * 1000;
-}
-
 function getFeeUpper(item: DraftProposalItem): number {
   return item.fee_upper ?? item.fee_amount ?? 0;
+}
+
+/**
+ * Largest Remainder Method distribution with smart rounding.
+ */
+function distributeProRataLRM(
+  items: { index: number; currentFee: number }[],
+  targetTotal: number
+): Map<number, number> {
+  const result = new Map<number, number>();
+  if (items.length === 0) return result;
+
+  const currentTotal = items.reduce((sum, i) => sum + i.currentFee, 0);
+  if (currentTotal <= 0) return result;
+
+  const shares = items.map(item => ({
+    index: item.index,
+    exactShare: (item.currentFee / currentTotal) * targetTotal,
+  }));
+
+  const roundedShares = shares.map(s => ({
+    ...s,
+    rounded: smartRoundFee(s.exactShare),
+    remainder: s.exactShare - smartRoundFee(s.exactShare),
+  }));
+
+  const totalRounded = roundedShares.reduce((sum, s) => sum + s.rounded, 0);
+  let discrepancy = targetTotal - totalRounded;
+
+  const sortedByRemainder = [...roundedShares].sort((a, b) =>
+    discrepancy > 0 ? b.remainder - a.remainder : a.remainder - b.remainder
+  );
+
+  const avgAmount = targetTotal / items.length;
+  const increment = avgAmount >= 10000 ? 1000 : 100;
+
+  sortedByRemainder.forEach(share => {
+    if (Math.abs(discrepancy) >= increment) {
+      const adjustment = discrepancy > 0 ? increment : -increment;
+      share.rounded += adjustment;
+      discrepancy -= adjustment;
+    }
+  });
+
+  if (discrepancy !== 0 && sortedByRemainder.length > 0) {
+    sortedByRemainder[0].rounded += discrepancy;
+  }
+
+  roundedShares.forEach(share => {
+    result.set(share.index, share.rounded);
+  });
+
+  return result;
 }
 
 export function ScalePricingWizard({
@@ -47,6 +97,13 @@ export function ScalePricingWizard({
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const [targetAmount, setTargetAmount] = useState("");
   const [selectionTab, setSelectionTab] = useState("phase");
+  const [includeLocked, setIncludeLocked] = useState(false);
+  const [showLockPrompt, setShowLockPrompt] = useState(false);
+
+  // Check if any included items are locked
+  const hasLockedItems = useMemo(() => {
+    return items.some(item => item.is_included && isItemLocked(item) && getFeeUpper(item) > 0);
+  }, [items, isItemLocked]);
 
   // Reset state when dialog opens
   const handleOpenChange = useCallback((o: boolean) => {
@@ -55,25 +112,31 @@ export function ScalePricingWizard({
       setSelectedIndices(new Set());
       setTargetAmount("");
       setSelectionTab("phase");
+      setIncludeLocked(false);
+      // Show lock prompt if there are locked items
+      if (items.some(item => item.is_included && isItemLocked(item) && getFeeUpper(item) > 0)) {
+        setShowLockPrompt(true);
+      }
     }
     onOpenChange(o);
-  }, [onOpenChange]);
+  }, [onOpenChange, items, isItemLocked]);
 
-  // Only included, non-locked items with a fee > 0 are selectable
+  // Selectable items based on lock override choice
   const selectableItems = useMemo(() => {
     const result: { index: number; item: DraftProposalItem }[] = [];
     items.forEach((item, index) => {
-      if (item.is_included && !isItemLocked(item) && getFeeUpper(item) > 0) {
-        result.push({ index, item });
+      if (item.is_included && getFeeUpper(item) > 0) {
+        if (includeLocked || !isItemLocked(item)) {
+          result.push({ index, item });
+        }
       }
     });
     return result;
-  }, [items, isItemLocked]);
+  }, [items, isItemLocked, includeLocked]);
 
   // Group by phase
   const phaseGroups = useMemo(() => {
     const groups = new Map<string, { phase: ProposalPhase | null; items: { index: number; item: DraftProposalItem }[] }>();
-    // Add an "Unassigned" group
     selectableItems.forEach(({ index, item }) => {
       const phaseId = item.phase_id || "__unassigned__";
       if (!groups.has(phaseId)) {
@@ -110,7 +173,7 @@ export function ScalePricingWizard({
   const percentChange = ((scalingFactor - 1) * 100);
   const isExtremeScale = scalingFactor < 0.5 || scalingFactor > 2.0;
 
-  // Preview of scaled items
+  // Preview using Largest Remainder Method with smart rounding
   const previewItems = useMemo(() => {
     if (currentTotal <= 0 || targetNum <= 0) return [];
 
@@ -121,29 +184,18 @@ export function ScalePricingWizard({
       scaledFee: 0,
     }));
 
-    // Scale and round
+    const allocations = distributeProRataLRM(
+      selected.map(s => ({ index: s.index, currentFee: s.currentFee })),
+      targetNum
+    );
+
     selected.forEach(s => {
-      s.scaledFee = roundTo1000(s.currentFee * scalingFactor);
+      s.scaledFee = allocations.get(s.index) ?? s.currentFee;
     });
 
-    // Residual reconciliation - apply to largest item
-    const roundedTotal = selected.reduce((sum, s) => sum + s.scaledFee, 0);
-    const residual = targetNum - roundedTotal;
-    if (residual !== 0 && selected.length > 0) {
-      // Find largest item
-      let largestIdx = 0;
-      selected.forEach((s, i) => {
-        if (s.scaledFee > selected[largestIdx].scaledFee) largestIdx = i;
-      });
-      selected[largestIdx].scaledFee += residual;
-      // Re-round the adjusted item to nearest 1000
-      selected[largestIdx].scaledFee = roundTo1000(selected[largestIdx].scaledFee);
-    }
-
     return selected;
-  }, [selectedIndices, items, currentTotal, targetNum, scalingFactor]);
+  }, [selectedIndices, items, currentTotal, targetNum]);
 
-  // Final total after rounding (may differ slightly from target due to rounding)
   const previewTotal = previewItems.reduce((sum, s) => sum + s.scaledFee, 0);
 
   // Toggle helpers
@@ -232,192 +284,219 @@ export function ScalePricingWizard({
   const fmt = (v: number) => `${currencySymbol}${v.toLocaleString()}`;
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Scale Pricing</DialogTitle>
-          <DialogDescription>
-            {step === 1
-              ? "Select work items to scale proportionally"
-              : "Set a new target and preview scaled fees"}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      {/* Lock override prompt */}
+      <AlertDialog open={showLockPrompt} onOpenChange={setShowLockPrompt}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Locked Categories Detected</AlertDialogTitle>
+            <AlertDialogDescription>
+              Some items belong to locked categories. Would you like to include locked items in this scaling adjustment?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => { setIncludeLocked(false); setShowLockPrompt(false); }}>
+              No, skip locked items
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={() => { setIncludeLocked(true); setShowLockPrompt(false); }}>
+              Yes, include locked items
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-        {step === 1 && (
-          <div className="flex-1 min-h-0 flex flex-col gap-3">
-            {/* Aggregate bar */}
-            <div className="flex items-center justify-between px-1">
-              <div className="text-sm text-muted-foreground">
-                {selectedIndices.size} item{selectedIndices.size !== 1 ? "s" : ""} selected
-              </div>
-              <div className="text-sm font-semibold">
-                Current total: {fmt(currentTotal)}
-              </div>
-            </div>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Scale Pricing</DialogTitle>
+            <DialogDescription>
+              {step === 1
+                ? "Select work items to scale proportionally"
+                : "Set a new target and preview scaled fees"}
+            </DialogDescription>
+          </DialogHeader>
 
-            <div className="flex gap-2 px-1">
-              <Button variant="ghost" size="sm" onClick={selectAll}>Select all</Button>
-              <Button variant="ghost" size="sm" onClick={selectNone}>Clear</Button>
-            </div>
-
-            <Tabs value={selectionTab} onValueChange={setSelectionTab} className="flex-1 min-h-0 flex flex-col">
-              <TabsList className="w-full justify-start">
-                <TabsTrigger value="phase">By Phase</TabsTrigger>
-                <TabsTrigger value="category">By Category</TabsTrigger>
-                <TabsTrigger value="item">By Item</TabsTrigger>
-              </TabsList>
-
-              <ScrollArea className="flex-1 min-h-0 mt-2" style={{ maxHeight: "40vh" }}>
-                <TabsContent value="phase" className="mt-0 space-y-2">
-                  {Array.from(phaseGroups.entries()).map(([phaseId, group]) => (
-                    <div key={phaseId} className="space-y-1">
-                      <label className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer font-medium text-sm">
-                        <Checkbox
-                          checked={isPhaseChecked(phaseId)}
-                          // @ts-ignore - indeterminate prop
-                          data-state={isPhaseIndeterminate(phaseId) ? "indeterminate" : undefined}
-                          onCheckedChange={() => togglePhase(phaseId)}
-                        />
-                        {group.phase?.name || "Unassigned"}
-                        <Badge variant="secondary" className="ml-auto text-xs">
-                          {group.items.length} item{group.items.length !== 1 ? "s" : ""} · {fmt(group.items.reduce((s, i) => s + getFeeUpper(i.item), 0))}
-                        </Badge>
-                      </label>
-                    </div>
-                  ))}
-                  {phaseGroups.size === 0 && (
-                    <p className="text-sm text-muted-foreground p-2">No selectable items</p>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="category" className="mt-0 space-y-2">
-                  {Array.from(categoryGroups.entries()).sort().map(([cat, groupItems]) => (
-                    <label key={cat} className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer text-sm">
-                      <Checkbox
-                        checked={isCatChecked(cat)}
-                        data-state={isCatIndeterminate(cat) ? "indeterminate" : undefined}
-                        onCheckedChange={() => toggleCategory(cat)}
-                      />
-                      {cat}
-                      <Badge variant="secondary" className="ml-auto text-xs">
-                        {groupItems.length} · {fmt(groupItems.reduce((s, i) => s + getFeeUpper(i.item), 0))}
-                      </Badge>
-                    </label>
-                  ))}
-                </TabsContent>
-
-                <TabsContent value="item" className="mt-0 space-y-1">
-                  {selectableItems.map(({ index, item }) => (
-                    <label key={index} className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer text-sm">
-                      <Checkbox
-                        checked={selectedIndices.has(index)}
-                        onCheckedChange={() => toggleIndex(index)}
-                      />
-                      <span className="flex-1 truncate">{item.work_item}</span>
-                      <span className="text-muted-foreground text-xs shrink-0">{fmt(getFeeUpper(item))}</span>
-                    </label>
-                  ))}
-                </TabsContent>
-              </ScrollArea>
-            </Tabs>
-          </div>
-        )}
-
-        {step === 2 && (
-          <div className="flex-1 min-h-0 flex flex-col gap-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-xs text-muted-foreground">Current total</Label>
-                <div className="text-lg font-semibold">{fmt(currentTotal)}</div>
-              </div>
-              <div>
-                <Label htmlFor="scale-target" className="text-xs text-muted-foreground">New target</Label>
-                <Input
-                  id="scale-target"
-                  type="number"
-                  min={0}
-                  step={1000}
-                  value={targetAmount}
-                  onChange={e => setTargetAmount(e.target.value)}
-                  placeholder="Enter target..."
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            {targetNum > 0 && (
-              <>
-                <div className="flex items-center gap-3 text-sm">
-                  <Badge variant={isExtremeScale ? "destructive" : "secondary"}>
-                    ×{scalingFactor.toFixed(2)} — {percentChange >= 0 ? "+" : ""}{percentChange.toFixed(0)}%
-                  </Badge>
-                  {isExtremeScale && (
-                    <span className="text-destructive flex items-center gap-1 text-xs">
-                      <AlertTriangle className="h-3 w-3" /> Extreme scaling factor
-                    </span>
+          {step === 1 && (
+            <div className="flex-1 min-h-0 flex flex-col gap-3">
+              {/* Aggregate bar */}
+              <div className="flex items-center justify-between px-1">
+                <div className="text-sm text-muted-foreground">
+                  {selectedIndices.size} item{selectedIndices.size !== 1 ? "s" : ""} selected
+                  {includeLocked && hasLockedItems && (
+                    <Badge variant="outline" className="ml-2 text-xs border-amber-400 text-amber-700 dark:text-amber-300">
+                      <Lock className="h-3 w-3 mr-1" /> Including locked
+                    </Badge>
                   )}
                 </div>
+                <div className="text-sm font-semibold">
+                  Current total: {fmt(currentTotal)}
+                </div>
+              </div>
 
-                <ScrollArea className="flex-1 min-h-0 border rounded-md" style={{ maxHeight: "35vh" }}>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Work Item</TableHead>
-                        <TableHead className="text-right">Current</TableHead>
-                        <TableHead className="text-right">Scaled</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {previewItems.map(s => (
-                        <TableRow key={s.index}>
-                          <TableCell className="text-sm truncate max-w-[200px]">{s.item.work_item}</TableCell>
-                          <TableCell className="text-right text-sm text-muted-foreground">{fmt(s.currentFee)}</TableCell>
-                          <TableCell className="text-right text-sm font-medium">{fmt(s.scaledFee)}</TableCell>
-                        </TableRow>
-                      ))}
-                      <TableRow className="font-semibold border-t-2">
-                        <TableCell>Total</TableCell>
-                        <TableCell className="text-right">{fmt(currentTotal)}</TableCell>
-                        <TableCell className="text-right">{fmt(previewTotal)}</TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
+              <div className="flex gap-2 px-1">
+                <Button variant="ghost" size="sm" onClick={selectAll}>Select all</Button>
+                <Button variant="ghost" size="sm" onClick={selectNone}>Clear</Button>
+              </div>
+
+              <Tabs value={selectionTab} onValueChange={setSelectionTab} className="flex-1 min-h-0 flex flex-col">
+                <TabsList className="w-full justify-start">
+                  <TabsTrigger value="phase">By Phase</TabsTrigger>
+                  <TabsTrigger value="category">By Category</TabsTrigger>
+                  <TabsTrigger value="item">By Item</TabsTrigger>
+                </TabsList>
+
+                <ScrollArea className="flex-1 min-h-0 mt-2" style={{ maxHeight: "40vh" }}>
+                  <TabsContent value="phase" className="mt-0 space-y-2">
+                    {Array.from(phaseGroups.entries()).map(([phaseId, group]) => (
+                      <div key={phaseId} className="space-y-1">
+                        <label className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer font-medium text-sm">
+                          <Checkbox
+                            checked={isPhaseChecked(phaseId)}
+                            // @ts-ignore - indeterminate prop
+                            data-state={isPhaseIndeterminate(phaseId) ? "indeterminate" : undefined}
+                            onCheckedChange={() => togglePhase(phaseId)}
+                          />
+                          {group.phase?.name || "Unassigned"}
+                          <Badge variant="secondary" className="ml-auto text-xs">
+                            {group.items.length} item{group.items.length !== 1 ? "s" : ""} · {fmt(group.items.reduce((s, i) => s + getFeeUpper(i.item), 0))}
+                          </Badge>
+                        </label>
+                      </div>
+                    ))}
+                    {phaseGroups.size === 0 && (
+                      <p className="text-sm text-muted-foreground p-2">No selectable items</p>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="category" className="mt-0 space-y-2">
+                    {Array.from(categoryGroups.entries()).sort().map(([cat, groupItems]) => (
+                      <label key={cat} className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer text-sm">
+                        <Checkbox
+                          checked={isCatChecked(cat)}
+                          data-state={isCatIndeterminate(cat) ? "indeterminate" : undefined}
+                          onCheckedChange={() => toggleCategory(cat)}
+                        />
+                        {cat}
+                        <Badge variant="secondary" className="ml-auto text-xs">
+                          {groupItems.length} · {fmt(groupItems.reduce((s, i) => s + getFeeUpper(i.item), 0))}
+                        </Badge>
+                      </label>
+                    ))}
+                  </TabsContent>
+
+                  <TabsContent value="item" className="mt-0 space-y-1">
+                    {selectableItems.map(({ index, item }) => (
+                      <label key={index} className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer text-sm">
+                        <Checkbox
+                          checked={selectedIndices.has(index)}
+                          onCheckedChange={() => toggleIndex(index)}
+                        />
+                        <span className="flex-1 truncate">{item.work_item}</span>
+                        <span className="text-muted-foreground text-xs shrink-0">{fmt(getFeeUpper(item))}</span>
+                      </label>
+                    ))}
+                  </TabsContent>
                 </ScrollArea>
+              </Tabs>
+            </div>
+          )}
 
-                {previewTotal !== targetNum && (
-                  <p className="text-xs text-muted-foreground">
-                    Note: Total is {fmt(previewTotal)} after rounding to nearest 1,000 (target: {fmt(targetNum)})
-                  </p>
-                )}
-              </>
+          {step === 2 && (
+            <div className="flex-1 min-h-0 flex flex-col gap-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Current total</Label>
+                  <div className="text-lg font-semibold">{fmt(currentTotal)}</div>
+                </div>
+                <div>
+                  <Label htmlFor="scale-target" className="text-xs text-muted-foreground">New target</Label>
+                  <Input
+                    id="scale-target"
+                    type="number"
+                    min={0}
+                    step={1000}
+                    value={targetAmount}
+                    onChange={e => setTargetAmount(e.target.value)}
+                    placeholder="Enter target..."
+                    autoFocus
+                  />
+                </div>
+              </div>
+
+              {targetNum > 0 && (
+                <>
+                  <div className="flex items-center gap-3 text-sm">
+                    <Badge variant={isExtremeScale ? "destructive" : "secondary"}>
+                      ×{scalingFactor.toFixed(2)} — {percentChange >= 0 ? "+" : ""}{percentChange.toFixed(0)}%
+                    </Badge>
+                    {isExtremeScale && (
+                      <span className="text-destructive flex items-center gap-1 text-xs">
+                        <AlertTriangle className="h-3 w-3" /> Extreme scaling factor
+                      </span>
+                    )}
+                  </div>
+
+                  <ScrollArea className="flex-1 min-h-0 border rounded-md" style={{ maxHeight: "35vh" }}>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Work Item</TableHead>
+                          <TableHead className="text-right">Current</TableHead>
+                          <TableHead className="text-right">Scaled</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {previewItems.map(s => (
+                          <TableRow key={s.index}>
+                            <TableCell className="text-sm truncate max-w-[200px]">{s.item.work_item}</TableCell>
+                            <TableCell className="text-right text-sm text-muted-foreground">{fmt(s.currentFee)}</TableCell>
+                            <TableCell className="text-right text-sm font-medium">{fmt(s.scaledFee)}</TableCell>
+                          </TableRow>
+                        ))}
+                        <TableRow className="font-semibold border-t-2">
+                          <TableCell>Total</TableCell>
+                          <TableCell className="text-right">{fmt(currentTotal)}</TableCell>
+                          <TableCell className="text-right">{fmt(previewTotal)}</TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+
+                  {previewTotal !== targetNum && (
+                    <p className="text-xs text-muted-foreground">
+                      Note: Total is {fmt(previewTotal)} after smart rounding (target: {fmt(targetNum)})
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          <DialogFooter className="flex-shrink-0 gap-2 sm:gap-0">
+            {step === 2 && (
+              <Button variant="outline" onClick={() => setStep(1)} className="mr-auto">
+                <ArrowLeft className="h-4 w-4 mr-1" /> Back
+              </Button>
             )}
-          </div>
-        )}
-
-        <DialogFooter className="flex-shrink-0 gap-2 sm:gap-0">
-          {step === 2 && (
-            <Button variant="outline" onClick={() => setStep(1)} className="mr-auto">
-              <ArrowLeft className="h-4 w-4 mr-1" /> Back
-            </Button>
-          )}
-          {step === 1 && (
-            <Button
-              onClick={() => setStep(2)}
-              disabled={selectedIndices.size === 0}
-            >
-              Next <ArrowRight className="h-4 w-4 ml-1" />
-            </Button>
-          )}
-          {step === 2 && (
-            <Button
-              onClick={handleApply}
-              disabled={targetNum <= 0 || previewItems.length === 0}
-            >
-              <Check className="h-4 w-4 mr-1" /> Apply Scaling
-            </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            {step === 1 && (
+              <Button
+                onClick={() => setStep(2)}
+                disabled={selectedIndices.size === 0}
+              >
+                Next <ArrowRight className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+            {step === 2 && (
+              <Button
+                onClick={handleApply}
+                disabled={targetNum <= 0 || previewItems.length === 0}
+              >
+                <Check className="h-4 w-4 mr-1" /> Apply Scaling
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

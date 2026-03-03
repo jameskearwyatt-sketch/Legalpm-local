@@ -1467,25 +1467,45 @@ export default function PricingProposalDetail() {
 
     setIsAllocatingTargetPricing(true);
     try {
-      // Get items to price based on phase selection
+      // Get items to price based on phase selection, excluding locked items
       let itemsToPriceIndices: number[] = [];
+      let lockedFeeTotal = 0;
       
       if (targetPricingPhaseId === 'all') {
         // All selected items across all phases
-        itemsToPriceIndices = draftItems
-          .map((item, idx) => item.is_included ? idx : -1)
-          .filter(idx => idx !== -1);
+        draftItems.forEach((item, idx) => {
+          if (item.is_included) {
+            if (isItemLocked(item)) {
+              lockedFeeTotal += item.fee_upper ?? item.fee_amount ?? 0;
+            } else {
+              itemsToPriceIndices.push(idx);
+            }
+          }
+        });
       } else if (targetPricingPhaseId === 'unassigned') {
-        // Selected items with no phase assignment
-        itemsToPriceIndices = draftItems
-          .map((item, idx) => (item.is_included && !item.phase_id) ? idx : -1)
-          .filter(idx => idx !== -1);
+        draftItems.forEach((item, idx) => {
+          if (item.is_included && !item.phase_id) {
+            if (isItemLocked(item)) {
+              lockedFeeTotal += item.fee_upper ?? item.fee_amount ?? 0;
+            } else {
+              itemsToPriceIndices.push(idx);
+            }
+          }
+        });
       } else {
-        // Selected items in specific phase
-        itemsToPriceIndices = draftItems
-          .map((item, idx) => (item.is_included && item.phase_id === targetPricingPhaseId) ? idx : -1)
-          .filter(idx => idx !== -1);
+        draftItems.forEach((item, idx) => {
+          if (item.is_included && item.phase_id === targetPricingPhaseId) {
+            if (isItemLocked(item)) {
+              lockedFeeTotal += item.fee_upper ?? item.fee_amount ?? 0;
+            } else {
+              itemsToPriceIndices.push(idx);
+            }
+          }
+        });
       }
+
+      // Subtract locked fees from target - unlocked items must absorb the remainder
+      const adjustedTarget = Math.max(0, targetAmount - lockedFeeTotal);
 
       if (itemsToPriceIndices.length === 0) {
         toast({ 

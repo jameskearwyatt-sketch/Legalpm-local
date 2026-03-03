@@ -84,7 +84,7 @@ function generateKey(level: string, label: string): string {
 function arrayToRateCard(feeEarners: FeeEarner[]): RateCard {
   const result: RateCard = {} as RateCard;
   feeEarners.forEach(earner => {
-    (result as any)[earner.key] = { rate: earner.teamRate, cost: 0, label: earner.label };
+    (result as any)[earner.key] = { rate: earner.teamRate, cost: 0, label: earner.label, level: earner.level };
   });
   return result;
 }

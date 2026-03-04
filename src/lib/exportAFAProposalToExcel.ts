@@ -606,13 +606,13 @@ export async function exportAFAProposalToExcel({
         if (includeInputDeptHighlighting) altRowValues.push('');
         altRowValues.push(delta > 0 ? `+${smartRound(delta).toLocaleString()} increase` : `${smartRound(delta).toLocaleString()} change`);
         altRow.values = altRowValues;
-        altRow.getCell(2).font = { size: 9, italic: true, color: { argb: 'FFB45309' } };
-        altRow.getCell(3).font = { size: 9, italic: true, color: { argb: 'FF92400E' } };
+        altRow.getCell(2).font = { size: 9, color: { argb: 'FFB45309' } };
+        altRow.getCell(3).font = { size: 9, color: { argb: 'FF92400E' } };
         altRow.getCell(3).alignment = { wrapText: true, vertical: 'top' };
         altRow.getCell(5).numFmt = '#,##0';
         altRow.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
         altRow.getCell(5).font = { size: 9, bold: true, color: { argb: 'FFB45309' } };
-        altRow.getCell(notesColumnIndex).font = { size: 9, italic: true, color: { argb: 'FFB45309' } };
+        altRow.getCell(notesColumnIndex).font = { size: 9, color: { argb: 'FFB45309' } };
         altRow.eachCell((cell) => {
           cell.fill = {
             type: 'pattern',

@@ -906,8 +906,11 @@ export async function exportAFAProposalToExcel({
     worksheet.getRow(currentRow).height = 30;
     currentRow++;
 
-    // Add discount note at top of team section if discounted rates AFA is active
+    // Check if discounted rates AFA is active
     const discountAfa = enabledAFAs.find(a => a.afa_type === 'discounted_rates' && a.is_enabled);
+    const hasAfaRates = !!discountAfa && teamMemberData.some(m => m.afaRate != null);
+
+    // Add discount note at top of team section if discounted rates AFA is active
     if (discountAfa) {
       const discConfig = discountAfa.config as { discountPercent?: number };
       const pct = discConfig?.discountPercent || 0;
@@ -920,11 +923,16 @@ export async function exportAFAProposalToExcel({
       currentRow++;
     }
 
-    // Table header row - use columns B, C, D for Team Member, Rate, Hours, Fee
+    // Table header row - use columns B, C, (D if AFA), then Hours, Fee
     const teamTableHeader = worksheet.getRow(currentRow);
-    teamTableHeader.values = ['', 'Team Member', `Rate (${teamCurrencySymbol}/hr)`, 'Estimated Hours', 'Estimated Fee'];
+    if (hasAfaRates) {
+      teamTableHeader.values = ['', 'Team Member', `Standard Rate (${teamCurrencySymbol}/hr)`, `AFA Rate (${teamCurrencySymbol}/hr)`, 'Estimated Hours', 'Estimated Fee'];
+    } else {
+      teamTableHeader.values = ['', 'Team Member', `Rate (${teamCurrencySymbol}/hr)`, 'Estimated Hours', 'Estimated Fee'];
+    }
+    const teamColCount = hasAfaRates ? 6 : 5;
     teamTableHeader.eachCell((cell, colNumber) => {
-      if (colNumber >= 2 && colNumber <= 5) {
+      if (colNumber >= 2 && colNumber <= teamColCount) {
         cell.font = { bold: true, size: 10, color: { argb: 'FF374151' } };
         cell.fill = {
           type: 'pattern',
@@ -949,18 +957,35 @@ export async function exportAFAProposalToExcel({
 
     for (const member of sortedTeam) {
       const memberRow = worksheet.getRow(currentRow);
-      memberRow.values = ['', member.label, member.rate, member.hours, smartRound(member.revenue)];
+      if (hasAfaRates) {
+        memberRow.values = ['', member.label, member.rate, member.afaRate || member.rate, member.hours, smartRound(member.revenue)];
+      } else {
+        memberRow.values = ['', member.label, member.rate, member.hours, smartRound(member.revenue)];
+      }
       
       memberRow.getCell(2).font = { size: 10 };
       memberRow.getCell(3).numFmt = '#,##0';
       memberRow.getCell(3).alignment = { horizontal: 'center' };
       memberRow.getCell(3).font = { size: 10, color: { argb: 'FF6B7280' } };
-      memberRow.getCell(4).numFmt = '#,##0.0';
-      memberRow.getCell(4).alignment = { horizontal: 'center' };
-      memberRow.getCell(4).font = { size: 10 };
-      memberRow.getCell(5).numFmt = '#,##0';
-      memberRow.getCell(5).alignment = { horizontal: 'center' };
-      memberRow.getCell(5).font = { size: 10, bold: true };
+
+      if (hasAfaRates) {
+        memberRow.getCell(4).numFmt = '#,##0';
+        memberRow.getCell(4).alignment = { horizontal: 'center' };
+        memberRow.getCell(4).font = { size: 10, color: { argb: 'FF2563EB' } };
+        memberRow.getCell(5).numFmt = '#,##0.0';
+        memberRow.getCell(5).alignment = { horizontal: 'center' };
+        memberRow.getCell(5).font = { size: 10 };
+        memberRow.getCell(6).numFmt = '#,##0';
+        memberRow.getCell(6).alignment = { horizontal: 'center' };
+        memberRow.getCell(6).font = { size: 10, bold: true };
+      } else {
+        memberRow.getCell(4).numFmt = '#,##0.0';
+        memberRow.getCell(4).alignment = { horizontal: 'center' };
+        memberRow.getCell(4).font = { size: 10 };
+        memberRow.getCell(5).numFmt = '#,##0';
+        memberRow.getCell(5).alignment = { horizontal: 'center' };
+        memberRow.getCell(5).font = { size: 10, bold: true };
+      }
 
       // Alternating row colors
       if (currentRow % 2 === 0) {
@@ -984,14 +1009,20 @@ export async function exportAFAProposalToExcel({
 
     // Totals row
     const teamTotalRow = worksheet.getRow(currentRow);
-    teamTotalRow.values = ['', 'TOTAL', '', totalHours, smartRound(totalRevenue)];
+    const hoursCol = hasAfaRates ? 5 : 4;
+    const feeCol = hasAfaRates ? 6 : 5;
+    if (hasAfaRates) {
+      teamTotalRow.values = ['', 'TOTAL', '', '', totalHours, smartRound(totalRevenue)];
+    } else {
+      teamTotalRow.values = ['', 'TOTAL', '', totalHours, smartRound(totalRevenue)];
+    }
     teamTotalRow.getCell(2).font = { bold: true, size: 11, color: { argb: primaryColor } };
-    teamTotalRow.getCell(4).numFmt = '#,##0.0';
-    teamTotalRow.getCell(4).alignment = { horizontal: 'center' };
-    teamTotalRow.getCell(4).font = { bold: true, size: 11, color: { argb: primaryColor } };
-    teamTotalRow.getCell(5).numFmt = '#,##0';
-    teamTotalRow.getCell(5).alignment = { horizontal: 'center' };
-    teamTotalRow.getCell(5).font = { bold: true, size: 11, color: { argb: primaryColor } };
+    teamTotalRow.getCell(hoursCol).numFmt = '#,##0.0';
+    teamTotalRow.getCell(hoursCol).alignment = { horizontal: 'center' };
+    teamTotalRow.getCell(hoursCol).font = { bold: true, size: 11, color: { argb: primaryColor } };
+    teamTotalRow.getCell(feeCol).numFmt = '#,##0';
+    teamTotalRow.getCell(feeCol).alignment = { horizontal: 'center' };
+    teamTotalRow.getCell(feeCol).font = { bold: true, size: 11, color: { argb: primaryColor } };
     teamTotalRow.eachCell((cell) => {
       cell.border = {
         top: { style: 'medium', color: { argb: primaryColor } },

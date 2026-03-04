@@ -773,7 +773,7 @@ export default function PricingProposalDetail() {
 
     setAssumptions(prev => ({ ...prev, summaryHours: newHours, summaryLocks: {} }));
     setSummaryInitialized(true);
-  }, [teamMembers, proposal, bmUpperTarget, summaryInitialized, assumptions.summaryHours]);
+  }, [teamMembers, proposal, bmUpperTarget, summaryInitialized, assumptions.summaryHours, afaRateDiscount]);
 
   // Reconcile when team members change (added/removed)
   useEffect(() => {

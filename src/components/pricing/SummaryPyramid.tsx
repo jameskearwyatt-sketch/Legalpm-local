@@ -365,7 +365,7 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
   const totalRevenue = teamMembers.reduce((s, m) => s + m.revenue, 0);
   const interactive = !!onMemberHoursCommit;
 
-  const hasKeyPlayers = Object.values(keyPlayers).some(Boolean);
+  const hasKeyPlayers = Object.values(keyPlayers).some(v => v > 0);
 
   const handleMemberClick = (key: string) => {
     setExpandedMember(prev => prev === key ? null : key);

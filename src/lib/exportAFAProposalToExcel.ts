@@ -533,7 +533,7 @@ export async function exportAFAProposalToExcel({
       }
       
       // Style notes column
-      dataRow.getCell(notesColumnIndex).font = { size: 9, color: { argb: 'FF2563EB' }, italic: true };
+      dataRow.getCell(notesColumnIndex).font = { size: 9, color: { argb: 'FF2563EB' } };
       dataRow.getCell(notesColumnIndex).alignment = { wrapText: true };
       
       // Apply row highlighting based on internal input dept (takes priority over other highlighting)

@@ -911,7 +911,7 @@ export async function exportAFAProposalToExcel({
       worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
       const discountNoteCell = worksheet.getCell(`A${currentRow}`);
       discountNoteCell.value = `Rates shown reflect a ${pct}% discount from standard rates.`;
-      discountNoteCell.font = { size: 10, italic: true, color: { argb: 'FF2563EB' } };
+      discountNoteCell.font = { size: 10, color: { argb: 'FF2563EB' } };
       discountNoteCell.alignment = { vertical: 'middle' };
       worksheet.getRow(currentRow).height = 22;
       currentRow++;

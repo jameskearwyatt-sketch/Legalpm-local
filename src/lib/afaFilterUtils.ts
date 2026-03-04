@@ -329,7 +329,7 @@ export function applyAFAFilters(
           original_fee_amount: item.fee_amount,
           fee_amount: roundedFee,
           afa_adjusted: false,
-          afa_comment: `${config.discountPercent}% rate discount applied (team hours adjusted)`,
+          afa_comment: undefined,
         };
       }
       // LC items use reconciled rounding

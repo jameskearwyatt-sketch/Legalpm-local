@@ -809,8 +809,8 @@ export async function exportAFAProposalToExcel({
       for (const afa of filterResult.appliedAFAs) {
         const afaDetailRow = worksheet.getRow(currentRow);
         afaDetailRow.values = ['', `  ${afa.label}`, '', '', '', '', afa.description];
-        afaDetailRow.getCell(2).font = { size: 10, color: { argb: 'FF2563EB' }, italic: true };
-        afaDetailRow.getCell(7).font = { size: 10, color: { argb: 'FF6B7280' }, italic: true };
+        afaDetailRow.getCell(2).font = { size: 10, color: { argb: 'FF2563EB' } };
+        afaDetailRow.getCell(7).font = { size: 10, color: { argb: 'FF6B7280' } };
         afaDetailRow.getCell(7).alignment = { wrapText: true };
         currentRow++;
       }

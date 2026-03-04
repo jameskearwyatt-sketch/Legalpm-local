@@ -302,7 +302,7 @@ export async function exportAFAProposalToExcel({
       worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
       const subheadingCell = worksheet.getCell(`A${currentRow}`);
       subheadingCell.value = categoryLabel;
-      subheadingCell.font = { bold: true, size: 10, color: { argb: 'FF1F2937' }, italic: true };
+      subheadingCell.font = { bold: true, size: 10, color: { argb: 'FF1F2937' } };
       subheadingCell.alignment = { vertical: 'middle' };
       worksheet.getRow(currentRow).height = 20;
       currentRow++;

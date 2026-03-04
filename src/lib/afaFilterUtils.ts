@@ -297,9 +297,9 @@ export function applyAFAFilters(
     item => item.provider === 'Local Counsel'
   );
 
-  // STEP 1: Apply discounted rates FIRST if enabled (this forms the baseline for client-facing line items)
-  // Discounted rates always apply to line items regardless of other AFAs
-  // Uses largest remainder method to ensure line items sum exactly to the rounded aggregate
+  // STEP 1: Note discounted rates if enabled as secondary AFA
+  // Rate discounts do NOT reduce the budget — they lower the hourly rate so the team can work more hours.
+  // Budget line items remain at their original (undiscounted) values.
   let discountMultiplier = 1;
   let discountedBmTotal = originalBmTotal;
   
@@ -308,30 +308,31 @@ export function applyAFAFilters(
     discountMultiplier = 1 - config.discountPercent / 100;
     discountedBmTotal = originalBmTotal * discountMultiplier;
     
-    // Calculate the target aggregate (rounded using smart rounding)
+    // Calculate the discounted total for informational display only
     const targetBmAggregate = smartRound(discountedBmTotal);
     
-    // Apply largest remainder rounding to BM items
+    // Apply reconciled rounding to BM items at their ORIGINAL fees (no discount applied to budget)
+    const targetBmOriginal = smartRound(originalBmTotal);
     const bmRoundedMap = applyReconciliationRounding(
       itemsWithBaseFee,
-      item => (item.fee_amount || 0) * discountMultiplier,
-      targetBmAggregate,
+      item => item.fee_amount || 0,
+      targetBmOriginal,
       item => item.provider === 'Baker McKenzie'
     );
     
-    // Initialize filtered items with intelligently rounded amounts
+    // Initialize filtered items with original (undiscounted) amounts
     filteredItems = itemsWithBaseFee.map((item, index) => {
       if (item.provider === 'Baker McKenzie') {
-        const roundedFee = bmRoundedMap.get(index) ?? smartRound((item.fee_amount || 0) * discountMultiplier);
+        const roundedFee = bmRoundedMap.get(index) ?? smartRound(item.fee_amount || 0);
         return {
           ...item,
           original_fee_amount: item.fee_amount,
           fee_amount: roundedFee,
-          afa_adjusted: true,
-          afa_comment: `${config.discountPercent}% discount applied`,
+          afa_adjusted: false,
+          afa_comment: `${config.discountPercent}% rate discount applied (team hours adjusted)`,
         };
       }
-      // LC items get reconciled rounding too
+      // LC items use reconciled rounding
       const lcRoundedFee = lcRoundedMap.get(index) ?? smartRound(item.fee_amount || 0);
       return {
         ...item,
@@ -344,11 +345,11 @@ export function applyAFAFilters(
     appliedAFAs.push({
       type: 'discounted_rates',
       label: AFA_TYPE_LABELS['discounted_rates'],
-      description: `${config.discountPercent}% discount on standard rates`,
+      description: `${config.discountPercent}% discount on standard rates — team can record more hours within the same budget`,
       clientPrice: targetBmAggregate + targetLcAggregate,
     });
     
-    globalComment = `${config.discountPercent}% discount applied to standard rates`;
+    globalComment = `${config.discountPercent}% rate discount applied to standard rates`;
   }
 
   // STEP 2: Apply primary AFA (but don't modify line items for fixed fees - they already show discounted baseline)
@@ -473,30 +474,29 @@ export function applyAFAFilters(
 
       case 'discounted_rates': {
         const config = primaryAFA.config as DiscountedRatesConfig;
-        globalComment = `${config.discountPercent}% discount applied to standard rates`;
-        const multiplier = 1 - config.discountPercent / 100;
+        globalComment = `${config.discountPercent}% rate discount applied to standard rates — team hours adjusted accordingly`;
         
-        // Calculate exact discounted BM total and round to get target
-        const exactDiscountedBm = originalBmTotal * multiplier;
-        const targetBmAggregate = smartRound(exactDiscountedBm);
+        // Rate discounts do NOT reduce the budget — budget stays at original values.
+        // The discount lowers hourly rates so the team can work more hours within the same budget.
+        const targetBmOriginal = smartRound(originalBmTotal);
         
-        // Apply largest remainder rounding to BM items using helper
+        // Apply reconciled rounding to BM items at their ORIGINAL fees
         const bmRoundedMap = applyReconciliationRounding(
           itemsWithBaseFee,
-          item => (item.fee_amount || 0) * multiplier,
-          targetBmAggregate,
+          item => item.fee_amount || 0,
+          targetBmOriginal,
           item => item.provider === 'Baker McKenzie'
         );
         
         filteredItems = itemsWithBaseFee.map((item, index) => {
           if (item.provider === 'Baker McKenzie') {
-            const roundedFee = bmRoundedMap.get(index) ?? smartRound((item.fee_amount || 0) * multiplier);
+            const roundedFee = bmRoundedMap.get(index) ?? smartRound(item.fee_amount || 0);
             return {
               ...item,
               original_fee_amount: item.fee_amount,
               fee_amount: roundedFee,
-              afa_adjusted: true,
-              afa_comment: `${config.discountPercent}% discount applied`,
+              afa_adjusted: false,
+              afa_comment: `${config.discountPercent}% rate discount applied (team hours adjusted)`,
             };
           }
           // LC items use reconciled rounding

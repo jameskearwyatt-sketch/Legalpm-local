@@ -870,7 +870,74 @@ export default function PricingProposalDetail() {
     });
   }, []);
 
-  // Auto-save summary changes (debounced)
+  // Auto-distribute hours across team using preset weights
+  const handleAutoDistribute = useCallback((preset: DistributionPreset) => {
+    const WEIGHTS: Record<DistributionPreset, Record<string, number>> = {
+      pyramid:  { partners: 1, senior: 2, associates: 3, juniors: 4 },
+      flat:     { partners: 1, senior: 1, associates: 1, juniors: 1 },
+      reverse:  { partners: 3, senior: 2.5, associates: 2, juniors: 3 },
+    };
+
+    const classifyTier = (m: typeof teamMembers[0]) => {
+      const lvl = (m.level || '').toLowerCase();
+      if (lvl === 'partner') return 'partners';
+      if (lvl === 'counsel' || lvl === 'seniorassociate') return 'senior';
+      if (lvl === 'associate') return 'associates';
+      if (lvl === 'trainee') return 'juniors';
+      const k = m.key.toLowerCase();
+      if (k.includes('partner')) return 'partners';
+      if (k.includes('counsel') || k.includes('seniorassociate') || k.includes('senior_associate') || k.includes('senior associate')) return 'senior';
+      if (k.includes('associate')) return 'associates';
+      return 'juniors';
+    };
+
+    setAssumptions(prev => {
+      const locks = prev.summaryLocks || {};
+      const hours = { ...(prev.summaryHours || {}) };
+      const weights = WEIGHTS[preset];
+
+      // Calculate locked revenue
+      const lockedRevenue = teamMembers
+        .filter(m => locks[m.key])
+        .reduce((s, m) => s + (hours[m.key] || 0) * m.rate, 0);
+
+      const targetRevenue = Math.max(0, bmUpperTarget - lockedRevenue);
+      const unlocked = teamMembers.filter(m => !locks[m.key]);
+
+      if (unlocked.length === 0) return prev;
+
+      // Compute raw weight per member: weight(tier) / rate
+      const memberWeights = unlocked.map(m => {
+        const tier = classifyTier(m);
+        const w = weights[tier] || 1;
+        return { key: m.key, rawWeight: m.rate > 0 ? w / m.rate : 0 };
+      });
+
+      const totalWeight = memberWeights.reduce((s, mw) => s + mw.rawWeight, 0);
+
+      if (totalWeight <= 0) return prev;
+
+      // hours = (rawWeight / totalWeight) * targetRevenue / rate
+      // but since rawWeight = weight/rate, hours = (weight/rate) / totalWeight * targetRevenue / rate... 
+      // Actually: targetRevenue = Σ(hours_i * rate_i), and hours_i proportional to rawWeight_i
+      // hours_i = rawWeight_i * K where K chosen so Σ(rawWeight_i * K * rate_i) = targetRevenue
+      // K = targetRevenue / Σ(rawWeight_i * rate_i)
+      const denominator = memberWeights.reduce((s, mw) => {
+        const m = unlocked.find(u => u.key === mw.key)!;
+        return s + mw.rawWeight * m.rate;
+      }, 0);
+
+      const K = denominator > 0 ? targetRevenue / denominator : 0;
+
+      memberWeights.forEach(mw => {
+        hours[mw.key] = Math.round(mw.rawWeight * K * 2) / 2; // round to 0.5
+      });
+
+      return { ...prev, summaryHours: hours };
+    });
+  }, [teamMembers, bmUpperTarget]);
+
+
   const summaryAutoSaveRef = useRef<NodeJS.Timeout | null>(null);
   const assumptionsRef = useRef(assumptions);
   useEffect(() => { assumptionsRef.current = assumptions; }, [assumptions]);

@@ -2842,7 +2842,12 @@ export default function PricingProposalDetail() {
                       <TableHead className="w-8"></TableHead>
                       <TableHead>Team Member</TableHead>
                       <TableHead className="text-right">Hours</TableHead>
-                      <TableHead className="text-right">Rate ({currencySymbol})</TableHead>
+                      <TableHead className="text-right">
+                        Rate ({currencySymbol})
+                        {summary.hasAfaDiscount && (
+                          <span className="ml-1 text-[10px] font-medium text-amber-600 dark:text-amber-400">AFA</span>
+                        )}
+                      </TableHead>
                       <TableHead className="text-right">Revenue ({currencySymbol})</TableHead>
                     </TableRow>
                   </TableHeader>

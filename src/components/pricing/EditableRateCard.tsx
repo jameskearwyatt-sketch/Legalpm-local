@@ -386,18 +386,37 @@ export function EditableRateCard({
             const avgFeeRate = sortedEarners.reduce((s, e) => s + e.feeRate, 0) / sortedEarners.length;
             const afaRateMultiplier = afaDiscount > 0 ? (100 - afaDiscount) / 100 : 0;
             const avgAfaRate = afaRateMultiplier > 0 ? sortedEarners.reduce((s, e) => s + Math.round(e.feeRate * afaRateMultiplier), 0) / sortedEarners.length : 0;
+            const avgTeamRate = sortedEarners.reduce((s, e) => s + e.teamRate, 0) / sortedEarners.length;
             return (
-              <div className="flex items-center justify-between px-2 py-2 text-xs text-muted-foreground border-t mt-1">
-                <span>Average Rate</span>
-                <div className="flex gap-4 tabular-nums">
-                  <span>{feeCurrencySymbol}{Math.round(avgFeeRate).toLocaleString()}</span>
-                  {afaRateMultiplier > 0 && (
-                    <span className="text-amber-600 dark:text-amber-400">
-                      AFA: {feeCurrencySymbol}{Math.round(avgAfaRate).toLocaleString()}
+              <div className={`grid ${getGridCols()} items-center gap-2 py-1.5 border-t mt-1 text-xs text-muted-foreground`}>
+                <span></span>
+                <span className="font-medium">Average</span>
+                <span className="text-right">{showTwoColumns ? teamCurrencySymbol : feeCurrencySymbol}</span>
+                <span className="text-right tabular-nums font-medium">
+                  {showTwoColumns
+                    ? Math.round(avgTeamRate).toLocaleString()
+                    : Math.round(avgFeeRate).toLocaleString()}
+                </span>
+                {showTwoColumns && (
+                  <>
+                    <span className="text-right">{feeCurrencySymbol}</span>
+                    <span className="text-right tabular-nums font-medium">
+                      {Math.round(avgFeeRate).toLocaleString()}
                     </span>
-                  )}
-                </div>
+                  </>
+                )}
+                {hasAfaDiscount && (
+                  <>
+                    <span className="text-right">{feeCurrencySymbol}</span>
+                    <span className="text-right tabular-nums font-medium text-destructive">
+                      {Math.round(avgAfaRate).toLocaleString()}
+                    </span>
+                  </>
+                )}
+                <span></span>
               </div>
+            );
+          })()}
             );
           })()}
 

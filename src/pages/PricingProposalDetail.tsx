@@ -943,7 +943,7 @@ export default function PricingProposalDetail() {
 
       return { ...prev, summaryHours: hours };
     });
-  }, [teamMembers, bmUpperTarget]);
+  }, [teamMembers, bmUpperTarget, afaRateDiscount]);
 
 
   const summaryAutoSaveRef = useRef<NodeJS.Timeout | null>(null);

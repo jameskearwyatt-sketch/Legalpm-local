@@ -87,7 +87,7 @@ import { AFATab } from "@/components/pricing/AFATab";
 import { ScalePricingWizard, ScaleApplyResult, distributeProRataLRM } from "@/components/pricing/ScalePricingWizard";
 import { Slider } from "@/components/ui/slider";
 import { ScopeAssumptionsTab, ScopeAssumptionsState, getAssumptionNarratives, getGroupedAssumptionNarratives } from "@/components/pricing/ScopeAssumptionsTab";
-import SummaryPyramid from "@/components/pricing/SummaryPyramid";
+import SummaryPyramid, { DistributionPreset } from "@/components/pricing/SummaryPyramid";
 import { exportAFAProposalToExcel } from "@/lib/exportAFAProposalToExcel";
 import { applyAFAFilters, getAFASummary } from "@/lib/afaFilterUtils";
 import {

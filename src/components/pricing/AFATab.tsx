@@ -1563,7 +1563,7 @@ export function AFATab({
                                       <p className="font-bold text-lg">{formatCurrency(clientPrice)}</p>
                                     </div>
                                     <div>
-                                      <p className="text-muted-foreground">Effective Rate</p>
+                                      <p className="text-muted-foreground">Blended Rate</p>
                                       <p className="font-medium">
                                         {currencySymbol}{Math.round(afa?.effective_rate || calculateEffectiveRate(clientPrice))}/hr
                                       </p>

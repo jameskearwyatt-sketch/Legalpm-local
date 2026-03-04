@@ -1891,6 +1891,10 @@ export default function PricingProposalDetail() {
       hours: m.hours,
       revenue: m.revenue,
     }));
+
+    // Find the AFA blended rate (effective_rate from discounted_rates AFA) for Excel export
+    const discountAfa = enabledAFAs.find(a => a.afa_type === 'discounted_rates' && a.is_enabled);
+    const afaBlendedRate = discountAfa?.effective_rate || null;
     
     await exportAFAProposalToExcel({
       items: draftItems,
@@ -1911,6 +1915,7 @@ export default function PricingProposalDetail() {
       teamMembers: teamMemberSummaryData,
       teamCurrency: proposal?.currency || 'GBP',
       hideUpperAndPcSum,
+      afaBlendedRate,
     });
     
     toast({ 

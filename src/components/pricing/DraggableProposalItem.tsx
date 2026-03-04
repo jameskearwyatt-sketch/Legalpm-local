@@ -537,7 +537,6 @@ function arePropsEqual(
   // Check other props
   if (
     prevProps.viewingHistoricalVersion !== nextProps.viewingHistoricalVersion ||
-    prevProps.afaDiscountMultiplier !== nextProps.afaDiscountMultiplier ||
     prevProps.hideIncludeColumn !== nextProps.hideIncludeColumn
   ) {
     return false;

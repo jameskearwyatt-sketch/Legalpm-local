@@ -474,30 +474,29 @@ export function applyAFAFilters(
 
       case 'discounted_rates': {
         const config = primaryAFA.config as DiscountedRatesConfig;
-        globalComment = `${config.discountPercent}% discount applied to standard rates`;
-        const multiplier = 1 - config.discountPercent / 100;
+        globalComment = `${config.discountPercent}% rate discount applied to standard rates — team hours adjusted accordingly`;
         
-        // Calculate exact discounted BM total and round to get target
-        const exactDiscountedBm = originalBmTotal * multiplier;
-        const targetBmAggregate = smartRound(exactDiscountedBm);
+        // Rate discounts do NOT reduce the budget — budget stays at original values.
+        // The discount lowers hourly rates so the team can work more hours within the same budget.
+        const targetBmOriginal = smartRound(originalBmTotal);
         
-        // Apply largest remainder rounding to BM items using helper
+        // Apply reconciled rounding to BM items at their ORIGINAL fees
         const bmRoundedMap = applyReconciliationRounding(
           itemsWithBaseFee,
-          item => (item.fee_amount || 0) * multiplier,
-          targetBmAggregate,
+          item => item.fee_amount || 0,
+          targetBmOriginal,
           item => item.provider === 'Baker McKenzie'
         );
         
         filteredItems = itemsWithBaseFee.map((item, index) => {
           if (item.provider === 'Baker McKenzie') {
-            const roundedFee = bmRoundedMap.get(index) ?? smartRound((item.fee_amount || 0) * multiplier);
+            const roundedFee = bmRoundedMap.get(index) ?? smartRound(item.fee_amount || 0);
             return {
               ...item,
               original_fee_amount: item.fee_amount,
               fee_amount: roundedFee,
-              afa_adjusted: true,
-              afa_comment: `${config.discountPercent}% discount applied`,
+              afa_adjusted: false,
+              afa_comment: `${config.discountPercent}% rate discount applied (team hours adjusted)`,
             };
           }
           // LC items use reconciled rounding

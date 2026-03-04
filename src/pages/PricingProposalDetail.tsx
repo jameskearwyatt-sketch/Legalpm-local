@@ -910,7 +910,10 @@ export default function PricingProposalDetail() {
       // Calculate locked revenue
       const lockedRevenue = teamMembers
         .filter(m => locks[m.key])
-        .reduce((s, m) => s + (hours[m.key] || 0) * m.rate, 0);
+        .reduce((s, m) => {
+          const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+          return s + (hours[m.key] || 0) * eRate;
+        }, 0);
 
       const targetRevenue = Math.max(0, bmUpperTarget - lockedRevenue);
       const unlocked = teamMembers.filter(m => !locks[m.key]);

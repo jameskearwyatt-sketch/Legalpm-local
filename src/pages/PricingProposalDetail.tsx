@@ -2789,6 +2789,10 @@ export default function PricingProposalDetail() {
               teamMembers={summary.teamMembers}
               formatCurrency={formatCurrency}
               formatHours={formatHours}
+              onDistribute={handleAutoDistribute}
+              onMemberHoursCommit={handleSummaryHoursChange}
+              lockedMembers={summaryLocks}
+              onToggleLock={toggleSummaryLock}
             />
 
             {/* Fixed-height container — never shifts layout */}

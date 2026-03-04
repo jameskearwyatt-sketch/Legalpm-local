@@ -195,7 +195,7 @@ export async function exportAFAProposalToExcel({
     month: 'long', 
     year: 'numeric' 
   })}`;
-  proposalCell.font = { ...subtitleFont, italic: true, color: { argb: 'FF6B7280' } };
+  proposalCell.font = { ...subtitleFont, color: { argb: 'FF6B7280' } };
 
   let currentRow = 4;
 

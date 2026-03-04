@@ -767,12 +767,13 @@ export default function PricingProposalDetail() {
     const revenuePerMember = bmUpperTarget / teamMembers.length;
     const newHours: Record<string, number> = {};
     teamMembers.forEach(m => {
-      newHours[m.key] = m.rate > 0 ? Math.round((revenuePerMember / m.rate) * 2) / 2 : 0;
+      const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+      newHours[m.key] = eRate > 0 ? Math.round((revenuePerMember / eRate) * 2) / 2 : 0;
     });
 
     setAssumptions(prev => ({ ...prev, summaryHours: newHours, summaryLocks: {} }));
     setSummaryInitialized(true);
-  }, [teamMembers, proposal, bmUpperTarget, summaryInitialized, assumptions.summaryHours]);
+  }, [teamMembers, proposal, bmUpperTarget, summaryInitialized, assumptions.summaryHours, afaRateDiscount]);
 
   // Reconcile when team members change (added/removed)
   useEffect(() => {
@@ -847,7 +848,8 @@ export default function PricingProposalDetail() {
       // Revenue from locked + just-edited members
       const fixedRevenue = teamMembers.reduce((sum, m) => {
         if (m.key === memberKey || locks[m.key]) {
-          return sum + ((hours[m.key] || 0) * m.rate);
+          const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+          return sum + ((hours[m.key] || 0) * eRate);
         }
         return sum;
       }, 0);
@@ -859,7 +861,8 @@ export default function PricingProposalDetail() {
         // Equal revenue share → cheaper members get more hours
         const revenuePerMember = remainingTarget / unlocked.length;
         unlocked.forEach(m => {
-          hours[m.key] = m.rate > 0 ? Math.round((revenuePerMember / m.rate) * 2) / 2 : 0;
+          const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+          hours[m.key] = eRate > 0 ? Math.round((revenuePerMember / eRate) * 2) / 2 : 0;
         });
       } else if (unlocked.length > 0) {
         unlocked.forEach(m => { hours[m.key] = 0; });
@@ -867,7 +870,7 @@ export default function PricingProposalDetail() {
 
       return { ...prev, summaryHours: hours };
     });
-  }, [teamMembers, bmUpperTarget]);
+  }, [teamMembers, bmUpperTarget, afaRateDiscount]);
 
   // Toggle lock on a team member
   const toggleSummaryLock = useCallback((memberKey: string) => {
@@ -907,7 +910,10 @@ export default function PricingProposalDetail() {
       // Calculate locked revenue
       const lockedRevenue = teamMembers
         .filter(m => locks[m.key])
-        .reduce((s, m) => s + (hours[m.key] || 0) * m.rate, 0);
+        .reduce((s, m) => {
+          const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+          return s + (hours[m.key] || 0) * eRate;
+        }, 0);
 
       const targetRevenue = Math.max(0, bmUpperTarget - lockedRevenue);
       const unlocked = teamMembers.filter(m => !locks[m.key]);
@@ -921,10 +927,11 @@ export default function PricingProposalDetail() {
         const tierWeight = weights[tier] || 1;
         const level = kp[m.key] || 0;
         const playerMult = level === 2 ? 4 : level === 1 ? 2 : 1;
-        return { key: m.key, rate: m.rate, rawWeight: tierWeight * playerMult };
+        const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+        return { key: m.key, rate: eRate, rawWeight: tierWeight * playerMult };
       });
 
-      // Scale factor so Σ(hours × rate) = targetRevenue
+      // Scale factor so Σ(hours × effectiveRate) = targetRevenue
       const denom = memberWeights.reduce((s, mw) => s + mw.rawWeight * mw.rate, 0);
       if (denom <= 0) return prev;
       const K = targetRevenue / denom;
@@ -936,7 +943,7 @@ export default function PricingProposalDetail() {
 
       return { ...prev, summaryHours: hours };
     });
-  }, [teamMembers, bmUpperTarget]);
+  }, [teamMembers, bmUpperTarget, afaRateDiscount]);
 
 
   const summaryAutoSaveRef = useRef<NodeJS.Timeout | null>(null);
@@ -975,7 +982,7 @@ export default function PricingProposalDetail() {
       return {
         ...m,
         hours,
-        revenue: hours * m.rate,
+        revenue: hours * (afaRateDiscount ? m.rate * afaRateDiscount : m.rate),
         displayRate,
         memberCost: hours * m.cost,
         isLocked: !!summaryLocks[m.key],

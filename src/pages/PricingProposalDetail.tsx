@@ -978,10 +978,12 @@ export default function PricingProposalDetail() {
   const summary = useMemo(() => {
     const enrichedMembers = teamMembers.map(m => {
       const hours = summaryHours[m.key] || 0;
+      const displayRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
       return {
         ...m,
         hours,
         revenue: hours * m.rate,
+        displayRate,
         memberCost: hours * m.cost,
         isLocked: !!summaryLocks[m.key],
       };
@@ -991,6 +993,7 @@ export default function PricingProposalDetail() {
     const totalRevenue = enrichedMembers.reduce((s, m) => s + m.revenue, 0);
     const totalCost = enrichedMembers.reduce((s, m) => s + m.memberCost, 0);
     const blendedRate = totalHours > 0 ? totalRevenue / totalHours : 0;
+    const displayBlendedRate = afaRateDiscount ? blendedRate * afaRateDiscount : blendedRate;
     const delta = totalRevenue - bmUpperTarget;
 
     return {
@@ -999,11 +1002,13 @@ export default function PricingProposalDetail() {
       totalRevenue,
       totalCost,
       blendedRate,
+      displayBlendedRate,
       delta,
       bmUpperTarget,
       hasEstimatedHours: enrichedMembers.length > 0,
+      hasAfaDiscount: !!afaRateDiscount,
     };
-  }, [teamMembers, summaryHours, summaryLocks, bmUpperTarget]);
+  }, [teamMembers, summaryHours, summaryLocks, bmUpperTarget, afaRateDiscount]);
 
   // Live rate card changes (for real-time pyramid updates)
   const handleRateCardChange = useCallback((newTeamRateCard: RateCard, newFeeRateCard: RateCard) => {

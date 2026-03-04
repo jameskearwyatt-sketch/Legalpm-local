@@ -40,7 +40,7 @@ function getFeeUpper(item: DraftProposalItem): number {
 /**
  * Largest Remainder Method distribution with smart rounding.
  */
-function distributeProRataLRM(
+export function distributeProRataLRM(
   items: { index: number; currentFee: number }[],
   targetTotal: number
 ): Map<number, number> {

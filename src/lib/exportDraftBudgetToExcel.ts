@@ -135,7 +135,7 @@ export async function exportDraftBudgetToExcel({
     worksheet.mergeCells(`A${currentRow}:${lastCol}${currentRow}`);
     const notesCell = worksheet.getCell(`A${currentRow}`);
     notesCell.value = notes;
-    notesCell.font = { size: 10, color: { argb: 'FF6B7280' }, italic: true };
+    notesCell.font = { size: 10, color: { argb: 'FF6B7280' } };
     notesCell.alignment = { wrapText: true };
     currentRow++;
   }

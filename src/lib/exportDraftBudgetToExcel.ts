@@ -127,7 +127,7 @@ export async function exportDraftBudgetToExcel({
         month: 'long', 
         year: 'numeric' 
       })}`;
-  draftCell.font = { ...subtitleFont, italic: true, color: { argb: 'FF6B7280' } };
+  draftCell.font = { ...subtitleFont, color: { argb: 'FF6B7280' } };
 
   // Add notes if provided
   let currentRow = 5;

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Lock, Unlock, Triangle, Minus, Star } from "lucide-react";
+import { Lock, Unlock, Triangle, Minus, Star, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";

@@ -993,7 +993,7 @@ export default function PricingProposalDetail() {
     const totalRevenue = enrichedMembers.reduce((s, m) => s + m.revenue, 0);
     const totalCost = enrichedMembers.reduce((s, m) => s + m.memberCost, 0);
     const blendedRate = totalHours > 0 ? totalRevenue / totalHours : 0;
-    const displayBlendedRate = afaRateDiscount ? blendedRate * afaRateDiscount : blendedRate;
+    const displayBlendedRate = blendedRate;
     const delta = totalRevenue - bmUpperTarget;
 
     return {

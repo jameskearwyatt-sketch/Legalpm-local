@@ -870,7 +870,7 @@ export default function PricingProposalDetail() {
 
       return { ...prev, summaryHours: hours };
     });
-  }, [teamMembers, bmUpperTarget]);
+  }, [teamMembers, bmUpperTarget, afaRateDiscount]);
 
   // Toggle lock on a team member
   const toggleSummaryLock = useCallback((memberKey: string) => {

@@ -66,7 +66,7 @@ function DraggableProposalItemInner({
   viewingHistoricalVersion,
   customCategories = [],
   onAddCustomCategory,
-  afaDiscountMultiplier = 1,
+  
   hideIncludeColumn = false,
 }: DraggableProposalItemProps) {
   const [isCustomCategoryDialogOpen, setIsCustomCategoryDialogOpen] = useState(false);

@@ -1,142 +1,47 @@
 
 
-# Scope-Aware Pricing Intelligence
+# Interactive Hour Distribution Controls for Summary Pyramids
 
-## Problem
+## Overview
 
-The system cannot distinguish between:
-- A **single DD task** like "Colombian DD (incl land)" (~GBP 15-26k)
-- A **comprehensive DD report** covering dozens of project documents (~GBP 100-287k)
+Add three "Auto-Distribute Hours" preset buttons (Pyramid, Flat, Reverse Pyramid) above the seniority pyramids, plus a fine-tune layer where clicking a member block expands an inline slider to adjust that member's hours, with locked members excluded from rebalancing.
 
-Both fall into the "Due Diligence" category. The current matching either finds an exact text match (unlikely for broad items) or falls back to a flat category median (~GBP 17k), which is wildly wrong for a comprehensive report.
+## Distribution Presets
 
-This is not unique to DD -- the same problem exists across categories (e.g., a single security agreement vs. a full security package; a simple legal opinion vs. a multi-jurisdiction opinion covering 10 topics).
+Three toggle buttons above the pyramid visualization:
 
-## Solution: Scope Classification + Complexity-Weighted Percentile Pricing
+- **Pyramid**: Juniors get the most hours, partners the least. Weight ratios by tier: Partners 1×, Senior 2×, Associates 3×, Juniors 4×. Within a tier, hours split equally among members. Total revenue = `bmUpperTarget`.
+- **Reverse Pyramid**: Partners and juniors get roughly equal hours, seniors/associates in between. Weight ratios: Partners 3×, Senior 2.5×, Associates 2×, Juniors 3×.
+- **Flat**: Equal revenue share across all members (current rebalance logic but applied to everyone). Weight ratios: Partners 1×, Senior 1×, Associates 1×, Juniors 1×.
 
-### Core Idea
+**Calculation**: For each unlocked member, compute `weight / rate`, then normalize so `Σ(hours × rate) = bmUpperTarget`. Locked members' revenue is subtracted from the target first; only unlocked members are redistributed.
 
-Before pricing, classify each item's **scope** using signals already available in the data:
+## Fine-Tune Layer (Click-to-Expand on Pyramid Blocks)
 
-1. **Detail text length** -- a comprehensive DD report will have a 300+ character detail describing all the areas covered; a single task will have a short or empty detail
-2. **Keyword indicators** -- words like "comprehensive", "full", "report", "review of all", "covering", "including" signal broad scope; words like a single country/entity name signal narrow scope
-3. **The item's own work_item label** -- "Due diligence report" (generic/broad) vs. "Colombian DD (incl land)" (specific/narrow)
+- Clicking a member block in the **Hours Distribution** pyramid toggles an expanded state showing a small horizontal slider + numeric input below that block.
+- Adjusting the slider sets local state; on release (mouseUp/touchEnd), the rebalancing fires — identical to the existing `handleSummaryHoursChange` logic.
+- Locked members show a lock icon overlay on their block and are excluded from rebalancing.
+- Clicking a locked member's block still allows viewing but the slider is disabled.
 
-Use this to place the item on a **percentile scale within its category**, rather than always using the median.
+## Files to Change
 
-### Changes to `suggest-pricing/index.ts`
+### 1. `src/components/pricing/SummaryPyramid.tsx`
+- Add props: `onDistribute: (preset: 'pyramid' | 'flat' | 'reverse') => void`, `onMemberHoursCommit: (key: string, hours: number) => void`, `lockedMembers: Record<string, boolean>`, `onToggleLock: (key: string) => void`
+- Render a `ToggleGroup` with three buttons ("Pyramid", "Flat", "Reverse Pyramid") above the pyramids
+- Make member blocks clickable — on click, expand an inline slider panel below that block
+- Show lock icon on locked members; lock/unlock on right-click or via a small lock toggle in the expanded panel
 
-**Add scope classification function:**
+### 2. `src/pages/PricingProposalDetail.tsx`
+- Add `handleAutoDistribute(preset)` callback that computes tier-weighted hours for all unlocked members to hit `bmUpperTarget`, updates `summaryHours` in assumptions state
+- Pass `onDistribute`, `onMemberHoursCommit` (reuse `handleSummaryHoursChange`), `lockedMembers` (from `summaryLocks`), and `onToggleLock` (reuse `toggleSummaryLock`) to `SummaryPyramid`
 
-```text
-classifyScope(workItem, detail) -> 'narrow' | 'moderate' | 'broad'
+### 3. Memory file update
+- Update `memory/features/pricing-proposal/summary-pyramids` with the new interactive capabilities
 
-Signals for 'broad':
-  - detail length > 250 chars
-  - Keywords in work_item or detail: "report", "comprehensive", "full", 
-    "all project", "covering", "review of all", "package", "suite",
-    "multi", "portfolio"
-  - Generic work_item with no specific entity/country name
-  
-Signals for 'narrow':
-  - detail length < 80 chars or no detail
-  - Specific entity/country in work_item (e.g., "Colombian", "BVI", "Singapore")
-  - Single-topic keywords: specific contract type names
-  
-Default: 'moderate'
-```
+## Interaction Flow
 
-**Replace flat category stats with percentile-based pricing:**
+1. User clicks "Pyramid" → all unlocked members get tier-weighted hours → pyramids animate to new shape → fee breakdown table below updates simultaneously
+2. User clicks a member block in the hours pyramid → block expands to show slider + input + lock toggle
+3. User drags slider → local display updates immediately → on release, rebalance fires for unlocked members
+4. User locks a member → that member's hours become fixed for all future distributions and rebalances
 
-Currently when an item has no text match, it falls through to AI with only a category average. Instead:
-
-1. Compute **percentiles** (25th, 50th, 75th, 90th) for each category from historical data
-2. Map scope to percentile:
-   - `narrow` -> 25th percentile
-   - `moderate` -> 50th percentile (median)
-   - `broad` -> 75th-90th percentile
-3. Use this as a **strong anchor** -- either as the direct precedent price (Tier 2) or as explicit guidance to the AI
-
-**Improve AI prompt for remaining unmatched items:**
-
-When items still go to AI, include the scope classification and the percentile range in the prompt so the AI knows where in the range to price:
-
-```text
-Item: "Due diligence report"
-Scope: BROAD (detail covers 15+ topics across multiple document types)
-Category: Due Diligence
-Historical range for Due Diligence: 25th=GBP 15,000, median=GBP 23,000, 75th=GBP 65,000, 90th=GBP 114,000
--> Price this at the 75th-90th percentile given its broad scope.
-```
-
-vs.
-
-```text
-Item: "Corporate DD on BVI entity"  
-Scope: NARROW (single entity, single jurisdiction)
-Category: Due Diligence
--> Price this at the 25th percentile.
-```
-
-**Better category-relevant context for AI:**
-
-Instead of sending `allHistorical.slice(0, 30)` (arbitrary first 30), for each unmatched item send:
-- Top 5 highest-fee items from the same category (so the AI sees the range ceiling)
-- 5 lowest-fee items from the same category (so it sees the floor)
-- The percentile stats
-
-### Changes to `allocate-target-pricing/index.ts`
-
-Apply the same scope classification and percentile-based pricing to the base price generation step (Phase 2). The deterministic scaling in Phase 3 remains unchanged.
-
-### Implementation Detail
-
-**Percentile helper functions:**
-
-```text
-median(values[]) -> number
-percentile(values[], p) -> number  // p = 25, 75, 90
-```
-
-**Scope classifier:**
-
-```text
-function classifyScope(workItem: string, detail: string | null): 'narrow' | 'moderate' | 'broad'
-
-broadIndicators = /\b(report|comprehensive|full|all project|covering|review of all|
-  package|suite|multi|portfolio|across|various|range of|complete|
-  extensive|wide|broad|overall|summary|overview)\b/i
-
-narrowIndicators = specific country/entity names, short detail, 
-  single contract type references
-
-Logic:
-  score = 0
-  if detail length > 250: score += 2
-  if detail length > 150: score += 1  
-  if broadIndicators match in workItem or detail: score += 2
-  if narrowIndicators match: score -= 2
-  if workItem is very generic (< 5 significant words, no proper nouns): score += 1
-  
-  score >= 3 -> 'broad'
-  score <= -1 -> 'narrow'
-  else -> 'moderate'
-```
-
-**Pricing by scope:**
-
-```text
-For Tier 2 (category match, no text match):
-  narrow  -> percentile(categoryFees, 25)
-  moderate -> percentile(categoryFees, 50)  
-  broad   -> percentile(categoryFees, 80)
-```
-
-### Files to Modify
-
-1. **`supabase/functions/suggest-pricing/index.ts`** -- Add `classifyScope()`, `median()`, `percentile()` helpers; replace flat category average with scope-aware percentile pricing; improve AI context with category-relevant items and scope guidance
-2. **`supabase/functions/allocate-target-pricing/index.ts`** -- Same scope classification and percentile logic for base price generation
-
-### What This Achieves
-
-A "Due diligence report" with a long detail covering many topics will be classified as `broad` and priced at the 80th percentile of DD items (~GBP 80-100k+ depending on data), while "Colombian DD (incl land)" will be classified as `narrow` and priced at the 25th percentile (~GBP 15k). This matches the user's intuitive understanding and requires no additional data -- it uses signals already present in the work item label and detail text.

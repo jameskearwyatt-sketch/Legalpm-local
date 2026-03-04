@@ -1888,6 +1888,7 @@ export default function PricingProposalDetail() {
       key: m.key,
       label: m.label,
       rate: m.rate,
+      afaRate: m.displayRate !== m.rate ? m.displayRate : null,
       hours: m.hours,
       revenue: m.revenue,
     }));

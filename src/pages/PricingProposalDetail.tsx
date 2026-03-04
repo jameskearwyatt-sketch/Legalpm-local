@@ -2817,6 +2817,8 @@ export default function PricingProposalDetail() {
               onMemberHoursCommit={handleSummaryHoursChange}
               lockedMembers={summaryLocks}
               onToggleLock={toggleSummaryLock}
+              keyPlayers={summaryKeyPlayers}
+              onToggleKeyPlayer={toggleKeyPlayer}
             />
 
             {/* Fixed-height container — never shifts layout */}

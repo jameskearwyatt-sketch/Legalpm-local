@@ -294,8 +294,8 @@ export function AFATab({
         return cfg.monthlyFee * cfg.durationMonths;
       }
       case 'discounted_rates': {
-        const cfg = config as DiscountedRatesConfig;
-        return currentBaselineTotals.total * (1 - cfg.discountPercent / 100);
+        // Rate discounts don't change the budget — return baseline total
+        return currentBaselineTotals.total;
       }
       case 'success_fee': {
         const cfg = config as SuccessFeeConfig;
@@ -1082,12 +1082,9 @@ export function AFATab({
         
         <div className="bg-muted/50 rounded-lg p-4 space-y-3">
           <div className="flex justify-between">
-            <span className="font-medium">Budget (unchanged)</span>
+            <span className="font-medium">Budget</span>
             <span className="text-xl font-bold">{formatCurrency(baselineTotals.total)}</span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Rate discounts lower hourly rates — they do not reduce the budget. The team can record more hours within the same fee estimate.
-          </p>
         </div>
         
         <div className="text-sm text-muted-foreground space-y-1">

@@ -1116,6 +1116,73 @@ export default function PricingProposalDetail() {
     setHasUnsavedChanges(true);
   }, []);
 
+  // --- Scale Pricing Helpers ---
+  const applyScaleFactor = useCallback((factor: number, baselines: Map<number, { fee_upper: number; fee_lower: number; fee_amount: number }>, indices: number[]) => {
+    const items = indices
+      .filter(idx => baselines.has(idx))
+      .map(idx => ({ index: idx, currentFee: baselines.get(idx)!.fee_upper }));
+    
+    if (items.length === 0) return;
+    
+    const targetTotal = Math.round(items.reduce((sum, i) => sum + i.currentFee, 0) * factor / 1000) * 1000;
+    const allocations = distributeProRataLRM(items, targetTotal);
+    
+    setDraftItems(prev => {
+      const next = [...prev];
+      allocations.forEach((scaledFeeUpper, idx) => {
+        const { fee_lower, fee_amount } = calculateFeeRange(scaledFeeUpper, next[idx]?.category);
+        next[idx] = { ...next[idx], fee_upper: scaledFeeUpper, fee_lower, fee_amount, pricing_method: 'manual' as const };
+      });
+      return next;
+    });
+    setHasUnsavedChanges(true);
+  }, []);
+
+  const handleScaleToggle = useCallback((active: boolean) => {
+    if (!scaleState) return;
+    setScaleState(prev => prev ? { ...prev, active } : prev);
+    
+    if (active) {
+      // Re-apply scaling from baselines
+      applyScaleFactor(scaleState.factor, scaleState.baselineFees, scaleState.selectedIndices);
+    } else {
+      // Restore baselines
+      setDraftItems(prev => {
+        const next = [...prev];
+        scaleState.baselineFees.forEach((baseline, idx) => {
+          if (idx < next.length) {
+            next[idx] = { ...next[idx], ...baseline, pricing_method: 'manual' as const };
+          }
+        });
+        return next;
+      });
+      setHasUnsavedChanges(true);
+    }
+  }, [scaleState, applyScaleFactor]);
+
+  const handleScaleFactorChange = useCallback((newFactor: number) => {
+    if (!scaleState) return;
+    setScaleState(prev => prev ? { ...prev, factor: newFactor } : prev);
+    applyScaleFactor(newFactor, scaleState.baselineFees, scaleState.selectedIndices);
+  }, [scaleState, applyScaleFactor]);
+
+  const handleClearScaling = useCallback(() => {
+    if (!scaleState) return;
+    // Restore baselines
+    setDraftItems(prev => {
+      const next = [...prev];
+      scaleState.baselineFees.forEach((baseline, idx) => {
+        if (idx < next.length) {
+          next[idx] = { ...next[idx], ...baseline, pricing_method: 'manual' as const };
+        }
+      });
+      return next;
+    });
+    setScaleState(null);
+    setHasUnsavedChanges(true);
+    toast({ title: 'Scaling cleared, original fees restored' });
+  }, [scaleState, toast]);
+
   // Handle drag end for reordering items
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;

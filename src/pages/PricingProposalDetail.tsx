@@ -927,10 +927,11 @@ export default function PricingProposalDetail() {
         const tierWeight = weights[tier] || 1;
         const level = kp[m.key] || 0;
         const playerMult = level === 2 ? 4 : level === 1 ? 2 : 1;
-        return { key: m.key, rate: m.rate, rawWeight: tierWeight * playerMult };
+        const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+        return { key: m.key, rate: eRate, rawWeight: tierWeight * playerMult };
       });
 
-      // Scale factor so Σ(hours × rate) = targetRevenue
+      // Scale factor so Σ(hours × effectiveRate) = targetRevenue
       const denom = memberWeights.reduce((s, mw) => s + mw.rawWeight * mw.rate, 0);
       if (denom <= 0) return prev;
       const K = targetRevenue / denom;

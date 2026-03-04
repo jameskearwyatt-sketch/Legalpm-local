@@ -1,142 +1,48 @@
 
 
-# Scope-Aware Pricing Intelligence
+# Fix: Rate Discounts Should Not Reduce Budget Line Items
 
-## Problem
+## Analysis
 
-The system cannot distinguish between:
-- A **single DD task** like "Colombian DD (incl land)" (~GBP 15-26k)
-- A **comprehensive DD report** covering dozens of project documents (~GBP 100-287k)
+After tracing the full code path, here is the current situation:
 
-Both fall into the "Due Diligence" category. The current matching either finds an exact text match (unlikely for broad items) or falls back to a flat category median (~GBP 17k), which is wildly wrong for a comprehensive report.
+- **`DraggableProposalItem.tsx`**: Has `afaDiscountMultiplier` prop but it is **never passed** by any parent — it defaults to `1`. So the Work Items tab display is already correct. The prop and its logic are dead code that should be cleaned up.
+- **`afaFilterUtils.ts`**: The `discounted_rates` AFA type (both as primary AFA at line 474 and as secondary discount at line 300) multiplies every BM line item fee by the discount factor. This is the core bug — it reduces the budget when it should not.
+- **`exportAFAProposalToExcel.ts`**: Calls `applyAFAFilters`, so the Excel export gets reduced line items.
+- **`usePricingProposals.ts`**: Also calls `applyAFAFilters` when syncing to a matter, so the matter budget gets the reduced figure.
+- **`EditableRateCard.tsx`**: Shows discounted hourly rates in an "AFA Rate" column — this is **correct** and stays as-is.
 
-This is not unique to DD -- the same problem exists across categories (e.g., a single security agreement vs. a full security package; a simple legal opinion vs. a multi-jurisdiction opinion covering 10 topics).
+## Changes
 
-## Solution: Scope Classification + Complexity-Weighted Percentile Pricing
+### 1. `afaFilterUtils.ts` — Stop reducing line item fees for discounted rates
 
-### Core Idea
+**Primary AFA case (line 474, `discounted_rates`)**: Instead of multiplying each BM item fee by the discount factor, pass through items at their original fees. The `appliedAFAs` array will still record the discount info for display purposes, but line item `fee_amount` values remain unchanged.
 
-Before pricing, classify each item's **scope** using signals already available in the data:
+**Secondary discount case (line 300, discount + another primary AFA)**: Same fix — stop multiplying BM item fees by the discount factor. Just pass through originals with reconciliation rounding.
 
-1. **Detail text length** -- a comprehensive DD report will have a 300+ character detail describing all the areas covered; a single task will have a short or empty detail
-2. **Keyword indicators** -- words like "comprehensive", "full", "report", "review of all", "covering", "including" signal broad scope; words like a single country/entity name signal narrow scope
-3. **The item's own work_item label** -- "Due diligence report" (generic/broad) vs. "Colombian DD (incl land)" (specific/narrow)
+The `clientPrice` in `appliedAFAs` should still reflect the discounted total for informational display on the AFA tab (showing what the effective hourly cost would be), but the budget line items themselves stay at baseline values.
 
-Use this to place the item on a **percentile scale within its category**, rather than always using the median.
+### 2. `DraggableProposalItem.tsx` — Remove dead `afaDiscountMultiplier` code
 
-### Changes to `suggest-pricing/index.ts`
+Remove the `afaDiscountMultiplier` prop, its usage in fee display/edit calculations (lines 401, 408, 413-415, 436, 443, 448-450), and the memo comparison (line 548). This is dead code cleanup — no functional change since it was always `1`.
 
-**Add scope classification function:**
+### 3. `usePricingProposals.ts` — No code change needed
 
-```text
-classifyScope(workItem, detail) -> 'narrow' | 'moderate' | 'broad'
+Once `applyAFAFilters` stops reducing line items, the matter sync automatically gets the correct full budget values.
 
-Signals for 'broad':
-  - detail length > 250 chars
-  - Keywords in work_item or detail: "report", "comprehensive", "full", 
-    "all project", "covering", "review of all", "package", "suite",
-    "multi", "portfolio"
-  - Generic work_item with no specific entity/country name
-  
-Signals for 'narrow':
-  - detail length < 80 chars or no detail
-  - Specific entity/country in work_item (e.g., "Colombian", "BVI", "Singapore")
-  - Single-topic keywords: specific contract type names
-  
-Default: 'moderate'
-```
+### 4. `exportAFAProposalToExcel.ts` — No code change needed
 
-**Replace flat category stats with percentile-based pricing:**
+Same as above — the Excel export will automatically show undiscounted budget line items once `applyAFAFilters` is fixed.
 
-Currently when an item has no text match, it falls through to AI with only a category average. Instead:
+## What stays the same
 
-1. Compute **percentiles** (25th, 50th, 75th, 90th) for each category from historical data
-2. Map scope to percentile:
-   - `narrow` -> 25th percentile
-   - `moderate` -> 50th percentile (median)
-   - `broad` -> 75th-90th percentile
-3. Use this as a **strong anchor** -- either as the direct precedent price (Tier 2) or as explicit guidance to the AI
+- **EditableRateCard.tsx** "AFA Rate" column showing discounted hourly rates — correct behavior, unchanged.
+- **AFATab.tsx** discount configuration and display — unchanged.
+- **Summary tab** totals — these are calculated from `draftItems` directly, not from AFA-filtered items, so they are already correct.
 
-**Improve AI prompt for remaining unmatched items:**
+## Net result
 
-When items still go to AI, include the scope classification and the percentile range in the prompt so the AI knows where in the range to price:
+- Budget = what the deal costs (unchanged by rate discount)
+- Discounted rates = team members' effective hourly rate is lower, meaning they can record more hours before blowing the budget
+- Excel export and matter sync reflect the true budget, not a discounted version
 
-```text
-Item: "Due diligence report"
-Scope: BROAD (detail covers 15+ topics across multiple document types)
-Category: Due Diligence
-Historical range for Due Diligence: 25th=GBP 15,000, median=GBP 23,000, 75th=GBP 65,000, 90th=GBP 114,000
--> Price this at the 75th-90th percentile given its broad scope.
-```
-
-vs.
-
-```text
-Item: "Corporate DD on BVI entity"  
-Scope: NARROW (single entity, single jurisdiction)
-Category: Due Diligence
--> Price this at the 25th percentile.
-```
-
-**Better category-relevant context for AI:**
-
-Instead of sending `allHistorical.slice(0, 30)` (arbitrary first 30), for each unmatched item send:
-- Top 5 highest-fee items from the same category (so the AI sees the range ceiling)
-- 5 lowest-fee items from the same category (so it sees the floor)
-- The percentile stats
-
-### Changes to `allocate-target-pricing/index.ts`
-
-Apply the same scope classification and percentile-based pricing to the base price generation step (Phase 2). The deterministic scaling in Phase 3 remains unchanged.
-
-### Implementation Detail
-
-**Percentile helper functions:**
-
-```text
-median(values[]) -> number
-percentile(values[], p) -> number  // p = 25, 75, 90
-```
-
-**Scope classifier:**
-
-```text
-function classifyScope(workItem: string, detail: string | null): 'narrow' | 'moderate' | 'broad'
-
-broadIndicators = /\b(report|comprehensive|full|all project|covering|review of all|
-  package|suite|multi|portfolio|across|various|range of|complete|
-  extensive|wide|broad|overall|summary|overview)\b/i
-
-narrowIndicators = specific country/entity names, short detail, 
-  single contract type references
-
-Logic:
-  score = 0
-  if detail length > 250: score += 2
-  if detail length > 150: score += 1  
-  if broadIndicators match in workItem or detail: score += 2
-  if narrowIndicators match: score -= 2
-  if workItem is very generic (< 5 significant words, no proper nouns): score += 1
-  
-  score >= 3 -> 'broad'
-  score <= -1 -> 'narrow'
-  else -> 'moderate'
-```
-
-**Pricing by scope:**
-
-```text
-For Tier 2 (category match, no text match):
-  narrow  -> percentile(categoryFees, 25)
-  moderate -> percentile(categoryFees, 50)  
-  broad   -> percentile(categoryFees, 80)
-```
-
-### Files to Modify
-
-1. **`supabase/functions/suggest-pricing/index.ts`** -- Add `classifyScope()`, `median()`, `percentile()` helpers; replace flat category average with scope-aware percentile pricing; improve AI context with category-relevant items and scope guidance
-2. **`supabase/functions/allocate-target-pricing/index.ts`** -- Same scope classification and percentile logic for base price generation
-
-### What This Achieves
-
-A "Due diligence report" with a long detail covering many topics will be classified as `broad` and priced at the 80th percentile of DD items (~GBP 80-100k+ depending on data), while "Colombian DD (incl land)" will be classified as `narrow` and priced at the 25th percentile (~GBP 15k). This matches the user's intuitive understanding and requires no additional data -- it uses signals already present in the work item label and detail text.

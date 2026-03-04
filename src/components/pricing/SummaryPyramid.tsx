@@ -27,7 +27,7 @@ interface SummaryPyramidProps {
   onMemberHoursCommit?: (key: string, hours: number) => void;
   lockedMembers?: Record<string, boolean>;
   onToggleLock?: (key: string) => void;
-  keyPlayers?: Record<string, boolean>;
+  keyPlayers?: Record<string, number>; // 0=background, 1=key, 2=anchor
   onToggleKeyPlayer?: (key: string) => void;
 }
 

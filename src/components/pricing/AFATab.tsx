@@ -294,8 +294,8 @@ export function AFATab({
         return cfg.monthlyFee * cfg.durationMonths;
       }
       case 'discounted_rates': {
-        const cfg = config as DiscountedRatesConfig;
-        return currentBaselineTotals.total * (1 - cfg.discountPercent / 100);
+        // Rate discounts don't change the budget — return baseline total
+        return currentBaselineTotals.total;
       }
       case 'success_fee': {
         const cfg = config as SuccessFeeConfig;

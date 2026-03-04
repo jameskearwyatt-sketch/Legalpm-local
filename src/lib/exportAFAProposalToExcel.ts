@@ -877,7 +877,7 @@ export async function exportAFAProposalToExcel({
       });
       const altNotesCell = altTotalRow.getCell(notesColumnIndex);
       altNotesCell.value = altDelta > 0 ? `+${smartRound(altDelta).toLocaleString()} vs base` : `${smartRound(altDelta).toLocaleString()} vs base`;
-      altNotesCell.font = { size: 9, italic: true, color: { argb: 'FFB45309' } };
+      altNotesCell.font = { size: 9, color: { argb: 'FFB45309' } };
       altTotalRow.height = 24;
       currentRow++;
     }

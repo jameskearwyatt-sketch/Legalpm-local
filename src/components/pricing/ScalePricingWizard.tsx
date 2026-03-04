@@ -274,7 +274,7 @@ export function ScalePricingWizard({
   };
 
   const handleApply = () => {
-    const result = previewItems.map(s => {
+    const scaledItems = previewItems.map(s => {
       const { fee_lower, fee_amount } = calculateFeeRange(s.scaledFee, s.item.category);
       return {
         index: s.index,
@@ -283,7 +283,23 @@ export function ScalePricingWizard({
         fee_amount,
       };
     });
-    onApply(result);
+
+    // Build baseline fees map from current (pre-scale) values
+    const baselineFees = new Map<number, { fee_upper: number; fee_lower: number; fee_amount: number }>();
+    previewItems.forEach(s => {
+      baselineFees.set(s.index, {
+        fee_upper: getFeeUpper(s.item),
+        fee_lower: s.item.fee_lower ?? 0,
+        fee_amount: s.item.fee_amount ?? 0,
+      });
+    });
+
+    onApply({
+      scaledItems,
+      factor: scalingFactor,
+      selectedIndices: Array.from(selectedIndices),
+      baselineFees,
+    });
     handleOpenChange(false);
   };
 

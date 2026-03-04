@@ -1061,13 +1061,45 @@ export default function PricingProposalDetail() {
       return updatedItems;
     });
     setHasUnsavedChanges(true);
-  }, []);
+    // If this item is under scaling, update its baseline too
+    if (scaleState?.active && scaleState.baselineFees.has(index)) {
+      const feeUpdates: Partial<{ fee_upper: number; fee_lower: number; fee_amount: number }> = {};
+      if ('fee_upper' in updates && updates.fee_upper !== undefined) feeUpdates.fee_upper = updates.fee_upper;
+      if ('fee_lower' in updates && updates.fee_lower !== undefined) feeUpdates.fee_lower = updates.fee_lower;
+      if ('fee_amount' in updates && updates.fee_amount !== undefined) feeUpdates.fee_amount = updates.fee_amount;
+      if (Object.keys(feeUpdates).length > 0) {
+        setScaleState(prev => {
+          if (!prev) return prev;
+          const newBaselines = new Map(prev.baselineFees);
+          const current = newBaselines.get(index)!;
+          newBaselines.set(index, { ...current, ...feeUpdates });
+          return { ...prev, baselineFees: newBaselines };
+        });
+      }
+    }
+  }, [scaleState]);
 
   // Remove work item - memoized to prevent child re-renders
   const removeItem = useCallback((index: number) => {
     setDraftItems(prev => prev.filter((_, i) => i !== index));
+    // Clean up scaling state if item removed
+    if (scaleState) {
+      setScaleState(prev => {
+        if (!prev) return prev;
+        const newBaselines = new Map(prev.baselineFees);
+        newBaselines.delete(index);
+        const newIndices = prev.selectedIndices.filter(i => i !== index).map(i => i > index ? i - 1 : i);
+        // Re-index baselines
+        const reindexed = new Map<number, { fee_upper: number; fee_lower: number; fee_amount: number }>();
+        newBaselines.forEach((v, k) => {
+          reindexed.set(k > index ? k - 1 : k, v);
+        });
+        if (newIndices.length === 0) return null;
+        return { ...prev, baselineFees: reindexed, selectedIndices: newIndices };
+      });
+    }
     setHasUnsavedChanges(true);
-  }, []);
+  }, [scaleState]);
 
   // Duplicate work item - inserts copy immediately below the original
   const duplicateItem = useCallback((index: number) => {

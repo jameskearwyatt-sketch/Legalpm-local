@@ -398,26 +398,22 @@ function DraggableProposalItemInner({
       <TableCell>
         {viewingHistoricalVersion ? (
           <span className="text-sm font-medium">
-            {formatCurrency((item.fee_lower ?? item.fee_amount) * (item.provider === 'Baker McKenzie' ? afaDiscountMultiplier : 1))}
+            {formatCurrency(item.fee_lower ?? item.fee_amount)}
           </span>
         ) : (
           <div className="flex items-center gap-1">
             <span className="text-xs text-muted-foreground">{formatCurrency(0).charAt(0)}</span>
             <Input
               type="text"
-              value={new Intl.NumberFormat('en-GB').format(Math.round(((item.fee_lower ?? item.fee_amount) || 0) * (item.provider === 'Baker McKenzie' ? afaDiscountMultiplier : 1)))}
+              value={new Intl.NumberFormat('en-GB').format(Math.round((item.fee_lower ?? item.fee_amount) || 0))}
               onChange={(e) => {
                 const rawValue = e.target.value.replace(/,/g, '');
-                // Reverse the discount to get the base value
-                const displayedValue = parseFloat(rawValue) || 0;
-                const baseValue = item.provider === 'Baker McKenzie' && afaDiscountMultiplier !== 1 
-                  ? Math.round(displayedValue / afaDiscountMultiplier) 
-                  : displayedValue;
+                const value = parseFloat(rawValue) || 0;
                 // When editing lower, also update fee_amount to midpoint
                 const upper = item.fee_upper ?? item.fee_amount ?? 0;
-                const midpoint = Math.round((baseValue + upper) / 2);
+                const midpoint = Math.round((value + upper) / 2);
                 onUpdate(index, {
-                  fee_lower: baseValue,
+                  fee_lower: value,
                   fee_amount: midpoint,
                   pricing_method: 'manual'
                 });

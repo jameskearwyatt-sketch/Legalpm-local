@@ -1,8 +1,10 @@
 import React, { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Lock, Unlock, Triangle, Minus, ArrowDownUp } from "lucide-react";
+import { Lock, Unlock, Triangle, Minus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
 
 interface TeamMember {
   key: string;
@@ -25,6 +27,8 @@ interface SummaryPyramidProps {
   onMemberHoursCommit?: (key: string, hours: number) => void;
   lockedMembers?: Record<string, boolean>;
   onToggleLock?: (key: string) => void;
+  keyPlayers?: Record<string, boolean>;
+  onToggleKeyPlayer?: (key: string) => void;
 }
 
 type TierKey = "partners" | "senior" | "associates" | "juniors";
@@ -59,7 +63,7 @@ const TIER_COLORS: Record<TierKey, { bg: string; border: string; text: string }>
   },
 };
 
-function classifyTier(member: TeamMember): TierKey {
+export function classifyTier(member: { key: string; level?: string }): TierKey {
   if (member.level) {
     const lvl = member.level.toLowerCase();
     if (lvl === "partner") return "partners";
@@ -273,11 +277,65 @@ function PyramidColumn({
   );
 }
 
+/* ─── Key Players Selection ─── */
+interface KeyPlayersSelectionProps {
+  tiers: Tier[];
+  keyPlayers: Record<string, boolean>;
+  onToggle: (key: string) => void;
+}
+
+function KeyPlayersSelection({ tiers, keyPlayers, onToggle }: KeyPlayersSelectionProps) {
+  const hasAny = tiers.some(t => t.members.length > 0);
+  if (!hasAny) return null;
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Star className="h-3.5 w-3.5 text-amber-500" />
+        <span className="text-xs font-medium text-muted-foreground">
+          Select key players (most active in each tier)
+        </span>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {tiers.filter(t => t.members.length > 0).map(tier => {
+          const colors = TIER_COLORS[tier.key];
+          return (
+            <div key={tier.key} className="flex items-center gap-1.5 flex-wrap">
+              <span className={cn("text-[10px] font-medium w-20 shrink-0 truncate", colors.text)}>
+                {tier.label}
+              </span>
+              {tier.members.map(m => {
+                const isKey = !!keyPlayers[m.key];
+                return (
+                  <Badge
+                    key={m.key}
+                    variant="outline"
+                    className={cn(
+                      "cursor-pointer text-[10px] px-2 py-0.5 transition-all select-none",
+                      isKey
+                        ? "bg-amber-100 dark:bg-amber-900/40 border-amber-400 text-amber-800 dark:text-amber-200 ring-1 ring-amber-400/50"
+                        : "hover:bg-muted/50"
+                    )}
+                    onClick={() => onToggle(m.key)}
+                  >
+                    {isKey && <Star className="h-2.5 w-2.5 mr-0.5 fill-amber-500 text-amber-500" />}
+                    {m.label}
+                  </Badge>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Preset Buttons ─── */
 const PRESETS: { key: DistributionPreset; label: string; icon: React.ReactNode; desc: string }[] = [
-  { key: "pyramid", label: "Pyramid", icon: <Triangle className="h-3.5 w-3.5" />, desc: "Most hours to juniors" },
+  { key: "pyramid", label: "Pyramid", icon: <Triangle className="h-3.5 w-3.5 rotate-180" />, desc: "Most hours to seniors & juniors" },
   { key: "flat", label: "Flat", icon: <Minus className="h-3.5 w-3.5" />, desc: "Equal revenue share" },
-  { key: "reverse", label: "Reverse", icon: <ArrowDownUp className="h-3.5 w-3.5" />, desc: "Partners ≈ juniors" },
+  { key: "reverse", label: "Reverse", icon: <Triangle className="h-3.5 w-3.5" />, desc: "Partners-heavy distribution" },
 ];
 
 /* ─── Main Component ─── */
@@ -289,6 +347,8 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
   onMemberHoursCommit,
   lockedMembers = {},
   onToggleLock,
+  keyPlayers = {},
+  onToggleKeyPlayer,
 }: SummaryPyramidProps) {
   const [expandedMember, setExpandedMember] = useState<string | null>(null);
   const [activePreset, setActivePreset] = useState<DistributionPreset | null>(null);
@@ -300,67 +360,89 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
   const totalRevenue = teamMembers.reduce((s, m) => s + m.revenue, 0);
   const interactive = !!onMemberHoursCommit;
 
+  const hasKeyPlayers = Object.values(keyPlayers).some(Boolean);
+
   const handleMemberClick = (key: string) => {
     setExpandedMember(prev => prev === key ? null : key);
   };
 
   const handlePresetClick = (preset: DistributionPreset) => {
+    if (!hasKeyPlayers) return;
     setActivePreset(preset);
     onDistribute?.(preset);
   };
 
   return (
-    <div className="rounded-lg border bg-card p-4 space-y-4">
-      {/* Preset buttons */}
-      {onDistribute && (
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Auto-Distribute Hours:</span>
-          <div className="flex gap-1.5 flex-wrap">
-            {PRESETS.map((p) => (
-              <Button
-                key={p.key}
-                variant={activePreset === p.key ? "default" : "outline"}
-                size="sm"
-                className="h-7 text-xs gap-1.5 px-2.5"
-                onClick={() => handlePresetClick(p.key)}
-                title={p.desc}
-              >
-                {p.icon}
-                {p.label}
-              </Button>
-            ))}
-          </div>
-        </div>
-      )}
+    <TooltipProvider>
+      <div className="rounded-lg border bg-card p-4 space-y-4">
+        {/* Key Players Selection */}
+        {onDistribute && onToggleKeyPlayer && (
+          <KeyPlayersSelection
+            tiers={tiers}
+            keyPlayers={keyPlayers}
+            onToggle={onToggleKeyPlayer}
+          />
+        )}
 
-      {/* Pyramids */}
-      <div className="flex flex-col sm:flex-row gap-6">
-        <PyramidColumn
-          title="Hours Distribution"
-          tiers={tiers}
-          getValue={(m) => m.hours}
-          formatValue={(v) => `${formatHours(v)}h`}
-          total={totalHours}
-          interactive={interactive}
-          expandedMember={expandedMember}
-          onMemberClick={handleMemberClick}
-          lockedMembers={lockedMembers}
-          onHoursCommit={onMemberHoursCommit}
-          onToggleLock={onToggleLock}
-          formatHours={formatHours}
-        />
-        <div className="hidden sm:block w-px bg-border" />
-        <PyramidColumn
-          title="Cost Distribution"
-          tiers={tiers}
-          getValue={(m) => m.revenue}
-          formatValue={(v) => formatCurrency(v)}
-          total={totalRevenue}
-          interactive={false}
-          expandedMember={null}
-        />
+        {/* Preset buttons */}
+        {onDistribute && (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Auto-Distribute Hours:</span>
+            <div className="flex gap-1.5 flex-wrap">
+              {PRESETS.map((p) => (
+                <Tooltip key={p.key}>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        variant={activePreset === p.key ? "default" : "outline"}
+                        size="sm"
+                        className="h-7 text-xs gap-1.5 px-2.5"
+                        onClick={() => handlePresetClick(p.key)}
+                        disabled={!hasKeyPlayers}
+                      >
+                        {p.icon}
+                        {p.label}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {hasKeyPlayers ? p.desc : "Select key players first"}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Pyramids */}
+        <div className="flex flex-col sm:flex-row gap-6">
+          <PyramidColumn
+            title="Hours Distribution"
+            tiers={tiers}
+            getValue={(m) => m.hours}
+            formatValue={(v) => `${formatHours(v)}h`}
+            total={totalHours}
+            interactive={interactive}
+            expandedMember={expandedMember}
+            onMemberClick={handleMemberClick}
+            lockedMembers={lockedMembers}
+            onHoursCommit={onMemberHoursCommit}
+            onToggleLock={onToggleLock}
+            formatHours={formatHours}
+          />
+          <div className="hidden sm:block w-px bg-border" />
+          <PyramidColumn
+            title="Cost Distribution"
+            tiers={tiers}
+            getValue={(m) => m.revenue}
+            formatValue={(v) => formatCurrency(v)}
+            total={totalRevenue}
+            interactive={false}
+            expandedMember={null}
+          />
+        </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 });
 

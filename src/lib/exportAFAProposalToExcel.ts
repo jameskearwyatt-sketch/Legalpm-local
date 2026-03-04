@@ -903,6 +903,20 @@ export async function exportAFAProposalToExcel({
     worksheet.getRow(currentRow).height = 30;
     currentRow++;
 
+    // Add discount note at top of team section if discounted rates AFA is active
+    const discountAfa = enabledAFAs.find(a => a.afa_type === 'discounted_rates' && a.is_enabled);
+    if (discountAfa) {
+      const discConfig = discountAfa.config as { discountPercent?: number };
+      const pct = discConfig?.discountPercent || 0;
+      worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+      const discountNoteCell = worksheet.getCell(`A${currentRow}`);
+      discountNoteCell.value = `Rates shown reflect a ${pct}% discount from standard rates.`;
+      discountNoteCell.font = { size: 10, italic: true, color: { argb: 'FF2563EB' } };
+      discountNoteCell.alignment = { vertical: 'middle' };
+      worksheet.getRow(currentRow).height = 22;
+      currentRow++;
+    }
+
     // Table header row - use columns B, C, D for Team Member, Rate, Hours, Fee
     const teamTableHeader = worksheet.getRow(currentRow);
     teamTableHeader.values = ['', 'Team Member', `Rate (${teamCurrencySymbol}/hr)`, 'Estimated Hours', 'Estimated Fee'];

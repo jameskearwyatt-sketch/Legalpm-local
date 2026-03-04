@@ -339,7 +339,7 @@ export async function exportDraftBudgetToExcel({
         }
         
         if (item.is_optional) {
-          dataRow.getCell(1).font = { ...dataRow.getCell(1).font, italic: true };
+          dataRow.getCell(1).font = { ...dataRow.getCell(1).font };
         }
       } else {
         categoryTotalProposed += proposedFee;

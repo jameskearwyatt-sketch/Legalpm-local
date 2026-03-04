@@ -34,6 +34,7 @@ interface TeamMemberSummary {
   key: string;
   label: string;
   rate: number;
+  afaRate?: number | null;
   hours: number;
   revenue: number;
 }

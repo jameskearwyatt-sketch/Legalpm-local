@@ -2870,7 +2870,12 @@ export default function PricingProposalDetail() {
                       <TableCell></TableCell>
                       <TableCell>Total</TableCell>
                       <TableCell className="text-right tabular-nums">{formatHours(summary.totalHours)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatCurrency(summary.blendedRate)} (blended)</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(summary.displayBlendedRate)} (blended)
+                        {summary.hasAfaDiscount && (
+                          <span className="block text-[10px] font-normal text-amber-600 dark:text-amber-400">AFA discounted</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex flex-col items-end">
                           <span className="tabular-nums">{formatCurrency(summary.totalRevenue)}</span>

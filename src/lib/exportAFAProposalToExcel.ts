@@ -84,6 +84,7 @@ export async function exportAFAProposalToExcel({
   teamMembers: teamMemberData = [],
   teamCurrency,
   hideUpperAndPcSum = false,
+  afaBlendedRate = null,
 }: ExportAFAProposalOptions): Promise<void> {
   const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency;
   

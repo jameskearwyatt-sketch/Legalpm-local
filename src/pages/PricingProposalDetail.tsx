@@ -993,7 +993,7 @@ export default function PricingProposalDetail() {
     const totalRevenue = enrichedMembers.reduce((s, m) => s + m.revenue, 0);
     const totalCost = enrichedMembers.reduce((s, m) => s + m.memberCost, 0);
     const blendedRate = totalHours > 0 ? totalRevenue / totalHours : 0;
-    const displayBlendedRate = afaRateDiscount ? blendedRate * afaRateDiscount : blendedRate;
+    const displayBlendedRate = blendedRate;
     const delta = totalRevenue - bmUpperTarget;
 
     return {
@@ -2794,7 +2794,7 @@ export default function PricingProposalDetail() {
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div className="min-w-[140px]">
-                      <p className="text-sm font-medium text-muted-foreground">Weighted Avg Rate</p>
+                      <p className="text-sm font-medium text-muted-foreground">Blended Rate</p>
                       <p className="text-2xl font-bold tabular-nums">{formatCurrency(summary.blendedRate)}</p>
                     </div>
                     <TrendingUp className="h-8 w-8 text-muted-foreground/30" />
@@ -2878,7 +2878,7 @@ export default function PricingProposalDetail() {
                       <TableCell>Total</TableCell>
                       <TableCell className="text-right tabular-nums">{formatHours(summary.totalHours)}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {formatCurrency(summary.displayBlendedRate)} (wtd avg)
+                        {formatCurrency(summary.displayBlendedRate)} (blended)
                         {summary.hasAfaDiscount && (
                           <span className="block text-[10px] font-normal text-amber-600 dark:text-amber-400">AFA discounted</span>
                         )}

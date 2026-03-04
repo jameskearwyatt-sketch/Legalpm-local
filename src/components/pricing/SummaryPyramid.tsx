@@ -1,5 +1,8 @@
-import React from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
+import { Lock, Unlock, Triangle, Minus, ArrowDownUp } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface TeamMember {
   key: string;
@@ -9,12 +12,19 @@ interface TeamMember {
   revenue: number;
   memberCost: number;
   level?: string;
+  isLocked?: boolean;
 }
+
+export type DistributionPreset = "pyramid" | "flat" | "reverse";
 
 interface SummaryPyramidProps {
   teamMembers: TeamMember[];
   formatCurrency: (value: number) => string;
   formatHours: (value: number) => string;
+  onDistribute?: (preset: DistributionPreset) => void;
+  onMemberHoursCommit?: (key: string, hours: number) => void;
+  lockedMembers?: Record<string, boolean>;
+  onToggleLock?: (key: string) => void;
 }
 
 type TierKey = "partners" | "senior" | "associates" | "juniors";
@@ -50,7 +60,6 @@ const TIER_COLORS: Record<TierKey, { bg: string; border: string; text: string }>
 };
 
 function classifyTier(member: TeamMember): TierKey {
-  // Use stored level if available
   if (member.level) {
     const lvl = member.level.toLowerCase();
     if (lvl === "partner") return "partners";
@@ -58,7 +67,6 @@ function classifyTier(member: TeamMember): TierKey {
     if (lvl === "associate") return "associates";
     if (lvl === "trainee") return "juniors";
   }
-  // Fallback: auto-detect from key
   const k = member.key.toLowerCase();
   if (k.includes("partner")) return "partners";
   if (k.includes("counsel") || k.includes("seniorassociate") || k.includes("senior_associate") || k.includes("senior associate"))
@@ -84,16 +92,97 @@ function buildTiers(members: TeamMember[]): Tier[] {
   ];
 }
 
+/* ─── Expanded inline editor for a member block ─── */
+interface MemberEditorProps {
+  member: TeamMember;
+  isLocked: boolean;
+  onHoursCommit: (key: string, hours: number) => void;
+  onToggleLock: (key: string) => void;
+  formatHours: (v: number) => string;
+}
+
+function MemberEditor({ member, isLocked, onHoursCommit, onToggleLock, formatHours }: MemberEditorProps) {
+  const [localHours, setLocalHours] = useState<number | null>(null);
+  const isDragging = useRef(false);
+  const displayHours = localHours !== null ? localHours : member.hours;
+
+  const commitValue = useCallback((val: number) => {
+    isDragging.current = false;
+    setLocalHours(null);
+    onHoursCommit(member.key, val);
+  }, [member.key, onHoursCommit]);
+
+  return (
+    <div className="flex items-center gap-2 w-full px-1 py-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
+      <Button
+        variant="ghost"
+        size="sm"
+        className="h-5 w-5 p-0 shrink-0"
+        onClick={(e) => { e.stopPropagation(); onToggleLock(member.key); }}
+        title={isLocked ? "Unlock" : "Lock"}
+      >
+        {isLocked
+          ? <Lock className="h-3 w-3 text-amber-600" />
+          : <Unlock className="h-3 w-3 text-muted-foreground/40" />
+        }
+      </Button>
+      <Input
+        type="number"
+        step="0.5"
+        min="0"
+        disabled={isLocked}
+        value={displayHours.toFixed(1)}
+        onChange={(e) => {
+          const val = Math.max(0, parseFloat(e.target.value) || 0);
+          onHoursCommit(member.key, val);
+        }}
+        onClick={(e) => e.stopPropagation()}
+        className={cn(
+          "w-16 h-6 text-right text-[10px] tabular-nums px-1",
+          isLocked && "bg-amber-50 dark:bg-amber-950/20 border-amber-300 opacity-60"
+        )}
+      />
+      <span className="text-[10px] text-muted-foreground shrink-0">h</span>
+      <input
+        type="range"
+        min="0"
+        max="500"
+        step="0.5"
+        disabled={isLocked}
+        value={Math.min(displayHours, 500)}
+        onMouseDown={() => { isDragging.current = true; }}
+        onTouchStart={() => { isDragging.current = true; }}
+        onChange={(e) => setLocalHours(parseFloat(e.target.value) || 0)}
+        onMouseUp={(e) => commitValue(parseFloat((e.target as HTMLInputElement).value) || 0)}
+        onTouchEnd={(e) => commitValue(parseFloat((e.target as HTMLInputElement).value) || 0)}
+        onClick={(e) => e.stopPropagation()}
+        className={cn("flex-1 h-1.5 accent-primary cursor-pointer min-w-[40px]", isLocked && "opacity-40 cursor-not-allowed")}
+      />
+    </div>
+  );
+}
+
+/* ─── Pyramid Column ─── */
 interface PyramidColumnProps {
   title: string;
   tiers: Tier[];
   getValue: (m: TeamMember) => number;
   formatValue: (v: number) => string;
   total: number;
+  interactive?: boolean;
+  expandedMember: string | null;
+  onMemberClick?: (key: string) => void;
+  lockedMembers?: Record<string, boolean>;
+  onHoursCommit?: (key: string, hours: number) => void;
+  onToggleLock?: (key: string) => void;
+  formatHours?: (v: number) => string;
 }
 
-function PyramidColumn({ title, tiers, getValue, formatValue, total }: PyramidColumnProps) {
-  // Max tier width proportional to tier's share of total
+function PyramidColumn({
+  title, tiers, getValue, formatValue, total,
+  interactive, expandedMember, onMemberClick,
+  lockedMembers, onHoursCommit, onToggleLock, formatHours,
+}: PyramidColumnProps) {
   const tierTotals = tiers.map((t) =>
     t.members.reduce((s, m) => s + getValue(m), 0)
   );
@@ -108,23 +197,16 @@ function PyramidColumn({ title, tiers, getValue, formatValue, total }: PyramidCo
         {tiers.map((tier, i) => {
           const tierTotal = tierTotals[i];
           const colors = TIER_COLORS[tier.key];
-          // Width: proportion of this tier vs the largest tier, with min 20% for visibility
           const widthPct = total > 0 ? Math.max(20, (tierTotal / maxTierTotal) * 100) : 20;
 
           if (tier.members.length === 0) {
-            // Empty tier — gap placeholder
             return (
               <div
                 key={tier.key}
                 className="flex items-center justify-center transition-all duration-500"
                 style={{ width: `${20}%`, minHeight: 36 }}
               >
-                <div
-                  className={cn(
-                    "w-full rounded-xl border-2 border-dashed flex items-center justify-center py-1.5 px-2",
-                    "border-muted-foreground/20"
-                  )}
-                >
+                <div className="w-full rounded-xl border-2 border-dashed flex items-center justify-center py-1.5 px-2 border-muted-foreground/20">
                   <span className="text-[10px] text-muted-foreground/50 whitespace-nowrap">
                     {tier.emptyLabel}
                   </span>
@@ -136,43 +218,53 @@ function PyramidColumn({ title, tiers, getValue, formatValue, total }: PyramidCo
           return (
             <div
               key={tier.key}
-              className="flex items-stretch gap-1 justify-center transition-all duration-500"
+              className="flex flex-col items-center gap-1 transition-all duration-500"
               style={{ width: `${widthPct}%` }}
             >
-              {tier.members.map((member) => {
-                const val = getValue(member);
-                const memberPct = tierTotal > 0 ? (val / tierTotal) * 100 : 100 / tier.members.length;
+              <div className="flex items-stretch gap-1 justify-center w-full">
+                {tier.members.map((member) => {
+                  const val = getValue(member);
+                  const memberPct = tierTotal > 0 ? (val / tierTotal) * 100 : 100 / tier.members.length;
+                  const isLocked = lockedMembers?.[member.key];
+                  const isExpanded = expandedMember === member.key && interactive;
 
-                return (
-                  <div
-                    key={member.key}
-                    className={cn(
-                      "rounded-xl border flex flex-col items-center justify-center py-1.5 px-1 transition-all duration-500 min-w-0 overflow-hidden",
-                      colors.bg,
-                      colors.border
-                    )}
-                    style={{ width: `${memberPct}%`, minWidth: 40, minHeight: 36 }}
-                    title={`${member.label}: ${formatValue(val)}`}
-                  >
-                    <span
-                      className={cn(
-                        "text-[10px] font-medium leading-tight truncate w-full text-center",
-                        colors.text
+                  return (
+                    <div key={member.key} className="flex flex-col min-w-0" style={{ width: `${memberPct}%`, minWidth: 40 }}>
+                      <div
+                        className={cn(
+                          "rounded-xl border flex flex-col items-center justify-center py-1.5 px-1 transition-all duration-500 min-w-0 overflow-hidden relative",
+                          colors.bg, colors.border,
+                          interactive && "cursor-pointer hover:ring-2 hover:ring-primary/30",
+                          isExpanded && "ring-2 ring-primary/50",
+                          isLocked && "ring-1 ring-amber-400/50"
+                        )}
+                        style={{ minHeight: 36 }}
+                        title={`${member.label}: ${formatValue(val)}`}
+                        onClick={() => interactive && onMemberClick?.(member.key)}
+                      >
+                        {isLocked && (
+                          <Lock className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-amber-500/70" />
+                        )}
+                        <span className={cn("text-[10px] font-medium leading-tight truncate w-full text-center", colors.text)}>
+                          {member.label}
+                        </span>
+                        <span className={cn("text-[10px] tabular-nums leading-tight opacity-75", colors.text)}>
+                          {formatValue(val)}
+                        </span>
+                      </div>
+                      {isExpanded && onHoursCommit && onToggleLock && formatHours && (
+                        <MemberEditor
+                          member={member}
+                          isLocked={!!isLocked}
+                          onHoursCommit={onHoursCommit}
+                          onToggleLock={onToggleLock}
+                          formatHours={formatHours}
+                        />
                       )}
-                    >
-                      {member.label}
-                    </span>
-                    <span
-                      className={cn(
-                        "text-[10px] tabular-nums leading-tight opacity-75",
-                        colors.text
-                      )}
-                    >
-                      {formatValue(val)}
-                    </span>
-                  </div>
-                );
-              })}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           );
         })}
@@ -181,19 +273,67 @@ function PyramidColumn({ title, tiers, getValue, formatValue, total }: PyramidCo
   );
 }
 
+/* ─── Preset Buttons ─── */
+const PRESETS: { key: DistributionPreset; label: string; icon: React.ReactNode; desc: string }[] = [
+  { key: "pyramid", label: "Pyramid", icon: <Triangle className="h-3.5 w-3.5" />, desc: "Most hours to juniors" },
+  { key: "flat", label: "Flat", icon: <Minus className="h-3.5 w-3.5" />, desc: "Equal revenue share" },
+  { key: "reverse", label: "Reverse", icon: <ArrowDownUp className="h-3.5 w-3.5" />, desc: "Partners ≈ juniors" },
+];
+
+/* ─── Main Component ─── */
 const SummaryPyramid = React.memo(function SummaryPyramid({
   teamMembers,
   formatCurrency,
   formatHours,
+  onDistribute,
+  onMemberHoursCommit,
+  lockedMembers = {},
+  onToggleLock,
 }: SummaryPyramidProps) {
+  const [expandedMember, setExpandedMember] = useState<string | null>(null);
+  const [activePreset, setActivePreset] = useState<DistributionPreset | null>(null);
+
   if (teamMembers.length === 0) return null;
 
   const tiers = buildTiers(teamMembers);
   const totalHours = teamMembers.reduce((s, m) => s + m.hours, 0);
   const totalRevenue = teamMembers.reduce((s, m) => s + m.revenue, 0);
+  const interactive = !!onMemberHoursCommit;
+
+  const handleMemberClick = (key: string) => {
+    setExpandedMember(prev => prev === key ? null : key);
+  };
+
+  const handlePresetClick = (preset: DistributionPreset) => {
+    setActivePreset(preset);
+    onDistribute?.(preset);
+  };
 
   return (
-    <div className="rounded-lg border bg-card p-4">
+    <div className="rounded-lg border bg-card p-4 space-y-4">
+      {/* Preset buttons */}
+      {onDistribute && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+          <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Auto-Distribute Hours:</span>
+          <div className="flex gap-1.5 flex-wrap">
+            {PRESETS.map((p) => (
+              <Button
+                key={p.key}
+                variant={activePreset === p.key ? "default" : "outline"}
+                size="sm"
+                className="h-7 text-xs gap-1.5 px-2.5"
+                onClick={() => handlePresetClick(p.key)}
+                title={p.desc}
+              >
+                {p.icon}
+                {p.label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Pyramids */}
       <div className="flex flex-col sm:flex-row gap-6">
         <PyramidColumn
           title="Hours Distribution"
@@ -201,6 +341,13 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
           getValue={(m) => m.hours}
           formatValue={(v) => `${formatHours(v)}h`}
           total={totalHours}
+          interactive={interactive}
+          expandedMember={expandedMember}
+          onMemberClick={handleMemberClick}
+          lockedMembers={lockedMembers}
+          onHoursCommit={onMemberHoursCommit}
+          onToggleLock={onToggleLock}
+          formatHours={formatHours}
         />
         <div className="hidden sm:block w-px bg-border" />
         <PyramidColumn
@@ -209,6 +356,8 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
           getValue={(m) => m.revenue}
           formatValue={(v) => formatCurrency(v)}
           total={totalRevenue}
+          interactive={false}
+          expandedMember={null}
         />
       </div>
     </div>

@@ -1003,7 +1003,7 @@ export async function exportAFAProposalToExcel({
       const blendedRate = totalRevenue / totalHours;
       const blendedRow = worksheet.getRow(currentRow);
       blendedRow.values = ['', `Blended Rate: ${teamCurrencySymbol}${Math.round(blendedRate).toLocaleString()}/hr`];
-      blendedRow.getCell(2).font = { size: 10, italic: true, color: { argb: 'FF6B7280' } };
+      blendedRow.getCell(2).font = { size: 10, color: { argb: 'FF6B7280' } };
       currentRow++;
     }
   }

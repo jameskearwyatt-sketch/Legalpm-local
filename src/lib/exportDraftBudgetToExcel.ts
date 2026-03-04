@@ -363,8 +363,8 @@ export async function exportDraftBudgetToExcel({
         dataRow.getCell(4).font = { size: 11 };
         
         if (item.is_optional) {
-          dataRow.getCell(1).font = { italic: true, color: { argb: 'FF6B7280' } };
-          dataRow.getCell(4).font = { italic: true, color: { argb: 'FF6B7280' } };
+          dataRow.getCell(1).font = { color: { argb: 'FF6B7280' } };
+          dataRow.getCell(4).font = { color: { argb: 'FF6B7280' } };
         }
       }
 

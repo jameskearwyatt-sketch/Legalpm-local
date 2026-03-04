@@ -270,7 +270,7 @@ export async function exportBudgetToExcel({
     subtotalRow.getCell(10).alignment = { horizontal: 'center' };
 
     if (categoryWriteOff > 0) {
-      subtotalRow.getCell(7).font = { color: { argb: 'FFDC2626' }, bold: true, italic: true };
+      subtotalRow.getCell(7).font = { color: { argb: 'FFDC2626' }, bold: true };
     }
 
     subtotalRow.eachCell((cell) => {

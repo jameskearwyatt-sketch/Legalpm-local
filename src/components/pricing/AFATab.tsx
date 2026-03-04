@@ -1081,19 +1081,13 @@ export function AFATab({
         </div>
         
         <div className="bg-muted/50 rounded-lg p-4 space-y-3">
-          <div className="flex justify-between text-sm">
-            <span>Standard rates total</span>
-            <span className="line-through text-muted-foreground">{formatCurrency(baselineTotals.total)}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span>Discount</span>
-            <span className="text-green-600">-{formatCurrency(baselineTotals.total - discountedTotal)}</span>
-          </div>
-          <Separator />
           <div className="flex justify-between">
-            <span className="font-medium">Discounted total</span>
-            <span className="text-xl font-bold">{formatCurrency(discountedTotal)}</span>
+            <span className="font-medium">Budget (unchanged)</span>
+            <span className="text-xl font-bold">{formatCurrency(baselineTotals.total)}</span>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Rate discounts lower hourly rates — they do not reduce the budget. The team can record more hours within the same fee estimate.
+          </p>
         </div>
         
         <div className="text-sm text-muted-foreground space-y-1">

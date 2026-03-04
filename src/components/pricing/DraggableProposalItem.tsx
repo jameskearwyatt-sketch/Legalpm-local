@@ -47,7 +47,7 @@ interface DraggableProposalItemProps {
   viewingHistoricalVersion: boolean;
   customCategories?: string[];
   onAddCustomCategory?: (category: string) => void;
-  afaDiscountMultiplier?: number;
+  
   hideIncludeColumn?: boolean;
 }
 

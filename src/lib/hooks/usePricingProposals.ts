@@ -60,7 +60,7 @@ export interface ProposalAssumptions {
   // Summary tab: persisted hours and lock states per team member
   summaryHours?: Record<string, number>;
   summaryLocks?: Record<string, boolean>;
-  summaryKeyPlayers?: Record<string, boolean>;
+  summaryKeyPlayers?: Record<string, number>; // 0=background, 1=key, 2=anchor
 }
 
 // Check if figure settings are complete (all three must be set)

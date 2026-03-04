@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Lock, Unlock, Triangle, Minus, Star } from "lucide-react";
+import { Lock, Unlock, Triangle, Minus, Star, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +27,7 @@ interface SummaryPyramidProps {
   onMemberHoursCommit?: (key: string, hours: number) => void;
   lockedMembers?: Record<string, boolean>;
   onToggleLock?: (key: string) => void;
-  keyPlayers?: Record<string, boolean>;
+  keyPlayers?: Record<string, number>; // 0=background, 1=key, 2=anchor
   onToggleKeyPlayer?: (key: string) => void;
 }
 
@@ -280,7 +280,7 @@ function PyramidColumn({
 /* ─── Key Players Selection ─── */
 interface KeyPlayersSelectionProps {
   tiers: Tier[];
-  keyPlayers: Record<string, boolean>;
+  keyPlayers: Record<string, number>;
   onToggle: (key: string) => void;
 }
 
@@ -293,7 +293,7 @@ function KeyPlayersSelection({ tiers, keyPlayers, onToggle }: KeyPlayersSelectio
       <div className="flex items-center gap-2">
         <Star className="h-3.5 w-3.5 text-amber-500" />
         <span className="text-xs font-medium text-muted-foreground">
-          Select key players (most active in each tier)
+          Tap to assign: Key (2×) → Anchor (4×) → Clear
         </span>
       </div>
       <div className="flex flex-col gap-1.5">
@@ -305,21 +305,26 @@ function KeyPlayersSelection({ tiers, keyPlayers, onToggle }: KeyPlayersSelectio
                 {tier.label}
               </span>
               {tier.members.map(m => {
-                const isKey = !!keyPlayers[m.key];
+                const level = keyPlayers[m.key] || 0;
                 return (
                   <Badge
                     key={m.key}
                     variant="outline"
                     className={cn(
                       "cursor-pointer text-[10px] px-2 py-0.5 transition-all select-none",
-                      isKey
+                      level === 2
+                        ? "bg-orange-100 dark:bg-orange-900/40 border-orange-500 text-orange-800 dark:text-orange-200 ring-1 ring-orange-500/60"
+                        : level === 1
                         ? "bg-amber-100 dark:bg-amber-900/40 border-amber-400 text-amber-800 dark:text-amber-200 ring-1 ring-amber-400/50"
                         : "hover:bg-muted/50"
                     )}
                     onClick={() => onToggle(m.key)}
                   >
-                    {isKey && <Star className="h-2.5 w-2.5 mr-0.5 fill-amber-500 text-amber-500" />}
+                    {level === 2 && <Zap className="h-2.5 w-2.5 mr-0.5 fill-orange-500 text-orange-500" />}
+                    {level === 1 && <Star className="h-2.5 w-2.5 mr-0.5 fill-amber-500 text-amber-500" />}
                     {m.label}
+                    {level === 1 && <span className="ml-1 text-[8px] opacity-70">Key</span>}
+                    {level === 2 && <span className="ml-1 text-[8px] opacity-70">Anchor</span>}
                   </Badge>
                 );
               })}
@@ -360,7 +365,7 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
   const totalRevenue = teamMembers.reduce((s, m) => s + m.revenue, 0);
   const interactive = !!onMemberHoursCommit;
 
-  const hasKeyPlayers = Object.values(keyPlayers).some(Boolean);
+  const hasKeyPlayers = Object.values(keyPlayers).some(v => v > 0);
 
   const handleMemberClick = (key: string) => {
     setExpandedMember(prev => prev === key ? null : key);

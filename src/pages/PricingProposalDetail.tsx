@@ -882,7 +882,8 @@ export default function PricingProposalDetail() {
   const toggleKeyPlayer = useCallback((memberKey: string) => {
     setAssumptions(prev => {
       const kp = { ...(prev.summaryKeyPlayers || {}) };
-      kp[memberKey] = !kp[memberKey];
+      const current = kp[memberKey] || 0;
+      kp[memberKey] = current === 0 ? 1 : current === 1 ? 2 : 0; // cycle: 0→1→2→0
       return { ...prev, summaryKeyPlayers: kp };
     });
   }, []);
@@ -930,9 +931,10 @@ export default function PricingProposalDetail() {
       const memberWeights = unlocked.map(m => {
         const tier = classifyTier(m);
         const tierWeight = weights[tier] || 1;
-        const keyMultiplier = kp[m.key] ? 2 : 1;
+        const playerLevel = kp[m.key] || 0;
+        const keyMultiplier = playerLevel === 2 ? 4 : playerLevel === 1 ? 2 : 1;
         const w = tierWeight * keyMultiplier;
-        return { key: m.key, rawWeight: m.rate > 0 ? w / m.rate : 0 };
+        return { key: m.key, rawWeight: m.rate > 0 ? w / m.rate : 0, rate: m.rate };
       });
 
       const totalWeight = memberWeights.reduce((s, mw) => s + mw.rawWeight, 0);

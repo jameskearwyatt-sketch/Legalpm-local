@@ -982,7 +982,7 @@ export default function PricingProposalDetail() {
       return {
         ...m,
         hours,
-        revenue: hours * m.rate,
+        revenue: hours * (afaRateDiscount ? m.rate * afaRateDiscount : m.rate),
         displayRate,
         memberCost: hours * m.cost,
         isLocked: !!summaryLocks[m.key],

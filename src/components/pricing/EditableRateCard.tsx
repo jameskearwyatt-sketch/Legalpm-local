@@ -382,6 +382,25 @@ export function EditableRateCard({
             )}
           </div>
 
+          {sortedEarners.length > 0 && (() => {
+            const avgFeeRate = sortedEarners.reduce((s, e) => s + e.feeRate, 0) / sortedEarners.length;
+            const afaRateMultiplier = afaDiscount > 0 ? (100 - afaDiscount) / 100 : 0;
+            const avgAfaRate = afaRateMultiplier > 0 ? sortedEarners.reduce((s, e) => s + Math.round(e.feeRate * afaRateMultiplier), 0) / sortedEarners.length : 0;
+            return (
+              <div className="flex items-center justify-between px-2 py-2 text-xs text-muted-foreground border-t mt-1">
+                <span>Average Rate</span>
+                <div className="flex gap-4 tabular-nums">
+                  <span>{feeCurrencySymbol}{Math.round(avgFeeRate).toLocaleString()}</span>
+                  {afaRateMultiplier > 0 && (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      AFA: {feeCurrencySymbol}{Math.round(avgAfaRate).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="flex justify-end gap-2 pt-3 border-t mt-3">
             {onSaveAsDefault && (
               <Button 

@@ -87,7 +87,7 @@ import { AFATab } from "@/components/pricing/AFATab";
 import { ScalePricingWizard, ScaleApplyResult, distributeProRataLRM } from "@/components/pricing/ScalePricingWizard";
 import { Slider } from "@/components/ui/slider";
 import { ScopeAssumptionsTab, ScopeAssumptionsState, getAssumptionNarratives, getGroupedAssumptionNarratives } from "@/components/pricing/ScopeAssumptionsTab";
-import SummaryPyramid, { DistributionPreset } from "@/components/pricing/SummaryPyramid";
+import SummaryPyramid, { DistributionPreset, classifyTier } from "@/components/pricing/SummaryPyramid";
 import { exportAFAProposalToExcel } from "@/lib/exportAFAProposalToExcel";
 import { applyAFAFilters, getAFASummary } from "@/lib/afaFilterUtils";
 import {
@@ -898,19 +898,6 @@ export default function PricingProposalDetail() {
       reverse:  { partners: 3, senior: 2, associates: 2, juniors: 2 },
     };
 
-    const classifyTier = (m: typeof teamMembers[0]) => {
-      const lvl = (m.level || '').toLowerCase();
-      if (lvl === 'partner') return 'partners';
-      if (lvl === 'counsel' || lvl === 'seniorassociate') return 'senior';
-      if (lvl === 'associate') return 'associates';
-      if (lvl === 'trainee') return 'juniors';
-      const k = m.key.toLowerCase();
-      if (k.includes('partner')) return 'partners';
-      if (k.includes('counsel') || k.includes('seniorassociate') || k.includes('senior_associate') || k.includes('senior associate')) return 'senior';
-      if (k.includes('associate')) return 'associates';
-      return 'juniors';
-    };
-
     setAssumptions(prev => {
       const locks = prev.summaryLocks || {};
       const kp = prev.summaryKeyPlayers || {};
@@ -927,7 +914,7 @@ export default function PricingProposalDetail() {
 
       if (unlocked.length === 0) return prev;
 
-      // Phase 1: Group unlocked members by tier and compute tier-level revenue allocation
+      // Phase 1: Group unlocked members by tier using shared classifyTier
       const tierGroups: Record<string, typeof unlocked> = {};
       unlocked.forEach(m => {
         const tier = classifyTier(m);
@@ -935,12 +922,11 @@ export default function PricingProposalDetail() {
         tierGroups[tier].push(m);
       });
 
-      // Sum of tier weights (each tier counted once regardless of member count)
+      // Sum of tier weights (each occupied tier counted once)
       const totalTierWeight = Object.keys(tierGroups).reduce((s, t) => s + (weights[t] || 1), 0);
       if (totalTierWeight <= 0) return prev;
 
       // Phase 2: Within each tier, distribute hours by shares (key=2×, anchor=4×, background=1×)
-      // Rate only affects how many hours a given revenue slice buys — NOT relative hour allocation
       Object.entries(tierGroups).forEach(([tier, members]) => {
         const tierWeight = weights[tier] || 1;
         const tierRevenue = (tierWeight / totalTierWeight) * targetRevenue;
@@ -956,7 +942,8 @@ export default function PricingProposalDetail() {
         // Each member gets their share of tier revenue, converted to hours at their rate
         memberShares.forEach(ms => {
           const memberRevenue = (ms.share / totalShares) * tierRevenue;
-          hours[ms.key] = Math.round((ms.rate > 0 ? memberRevenue / ms.rate : 0) * 2) / 2; // round to 0.5
+          const computed = ms.rate > 0 ? memberRevenue / ms.rate : 0;
+          hours[ms.key] = Math.max(0.5, Math.round(computed * 2) / 2); // min 0.5h, round to 0.5
         });
       });
 

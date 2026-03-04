@@ -615,6 +615,14 @@ export default function PricingProposalDetail() {
     return proposalAFAs.filter(a => a.is_enabled);
   }, [proposalAFAs]);
 
+  // AFA discount multiplier for display rates in Summary tab
+  const afaRateDiscount = useMemo(() => {
+    const discountAfa = proposalAFAs.find(a => a.afa_type === 'discounted_rates' && a.is_enabled);
+    if (!discountAfa) return null;
+    const pct = (discountAfa.config as any).discountPercent || 0;
+    return pct > 0 ? (100 - pct) / 100 : null;
+  }, [proposalAFAs]);
+
   // Get unique department names from all items for the "BM Input" column
   const existingInputDepts = useMemo(() => {
     const depts = new Set<string>();

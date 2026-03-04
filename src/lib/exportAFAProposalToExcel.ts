@@ -576,8 +576,8 @@ export async function exportAFAProposalToExcel({
       }
 
       if (item.is_optional) {
-        dataRow.getCell(2).font = { italic: true, color: { argb: 'FF6B7280' } };
-        dataRow.getCell(notesColumnIndex).font = { italic: true, color: { argb: 'FF6B7280' } };
+        dataRow.getCell(2).font = { color: { argb: 'FF6B7280' } };
+        dataRow.getCell(notesColumnIndex).font = { color: { argb: 'FF6B7280' } };
       }
 
       // Subtle borders

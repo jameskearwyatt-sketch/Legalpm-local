@@ -878,12 +878,23 @@ export default function PricingProposalDetail() {
     });
   }, []);
 
+  // Toggle key player status
+  const toggleKeyPlayer = useCallback((memberKey: string) => {
+    setAssumptions(prev => {
+      const kp = { ...(prev.summaryKeyPlayers || {}) };
+      kp[memberKey] = !kp[memberKey];
+      return { ...prev, summaryKeyPlayers: kp };
+    });
+  }, []);
+
+  const summaryKeyPlayers = assumptions.summaryKeyPlayers || {};
+
   // Auto-distribute hours across team using preset weights
   const handleAutoDistribute = useCallback((preset: DistributionPreset) => {
     const WEIGHTS: Record<DistributionPreset, Record<string, number>> = {
-      pyramid:  { partners: 1, senior: 2, associates: 3, juniors: 4 },
+      pyramid:  { partners: 1, senior: 4, associates: 3, juniors: 4 },
       flat:     { partners: 1, senior: 1, associates: 1, juniors: 1 },
-      reverse:  { partners: 3, senior: 2.5, associates: 2, juniors: 3 },
+      reverse:  { partners: 3, senior: 2, associates: 2, juniors: 2 },
     };
 
     const classifyTier = (m: typeof teamMembers[0]) => {
@@ -901,6 +912,7 @@ export default function PricingProposalDetail() {
 
     setAssumptions(prev => {
       const locks = prev.summaryLocks || {};
+      const kp = prev.summaryKeyPlayers || {};
       const hours = { ...(prev.summaryHours || {}) };
       const weights = WEIGHTS[preset];
 
@@ -914,10 +926,12 @@ export default function PricingProposalDetail() {
 
       if (unlocked.length === 0) return prev;
 
-      // Compute raw weight per member: weight(tier) / rate
+      // Compute raw weight per member: tierWeight * keyPlayerMultiplier / rate
       const memberWeights = unlocked.map(m => {
         const tier = classifyTier(m);
-        const w = weights[tier] || 1;
+        const tierWeight = weights[tier] || 1;
+        const keyMultiplier = kp[m.key] ? 2 : 1;
+        const w = tierWeight * keyMultiplier;
         return { key: m.key, rawWeight: m.rate > 0 ? w / m.rate : 0 };
       });
 
@@ -925,9 +939,6 @@ export default function PricingProposalDetail() {
 
       if (totalWeight <= 0) return prev;
 
-      // hours = (rawWeight / totalWeight) * targetRevenue / rate
-      // but since rawWeight = weight/rate, hours = (weight/rate) / totalWeight * targetRevenue / rate... 
-      // Actually: targetRevenue = Σ(hours_i * rate_i), and hours_i proportional to rawWeight_i
       // hours_i = rawWeight_i * K where K chosen so Σ(rawWeight_i * K * rate_i) = targetRevenue
       // K = targetRevenue / Σ(rawWeight_i * rate_i)
       const denominator = memberWeights.reduce((s, mw) => {

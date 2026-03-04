@@ -615,6 +615,14 @@ export default function PricingProposalDetail() {
     return proposalAFAs.filter(a => a.is_enabled);
   }, [proposalAFAs]);
 
+  // AFA discount multiplier for display rates in Summary tab
+  const afaRateDiscount = useMemo(() => {
+    const discountAfa = proposalAFAs.find(a => a.afa_type === 'discounted_rates' && a.is_enabled);
+    if (!discountAfa) return null;
+    const pct = (discountAfa.config as any).discountPercent || 0;
+    return pct > 0 ? (100 - pct) / 100 : null;
+  }, [proposalAFAs]);
+
   // Get unique department names from all items for the "BM Input" column
   const existingInputDepts = useMemo(() => {
     const depts = new Set<string>();
@@ -970,10 +978,12 @@ export default function PricingProposalDetail() {
   const summary = useMemo(() => {
     const enrichedMembers = teamMembers.map(m => {
       const hours = summaryHours[m.key] || 0;
+      const displayRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
       return {
         ...m,
         hours,
         revenue: hours * m.rate,
+        displayRate,
         memberCost: hours * m.cost,
         isLocked: !!summaryLocks[m.key],
       };
@@ -983,6 +993,7 @@ export default function PricingProposalDetail() {
     const totalRevenue = enrichedMembers.reduce((s, m) => s + m.revenue, 0);
     const totalCost = enrichedMembers.reduce((s, m) => s + m.memberCost, 0);
     const blendedRate = totalHours > 0 ? totalRevenue / totalHours : 0;
+    const displayBlendedRate = afaRateDiscount ? blendedRate * afaRateDiscount : blendedRate;
     const delta = totalRevenue - bmUpperTarget;
 
     return {
@@ -991,11 +1002,13 @@ export default function PricingProposalDetail() {
       totalRevenue,
       totalCost,
       blendedRate,
+      displayBlendedRate,
       delta,
       bmUpperTarget,
       hasEstimatedHours: enrichedMembers.length > 0,
+      hasAfaDiscount: !!afaRateDiscount,
     };
-  }, [teamMembers, summaryHours, summaryLocks, bmUpperTarget]);
+  }, [teamMembers, summaryHours, summaryLocks, bmUpperTarget, afaRateDiscount]);
 
   // Live rate card changes (for real-time pyramid updates)
   const handleRateCardChange = useCallback((newTeamRateCard: RateCard, newFeeRateCard: RateCard) => {
@@ -2829,7 +2842,12 @@ export default function PricingProposalDetail() {
                       <TableHead className="w-8"></TableHead>
                       <TableHead>Team Member</TableHead>
                       <TableHead className="text-right">Hours</TableHead>
-                      <TableHead className="text-right">Rate ({currencySymbol})</TableHead>
+                      <TableHead className="text-right">
+                        Rate ({currencySymbol})
+                        {summary.hasAfaDiscount && (
+                          <span className="ml-1 text-[10px] font-medium text-amber-600 dark:text-amber-400">AFA</span>
+                        )}
+                      </TableHead>
                       <TableHead className="text-right">Revenue ({currencySymbol})</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -2840,7 +2858,7 @@ export default function PricingProposalDetail() {
                         memberKey={member.key}
                         label={member.label}
                         hours={member.hours}
-                        rate={member.rate}
+                        rate={member.displayRate}
                         revenue={member.revenue}
                         isLocked={member.isLocked}
                         formatCurrency={formatCurrency}
@@ -2852,7 +2870,12 @@ export default function PricingProposalDetail() {
                       <TableCell></TableCell>
                       <TableCell>Total</TableCell>
                       <TableCell className="text-right tabular-nums">{formatHours(summary.totalHours)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatCurrency(summary.blendedRate)} (blended)</TableCell>
+                      <TableCell className="text-right tabular-nums">
+                        {formatCurrency(summary.displayBlendedRate)} (blended)
+                        {summary.hasAfaDiscount && (
+                          <span className="block text-[10px] font-normal text-amber-600 dark:text-amber-400">AFA discounted</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex flex-col items-end">
                           <span className="tabular-nums">{formatCurrency(summary.totalRevenue)}</span>

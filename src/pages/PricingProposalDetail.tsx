@@ -861,7 +861,8 @@ export default function PricingProposalDetail() {
         // Equal revenue share → cheaper members get more hours
         const revenuePerMember = remainingTarget / unlocked.length;
         unlocked.forEach(m => {
-          hours[m.key] = m.rate > 0 ? Math.round((revenuePerMember / m.rate) * 2) / 2 : 0;
+          const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+          hours[m.key] = eRate > 0 ? Math.round((revenuePerMember / eRate) * 2) / 2 : 0;
         });
       } else if (unlocked.length > 0) {
         unlocked.forEach(m => { hours[m.key] = 0; });

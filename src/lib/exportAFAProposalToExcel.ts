@@ -242,7 +242,7 @@ export async function exportAFAProposalToExcel({
         worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
         const narrativeCell = worksheet.getCell(`A${currentRow}`);
         narrativeCell.value = originalAfa.client_narrative.trim();
-        narrativeCell.font = { size: 10, italic: true, color: { argb: 'FF374151' } };
+        narrativeCell.font = { size: 10, color: { argb: 'FF374151' } };
         narrativeCell.fill = {
           type: 'pattern',
           pattern: 'solid',

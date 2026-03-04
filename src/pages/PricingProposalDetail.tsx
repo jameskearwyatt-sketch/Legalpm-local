@@ -159,6 +159,14 @@ export default function PricingProposalDetail() {
   const [isAllocatingTargetPricing, setIsAllocatingTargetPricing] = useState(false);
   const [isAddWorkItemDialogOpen, setIsAddWorkItemDialogOpen] = useState(false);
   const [isScalePricingOpen, setIsScalePricingOpen] = useState(false);
+
+  // Non-destructive scale pricing state
+  const [scaleState, setScaleState] = useState<{
+    active: boolean;
+    factor: number;
+    selectedIndices: number[];
+    baselineFees: Map<number, { fee_upper: number; fee_lower: number; fee_amount: number }>;
+  } | null>(null);
   
   const [isDeletingVersion, setIsDeletingVersion] = useState(false);
   const [isSendToMatterOpen, setIsSendToMatterOpen] = useState(false);

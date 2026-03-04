@@ -84,7 +84,8 @@ import { PhasedWorkItemsView, PhasedWorkItemsViewRef } from "@/components/pricin
 import { AddWorkItemDialog } from "@/components/pricing/AddWorkItemDialog";
 import { LocalCounselPanel } from "@/components/pricing/LocalCounselPanel";
 import { AFATab } from "@/components/pricing/AFATab";
-import { ScalePricingWizard } from "@/components/pricing/ScalePricingWizard";
+import { ScalePricingWizard, ScaleApplyResult, distributeProRataLRM } from "@/components/pricing/ScalePricingWizard";
+import { Slider } from "@/components/ui/slider";
 import { ScopeAssumptionsTab, ScopeAssumptionsState, getAssumptionNarratives, getGroupedAssumptionNarratives } from "@/components/pricing/ScopeAssumptionsTab";
 import SummaryPyramid from "@/components/pricing/SummaryPyramid";
 import { exportAFAProposalToExcel } from "@/lib/exportAFAProposalToExcel";
@@ -158,6 +159,14 @@ export default function PricingProposalDetail() {
   const [isAllocatingTargetPricing, setIsAllocatingTargetPricing] = useState(false);
   const [isAddWorkItemDialogOpen, setIsAddWorkItemDialogOpen] = useState(false);
   const [isScalePricingOpen, setIsScalePricingOpen] = useState(false);
+
+  // Non-destructive scale pricing state
+  const [scaleState, setScaleState] = useState<{
+    active: boolean;
+    factor: number;
+    selectedIndices: number[];
+    baselineFees: Map<number, { fee_upper: number; fee_lower: number; fee_amount: number }>;
+  } | null>(null);
   
   const [isDeletingVersion, setIsDeletingVersion] = useState(false);
   const [isSendToMatterOpen, setIsSendToMatterOpen] = useState(false);
@@ -1052,13 +1061,45 @@ export default function PricingProposalDetail() {
       return updatedItems;
     });
     setHasUnsavedChanges(true);
-  }, []);
+    // If this item is under scaling, update its baseline too
+    if (scaleState?.active && scaleState.baselineFees.has(index)) {
+      const feeUpdates: Partial<{ fee_upper: number; fee_lower: number; fee_amount: number }> = {};
+      if ('fee_upper' in updates && updates.fee_upper !== undefined) feeUpdates.fee_upper = updates.fee_upper;
+      if ('fee_lower' in updates && updates.fee_lower !== undefined) feeUpdates.fee_lower = updates.fee_lower;
+      if ('fee_amount' in updates && updates.fee_amount !== undefined) feeUpdates.fee_amount = updates.fee_amount;
+      if (Object.keys(feeUpdates).length > 0) {
+        setScaleState(prev => {
+          if (!prev) return prev;
+          const newBaselines = new Map(prev.baselineFees);
+          const current = newBaselines.get(index)!;
+          newBaselines.set(index, { ...current, ...feeUpdates });
+          return { ...prev, baselineFees: newBaselines };
+        });
+      }
+    }
+  }, [scaleState]);
 
   // Remove work item - memoized to prevent child re-renders
   const removeItem = useCallback((index: number) => {
     setDraftItems(prev => prev.filter((_, i) => i !== index));
+    // Clean up scaling state if item removed
+    if (scaleState) {
+      setScaleState(prev => {
+        if (!prev) return prev;
+        const newBaselines = new Map(prev.baselineFees);
+        newBaselines.delete(index);
+        const newIndices = prev.selectedIndices.filter(i => i !== index).map(i => i > index ? i - 1 : i);
+        // Re-index baselines
+        const reindexed = new Map<number, { fee_upper: number; fee_lower: number; fee_amount: number }>();
+        newBaselines.forEach((v, k) => {
+          reindexed.set(k > index ? k - 1 : k, v);
+        });
+        if (newIndices.length === 0) return null;
+        return { ...prev, baselineFees: reindexed, selectedIndices: newIndices };
+      });
+    }
     setHasUnsavedChanges(true);
-  }, []);
+  }, [scaleState]);
 
   // Duplicate work item - inserts copy immediately below the original
   const duplicateItem = useCallback((index: number) => {
@@ -1074,6 +1115,73 @@ export default function PricingProposalDetail() {
     });
     setHasUnsavedChanges(true);
   }, []);
+
+  // --- Scale Pricing Helpers ---
+  const applyScaleFactor = useCallback((factor: number, baselines: Map<number, { fee_upper: number; fee_lower: number; fee_amount: number }>, indices: number[]) => {
+    const items = indices
+      .filter(idx => baselines.has(idx))
+      .map(idx => ({ index: idx, currentFee: baselines.get(idx)!.fee_upper }));
+    
+    if (items.length === 0) return;
+    
+    const targetTotal = Math.round(items.reduce((sum, i) => sum + i.currentFee, 0) * factor / 1000) * 1000;
+    const allocations = distributeProRataLRM(items, targetTotal);
+    
+    setDraftItems(prev => {
+      const next = [...prev];
+      allocations.forEach((scaledFeeUpper, idx) => {
+        const { fee_lower, fee_amount } = calculateFeeRange(scaledFeeUpper, next[idx]?.category);
+        next[idx] = { ...next[idx], fee_upper: scaledFeeUpper, fee_lower, fee_amount, pricing_method: 'manual' as const };
+      });
+      return next;
+    });
+    setHasUnsavedChanges(true);
+  }, []);
+
+  const handleScaleToggle = useCallback((active: boolean) => {
+    if (!scaleState) return;
+    setScaleState(prev => prev ? { ...prev, active } : prev);
+    
+    if (active) {
+      // Re-apply scaling from baselines
+      applyScaleFactor(scaleState.factor, scaleState.baselineFees, scaleState.selectedIndices);
+    } else {
+      // Restore baselines
+      setDraftItems(prev => {
+        const next = [...prev];
+        scaleState.baselineFees.forEach((baseline, idx) => {
+          if (idx < next.length) {
+            next[idx] = { ...next[idx], ...baseline, pricing_method: 'manual' as const };
+          }
+        });
+        return next;
+      });
+      setHasUnsavedChanges(true);
+    }
+  }, [scaleState, applyScaleFactor]);
+
+  const handleScaleFactorChange = useCallback((newFactor: number) => {
+    if (!scaleState) return;
+    setScaleState(prev => prev ? { ...prev, factor: newFactor } : prev);
+    applyScaleFactor(newFactor, scaleState.baselineFees, scaleState.selectedIndices);
+  }, [scaleState, applyScaleFactor]);
+
+  const handleClearScaling = useCallback(() => {
+    if (!scaleState) return;
+    // Restore baselines
+    setDraftItems(prev => {
+      const next = [...prev];
+      scaleState.baselineFees.forEach((baseline, idx) => {
+        if (idx < next.length) {
+          next[idx] = { ...next[idx], ...baseline, pricing_method: 'manual' as const };
+        }
+      });
+      return next;
+    });
+    setScaleState(null);
+    setHasUnsavedChanges(true);
+    toast({ title: 'Scaling cleared, original fees restored' });
+  }, [scaleState, toast]);
 
   // Handle drag end for reordering items
   const handleDragEnd = useCallback((event: DragEndEvent) => {
@@ -2288,6 +2396,7 @@ export default function PricingProposalDetail() {
                         associate_hours: 0,
                         num_turns: 1,
                       })));
+                      setScaleState(null);
                       setHasUnsavedChanges(true);
                       toast({ title: 'All pricing cleared' });
                     }}
@@ -2320,21 +2429,92 @@ export default function PricingProposalDetail() {
               currencySymbol={currencySymbol}
               lockedCategories={lockedCategories}
               isItemLocked={isItemLocked}
-              onApply={(scaledItems) => {
+              onApply={(result: ScaleApplyResult) => {
+                // Store baselines and apply scaled values
+                setScaleState({
+                  active: true,
+                  factor: result.factor,
+                  selectedIndices: result.selectedIndices,
+                  baselineFees: result.baselineFees,
+                });
                 setDraftItems(prev => {
                   const next = [...prev];
-                  scaledItems.forEach(({ index, fee_upper, fee_lower, fee_amount }) => {
+                  result.scaledItems.forEach(({ index, fee_upper, fee_lower, fee_amount }) => {
                     next[index] = { ...next[index], fee_upper, fee_lower, fee_amount, pricing_method: 'manual' as const };
                   });
                   return next;
                 });
                 setHasUnsavedChanges(true);
                 toast({
-                  title: `Scaled ${scaledItems.length} item${scaledItems.length !== 1 ? 's' : ''}`,
-                  description: `Factor ×${(scaledItems.length > 0 ? (scaledItems[0].fee_upper / (draftItems[scaledItems[0].index].fee_upper || draftItems[scaledItems[0].index].fee_amount || 1)) : 1).toFixed(2)}`,
+                  title: `Scaled ${result.scaledItems.length} item${result.scaledItems.length !== 1 ? 's' : ''}`,
+                  description: `Factor ×${result.factor.toFixed(2)} — Toggle on/off anytime`,
                 });
               }}
             />
+
+            {/* Inline Scale Controls */}
+            {scaleState && !viewingHistoricalVersion && (
+              <Card className="border-primary/30 bg-primary/5">
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={scaleState.active}
+                        onCheckedChange={handleScaleToggle}
+                      />
+                      <Label className="text-sm font-medium">
+                        Scaling {scaleState.active ? 'Active' : 'Off'}
+                      </Label>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-[400px]">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">0.5×</span>
+                      <Slider
+                        min={50}
+                        max={200}
+                        step={1}
+                        value={[Math.round(scaleState.factor * 100)]}
+                        onValueChange={([v]) => handleScaleFactorChange(v / 100)}
+                        disabled={!scaleState.active}
+                        className="flex-1"
+                      />
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">2.0×</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={50}
+                        max={200}
+                        step={1}
+                        value={Math.round(scaleState.factor * 100)}
+                        onChange={(e) => {
+                          const v = Math.max(50, Math.min(200, parseInt(e.target.value) || 100));
+                          handleScaleFactorChange(v / 100);
+                        }}
+                        disabled={!scaleState.active}
+                        className="w-16 h-8 text-xs text-center"
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+
+                    <Badge variant={scaleState.active ? "default" : "secondary"} className="text-xs">
+                      {scaleState.selectedIndices.length} items · ×{scaleState.factor.toFixed(2)}
+                    </Badge>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleClearScaling}
+                      className="text-xs text-destructive hover:text-destructive"
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Clear
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {draftItems.length > 0 && !viewingHistoricalVersion && (
               <Card>

@@ -15,6 +15,13 @@ import { DraftProposalItem, ProposalPhase } from "@/lib/hooks/usePricingProposal
 import { calculateFeeRange, smartRoundFee } from "@/lib/feeSpreadUtils";
 import { cn } from "@/lib/utils";
 
+export interface ScaleApplyResult {
+  scaledItems: { index: number; fee_upper: number; fee_lower: number; fee_amount: number }[];
+  factor: number;
+  selectedIndices: number[];
+  baselineFees: Map<number, { fee_upper: number; fee_lower: number; fee_amount: number }>;
+}
+
 interface ScalePricingWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -23,7 +30,7 @@ interface ScalePricingWizardProps {
   currencySymbol: string;
   lockedCategories: Set<string>;
   isItemLocked: (item: DraftProposalItem) => boolean;
-  onApply: (scaledItems: { index: number; fee_upper: number; fee_lower: number; fee_amount: number }[]) => void;
+  onApply: (result: ScaleApplyResult) => void;
 }
 
 function getFeeUpper(item: DraftProposalItem): number {
@@ -33,7 +40,7 @@ function getFeeUpper(item: DraftProposalItem): number {
 /**
  * Largest Remainder Method distribution with smart rounding.
  */
-function distributeProRataLRM(
+export function distributeProRataLRM(
   items: { index: number; currentFee: number }[],
   targetTotal: number
 ): Map<number, number> {
@@ -267,7 +274,7 @@ export function ScalePricingWizard({
   };
 
   const handleApply = () => {
-    const result = previewItems.map(s => {
+    const scaledItems = previewItems.map(s => {
       const { fee_lower, fee_amount } = calculateFeeRange(s.scaledFee, s.item.category);
       return {
         index: s.index,
@@ -276,7 +283,23 @@ export function ScalePricingWizard({
         fee_amount,
       };
     });
-    onApply(result);
+
+    // Build baseline fees map from current (pre-scale) values
+    const baselineFees = new Map<number, { fee_upper: number; fee_lower: number; fee_amount: number }>();
+    previewItems.forEach(s => {
+      baselineFees.set(s.index, {
+        fee_upper: getFeeUpper(s.item),
+        fee_lower: s.item.fee_lower ?? 0,
+        fee_amount: s.item.fee_amount ?? 0,
+      });
+    });
+
+    onApply({
+      scaledItems,
+      factor: scalingFactor,
+      selectedIndices: Array.from(selectedIndices),
+      baselineFees,
+    });
     handleOpenChange(false);
   };
 

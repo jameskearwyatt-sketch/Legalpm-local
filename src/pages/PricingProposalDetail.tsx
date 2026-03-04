@@ -2789,7 +2789,7 @@ export default function PricingProposalDetail() {
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div className="min-w-[140px]">
-                      <p className="text-sm font-medium text-muted-foreground">Blended Rate</p>
+                      <p className="text-sm font-medium text-muted-foreground">Weighted Avg Rate</p>
                       <p className="text-2xl font-bold tabular-nums">{formatCurrency(summary.blendedRate)}</p>
                     </div>
                     <TrendingUp className="h-8 w-8 text-muted-foreground/30" />

@@ -2428,21 +2428,92 @@ export default function PricingProposalDetail() {
               currencySymbol={currencySymbol}
               lockedCategories={lockedCategories}
               isItemLocked={isItemLocked}
-              onApply={(scaledItems) => {
+              onApply={(result: ScaleApplyResult) => {
+                // Store baselines and apply scaled values
+                setScaleState({
+                  active: true,
+                  factor: result.factor,
+                  selectedIndices: result.selectedIndices,
+                  baselineFees: result.baselineFees,
+                });
                 setDraftItems(prev => {
                   const next = [...prev];
-                  scaledItems.forEach(({ index, fee_upper, fee_lower, fee_amount }) => {
+                  result.scaledItems.forEach(({ index, fee_upper, fee_lower, fee_amount }) => {
                     next[index] = { ...next[index], fee_upper, fee_lower, fee_amount, pricing_method: 'manual' as const };
                   });
                   return next;
                 });
                 setHasUnsavedChanges(true);
                 toast({
-                  title: `Scaled ${scaledItems.length} item${scaledItems.length !== 1 ? 's' : ''}`,
-                  description: `Factor ×${(scaledItems.length > 0 ? (scaledItems[0].fee_upper / (draftItems[scaledItems[0].index].fee_upper || draftItems[scaledItems[0].index].fee_amount || 1)) : 1).toFixed(2)}`,
+                  title: `Scaled ${result.scaledItems.length} item${result.scaledItems.length !== 1 ? 's' : ''}`,
+                  description: `Factor ×${result.factor.toFixed(2)} — Toggle on/off anytime`,
                 });
               }}
             />
+
+            {/* Inline Scale Controls */}
+            {scaleState && !viewingHistoricalVersion && (
+              <Card className="border-primary/30 bg-primary/5">
+                <CardContent className="py-3 px-4">
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <Switch
+                        checked={scaleState.active}
+                        onCheckedChange={handleScaleToggle}
+                      />
+                      <Label className="text-sm font-medium">
+                        Scaling {scaleState.active ? 'Active' : 'Off'}
+                      </Label>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-[400px]">
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">0.5×</span>
+                      <Slider
+                        min={50}
+                        max={200}
+                        step={1}
+                        value={[Math.round(scaleState.factor * 100)]}
+                        onValueChange={([v]) => handleScaleFactorChange(v / 100)}
+                        disabled={!scaleState.active}
+                        className="flex-1"
+                      />
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">2.0×</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min={50}
+                        max={200}
+                        step={1}
+                        value={Math.round(scaleState.factor * 100)}
+                        onChange={(e) => {
+                          const v = Math.max(50, Math.min(200, parseInt(e.target.value) || 100));
+                          handleScaleFactorChange(v / 100);
+                        }}
+                        disabled={!scaleState.active}
+                        className="w-16 h-8 text-xs text-center"
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+
+                    <Badge variant={scaleState.active ? "default" : "secondary"} className="text-xs">
+                      {scaleState.selectedIndices.length} items · ×{scaleState.factor.toFixed(2)}
+                    </Badge>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleClearScaling}
+                      className="text-xs text-destructive hover:text-destructive"
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Clear
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {draftItems.length > 0 && !viewingHistoricalVersion && (
               <Card>

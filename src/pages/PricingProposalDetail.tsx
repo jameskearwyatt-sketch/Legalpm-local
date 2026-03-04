@@ -2858,7 +2858,7 @@ export default function PricingProposalDetail() {
                         memberKey={member.key}
                         label={member.label}
                         hours={member.hours}
-                        rate={member.rate}
+                        rate={member.displayRate}
                         revenue={member.revenue}
                         isLocked={member.isLocked}
                         formatCurrency={formatCurrency}

@@ -882,7 +882,8 @@ export default function PricingProposalDetail() {
   const toggleKeyPlayer = useCallback((memberKey: string) => {
     setAssumptions(prev => {
       const kp = { ...(prev.summaryKeyPlayers || {}) };
-      kp[memberKey] = !kp[memberKey];
+      const current = kp[memberKey] || 0;
+      kp[memberKey] = current === 0 ? 1 : current === 1 ? 2 : 0; // cycle: 0→1→2→0
       return { ...prev, summaryKeyPlayers: kp };
     });
   }, []);

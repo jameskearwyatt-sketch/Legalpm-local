@@ -92,6 +92,26 @@ export const SIMPLE_ASSUMPTIONS: SimpleAssumption[] = [
     narrativeTemplate: () => 'Our scope of work does not include the preparation, review or negotiation of ancillary contracts or agreements.',
   },
   {
+    id: 'includes_legal_annexes_review',
+    label: 'Review of legal annexes',
+    description: 'Covers review and assistance with bonds, guarantees and similar legal annexes',
+    category: 'scope',
+    sectionType: 'general',
+    requiresInput: false,
+    narrativeTemplate: () =>
+      'Our scope includes the review of and assistance with legal annexes to the transaction documents, including performance bonds, parent company guarantees, and similar security instruments.',
+  },
+  {
+    id: 'excludes_rfp_documents',
+    label: 'Excludes RFP documents',
+    description: 'Drafting or reviewing RFP/tender documents is excluded',
+    category: 'scope',
+    sectionType: 'general',
+    requiresInput: false,
+    narrativeTemplate: () =>
+      'The drafting, review, or negotiation of any request for proposal (RFP) or tender documents is excluded from this scope of work.',
+  },
+  {
     id: 'time_to_completion',
     label: 'Time to completion',
     description: 'Expected deal timeline from substantial commencement',

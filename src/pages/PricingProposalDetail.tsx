@@ -914,37 +914,24 @@ export default function PricingProposalDetail() {
 
       if (unlocked.length === 0) return prev;
 
-      // Phase 1: Group unlocked members by tier using shared classifyTier
-      const tierGroups: Record<string, typeof unlocked> = {};
-      unlocked.forEach(m => {
+      // Assign raw hour weights (rate-independent)
+      // Hours are proportional to tierWeight × playerMultiplier, NOT divided by rate
+      const memberWeights = unlocked.map(m => {
         const tier = classifyTier(m);
-        if (!tierGroups[tier]) tierGroups[tier] = [];
-        tierGroups[tier].push(m);
+        const tierWeight = weights[tier] || 1;
+        const level = kp[m.key] || 0;
+        const playerMult = level === 2 ? 4 : level === 1 ? 2 : 1;
+        return { key: m.key, rate: m.rate, rawWeight: tierWeight * playerMult };
       });
 
-      // Sum of tier weights (each occupied tier counted once)
-      const totalTierWeight = Object.keys(tierGroups).reduce((s, t) => s + (weights[t] || 1), 0);
-      if (totalTierWeight <= 0) return prev;
+      // Scale factor so Σ(hours × rate) = targetRevenue
+      const denom = memberWeights.reduce((s, mw) => s + mw.rawWeight * mw.rate, 0);
+      if (denom <= 0) return prev;
+      const K = targetRevenue / denom;
 
-      // Phase 2: Within each tier, distribute hours by shares (key=2×, anchor=4×, background=1×)
-      Object.entries(tierGroups).forEach(([tier, members]) => {
-        const tierWeight = weights[tier] || 1;
-        const tierRevenue = (tierWeight / totalTierWeight) * targetRevenue;
-
-        // Compute shares per member (rate-independent)
-        const memberShares = members.map(m => {
-          const level = kp[m.key] || 0;
-          const share = level === 2 ? 4 : level === 1 ? 2 : 1;
-          return { key: m.key, share, rate: m.rate };
-        });
-        const totalShares = memberShares.reduce((s, ms) => s + ms.share, 0);
-
-        // Each member gets their share of tier revenue, converted to hours at their rate
-        memberShares.forEach(ms => {
-          const memberRevenue = (ms.share / totalShares) * tierRevenue;
-          const computed = ms.rate > 0 ? memberRevenue / ms.rate : 0;
-          hours[ms.key] = Math.max(0.5, Math.round(computed * 2) / 2); // min 0.5h, round to 0.5
-        });
+      // Assign hours proportional to weight, independent of rate
+      memberWeights.forEach(mw => {
+        hours[mw.key] = Math.max(0.5, Math.round(mw.rawWeight * K * 2) / 2);
       });
 
       return { ...prev, summaryHours: hours };

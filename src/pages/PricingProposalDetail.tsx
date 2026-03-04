@@ -2396,6 +2396,7 @@ export default function PricingProposalDetail() {
                         associate_hours: 0,
                         num_turns: 1,
                       })));
+                      setScaleState(null);
                       setHasUnsavedChanges(true);
                       toast({ title: 'All pricing cleared' });
                     }}

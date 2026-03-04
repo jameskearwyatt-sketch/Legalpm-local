@@ -1,142 +1,41 @@
 
 
-# Scope-Aware Pricing Intelligence
+# Fix: AFA Rate Discount Not Flowing Into Summary Hour Calculations
 
 ## Problem
 
-The system cannot distinguish between:
-- A **single DD task** like "Colombian DD (incl land)" (~GBP 15-26k)
-- A **comprehensive DD report** covering dozens of project documents (~GBP 100-287k)
+When a rate discount (e.g. 10%) is enabled in the AFA section, everyone's effective hourly rate drops — meaning the same budget should buy **more hours**. But the Summary section ignores the discount entirely because all hour-distribution logic uses `m.rate` (the full, undiscounted rate).
 
-Both fall into the "Due Diligence" category. The current matching either finds an exact text match (unlikely for broad items) or falls back to a flat category median (~GBP 17k), which is wildly wrong for a comprehensive report.
+There are four places that calculate hours from revenue using the full rate:
 
-This is not unique to DD -- the same problem exists across categories (e.g., a single security agreement vs. a full security package; a simple legal opinion vs. a multi-jurisdiction opinion covering 10 topics).
+1. **Auto-distribute presets** (line 910, 924, 928) — locked revenue and the scaling factor `K` both use `m.rate`
+2. **Manual rebalance** (`handleSummaryHoursChange`, line 850, 862) — uses `m.rate`
+3. **Budget scaling** (line 824-836) — ratio-based so unaffected, but initial distribution (line 770) uses `m.rate`
+4. **Summary aggregates** (line 978) — `revenue: hours * m.rate` ignores discount
 
-## Solution: Scope Classification + Complexity-Weighted Percentile Pricing
+## Fix
 
-### Core Idea
+Introduce an `effectiveRate(m)` helper that applies the AFA discount:
 
-Before pricing, classify each item's **scope** using signals already available in the data:
-
-1. **Detail text length** -- a comprehensive DD report will have a 300+ character detail describing all the areas covered; a single task will have a short or empty detail
-2. **Keyword indicators** -- words like "comprehensive", "full", "report", "review of all", "covering", "including" signal broad scope; words like a single country/entity name signal narrow scope
-3. **The item's own work_item label** -- "Due diligence report" (generic/broad) vs. "Colombian DD (incl land)" (specific/narrow)
-
-Use this to place the item on a **percentile scale within its category**, rather than always using the median.
-
-### Changes to `suggest-pricing/index.ts`
-
-**Add scope classification function:**
-
-```text
-classifyScope(workItem, detail) -> 'narrow' | 'moderate' | 'broad'
-
-Signals for 'broad':
-  - detail length > 250 chars
-  - Keywords in work_item or detail: "report", "comprehensive", "full", 
-    "all project", "covering", "review of all", "package", "suite",
-    "multi", "portfolio"
-  - Generic work_item with no specific entity/country name
-  
-Signals for 'narrow':
-  - detail length < 80 chars or no detail
-  - Specific entity/country in work_item (e.g., "Colombian", "BVI", "Singapore")
-  - Single-topic keywords: specific contract type names
-  
-Default: 'moderate'
+```typescript
+const effectiveRate = useCallback((m: { rate: number }) => {
+  return afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+}, [afaRateDiscount]);
 ```
 
-**Replace flat category stats with percentile-based pricing:**
+Then replace `m.rate` with `effectiveRate(m)` in these four locations:
 
-Currently when an item has no text match, it falls through to AI with only a category average. Instead:
+1. **`handleAutoDistribute`** — locked revenue calculation and the `K` scaling denominator use `effectiveRate` so hours expand when rates are discounted
+2. **`handleSummaryHoursChange`** — rebalancing uses `effectiveRate` for revenue allocation
+3. **Initial distribution** — uses `effectiveRate` when converting revenue-per-member to hours
+4. **Summary aggregates** — `revenue: hours * effectiveRate(m)` so totals reflect actual billing
 
-1. Compute **percentiles** (25th, 50th, 75th, 90th) for each category from historical data
-2. Map scope to percentile:
-   - `narrow` -> 25th percentile
-   - `moderate` -> 50th percentile (median)
-   - `broad` -> 75th-90th percentile
-3. Use this as a **strong anchor** -- either as the direct precedent price (Tier 2) or as explicit guidance to the AI
+Additionally, add `afaRateDiscount` to the dependency arrays of `handleAutoDistribute` and `handleSummaryHoursChange`.
 
-**Improve AI prompt for remaining unmatched items:**
+## Effect
 
-When items still go to AI, include the scope classification and the percentile range in the prompt so the AI knows where in the range to price:
+When the user sets a 10% rate discount, the same budget target now produces ~11% more hours across the team, correctly reflecting that cheaper rates = more available time within the same fee.
 
-```text
-Item: "Due diligence report"
-Scope: BROAD (detail covers 15+ topics across multiple document types)
-Category: Due Diligence
-Historical range for Due Diligence: 25th=GBP 15,000, median=GBP 23,000, 75th=GBP 65,000, 90th=GBP 114,000
--> Price this at the 75th-90th percentile given its broad scope.
-```
+## File Changed
+- `src/pages/PricingProposalDetail.tsx`
 
-vs.
-
-```text
-Item: "Corporate DD on BVI entity"  
-Scope: NARROW (single entity, single jurisdiction)
-Category: Due Diligence
--> Price this at the 25th percentile.
-```
-
-**Better category-relevant context for AI:**
-
-Instead of sending `allHistorical.slice(0, 30)` (arbitrary first 30), for each unmatched item send:
-- Top 5 highest-fee items from the same category (so the AI sees the range ceiling)
-- 5 lowest-fee items from the same category (so it sees the floor)
-- The percentile stats
-
-### Changes to `allocate-target-pricing/index.ts`
-
-Apply the same scope classification and percentile-based pricing to the base price generation step (Phase 2). The deterministic scaling in Phase 3 remains unchanged.
-
-### Implementation Detail
-
-**Percentile helper functions:**
-
-```text
-median(values[]) -> number
-percentile(values[], p) -> number  // p = 25, 75, 90
-```
-
-**Scope classifier:**
-
-```text
-function classifyScope(workItem: string, detail: string | null): 'narrow' | 'moderate' | 'broad'
-
-broadIndicators = /\b(report|comprehensive|full|all project|covering|review of all|
-  package|suite|multi|portfolio|across|various|range of|complete|
-  extensive|wide|broad|overall|summary|overview)\b/i
-
-narrowIndicators = specific country/entity names, short detail, 
-  single contract type references
-
-Logic:
-  score = 0
-  if detail length > 250: score += 2
-  if detail length > 150: score += 1  
-  if broadIndicators match in workItem or detail: score += 2
-  if narrowIndicators match: score -= 2
-  if workItem is very generic (< 5 significant words, no proper nouns): score += 1
-  
-  score >= 3 -> 'broad'
-  score <= -1 -> 'narrow'
-  else -> 'moderate'
-```
-
-**Pricing by scope:**
-
-```text
-For Tier 2 (category match, no text match):
-  narrow  -> percentile(categoryFees, 25)
-  moderate -> percentile(categoryFees, 50)  
-  broad   -> percentile(categoryFees, 80)
-```
-
-### Files to Modify
-
-1. **`supabase/functions/suggest-pricing/index.ts`** -- Add `classifyScope()`, `median()`, `percentile()` helpers; replace flat category average with scope-aware percentile pricing; improve AI context with category-relevant items and scope guidance
-2. **`supabase/functions/allocate-target-pricing/index.ts`** -- Same scope classification and percentile logic for base price generation
-
-### What This Achieves
-
-A "Due diligence report" with a long detail covering many topics will be classified as `broad` and priced at the 80th percentile of DD items (~GBP 80-100k+ depending on data), while "Colombian DD (incl land)" will be classified as `narrow` and priced at the 25th percentile (~GBP 15k). This matches the user's intuitive understanding and requires no additional data -- it uses signals already present in the work item label and detail text.

@@ -62,6 +62,7 @@ interface ExportAFAProposalOptions {
   teamMembers?: TeamMemberSummary[];
   teamCurrency?: string;
   hideUpperAndPcSum?: boolean;
+  afaBlendedRate?: number | null;
 }
 
 export async function exportAFAProposalToExcel({

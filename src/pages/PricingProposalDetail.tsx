@@ -767,7 +767,8 @@ export default function PricingProposalDetail() {
     const revenuePerMember = bmUpperTarget / teamMembers.length;
     const newHours: Record<string, number> = {};
     teamMembers.forEach(m => {
-      newHours[m.key] = m.rate > 0 ? Math.round((revenuePerMember / m.rate) * 2) / 2 : 0;
+      const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+      newHours[m.key] = eRate > 0 ? Math.round((revenuePerMember / eRate) * 2) / 2 : 0;
     });
 
     setAssumptions(prev => ({ ...prev, summaryHours: newHours, summaryLocks: {} }));

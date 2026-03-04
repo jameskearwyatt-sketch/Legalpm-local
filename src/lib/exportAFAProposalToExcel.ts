@@ -62,6 +62,7 @@ interface ExportAFAProposalOptions {
   teamMembers?: TeamMemberSummary[];
   teamCurrency?: string;
   hideUpperAndPcSum?: boolean;
+  afaBlendedRate?: number | null;
 }
 
 export async function exportAFAProposalToExcel({
@@ -83,6 +84,7 @@ export async function exportAFAProposalToExcel({
   teamMembers: teamMemberData = [],
   teamCurrency,
   hideUpperAndPcSum = false,
+  afaBlendedRate = null,
 }: ExportAFAProposalOptions): Promise<void> {
   const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency;
   
@@ -998,11 +1000,11 @@ export async function exportAFAProposalToExcel({
     teamTotalRow.height = 24;
     currentRow++;
 
-    // Blended rate
+    // Blended rate — use AFA blended rate if available (client-facing), otherwise weighted average
     if (totalHours > 0) {
-      const blendedRate = totalRevenue / totalHours;
+      const displayRate = afaBlendedRate || (totalRevenue / totalHours);
       const blendedRow = worksheet.getRow(currentRow);
-      blendedRow.values = ['', `Blended Rate: ${teamCurrencySymbol}${Math.round(blendedRate).toLocaleString()}/hr`];
+      blendedRow.values = ['', `Blended Rate: ${teamCurrencySymbol}${Math.round(displayRate).toLocaleString()}/hr`];
       blendedRow.getCell(2).font = { size: 10, color: { argb: 'FF6B7280' } };
       currentRow++;
     }

@@ -1891,6 +1891,10 @@ export default function PricingProposalDetail() {
       hours: m.hours,
       revenue: m.revenue,
     }));
+
+    // Find the AFA blended rate (effective_rate from discounted_rates AFA) for Excel export
+    const discountAfa = enabledAFAs.find(a => a.afa_type === 'discounted_rates' && a.is_enabled);
+    const afaBlendedRate = discountAfa?.effective_rate || null;
     
     await exportAFAProposalToExcel({
       items: draftItems,
@@ -1911,6 +1915,7 @@ export default function PricingProposalDetail() {
       teamMembers: teamMemberSummaryData,
       teamCurrency: proposal?.currency || 'GBP',
       hideUpperAndPcSum,
+      afaBlendedRate,
     });
     
     toast({ 
@@ -2789,7 +2794,7 @@ export default function PricingProposalDetail() {
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div className="min-w-[140px]">
-                      <p className="text-sm font-medium text-muted-foreground">Blended Rate</p>
+                      <p className="text-sm font-medium text-muted-foreground">Weighted Avg Rate</p>
                       <p className="text-2xl font-bold tabular-nums">{formatCurrency(summary.blendedRate)}</p>
                     </div>
                     <TrendingUp className="h-8 w-8 text-muted-foreground/30" />
@@ -2873,7 +2878,7 @@ export default function PricingProposalDetail() {
                       <TableCell>Total</TableCell>
                       <TableCell className="text-right tabular-nums">{formatHours(summary.totalHours)}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {formatCurrency(summary.displayBlendedRate)} (blended)
+                        {formatCurrency(summary.displayBlendedRate)} (wtd avg)
                         {summary.hasAfaDiscount && (
                           <span className="block text-[10px] font-normal text-amber-600 dark:text-amber-400">AFA discounted</span>
                         )}

@@ -260,7 +260,7 @@ export async function exportBudgetToExcel({
       categoryRemaining,
       categoryBurnPct / 100,
     ];
-    subtotalRow.font = { bold: true, italic: true };
+    subtotalRow.font = { bold: true };
     subtotalRow.getCell(2).alignment = { horizontal: 'right' };
     [5, 6, 7, 8, 9].forEach((col) => {
       subtotalRow.getCell(col).numFmt = '#,##0.00';
@@ -270,7 +270,7 @@ export async function exportBudgetToExcel({
     subtotalRow.getCell(10).alignment = { horizontal: 'center' };
 
     if (categoryWriteOff > 0) {
-      subtotalRow.getCell(7).font = { color: { argb: 'FFDC2626' }, bold: true, italic: true };
+      subtotalRow.getCell(7).font = { color: { argb: 'FFDC2626' }, bold: true };
     }
 
     subtotalRow.eachCell((cell) => {

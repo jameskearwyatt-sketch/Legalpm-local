@@ -195,7 +195,7 @@ export async function exportAFAProposalToExcel({
     month: 'long', 
     year: 'numeric' 
   })}`;
-  proposalCell.font = { ...subtitleFont, italic: true, color: { argb: 'FF6B7280' } };
+  proposalCell.font = { ...subtitleFont, color: { argb: 'FF6B7280' } };
 
   let currentRow = 4;
 
@@ -242,7 +242,7 @@ export async function exportAFAProposalToExcel({
         worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
         const narrativeCell = worksheet.getCell(`A${currentRow}`);
         narrativeCell.value = originalAfa.client_narrative.trim();
-        narrativeCell.font = { size: 10, italic: true, color: { argb: 'FF374151' } };
+        narrativeCell.font = { size: 10, color: { argb: 'FF374151' } };
         narrativeCell.fill = {
           type: 'pattern',
           pattern: 'solid',
@@ -302,7 +302,7 @@ export async function exportAFAProposalToExcel({
       worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
       const subheadingCell = worksheet.getCell(`A${currentRow}`);
       subheadingCell.value = categoryLabel;
-      subheadingCell.font = { bold: true, size: 10, color: { argb: 'FF1F2937' }, italic: true };
+      subheadingCell.font = { bold: true, size: 10, color: { argb: 'FF1F2937' } };
       subheadingCell.alignment = { vertical: 'middle' };
       worksheet.getRow(currentRow).height = 20;
       currentRow++;
@@ -335,7 +335,7 @@ export async function exportAFAProposalToExcel({
     worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
     const notesCell = worksheet.getCell(`A${currentRow}`);
     notesCell.value = notes;
-    notesCell.font = { size: 10, color: { argb: 'FF6B7280' }, italic: true };
+    notesCell.font = { size: 10, color: { argb: 'FF6B7280' } };
     notesCell.alignment = { wrapText: true };
     currentRow++;
   }
@@ -533,7 +533,7 @@ export async function exportAFAProposalToExcel({
       }
       
       // Style notes column
-      dataRow.getCell(notesColumnIndex).font = { size: 9, color: { argb: 'FF2563EB' }, italic: true };
+      dataRow.getCell(notesColumnIndex).font = { size: 9, color: { argb: 'FF2563EB' } };
       dataRow.getCell(notesColumnIndex).alignment = { wrapText: true };
       
       // Apply row highlighting based on internal input dept (takes priority over other highlighting)
@@ -576,8 +576,8 @@ export async function exportAFAProposalToExcel({
       }
 
       if (item.is_optional) {
-        dataRow.getCell(2).font = { italic: true, color: { argb: 'FF6B7280' } };
-        dataRow.getCell(notesColumnIndex).font = { italic: true, color: { argb: 'FF6B7280' } };
+        dataRow.getCell(2).font = { color: { argb: 'FF6B7280' } };
+        dataRow.getCell(notesColumnIndex).font = { color: { argb: 'FF6B7280' } };
       }
 
       // Subtle borders
@@ -606,13 +606,13 @@ export async function exportAFAProposalToExcel({
         if (includeInputDeptHighlighting) altRowValues.push('');
         altRowValues.push(delta > 0 ? `+${smartRound(delta).toLocaleString()} increase` : `${smartRound(delta).toLocaleString()} change`);
         altRow.values = altRowValues;
-        altRow.getCell(2).font = { size: 9, italic: true, color: { argb: 'FFB45309' } };
-        altRow.getCell(3).font = { size: 9, italic: true, color: { argb: 'FF92400E' } };
+        altRow.getCell(2).font = { size: 9, color: { argb: 'FFB45309' } };
+        altRow.getCell(3).font = { size: 9, color: { argb: 'FF92400E' } };
         altRow.getCell(3).alignment = { wrapText: true, vertical: 'top' };
         altRow.getCell(5).numFmt = '#,##0';
         altRow.getCell(5).alignment = { horizontal: 'center', vertical: 'middle' };
         altRow.getCell(5).font = { size: 9, bold: true, color: { argb: 'FFB45309' } };
-        altRow.getCell(notesColumnIndex).font = { size: 9, italic: true, color: { argb: 'FFB45309' } };
+        altRow.getCell(notesColumnIndex).font = { size: 9, color: { argb: 'FFB45309' } };
         altRow.eachCell((cell) => {
           cell.fill = {
             type: 'pattern',
@@ -809,8 +809,8 @@ export async function exportAFAProposalToExcel({
       for (const afa of filterResult.appliedAFAs) {
         const afaDetailRow = worksheet.getRow(currentRow);
         afaDetailRow.values = ['', `  ${afa.label}`, '', '', '', '', afa.description];
-        afaDetailRow.getCell(2).font = { size: 10, color: { argb: 'FF2563EB' }, italic: true };
-        afaDetailRow.getCell(7).font = { size: 10, color: { argb: 'FF6B7280' }, italic: true };
+        afaDetailRow.getCell(2).font = { size: 10, color: { argb: 'FF2563EB' } };
+        afaDetailRow.getCell(7).font = { size: 10, color: { argb: 'FF6B7280' } };
         afaDetailRow.getCell(7).alignment = { wrapText: true };
         currentRow++;
       }
@@ -877,7 +877,7 @@ export async function exportAFAProposalToExcel({
       });
       const altNotesCell = altTotalRow.getCell(notesColumnIndex);
       altNotesCell.value = altDelta > 0 ? `+${smartRound(altDelta).toLocaleString()} vs base` : `${smartRound(altDelta).toLocaleString()} vs base`;
-      altNotesCell.font = { size: 9, italic: true, color: { argb: 'FFB45309' } };
+      altNotesCell.font = { size: 9, color: { argb: 'FFB45309' } };
       altTotalRow.height = 24;
       currentRow++;
     }
@@ -911,7 +911,7 @@ export async function exportAFAProposalToExcel({
       worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
       const discountNoteCell = worksheet.getCell(`A${currentRow}`);
       discountNoteCell.value = `Rates shown reflect a ${pct}% discount from standard rates.`;
-      discountNoteCell.font = { size: 10, italic: true, color: { argb: 'FF2563EB' } };
+      discountNoteCell.font = { size: 10, color: { argb: 'FF2563EB' } };
       discountNoteCell.alignment = { vertical: 'middle' };
       worksheet.getRow(currentRow).height = 22;
       currentRow++;
@@ -1003,7 +1003,7 @@ export async function exportAFAProposalToExcel({
       const blendedRate = totalRevenue / totalHours;
       const blendedRow = worksheet.getRow(currentRow);
       blendedRow.values = ['', `Blended Rate: ${teamCurrencySymbol}${Math.round(blendedRate).toLocaleString()}/hr`];
-      blendedRow.getCell(2).font = { size: 10, italic: true, color: { argb: 'FF6B7280' } };
+      blendedRow.getCell(2).font = { size: 10, color: { argb: 'FF6B7280' } };
       currentRow++;
     }
   }

@@ -127,7 +127,7 @@ export async function exportDraftBudgetToExcel({
         month: 'long', 
         year: 'numeric' 
       })}`;
-  draftCell.font = { ...subtitleFont, italic: true, color: { argb: 'FF6B7280' } };
+  draftCell.font = { ...subtitleFont, color: { argb: 'FF6B7280' } };
 
   // Add notes if provided
   let currentRow = 5;
@@ -135,7 +135,7 @@ export async function exportDraftBudgetToExcel({
     worksheet.mergeCells(`A${currentRow}:${lastCol}${currentRow}`);
     const notesCell = worksheet.getCell(`A${currentRow}`);
     notesCell.value = notes;
-    notesCell.font = { size: 10, color: { argb: 'FF6B7280' }, italic: true };
+    notesCell.font = { size: 10, color: { argb: 'FF6B7280' } };
     notesCell.alignment = { wrapText: true };
     currentRow++;
   }
@@ -339,7 +339,7 @@ export async function exportDraftBudgetToExcel({
         }
         
         if (item.is_optional) {
-          dataRow.getCell(1).font = { ...dataRow.getCell(1).font, italic: true };
+          dataRow.getCell(1).font = { ...dataRow.getCell(1).font };
         }
       } else {
         categoryTotalProposed += proposedFee;
@@ -363,8 +363,8 @@ export async function exportDraftBudgetToExcel({
         dataRow.getCell(4).font = { size: 11 };
         
         if (item.is_optional) {
-          dataRow.getCell(1).font = { italic: true, color: { argb: 'FF6B7280' } };
-          dataRow.getCell(4).font = { italic: true, color: { argb: 'FF6B7280' } };
+          dataRow.getCell(1).font = { color: { argb: 'FF6B7280' } };
+          dataRow.getCell(4).font = { color: { argb: 'FF6B7280' } };
         }
       }
 

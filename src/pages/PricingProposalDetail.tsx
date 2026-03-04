@@ -894,8 +894,8 @@ export default function PricingProposalDetail() {
   const handleAutoDistribute = useCallback((preset: DistributionPreset) => {
     const WEIGHTS: Record<DistributionPreset, Record<string, number>> = {
       pyramid:  { partners: 1, senior: 4, associates: 3, juniors: 4 },
-      flat:     { partners: 1, senior: 1, associates: 1, juniors: 1 },
-      reverse:  { partners: 3, senior: 2, associates: 2, juniors: 2 },
+      flat:     { partners: 2, senior: 3, associates: 3, juniors: 3 },
+      reverse:  { partners: 5, senior: 4, associates: 4, juniors: 3 },
     };
 
     setAssumptions(prev => {

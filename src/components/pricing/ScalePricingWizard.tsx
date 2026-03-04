@@ -15,6 +15,13 @@ import { DraftProposalItem, ProposalPhase } from "@/lib/hooks/usePricingProposal
 import { calculateFeeRange, smartRoundFee } from "@/lib/feeSpreadUtils";
 import { cn } from "@/lib/utils";
 
+export interface ScaleApplyResult {
+  scaledItems: { index: number; fee_upper: number; fee_lower: number; fee_amount: number }[];
+  factor: number;
+  selectedIndices: number[];
+  baselineFees: Map<number, { fee_upper: number; fee_lower: number; fee_amount: number }>;
+}
+
 interface ScalePricingWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -23,7 +30,7 @@ interface ScalePricingWizardProps {
   currencySymbol: string;
   lockedCategories: Set<string>;
   isItemLocked: (item: DraftProposalItem) => boolean;
-  onApply: (scaledItems: { index: number; fee_upper: number; fee_lower: number; fee_amount: number }[]) => void;
+  onApply: (result: ScaleApplyResult) => void;
 }
 
 function getFeeUpper(item: DraftProposalItem): number {

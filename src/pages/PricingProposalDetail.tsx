@@ -848,7 +848,8 @@ export default function PricingProposalDetail() {
       // Revenue from locked + just-edited members
       const fixedRevenue = teamMembers.reduce((sum, m) => {
         if (m.key === memberKey || locks[m.key]) {
-          return sum + ((hours[m.key] || 0) * m.rate);
+          const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+          return sum + ((hours[m.key] || 0) * eRate);
         }
         return sum;
       }, 0);

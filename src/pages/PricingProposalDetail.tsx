@@ -983,7 +983,7 @@ export default function PricingProposalDetail() {
       hasEstimatedHours: enrichedMembers.length > 0,
       hasAfaDiscount: !!afaRateDiscount,
     };
-  }, [teamMembers, summaryHours, summaryLocks, bmUpperTarget, afaRateDiscount]);
+  }, [teamMembers, summaryHours, bmUpperTarget, afaRateDiscount]);
 
   // Live rate card changes (for real-time pyramid updates)
   const handleRateCardChange = useCallback((newTeamRateCard: RateCard, newFeeRateCard: RateCard) => {

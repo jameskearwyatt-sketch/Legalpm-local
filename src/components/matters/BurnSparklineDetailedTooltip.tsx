@@ -51,7 +51,9 @@ export function BurnSparklineDetailedTooltip({
   proposalData,
   rawBurn,
   dataPoints,
+  matterName,
 }: BurnSparklineDetailedTooltipProps) {
+  const tooltipRef = useRef<HTMLDivElement>(null);
   // Larger chart dimensions (1.5x scale)
   const width = 420;
   const height = 210;

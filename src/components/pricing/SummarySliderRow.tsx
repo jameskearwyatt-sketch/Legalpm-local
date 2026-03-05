@@ -25,7 +25,9 @@ const SummarySliderRow = React.memo(function SummarySliderRow({
   onHoursCommit,
 }: SummarySliderRowProps) {
   const [localHours, setLocalHours] = useState<number | null>(null);
+  const [inputFocused, setInputFocused] = useState(false);
   const isDragging = useRef(false);
+  const commitTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const displayHours = localHours !== null ? localHours : hours;
   const displayRevenue = localHours !== null ? localHours * rate : revenue;
@@ -36,6 +38,26 @@ const SummarySliderRow = React.memo(function SummarySliderRow({
     setLocalHours(null);
     onHoursCommit(memberKey, val);
   }, [memberKey, onHoursCommit]);
+
+  // Debounced commit for number input (allows spinner arrows to work)
+  const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = Math.max(0, parseFloat(e.target.value) || 0);
+    setLocalHours(val);
+    clearTimeout(commitTimer.current);
+    commitTimer.current = setTimeout(() => {
+      onHoursCommit(memberKey, val);
+      setLocalHours(null);
+    }, 300);
+  }, [memberKey, onHoursCommit]);
+
+  const handleInputBlur = useCallback(() => {
+    setInputFocused(false);
+    clearTimeout(commitTimer.current);
+    if (localHours !== null) {
+      onHoursCommit(memberKey, localHours);
+      setLocalHours(null);
+    }
+  }, [memberKey, localHours, onHoursCommit]);
 
   return (
     <TableRow>
@@ -48,10 +70,9 @@ const SummarySliderRow = React.memo(function SummarySliderRow({
             min="0"
             max={maxHours}
             value={displayHours.toFixed(1)}
-            onChange={(e) => {
-              const val = Math.max(0, parseFloat(e.target.value) || 0);
-              onHoursCommit(memberKey, val);
-            }}
+            onChange={handleInputChange}
+            onFocus={() => setInputFocused(true)}
+            onBlur={handleInputBlur}
             className="w-20 h-7 text-right text-sm ml-auto tabular-nums"
           />
           <input

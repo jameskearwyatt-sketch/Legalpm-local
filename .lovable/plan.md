@@ -1,55 +1,142 @@
 
 
-# Labelled Levels + Drag-to-Reorder Between Levels in Pyramid
+# Scope-Aware Pricing Intelligence
 
-## What changes
+## Problem
 
-### 1. Expand from 4 tiers to 5 levels
-Currently the pyramid groups members into 4 tiers (Partners, Counsel/Sr. Associates, Associates, Juniors). Change to 5 discrete levels matching the Teams & Rates dropdown exactly:
-- **Partner** (indigo)
-- **Counsel** (violet)
-- **Senior Associate** (purple)
-- **Associate** (sky)
-- **Trainee** (emerald)
+The system cannot distinguish between:
+- A **single DD task** like "Colombian DD (incl land)" (~GBP 15-26k)
+- A **comprehensive DD report** covering dozens of project documents (~GBP 100-287k)
 
-Each level gets its own labelled row in the pyramid, with a visible label on the left side.
+Both fall into the "Due Diligence" category. The current matching either finds an exact text match (unlikely for broad items) or falls back to a flat category median (~GBP 17k), which is wildly wrong for a comprehensive report.
 
-### 2. Drag fee earners between levels
-Users can click and drag a member block vertically from one level row to another. This reassigns the member's "modelling level" for cost-thinking purposes without changing their actual job title.
+This is not unique to DD -- the same problem exists across categories (e.g., a single security agreement vs. a full security package; a simple legal opinion vs. a multi-jurisdiction opinion covering 10 topics).
 
-- Members keep the **colour of their original/home level** so the user always knows where they "really" belong. For example, an Associate (sky blue) dragged into the Trainee row stays sky blue.
-- On drop, the component fires a new callback `onMemberLevelOverride(key, newLevel)` which stores the override in assumptions state (similar to `summaryKeyPlayers`).
+## Solution: Scope Classification + Complexity-Weighted Percentile Pricing
 
-### 3. Visual design
-- Each level row has a left-side label (e.g. "Partner", "Counsel") in the tier's colour.
-- Empty levels show a dashed placeholder row (as today).
-- Dragged member gets a shadow/elevation effect during drag. A drop-zone highlight appears on the target level row.
-- The member block's background colour always reflects their **home** level, not the level they've been dragged to.
+### Core Idea
 
-## Technical approach
+Before pricing, classify each item's **scope** using signals already available in the data:
 
-### `SummaryPyramid.tsx`
-- Update `TierKey` type to 5 values: `"partner" | "counsel" | "seniorAssociate" | "associate" | "trainee"`.
-- Update `TIER_COLORS` with 5 entries (split current "senior" into counsel + seniorAssociate).
-- Update `classifyTier` to map to 5 levels.
-- Update `buildTiers` to produce 5 rows.
-- Add a new prop `levelOverrides?: Record<string, string>` — maps member key to overridden level.
-- Add a new prop `onMemberLevelOverride?: (key: string, newLevel: string) => void`.
-- When building tiers, place members according to their `levelOverrides[m.key] || m.level`.
-- Track a `homeTier` on each member (from their actual level) and use that for colour, even when they're in a different level row.
-- Implement vertical drag using native HTML drag-and-drop (`draggable`, `onDragStart`, `onDragOver`, `onDrop`) on member blocks and tier rows. This is simpler than integrating dnd-kit for this use case.
-- Each tier row acts as a drop zone with visual feedback (border highlight on `dragOver`).
+1. **Detail text length** -- a comprehensive DD report will have a 300+ character detail describing all the areas covered; a single task will have a short or empty detail
+2. **Keyword indicators** -- words like "comprehensive", "full", "report", "review of all", "covering", "including" signal broad scope; words like a single country/entity name signal narrow scope
+3. **The item's own work_item label** -- "Due diligence report" (generic/broad) vs. "Colombian DD (incl land)" (specific/narrow)
 
-### `PricingProposalDetail.tsx`
-- Add `summaryLevelOverrides: Record<string, string>` to assumptions state (persisted same as `summaryKeyPlayers`).
-- Pass `levelOverrides` and `onMemberLevelOverride` to `SummaryPyramid`.
-- The override callback updates assumptions state.
+Use this to place the item on a **percentile scale within its category**, rather than always using the median.
 
-### `DraggableMemberBlock`
-- Accept a `homeTierKey` prop (original level colour) separate from the `tierKey` prop (current display row).
-- Always render with `TIER_COLORS[homeTierKey]` for the block's background/border/text styling.
+### Changes to `suggest-pricing/index.ts`
 
-## Files to edit
-- `src/components/pricing/SummaryPyramid.tsx` — expand to 5 levels, add labels, implement drag-between-levels, add homeTier colouring.
-- `src/pages/PricingProposalDetail.tsx` — add `summaryLevelOverrides` state and pass new props to SummaryPyramid.
+**Add scope classification function:**
 
+```text
+classifyScope(workItem, detail) -> 'narrow' | 'moderate' | 'broad'
+
+Signals for 'broad':
+  - detail length > 250 chars
+  - Keywords in work_item or detail: "report", "comprehensive", "full", 
+    "all project", "covering", "review of all", "package", "suite",
+    "multi", "portfolio"
+  - Generic work_item with no specific entity/country name
+  
+Signals for 'narrow':
+  - detail length < 80 chars or no detail
+  - Specific entity/country in work_item (e.g., "Colombian", "BVI", "Singapore")
+  - Single-topic keywords: specific contract type names
+  
+Default: 'moderate'
+```
+
+**Replace flat category stats with percentile-based pricing:**
+
+Currently when an item has no text match, it falls through to AI with only a category average. Instead:
+
+1. Compute **percentiles** (25th, 50th, 75th, 90th) for each category from historical data
+2. Map scope to percentile:
+   - `narrow` -> 25th percentile
+   - `moderate` -> 50th percentile (median)
+   - `broad` -> 75th-90th percentile
+3. Use this as a **strong anchor** -- either as the direct precedent price (Tier 2) or as explicit guidance to the AI
+
+**Improve AI prompt for remaining unmatched items:**
+
+When items still go to AI, include the scope classification and the percentile range in the prompt so the AI knows where in the range to price:
+
+```text
+Item: "Due diligence report"
+Scope: BROAD (detail covers 15+ topics across multiple document types)
+Category: Due Diligence
+Historical range for Due Diligence: 25th=GBP 15,000, median=GBP 23,000, 75th=GBP 65,000, 90th=GBP 114,000
+-> Price this at the 75th-90th percentile given its broad scope.
+```
+
+vs.
+
+```text
+Item: "Corporate DD on BVI entity"  
+Scope: NARROW (single entity, single jurisdiction)
+Category: Due Diligence
+-> Price this at the 25th percentile.
+```
+
+**Better category-relevant context for AI:**
+
+Instead of sending `allHistorical.slice(0, 30)` (arbitrary first 30), for each unmatched item send:
+- Top 5 highest-fee items from the same category (so the AI sees the range ceiling)
+- 5 lowest-fee items from the same category (so it sees the floor)
+- The percentile stats
+
+### Changes to `allocate-target-pricing/index.ts`
+
+Apply the same scope classification and percentile-based pricing to the base price generation step (Phase 2). The deterministic scaling in Phase 3 remains unchanged.
+
+### Implementation Detail
+
+**Percentile helper functions:**
+
+```text
+median(values[]) -> number
+percentile(values[], p) -> number  // p = 25, 75, 90
+```
+
+**Scope classifier:**
+
+```text
+function classifyScope(workItem: string, detail: string | null): 'narrow' | 'moderate' | 'broad'
+
+broadIndicators = /\b(report|comprehensive|full|all project|covering|review of all|
+  package|suite|multi|portfolio|across|various|range of|complete|
+  extensive|wide|broad|overall|summary|overview)\b/i
+
+narrowIndicators = specific country/entity names, short detail, 
+  single contract type references
+
+Logic:
+  score = 0
+  if detail length > 250: score += 2
+  if detail length > 150: score += 1  
+  if broadIndicators match in workItem or detail: score += 2
+  if narrowIndicators match: score -= 2
+  if workItem is very generic (< 5 significant words, no proper nouns): score += 1
+  
+  score >= 3 -> 'broad'
+  score <= -1 -> 'narrow'
+  else -> 'moderate'
+```
+
+**Pricing by scope:**
+
+```text
+For Tier 2 (category match, no text match):
+  narrow  -> percentile(categoryFees, 25)
+  moderate -> percentile(categoryFees, 50)  
+  broad   -> percentile(categoryFees, 80)
+```
+
+### Files to Modify
+
+1. **`supabase/functions/suggest-pricing/index.ts`** -- Add `classifyScope()`, `median()`, `percentile()` helpers; replace flat category average with scope-aware percentile pricing; improve AI context with category-relevant items and scope guidance
+2. **`supabase/functions/allocate-target-pricing/index.ts`** -- Same scope classification and percentile logic for base price generation
+
+### What This Achieves
+
+A "Due diligence report" with a long detail covering many topics will be classified as `broad` and priced at the 80th percentile of DD items (~GBP 80-100k+ depending on data), while "Colombian DD (incl land)" will be classified as `narrow` and priced at the 25th percentile (~GBP 15k). This matches the user's intuitive understanding and requires no additional data -- it uses signals already present in the work item label and detail text.

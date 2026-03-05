@@ -1,36 +1,27 @@
 # Memory: features/pricing-proposal/summary-pyramids
 Updated: now
 
-The Summary tab features dual "Seniority Pyramid" visualizations that compare Hours Distribution vs. Cost Distribution side-by-side. Team members are grouped into four tiers: Partners, Counsel / Senior Associates, Associates, and Trainees / Juniors.
+The Summary tab features interactive 'Seniority Pyramid' visualizations for Hours and Cost Distribution. Members are grouped into **five** discrete levels matching the Teams & Rates dropdown: Partner (indigo), Counsel (violet), Senior Associate (purple), Associate (sky), and Trainee (emerald). Each level row has a left-aligned label in its tier colour.
 
-## Drag-to-Resize Interaction
-Member blocks in the Hours Distribution pyramid are directly resizable:
-- Click a member to select them → a drag handle (⋮⋮ GripVertical icon rotated 90°) appears on the right edge
-- Grab the handle and drag horizontally: bar width and hours update in real-time via local state
-- On mouse/touch release: hours are rounded to nearest 0.5 and committed
-- Drag right → hours increase (hard-capped at `maxHours` from budget buffer)
-- Drag left → hours decrease toward 0
-- Click the hours value directly to open an inline numeric input for precise entry
+## Drag-to-Resize (Horizontal)
+Member bars have a drag handle (⋮⋮ GripVertical rotated 90°) that appears on hover on the right edge. The bar's edge follows the cursor exactly, with hours expanding/contracting in real-time until the budget cap is reached. For precision, an inline numeric input is available by clicking the hours label.
 
-The Cost Distribution pyramid is read-only (no drag handles or editing).
+## Drag-Between-Levels (Vertical)
+Members can be dragged vertically between level rows using native HTML drag-and-drop. This reassigns the member's "modelling level" without changing their actual seniority. Members **retain the colour of their home level** so the user always knows their real seniority. The override is stored in `assumptions.summaryLevelOverrides: Record<string, string>` and persisted via auto-save. Dragging a member back to their home tier removes the override.
 
 ## Three-Tier Player Selection
-Before auto-distribute presets can be used, users must assign player roles via a tap-cycle on member chips:
-- **Tap 1 → Key** (⭐ amber): 2× hour share within their tier
-- **Tap 2 → Anchor** (⚡ orange): 4× hour share within their tier
-- **Tap 3 → Clear**: back to background (1× share)
+Users assign player roles via tap-cycle on member chips:
+- **Tap 1 → Key** (⭐ amber): 2× hour share
+- **Tap 2 → Anchor** (⚡ orange): 4× hour share
+- **Tap 3 → Clear**: back to 1× share
 
-State: `assumptions.summaryKeyPlayers: Record<string, number>` (0=background, 1=key, 2=anchor)
-
-Preset buttons are disabled until at least one member has level > 0.
+State: `assumptions.summaryKeyPlayers: Record<string, number>`
 
 ## Auto-Distribute Presets
-Three buttons allow one-click hour distribution to hit `bmUpperTarget`:
-- **Pyramid (▽ inverted triangle)**: Partners 1×, Senior 4×, Associates 3×, Juniors 4×
-- **Flat**: Equal weights across all tiers
-- **Reverse (△ upright triangle)**: Partners 3×, Senior 2×, Associates 2×, Juniors 2×
-
-Within each tier, anchor players get 4× shares, key players get 2×, background players get 1×.
+Three buttons distribute hours to hit `bmUpperTarget` using the member's **effective tier** (overridden or home):
+- **Pyramid (▽)**: Partner 1×, Counsel 3×, Sr. Assoc 4×, Associate 3×, Trainee 4×
+- **Flat**: Equal-ish weights
+- **Reverse (△)**: Partner 5×, Counsel 4×, Sr. Assoc 4×, Associate 3×, Trainee 2×
 
 ## Visual Design
-Individual members are represented as soft, rounded blocks with pastel tier-colored backgrounds. The selected member shows a primary ring. During drag, the block gets a shadow elevation. Empty tiers display dashed-border placeholders. All values use tabular numbers. Key players show a filled star icon and amber highlight. Anchor players show a bolt icon and orange highlight.
+Individual members are rounded blocks with pastel tier-coloured backgrounds based on their **home** level. Relocated members show a subtle ring offset. Drop-zone highlights appear on target level rows during drag. Empty tiers show dashed placeholders.

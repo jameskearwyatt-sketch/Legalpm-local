@@ -61,6 +61,7 @@ export interface ProposalAssumptions {
   summaryHours?: Record<string, number>;
   summaryLocks?: Record<string, boolean>;
   summaryKeyPlayers?: Record<string, number>; // 0=background, 1=key, 2=anchor
+  summaryLevelOverrides?: Record<string, string>; // member key → overridden tier key for modelling
 }
 
 // Check if figure settings are complete (all three must be set)

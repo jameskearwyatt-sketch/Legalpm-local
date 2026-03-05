@@ -875,36 +875,34 @@ export default function PricingProposalDetail() {
   // Auto-distribute hours across team using preset weights
   const handleAutoDistribute = useCallback((preset: DistributionPreset) => {
     const WEIGHTS: Record<DistributionPreset, Record<string, number>> = {
-      pyramid:  { partners: 1, senior: 4, associates: 3, juniors: 4 },
-      flat:     { partners: 2, senior: 3, associates: 3, juniors: 3 },
-      reverse:  { partners: 5, senior: 4, associates: 4, juniors: 3 },
+      pyramid:  { partner: 1, counsel: 3, seniorAssociate: 4, associate: 3, trainee: 4 },
+      flat:     { partner: 2, counsel: 3, seniorAssociate: 3, associate: 3, trainee: 3 },
+      reverse:  { partner: 5, counsel: 4, seniorAssociate: 4, associate: 3, trainee: 2 },
     };
 
     setAssumptions(prev => {
       const kp = prev.summaryKeyPlayers || {};
+      const lo = prev.summaryLevelOverrides || {};
       const hours = { ...(prev.summaryHours || {}) };
       const weights = WEIGHTS[preset];
 
       const targetRevenue = bmUpperTarget;
       const allMembers = teamMembers;
 
-      // Assign raw hour weights (rate-independent)
-      // Hours are proportional to tierWeight × playerMultiplier, NOT divided by rate
       const memberWeights = allMembers.map(m => {
-        const tier = classifyTier(m);
-        const tierWeight = weights[tier] || 1;
+        const homeTier = classifyTier(m);
+        const effectiveTier = lo[m.key] || homeTier;
+        const tierWeight = weights[effectiveTier] || 1;
         const level = kp[m.key] || 0;
         const playerMult = level === 2 ? 4 : level === 1 ? 2 : 1;
         const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
         return { key: m.key, rate: eRate, rawWeight: tierWeight * playerMult };
       });
 
-      // Scale factor so Σ(hours × effectiveRate) = targetRevenue
       const denom = memberWeights.reduce((s, mw) => s + mw.rawWeight * mw.rate, 0);
       if (denom <= 0) return prev;
       const K = targetRevenue / denom;
 
-      // Assign hours proportional to weight, independent of rate
       memberWeights.forEach(mw => {
         hours[mw.key] = Math.max(0.5, Math.round(mw.rawWeight * K * 2) / 2);
       });
@@ -912,6 +910,24 @@ export default function PricingProposalDetail() {
       return { ...prev, summaryHours: hours };
     });
   }, [teamMembers, bmUpperTarget, afaRateDiscount]);
+
+  // Handle member level override (drag between pyramid tiers)
+  const handleMemberLevelOverride = useCallback((memberKey: string, newLevel: string) => {
+    setAssumptions(prev => {
+      const lo = { ...(prev.summaryLevelOverrides || {}) };
+      // If dragged back to home tier, remove override
+      const member = teamMembers.find(m => m.key === memberKey);
+      const homeTier = member ? classifyTier(member) : '';
+      if (newLevel === homeTier) {
+        delete lo[memberKey];
+      } else {
+        lo[memberKey] = newLevel;
+      }
+      return { ...prev, summaryLevelOverrides: lo };
+    });
+  }, [teamMembers]);
+
+  const summaryLevelOverrides = assumptions.summaryLevelOverrides || {};
 
 
   const summaryAutoSaveRef = useRef<NodeJS.Timeout | null>(null);
@@ -940,7 +956,7 @@ export default function PricingProposalDetail() {
     return () => {
       if (summaryAutoSaveRef.current) clearTimeout(summaryAutoSaveRef.current);
     };
-  }, [assumptions.summaryHours, summaryInitialized, proposalId]);
+  }, [assumptions.summaryHours, assumptions.summaryLevelOverrides, summaryInitialized, proposalId]);
 
   // Summary aggregates
   const summary = useMemo(() => {
@@ -2787,6 +2803,8 @@ export default function PricingProposalDetail() {
               onMemberHoursCommit={handleSummaryHoursChange}
               keyPlayers={summaryKeyPlayers}
               onToggleKeyPlayer={toggleKeyPlayer}
+              levelOverrides={summaryLevelOverrides}
+              onMemberLevelOverride={handleMemberLevelOverride}
             />
 
             {/* Budget buffer indicator */}

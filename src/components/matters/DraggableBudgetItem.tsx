@@ -89,6 +89,7 @@ export function DraggableBudgetItem({
   updateLineItemOptional,
   toggleLineItemIncluded,
   updateLineItemCapped,
+  onToggleAdditionalScope,
   canDelete,
 }: DraggableBudgetItemProps) {
   const {

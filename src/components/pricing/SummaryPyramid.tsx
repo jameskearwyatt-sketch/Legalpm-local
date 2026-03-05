@@ -30,6 +30,8 @@ interface SummaryPyramidProps {
   onToggleKeyPlayer?: (key: string) => void;
   levelOverrides?: Record<string, string>;
   onMemberLevelOverride?: (key: string, newLevel: string) => void;
+  benchedMembers?: string[];
+  onBenchMember?: (key: string, benched: boolean) => void;
   memorySlots?: (SummaryMemorySlot | null)[];
   onSaveMemory?: (slotIndex: number, note?: string) => void;
   onLoadMemory?: (slotIndex: number) => void;

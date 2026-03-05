@@ -71,6 +71,7 @@ export interface SummaryMemorySlot {
   hours: Record<string, number>;
   keyPlayers: Record<string, number>;
   levelOverrides: Record<string, string>;
+  benchedMembers?: string[];
   note?: string;
   savedAt: string;
 }

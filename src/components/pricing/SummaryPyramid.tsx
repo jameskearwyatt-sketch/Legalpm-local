@@ -440,8 +440,8 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
       if (!dragRef.current) return;
       const { startX, startHours, maxHours, containerWidth } = dragRef.current;
       const deltaX = e.clientX - startX;
-      // Map full container width to maxHours
-      const hourDelta = (deltaX / containerWidth) * maxHours;
+      const sensitivity = 3;
+      const hourDelta = (deltaX / containerWidth) * maxHours * sensitivity;
       const newHours = Math.min(Math.max(0, startHours + hourDelta), maxHours);
       setDragState({ key: dragRef.current.key, hours: newHours });
     };
@@ -464,7 +464,8 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
       const touch = e.touches[0];
       const { startX, startHours, maxHours, containerWidth } = dragRef.current;
       const deltaX = touch.clientX - startX;
-      const hourDelta = (deltaX / containerWidth) * maxHours;
+      const sensitivity = 3;
+      const hourDelta = (deltaX / containerWidth) * maxHours * sensitivity;
       const newHours = Math.min(Math.max(0, startHours + hourDelta), maxHours);
       setDragState({ key: dragRef.current.key, hours: newHours });
     };

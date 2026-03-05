@@ -881,23 +881,12 @@ export default function PricingProposalDetail() {
     };
 
     setAssumptions(prev => {
-      const locks = prev.summaryLocks || {};
       const kp = prev.summaryKeyPlayers || {};
       const hours = { ...(prev.summaryHours || {}) };
       const weights = WEIGHTS[preset];
 
-      // Calculate locked revenue
-      const lockedRevenue = teamMembers
-        .filter(m => locks[m.key])
-        .reduce((s, m) => {
-          const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
-          return s + (hours[m.key] || 0) * eRate;
-        }, 0);
-
-      const targetRevenue = Math.max(0, bmUpperTarget - lockedRevenue);
-      const unlocked = teamMembers.filter(m => !locks[m.key]);
-
-      if (unlocked.length === 0) return prev;
+      const targetRevenue = bmUpperTarget;
+      const allMembers = teamMembers;
 
       // Assign raw hour weights (rate-independent)
       // Hours are proportional to tierWeight × playerMultiplier, NOT divided by rate

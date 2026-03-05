@@ -204,7 +204,7 @@ export function DraggableBudgetItem({
         </div>
 
         {/* New value */}
-        <div className="col-span-2">
+        <div className="min-w-[90px]">
           <Input
             type="number"
             value={newFee || ''}

@@ -97,6 +97,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [aiSuggestedIndices, setAiSuggestedIndices] = useState<Set<number>>(new Set());
   // Store original values when editing starts for comparison
   const [originalItems, setOriginalItems] = useState<DraftLineItem[]>([]);
+  // Store version 1 (original settled) line items for budget creep visibility
+  const [settledItems, setSettledItems] = useState<DraftLineItem[]>([]);
 
   // Silent update for local counsel billing (no toast)
   const updateLocalCounselBilling = async (value: 'Direct' | 'Disb' | null) => {

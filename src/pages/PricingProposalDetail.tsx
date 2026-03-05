@@ -890,7 +890,9 @@ export default function PricingProposalDetail() {
       const targetRevenue = bmUpperTarget;
       const allMembers = teamMembers;
 
-      const memberWeights = allMembers.map(m => {
+      const memberWeights = allMembers
+        .filter(m => !(prev.summaryBenchedMembers || []).includes(m.key))
+        .map(m => {
         const homeTier = classifyTier(m);
         const effectiveTier = lo[m.key] || homeTier;
         const tierWeight = weights[effectiveTier] || 1;

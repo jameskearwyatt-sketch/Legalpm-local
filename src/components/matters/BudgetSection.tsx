@@ -1121,6 +1121,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
               toggleLineItemIncluded={toggleLineItemIncluded}
               updateLineItemCapped={updateLineItemCapped}
               matterId={matterId}
+              settledItems={settledItems}
             />
           </CollapsibleContent>
         </Collapsible>

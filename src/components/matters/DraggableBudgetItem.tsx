@@ -62,6 +62,7 @@ interface DraggableBudgetItemProps {
   updateLineItemOptional: any;
   toggleLineItemIncluded: any;
   updateLineItemCapped: any;
+  onToggleAdditionalScope?: (index: number) => void;
   canDelete: boolean;
 }
 

@@ -503,6 +503,11 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
   onToggleKeyPlayer,
   levelOverrides = {},
   onMemberLevelOverride,
+  memorySlots = [null, null, null],
+  onSaveMemory,
+  onLoadMemory,
+  onClearMemory,
+  onUpdateMemoryNote,
 }: SummaryPyramidProps) {
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [activePreset, setActivePreset] = useState<DistributionPreset | null>(null);

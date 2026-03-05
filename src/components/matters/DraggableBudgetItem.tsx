@@ -141,7 +141,7 @@ export function DraggableBudgetItem({
         </div>
 
         {/* Work Item */}
-        <div className="col-span-3">
+        <div className="flex-1 min-w-[150px]">
           <Input
             value={item.work_item}
             onChange={(e) => onEdit(index, 'work_item', e.target.value)}

@@ -770,7 +770,7 @@ export default function PricingProposalDetail() {
       newHours[m.key] = eRate > 0 ? Math.round((revenuePerMember / eRate) * 2) / 2 : 0;
     });
 
-    setAssumptions(prev => ({ ...prev, summaryHours: newHours, summaryLocks: {} }));
+    setAssumptions(prev => ({ ...prev, summaryHours: newHours }));
     setSummaryInitialized(true);
   }, [teamMembers, proposal, bmUpperTarget, summaryInitialized, assumptions.summaryHours, afaRateDiscount]);
 

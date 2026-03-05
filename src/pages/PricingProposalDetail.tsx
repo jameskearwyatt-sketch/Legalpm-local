@@ -209,12 +209,12 @@ export default function PricingProposalDetail() {
   useEffect(() => {
     if (proposal) {
       setRateCard(proposal.rate_card || DEFAULT_RATE_CARD);
-      // Sync assumptions from DB, but preserve locally-managed summaryHours/summaryLocks
+      // Sync assumptions from DB, but preserve locally-managed summaryHours
       // once they've been initialized (to prevent refetch from overwriting scaled hours)
       setAssumptions(prev => {
         const incoming = proposal.assumptions || DEFAULT_ASSUMPTIONS;
         if (summaryInitialized) {
-          return { ...incoming, summaryHours: prev.summaryHours, summaryLocks: prev.summaryLocks };
+          return { ...incoming, summaryHours: prev.summaryHours };
         }
         return incoming;
       });
@@ -739,7 +739,6 @@ export default function PricingProposalDetail() {
 
   // Summary state derived from assumptions
   const summaryHours = assumptions.summaryHours || {};
-  const summaryLocks = assumptions.summaryLocks || {};
 
   // BM upper estimate target
   const bmUpperTarget = useMemo(() => {
@@ -771,7 +770,7 @@ export default function PricingProposalDetail() {
       newHours[m.key] = eRate > 0 ? Math.round((revenuePerMember / eRate) * 2) / 2 : 0;
     });
 
-    setAssumptions(prev => ({ ...prev, summaryHours: newHours, summaryLocks: {} }));
+    setAssumptions(prev => ({ ...prev, summaryHours: newHours }));
     setSummaryInitialized(true);
   }, [teamMembers, proposal, bmUpperTarget, summaryInitialized, assumptions.summaryHours, afaRateDiscount]);
 
@@ -789,9 +788,8 @@ export default function PricingProposalDetail() {
 
     setAssumptions(prev => {
       const updated = { ...(prev.summaryHours || {}) };
-      const updatedLocks = { ...(prev.summaryLocks || {}) };
 
-      removedKeys.forEach(k => { delete updated[k]; delete updatedLocks[k]; });
+      removedKeys.forEach(k => { delete updated[k]; });
 
       if (newMembers.length > 0) {
         const existingRevenue = Object.entries(updated).reduce((sum, [key, hours]) => {
@@ -807,7 +805,7 @@ export default function PricingProposalDetail() {
         });
       }
 
-      return { ...prev, summaryHours: updated, summaryLocks: updatedLocks };
+      return { ...prev, summaryHours: updated };
     });
   }, [teamMembers, summaryInitialized, summaryHours, bmUpperTarget]);
 
@@ -837,49 +835,30 @@ export default function PricingProposalDetail() {
     });
   }, [bmUpperTarget, summaryInitialized, teamMembers.length]);
 
-  // Handle user editing hours — auto-rebalance unlocked members
+  // Handle user editing hours — budget buffer model (no rebalancing)
   const handleSummaryHoursChange = useCallback((memberKey: string, newHours: number) => {
     setAssumptions(prev => {
       const hours = { ...(prev.summaryHours || {}) };
-      const locks = prev.summaryLocks || {};
 
-      hours[memberKey] = newHours;
+      // Calculate max allowed: (budget - revenue of all OTHER members) / this member's rate
+      const member = teamMembers.find(m => m.key === memberKey);
+      if (!member) return prev;
+      const eRate = afaRateDiscount ? member.rate * afaRateDiscount : member.rate;
+      if (eRate <= 0) { hours[memberKey] = 0; return { ...prev, summaryHours: hours }; }
 
-      // Revenue from locked + just-edited members
-      const fixedRevenue = teamMembers.reduce((sum, m) => {
-        if (m.key === memberKey || locks[m.key]) {
-          const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
-          return sum + ((hours[m.key] || 0) * eRate);
-        }
-        return sum;
+      const othersRevenue = teamMembers.reduce((sum, m) => {
+        if (m.key === memberKey) return sum;
+        const mRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+        return sum + ((hours[m.key] || 0) * mRate);
       }, 0);
 
-      const remainingTarget = bmUpperTarget - fixedRevenue;
-      const unlocked = teamMembers.filter(m => m.key !== memberKey && !locks[m.key]);
-
-      if (unlocked.length > 0 && remainingTarget > 0) {
-        // Equal revenue share → cheaper members get more hours
-        const revenuePerMember = remainingTarget / unlocked.length;
-        unlocked.forEach(m => {
-          const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
-          hours[m.key] = eRate > 0 ? Math.round((revenuePerMember / eRate) * 2) / 2 : 0;
-        });
-      } else if (unlocked.length > 0) {
-        unlocked.forEach(m => { hours[m.key] = 0; });
-      }
+      const maxAllowed = Math.max(0, (bmUpperTarget - othersRevenue) / eRate);
+      const clamped = Math.round(Math.min(Math.max(0, newHours), maxAllowed) * 2) / 2;
+      hours[memberKey] = clamped;
 
       return { ...prev, summaryHours: hours };
     });
   }, [teamMembers, bmUpperTarget, afaRateDiscount]);
-
-  // Toggle lock on a team member
-  const toggleSummaryLock = useCallback((memberKey: string) => {
-    setAssumptions(prev => {
-      const locks = { ...(prev.summaryLocks || {}) };
-      locks[memberKey] = !locks[memberKey];
-      return { ...prev, summaryLocks: locks };
-    });
-  }, []);
 
   // Toggle key player status
   const toggleKeyPlayer = useCallback((memberKey: string) => {
@@ -902,27 +881,16 @@ export default function PricingProposalDetail() {
     };
 
     setAssumptions(prev => {
-      const locks = prev.summaryLocks || {};
       const kp = prev.summaryKeyPlayers || {};
       const hours = { ...(prev.summaryHours || {}) };
       const weights = WEIGHTS[preset];
 
-      // Calculate locked revenue
-      const lockedRevenue = teamMembers
-        .filter(m => locks[m.key])
-        .reduce((s, m) => {
-          const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
-          return s + (hours[m.key] || 0) * eRate;
-        }, 0);
-
-      const targetRevenue = Math.max(0, bmUpperTarget - lockedRevenue);
-      const unlocked = teamMembers.filter(m => !locks[m.key]);
-
-      if (unlocked.length === 0) return prev;
+      const targetRevenue = bmUpperTarget;
+      const allMembers = teamMembers;
 
       // Assign raw hour weights (rate-independent)
       // Hours are proportional to tierWeight × playerMultiplier, NOT divided by rate
-      const memberWeights = unlocked.map(m => {
+      const memberWeights = allMembers.map(m => {
         const tier = classifyTier(m);
         const tierWeight = weights[tier] || 1;
         const level = kp[m.key] || 0;
@@ -972,20 +940,27 @@ export default function PricingProposalDetail() {
     return () => {
       if (summaryAutoSaveRef.current) clearTimeout(summaryAutoSaveRef.current);
     };
-  }, [assumptions.summaryHours, assumptions.summaryLocks, summaryInitialized, proposalId]);
+  }, [assumptions.summaryHours, summaryInitialized, proposalId]);
 
   // Summary aggregates
   const summary = useMemo(() => {
     const enrichedMembers = teamMembers.map(m => {
       const hours = summaryHours[m.key] || 0;
       const displayRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+      // Calculate max hours this member could have (budget minus others' revenue) / rate
+      const othersRevenue = teamMembers.reduce((sum, other) => {
+        if (other.key === m.key) return sum;
+        const oRate = afaRateDiscount ? other.rate * afaRateDiscount : other.rate;
+        return sum + ((summaryHours[other.key] || 0) * oRate);
+      }, 0);
+      const maxHours = displayRate > 0 ? Math.max(0, (bmUpperTarget - othersRevenue) / displayRate) : 0;
       return {
         ...m,
         hours,
-        revenue: hours * (afaRateDiscount ? m.rate * afaRateDiscount : m.rate),
+        revenue: hours * displayRate,
         displayRate,
         memberCost: hours * m.cost,
-        isLocked: !!summaryLocks[m.key],
+        maxHours,
       };
     });
 
@@ -1008,7 +983,7 @@ export default function PricingProposalDetail() {
       hasEstimatedHours: enrichedMembers.length > 0,
       hasAfaDiscount: !!afaRateDiscount,
     };
-  }, [teamMembers, summaryHours, summaryLocks, bmUpperTarget, afaRateDiscount]);
+  }, [teamMembers, summaryHours, bmUpperTarget, afaRateDiscount]);
 
   // Live rate card changes (for real-time pyramid updates)
   const handleRateCardChange = useCallback((newTeamRateCard: RateCard, newFeeRateCard: RateCard) => {
@@ -2810,36 +2785,32 @@ export default function PricingProposalDetail() {
               formatHours={formatHours}
               onDistribute={handleAutoDistribute}
               onMemberHoursCommit={handleSummaryHoursChange}
-              lockedMembers={summaryLocks}
-              onToggleLock={toggleSummaryLock}
               keyPlayers={summaryKeyPlayers}
               onToggleKeyPlayer={toggleKeyPlayer}
             />
 
-            {/* Fixed-height container — never shifts layout */}
+            {/* Budget buffer indicator */}
             <div className="min-h-[52px]">
-              <Alert className={cn(
-                "border transition-opacity duration-200",
-                Math.abs(summary.delta) < 100 && "opacity-0 pointer-events-none",
-                summary.delta > 0
-                  ? "border-amber-500 bg-amber-50 dark:bg-amber-950/20"
-                  : "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
-              )}>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  {summary.delta > 0
-                    ? `Revenue exceeds upper estimate by ${formatCurrency(summary.delta)}. Reduce hours or unlock team members to rebalance.`
-                    : `Revenue is ${formatCurrency(Math.abs(summary.delta))} below upper estimate. Add hours to unlocked team members.`
-                  }
-                </AlertDescription>
-              </Alert>
+              {Math.abs(summary.delta) < 100 ? (
+                <Alert className="border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 transition-opacity duration-200">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>Fully allocated</AlertDescription>
+                </Alert>
+              ) : summary.delta < 0 ? (
+                <Alert className="border border-blue-500 bg-blue-50 dark:bg-blue-950/20 transition-opacity duration-200">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Unallocated: {formatCurrency(Math.abs(summary.delta))} remaining — increase hours on any team member to allocate.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
             </div>
 
             <Card>
               <CardHeader>
                 <CardTitle>Fee Breakdown by Team Member</CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Edit hours to adjust allocation. Lock members to prevent auto-rebalancing.
+                  Edit hours to adjust allocation. Unallocated budget shown above.
                   Rates can only be changed in Team & Rates tab.
                 </p>
               </CardHeader>
@@ -2847,7 +2818,6 @@ export default function PricingProposalDetail() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-8"></TableHead>
                       <TableHead>Team Member</TableHead>
                       <TableHead className="text-right">Hours</TableHead>
                       <TableHead className="text-right">
@@ -2868,14 +2838,12 @@ export default function PricingProposalDetail() {
                         hours={member.hours}
                         rate={member.displayRate}
                         revenue={member.revenue}
-                        isLocked={member.isLocked}
+                        maxHours={member.maxHours}
                         formatCurrency={formatCurrency}
                         onHoursCommit={handleSummaryHoursChange}
-                        onToggleLock={toggleSummaryLock}
                       />
                     ))}
                     <TableRow className="font-bold bg-muted/50">
-                      <TableCell></TableCell>
                       <TableCell>Total</TableCell>
                       <TableCell className="text-right tabular-nums">{formatHours(summary.totalHours)}</TableCell>
                       <TableCell className="text-right tabular-nums">

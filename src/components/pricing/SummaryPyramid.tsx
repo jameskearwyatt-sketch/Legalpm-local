@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { Lock, Unlock, Triangle, Minus, Star, Zap } from "lucide-react";
+import { Triangle, Minus, Star, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +14,7 @@ interface TeamMember {
   revenue: number;
   memberCost: number;
   level?: string;
-  isLocked?: boolean;
+  maxHours?: number;
 }
 
 export type DistributionPreset = "pyramid" | "flat" | "reverse";
@@ -25,9 +25,7 @@ interface SummaryPyramidProps {
   formatHours: (value: number) => string;
   onDistribute?: (preset: DistributionPreset) => void;
   onMemberHoursCommit?: (key: string, hours: number) => void;
-  lockedMembers?: Record<string, boolean>;
-  onToggleLock?: (key: string) => void;
-  keyPlayers?: Record<string, number>; // 0=background, 1=key, 2=anchor
+  keyPlayers?: Record<string, number>;
   onToggleKeyPlayer?: (key: string) => void;
 }
 
@@ -99,16 +97,15 @@ function buildTiers(members: TeamMember[]): Tier[] {
 /* ─── Expanded inline editor for a member block ─── */
 interface MemberEditorProps {
   member: TeamMember;
-  isLocked: boolean;
   onHoursCommit: (key: string, hours: number) => void;
-  onToggleLock: (key: string) => void;
   formatHours: (v: number) => string;
 }
 
-function MemberEditor({ member, isLocked, onHoursCommit, onToggleLock, formatHours }: MemberEditorProps) {
+function MemberEditor({ member, onHoursCommit, formatHours }: MemberEditorProps) {
   const [localHours, setLocalHours] = useState<number | null>(null);
   const isDragging = useRef(false);
   const displayHours = localHours !== null ? localHours : member.hours;
+  const sliderMax = Math.max(Math.ceil(member.maxHours || 500), 1);
 
   const commitValue = useCallback((val: number) => {
     isDragging.current = false;
@@ -118,49 +115,33 @@ function MemberEditor({ member, isLocked, onHoursCommit, onToggleLock, formatHou
 
   return (
     <div className="flex items-center gap-2 w-full px-1 py-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-5 w-5 p-0 shrink-0"
-        onClick={(e) => { e.stopPropagation(); onToggleLock(member.key); }}
-        title={isLocked ? "Unlock" : "Lock"}
-      >
-        {isLocked
-          ? <Lock className="h-3 w-3 text-amber-600" />
-          : <Unlock className="h-3 w-3 text-muted-foreground/40" />
-        }
-      </Button>
       <Input
         type="number"
         step="0.5"
         min="0"
-        disabled={isLocked}
+        max={member.maxHours}
         value={displayHours.toFixed(1)}
         onChange={(e) => {
           const val = Math.max(0, parseFloat(e.target.value) || 0);
           onHoursCommit(member.key, val);
         }}
         onClick={(e) => e.stopPropagation()}
-        className={cn(
-          "w-16 h-6 text-right text-[10px] tabular-nums px-1",
-          isLocked && "bg-amber-50 dark:bg-amber-950/20 border-amber-300 opacity-60"
-        )}
+        className="w-16 h-6 text-right text-[10px] tabular-nums px-1"
       />
       <span className="text-[10px] text-muted-foreground shrink-0">h</span>
       <input
         type="range"
         min="0"
-        max="500"
+        max={sliderMax}
         step="0.5"
-        disabled={isLocked}
-        value={Math.min(displayHours, 500)}
+        value={Math.min(displayHours, sliderMax)}
         onMouseDown={() => { isDragging.current = true; }}
         onTouchStart={() => { isDragging.current = true; }}
         onChange={(e) => setLocalHours(parseFloat(e.target.value) || 0)}
         onMouseUp={(e) => commitValue(parseFloat((e.target as HTMLInputElement).value) || 0)}
         onTouchEnd={(e) => commitValue(parseFloat((e.target as HTMLInputElement).value) || 0)}
         onClick={(e) => e.stopPropagation()}
-        className={cn("flex-1 h-1.5 accent-primary cursor-pointer min-w-[40px]", isLocked && "opacity-40 cursor-not-allowed")}
+        className="flex-1 h-1.5 accent-primary cursor-pointer min-w-[40px]"
       />
     </div>
   );
@@ -176,16 +157,14 @@ interface PyramidColumnProps {
   interactive?: boolean;
   expandedMember: string | null;
   onMemberClick?: (key: string) => void;
-  lockedMembers?: Record<string, boolean>;
   onHoursCommit?: (key: string, hours: number) => void;
-  onToggleLock?: (key: string) => void;
   formatHours?: (v: number) => string;
 }
 
 function PyramidColumn({
   title, tiers, getValue, formatValue, total,
   interactive, expandedMember, onMemberClick,
-  lockedMembers, onHoursCommit, onToggleLock, formatHours,
+  onHoursCommit, formatHours,
 }: PyramidColumnProps) {
   const tierTotals = tiers.map((t) =>
     t.members.reduce((s, m) => s + getValue(m), 0)
@@ -229,7 +208,6 @@ function PyramidColumn({
                 {tier.members.map((member) => {
                   const val = getValue(member);
                   const memberPct = tierTotal > 0 ? (val / tierTotal) * 100 : 100 / tier.members.length;
-                  const isLocked = lockedMembers?.[member.key];
                   const isExpanded = expandedMember === member.key && interactive;
 
                   return (
@@ -240,15 +218,11 @@ function PyramidColumn({
                           colors.bg, colors.border,
                           interactive && "cursor-pointer hover:ring-2 hover:ring-primary/30",
                           isExpanded && "ring-2 ring-primary/50",
-                          isLocked && "ring-1 ring-amber-400/50"
                         )}
                         style={{ minHeight: 36 }}
                         title={`${member.label}: ${formatValue(val)}`}
                         onClick={() => interactive && onMemberClick?.(member.key)}
                       >
-                        {isLocked && (
-                          <Lock className="absolute top-0.5 right-0.5 h-2.5 w-2.5 text-amber-500/70" />
-                        )}
                         <span className={cn("text-[10px] font-medium leading-tight truncate w-full text-center", colors.text)}>
                           {member.label}
                         </span>
@@ -256,12 +230,10 @@ function PyramidColumn({
                           {formatValue(val)}
                         </span>
                       </div>
-                      {isExpanded && onHoursCommit && onToggleLock && formatHours && (
+                      {isExpanded && onHoursCommit && formatHours && (
                         <MemberEditor
                           member={member}
-                          isLocked={!!isLocked}
                           onHoursCommit={onHoursCommit}
-                          onToggleLock={onToggleLock}
                           formatHours={formatHours}
                         />
                       )}
@@ -350,8 +322,6 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
   formatHours,
   onDistribute,
   onMemberHoursCommit,
-  lockedMembers = {},
-  onToggleLock,
   keyPlayers = {},
   onToggleKeyPlayer,
 }: SummaryPyramidProps) {
@@ -430,9 +400,7 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
             interactive={interactive}
             expandedMember={expandedMember}
             onMemberClick={handleMemberClick}
-            lockedMembers={lockedMembers}
             onHoursCommit={onMemberHoursCommit}
-            onToggleLock={onToggleLock}
             formatHours={formatHours}
           />
           <div className="hidden sm:block w-px bg-border" />

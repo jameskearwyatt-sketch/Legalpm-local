@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useCallback } from 'react';
 import { format, parseISO, differenceInMonths, differenceInDays } from 'date-fns';
 import { formatCurrency } from '@/lib/currencyUtils';
-import { TrendingUp, TrendingDown, Calendar, Target, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calendar, Target, Clock, AlertTriangle, CheckCircle, Download } from 'lucide-react';
 
 interface SnapshotPoint {
   as_of_date: string;

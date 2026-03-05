@@ -171,6 +171,7 @@ export function useBudgetVersions(matterId?: string) {
           lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
           is_optional: item.is_optional ?? false,
           is_included: item.is_included ?? true,
+          is_additional_scope: item.is_additional_scope ?? false,
           category: item.category || null,
         }));
 

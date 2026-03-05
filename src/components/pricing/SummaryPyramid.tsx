@@ -686,6 +686,8 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
   onToggleKeyPlayer,
   levelOverrides = {},
   onMemberLevelOverride,
+  benchedMembers: benchedMemberKeys = [],
+  onBenchMember,
   memorySlots = [null, null, null],
   onSaveMemory,
   onLoadMemory,

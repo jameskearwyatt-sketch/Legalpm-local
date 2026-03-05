@@ -245,8 +245,8 @@ interface PyramidColumnProps {
   onMemberClick?: (key: string) => void;
   onHoursCommit?: (key: string, hours: number) => void;
   formatHours?: (v: number) => string;
-  dragState: { key: string; hours: number } | null;
-  onDragStart: (key: string, startX: number, startHours: number) => void;
+  dragState: { key: string; hours: number; widthPx: number } | null;
+  onDragStart: (key: string, barEl: HTMLDivElement) => void;
   editingKey: string | null;
   onEditClick: (key: string) => void;
   onEditDone: (key: string, val: number) => void;

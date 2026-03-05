@@ -974,6 +974,7 @@ export default function PricingProposalDetail() {
         summaryHours: { ...slot.hours },
         summaryKeyPlayers: { ...slot.keyPlayers },
         summaryLevelOverrides: { ...slot.levelOverrides },
+        summaryBenchedMembers: [...(slot.benchedMembers || [])],
       };
     });
   }, []);

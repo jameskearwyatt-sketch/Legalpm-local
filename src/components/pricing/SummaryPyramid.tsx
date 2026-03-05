@@ -161,11 +161,28 @@ function DraggableMemberBlock({
     }
   };
 
+  // During drag, scale the wrapper width proportionally without affecting siblings
+  const dragScale = isDragging && member.hours > 0
+    ? dragHoursOverride! / member.hours
+    : 1;
+  const wrapperStyle: React.CSSProperties = {
+    width: `${widthPct}%`,
+    minWidth: 40,
+    // During drag, override flex sizing to grow/shrink this bar only
+    ...(isDragging ? { flex: `0 0 ${widthPct * dragScale}%`, width: `${widthPct * dragScale}%` } : {}),
+  };
+
   return (
-    <div className="flex flex-col min-w-0" style={{ width: `${widthPct}%`, minWidth: 40 }}>
+    <div className="flex flex-col min-w-0" style={wrapperStyle}>
       <div
         className={cn(
-          "rounded-xl border flex items-center justify-between py-1.5 px-1.5 transition-all duration-300 min-w-0 overflow-hidden relative group",
+          "rounded-xl border flex items-center justify-between py-1.5 px-1.5 min-w-0 overflow-hidden relative group",
+          isDragging ? "transition-none" : "transition-all duration-300",
+          colors.bg, colors.border,
+          interactive && "cursor-pointer hover:ring-2 hover:ring-primary/30",
+          isSelected && !isDragging && "ring-2 ring-primary/50",
+          isDragging && "ring-2 ring-primary shadow-lg",
+        )}
           colors.bg, colors.border,
           interactive && "cursor-pointer hover:ring-2 hover:ring-primary/30",
           isSelected && !isDragging && "ring-2 ring-primary/50",

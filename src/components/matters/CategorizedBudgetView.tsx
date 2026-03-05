@@ -485,6 +485,79 @@ export function CategorizedBudgetView({
         </Button>
       </div>
 
+      {/* Additional Scope Section */}
+      {hasAdditionalScope && (
+        <div className="rounded-lg border-2 border-emerald-400 dark:border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-500">
+              <Layers className="h-3 w-3 mr-1" />
+              Additional Scope
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {formatCurrency(additionalScopeTotal, differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : currency)}
+            </span>
+          </div>
+          {BUDGET_CATEGORIES.map(category => {
+            const group = additionalScopeGroups[category];
+            if (!group || group.items.length === 0) return null;
+            const groupBudget = group.items
+              .filter(item => !item.is_optional || (item.is_optional && item.is_included !== false))
+              .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+            const groupUsed = group.items.reduce((sum, item) => {
+              return sum + ((item.wip_amount || 0) - (item.wip_write_off || 0));
+            }, 0);
+            const groupWO = group.items.reduce((sum, item) => sum + (item.wip_write_off || 0), 0);
+            return (
+              <CategoryGroup
+                key={`addl-${category}`}
+                category={category as BudgetCategory}
+                providerName=""
+                groupKey={`addl-${category}`}
+                subtotal={groupBudget}
+                budgetUsed={groupUsed}
+                writeOffTotal={groupWO}
+                formatCurrency={formatCurrency}
+                currency={differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : currency}
+                mandatedRate={mandatedRate}
+              >
+                {group.items.map((item, localIdx) => {
+                  const globalIndex = group.indices[localIdx];
+                  return (
+                    <DraggableBudgetItem
+                      key={globalIndex}
+                      id={globalIndex.toString()}
+                      item={item}
+                      index={globalIndex}
+                      onEdit={onItemEdit}
+                      onRemove={onRemoveItem}
+                      onCategoryChange={handleCategoryChange}
+                      isEditing={isEditing}
+                      hasExistingBudget={hasExistingBudget}
+                      formatCurrency={formatCurrency}
+                      currency={currency}
+                      billingCurrency={billingCurrency}
+                      quoteCurrency={quoteCurrency}
+                      differentBillingCurrency={differentBillingCurrency}
+                      agreedBillingAmount={agreedBillingAmount}
+                      mandatedRate={mandatedRate}
+                      existingLcFirmNames={existingLcFirmNames}
+                      hasOptionalItems={hasOptionalItems}
+                      isAiSuggested={aiSuggestedIndices.has(globalIndex)}
+                      originalItem={originalItems.find(orig => orig.id === item.id)}
+                      updateLineItemOptional={updateLineItemOptional}
+                      toggleLineItemIncluded={toggleLineItemIncluded}
+                      updateLineItemCapped={updateLineItemCapped}
+                      onToggleAdditionalScope={handleToggleAdditionalScope}
+                      canDelete={items.length > 1}
+                    />
+                  );
+                })}
+              </CategoryGroup>
+            );
+          })}
+        </div>
+      )}
+
       {/* Line Items with Drag and Drop */}
       <DndContext
         sensors={sensors}

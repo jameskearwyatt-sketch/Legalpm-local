@@ -547,6 +547,7 @@ export function CategorizedBudgetView({
                       hasOptionalItems={hasOptionalItems}
                       isAiSuggested={aiSuggestedIndices.has(globalIndex)}
                       originalItem={originalItems.find(orig => orig.id === item.id)}
+                      settledItem={settledItems?.find(s => s.work_item === item.work_item && s.provider === item.provider)}
                       updateLineItemOptional={updateLineItemOptional}
                       toggleLineItemIncluded={toggleLineItemIncluded}
                       updateLineItemCapped={updateLineItemCapped}

@@ -131,12 +131,13 @@ export function CategorizedBudgetView({
     return `${category}|${providerName}`;
   };
 
-  // Group items by category AND provider
+  // Group items by category AND provider (excluding additional scope items)
   const groupedItems = useMemo(() => {
     const groups: Record<string, { items: DraftLineItem[]; indices: number[]; category: BudgetCategory; providerName: string }> = {};
     
-    // Group items
+    // Group items - exclude additional scope items (they render in their own section)
     items.forEach((item, index) => {
+      if (item.is_additional_scope) return;
       const category = (item.category || 'Other') as BudgetCategory;
       const providerName = item.provider === 'Local Counsel' && item.lc_firm_name ? item.lc_firm_name : 'Baker McKenzie';
       const key = `${category}|${providerName}`;

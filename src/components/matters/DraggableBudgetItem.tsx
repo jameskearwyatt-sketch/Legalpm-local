@@ -59,6 +59,7 @@ interface DraggableBudgetItemProps {
   hasOptionalItems: boolean;
   isAiSuggested: boolean;
   originalItem?: DraftLineItem;
+  settledItem?: DraftLineItem;
   updateLineItemOptional: any;
   toggleLineItemIncluded: any;
   updateLineItemCapped: any;

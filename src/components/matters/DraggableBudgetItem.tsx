@@ -473,6 +473,14 @@ export function DraggableBudgetItem({
         </div>
       )}
 
+      {/* Additional Scope badge - viewing mode */}
+      {hasExistingBudget && item.is_additional_scope && (
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 whitespace-nowrap">
+          <Layers className="h-3 w-3 mr-0.5" />
+          Add'l Scope
+        </Badge>
+      )}
+
       {/* Optional checkbox - only show when budget exists */}
       {hasExistingBudget && item.id && (
         <div className="flex items-center gap-1">

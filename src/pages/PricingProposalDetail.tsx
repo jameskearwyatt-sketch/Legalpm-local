@@ -835,49 +835,30 @@ export default function PricingProposalDetail() {
     });
   }, [bmUpperTarget, summaryInitialized, teamMembers.length]);
 
-  // Handle user editing hours — auto-rebalance unlocked members
+  // Handle user editing hours — budget buffer model (no rebalancing)
   const handleSummaryHoursChange = useCallback((memberKey: string, newHours: number) => {
     setAssumptions(prev => {
       const hours = { ...(prev.summaryHours || {}) };
-      const locks = prev.summaryLocks || {};
 
-      hours[memberKey] = newHours;
+      // Calculate max allowed: (budget - revenue of all OTHER members) / this member's rate
+      const member = teamMembers.find(m => m.key === memberKey);
+      if (!member) return prev;
+      const eRate = afaRateDiscount ? member.rate * afaRateDiscount : member.rate;
+      if (eRate <= 0) { hours[memberKey] = 0; return { ...prev, summaryHours: hours }; }
 
-      // Revenue from locked + just-edited members
-      const fixedRevenue = teamMembers.reduce((sum, m) => {
-        if (m.key === memberKey || locks[m.key]) {
-          const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
-          return sum + ((hours[m.key] || 0) * eRate);
-        }
-        return sum;
+      const othersRevenue = teamMembers.reduce((sum, m) => {
+        if (m.key === memberKey) return sum;
+        const mRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+        return sum + ((hours[m.key] || 0) * mRate);
       }, 0);
 
-      const remainingTarget = bmUpperTarget - fixedRevenue;
-      const unlocked = teamMembers.filter(m => m.key !== memberKey && !locks[m.key]);
-
-      if (unlocked.length > 0 && remainingTarget > 0) {
-        // Equal revenue share → cheaper members get more hours
-        const revenuePerMember = remainingTarget / unlocked.length;
-        unlocked.forEach(m => {
-          const eRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
-          hours[m.key] = eRate > 0 ? Math.round((revenuePerMember / eRate) * 2) / 2 : 0;
-        });
-      } else if (unlocked.length > 0) {
-        unlocked.forEach(m => { hours[m.key] = 0; });
-      }
+      const maxAllowed = Math.max(0, (bmUpperTarget - othersRevenue) / eRate);
+      const clamped = Math.round(Math.min(Math.max(0, newHours), maxAllowed) * 2) / 2;
+      hours[memberKey] = clamped;
 
       return { ...prev, summaryHours: hours };
     });
   }, [teamMembers, bmUpperTarget, afaRateDiscount]);
-
-  // Toggle lock on a team member
-  const toggleSummaryLock = useCallback((memberKey: string) => {
-    setAssumptions(prev => {
-      const locks = { ...(prev.summaryLocks || {}) };
-      locks[memberKey] = !locks[memberKey];
-      return { ...prev, summaryLocks: locks };
-    });
-  }, []);
 
   // Toggle key player status
   const toggleKeyPlayer = useCallback((memberKey: string) => {

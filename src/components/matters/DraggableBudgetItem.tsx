@@ -193,7 +193,7 @@ export function DraggableBudgetItem({
         </div>
 
         {/* Current (original) value */}
-        <div className="col-span-2 text-right">
+        <div className="text-right min-w-[90px]">
           {originalItem ? (
             <span className="text-muted-foreground text-sm">
               {formatCurrency(originalDisplayFee, displayCurrency)}

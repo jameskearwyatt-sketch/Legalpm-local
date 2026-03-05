@@ -87,6 +87,7 @@ export function DraggableBudgetItem({
   hasOptionalItems,
   isAiSuggested,
   originalItem,
+  settledItem,
   updateLineItemOptional,
   toggleLineItemIncluded,
   updateLineItemCapped,

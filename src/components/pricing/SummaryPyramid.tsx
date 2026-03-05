@@ -183,11 +183,6 @@ function DraggableMemberBlock({
           isSelected && !isDragging && "ring-2 ring-primary/50",
           isDragging && "ring-2 ring-primary shadow-lg",
         )}
-          colors.bg, colors.border,
-          interactive && "cursor-pointer hover:ring-2 hover:ring-primary/30",
-          isSelected && !isDragging && "ring-2 ring-primary/50",
-          isDragging && "ring-2 ring-primary shadow-lg",
-        )}
         style={{ minHeight: 36 }}
         title={`${member.label}: ${formatValue(value)}`}
         onClick={() => interactive && onSelect(member.key)}

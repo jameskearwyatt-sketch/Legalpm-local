@@ -97,6 +97,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [aiSuggestedIndices, setAiSuggestedIndices] = useState<Set<number>>(new Set());
   // Store original values when editing starts for comparison
   const [originalItems, setOriginalItems] = useState<DraftLineItem[]>([]);
+  // Store version 1 (original settled) line items for budget creep visibility
+  const [settledItems, setSettledItems] = useState<DraftLineItem[]>([]);
 
   // Silent update for local counsel billing (no toast)
   const updateLocalCounselBilling = async (value: 'Direct' | 'Disb' | null) => {
@@ -145,6 +147,32 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const { createBulkAssumptions } = useAssumptions(matterId);
 
   const hasExistingBudget = versions.length > 0;
+
+  // Fetch version 1 (original settled) line items for budget creep display
+  useEffect(() => {
+    if (versions.length < 2) {
+      // Only one version or none — no creep to show
+      setSettledItems([]);
+      return;
+    }
+    // versions are sorted descending, so version 1 is the last element
+    const version1 = versions[versions.length - 1];
+    if (!version1) return;
+    
+    fetchLineItems(version1.id).then(items => {
+      setSettledItems(items.map(item => ({
+        id: item.id,
+        work_item: item.work_item,
+        provider: item.provider,
+        fee_amount: item.fee_amount,
+        lc_firm_name: item.lc_firm_name || undefined,
+        category: item.category || undefined,
+      })));
+    }).catch(err => {
+      console.error('Failed to fetch settled items:', err);
+      setSettledItems([]);
+    });
+  }, [versions]);
   
   // Auto-open line items when editing or no budget exists
   useEffect(() => {
@@ -1093,6 +1121,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
               toggleLineItemIncluded={toggleLineItemIncluded}
               updateLineItemCapped={updateLineItemCapped}
               matterId={matterId}
+              settledItems={settledItems}
             />
           </CollapsibleContent>
         </Collapsible>

@@ -76,6 +76,7 @@ interface CategorizedBudgetViewProps {
   toggleLineItemIncluded: any;
   updateLineItemCapped: any;
   matterId: string;
+  settledItems?: DraftLineItem[];
 }
 
 export function CategorizedBudgetView({
@@ -101,6 +102,7 @@ export function CategorizedBudgetView({
   toggleLineItemIncluded,
   updateLineItemCapped,
   matterId,
+  settledItems,
 }: CategorizedBudgetViewProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isCategorizing, setIsCategorizing] = useState(false);
@@ -545,6 +547,7 @@ export function CategorizedBudgetView({
                       hasOptionalItems={hasOptionalItems}
                       isAiSuggested={aiSuggestedIndices.has(globalIndex)}
                       originalItem={originalItems.find(orig => orig.id === item.id)}
+                      settledItem={settledItems?.find(s => s.work_item === item.work_item && s.provider === item.provider)}
                       updateLineItemOptional={updateLineItemOptional}
                       toggleLineItemIncluded={toggleLineItemIncluded}
                       updateLineItemCapped={updateLineItemCapped}
@@ -643,6 +646,7 @@ export function CategorizedBudgetView({
                         hasOptionalItems={hasOptionalItems}
                         isAiSuggested={aiSuggestedIndices.has(globalIndex)}
                         originalItem={originalItems.find(orig => orig.id === item.id)}
+                        settledItem={settledItems?.find(s => s.work_item === item.work_item && s.provider === item.provider)}
                         updateLineItemOptional={updateLineItemOptional}
                         toggleLineItemIncluded={toggleLineItemIncluded}
                         updateLineItemCapped={updateLineItemCapped}

@@ -106,7 +106,8 @@ interface DraggableMemberBlockProps {
   onSelect: (key: string) => void;
   onHoursCommit?: (key: string, hours: number) => void;
   dragHoursOverride: number | null;
-  onDragStart: (key: string, startX: number, startHours: number) => void;
+  dragWidthPx: number | null;
+  onDragStart: (key: string, barEl: HTMLDivElement) => void;
   editingKey: string | null;
   onEditClick: (key: string) => void;
   onEditDone: (key: string, val: number) => void;

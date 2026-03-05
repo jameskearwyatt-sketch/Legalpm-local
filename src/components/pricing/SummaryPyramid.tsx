@@ -294,7 +294,7 @@ function PyramidColumn({
             >
               <div className="flex items-stretch gap-1 justify-center w-full">
                 {tier.members.map((member) => {
-                  const val = getEffectiveValue(member);
+                  const val = getValue(member);
                   const memberPct = tierTotal > 0 ? (val / tierTotal) * 100 : 100 / tier.members.length;
 
                   return (

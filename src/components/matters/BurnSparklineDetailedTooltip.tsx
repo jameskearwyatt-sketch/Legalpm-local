@@ -235,19 +235,40 @@ export function BurnSparklineDetailedTooltip({
     [dataPoints]
   );
 
-  // html-to-image based PNG export — captures the tooltip exactly as rendered
+  // html-to-image based PNG export — clones the tooltip and expands the scrollable table
   const handleDownload = useCallback(async () => {
     if (!tooltipRef.current) return;
     try {
-      const dataUrl = await toPng(tooltipRef.current, {
+      // Clone the node so we can expand the scrollable data table without affecting the UI
+      const clone = tooltipRef.current.cloneNode(true) as HTMLElement;
+      clone.style.position = 'absolute';
+      clone.style.left = '-9999px';
+      clone.style.top = '0';
+      clone.style.maxHeight = 'none';
+      clone.style.overflow = 'visible';
+      
+      // Remove max-height and scroll from the data table container in the clone
+      const scrollContainers = clone.querySelectorAll('.max-h-\\[140px\\]');
+      scrollContainers.forEach(el => {
+        (el as HTMLElement).style.maxHeight = 'none';
+        (el as HTMLElement).style.overflow = 'visible';
+      });
+      // Also catch by overflow-y-auto class
+      const overflowEls = clone.querySelectorAll('.overflow-y-auto');
+      overflowEls.forEach(el => {
+        (el as HTMLElement).style.maxHeight = 'none';
+        (el as HTMLElement).style.overflow = 'visible';
+      });
+
+      document.body.appendChild(clone);
+
+      const dataUrl = await toPng(clone, {
         backgroundColor: '#ffffff',
         pixelRatio: 2,
-        style: {
-          // Ensure the tooltip renders fully for the screenshot
-          maxHeight: 'none',
-          overflow: 'visible',
-        },
       });
+
+      document.body.removeChild(clone);
+
       const link = document.createElement('a');
       const safeName = (matterName || 'wip-chart').replace(/[^a-zA-Z0-9-_ ]/g, '').trim().replace(/\s+/g, '-');
       link.download = `${safeName}-burn-report.png`;

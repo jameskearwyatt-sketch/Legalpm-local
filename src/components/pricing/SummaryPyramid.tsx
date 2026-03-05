@@ -30,6 +30,11 @@ interface SummaryPyramidProps {
   onToggleKeyPlayer?: (key: string) => void;
   levelOverrides?: Record<string, string>;
   onMemberLevelOverride?: (key: string, newLevel: string) => void;
+  memorySlots?: (SummaryMemorySlot | null)[];
+  onSaveMemory?: (slotIndex: number, note?: string) => void;
+  onLoadMemory?: (slotIndex: number) => void;
+  onClearMemory?: (slotIndex: number) => void;
+  onUpdateMemoryNote?: (slotIndex: number, note: string) => void;
 }
 
 export type TierKey = "partner" | "counsel" | "seniorAssociate" | "associate" | "trainee";

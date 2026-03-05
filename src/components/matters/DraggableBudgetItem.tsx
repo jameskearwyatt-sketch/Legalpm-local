@@ -388,7 +388,7 @@ export function DraggableBudgetItem({
             )}>
               {formatCurrency(displayAmount, displayCurrency)}
             </div>
-            {settledItem && Math.abs(displayAmount - settledItem.fee_amount) > 0.01 && (
+            {settledItem && settledItem.fee_amount > 0 && Math.abs(displayAmount - settledItem.fee_amount) / settledItem.fee_amount > 0.02 && (
               <div className="text-[10px] italic text-muted-foreground/70">
                 Originally: {formatCurrency(settledItem.fee_amount, displayCurrency)}
               </div>

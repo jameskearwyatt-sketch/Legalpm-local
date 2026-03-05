@@ -10,6 +10,7 @@ interface MatterInfo {
   matter_name: string;
   matter_number: string;
   client_name: string;
+  cm_number?: string;
   currency: string;
   current_wip: number;
   current_wip_write_off: number;

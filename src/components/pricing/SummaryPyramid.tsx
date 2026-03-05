@@ -116,7 +116,7 @@ interface DraggableMemberBlockProps {
 function DraggableMemberBlock({
   member, tierKey, widthPct, formatValue, value,
   interactive, isSelected, onSelect, onHoursCommit,
-  dragHoursOverride, onDragStart,
+  dragHoursOverride, dragWidthPx, onDragStart,
   editingKey, onEditClick, onEditDone,
 }: DraggableMemberBlockProps) {
   const colors = TIER_COLORS[tierKey];
@@ -125,6 +125,7 @@ function DraggableMemberBlock({
   const isDragging = dragHoursOverride !== null;
   const [editVal, setEditVal] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
   const isEditing = editingKey === member.key;
 
   useEffect(() => {
@@ -137,13 +138,12 @@ function DraggableMemberBlock({
   const handleHandleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    onDragStart(member.key, e.clientX, member.hours);
+    if (barRef.current) onDragStart(member.key, barRef.current);
   };
 
   const handleHandleTouchStart = (e: React.TouchEvent) => {
     e.stopPropagation();
-    const touch = e.touches[0];
-    onDragStart(member.key, touch.clientX, member.hours);
+    if (barRef.current) onDragStart(member.key, barRef.current);
   };
 
   const handleValueClick = (e: React.MouseEvent) => {
@@ -162,16 +162,10 @@ function DraggableMemberBlock({
     }
   };
 
-  // During drag, scale the wrapper width proportionally without affecting siblings
-  const dragScale = isDragging && member.hours > 0
-    ? dragHoursOverride! / member.hours
-    : 1;
-  const wrapperStyle: React.CSSProperties = {
-    width: `${widthPct}%`,
-    minWidth: 40,
-    // During drag, override flex sizing to grow/shrink this bar only
-    ...(isDragging ? { flex: `0 0 ${widthPct * dragScale}%`, width: `${widthPct * dragScale}%` } : {}),
-  };
+  // During drag, use absolute pixel width; otherwise percentage
+  const wrapperStyle: React.CSSProperties = isDragging && dragWidthPx !== null
+    ? { width: dragWidthPx, minWidth: 20, flex: 'none' }
+    : { width: `${widthPct}%`, minWidth: 40 };
 
   return (
     <div className="flex flex-col min-w-0" style={wrapperStyle}>

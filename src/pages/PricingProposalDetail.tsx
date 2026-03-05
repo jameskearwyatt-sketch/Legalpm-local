@@ -209,12 +209,12 @@ export default function PricingProposalDetail() {
   useEffect(() => {
     if (proposal) {
       setRateCard(proposal.rate_card || DEFAULT_RATE_CARD);
-      // Sync assumptions from DB, but preserve locally-managed summaryHours/summaryLocks
+      // Sync assumptions from DB, but preserve locally-managed summaryHours
       // once they've been initialized (to prevent refetch from overwriting scaled hours)
       setAssumptions(prev => {
         const incoming = proposal.assumptions || DEFAULT_ASSUMPTIONS;
         if (summaryInitialized) {
-          return { ...incoming, summaryHours: prev.summaryHours, summaryLocks: prev.summaryLocks };
+          return { ...incoming, summaryHours: prev.summaryHours };
         }
         return incoming;
       });

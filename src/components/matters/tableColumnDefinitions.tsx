@@ -392,7 +392,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
             ar_write_off_amount: proposal?.ar_write_off_amount || 0,
           } : null}
           rawBurn={rawBurn}
-          matterName={ctx.matter.name}
+          matterName={ctx.matter.matter_name}
         />
       );
     },

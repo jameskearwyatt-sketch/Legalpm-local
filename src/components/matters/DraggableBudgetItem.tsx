@@ -238,7 +238,7 @@ export function DraggableBudgetItem({
 
         {/* Additional Scope toggle in editing mode */}
         {onToggleAdditionalScope && (
-          <div className="col-span-1 flex items-center justify-center">
+          <div className="flex items-center justify-center">
             <div className="flex items-center gap-1">
               <Checkbox
                 id={`addl-scope-edit-${index}`}

@@ -2789,23 +2789,21 @@ export default function PricingProposalDetail() {
               onToggleKeyPlayer={toggleKeyPlayer}
             />
 
-            {/* Fixed-height container — never shifts layout */}
+            {/* Budget buffer indicator */}
             <div className="min-h-[52px]">
-              <Alert className={cn(
-                "border transition-opacity duration-200",
-                Math.abs(summary.delta) < 100 && "opacity-0 pointer-events-none",
-                summary.delta > 0
-                  ? "border-amber-500 bg-amber-50 dark:bg-amber-950/20"
-                  : "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
-              )}>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  {summary.delta > 0
-                    ? `Revenue exceeds upper estimate by ${formatCurrency(summary.delta)}. Reduce hours or unlock team members to rebalance.`
-                    : `Revenue is ${formatCurrency(Math.abs(summary.delta))} below upper estimate. Add hours to unlocked team members.`
-                  }
-                </AlertDescription>
-              </Alert>
+              {Math.abs(summary.delta) < 100 ? (
+                <Alert className="border border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20 transition-opacity duration-200">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>Fully allocated</AlertDescription>
+                </Alert>
+              ) : summary.delta < 0 ? (
+                <Alert className="border border-blue-500 bg-blue-50 dark:bg-blue-950/20 transition-opacity duration-200">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Unallocated: {formatCurrency(Math.abs(summary.delta))} remaining — increase hours on any team member to allocate.
+                  </AlertDescription>
+                </Alert>
+              ) : null}
             </div>
 
             <Card>

@@ -27,76 +27,110 @@ interface SummaryPyramidProps {
   onMemberHoursCommit?: (key: string, hours: number) => void;
   keyPlayers?: Record<string, number>;
   onToggleKeyPlayer?: (key: string) => void;
+  levelOverrides?: Record<string, string>;
+  onMemberLevelOverride?: (key: string, newLevel: string) => void;
 }
 
-type TierKey = "partners" | "senior" | "associates" | "juniors";
+export type TierKey = "partner" | "counsel" | "seniorAssociate" | "associate" | "trainee";
+
+interface TierMember extends TeamMember {
+  homeTierKey: TierKey;
+}
 
 interface Tier {
   key: TierKey;
   label: string;
   emptyLabel: string;
-  members: TeamMember[];
+  members: TierMember[];
 }
 
-const TIER_COLORS: Record<TierKey, { bg: string; border: string; text: string }> = {
-  partners: {
+const TIER_ORDER: TierKey[] = ["partner", "counsel", "seniorAssociate", "associate", "trainee"];
+
+const TIER_COLORS: Record<TierKey, { bg: string; border: string; text: string; labelText: string }> = {
+  partner: {
     bg: "bg-indigo-100 dark:bg-indigo-900/30",
     border: "border-indigo-200 dark:border-indigo-800/50",
     text: "text-indigo-700 dark:text-indigo-300",
+    labelText: "text-indigo-600 dark:text-indigo-400",
   },
-  senior: {
+  counsel: {
     bg: "bg-violet-100 dark:bg-violet-900/30",
     border: "border-violet-200 dark:border-violet-800/50",
     text: "text-violet-700 dark:text-violet-300",
+    labelText: "text-violet-600 dark:text-violet-400",
   },
-  associates: {
+  seniorAssociate: {
+    bg: "bg-purple-100 dark:bg-purple-900/30",
+    border: "border-purple-200 dark:border-purple-800/50",
+    text: "text-purple-700 dark:text-purple-300",
+    labelText: "text-purple-600 dark:text-purple-400",
+  },
+  associate: {
     bg: "bg-sky-100 dark:bg-sky-900/30",
     border: "border-sky-200 dark:border-sky-800/50",
     text: "text-sky-700 dark:text-sky-300",
+    labelText: "text-sky-600 dark:text-sky-400",
   },
-  juniors: {
+  trainee: {
     bg: "bg-emerald-100 dark:bg-emerald-900/30",
     border: "border-emerald-200 dark:border-emerald-800/50",
     text: "text-emerald-700 dark:text-emerald-300",
+    labelText: "text-emerald-600 dark:text-emerald-400",
   },
+};
+
+const TIER_LABELS: Record<TierKey, string> = {
+  partner: "Partner",
+  counsel: "Counsel",
+  seniorAssociate: "Senior Associate",
+  associate: "Associate",
+  trainee: "Trainee",
 };
 
 export function classifyTier(member: { key: string; level?: string }): TierKey {
   if (member.level) {
     const lvl = member.level.toLowerCase();
-    if (lvl === "partner") return "partners";
-    if (lvl === "counsel" || lvl === "seniorassociate") return "senior";
-    if (lvl === "associate") return "associates";
-    if (lvl === "trainee") return "juniors";
+    if (lvl === "partner") return "partner";
+    if (lvl === "counsel") return "counsel";
+    if (lvl === "seniorassociate" || lvl === "senior associate") return "seniorAssociate";
+    if (lvl === "associate") return "associate";
+    if (lvl === "trainee") return "trainee";
   }
   const k = member.key.toLowerCase();
-  if (k.includes("partner")) return "partners";
-  if (k.includes("counsel") || k.includes("seniorassociate") || k.includes("senior_associate") || k.includes("senior associate"))
-    return "senior";
-  if (k.includes("associate")) return "associates";
-  return "juniors";
+  if (k.includes("partner")) return "partner";
+  if (k.includes("counsel")) return "counsel";
+  if (k.includes("seniorassociate") || k.includes("senior_associate") || k.includes("senior associate")) return "seniorAssociate";
+  if (k.includes("associate")) return "associate";
+  return "trainee";
 }
 
-function buildTiers(members: TeamMember[]): Tier[] {
-  const groups: Record<TierKey, TeamMember[]> = {
-    partners: [],
-    senior: [],
-    associates: [],
-    juniors: [],
+function buildTiers(members: TeamMember[], levelOverrides?: Record<string, string>): Tier[] {
+  const groups: Record<TierKey, TierMember[]> = {
+    partner: [],
+    counsel: [],
+    seniorAssociate: [],
+    associate: [],
+    trainee: [],
   };
-  members.forEach((m) => groups[classifyTier(m)].push(m));
 
-  return [
-    { key: "partners", label: "Partners", emptyLabel: "No Partners", members: groups.partners },
-    { key: "senior", label: "Counsel / Sr. Associates", emptyLabel: "No Counsel / Sr. Associates", members: groups.senior },
-    { key: "associates", label: "Associates", emptyLabel: "No Associates", members: groups.associates },
-    { key: "juniors", label: "Trainees / Juniors", emptyLabel: "No Trainees / Juniors", members: groups.juniors },
-  ];
+  members.forEach((m) => {
+    const homeTier = classifyTier(m);
+    const displayTier = (levelOverrides?.[m.key] as TierKey) || homeTier;
+    const validTier = TIER_ORDER.includes(displayTier) ? displayTier : homeTier;
+    groups[validTier].push({ ...m, homeTierKey: homeTier });
+  });
+
+  return TIER_ORDER.map(key => ({
+    key,
+    label: TIER_LABELS[key],
+    emptyLabel: `No ${TIER_LABELS[key]}s`,
+    members: groups[key],
+  }));
 }
 
 /* ─── Draggable Member Block ─── */
 interface DraggableMemberBlockProps {
-  member: TeamMember;
+  member: TierMember;
   tierKey: TierKey;
   widthPct: number;
   formatValue: (v: number) => string;
@@ -111,6 +145,7 @@ interface DraggableMemberBlockProps {
   editingKey: string | null;
   onEditClick: (key: string) => void;
   onEditDone: (key: string, val: number) => void;
+  onVerticalDragStart?: (key: string) => void;
 }
 
 function DraggableMemberBlock({
@@ -118,8 +153,11 @@ function DraggableMemberBlock({
   interactive, isSelected, onSelect, onHoursCommit,
   dragHoursOverride, dragWidthPx, onDragStart,
   editingKey, onEditClick, onEditDone,
+  onVerticalDragStart,
 }: DraggableMemberBlockProps) {
-  const colors = TIER_COLORS[tierKey];
+  // Always use HOME tier colors, not the row they're in
+  const colors = TIER_COLORS[member.homeTierKey];
+  const isRelocated = member.homeTierKey !== tierKey;
   const displayHours = dragHoursOverride !== null ? dragHoursOverride : member.hours;
   const displayValue = dragHoursOverride !== null ? dragHoursOverride : value;
   const isDragging = dragHoursOverride !== null;
@@ -162,6 +200,13 @@ function DraggableMemberBlock({
     }
   };
 
+  // Native drag for vertical reorder between tiers
+  const handleNativeDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData("text/plain", member.key);
+    e.dataTransfer.effectAllowed = "move";
+    onVerticalDragStart?.(member.key);
+  };
+
   // During drag, use absolute pixel width; otherwise percentage
   const wrapperStyle: React.CSSProperties = isDragging && dragWidthPx !== null
     ? { width: dragWidthPx, minWidth: 20, flex: 'none' }
@@ -170,16 +215,19 @@ function DraggableMemberBlock({
   return (
     <div className="flex flex-col min-w-0" style={wrapperStyle} ref={barRef}>
       <div
+        draggable={interactive}
+        onDragStart={handleNativeDragStart}
         className={cn(
           "rounded-xl border flex items-center justify-between py-1.5 px-1.5 min-w-0 overflow-hidden relative group",
           isDragging ? "transition-none" : "transition-all duration-300",
           colors.bg, colors.border,
-          interactive && "cursor-pointer hover:ring-2 hover:ring-primary/30",
+          interactive && "cursor-grab hover:ring-2 hover:ring-primary/30",
           isSelected && !isDragging && "ring-2 ring-primary/50",
           isDragging && "ring-2 ring-primary shadow-lg",
+          isRelocated && "ring-1 ring-offset-1 ring-muted-foreground/30",
         )}
         style={{ minHeight: 36 }}
-        title={`${member.label}: ${formatValue(value)}`}
+        title={`${member.label}: ${formatValue(value)}${isRelocated ? ` (home: ${TIER_LABELS[member.homeTierKey]})` : ''}`}
         onClick={() => interactive && onSelect(member.key)}
       >
         {/* Content */}
@@ -217,7 +265,7 @@ function DraggableMemberBlock({
           )}
         </div>
 
-        {/* Drag handle — visible on hover/selected for interactive blocks */}
+        {/* Drag handle — visible on hover for interactive blocks */}
         {interactive && !isEditing && (
           <div
             className="flex items-center justify-center w-4 h-full cursor-col-resize shrink-0 opacity-60 hover:opacity-100 transition-opacity touch-none"
@@ -237,7 +285,7 @@ function DraggableMemberBlock({
 interface PyramidColumnProps {
   title: string;
   tiers: Tier[];
-  getValue: (m: TeamMember) => number;
+  getValue: (m: TierMember) => number;
   formatValue: (v: number) => string;
   total: number;
   interactive?: boolean;
@@ -250,6 +298,7 @@ interface PyramidColumnProps {
   editingKey: string | null;
   onEditClick: (key: string) => void;
   onEditDone: (key: string, val: number) => void;
+  onMemberLevelOverride?: (key: string, newLevel: string) => void;
 }
 
 function PyramidColumn({
@@ -258,73 +307,110 @@ function PyramidColumn({
   onHoursCommit, formatHours,
   dragState, onDragStart,
   editingKey, onEditClick, onEditDone,
+  onMemberLevelOverride,
 }: PyramidColumnProps) {
-  const isDragging = !!dragState;
+  const [dragOverTier, setDragOverTier] = useState<TierKey | null>(null);
+  const [verticalDragKey, setVerticalDragKey] = useState<string | null>(null);
 
   const tierTotals = tiers.map((t) =>
     t.members.reduce((s, m) => s + getValue(m), 0)
   );
   const maxTierTotal = Math.max(...tierTotals, 1);
 
+  const handleDragOver = (e: React.DragEvent, tierKey: TierKey) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    setDragOverTier(tierKey);
+  };
+
+  const handleDragLeave = () => {
+    setDragOverTier(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, tierKey: TierKey) => {
+    e.preventDefault();
+    const memberKey = e.dataTransfer.getData("text/plain");
+    if (memberKey && onMemberLevelOverride) {
+      onMemberLevelOverride(memberKey, tierKey);
+    }
+    setDragOverTier(null);
+    setVerticalDragKey(null);
+  };
+
   return (
     <div className="flex-1 min-w-0">
       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 text-center">
         {title}
       </p>
-      <div className="flex flex-col items-center gap-1.5">
+      <div className="flex flex-col items-stretch gap-1.5">
         {tiers.map((tier, i) => {
           const tierTotal = tierTotals[i];
           const colors = TIER_COLORS[tier.key];
           const widthPct = total > 0 ? Math.max(20, (tierTotal / maxTierTotal) * 100) : 20;
-
-          if (tier.members.length === 0) {
-            return (
-              <div
-                key={tier.key}
-                className="flex items-center justify-center transition-all duration-500"
-                style={{ width: `${20}%`, minHeight: 36 }}
-              >
-                <div className="w-full rounded-xl border-2 border-dashed flex items-center justify-center py-1.5 px-2 border-muted-foreground/20">
-                  <span className="text-[10px] text-muted-foreground/50 whitespace-nowrap">
-                    {tier.emptyLabel}
-                  </span>
-                </div>
-              </div>
-            );
-          }
+          const isDropTarget = dragOverTier === tier.key;
 
           return (
             <div
               key={tier.key}
-              className="flex flex-col items-center gap-1 transition-all duration-300"
-              style={{ width: `${widthPct}%` }}
+              className={cn(
+                "flex items-center gap-2 transition-all duration-200 rounded-lg px-1 py-0.5",
+                isDropTarget && "bg-primary/10 ring-2 ring-primary/40 ring-dashed",
+              )}
+              onDragOver={(e) => interactive && handleDragOver(e, tier.key)}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => interactive && handleDrop(e, tier.key)}
             >
-              <div className="flex items-stretch gap-1 justify-center w-full">
-                {tier.members.map((member) => {
-                  const val = getValue(member);
-                  const memberPct = tierTotal > 0 ? (val / tierTotal) * 100 : 100 / tier.members.length;
+              {/* Level label */}
+              <span className={cn("text-[10px] font-semibold w-16 shrink-0 text-right leading-tight", colors.labelText)}>
+                {tier.label}
+              </span>
 
-                  return (
-                    <DraggableMemberBlock
-                      key={member.key}
-                      member={member}
-                      tierKey={tier.key}
-                      widthPct={memberPct}
-                      formatValue={formatValue}
-                      value={val}
-                      interactive={!!interactive}
-                      isSelected={selectedMember === member.key}
-                      onSelect={(k) => onMemberClick?.(k)}
-                      onHoursCommit={onHoursCommit}
-                      dragHoursOverride={dragState?.key === member.key ? dragState.hours : null}
-                      dragWidthPx={dragState?.key === member.key ? dragState.widthPx : null}
-                      onDragStart={onDragStart}
-                      editingKey={editingKey}
-                      onEditClick={onEditClick}
-                      onEditDone={onEditDone}
-                    />
-                  );
-                })}
+              {/* Member blocks or empty placeholder */}
+              <div className="flex-1 min-w-0 flex justify-center">
+                {tier.members.length === 0 ? (
+                  <div
+                    className="w-full transition-all duration-500"
+                    style={{ maxWidth: `${20}%` }}
+                  >
+                    <div className="w-full rounded-xl border-2 border-dashed flex items-center justify-center py-1.5 px-2 border-muted-foreground/20" style={{ minHeight: 36 }}>
+                      <span className="text-[10px] text-muted-foreground/50 whitespace-nowrap">
+                        {tier.emptyLabel}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div
+                    className="flex items-stretch gap-1 justify-center transition-all duration-300"
+                    style={{ width: `${widthPct}%` }}
+                  >
+                    {tier.members.map((member) => {
+                      const val = getValue(member);
+                      const memberPct = tierTotal > 0 ? (val / tierTotal) * 100 : 100 / tier.members.length;
+
+                      return (
+                        <DraggableMemberBlock
+                          key={member.key}
+                          member={member}
+                          tierKey={tier.key}
+                          widthPct={memberPct}
+                          formatValue={formatValue}
+                          value={val}
+                          interactive={!!interactive}
+                          isSelected={selectedMember === member.key}
+                          onSelect={(k) => onMemberClick?.(k)}
+                          onHoursCommit={onHoursCommit}
+                          dragHoursOverride={dragState?.key === member.key ? dragState.hours : null}
+                          dragWidthPx={dragState?.key === member.key ? dragState.widthPx : null}
+                          onDragStart={onDragStart}
+                          editingKey={editingKey}
+                          onEditClick={onEditClick}
+                          onEditDone={onEditDone}
+                          onVerticalDragStart={setVerticalDragKey}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -409,6 +495,8 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
   onMemberHoursCommit,
   keyPlayers = {},
   onToggleKeyPlayer,
+  levelOverrides = {},
+  onMemberLevelOverride,
 }: SummaryPyramidProps) {
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [activePreset, setActivePreset] = useState<DistributionPreset | null>(null);
@@ -422,9 +510,7 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
     startWidth: number;
     startHours: number;
     maxHours: number;
-    // px per hour: how many pixels correspond to one hour
     pxPerHour: number;
-    // max width the bar can reach (based on maxHours)
     maxWidthPx: number;
   } | null>(null);
   const pyramidContainerRef = useRef<HTMLDivElement>(null);
@@ -437,7 +523,6 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
     const barLeftEdge = rect.left;
     const startHours = member.hours;
     const maxHours = member.maxHours || 500;
-    // Calculate px per hour from current bar width
     const pxPerHour = startHours > 0 ? startWidth / startHours : startWidth / 1;
     const maxWidthPx = pxPerHour * maxHours;
 
@@ -457,7 +542,6 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
     const handleMouseMove = (e: MouseEvent) => {
       if (!dragRef.current) return;
       const { barLeftEdge, maxHours, pxPerHour, maxWidthPx } = dragRef.current;
-      // Right edge of bar = cursor X position
       const desiredWidth = Math.max(20, Math.min(e.clientX - barLeftEdge, maxWidthPx));
       const newHours = Math.min(Math.max(0, desiredWidth / pxPerHour), maxHours);
       setDragState({ key: dragRef.current.key, hours: newHours, widthPx: desiredWidth });
@@ -513,7 +597,7 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
 
   if (teamMembers.length === 0) return null;
 
-  const tiers = buildTiers(teamMembers);
+  const tiers = buildTiers(teamMembers, levelOverrides);
   const totalHours = teamMembers.reduce((s, m) => s + m.hours, 0);
   const totalRevenue = teamMembers.reduce((s, m) => s + m.revenue, 0);
   const interactive = !!onMemberHoursCommit;
@@ -585,10 +669,10 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
           </div>
         )}
 
-        {/* Hint for drag interaction */}
+        {/* Hint */}
         {interactive && (
           <p className="text-[10px] text-muted-foreground/70 text-center">
-            Click a member, then drag the ⋮⋮ handle to resize — or click the hours value to type
+            Drag ⋮⋮ handle to resize hours · Drag a block up/down to move between levels · Click hours to type
           </p>
         )}
 
@@ -610,6 +694,7 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
             editingKey={editingKey}
             onEditClick={handleEditClick}
             onEditDone={handleEditDone}
+            onMemberLevelOverride={onMemberLevelOverride}
           />
           <div className="hidden sm:block w-px bg-border" />
           <PyramidColumn

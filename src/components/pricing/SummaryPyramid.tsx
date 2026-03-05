@@ -312,14 +312,14 @@ interface PyramidColumnProps {
 }
 
 function PyramidColumn({
-  title, tiers, getValue, formatValue, total,
+  title, tiers, benchedMembers, getValue, formatValue, total,
   interactive, selectedMember, onMemberClick,
   onHoursCommit, formatHours,
   dragState, onDragStart,
   editingKey, onEditClick, onEditDone,
-  onMemberLevelOverride,
+  onMemberLevelOverride, onBenchMember,
 }: PyramidColumnProps) {
-  const [dragOverTier, setDragOverTier] = useState<TierKey | null>(null);
+  const [dragOverTier, setDragOverTier] = useState<TierKey | "bench" | null>(null);
   const [verticalDragKey, setVerticalDragKey] = useState<string | null>(null);
 
   const tierTotals = tiers.map((t) =>

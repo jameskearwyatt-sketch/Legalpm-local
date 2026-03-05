@@ -788,9 +788,8 @@ export default function PricingProposalDetail() {
 
     setAssumptions(prev => {
       const updated = { ...(prev.summaryHours || {}) };
-      const updatedLocks = { ...(prev.summaryLocks || {}) };
 
-      removedKeys.forEach(k => { delete updated[k]; delete updatedLocks[k]; });
+      removedKeys.forEach(k => { delete updated[k]; });
 
       if (newMembers.length > 0) {
         const existingRevenue = Object.entries(updated).reduce((sum, [key, hours]) => {
@@ -806,7 +805,7 @@ export default function PricingProposalDetail() {
         });
       }
 
-      return { ...prev, summaryHours: updated, summaryLocks: updatedLocks };
+      return { ...prev, summaryHours: updated };
     });
   }, [teamMembers, summaryInitialized, summaryHours, bmUpperTarget]);
 

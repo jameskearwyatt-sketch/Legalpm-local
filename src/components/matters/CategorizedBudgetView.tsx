@@ -76,6 +76,7 @@ interface CategorizedBudgetViewProps {
   toggleLineItemIncluded: any;
   updateLineItemCapped: any;
   matterId: string;
+  settledItems?: DraftLineItem[];
 }
 
 export function CategorizedBudgetView({

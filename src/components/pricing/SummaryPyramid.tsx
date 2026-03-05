@@ -414,40 +414,53 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
   const [activePreset, setActivePreset] = useState<DistributionPreset | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
 
-  // Drag state
-  const [dragState, setDragState] = useState<{ key: string; hours: number } | null>(null);
+  // Drag state: tracks hours and pixel width for the bar being dragged
+  const [dragState, setDragState] = useState<{ key: string; hours: number; widthPx: number } | null>(null);
   const dragRef = useRef<{
     key: string;
-    startX: number;
+    barLeftEdge: number;
+    startWidth: number;
     startHours: number;
     maxHours: number;
-    containerWidth: number;
+    // px per hour: how many pixels correspond to one hour
+    pxPerHour: number;
+    // max width the bar can reach (based on maxHours)
+    maxWidthPx: number;
   } | null>(null);
   const pyramidContainerRef = useRef<HTMLDivElement>(null);
 
-  const handleDragStart = useCallback((key: string, startX: number, startHours: number) => {
+  const handleDragStart = useCallback((key: string, barEl: HTMLDivElement) => {
     const member = teamMembers.find(m => m.key === key);
     if (!member) return;
-    const containerWidth = pyramidContainerRef.current?.offsetWidth || 400;
+    const rect = barEl.getBoundingClientRect();
+    const startWidth = rect.width;
+    const barLeftEdge = rect.left;
+    const startHours = member.hours;
+    const maxHours = member.maxHours || 500;
+    // Calculate px per hour from current bar width
+    const pxPerHour = startHours > 0 ? startWidth / startHours : startWidth / 1;
+    const maxWidthPx = pxPerHour * maxHours;
+
     dragRef.current = {
       key,
-      startX,
+      barLeftEdge,
+      startWidth,
       startHours,
-      maxHours: member.maxHours || 500,
-      containerWidth,
+      maxHours,
+      pxPerHour,
+      maxWidthPx,
     };
-    setDragState({ key, hours: startHours });
+    setDragState({ key, hours: startHours, widthPx: startWidth });
   }, [teamMembers]);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!dragRef.current) return;
-      const { startX, startHours, maxHours, containerWidth } = dragRef.current;
-      const deltaX = e.clientX - startX;
-      const sensitivity = 3;
-      const hourDelta = (deltaX / containerWidth) * maxHours * sensitivity;
-      const newHours = Math.min(Math.max(0, startHours + hourDelta), maxHours);
-      setDragState({ key: dragRef.current.key, hours: newHours });
+      const { barLeftEdge, maxHours, pxPerHour, maxWidthPx } = dragRef.current;
+      // Right edge of bar = cursor X position
+      const desiredWidth = Math.max(20, Math.min(e.clientX - barLeftEdge, maxWidthPx));
+      const newHours = Math.min(Math.max(0, desiredWidth / pxPerHour), maxHours);
+      setDragState({ key: dragRef.current.key, hours: newHours, widthPx: desiredWidth });
     };
 
     const handleMouseUp = () => {
@@ -466,12 +479,10 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
     const handleTouchMove = (e: TouchEvent) => {
       if (!dragRef.current) return;
       const touch = e.touches[0];
-      const { startX, startHours, maxHours, containerWidth } = dragRef.current;
-      const deltaX = touch.clientX - startX;
-      const sensitivity = 3;
-      const hourDelta = (deltaX / containerWidth) * maxHours * sensitivity;
-      const newHours = Math.min(Math.max(0, startHours + hourDelta), maxHours);
-      setDragState({ key: dragRef.current.key, hours: newHours });
+      const { barLeftEdge, maxHours, pxPerHour, maxWidthPx } = dragRef.current;
+      const desiredWidth = Math.max(20, Math.min(touch.clientX - barLeftEdge, maxWidthPx));
+      const newHours = Math.min(Math.max(0, desiredWidth / pxPerHour), maxHours);
+      setDragState({ key: dragRef.current.key, hours: newHours, widthPx: desiredWidth });
     };
 
     const handleTouchEnd = () => {

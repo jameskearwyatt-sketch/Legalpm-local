@@ -155,7 +155,7 @@ export function DraggableBudgetItem({
         </div>
 
         {/* Provider */}
-        <div className="col-span-2 flex gap-1">
+        <div className="flex gap-1 min-w-[140px]">
           <Select
             value={item.provider}
             onValueChange={(v) => {

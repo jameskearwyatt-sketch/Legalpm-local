@@ -1,11 +1,12 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2 } from 'lucide-react';
+import { GripVertical, Trash2, Layers } from 'lucide-react';
 import { DraftLineItem, BUDGET_CATEGORIES } from '@/lib/hooks/useBudgetVersions';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,

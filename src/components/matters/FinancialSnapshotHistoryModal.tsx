@@ -86,8 +86,9 @@ export function FinancialSnapshotHistoryModal({
           ) : (
             <div className="space-y-3">
               {sortedSnapshots.map((snapshot, index) => {
-                // For snapshots, wip_amount IS already NET - write-off is tracked separately for realization
+                // wip_amount IS already NET - write-off is tracked separately for realization
                 const netWip = snapshot.wip_amount;
+                const rawWip = netWip + (snapshot.wip_write_off_amount || 0);
                 const isLatest = index === 0;
                 
                 return (

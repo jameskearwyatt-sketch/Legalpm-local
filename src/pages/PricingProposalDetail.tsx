@@ -931,6 +931,22 @@ export default function PricingProposalDetail() {
   }, [teamMembers]);
 
   const summaryLevelOverrides = assumptions.summaryLevelOverrides || {};
+  const summaryBenchedMembers = assumptions.summaryBenchedMembers || [];
+
+  const handleBenchMember = useCallback((memberKey: string, benched: boolean) => {
+    setAssumptions(prev => {
+      const current = prev.summaryBenchedMembers || [];
+      const hours = { ...(prev.summaryHours || {}) };
+      if (benched) {
+        if (current.includes(memberKey)) return prev;
+        hours[memberKey] = 0;
+        return { ...prev, summaryBenchedMembers: [...current, memberKey], summaryHours: hours };
+      } else {
+        return { ...prev, summaryBenchedMembers: current.filter(k => k !== memberKey) };
+      }
+    });
+  }, []);
+
   const summaryMemorySlots: (SummaryMemorySlot | null)[] = assumptions.summaryMemorySlots
     ? [assumptions.summaryMemorySlots[0] ?? null, assumptions.summaryMemorySlots[1] ?? null, assumptions.summaryMemorySlots[2] ?? null]
     : [null, null, null];

@@ -123,6 +123,7 @@ function calculateMatchScore(
   const normImportedName = normalizeString(importedName);
   const normImportedClient = normalizeString(importedClientName);
   const normMatterNum = normalizeString(matter.matter_number);
+  const normCmNumber = matter.cm_number ? normalizeString(matter.cm_number) : '';
   const normMatterName = normalizeString(matter.matter_name);
   const normClientName = normalizeString(matter.client_name);
 
@@ -131,8 +132,15 @@ function calculateMatchScore(
   let clientNameScore = 0;
 
   // Exact matter number match = very high confidence
+  // Also check against cm_number (the firm's internal reference number)
   if (normImportedNum && normMatterNum && normImportedNum === normMatterNum) {
     matterNumberScore = 100;
+  } else if (normImportedNum && normCmNumber && normImportedNum === normCmNumber) {
+    // C/M number exact match — same confidence as matter number match
+    matterNumberScore = 100;
+  } else if (normImportedNum && normCmNumber && (normCmNumber.includes(normImportedNum) || normImportedNum.includes(normCmNumber))) {
+    // Partial C/M number match
+    matterNumberScore = 60;
   } else if (normImportedNum && normMatterNum && normMatterNum.includes(normImportedNum)) {
     matterNumberScore = 60;
   } else if (normImportedNum && normMatterNum && normImportedNum.includes(normMatterNum)) {

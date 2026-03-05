@@ -327,7 +327,7 @@ function PyramidColumn({
   );
   const maxTierTotal = Math.max(...tierTotals, 1);
 
-  const handleDragOver = (e: React.DragEvent, tierKey: TierKey) => {
+  const handleDragOver = (e: React.DragEvent, tierKey: TierKey | "bench") => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     setDragOverTier(tierKey);
@@ -337,11 +337,17 @@ function PyramidColumn({
     setDragOverTier(null);
   };
 
-  const handleDrop = (e: React.DragEvent, tierKey: TierKey) => {
+  const handleDrop = (e: React.DragEvent, tierKey: TierKey | "bench") => {
     e.preventDefault();
     const memberKey = e.dataTransfer.getData("text/plain");
-    if (memberKey && onMemberLevelOverride) {
-      onMemberLevelOverride(memberKey, tierKey);
+    if (memberKey) {
+      if (tierKey === "bench") {
+        onBenchMember?.(memberKey, true);
+      } else {
+        // If member was benched, unbench them first
+        onBenchMember?.(memberKey, false);
+        onMemberLevelOverride?.(memberKey, tierKey);
+      }
     }
     setDragOverTier(null);
     setVerticalDragKey(null);

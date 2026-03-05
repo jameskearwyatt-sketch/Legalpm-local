@@ -739,7 +739,6 @@ export default function PricingProposalDetail() {
 
   // Summary state derived from assumptions
   const summaryHours = assumptions.summaryHours || {};
-  const summaryLocks = assumptions.summaryLocks || {};
 
   // BM upper estimate target
   const bmUpperTarget = useMemo(() => {

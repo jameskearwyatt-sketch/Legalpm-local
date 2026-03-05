@@ -197,9 +197,16 @@ export function DraggableBudgetItem({
         {/* Current (original) value */}
         <div className="text-right min-w-[90px]">
           {originalItem ? (
-            <span className="text-muted-foreground text-sm">
-              {formatCurrency(originalDisplayFee, displayCurrency)}
-            </span>
+            <div>
+              <span className="text-muted-foreground text-sm">
+                {formatCurrency(originalDisplayFee, displayCurrency)}
+              </span>
+              {settledItem && Math.abs(originalDisplayFee - settledItem.fee_amount) > 0.01 && (
+                <div className="text-[10px] italic text-muted-foreground/70">
+                  Originally: {formatCurrency(settledItem.fee_amount, displayCurrency)}
+                </div>
+              )}
+            </div>
           ) : (
             <span className="text-xs text-green-600 dark:text-green-400 italic">NEW</span>
           )}

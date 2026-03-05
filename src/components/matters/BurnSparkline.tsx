@@ -33,8 +33,8 @@ interface BurnSparklineProps {
   hasActiveProposal?: boolean;
   /** The proposal data with write-off amounts */
   proposalData?: ProposalData | null;
-  /** The raw burn amount before proposal adjustments */
   rawBurn?: number;
+  matterName?: string;
 }
 
 interface DataPoint {

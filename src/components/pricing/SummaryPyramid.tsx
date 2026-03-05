@@ -1,6 +1,6 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Triangle, Minus, Star, Zap } from "lucide-react";
+import { Triangle, Minus, Star, Zap, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -94,55 +94,134 @@ function buildTiers(members: TeamMember[]): Tier[] {
   ];
 }
 
-/* ─── Expanded inline editor for a member block ─── */
-interface MemberEditorProps {
+/* ─── Draggable Member Block ─── */
+interface DraggableMemberBlockProps {
   member: TeamMember;
-  onHoursCommit: (key: string, hours: number) => void;
-  formatHours: (v: number) => string;
+  tierKey: TierKey;
+  widthPct: number;
+  formatValue: (v: number) => string;
+  value: number;
+  interactive: boolean;
+  isSelected: boolean;
+  onSelect: (key: string) => void;
+  onHoursCommit?: (key: string, hours: number) => void;
+  dragHoursOverride: number | null;
+  onDragStart: (key: string, startX: number, startHours: number) => void;
+  editingKey: string | null;
+  onEditClick: (key: string) => void;
+  onEditDone: (key: string, val: number) => void;
 }
 
-function MemberEditor({ member, onHoursCommit, formatHours }: MemberEditorProps) {
-  const [localHours, setLocalHours] = useState<number | null>(null);
-  const isDragging = useRef(false);
-  const displayHours = localHours !== null ? localHours : member.hours;
-  const sliderMax = Math.max(Math.ceil(member.maxHours || 500), 1);
+function DraggableMemberBlock({
+  member, tierKey, widthPct, formatValue, value,
+  interactive, isSelected, onSelect, onHoursCommit,
+  dragHoursOverride, onDragStart,
+  editingKey, onEditClick, onEditDone,
+}: DraggableMemberBlockProps) {
+  const colors = TIER_COLORS[tierKey];
+  const displayHours = dragHoursOverride !== null ? dragHoursOverride : member.hours;
+  const displayValue = dragHoursOverride !== null ? dragHoursOverride : value;
+  const isDragging = dragHoursOverride !== null;
+  const [editVal, setEditVal] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isEditing = editingKey === member.key;
 
-  const commitValue = useCallback((val: number) => {
-    isDragging.current = false;
-    setLocalHours(null);
-    onHoursCommit(member.key, val);
-  }, [member.key, onHoursCommit]);
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleHandleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDragStart(member.key, e.clientX, member.hours);
+  };
+
+  const handleHandleTouchStart = (e: React.TouchEvent) => {
+    e.stopPropagation();
+    const touch = e.touches[0];
+    onDragStart(member.key, touch.clientX, member.hours);
+  };
+
+  const handleValueClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!interactive || !onHoursCommit) return;
+    setEditVal(member.hours.toFixed(1));
+    onEditClick(member.key);
+  };
+
+  const commitEdit = () => {
+    const parsed = parseFloat(editVal);
+    if (!isNaN(parsed) && parsed >= 0) {
+      onEditDone(member.key, parsed);
+    } else {
+      onEditDone(member.key, member.hours);
+    }
+  };
 
   return (
-    <div className="flex items-center gap-2 w-full px-1 py-1.5 animate-in fade-in slide-in-from-top-1 duration-200">
-      <Input
-        type="number"
-        step="0.5"
-        min="0"
-        max={member.maxHours}
-        value={displayHours.toFixed(1)}
-        onChange={(e) => {
-          const val = Math.max(0, parseFloat(e.target.value) || 0);
-          onHoursCommit(member.key, val);
-        }}
-        onClick={(e) => e.stopPropagation()}
-        className="w-16 h-6 text-right text-[10px] tabular-nums px-1"
-      />
-      <span className="text-[10px] text-muted-foreground shrink-0">h</span>
-      <input
-        type="range"
-        min="0"
-        max={sliderMax}
-        step="0.5"
-        value={Math.min(displayHours, sliderMax)}
-        onMouseDown={() => { isDragging.current = true; }}
-        onTouchStart={() => { isDragging.current = true; }}
-        onChange={(e) => setLocalHours(parseFloat(e.target.value) || 0)}
-        onMouseUp={(e) => commitValue(parseFloat((e.target as HTMLInputElement).value) || 0)}
-        onTouchEnd={(e) => commitValue(parseFloat((e.target as HTMLInputElement).value) || 0)}
-        onClick={(e) => e.stopPropagation()}
-        className="flex-1 h-1.5 accent-primary cursor-pointer min-w-[40px]"
-      />
+    <div className="flex flex-col min-w-0" style={{ width: `${widthPct}%`, minWidth: 40 }}>
+      <div
+        className={cn(
+          "rounded-xl border flex items-center justify-between py-1.5 px-1.5 transition-all duration-300 min-w-0 overflow-hidden relative group",
+          colors.bg, colors.border,
+          interactive && "cursor-pointer hover:ring-2 hover:ring-primary/30",
+          isSelected && !isDragging && "ring-2 ring-primary/50",
+          isDragging && "ring-2 ring-primary shadow-lg",
+        )}
+        style={{ minHeight: 36 }}
+        title={`${member.label}: ${formatValue(value)}`}
+        onClick={() => interactive && onSelect(member.key)}
+      >
+        {/* Content */}
+        <div className="flex flex-col items-center justify-center flex-1 min-w-0 overflow-hidden">
+          <span className={cn("text-[10px] font-medium leading-tight truncate w-full text-center", colors.text)}>
+            {member.label}
+          </span>
+          {isEditing ? (
+            <input
+              ref={inputRef}
+              type="number"
+              step="0.5"
+              min="0"
+              max={member.maxHours}
+              value={editVal}
+              onChange={(e) => setEditVal(e.target.value)}
+              onBlur={commitEdit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") commitEdit();
+                if (e.key === "Escape") onEditDone(member.key, member.hours);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-14 h-4 text-center text-[10px] tabular-nums bg-background/80 border rounded px-0.5 outline-none focus:ring-1 focus:ring-primary"
+            />
+          ) : (
+            <span
+              className={cn(
+                "text-[10px] tabular-nums leading-tight opacity-75 cursor-text hover:opacity-100 hover:underline",
+                colors.text
+              )}
+              onClick={handleValueClick}
+            >
+              {interactive ? `${displayHours.toFixed(1)}h` : formatValue(displayValue)}
+            </span>
+          )}
+        </div>
+
+        {/* Drag handle — visible on hover/selected for interactive blocks */}
+        {interactive && isSelected && !isEditing && (
+          <div
+            className="flex items-center justify-center w-4 h-full cursor-col-resize shrink-0 opacity-60 hover:opacity-100 transition-opacity touch-none"
+            onMouseDown={handleHandleMouseDown}
+            onTouchStart={handleHandleTouchStart}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <GripVertical className={cn("h-3.5 w-3.5 rotate-90", colors.text)} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -155,19 +234,32 @@ interface PyramidColumnProps {
   formatValue: (v: number) => string;
   total: number;
   interactive?: boolean;
-  expandedMember: string | null;
+  selectedMember: string | null;
   onMemberClick?: (key: string) => void;
   onHoursCommit?: (key: string, hours: number) => void;
   formatHours?: (v: number) => string;
+  dragState: { key: string; hours: number } | null;
+  onDragStart: (key: string, startX: number, startHours: number) => void;
+  editingKey: string | null;
+  onEditClick: (key: string) => void;
+  onEditDone: (key: string, val: number) => void;
 }
 
 function PyramidColumn({
   title, tiers, getValue, formatValue, total,
-  interactive, expandedMember, onMemberClick,
+  interactive, selectedMember, onMemberClick,
   onHoursCommit, formatHours,
+  dragState, onDragStart,
+  editingKey, onEditClick, onEditDone,
 }: PyramidColumnProps) {
+  // When dragging, override the member's value for width calculation
+  const getEffectiveValue = (m: TeamMember) => {
+    if (dragState && dragState.key === m.key) return dragState.hours;
+    return getValue(m);
+  };
+
   const tierTotals = tiers.map((t) =>
-    t.members.reduce((s, m) => s + getValue(m), 0)
+    t.members.reduce((s, m) => s + getEffectiveValue(m), 0)
   );
   const maxTierTotal = Math.max(...tierTotals, 1);
 
@@ -201,43 +293,32 @@ function PyramidColumn({
           return (
             <div
               key={tier.key}
-              className="flex flex-col items-center gap-1 transition-all duration-500"
+              className="flex flex-col items-center gap-1 transition-all duration-300"
               style={{ width: `${widthPct}%` }}
             >
               <div className="flex items-stretch gap-1 justify-center w-full">
                 {tier.members.map((member) => {
-                  const val = getValue(member);
+                  const val = getEffectiveValue(member);
                   const memberPct = tierTotal > 0 ? (val / tierTotal) * 100 : 100 / tier.members.length;
-                  const isExpanded = expandedMember === member.key && interactive;
 
                   return (
-                    <div key={member.key} className="flex flex-col min-w-0" style={{ width: `${memberPct}%`, minWidth: 40 }}>
-                      <div
-                        className={cn(
-                          "rounded-xl border flex flex-col items-center justify-center py-1.5 px-1 transition-all duration-500 min-w-0 overflow-hidden relative",
-                          colors.bg, colors.border,
-                          interactive && "cursor-pointer hover:ring-2 hover:ring-primary/30",
-                          isExpanded && "ring-2 ring-primary/50",
-                        )}
-                        style={{ minHeight: 36 }}
-                        title={`${member.label}: ${formatValue(val)}`}
-                        onClick={() => interactive && onMemberClick?.(member.key)}
-                      >
-                        <span className={cn("text-[10px] font-medium leading-tight truncate w-full text-center", colors.text)}>
-                          {member.label}
-                        </span>
-                        <span className={cn("text-[10px] tabular-nums leading-tight opacity-75", colors.text)}>
-                          {formatValue(val)}
-                        </span>
-                      </div>
-                      {isExpanded && onHoursCommit && formatHours && (
-                        <MemberEditor
-                          member={member}
-                          onHoursCommit={onHoursCommit}
-                          formatHours={formatHours}
-                        />
-                      )}
-                    </div>
+                    <DraggableMemberBlock
+                      key={member.key}
+                      member={member}
+                      tierKey={tier.key}
+                      widthPct={memberPct}
+                      formatValue={formatValue}
+                      value={val}
+                      interactive={!!interactive}
+                      isSelected={selectedMember === member.key}
+                      onSelect={(k) => onMemberClick?.(k)}
+                      onHoursCommit={onHoursCommit}
+                      dragHoursOverride={dragState?.key === member.key ? dragState.hours : null}
+                      onDragStart={onDragStart}
+                      editingKey={editingKey}
+                      onEditClick={onEditClick}
+                      onEditDone={onEditDone}
+                    />
                   );
                 })}
               </div>
@@ -325,8 +406,94 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
   keyPlayers = {},
   onToggleKeyPlayer,
 }: SummaryPyramidProps) {
-  const [expandedMember, setExpandedMember] = useState<string | null>(null);
+  const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [activePreset, setActivePreset] = useState<DistributionPreset | null>(null);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
+
+  // Drag state
+  const [dragState, setDragState] = useState<{ key: string; hours: number } | null>(null);
+  const dragRef = useRef<{
+    key: string;
+    startX: number;
+    startHours: number;
+    maxHours: number;
+    containerWidth: number;
+  } | null>(null);
+  const pyramidContainerRef = useRef<HTMLDivElement>(null);
+
+  const handleDragStart = useCallback((key: string, startX: number, startHours: number) => {
+    const member = teamMembers.find(m => m.key === key);
+    if (!member) return;
+    const containerWidth = pyramidContainerRef.current?.offsetWidth || 400;
+    dragRef.current = {
+      key,
+      startX,
+      startHours,
+      maxHours: member.maxHours || 500,
+      containerWidth,
+    };
+    setDragState({ key, hours: startHours });
+  }, [teamMembers]);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const { startX, startHours, maxHours, containerWidth } = dragRef.current;
+      const deltaX = e.clientX - startX;
+      // Map full container width to maxHours
+      const hourDelta = (deltaX / containerWidth) * maxHours;
+      const newHours = Math.min(Math.max(0, startHours + hourDelta), maxHours);
+      setDragState({ key: dragRef.current.key, hours: newHours });
+    };
+
+    const handleMouseUp = () => {
+      if (!dragRef.current) return;
+      const { key } = dragRef.current;
+      setDragState(prev => {
+        if (prev && onMemberHoursCommit) {
+          const rounded = Math.round(prev.hours * 2) / 2;
+          onMemberHoursCommit(key, rounded);
+        }
+        return null;
+      });
+      dragRef.current = null;
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!dragRef.current) return;
+      const touch = e.touches[0];
+      const { startX, startHours, maxHours, containerWidth } = dragRef.current;
+      const deltaX = touch.clientX - startX;
+      const hourDelta = (deltaX / containerWidth) * maxHours;
+      const newHours = Math.min(Math.max(0, startHours + hourDelta), maxHours);
+      setDragState({ key: dragRef.current.key, hours: newHours });
+    };
+
+    const handleTouchEnd = () => {
+      if (!dragRef.current) return;
+      const { key } = dragRef.current;
+      setDragState(prev => {
+        if (prev && onMemberHoursCommit) {
+          const rounded = Math.round(prev.hours * 2) / 2;
+          onMemberHoursCommit(key, rounded);
+        }
+        return null;
+      });
+      dragRef.current = null;
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    window.addEventListener("touchmove", handleTouchMove, { passive: true });
+    window.addEventListener("touchend", handleTouchEnd);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      window.removeEventListener("touchmove", handleTouchMove);
+      window.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [onMemberHoursCommit]);
 
   if (teamMembers.length === 0) return null;
 
@@ -338,7 +505,8 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
   const hasKeyPlayers = Object.values(keyPlayers).some(v => v > 0);
 
   const handleMemberClick = (key: string) => {
-    setExpandedMember(prev => prev === key ? null : key);
+    setSelectedMember(prev => prev === key ? null : key);
+    setEditingKey(null);
   };
 
   const handlePresetClick = (preset: DistributionPreset) => {
@@ -347,9 +515,21 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
     onDistribute?.(preset);
   };
 
+  const handleEditClick = (key: string) => {
+    setEditingKey(key);
+  };
+
+  const handleEditDone = (key: string, val: number) => {
+    setEditingKey(null);
+    if (onMemberHoursCommit) {
+      const rounded = Math.round(val * 2) / 2;
+      onMemberHoursCommit(key, rounded);
+    }
+  };
+
   return (
     <TooltipProvider>
-      <div className="rounded-lg border bg-card p-4 space-y-4">
+      <div className="rounded-lg border bg-card p-4 space-y-4" ref={pyramidContainerRef}>
         {/* Key Players Selection */}
         {onDistribute && onToggleKeyPlayer && (
           <KeyPlayersSelection
@@ -389,6 +569,13 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
           </div>
         )}
 
+        {/* Hint for drag interaction */}
+        {interactive && (
+          <p className="text-[10px] text-muted-foreground/70 text-center">
+            Click a member, then drag the ⋮⋮ handle to resize — or click the hours value to type
+          </p>
+        )}
+
         {/* Pyramids */}
         <div className="flex flex-col sm:flex-row gap-6">
           <PyramidColumn
@@ -398,10 +585,15 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
             formatValue={(v) => `${formatHours(v)}h`}
             total={totalHours}
             interactive={interactive}
-            expandedMember={expandedMember}
+            selectedMember={selectedMember}
             onMemberClick={handleMemberClick}
             onHoursCommit={onMemberHoursCommit}
             formatHours={formatHours}
+            dragState={dragState}
+            onDragStart={handleDragStart}
+            editingKey={editingKey}
+            onEditClick={handleEditClick}
+            onEditDone={handleEditDone}
           />
           <div className="hidden sm:block w-px bg-border" />
           <PyramidColumn
@@ -411,7 +603,12 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
             formatValue={(v) => formatCurrency(v)}
             total={totalRevenue}
             interactive={false}
-            expandedMember={null}
+            selectedMember={null}
+            dragState={null}
+            onDragStart={() => {}}
+            editingKey={null}
+            onEditClick={() => {}}
+            onEditDone={() => {}}
           />
         </div>
       </div>

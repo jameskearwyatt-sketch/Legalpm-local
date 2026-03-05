@@ -890,7 +890,7 @@ export default function PricingProposalDetail() {
 
       // Assign raw hour weights (rate-independent)
       // Hours are proportional to tierWeight × playerMultiplier, NOT divided by rate
-      const memberWeights = unlocked.map(m => {
+      const memberWeights = allMembers.map(m => {
         const tier = classifyTier(m);
         const tierWeight = weights[tier] || 1;
         const level = kp[m.key] || 0;

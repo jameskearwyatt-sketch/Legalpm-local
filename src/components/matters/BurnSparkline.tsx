@@ -33,8 +33,8 @@ interface BurnSparklineProps {
   hasActiveProposal?: boolean;
   /** The proposal data with write-off amounts */
   proposalData?: ProposalData | null;
-  /** The raw burn amount before proposal adjustments */
   rawBurn?: number;
+  matterName?: string;
 }
 
 interface DataPoint {
@@ -55,6 +55,7 @@ export function BurnSparkline({
   hasActiveProposal = false,
   proposalData,
   rawBurn,
+  matterName,
 }: BurnSparklineProps) {
   // Dimensions for the sparkline
   const width = 90;
@@ -413,6 +414,7 @@ export function BurnSparkline({
           proposalData={proposalData}
           rawBurn={rawBurn}
           dataPoints={dataPoints}
+          matterName={matterName}
         />
       </HoverCardContent>
     </HoverCard>
@@ -572,6 +574,7 @@ export function BurnSparkline({
           proposalData={proposalData}
           rawBurn={rawBurn}
           dataPoints={dataPoints}
+          matterName={matterName}
         />
       </HoverCardContent>
     </HoverCard>

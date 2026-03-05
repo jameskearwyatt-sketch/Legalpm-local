@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useRef, useCallback } from 'react';
 import { format, parseISO, differenceInMonths, differenceInDays } from 'date-fns';
 import { formatCurrency } from '@/lib/currencyUtils';
-import { TrendingUp, TrendingDown, Calendar, Target, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calendar, Target, Clock, AlertTriangle, CheckCircle, Download } from 'lucide-react';
 
 interface SnapshotPoint {
   as_of_date: string;
@@ -35,6 +35,7 @@ interface BurnSparklineDetailedTooltipProps {
   proposalData?: ProposalData | null;
   rawBurn?: number;
   dataPoints: DataPoint[];
+  matterName?: string;
 }
 
 export function BurnSparklineDetailedTooltip({
@@ -50,7 +51,9 @@ export function BurnSparklineDetailedTooltip({
   proposalData,
   rawBurn,
   dataPoints,
+  matterName,
 }: BurnSparklineDetailedTooltipProps) {
+  const tooltipRef = useRef<HTMLDivElement>(null);
   // Larger chart dimensions (1.5x scale)
   const width = 420;
   const height = 210;
@@ -225,13 +228,132 @@ export function BurnSparklineDetailedTooltip({
     return { linePath, areaPath, budgetLineY, gridLines, xLabels, yLabels, dots, proposalDrop };
   }, [dataPoints, bmBudget, currentBurn, chartWidth, chartHeight, hasActiveProposal, rawBurn, proposalWriteOff, width]);
 
+  // Real (non-synthetic) data points for the history table
+  const realDataPoints = useMemo(() => 
+    dataPoints.filter(d => !d.isSynthetic), 
+    [dataPoints]
+  );
+
+  // Canvas-based PNG export
+  const handleDownload = useCallback(async () => {
+    const svgEl = tooltipRef.current?.querySelector('svg');
+    if (!svgEl) return;
+
+    const svgWidth = width;
+    const svgHeight = height;
+    const tableRowHeight = 18;
+    const tableHeaderHeight = 24;
+    const tablePaddingTop = 20;
+    const titleHeight = 40;
+    const metricsHeight = 60;
+    const tableHeight = tablePaddingTop + tableHeaderHeight + (realDataPoints.length * tableRowHeight) + 10;
+    const canvasWidth = Math.max(svgWidth + 60, 500);
+    const canvasHeight = titleHeight + svgHeight + metricsHeight + tableHeight + 30;
+
+    const canvas = document.createElement('canvas');
+    const scale = 2; // retina
+    canvas.width = canvasWidth * scale;
+    canvas.height = canvasHeight * scale;
+    const ctx = canvas.getContext('2d')!;
+    ctx.scale(scale, scale);
+
+    // Background
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+    // Title
+    ctx.fillStyle = '#1a1a2e';
+    ctx.font = 'bold 14px system-ui, sans-serif';
+    ctx.fillText(matterName ? `WIP Burn — ${matterName}` : 'WIP Burn Chart', 20, 26);
+    ctx.font = '11px system-ui, sans-serif';
+    ctx.fillStyle = '#6b7280';
+    ctx.fillText(`${currency} • ${adjustedBurnPercent.toFixed(0)}% of budget used`, 20, 40);
+
+    // Draw SVG chart onto canvas
+    const svgData = new XMLSerializer().serializeToString(svgEl);
+    const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(svgBlob);
+    
+    await new Promise<void>((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        ctx.drawImage(img, 20, titleHeight, svgWidth, svgHeight);
+        URL.revokeObjectURL(url);
+        resolve();
+      };
+      img.src = url;
+    });
+
+    const metricsY = titleHeight + svgHeight + 20;
+    
+    // Key metrics row
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillText(`Burn: ${formatCurrency(currentBurn, currency)}`, 20, metricsY);
+    ctx.fillText(`Budget: ${formatCurrency(bmBudget, currency)}`, 180, metricsY);
+    ctx.fillText(`Remaining: ${formatCurrency(Math.max(0, bmBudget - currentBurn), currency)}`, 340, metricsY);
+    
+    ctx.font = '10px system-ui, sans-serif';
+    ctx.fillStyle = '#6b7280';
+    ctx.fillText(`Rate: ${formatCurrency(burnRatePerMonth, currency)}/mo`, 20, metricsY + 16);
+    ctx.fillText(`Runway: ${currentBurn >= bmBudget ? 'Exhausted' : monthsToExhaustion.toFixed(1) + 'm'}`, 180, metricsY + 16);
+    ctx.fillText(`Snapshots: ${realDataPoints.length}`, 340, metricsY + 16);
+
+    // Data table
+    const tableY = metricsY + metricsHeight;
+    
+    ctx.font = 'bold 11px system-ui, sans-serif';
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillText('Budget Usage Build-Up', 20, tableY);
+
+    // Table headers
+    const headerY = tableY + tableHeaderHeight;
+    ctx.fillStyle = '#f3f4f6';
+    ctx.fillRect(20, headerY - 14, canvasWidth - 40, 18);
+    ctx.font = 'bold 10px system-ui, sans-serif';
+    ctx.fillStyle = '#374151';
+    ctx.fillText('Date', 28, headerY);
+    ctx.fillText('Cumulative Burn', 160, headerY);
+    ctx.fillText('Budget Used %', 320, headerY);
+
+    // Table rows
+    ctx.font = '10px system-ui, sans-serif';
+    realDataPoints.forEach((dp, i) => {
+      const rowY = headerY + ((i + 1) * tableRowHeight);
+      
+      // Alternating row background
+      if (i % 2 === 0) {
+        ctx.fillStyle = '#f9fafb';
+        ctx.fillRect(20, rowY - 12, canvasWidth - 40, tableRowHeight);
+      }
+      
+      const pct = bmBudget > 0 ? ((dp.burn / bmBudget) * 100).toFixed(1) : '0.0';
+      
+      ctx.fillStyle = '#374151';
+      ctx.fillText(format(parseISO(dp.date), 'dd MMM yyyy'), 28, rowY);
+      ctx.fillText(formatCurrency(dp.burn, currency), 160, rowY);
+      
+      // Color-code percentage
+      const pctNum = parseFloat(pct);
+      ctx.fillStyle = pctNum > 105 ? '#ef4444' : pctNum > 80 ? '#f59e0b' : '#22c55e';
+      ctx.fillText(`${pct}%`, 320, rowY);
+    });
+
+    // Trigger download
+    const link = document.createElement('a');
+    const safeName = (matterName || 'wip-chart').replace(/[^a-zA-Z0-9-_ ]/g, '').trim().replace(/\s+/g, '-');
+    link.download = `${safeName}-burn-report.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  }, [width, height, realDataPoints, currency, currentBurn, bmBudget, burnRatePerMonth, monthsToExhaustion, adjustedBurnPercent, matterName]);
+
   // WIP/AR/Paid breakdown from latest snapshot
   const latestSnapshot = snapshots.length > 0 
     ? [...snapshots].sort((a, b) => new Date(b.as_of_date).getTime() - new Date(a.as_of_date).getTime())[0]
     : null;
 
   return (
-    <div className="flex flex-col gap-4 min-w-[450px]">
+    <div ref={tooltipRef} className="flex flex-col gap-4 min-w-[450px]">
       {/* Header with status */}
       <div className={`flex items-center justify-between px-4 py-3 rounded-lg ${statusColors.bg}`}>
         <div className="flex items-center gap-3">
@@ -244,9 +366,18 @@ export function BurnSparklineDetailedTooltip({
             {adjustedBurnPercent.toFixed(0)}% of Budget
           </span>
         </div>
-        <span className={`text-sm font-medium ${statusColors.text}`}>
-          {adjustedBurnPercent > 100 ? 'Over Budget' : adjustedBurnPercent > 80 ? 'Nearing Limit' : 'On Track'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-medium ${statusColors.text}`}>
+            {adjustedBurnPercent > 100 ? 'Over Budget' : adjustedBurnPercent > 80 ? 'Nearing Limit' : 'On Track'}
+          </span>
+          <button
+            onClick={(e) => { e.stopPropagation(); handleDownload(); }}
+            className="p-1 rounded hover:bg-background/50 transition-colors"
+            title="Download as PNG"
+          >
+            <Download className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+          </button>
+        </div>
       </div>
 
       {/* Large detailed chart */}
@@ -491,6 +622,38 @@ export function BurnSparklineDetailedTooltip({
           </div>
           <div className="text-muted-foreground mt-0.5">
             {formatCurrency(proposalWriteOff, currency)} proposed write-off
+          </div>
+        </div>
+      )}
+
+      {/* Data-point history table */}
+      {realDataPoints.length > 0 && (
+        <div className="border-t pt-3">
+          <div className="text-xs text-muted-foreground mb-2 font-medium">Budget Usage Build-Up</div>
+          <div className="max-h-[140px] overflow-y-auto rounded border">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-muted/70">
+                  <th className="text-left px-2 py-1 font-medium text-muted-foreground">Date</th>
+                  <th className="text-right px-2 py-1 font-medium text-muted-foreground">Cumulative Burn</th>
+                  <th className="text-right px-2 py-1 font-medium text-muted-foreground">Budget Used</th>
+                </tr>
+              </thead>
+              <tbody>
+                {realDataPoints.map((dp, i) => {
+                  const pct = bmBudget > 0 ? ((dp.burn / bmBudget) * 100) : 0;
+                  return (
+                    <tr key={i} className={i % 2 === 0 ? 'bg-muted/20' : ''}>
+                      <td className="px-2 py-0.5 text-muted-foreground">{format(parseISO(dp.date), 'dd MMM yyyy')}</td>
+                      <td className="px-2 py-0.5 text-right font-medium">{formatCurrency(dp.burn, currency)}</td>
+                      <td className={`px-2 py-0.5 text-right font-medium ${pct > 105 ? 'text-destructive' : pct > 80 ? 'text-warning' : 'text-success'}`}>
+                        {pct.toFixed(1)}%
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

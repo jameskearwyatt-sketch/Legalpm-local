@@ -259,7 +259,7 @@ export function DraggableBudgetItem({
         )}
 
         {/* Delete button */}
-        <div className="col-span-1 flex justify-center">
+        <div className="flex justify-center w-8">
           {canDelete && (
             <Button
               variant="ghost"

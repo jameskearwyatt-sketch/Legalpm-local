@@ -956,7 +956,7 @@ export default function PricingProposalDetail() {
     return () => {
       if (summaryAutoSaveRef.current) clearTimeout(summaryAutoSaveRef.current);
     };
-  }, [assumptions.summaryHours, summaryInitialized, proposalId]);
+  }, [assumptions.summaryHours, assumptions.summaryLevelOverrides, summaryInitialized, proposalId]);
 
   // Summary aggregates
   const summary = useMemo(() => {

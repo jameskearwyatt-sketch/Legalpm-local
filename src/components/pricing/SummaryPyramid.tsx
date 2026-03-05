@@ -884,7 +884,14 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
         {/* Hint */}
         {interactive && (
           <p className="text-[10px] text-muted-foreground/70 text-center">
-            Drag ⋮⋮ handle to resize hours · Drag a block up/down to move between levels · Click hours to type
+            Drag ⋮⋮ handle to resize hours · Drag a block up/down to move between levels · Drag to bench to remove · Click hours to type
+          </p>
+        )}
+
+        {/* Hint about bench */}
+        {interactive && benchedMembersList.length > 0 && (
+          <p className="text-[10px] text-muted-foreground/70 text-center">
+            {benchedMembersList.length} member{benchedMembersList.length !== 1 ? 's' : ''} on the bench — drag back to reactivate
           </p>
         )}
 

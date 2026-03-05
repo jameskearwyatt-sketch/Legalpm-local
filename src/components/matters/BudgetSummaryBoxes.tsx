@@ -205,6 +205,47 @@ export function BudgetSummaryBoxes({
             </div>
           );
         })}
+
+        {/* Additional Scope Total Box */}
+        {(() => {
+          const additionalScopeItems = items.filter(i => i.is_additional_scope);
+          if (additionalScopeItems.length === 0) return null;
+          const addlBudget = additionalScopeItems
+            .filter(i => !i.is_optional || (i.is_optional && i.is_included !== false))
+            .reduce((sum, i) => sum + (i.fee_amount || 0), 0);
+          const addlUsed = additionalScopeItems.reduce((sum, i) => sum + ((i.wip_amount || 0) - (i.wip_write_off || 0)), 0);
+          if (addlBudget === 0 && addlUsed === 0) return null;
+          const burnPct = addlBudget > 0 ? Math.round((addlUsed / addlBudget) * 100) : 0;
+          const burnColor = burnPct > 100 ? 'text-red-600 dark:text-red-400' : 
+                           burnPct > 85 ? 'text-orange-600 dark:text-orange-400' : 
+                           burnPct > 70 ? 'text-amber-600 dark:text-amber-400' : 
+                           'text-green-600 dark:text-green-400';
+          return (
+            <div className="rounded-md px-3 py-2 border bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700 min-w-[140px]">
+              <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-1">
+                Additional Scope
+              </div>
+              <div className="flex items-baseline gap-1">
+                {addlUsed > 0 && (
+                  <>
+                    <span className={cn('text-sm font-semibold', burnColor)}>
+                      {formatCurrency(addlUsed, displayCurrency)}
+                    </span>
+                    <span className="text-xs text-muted-foreground">/</span>
+                  </>
+                )}
+                <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                  {formatCurrency(addlBudget, displayCurrency)}
+                </span>
+                {addlUsed > 0 && (
+                  <span className={cn('text-xs font-medium', burnColor)}>
+                    ({burnPct}%)
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
         
         {/* Total Box */}
         {(() => {

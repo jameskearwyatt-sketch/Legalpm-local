@@ -17,8 +17,9 @@ import {
 import { DraftLineItem, BUDGET_CATEGORIES, BudgetCategory } from '@/lib/hooks/useBudgetVersions';
 import { CategoryGroup } from './CategoryGroup';
 import { DraggableBudgetItem } from './DraggableBudgetItem';
-import { Loader2, Wand2, Plus } from 'lucide-react';
+import { Loader2, Wand2, Plus, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -130,12 +131,13 @@ export function CategorizedBudgetView({
     return `${category}|${providerName}`;
   };
 
-  // Group items by category AND provider
+  // Group items by category AND provider (excluding additional scope items)
   const groupedItems = useMemo(() => {
     const groups: Record<string, { items: DraftLineItem[]; indices: number[]; category: BudgetCategory; providerName: string }> = {};
     
-    // Group items
+    // Group items - exclude additional scope items (they render in their own section)
     items.forEach((item, index) => {
+      if (item.is_additional_scope) return;
       const category = (item.category || 'Other') as BudgetCategory;
       const providerName = item.provider === 'Local Counsel' && item.lc_firm_name ? item.lc_firm_name : 'Baker McKenzie';
       const key = `${category}|${providerName}`;
@@ -399,6 +401,59 @@ export function CategorizedBudgetView({
 
   const activeItem = activeId !== null ? items[parseInt(activeId)] : null;
 
+  // Toggle additional scope for an item
+  const handleToggleAdditionalScope = async (index: number) => {
+    const updatedItems = [...items];
+    const newValue = !updatedItems[index].is_additional_scope;
+    updatedItems[index] = { ...updatedItems[index], is_additional_scope: newValue };
+    onItemsChange(updatedItems);
+    
+    // Persist to DB if item has an ID
+    const item = items[index];
+    if (item.id) {
+      try {
+        const { error } = await supabase
+          .from('budget_line_items')
+          .update({ is_additional_scope: newValue })
+          .eq('id', item.id);
+        if (error) {
+          console.error('Error saving additional scope:', error);
+          toast.error('Failed to save additional scope');
+        }
+      } catch (error) {
+        console.error('Error saving additional scope:', error);
+      }
+    }
+  };
+
+  // Separate additional scope items from original scope items
+  const additionalScopeItems = useMemo(() => {
+    return items.map((item, index) => ({ item, index })).filter(({ item }) => item.is_additional_scope);
+  }, [items]);
+
+  const hasAdditionalScope = additionalScopeItems.length > 0;
+
+  // Group additional scope items by category
+  const additionalScopeGroups = useMemo(() => {
+    const groups: Record<string, { items: DraftLineItem[]; indices: number[]; category: BudgetCategory }> = {};
+    additionalScopeItems.forEach(({ item, index }) => {
+      const category = (item.category || 'Other') as BudgetCategory;
+      if (!groups[category]) {
+        groups[category] = { items: [], indices: [], category };
+      }
+      groups[category].items.push(item);
+      groups[category].indices.push(index);
+    });
+    return groups;
+  }, [additionalScopeItems]);
+
+  const additionalScopeTotal = useMemo(() => {
+    return additionalScopeItems.reduce((sum, { item }) => {
+      const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
+      return sum + (isIncluded ? (item.fee_amount || 0) : 0);
+    }, 0);
+  }, [additionalScopeItems]);
+
   // Count uncategorized items
   const uncategorizedCount = items.filter(item => !item.category && item.work_item.trim()).length;
 
@@ -430,6 +485,79 @@ export function CategorizedBudgetView({
           )}
         </Button>
       </div>
+
+      {/* Additional Scope Section */}
+      {hasAdditionalScope && (
+        <div className="rounded-lg border-2 border-emerald-400 dark:border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white dark:bg-emerald-500">
+              <Layers className="h-3 w-3 mr-1" />
+              Additional Scope
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {formatCurrency(additionalScopeTotal, differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : currency)}
+            </span>
+          </div>
+          {BUDGET_CATEGORIES.map(category => {
+            const group = additionalScopeGroups[category];
+            if (!group || group.items.length === 0) return null;
+            const groupBudget = group.items
+              .filter(item => !item.is_optional || (item.is_optional && item.is_included !== false))
+              .reduce((sum, item) => sum + (item.fee_amount || 0), 0);
+            const groupUsed = group.items.reduce((sum, item) => {
+              return sum + ((item.wip_amount || 0) - (item.wip_write_off || 0));
+            }, 0);
+            const groupWO = group.items.reduce((sum, item) => sum + (item.wip_write_off || 0), 0);
+            return (
+              <CategoryGroup
+                key={`addl-${category}`}
+                category={category as BudgetCategory}
+                providerName=""
+                groupKey={`addl-${category}`}
+                subtotal={groupBudget}
+                budgetUsed={groupUsed}
+                writeOffTotal={groupWO}
+                formatCurrency={formatCurrency}
+                currency={differentBillingCurrency && agreedBillingAmount > 0 ? billingCurrency : currency}
+                mandatedRate={mandatedRate}
+              >
+                {group.items.map((item, localIdx) => {
+                  const globalIndex = group.indices[localIdx];
+                  return (
+                    <DraggableBudgetItem
+                      key={globalIndex}
+                      id={globalIndex.toString()}
+                      item={item}
+                      index={globalIndex}
+                      onEdit={onItemEdit}
+                      onRemove={onRemoveItem}
+                      onCategoryChange={handleCategoryChange}
+                      isEditing={isEditing}
+                      hasExistingBudget={hasExistingBudget}
+                      formatCurrency={formatCurrency}
+                      currency={currency}
+                      billingCurrency={billingCurrency}
+                      quoteCurrency={quoteCurrency}
+                      differentBillingCurrency={differentBillingCurrency}
+                      agreedBillingAmount={agreedBillingAmount}
+                      mandatedRate={mandatedRate}
+                      existingLcFirmNames={existingLcFirmNames}
+                      hasOptionalItems={hasOptionalItems}
+                      isAiSuggested={aiSuggestedIndices.has(globalIndex)}
+                      originalItem={originalItems.find(orig => orig.id === item.id)}
+                      updateLineItemOptional={updateLineItemOptional}
+                      toggleLineItemIncluded={toggleLineItemIncluded}
+                      updateLineItemCapped={updateLineItemCapped}
+                      onToggleAdditionalScope={handleToggleAdditionalScope}
+                      canDelete={items.length > 1}
+                    />
+                  );
+                })}
+              </CategoryGroup>
+            );
+          })}
+        </div>
+      )}
 
       {/* Line Items with Drag and Drop */}
       <DndContext
@@ -518,6 +646,7 @@ export function CategorizedBudgetView({
                         updateLineItemOptional={updateLineItemOptional}
                         toggleLineItemIncluded={toggleLineItemIncluded}
                         updateLineItemCapped={updateLineItemCapped}
+                        onToggleAdditionalScope={handleToggleAdditionalScope}
                         canDelete={items.length > 1}
                       />
                     );

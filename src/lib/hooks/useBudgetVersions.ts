@@ -16,6 +16,7 @@ export interface BudgetLineItem {
   is_optional: boolean;
   is_included: boolean;
   is_capped: boolean;
+  is_additional_scope: boolean;
   category: string | null;
   wip_amount: number;
   wip_write_off: number;
@@ -63,6 +64,7 @@ export interface DraftLineItem {
   is_optional?: boolean;
   is_included?: boolean;
   is_capped?: boolean;
+  is_additional_scope?: boolean;
   category?: string | null;
   wip_amount?: number;
   wip_write_off?: number;
@@ -169,6 +171,7 @@ export function useBudgetVersions(matterId?: string) {
           lc_firm_name: item.provider === 'Local Counsel' ? (item.lc_firm_name || null) : null,
           is_optional: item.is_optional ?? false,
           is_included: item.is_included ?? true,
+          is_additional_scope: item.is_additional_scope ?? false,
           category: item.category || null,
         }));
 

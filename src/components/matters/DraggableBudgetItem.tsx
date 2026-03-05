@@ -1,11 +1,12 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2 } from 'lucide-react';
+import { GripVertical, Trash2, Layers } from 'lucide-react';
 import { DraftLineItem, BUDGET_CATEGORIES } from '@/lib/hooks/useBudgetVersions';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -61,6 +62,7 @@ interface DraggableBudgetItemProps {
   updateLineItemOptional: any;
   toggleLineItemIncluded: any;
   updateLineItemCapped: any;
+  onToggleAdditionalScope?: (index: number) => void;
   canDelete: boolean;
 }
 
@@ -87,6 +89,7 @@ export function DraggableBudgetItem({
   updateLineItemOptional,
   toggleLineItemIncluded,
   updateLineItemCapped,
+  onToggleAdditionalScope,
   canDelete,
 }: DraggableBudgetItemProps) {
   const {
@@ -121,7 +124,7 @@ export function DraggableBudgetItem({
         ref={setNodeRef}
         style={style}
         className={cn(
-          'grid grid-cols-12 gap-2 items-center rounded-md py-1 px-1 transition-colors',
+          'flex flex-wrap gap-2 items-center rounded-md py-1 px-1 transition-colors',
           isDragging && 'opacity-50',
           isAiSuggested && 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700',
           isNewItem && !isAiSuggested && 'bg-green-50 dark:bg-green-950/30 ring-1 ring-green-300 dark:ring-green-700',
@@ -132,13 +135,13 @@ export function DraggableBudgetItem({
         <div
           {...attributes}
           {...listeners}
-          className="col-span-1 flex justify-center cursor-grab active:cursor-grabbing"
+          className="flex justify-center cursor-grab active:cursor-grabbing w-8"
         >
           <GripVertical className="h-4 w-4 text-muted-foreground" />
         </div>
 
         {/* Work Item */}
-        <div className="col-span-3">
+        <div className="flex-1 min-w-[150px]">
           <Input
             value={item.work_item}
             onChange={(e) => onEdit(index, 'work_item', e.target.value)}
@@ -152,7 +155,7 @@ export function DraggableBudgetItem({
         </div>
 
         {/* Provider */}
-        <div className="col-span-2 flex gap-1">
+        <div className="flex gap-1 min-w-[140px]">
           <Select
             value={item.provider}
             onValueChange={(v) => {
@@ -190,7 +193,7 @@ export function DraggableBudgetItem({
         </div>
 
         {/* Current (original) value */}
-        <div className="col-span-2 text-right">
+        <div className="text-right min-w-[90px]">
           {originalItem ? (
             <span className="text-muted-foreground text-sm">
               {formatCurrency(originalDisplayFee, displayCurrency)}
@@ -201,7 +204,7 @@ export function DraggableBudgetItem({
         </div>
 
         {/* New value */}
-        <div className="col-span-2">
+        <div className="min-w-[90px]">
           <Input
             type="number"
             value={newFee || ''}
@@ -217,7 +220,7 @@ export function DraggableBudgetItem({
         </div>
 
         {/* Category selector */}
-        <div className="col-span-1">
+        <div className="min-w-[80px]">
           <Select
             value={item.category || 'Other'}
             onValueChange={(v) => onCategoryChange(index, v)}
@@ -233,8 +236,30 @@ export function DraggableBudgetItem({
           </Select>
         </div>
 
+        {/* Additional Scope toggle in editing mode */}
+        {onToggleAdditionalScope && (
+          <div className="flex items-center justify-center">
+            <div className="flex items-center gap-1">
+              <Checkbox
+                id={`addl-scope-edit-${index}`}
+                checked={item.is_additional_scope ?? false}
+                onCheckedChange={() => onToggleAdditionalScope(index)}
+                className={cn(
+                  item.is_additional_scope && "border-emerald-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 dark:border-emerald-400 dark:data-[state=checked]:bg-emerald-500 dark:data-[state=checked]:border-emerald-500"
+                )}
+              />
+              <label htmlFor={`addl-scope-edit-${index}`} className={cn(
+                "text-xs cursor-pointer whitespace-nowrap",
+                item.is_additional_scope ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-muted-foreground"
+              )}>
+                Add'l
+              </label>
+            </div>
+          </div>
+        )}
+
         {/* Delete button */}
-        <div className="col-span-1 flex justify-center">
+        <div className="flex justify-center w-8">
           {canDelete && (
             <Button
               variant="ghost"
@@ -446,6 +471,14 @@ export function DraggableBudgetItem({
             Cap?
           </label>
         </div>
+      )}
+
+      {/* Additional Scope badge - viewing mode */}
+      {hasExistingBudget && item.is_additional_scope && (
+        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5 border-emerald-500 text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 whitespace-nowrap">
+          <Layers className="h-3 w-3 mr-0.5" />
+          Add'l Scope
+        </Badge>
       )}
 
       {/* Optional checkbox - only show when budget exists */}

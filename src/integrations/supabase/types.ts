@@ -235,6 +235,7 @@ export type Database = {
           created_at: string
           fee_amount: number
           id: string
+          is_additional_scope: boolean
           is_capped: boolean
           is_included: boolean
           is_optional: boolean
@@ -258,6 +259,7 @@ export type Database = {
           created_at?: string
           fee_amount?: number
           id?: string
+          is_additional_scope?: boolean
           is_capped?: boolean
           is_included?: boolean
           is_optional?: boolean
@@ -281,6 +283,7 @@ export type Database = {
           created_at?: string
           fee_amount?: number
           id?: string
+          is_additional_scope?: boolean
           is_capped?: boolean
           is_included?: boolean
           is_optional?: boolean

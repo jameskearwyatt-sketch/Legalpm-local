@@ -57,6 +57,7 @@ import {
   BUDGET_CATEGORIES,
   RateCard,
   ProposalAssumptions,
+  SummaryMemorySlot,
   DEFAULT_RATE_CARD,
   DEFAULT_ASSUMPTIONS,
   EstimationMethod,

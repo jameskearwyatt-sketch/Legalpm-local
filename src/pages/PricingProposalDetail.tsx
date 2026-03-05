@@ -929,6 +929,53 @@ export default function PricingProposalDetail() {
   }, [teamMembers]);
 
   const summaryLevelOverrides = assumptions.summaryLevelOverrides || {};
+  const summaryMemorySlots: (SummaryMemorySlot | null)[] = assumptions.summaryMemorySlots
+    ? [assumptions.summaryMemorySlots[0] ?? null, assumptions.summaryMemorySlots[1] ?? null, assumptions.summaryMemorySlots[2] ?? null]
+    : [null, null, null];
+
+  const handleSaveMemory = useCallback((slotIndex: number) => {
+    setAssumptions(prev => {
+      const slots = [...(prev.summaryMemorySlots || [null, null, null])];
+      slots[slotIndex] = {
+        hours: { ...(prev.summaryHours || {}) },
+        keyPlayers: { ...(prev.summaryKeyPlayers || {}) },
+        levelOverrides: { ...(prev.summaryLevelOverrides || {}) },
+        savedAt: new Date().toISOString(),
+      };
+      return { ...prev, summaryMemorySlots: slots };
+    });
+  }, []);
+
+  const handleLoadMemory = useCallback((slotIndex: number) => {
+    setAssumptions(prev => {
+      const slot = prev.summaryMemorySlots?.[slotIndex];
+      if (!slot) return prev;
+      return {
+        ...prev,
+        summaryHours: { ...slot.hours },
+        summaryKeyPlayers: { ...slot.keyPlayers },
+        summaryLevelOverrides: { ...slot.levelOverrides },
+      };
+    });
+  }, []);
+
+  const handleClearMemory = useCallback((slotIndex: number) => {
+    setAssumptions(prev => {
+      const slots = [...(prev.summaryMemorySlots || [null, null, null])];
+      slots[slotIndex] = null as any;
+      return { ...prev, summaryMemorySlots: slots };
+    });
+  }, []);
+
+  const handleUpdateMemoryNote = useCallback((slotIndex: number, note: string) => {
+    setAssumptions(prev => {
+      const slots = [...(prev.summaryMemorySlots || [null, null, null])];
+      if (slots[slotIndex]) {
+        slots[slotIndex] = { ...slots[slotIndex]!, note };
+      }
+      return { ...prev, summaryMemorySlots: slots };
+    });
+  }, []);
 
 
   const summaryAutoSaveRef = useRef<NodeJS.Timeout | null>(null);

@@ -890,7 +890,9 @@ export default function PricingProposalDetail() {
       const targetRevenue = bmUpperTarget;
       const allMembers = teamMembers;
 
-      const memberWeights = allMembers.map(m => {
+      const memberWeights = allMembers
+        .filter(m => !(prev.summaryBenchedMembers || []).includes(m.key))
+        .map(m => {
         const homeTier = classifyTier(m);
         const effectiveTier = lo[m.key] || homeTier;
         const tierWeight = weights[effectiveTier] || 1;
@@ -929,6 +931,22 @@ export default function PricingProposalDetail() {
   }, [teamMembers]);
 
   const summaryLevelOverrides = assumptions.summaryLevelOverrides || {};
+  const summaryBenchedMembers = assumptions.summaryBenchedMembers || [];
+
+  const handleBenchMember = useCallback((memberKey: string, benched: boolean) => {
+    setAssumptions(prev => {
+      const current = prev.summaryBenchedMembers || [];
+      const hours = { ...(prev.summaryHours || {}) };
+      if (benched) {
+        if (current.includes(memberKey)) return prev;
+        hours[memberKey] = 0;
+        return { ...prev, summaryBenchedMembers: [...current, memberKey], summaryHours: hours };
+      } else {
+        return { ...prev, summaryBenchedMembers: current.filter(k => k !== memberKey) };
+      }
+    });
+  }, []);
+
   const summaryMemorySlots: (SummaryMemorySlot | null)[] = assumptions.summaryMemorySlots
     ? [assumptions.summaryMemorySlots[0] ?? null, assumptions.summaryMemorySlots[1] ?? null, assumptions.summaryMemorySlots[2] ?? null]
     : [null, null, null];
@@ -940,6 +958,7 @@ export default function PricingProposalDetail() {
         hours: { ...(prev.summaryHours || {}) },
         keyPlayers: { ...(prev.summaryKeyPlayers || {}) },
         levelOverrides: { ...(prev.summaryLevelOverrides || {}) },
+        benchedMembers: [...(prev.summaryBenchedMembers || [])],
         savedAt: new Date().toISOString(),
       };
       return { ...prev, summaryMemorySlots: slots };
@@ -955,6 +974,7 @@ export default function PricingProposalDetail() {
         summaryHours: { ...slot.hours },
         summaryKeyPlayers: { ...slot.keyPlayers },
         summaryLevelOverrides: { ...slot.levelOverrides },
+        summaryBenchedMembers: [...(slot.benchedMembers || [])],
       };
     });
   }, []);
@@ -2853,6 +2873,8 @@ export default function PricingProposalDetail() {
               onToggleKeyPlayer={toggleKeyPlayer}
               levelOverrides={summaryLevelOverrides}
               onMemberLevelOverride={handleMemberLevelOverride}
+              benchedMembers={summaryBenchedMembers}
+              onBenchMember={handleBenchMember}
               memorySlots={summaryMemorySlots}
               onSaveMemory={handleSaveMemory}
               onLoadMemory={handleLoadMemory}

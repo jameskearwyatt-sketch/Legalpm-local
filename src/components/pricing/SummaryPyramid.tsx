@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Triangle, Minus, Star, Zap, GripVertical, Save, RotateCcw, X, Pencil } from "lucide-react";
+import { Triangle, Minus, Star, Zap, GripVertical, Save, RotateCcw, X, Pencil, UserMinus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +30,8 @@ interface SummaryPyramidProps {
   onToggleKeyPlayer?: (key: string) => void;
   levelOverrides?: Record<string, string>;
   onMemberLevelOverride?: (key: string, newLevel: string) => void;
+  benchedMembers?: string[];
+  onBenchMember?: (key: string, benched: boolean) => void;
   memorySlots?: (SummaryMemorySlot | null)[];
   onSaveMemory?: (slotIndex: number, note?: string) => void;
   onLoadMemory?: (slotIndex: number) => void;
@@ -291,6 +293,7 @@ function DraggableMemberBlock({
 interface PyramidColumnProps {
   title: string;
   tiers: Tier[];
+  benchedMembers: TierMember[];
   getValue: (m: TierMember) => number;
   formatValue: (v: number) => string;
   total: number;
@@ -305,17 +308,18 @@ interface PyramidColumnProps {
   onEditClick: (key: string) => void;
   onEditDone: (key: string, val: number) => void;
   onMemberLevelOverride?: (key: string, newLevel: string) => void;
+  onBenchMember?: (key: string, benched: boolean) => void;
 }
 
 function PyramidColumn({
-  title, tiers, getValue, formatValue, total,
+  title, tiers, benchedMembers, getValue, formatValue, total,
   interactive, selectedMember, onMemberClick,
   onHoursCommit, formatHours,
   dragState, onDragStart,
   editingKey, onEditClick, onEditDone,
-  onMemberLevelOverride,
+  onMemberLevelOverride, onBenchMember,
 }: PyramidColumnProps) {
-  const [dragOverTier, setDragOverTier] = useState<TierKey | null>(null);
+  const [dragOverTier, setDragOverTier] = useState<TierKey | "bench" | null>(null);
   const [verticalDragKey, setVerticalDragKey] = useState<string | null>(null);
 
   const tierTotals = tiers.map((t) =>
@@ -323,7 +327,7 @@ function PyramidColumn({
   );
   const maxTierTotal = Math.max(...tierTotals, 1);
 
-  const handleDragOver = (e: React.DragEvent, tierKey: TierKey) => {
+  const handleDragOver = (e: React.DragEvent, tierKey: TierKey | "bench") => {
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     setDragOverTier(tierKey);
@@ -333,11 +337,17 @@ function PyramidColumn({
     setDragOverTier(null);
   };
 
-  const handleDrop = (e: React.DragEvent, tierKey: TierKey) => {
+  const handleDrop = (e: React.DragEvent, tierKey: TierKey | "bench") => {
     e.preventDefault();
     const memberKey = e.dataTransfer.getData("text/plain");
-    if (memberKey && onMemberLevelOverride) {
-      onMemberLevelOverride(memberKey, tierKey);
+    if (memberKey) {
+      if (tierKey === "bench") {
+        onBenchMember?.(memberKey, true);
+      } else {
+        // If member was benched, unbench them first
+        onBenchMember?.(memberKey, false);
+        onMemberLevelOverride?.(memberKey, tierKey);
+      }
     }
     setDragOverTier(null);
     setVerticalDragKey(null);
@@ -421,6 +431,55 @@ function PyramidColumn({
             </div>
           );
         })}
+        {/* Bench zone */}
+        {interactive && (
+          <div
+            className={cn(
+              "flex items-center gap-2 mt-2 rounded-lg px-1 py-1.5 border-2 border-dashed transition-all duration-200",
+              dragOverTier === "bench"
+                ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
+                : "border-muted-foreground/20 bg-muted/30",
+            )}
+            onDragOver={(e) => handleDragOver(e, "bench")}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, "bench")}
+          >
+            <span className="text-[10px] font-semibold w-16 shrink-0 text-right leading-tight text-muted-foreground flex items-center justify-end gap-1">
+              <UserMinus className="h-3 w-3" />
+              Bench
+            </span>
+            <div className="flex-1 min-w-0 flex flex-wrap gap-1">
+              {benchedMembers.length === 0 ? (
+                <span className="text-[10px] text-muted-foreground/50 italic">
+                  Drag members here to bench
+                </span>
+              ) : (
+                benchedMembers.map((member) => {
+                  const colors = TIER_COLORS[member.homeTierKey];
+                  return (
+                    <div
+                      key={member.key}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", member.key);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      className={cn(
+                        "rounded-lg border flex items-center gap-1 py-1 px-2 cursor-grab opacity-50 hover:opacity-75 transition-opacity",
+                        colors.bg, colors.border,
+                      )}
+                      title={`${member.label} (benched) — drag back to reactivate`}
+                    >
+                      <span className={cn("text-[10px] font-medium line-through", colors.text)}>
+                        {member.label}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -627,6 +686,8 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
   onToggleKeyPlayer,
   levelOverrides = {},
   onMemberLevelOverride,
+  benchedMembers: benchedMemberKeys = [],
+  onBenchMember,
   memorySlots = [null, null, null],
   onSaveMemory,
   onLoadMemory,
@@ -732,9 +793,14 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
 
   if (teamMembers.length === 0) return null;
 
-  const tiers = buildTiers(teamMembers, levelOverrides);
-  const totalHours = teamMembers.reduce((s, m) => s + m.hours, 0);
-  const totalRevenue = teamMembers.reduce((s, m) => s + m.revenue, 0);
+  const activeMembers = teamMembers.filter(m => !benchedMemberKeys.includes(m.key));
+  const benchedMembersList: TierMember[] = teamMembers
+    .filter(m => benchedMemberKeys.includes(m.key))
+    .map(m => ({ ...m, homeTierKey: classifyTier(m) }));
+
+  const tiers = buildTiers(activeMembers, levelOverrides);
+  const totalHours = activeMembers.reduce((s, m) => s + m.hours, 0);
+  const totalRevenue = activeMembers.reduce((s, m) => s + m.revenue, 0);
   const interactive = !!onMemberHoursCommit;
 
   const hasKeyPlayers = Object.values(keyPlayers).some(v => v > 0);
@@ -818,7 +884,14 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
         {/* Hint */}
         {interactive && (
           <p className="text-[10px] text-muted-foreground/70 text-center">
-            Drag ⋮⋮ handle to resize hours · Drag a block up/down to move between levels · Click hours to type
+            Drag ⋮⋮ handle to resize hours · Drag a block up/down to move between levels · Drag to bench to remove · Click hours to type
+          </p>
+        )}
+
+        {/* Hint about bench */}
+        {interactive && benchedMembersList.length > 0 && (
+          <p className="text-[10px] text-muted-foreground/70 text-center">
+            {benchedMembersList.length} member{benchedMembersList.length !== 1 ? 's' : ''} on the bench — drag back to reactivate
           </p>
         )}
 
@@ -827,6 +900,7 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
           <PyramidColumn
             title="Hours Distribution"
             tiers={tiers}
+            benchedMembers={benchedMembersList}
             getValue={(m) => m.hours}
             formatValue={(v) => `${formatHours(v)}h`}
             total={totalHours}
@@ -841,11 +915,13 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
             onEditClick={handleEditClick}
             onEditDone={handleEditDone}
             onMemberLevelOverride={onMemberLevelOverride}
+            onBenchMember={onBenchMember}
           />
           <div className="hidden sm:block w-px bg-border" />
           <PyramidColumn
             title="Cost Distribution"
             tiers={tiers}
+            benchedMembers={benchedMembersList}
             getValue={(m) => m.revenue}
             formatValue={(v) => formatCurrency(v)}
             total={totalRevenue}

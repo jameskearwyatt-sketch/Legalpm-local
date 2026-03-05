@@ -793,9 +793,14 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
 
   if (teamMembers.length === 0) return null;
 
-  const tiers = buildTiers(teamMembers, levelOverrides);
-  const totalHours = teamMembers.reduce((s, m) => s + m.hours, 0);
-  const totalRevenue = teamMembers.reduce((s, m) => s + m.revenue, 0);
+  const activeMembers = teamMembers.filter(m => !benchedMemberKeys.includes(m.key));
+  const benchedMembersList: TierMember[] = teamMembers
+    .filter(m => benchedMemberKeys.includes(m.key))
+    .map(m => ({ ...m, homeTierKey: classifyTier(m) }));
+
+  const tiers = buildTiers(activeMembers, levelOverrides);
+  const totalHours = activeMembers.reduce((s, m) => s + m.hours, 0);
+  const totalRevenue = activeMembers.reduce((s, m) => s + m.revenue, 0);
   const interactive = !!onMemberHoursCommit;
 
   const hasKeyPlayers = Object.values(keyPlayers).some(v => v > 0);

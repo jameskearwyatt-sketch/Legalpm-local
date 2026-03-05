@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Triangle, Minus, Star, Zap, GripVertical } from "lucide-react";
+import { Triangle, Minus, Star, Zap, GripVertical, Save, RotateCcw, X, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { SummaryMemorySlot } from "@/lib/hooks/usePricingProposals";
 
 interface TeamMember {
   key: string;

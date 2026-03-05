@@ -680,6 +680,17 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
           </div>
         )}
 
+        {/* Memory Slots */}
+        {onSaveMemory && (
+          <MemorySlots
+            slots={memorySlots}
+            onSave={onSaveMemory}
+            onLoad={onLoadMemory!}
+            onClear={onClearMemory!}
+            onUpdateNote={onUpdateMemoryNote!}
+          />
+        )}
+
         {/* Hint */}
         {interactive && (
           <p className="text-[10px] text-muted-foreground/70 text-center">

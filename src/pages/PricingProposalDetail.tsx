@@ -2810,7 +2810,7 @@ export default function PricingProposalDetail() {
               <CardHeader>
                 <CardTitle>Fee Breakdown by Team Member</CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Edit hours to adjust allocation. Lock members to prevent auto-rebalancing.
+                  Edit hours to adjust allocation. Unallocated budget shown above.
                   Rates can only be changed in Team & Rates tab.
                 </p>
               </CardHeader>
@@ -2818,7 +2818,6 @@ export default function PricingProposalDetail() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-8"></TableHead>
                       <TableHead>Team Member</TableHead>
                       <TableHead className="text-right">Hours</TableHead>
                       <TableHead className="text-right">
@@ -2839,10 +2838,9 @@ export default function PricingProposalDetail() {
                         hours={member.hours}
                         rate={member.displayRate}
                         revenue={member.revenue}
-                        isLocked={member.isLocked}
+                        maxHours={member.maxHours}
                         formatCurrency={formatCurrency}
                         onHoursCommit={handleSummaryHoursChange}
-                        onToggleLock={toggleSummaryLock}
                       />
                     ))}
                     <TableRow className="font-bold bg-muted/50">

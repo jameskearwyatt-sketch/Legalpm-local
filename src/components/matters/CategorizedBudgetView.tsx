@@ -17,8 +17,9 @@ import {
 import { DraftLineItem, BUDGET_CATEGORIES, BudgetCategory } from '@/lib/hooks/useBudgetVersions';
 import { CategoryGroup } from './CategoryGroup';
 import { DraggableBudgetItem } from './DraggableBudgetItem';
-import { Loader2, Wand2, Plus } from 'lucide-react';
+import { Loader2, Wand2, Plus, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';

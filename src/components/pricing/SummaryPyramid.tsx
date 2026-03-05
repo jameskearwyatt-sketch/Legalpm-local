@@ -1,10 +1,11 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { cn } from "@/lib/utils";
-import { Triangle, Minus, Star, Zap, GripVertical } from "lucide-react";
+import { Triangle, Minus, Star, Zap, GripVertical, Save, RotateCcw, X, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip";
+import { SummaryMemorySlot } from "@/lib/hooks/usePricingProposals";
 
 interface TeamMember {
   key: string;
@@ -29,6 +30,11 @@ interface SummaryPyramidProps {
   onToggleKeyPlayer?: (key: string) => void;
   levelOverrides?: Record<string, string>;
   onMemberLevelOverride?: (key: string, newLevel: string) => void;
+  memorySlots?: (SummaryMemorySlot | null)[];
+  onSaveMemory?: (slotIndex: number, note?: string) => void;
+  onLoadMemory?: (slotIndex: number) => void;
+  onClearMemory?: (slotIndex: number) => void;
+  onUpdateMemoryNote?: (slotIndex: number, note: string) => void;
 }
 
 export type TierKey = "partner" | "counsel" | "seniorAssociate" | "associate" | "trainee";
@@ -486,6 +492,130 @@ const PRESETS: { key: DistributionPreset; label: string; icon: React.ReactNode; 
   { key: "reverse", label: "Reverse", icon: <Triangle className="h-3.5 w-3.5 rotate-180" />, desc: "Partners-heavy distribution" },
 ];
 
+/* ─── Memory Slots ─── */
+interface MemorySlotsProps {
+  slots: (SummaryMemorySlot | null)[];
+  onSave: (index: number, note?: string) => void;
+  onLoad: (index: number) => void;
+  onClear: (index: number) => void;
+  onUpdateNote: (index: number, note: string) => void;
+}
+
+function MemorySlots({ slots, onSave, onLoad, onClear, onUpdateNote }: MemorySlotsProps) {
+  const [editingNote, setEditingNote] = useState<number | null>(null);
+  const [noteValue, setNoteValue] = useState("");
+  const noteInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingNote !== null && noteInputRef.current) {
+      noteInputRef.current.focus();
+    }
+  }, [editingNote]);
+
+  const handleStartEditNote = (index: number, currentNote: string) => {
+    setEditingNote(index);
+    setNoteValue(currentNote);
+  };
+
+  const handleCommitNote = (index: number) => {
+    onUpdateNote(index, noteValue.trim());
+    setEditingNote(null);
+  };
+
+  return (
+    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+      <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Memory:</span>
+      <div className="flex gap-1.5 flex-wrap items-center">
+        {[0, 1, 2].map((i) => {
+          const slot = slots[i] ?? null;
+          const isEmpty = !slot;
+          return (
+            <div key={i} className="flex items-center gap-0.5">
+              {isEmpty ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1 px-2 border-dashed"
+                      onClick={() => onSave(i)}
+                    >
+                      <Save className="h-3 w-3" />
+                      M{i + 1}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Save current allocation to Memory {i + 1}</TooltipContent>
+                </Tooltip>
+              ) : (
+                <div className="flex items-center gap-0.5">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="h-7 text-xs gap-1 px-2"
+                        onClick={() => onLoad(i)}
+                      >
+                        <RotateCcw className="h-3 w-3" />
+                        M{i + 1}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <div className="text-xs">
+                        <p className="font-medium">Restore Memory {i + 1}</p>
+                        {slot.note && <p className="text-muted-foreground mt-0.5">"{slot.note}"</p>}
+                        <p className="text-muted-foreground mt-0.5">Saved {new Date(slot.savedAt).toLocaleDateString()}</p>
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                  {editingNote === i ? (
+                    <Input
+                      ref={noteInputRef}
+                      value={noteValue}
+                      onChange={(e) => setNoteValue(e.target.value)}
+                      onBlur={() => handleCommitNote(i)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleCommitNote(i); if (e.key === "Escape") setEditingNote(null); }}
+                      className="h-7 w-28 text-xs px-1.5"
+                      placeholder="Add note…"
+                    />
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0"
+                          onClick={() => handleStartEditNote(i, slot.note || "")}
+                        >
+                          <Pencil className="h-2.5 w-2.5 text-muted-foreground" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{slot.note || "Add note"}</TooltipContent>
+                    </Tooltip>
+                  )}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => onClear(i)}
+                      >
+                        <X className="h-2.5 w-2.5 text-muted-foreground" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Clear Memory {i + 1}</TooltipContent>
+                  </Tooltip>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 /* ─── Main Component ─── */
 const SummaryPyramid = React.memo(function SummaryPyramid({
   teamMembers,
@@ -497,6 +627,11 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
   onToggleKeyPlayer,
   levelOverrides = {},
   onMemberLevelOverride,
+  memorySlots = [null, null, null],
+  onSaveMemory,
+  onLoadMemory,
+  onClearMemory,
+  onUpdateMemoryNote,
 }: SummaryPyramidProps) {
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [activePreset, setActivePreset] = useState<DistributionPreset | null>(null);
@@ -667,6 +802,17 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
               ))}
             </div>
           </div>
+        )}
+
+        {/* Memory Slots */}
+        {onSaveMemory && (
+          <MemorySlots
+            slots={memorySlots}
+            onSave={onSaveMemory}
+            onLoad={onLoadMemory!}
+            onClear={onClearMemory!}
+            onUpdateNote={onUpdateMemoryNote!}
+          />
         )}
 
         {/* Hint */}

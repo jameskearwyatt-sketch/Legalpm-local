@@ -86,8 +86,9 @@ export function FinancialSnapshotHistoryModal({
           ) : (
             <div className="space-y-3">
               {sortedSnapshots.map((snapshot, index) => {
-                // For snapshots, wip_amount IS already NET - write-off is tracked separately for realization
+                // wip_amount IS already NET - write-off is tracked separately for realization
                 const netWip = snapshot.wip_amount;
+                const rawWip = netWip + (snapshot.wip_write_off_amount || 0);
                 const isLatest = index === 0;
                 
                 return (
@@ -149,7 +150,7 @@ export function FinancialSnapshotHistoryModal({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                       <div>
                         <p className="text-xs text-muted-foreground">Raw WIP</p>
-                        <p className="font-medium">{formatCurrency(snapshot.wip_amount, currency)}</p>
+                        <p className="font-medium">{formatCurrency(rawWip, currency)}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Write-off</p>

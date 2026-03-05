@@ -9,6 +9,9 @@ Member bars have a drag handle (⋮⋮ GripVertical rotated 90°) that appears o
 ## Drag-Between-Levels (Vertical)
 Members can be dragged vertically between level rows using native HTML drag-and-drop. This reassigns the member's "modelling level" without changing their actual seniority. Members **retain the colour of their home level** so the user always knows their real seniority. The override is stored in `assumptions.summaryLevelOverrides: Record<string, string>` and persisted via auto-save. Dragging a member back to their home tier removes the override.
 
+## Bench Feature
+Members can be dragged to a "Bench" zone below the pyramid tiers to temporarily remove them from active allocations (hours set to zero). Benched members appear with reduced opacity and a strikethrough label, retaining their home-tier colour. They can be dragged back into any tier row to reactivate. State is stored in `assumptions.summaryBenchedMembers: string[]`. Auto-distribute presets skip benched members. Memory slots save/restore bench state.
+
 ## Three-Tier Player Selection
 Users assign player roles via tap-cycle on member chips:
 - **Tap 1 → Key** (⭐ amber): 2× hour share
@@ -18,10 +21,10 @@ Users assign player roles via tap-cycle on member chips:
 State: `assumptions.summaryKeyPlayers: Record<string, number>`
 
 ## Auto-Distribute Presets
-Three buttons distribute hours to hit `bmUpperTarget` using the member's **effective tier** (overridden or home):
+Three buttons distribute hours to hit `bmUpperTarget` using the member's **effective tier** (overridden or home), skipping benched members:
 - **Pyramid (▽)**: Partner 1×, Counsel 3×, Sr. Assoc 4×, Associate 3×, Trainee 4×
 - **Flat**: Equal-ish weights
 - **Reverse (△)**: Partner 5×, Counsel 4×, Sr. Assoc 4×, Associate 3×, Trainee 2×
 
 ## Visual Design
-Individual members are rounded blocks with pastel tier-coloured backgrounds based on their **home** level. Relocated members show a subtle ring offset. Drop-zone highlights appear on target level rows during drag. Empty tiers show dashed placeholders.
+Individual members are rounded blocks with pastel tier-coloured backgrounds based on their **home** level. Relocated members show a subtle ring offset. Drop-zone highlights appear on target level rows during drag. Empty tiers show dashed placeholders. The bench zone uses a dashed border with muted background and a UserMinus icon.

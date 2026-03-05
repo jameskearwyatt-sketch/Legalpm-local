@@ -124,7 +124,7 @@ export function DraggableBudgetItem({
         ref={setNodeRef}
         style={style}
         className={cn(
-          'grid grid-cols-12 gap-2 items-center rounded-md py-1 px-1 transition-colors',
+          'flex flex-wrap gap-2 items-center rounded-md py-1 px-1 transition-colors',
           isDragging && 'opacity-50',
           isAiSuggested && 'bg-blue-50 dark:bg-blue-950/30 ring-1 ring-blue-300 dark:ring-blue-700',
           isNewItem && !isAiSuggested && 'bg-green-50 dark:bg-green-950/30 ring-1 ring-green-300 dark:ring-green-700',

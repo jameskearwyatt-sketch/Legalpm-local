@@ -317,6 +317,7 @@ function PyramidColumn({
                       onSelect={(k) => onMemberClick?.(k)}
                       onHoursCommit={onHoursCommit}
                       dragHoursOverride={dragState?.key === member.key ? dragState.hours : null}
+                      dragWidthPx={dragState?.key === member.key ? dragState.widthPx : null}
                       onDragStart={onDragStart}
                       editingKey={editingKey}
                       onEditClick={onEditClick}

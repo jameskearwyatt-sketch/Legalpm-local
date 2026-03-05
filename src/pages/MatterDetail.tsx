@@ -1495,7 +1495,7 @@ export default function MatterDetail() {
             }))}
             currentValues={{
               // Financial snapshots are stored in billing currency - no conversion needed
-              wip_amount: rawWipAmount,
+              wip_amount: wipAmount,
               wip_write_off_amount: wipWriteOffAmount,
               billed_amount: billedAmount,
               accounts_receivable: accountsReceivable,

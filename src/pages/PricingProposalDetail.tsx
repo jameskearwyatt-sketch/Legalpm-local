@@ -958,6 +958,7 @@ export default function PricingProposalDetail() {
         hours: { ...(prev.summaryHours || {}) },
         keyPlayers: { ...(prev.summaryKeyPlayers || {}) },
         levelOverrides: { ...(prev.summaryLevelOverrides || {}) },
+        benchedMembers: [...(prev.summaryBenchedMembers || [])],
         savedAt: new Date().toISOString(),
       };
       return { ...prev, summaryMemorySlots: slots };

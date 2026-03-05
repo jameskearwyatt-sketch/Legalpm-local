@@ -646,6 +646,7 @@ export function CategorizedBudgetView({
                         updateLineItemOptional={updateLineItemOptional}
                         toggleLineItemIncluded={toggleLineItemIncluded}
                         updateLineItemCapped={updateLineItemCapped}
+                        onToggleAdditionalScope={handleToggleAdditionalScope}
                         canDelete={items.length > 1}
                       />
                     );

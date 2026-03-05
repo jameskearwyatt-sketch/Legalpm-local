@@ -252,14 +252,10 @@ function PyramidColumn({
   dragState, onDragStart,
   editingKey, onEditClick, onEditDone,
 }: PyramidColumnProps) {
-  // When dragging, override the member's value for width calculation
-  const getEffectiveValue = (m: TeamMember) => {
-    if (dragState && dragState.key === m.key) return dragState.hours;
-    return getValue(m);
-  };
+  const isDragging = !!dragState;
 
   const tierTotals = tiers.map((t) =>
-    t.members.reduce((s, m) => s + getEffectiveValue(m), 0)
+    t.members.reduce((s, m) => s + getValue(m), 0)
   );
   const maxTierTotal = Math.max(...tierTotals, 1);
 

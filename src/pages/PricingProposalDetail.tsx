@@ -2873,6 +2873,8 @@ export default function PricingProposalDetail() {
               onToggleKeyPlayer={toggleKeyPlayer}
               levelOverrides={summaryLevelOverrides}
               onMemberLevelOverride={handleMemberLevelOverride}
+              benchedMembers={summaryBenchedMembers}
+              onBenchMember={handleBenchMember}
               memorySlots={summaryMemorySlots}
               onSaveMemory={handleSaveMemory}
               onLoadMemory={handleLoadMemory}

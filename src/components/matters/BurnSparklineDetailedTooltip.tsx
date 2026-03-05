@@ -351,6 +351,9 @@ export function BurnSparklineDetailedTooltip({
   const latestSnapshot = snapshots.length > 0 
     ? [...snapshots].sort((a, b) => new Date(b.as_of_date).getTime() - new Date(a.as_of_date).getTime())[0]
     : null;
+
+  return (
+    <div ref={tooltipRef} className="flex flex-col gap-4 min-w-[450px]">
       {/* Header with status */}
       <div className={`flex items-center justify-between px-4 py-3 rounded-lg ${statusColors.bg}`}>
         <div className="flex items-center gap-3">
@@ -363,9 +366,18 @@ export function BurnSparklineDetailedTooltip({
             {adjustedBurnPercent.toFixed(0)}% of Budget
           </span>
         </div>
-        <span className={`text-sm font-medium ${statusColors.text}`}>
-          {adjustedBurnPercent > 100 ? 'Over Budget' : adjustedBurnPercent > 80 ? 'Nearing Limit' : 'On Track'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-medium ${statusColors.text}`}>
+            {adjustedBurnPercent > 100 ? 'Over Budget' : adjustedBurnPercent > 80 ? 'Nearing Limit' : 'On Track'}
+          </span>
+          <button
+            onClick={(e) => { e.stopPropagation(); handleDownload(); }}
+            className="p-1 rounded hover:bg-background/50 transition-colors"
+            title="Download as PNG"
+          >
+            <Download className="h-4 w-4 text-muted-foreground hover:text-foreground" />
+          </button>
+        </div>
       </div>
 
       {/* Large detailed chart */}

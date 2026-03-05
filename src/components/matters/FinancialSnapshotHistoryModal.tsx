@@ -150,7 +150,7 @@ export function FinancialSnapshotHistoryModal({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
                       <div>
                         <p className="text-xs text-muted-foreground">Raw WIP</p>
-                        <p className="font-medium">{formatCurrency(snapshot.wip_amount, currency)}</p>
+                        <p className="font-medium">{formatCurrency(rawWip, currency)}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">Write-off</p>

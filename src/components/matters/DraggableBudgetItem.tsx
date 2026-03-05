@@ -135,7 +135,7 @@ export function DraggableBudgetItem({
         <div
           {...attributes}
           {...listeners}
-          className="col-span-1 flex justify-center cursor-grab active:cursor-grabbing"
+          className="flex justify-center cursor-grab active:cursor-grabbing w-8"
         >
           <GripVertical className="h-4 w-4 text-muted-foreground" />
         </div>

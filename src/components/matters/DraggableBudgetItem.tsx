@@ -236,6 +236,28 @@ export function DraggableBudgetItem({
           </Select>
         </div>
 
+        {/* Additional Scope toggle in editing mode */}
+        {onToggleAdditionalScope && (
+          <div className="col-span-1 flex items-center justify-center">
+            <div className="flex items-center gap-1">
+              <Checkbox
+                id={`addl-scope-edit-${index}`}
+                checked={item.is_additional_scope ?? false}
+                onCheckedChange={() => onToggleAdditionalScope(index)}
+                className={cn(
+                  item.is_additional_scope && "border-emerald-600 data-[state=checked]:bg-emerald-600 data-[state=checked]:border-emerald-600 dark:border-emerald-400 dark:data-[state=checked]:bg-emerald-500 dark:data-[state=checked]:border-emerald-500"
+                )}
+              />
+              <label htmlFor={`addl-scope-edit-${index}`} className={cn(
+                "text-xs cursor-pointer whitespace-nowrap",
+                item.is_additional_scope ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-muted-foreground"
+              )}>
+                Add'l
+              </label>
+            </div>
+          </div>
+        )}
+
         {/* Delete button */}
         <div className="col-span-1 flex justify-center">
           {canDelete && (

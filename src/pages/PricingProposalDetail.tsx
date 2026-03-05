@@ -2853,6 +2853,11 @@ export default function PricingProposalDetail() {
               onToggleKeyPlayer={toggleKeyPlayer}
               levelOverrides={summaryLevelOverrides}
               onMemberLevelOverride={handleMemberLevelOverride}
+              memorySlots={summaryMemorySlots}
+              onSaveMemory={handleSaveMemory}
+              onLoadMemory={handleLoadMemory}
+              onClearMemory={handleClearMemory}
+              onUpdateMemoryNote={handleUpdateMemoryNote}
             />
 
             {/* Budget buffer indicator */}

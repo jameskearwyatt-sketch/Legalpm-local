@@ -64,6 +64,7 @@ export interface DraftLineItem {
   is_optional?: boolean;
   is_included?: boolean;
   is_capped?: boolean;
+  is_additional_scope?: boolean;
   category?: string | null;
   wip_amount?: number;
   wip_write_off?: number;

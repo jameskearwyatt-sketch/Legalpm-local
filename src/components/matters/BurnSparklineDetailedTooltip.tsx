@@ -626,6 +626,38 @@ export function BurnSparklineDetailedTooltip({
         </div>
       )}
 
+      {/* Data-point history table */}
+      {realDataPoints.length > 0 && (
+        <div className="border-t pt-3">
+          <div className="text-xs text-muted-foreground mb-2 font-medium">Budget Usage Build-Up</div>
+          <div className="max-h-[140px] overflow-y-auto rounded border">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-muted/70">
+                  <th className="text-left px-2 py-1 font-medium text-muted-foreground">Date</th>
+                  <th className="text-right px-2 py-1 font-medium text-muted-foreground">Cumulative Burn</th>
+                  <th className="text-right px-2 py-1 font-medium text-muted-foreground">Budget Used</th>
+                </tr>
+              </thead>
+              <tbody>
+                {realDataPoints.map((dp, i) => {
+                  const pct = bmBudget > 0 ? ((dp.burn / bmBudget) * 100) : 0;
+                  return (
+                    <tr key={i} className={i % 2 === 0 ? 'bg-muted/20' : ''}>
+                      <td className="px-2 py-0.5 text-muted-foreground">{format(parseISO(dp.date), 'dd MMM yyyy')}</td>
+                      <td className="px-2 py-0.5 text-right font-medium">{formatCurrency(dp.burn, currency)}</td>
+                      <td className={`px-2 py-0.5 text-right font-medium ${pct > 105 ? 'text-destructive' : pct > 80 ? 'text-warning' : 'text-success'}`}>
+                        {pct.toFixed(1)}%
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Footer metadata */}
       <div className="flex items-center justify-between text-xs text-muted-foreground border-t pt-3">
         <div className="flex items-center gap-1.5">

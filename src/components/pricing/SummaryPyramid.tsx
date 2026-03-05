@@ -293,6 +293,7 @@ function DraggableMemberBlock({
 interface PyramidColumnProps {
   title: string;
   tiers: Tier[];
+  benchedMembers: TierMember[];
   getValue: (m: TierMember) => number;
   formatValue: (v: number) => string;
   total: number;
@@ -307,6 +308,7 @@ interface PyramidColumnProps {
   onEditClick: (key: string) => void;
   onEditDone: (key: string, val: number) => void;
   onMemberLevelOverride?: (key: string, newLevel: string) => void;
+  onBenchMember?: (key: string, benched: boolean) => void;
 }
 
 function PyramidColumn({

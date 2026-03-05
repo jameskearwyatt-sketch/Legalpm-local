@@ -235,39 +235,29 @@ export function BurnSparklineDetailedTooltip({
     [dataPoints]
   );
 
-  // html-to-image based PNG export — clones the tooltip and expands the scrollable table
+  // html-to-image PNG export — temporarily expand scrollable table, capture, restore
   const handleDownload = useCallback(async () => {
     if (!tooltipRef.current) return;
     try {
-      // Clone the node so we can expand the scrollable data table without affecting the UI
-      const clone = tooltipRef.current.cloneNode(true) as HTMLElement;
-      clone.style.position = 'absolute';
-      clone.style.left = '-9999px';
-      clone.style.top = '0';
-      clone.style.maxHeight = 'none';
-      clone.style.overflow = 'visible';
-      
-      // Remove max-height and scroll from the data table container in the clone
-      const scrollContainers = clone.querySelectorAll('.max-h-\\[140px\\]');
-      scrollContainers.forEach(el => {
-        (el as HTMLElement).style.maxHeight = 'none';
-        (el as HTMLElement).style.overflow = 'visible';
-      });
-      // Also catch by overflow-y-auto class
-      const overflowEls = clone.querySelectorAll('.overflow-y-auto');
-      overflowEls.forEach(el => {
-        (el as HTMLElement).style.maxHeight = 'none';
-        (el as HTMLElement).style.overflow = 'visible';
+      // Find scrollable containers and temporarily expand them
+      const scrollEls = tooltipRef.current.querySelectorAll<HTMLElement>('.overflow-y-auto');
+      const origStyles: { el: HTMLElement; maxHeight: string; overflow: string }[] = [];
+      scrollEls.forEach(el => {
+        origStyles.push({ el, maxHeight: el.style.maxHeight, overflow: el.style.overflow });
+        el.style.maxHeight = 'none';
+        el.style.overflow = 'visible';
       });
 
-      document.body.appendChild(clone);
-
-      const dataUrl = await toPng(clone, {
+      const dataUrl = await toPng(tooltipRef.current, {
         backgroundColor: '#ffffff',
         pixelRatio: 2,
       });
 
-      document.body.removeChild(clone);
+      // Restore original styles
+      origStyles.forEach(({ el, maxHeight, overflow }) => {
+        el.style.maxHeight = maxHeight;
+        el.style.overflow = overflow;
+      });
 
       const link = document.createElement('a');
       const safeName = (matterName || 'wip-chart').replace(/[^a-zA-Z0-9-_ ]/g, '').trim().replace(/\s+/g, '-');

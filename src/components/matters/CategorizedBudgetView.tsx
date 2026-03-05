@@ -400,6 +400,59 @@ export function CategorizedBudgetView({
 
   const activeItem = activeId !== null ? items[parseInt(activeId)] : null;
 
+  // Toggle additional scope for an item
+  const handleToggleAdditionalScope = async (index: number) => {
+    const updatedItems = [...items];
+    const newValue = !updatedItems[index].is_additional_scope;
+    updatedItems[index] = { ...updatedItems[index], is_additional_scope: newValue };
+    onItemsChange(updatedItems);
+    
+    // Persist to DB if item has an ID
+    const item = items[index];
+    if (item.id) {
+      try {
+        const { error } = await supabase
+          .from('budget_line_items')
+          .update({ is_additional_scope: newValue })
+          .eq('id', item.id);
+        if (error) {
+          console.error('Error saving additional scope:', error);
+          toast.error('Failed to save additional scope');
+        }
+      } catch (error) {
+        console.error('Error saving additional scope:', error);
+      }
+    }
+  };
+
+  // Separate additional scope items from original scope items
+  const additionalScopeItems = useMemo(() => {
+    return items.map((item, index) => ({ item, index })).filter(({ item }) => item.is_additional_scope);
+  }, [items]);
+
+  const hasAdditionalScope = additionalScopeItems.length > 0;
+
+  // Group additional scope items by category
+  const additionalScopeGroups = useMemo(() => {
+    const groups: Record<string, { items: DraftLineItem[]; indices: number[]; category: BudgetCategory }> = {};
+    additionalScopeItems.forEach(({ item, index }) => {
+      const category = (item.category || 'Other') as BudgetCategory;
+      if (!groups[category]) {
+        groups[category] = { items: [], indices: [], category };
+      }
+      groups[category].items.push(item);
+      groups[category].indices.push(index);
+    });
+    return groups;
+  }, [additionalScopeItems]);
+
+  const additionalScopeTotal = useMemo(() => {
+    return additionalScopeItems.reduce((sum, { item }) => {
+      const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
+      return sum + (isIncluded ? (item.fee_amount || 0) : 0);
+    }, 0);
+  }, [additionalScopeItems]);
+
   // Count uncategorized items
   const uncategorizedCount = items.filter(item => !item.category && item.work_item.trim()).length;
 

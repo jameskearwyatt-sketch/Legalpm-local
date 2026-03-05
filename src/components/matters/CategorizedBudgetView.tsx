@@ -102,6 +102,7 @@ export function CategorizedBudgetView({
   toggleLineItemIncluded,
   updateLineItemCapped,
   matterId,
+  settledItems,
 }: CategorizedBudgetViewProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isCategorizing, setIsCategorizing] = useState(false);

@@ -947,13 +947,20 @@ export default function PricingProposalDetail() {
     const enrichedMembers = teamMembers.map(m => {
       const hours = summaryHours[m.key] || 0;
       const displayRate = afaRateDiscount ? m.rate * afaRateDiscount : m.rate;
+      // Calculate max hours this member could have (budget minus others' revenue) / rate
+      const othersRevenue = teamMembers.reduce((sum, other) => {
+        if (other.key === m.key) return sum;
+        const oRate = afaRateDiscount ? other.rate * afaRateDiscount : other.rate;
+        return sum + ((summaryHours[other.key] || 0) * oRate);
+      }, 0);
+      const maxHours = displayRate > 0 ? Math.max(0, (bmUpperTarget - othersRevenue) / displayRate) : 0;
       return {
         ...m,
         hours,
-        revenue: hours * (afaRateDiscount ? m.rate * afaRateDiscount : m.rate),
+        revenue: hours * displayRate,
         displayRate,
         memberCost: hours * m.cost,
-        isLocked: !!summaryLocks[m.key],
+        maxHours,
       };
     });
 

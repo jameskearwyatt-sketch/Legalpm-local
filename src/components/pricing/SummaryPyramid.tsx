@@ -168,7 +168,7 @@ function DraggableMemberBlock({
     : { width: `${widthPct}%`, minWidth: 40 };
 
   return (
-    <div className="flex flex-col min-w-0" style={wrapperStyle}>
+    <div className="flex flex-col min-w-0" style={wrapperStyle} ref={barRef}>
       <div
         className={cn(
           "rounded-xl border flex items-center justify-between py-1.5 px-1.5 min-w-0 overflow-hidden relative group",

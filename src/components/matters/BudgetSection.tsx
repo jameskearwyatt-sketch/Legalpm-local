@@ -163,7 +163,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       // Bella-specific patch: V1 was priced in USD, current budget is GBP
       // Convert settled amounts from USD→GBP for display comparison only
       const isBellaMatter = matterId === '43d4a3fd-e461-45d8-b4b5-66872029f580';
-      const usdToGbpRate = 0.79;
+      const usdToGbpRate = 1 / 1.36;
       
       setSettledItems(items.map(item => ({
         id: item.id,

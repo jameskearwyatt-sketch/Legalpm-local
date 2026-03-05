@@ -2803,6 +2803,8 @@ export default function PricingProposalDetail() {
               onMemberHoursCommit={handleSummaryHoursChange}
               keyPlayers={summaryKeyPlayers}
               onToggleKeyPlayer={toggleKeyPlayer}
+              levelOverrides={summaryLevelOverrides}
+              onMemberLevelOverride={handleMemberLevelOverride}
             />
 
             {/* Budget buffer indicator */}

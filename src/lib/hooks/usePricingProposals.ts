@@ -62,6 +62,7 @@ export interface ProposalAssumptions {
   summaryLocks?: Record<string, boolean>;
   summaryKeyPlayers?: Record<string, number>; // 0=background, 1=key, 2=anchor
   summaryLevelOverrides?: Record<string, string>; // member key → overridden tier key for modelling
+  summaryBenchedMembers?: string[]; // member keys currently on the bench
   // Memory slots for saving/restoring hour allocations
   summaryMemorySlots?: SummaryMemorySlot[];
 }

@@ -431,6 +431,55 @@ function PyramidColumn({
             </div>
           );
         })}
+        {/* Bench zone */}
+        {interactive && (
+          <div
+            className={cn(
+              "flex items-center gap-2 mt-2 rounded-lg px-1 py-1.5 border-2 border-dashed transition-all duration-200",
+              dragOverTier === "bench"
+                ? "border-primary/50 bg-primary/10 ring-2 ring-primary/40"
+                : "border-muted-foreground/20 bg-muted/30",
+            )}
+            onDragOver={(e) => handleDragOver(e, "bench")}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, "bench")}
+          >
+            <span className="text-[10px] font-semibold w-16 shrink-0 text-right leading-tight text-muted-foreground flex items-center justify-end gap-1">
+              <UserMinus className="h-3 w-3" />
+              Bench
+            </span>
+            <div className="flex-1 min-w-0 flex flex-wrap gap-1">
+              {benchedMembers.length === 0 ? (
+                <span className="text-[10px] text-muted-foreground/50 italic">
+                  Drag members here to bench
+                </span>
+              ) : (
+                benchedMembers.map((member) => {
+                  const colors = TIER_COLORS[member.homeTierKey];
+                  return (
+                    <div
+                      key={member.key}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("text/plain", member.key);
+                        e.dataTransfer.effectAllowed = "move";
+                      }}
+                      className={cn(
+                        "rounded-lg border flex items-center gap-1 py-1 px-2 cursor-grab opacity-50 hover:opacity-75 transition-opacity",
+                        colors.bg, colors.border,
+                      )}
+                      title={`${member.label} (benched) — drag back to reactivate`}
+                    >
+                      <span className={cn("text-[10px] font-medium line-through", colors.text)}>
+                        {member.label}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

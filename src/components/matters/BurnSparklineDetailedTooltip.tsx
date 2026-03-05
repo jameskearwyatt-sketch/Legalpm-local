@@ -35,6 +35,7 @@ interface BurnSparklineDetailedTooltipProps {
   proposalData?: ProposalData | null;
   rawBurn?: number;
   dataPoints: DataPoint[];
+  matterName?: string;
 }
 
 export function BurnSparklineDetailedTooltip({

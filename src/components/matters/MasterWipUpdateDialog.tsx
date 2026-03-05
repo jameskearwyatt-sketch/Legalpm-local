@@ -314,6 +314,7 @@ export function MasterWipUpdateDialog({
           matter_name: m.matter_name,
           matter_number: m.matter_number,
           client_name: m.clients?.name || '',
+          cm_number: m.cm_number || '',
           currency: (m as any).effective_currency ?? m.fee_currency,
           current_wip: snapshot?.wip_amount || 0,
           current_wip_write_off: snapshot?.wip_write_off_amount || 0,

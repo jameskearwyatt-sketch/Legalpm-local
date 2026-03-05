@@ -900,6 +900,7 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
           <PyramidColumn
             title="Hours Distribution"
             tiers={tiers}
+            benchedMembers={benchedMembersList}
             getValue={(m) => m.hours}
             formatValue={(v) => `${formatHours(v)}h`}
             total={totalHours}
@@ -914,11 +915,13 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
             onEditClick={handleEditClick}
             onEditDone={handleEditDone}
             onMemberLevelOverride={onMemberLevelOverride}
+            onBenchMember={onBenchMember}
           />
           <div className="hidden sm:block w-px bg-border" />
           <PyramidColumn
             title="Cost Distribution"
             tiers={tiers}
+            benchedMembers={benchedMembersList}
             getValue={(m) => m.revenue}
             formatValue={(v) => formatCurrency(v)}
             total={totalRevenue}

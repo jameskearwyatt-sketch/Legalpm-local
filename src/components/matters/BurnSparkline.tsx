@@ -414,6 +414,7 @@ export function BurnSparkline({
           proposalData={proposalData}
           rawBurn={rawBurn}
           dataPoints={dataPoints}
+          matterName={matterName}
         />
       </HoverCardContent>
     </HoverCard>

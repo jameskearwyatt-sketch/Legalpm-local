@@ -940,7 +940,7 @@ export default function PricingProposalDetail() {
     return () => {
       if (summaryAutoSaveRef.current) clearTimeout(summaryAutoSaveRef.current);
     };
-  }, [assumptions.summaryHours, assumptions.summaryLocks, summaryInitialized, proposalId]);
+  }, [assumptions.summaryHours, summaryInitialized, proposalId]);
 
   // Summary aggregates
   const summary = useMemo(() => {

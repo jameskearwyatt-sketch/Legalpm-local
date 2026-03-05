@@ -2785,8 +2785,6 @@ export default function PricingProposalDetail() {
               formatHours={formatHours}
               onDistribute={handleAutoDistribute}
               onMemberHoursCommit={handleSummaryHoursChange}
-              lockedMembers={summaryLocks}
-              onToggleLock={toggleSummaryLock}
               keyPlayers={summaryKeyPlayers}
               onToggleKeyPlayer={toggleKeyPlayer}
             />

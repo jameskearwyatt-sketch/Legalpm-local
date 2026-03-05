@@ -481,9 +481,9 @@ function KeyPlayersSelection({ tiers, keyPlayers, onToggle }: KeyPlayersSelectio
 
 /* ─── Preset Buttons ─── */
 const PRESETS: { key: DistributionPreset; label: string; icon: React.ReactNode; desc: string }[] = [
-  { key: "pyramid", label: "Pyramid", icon: <Triangle className="h-3.5 w-3.5 rotate-180" />, desc: "Most hours to seniors & juniors" },
+  { key: "pyramid", label: "Pyramid", icon: <Triangle className="h-3.5 w-3.5" />, desc: "Most hours to seniors & juniors" },
   { key: "flat", label: "Flat", icon: <Minus className="h-3.5 w-3.5" />, desc: "Equal revenue share" },
-  { key: "reverse", label: "Reverse", icon: <Triangle className="h-3.5 w-3.5" />, desc: "Partners-heavy distribution" },
+  { key: "reverse", label: "Reverse", icon: <Triangle className="h-3.5 w-3.5 rotate-180" />, desc: "Partners-heavy distribution" },
 ];
 
 /* ─── Main Component ─── */

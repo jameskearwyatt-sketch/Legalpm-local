@@ -220,7 +220,7 @@ export function DraggableBudgetItem({
         </div>
 
         {/* Category selector */}
-        <div className="col-span-1">
+        <div className="min-w-[80px]">
           <Select
             value={item.category || 'Other'}
             onValueChange={(v) => onCategoryChange(index, v)}

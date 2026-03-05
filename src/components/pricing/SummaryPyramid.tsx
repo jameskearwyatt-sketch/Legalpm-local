@@ -218,7 +218,7 @@ function DraggableMemberBlock({
         </div>
 
         {/* Drag handle — visible on hover/selected for interactive blocks */}
-        {interactive && isSelected && !isEditing && (
+        {interactive && !isEditing && (
           <div
             className="flex items-center justify-center w-4 h-full cursor-col-resize shrink-0 opacity-60 hover:opacity-100 transition-opacity touch-none"
             onMouseDown={handleHandleMouseDown}

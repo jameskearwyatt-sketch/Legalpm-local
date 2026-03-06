@@ -282,43 +282,19 @@ export function CategoryFeeAllocationDialog({
     }
   }, [initialAllocations, hasChanges]);
   
-  // Handle slider change: adjust one item, redistribute remainder proportionally among others
+  // Handle slider change: independent budget-buffer model — no auto-redistribution
   const handleSliderChange = useCallback((changedIndex: number, newValue: number) => {
     setSliderValues(prev => {
       const next = new Map(prev);
-      const oldValue = prev.get(changedIndex) ?? 0;
-      const delta = newValue - oldValue;
-      
-      if (Math.abs(delta) < 1) return prev;
-      
-      // Collect other items and their current values
-      const others: { index: number; value: number }[] = [];
+      // Calculate budget used by all OTHER items
       let othersTotal = 0;
       prev.forEach((val, idx) => {
-        if (idx !== changedIndex) {
-          others.push({ index: idx, value: val });
-          othersTotal += val;
-        }
+        if (idx !== changedIndex) othersTotal += val;
       });
-      
-      // Clamp the changed value so others don't go below 0
-      const clampedValue = Math.max(0, Math.min(newValue, newTotal));
-      const remainingBudget = newTotal - clampedValue;
-      
-      next.set(changedIndex, clampedValue);
-      
-      // Redistribute remaining budget proportionally among others
-      if (othersTotal > 0) {
-        others.forEach(other => {
-          const proportion = other.value / othersTotal;
-          next.set(other.index, Math.max(0, proportion * remainingBudget));
-        });
-      } else if (others.length > 0) {
-        // All others are zero — distribute equally
-        const equalShare = remainingBudget / others.length;
-        others.forEach(other => next.set(other.index, equalShare));
-      }
-      
+      // Cap: can't exceed total budget minus what others are using
+      const maxAllowed = Math.max(0, newTotal - othersTotal);
+      const clamped = Math.max(0, Math.min(newValue, maxAllowed));
+      next.set(changedIndex, clamped);
       return next;
     });
   }, [newTotal]);
@@ -357,12 +333,21 @@ export function CategoryFeeAllocationDialog({
   };
   
   const dialogTitle = isSubtotalEdit ? 'Adjust Phase Subtotal' : 'Adjust Category Fee';
+
+  // Budget buffer: how much is unallocated
+  const allocatedTotal = useMemo(() => {
+    let sum = 0;
+    sliderValues.forEach(v => sum += v);
+    return sum;
+  }, [sliderValues]);
+  const unallocated = newTotal - allocatedTotal;
+  const isFullyAllocated = Math.abs(unallocated) < 100;
+
   const dialogDescription = isSubtotalEdit
     ? <>Adjust the subtotal for <strong>{phaseName}</strong>. The change will be distributed pro-rata across categories first, then within each category across {affectedItems.length} work item(s).</>
     : <>Adjust the total fee for <strong>{categoryName}</strong>{phaseName && <> in <strong>{phaseName}</strong></>}. The change will be distributed pro-rata across {affectedItems.length} work item(s).</>;
   
-  // Max for any single slider (the full total, since others can go to 0)
-  const sliderMax = newTotal;
+  // Each slider's max = its current value + unallocated budget
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -431,12 +416,28 @@ export function CategoryFeeAllocationDialog({
                   Reset
                 </Button>
               </div>
-              <div className="max-h-[350px] overflow-y-auto px-4 py-3 space-y-4">
+              
+              {/* Budget buffer indicator */}
+              <div className="px-4 py-2 border-b min-h-[40px] flex items-center justify-center">
+                {isFullyAllocated ? (
+                  <span className="text-xs font-medium text-green-700 dark:text-green-400">
+                    ✓ Fully allocated
+                  </span>
+                ) : unallocated > 0 ? (
+                  <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                    Unallocated: {formatCurrency(unallocated)} remaining
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="max-h-[320px] overflow-y-auto px-4 py-3 space-y-4">
                 {previewItems.map((item) => {
                   const rawValue = sliderValues.get(item.index) ?? 0;
                   const snappedValue = snappedValues.get(item.index) ?? 0;
                   const pctOfTotal = newTotal > 0 ? (rawValue / newTotal) * 100 : 0;
                   const changeFromCurrent = snappedValue - item.currentFee;
+                  // Per-item max: current value + whatever is unallocated
+                  const itemMax = rawValue + Math.max(0, unallocated);
                   
                   return (
                     <div key={item.index} className="space-y-1.5">
@@ -462,8 +463,8 @@ export function CategoryFeeAllocationDialog({
                         <Slider
                           value={[rawValue]}
                           min={0}
-                          max={sliderMax}
-                          step={sliderMax / 200} // smooth ~0.5% increments
+                          max={Math.max(itemMax, 1)} // prevent max=0
+                          step={newTotal / 200}
                           onValueChange={([v]) => handleSliderChange(item.index, v)}
                           className="flex-1"
                         />
@@ -479,7 +480,7 @@ export function CategoryFeeAllocationDialog({
                 })}
               </div>
               <div className="px-4 py-2 border-t bg-muted/30 text-xs text-muted-foreground text-center">
-                Drag sliders to rebalance visually · Values snap to nearest {currencySymbol}1,000 on apply
+                Slide to adjust · Budget-capped · Snaps to nearest {currencySymbol}1,000 on apply
               </div>
             </div>
           )}

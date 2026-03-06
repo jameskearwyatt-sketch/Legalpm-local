@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { Slider } from '@/components/ui/slider';
+import { ArrowRight, TrendingUp, TrendingDown, RotateCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Rounding: always nearest 1,000
@@ -30,11 +31,9 @@ function distributeProRata(
   const currentTotal = items.reduce((sum, item) => sum + item.currentFee, 0);
   
   if (currentTotal === 0) {
-    // If all items are zero, distribute equally with smart rounding
     const equalShare = targetTotal / items.length;
     const roundedShare = smartRound(equalShare);
     
-    // Give each item the rounded share, adjust last item to match target
     let distributed = 0;
     items.forEach((item, idx) => {
       if (idx === items.length - 1) {
@@ -47,33 +46,27 @@ function distributeProRata(
     return result;
   }
   
-  // Calculate proportional shares
   const shares = items.map(item => ({
     index: item.index,
     proportion: item.currentFee / currentTotal,
     exactShare: (item.currentFee / currentTotal) * targetTotal,
   }));
   
-  // First pass: round each share using smart rounding
   const roundedShares = shares.map(share => ({
     ...share,
     rounded: smartRound(share.exactShare),
     remainder: share.exactShare - smartRound(share.exactShare),
   }));
   
-  // Calculate discrepancy
   const totalRounded = roundedShares.reduce((sum, s) => sum + s.rounded, 0);
   let discrepancy = targetTotal - totalRounded;
   
-  // Sort by remainder (largest first for positive discrepancy, smallest for negative)
   const sortedByRemainder = [...roundedShares].sort((a, b) => 
     discrepancy > 0 ? b.remainder - a.remainder : a.remainder - b.remainder
   );
   
-  // Always use 1000 increment for discrepancy adjustment
   const increment = 1000;
   
-  // Adjust items to eliminate discrepancy
   sortedByRemainder.forEach(share => {
     if (Math.abs(discrepancy) >= increment) {
       const adjustment = discrepancy > 0 ? increment : -increment;
@@ -82,12 +75,10 @@ function distributeProRata(
     }
   });
   
-  // Final adjustment if still off (add to largest item)
   if (discrepancy !== 0 && sortedByRemainder.length > 0) {
     sortedByRemainder[0].rounded += discrepancy;
   }
   
-  // Build result map
   roundedShares.forEach(share => {
     result.set(share.index, share.rounded);
   });
@@ -104,7 +95,6 @@ function distributeTwoTier(
   
   if (items.length === 0) return result;
   
-  // Group items by category
   const categoryGroups = new Map<string, { index: number; currentFee: number }[]>();
   items.forEach(item => {
     const existing = categoryGroups.get(item.category) || [];
@@ -112,7 +102,6 @@ function distributeTwoTier(
     categoryGroups.set(item.category, existing);
   });
   
-  // Calculate current category totals
   const categoryTotals: { category: string; total: number }[] = [];
   categoryGroups.forEach((groupItems, category) => {
     const total = groupItems.reduce((sum, item) => sum + item.currentFee, 0);
@@ -121,11 +110,9 @@ function distributeTwoTier(
   
   const currentGrandTotal = categoryTotals.reduce((sum, c) => sum + c.total, 0);
   
-  // First tier: distribute target across categories pro-rata
   const categoryTargets = new Map<string, number>();
   
   if (currentGrandTotal === 0) {
-    // Equal distribution across categories
     const equalShare = targetTotal / categoryTotals.length;
     const roundedShare = smartRound(equalShare);
     let distributed = 0;
@@ -138,7 +125,6 @@ function distributeTwoTier(
       }
     });
   } else {
-    // Pro-rata by current category totals
     const categoryShares = categoryTotals.map(cat => ({
       category: cat.category,
       proportion: cat.total / currentGrandTotal,
@@ -151,7 +137,6 @@ function distributeTwoTier(
       remainder: share.exactShare - smartRound(share.exactShare),
     }));
     
-    // Reconcile category discrepancy
     const totalCategoryRounded = roundedCategoryShares.reduce((sum, s) => sum + s.rounded, 0);
     let categoryDiscrepancy = targetTotal - totalCategoryRounded;
     
@@ -178,7 +163,6 @@ function distributeTwoTier(
     });
   }
   
-  // Second tier: distribute each category's target across its items
   categoryGroups.forEach((groupItems, category) => {
     const categoryTarget = categoryTargets.get(category) ?? 0;
     const itemAllocations = distributeProRata(groupItems, categoryTarget);
@@ -190,17 +174,57 @@ function distributeTwoTier(
   return result;
 }
 
+// Snap continuous slider values to clean 1,000 multiples using Largest Remainder
+function snapToCleanValues(
+  values: Map<number, number>,
+  targetTotal: number
+): Map<number, number> {
+  const result = new Map<number, number>();
+  const entries = Array.from(values.entries());
+  
+  if (entries.length === 0) return result;
+  
+  const roundedEntries = entries.map(([index, value]) => ({
+    index,
+    exact: value,
+    rounded: smartRound(value),
+    remainder: value - smartRound(value),
+  }));
+  
+  const totalRounded = roundedEntries.reduce((sum, e) => sum + e.rounded, 0);
+  let discrepancy = targetTotal - totalRounded;
+  
+  const sorted = [...roundedEntries].sort((a, b) =>
+    discrepancy > 0 ? b.remainder - a.remainder : a.remainder - b.remainder
+  );
+  
+  sorted.forEach(entry => {
+    if (Math.abs(discrepancy) >= 1000) {
+      const adj = discrepancy > 0 ? 1000 : -1000;
+      entry.rounded += adj;
+      discrepancy -= adj;
+    }
+  });
+  
+  if (discrepancy !== 0 && sorted.length > 0) {
+    sorted[0].rounded += discrepancy;
+  }
+  
+  roundedEntries.forEach(e => result.set(e.index, e.rounded));
+  return result;
+}
+
 interface CategoryFeeAllocationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  categoryName: string | null; // null for subtotal edit
+  categoryName: string | null;
   phaseName: string | null;
   currentTotal: number;
   affectedItems: { index: number; workItem: string; currentFee: number; category: string }[];
   formatCurrency: (value: number) => string;
   currencySymbol: string;
   onApply: (allocations: Map<number, number>) => void;
-  isSubtotalEdit?: boolean; // true = editing phase subtotal, false = editing single category
+  isSubtotalEdit?: boolean;
 }
 
 export function CategoryFeeAllocationDialog({
@@ -216,24 +240,31 @@ export function CategoryFeeAllocationDialog({
   isSubtotalEdit = false,
 }: CategoryFeeAllocationDialogProps) {
   const [newTotalInput, setNewTotalInput] = useState('');
-  
-  // Reset input when dialog opens
-  useEffect(() => {
-    if (open) {
-      setNewTotalInput(currentTotal.toString());
-    }
-  }, [open, currentTotal]);
+  // Continuous (unrounded) slider values keyed by item index
+  const [sliderValues, setSliderValues] = useState<Map<number, number>>(new Map());
+  const [slidersInitialized, setSlidersInitialized] = useState(false);
   
   const newTotal = useMemo(() => {
     const parsed = parseFloat(newTotalInput.replace(/,/g, ''));
     return isNaN(parsed) ? currentTotal : parsed;
   }, [newTotalInput, currentTotal]);
+
+  // Reset when dialog opens
+  useEffect(() => {
+    if (open) {
+      setNewTotalInput(currentTotal.toString());
+      setSlidersInitialized(false);
+      setSliderValues(new Map());
+    }
+  }, [open, currentTotal]);
   
   const difference = newTotal - currentTotal;
   const percentChange = currentTotal > 0 ? (difference / currentTotal) * 100 : 0;
+  const hasChanges = difference !== 0;
   
-  // Preview allocations - use two-tier for subtotal, single-tier for category
-  const previewAllocations = useMemo(() => {
+  // Initial pro-rata allocation (used as starting point for sliders)
+  const initialAllocations = useMemo(() => {
+    if (!hasChanges) return new Map<number, number>();
     if (isSubtotalEdit) {
       return distributeTwoTier(affectedItems, newTotal);
     }
@@ -241,29 +272,78 @@ export function CategoryFeeAllocationDialog({
       affectedItems.map(item => ({ index: item.index, currentFee: item.currentFee })),
       newTotal
     );
-  }, [affectedItems, newTotal, isSubtotalEdit]);
+  }, [affectedItems, newTotal, isSubtotalEdit, hasChanges]);
   
-  // Preview items with new values, grouped by category for subtotal view
+  // Initialize slider values from pro-rata when total changes
+  useEffect(() => {
+    if (hasChanges && initialAllocations.size > 0) {
+      setSliderValues(new Map(initialAllocations));
+      setSlidersInitialized(true);
+    }
+  }, [initialAllocations, hasChanges]);
+  
+  // Handle slider change: adjust one item, redistribute remainder proportionally among others
+  const handleSliderChange = useCallback((changedIndex: number, newValue: number) => {
+    setSliderValues(prev => {
+      const next = new Map(prev);
+      const oldValue = prev.get(changedIndex) ?? 0;
+      const delta = newValue - oldValue;
+      
+      if (Math.abs(delta) < 1) return prev;
+      
+      // Collect other items and their current values
+      const others: { index: number; value: number }[] = [];
+      let othersTotal = 0;
+      prev.forEach((val, idx) => {
+        if (idx !== changedIndex) {
+          others.push({ index: idx, value: val });
+          othersTotal += val;
+        }
+      });
+      
+      // Clamp the changed value so others don't go below 0
+      const clampedValue = Math.max(0, Math.min(newValue, newTotal));
+      const remainingBudget = newTotal - clampedValue;
+      
+      next.set(changedIndex, clampedValue);
+      
+      // Redistribute remaining budget proportionally among others
+      if (othersTotal > 0) {
+        others.forEach(other => {
+          const proportion = other.value / othersTotal;
+          next.set(other.index, Math.max(0, proportion * remainingBudget));
+        });
+      } else if (others.length > 0) {
+        // All others are zero — distribute equally
+        const equalShare = remainingBudget / others.length;
+        others.forEach(other => next.set(other.index, equalShare));
+      }
+      
+      return next;
+    });
+  }, [newTotal]);
+  
+  // Reset sliders to pro-rata
+  const handleResetSliders = useCallback(() => {
+    setSliderValues(new Map(initialAllocations));
+  }, [initialAllocations]);
+  
+  // Final snapped values for display and apply
+  const snappedValues = useMemo(() => {
+    if (!slidersInitialized || sliderValues.size === 0) return new Map<number, number>();
+    return snapToCleanValues(sliderValues, newTotal);
+  }, [sliderValues, newTotal, slidersInitialized]);
+  
+  // Preview items
   const previewItems = useMemo(() => {
+    const source = slidersInitialized ? snappedValues : initialAllocations;
     return affectedItems.map(item => ({
       ...item,
-      newFee: previewAllocations.get(item.index) ?? item.currentFee,
-      change: (previewAllocations.get(item.index) ?? item.currentFee) - item.currentFee,
+      newFee: source.get(item.index) ?? item.currentFee,
+      rawFee: sliderValues.get(item.index) ?? item.currentFee,
+      change: (source.get(item.index) ?? item.currentFee) - item.currentFee,
     }));
-  }, [affectedItems, previewAllocations]);
-  
-  // Group items by category for subtotal preview
-  const groupedPreviewItems = useMemo(() => {
-    if (!isSubtotalEdit) return null;
-    
-    const groups = new Map<string, typeof previewItems>();
-    previewItems.forEach(item => {
-      const existing = groups.get(item.category) || [];
-      existing.push(item);
-      groups.set(item.category, existing);
-    });
-    return groups;
-  }, [previewItems, isSubtotalEdit]);
+  }, [affectedItems, snappedValues, initialAllocations, sliderValues, slidersInitialized]);
   
   const formatNumber = (value: string): string => {
     const num = parseFloat(value.replace(/,/g, ''));
@@ -272,21 +352,21 @@ export function CategoryFeeAllocationDialog({
   };
   
   const handleApply = () => {
-    onApply(previewAllocations);
+    onApply(snappedValues.size > 0 ? snappedValues : initialAllocations);
     onOpenChange(false);
   };
   
-  const hasChanges = difference !== 0;
-  
-  // Build dialog title and description
   const dialogTitle = isSubtotalEdit ? 'Adjust Phase Subtotal' : 'Adjust Category Fee';
   const dialogDescription = isSubtotalEdit
     ? <>Adjust the subtotal for <strong>{phaseName}</strong>. The change will be distributed pro-rata across categories first, then within each category across {affectedItems.length} work item(s).</>
     : <>Adjust the total fee for <strong>{categoryName}</strong>{phaseName && <> in <strong>{phaseName}</strong></>}. The change will be distributed pro-rata across {affectedItems.length} work item(s).</>;
   
+  // Max for any single slider (the full total, since others can go to 0)
+  const sliderMax = newTotal;
+  
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[650px] max-h-[80vh] overflow-hidden flex flex-col">
+      <DialogContent className="sm:max-w-[700px] max-h-[85vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{dialogTitle}</DialogTitle>
           <DialogDescription>{dialogDescription}</DialogDescription>
@@ -336,81 +416,70 @@ export function CategoryFeeAllocationDialog({
             </div>
           )}
           
-          {/* Preview table */}
-          {hasChanges && (
+          {/* Slider-based allocation */}
+          {hasChanges && slidersInitialized && (
             <div className="border rounded-md">
-              <div className="px-3 py-2 bg-muted/50 border-b">
-                <span className="text-sm font-medium">Preview Allocation</span>
+              <div className="px-3 py-2 bg-muted/50 border-b flex items-center justify-between">
+                <span className="text-sm font-medium">Adjust Balance</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleResetSliders}
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Reset
+                </Button>
               </div>
-              <div className="max-h-[250px] overflow-y-auto">
-                <table className="w-full text-sm">
-                  <thead className="sticky top-0 bg-background">
-                    <tr className="border-b">
-                      {isSubtotalEdit && <th className="text-left px-3 py-2 font-medium">Category</th>}
-                      <th className="text-left px-3 py-2 font-medium">Work Item</th>
-                      <th className="text-right px-3 py-2 font-medium">Current</th>
-                      <th className="text-right px-3 py-2 font-medium">New</th>
-                      <th className="text-right px-3 py-2 font-medium">Change</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {isSubtotalEdit && groupedPreviewItems ? (
-                      // Grouped view for subtotal
-                      Array.from(groupedPreviewItems.entries()).map(([category, items]) => (
-                        <React.Fragment key={category}>
-                          {items.map((item, idx) => (
-                            <tr key={item.index} className={cn(idx % 2 === 0 && "bg-muted/30")}>
-                              {idx === 0 && (
-                                <td 
-                                  className="px-3 py-1.5 text-xs font-medium text-muted-foreground align-top"
-                                  rowSpan={items.length}
-                                >
-                                  {category}
-                                </td>
-                              )}
-                              <td className="px-3 py-1.5 truncate max-w-[180px]" title={item.workItem}>
-                                {item.workItem || '(No description)'}
-                              </td>
-                              <td className="text-right px-3 py-1.5 text-muted-foreground">
-                                {formatCurrency(item.currentFee)}
-                              </td>
-                              <td className="text-right px-3 py-1.5 font-medium">
-                                {formatCurrency(item.newFee)}
-                              </td>
-                              <td className={cn(
-                                "text-right px-3 py-1.5",
-                                item.change > 0 ? "text-green-600" : item.change < 0 ? "text-red-600" : "text-muted-foreground"
-                              )}>
-                                {item.change > 0 ? '+' : ''}{formatCurrency(item.change)}
-                              </td>
-                            </tr>
-                          ))}
-                        </React.Fragment>
-                      ))
-                    ) : (
-                      // Flat view for category edit
-                      previewItems.map((item, idx) => (
-                        <tr key={item.index} className={cn(idx % 2 === 0 && "bg-muted/30")}>
-                          <td className="px-3 py-1.5 truncate max-w-[200px]" title={item.workItem}>
-                            {item.workItem || '(No description)'}
-                          </td>
-                          <td className="text-right px-3 py-1.5 text-muted-foreground">
-                            {formatCurrency(item.currentFee)}
-                          </td>
-                          <td className="text-right px-3 py-1.5 font-medium">
-                            {formatCurrency(item.newFee)}
-                          </td>
-                          <td className={cn(
-                            "text-right px-3 py-1.5",
-                            item.change > 0 ? "text-green-600" : item.change < 0 ? "text-red-600" : "text-muted-foreground"
-                          )}>
-                            {item.change > 0 ? '+' : ''}{formatCurrency(item.change)}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+              <div className="max-h-[350px] overflow-y-auto px-4 py-3 space-y-4">
+                {previewItems.map((item) => {
+                  const rawValue = sliderValues.get(item.index) ?? 0;
+                  const snappedValue = snappedValues.get(item.index) ?? 0;
+                  const pctOfTotal = newTotal > 0 ? (rawValue / newTotal) * 100 : 0;
+                  const changeFromCurrent = snappedValue - item.currentFee;
+                  
+                  return (
+                    <div key={item.index} className="space-y-1.5">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-sm truncate flex-1" title={item.workItem}>
+                          {item.workItem || '(No description)'}
+                        </span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-sm font-semibold tabular-nums min-w-[80px] text-right">
+                            {formatCurrency(snappedValue)}
+                          </span>
+                          {changeFromCurrent !== 0 && (
+                            <span className={cn(
+                              "text-xs tabular-nums",
+                              changeFromCurrent > 0 ? "text-green-600" : "text-red-600"
+                            )}>
+                              {changeFromCurrent > 0 ? '+' : ''}{formatCurrency(changeFromCurrent)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Slider
+                          value={[rawValue]}
+                          min={0}
+                          max={sliderMax}
+                          step={sliderMax / 200} // smooth ~0.5% increments
+                          onValueChange={([v]) => handleSliderChange(item.index, v)}
+                          className="flex-1"
+                        />
+                        <span className="text-xs text-muted-foreground tabular-nums w-[36px] text-right">
+                          {pctOfTotal.toFixed(0)}%
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Was: {formatCurrency(item.currentFee)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="px-4 py-2 border-t bg-muted/30 text-xs text-muted-foreground text-center">
+                Drag sliders to rebalance visually · Values snap to nearest {currencySymbol}1,000 on apply
               </div>
             </div>
           )}

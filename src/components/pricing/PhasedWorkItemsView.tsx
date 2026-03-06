@@ -190,32 +190,36 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
   useImperativeHandle(ref, () => ({
     navigateToPhaseCategory: (phaseId: string | null, category: string) => {
       const targetPhaseId = phaseId ?? 'unassigned';
-      console.log('[NAV] navigateToPhaseCategory called', { phaseId, category, targetPhaseId });
-      console.log('[NAV] Available phases:', phases.map(p => ({ id: p.id, name: p.name })));
-      console.log('[NAV] phaseRefs keys:', Object.keys(phaseRefs.current));
       
-      // Helper to scroll to a phase element
-      const scrollToPhase = (id: string) => {
+      // Helper to scroll to a specific category within a phase
+      const scrollToCategoryInPhase = (pId: string, cat: string) => {
         setTimeout(() => {
-          const byData = document.querySelector(`[data-phase-id="${id}"]`) as HTMLElement;
-          const byRef = phaseRefs.current[id];
-          console.log('[NAV] scrollToPhase', { id, foundByData: !!byData, foundByRef: !!byRef });
-          console.log('[NAV] All data-phase-id elements:', 
-            Array.from(document.querySelectorAll('[data-phase-id]')).map(el => el.getAttribute('data-phase-id'))
-          );
-          const el = byData || byRef;
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          } else {
-            console.warn('[NAV] No element found for phase', id);
+          // First try to find the exact category row within the phase
+          const categoryEl = document.querySelector(`[data-phase-category="${pId}::${cat}"]`) as HTMLElement;
+          if (categoryEl) {
+            categoryEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Brief highlight effect
+            categoryEl.style.outline = '2px solid hsl(var(--primary))';
+            categoryEl.style.outlineOffset = '2px';
+            setTimeout(() => {
+              categoryEl.style.outline = '';
+              categoryEl.style.outlineOffset = '';
+            }, 2000);
+            return;
           }
-        }, 150);
+          // Fallback: scroll to the phase card
+          const phaseEl = document.querySelector(`[data-phase-id="${pId}"]`) as HTMLElement;
+          if (phaseEl) {
+            phaseEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 200);
       };
 
       if (phaseId === null) {
         // Aggregate: expand all phases
         setExpandedPhases(new Set(['unassigned', ...phases.map(p => p.id)]));
         
+        // Find the first phase that has items in this category
         const validIds = new Set(phases.map(p => p.id));
         const firstPhaseWithCategory = phases.find(phase => {
           return items.some(item => {
@@ -231,17 +235,16 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
         });
         
         const scrollTarget = hasUnassignedInCategory ? 'unassigned' : (firstPhaseWithCategory?.id || 'unassigned');
-        console.log('[NAV] Aggregate scroll target:', scrollTarget);
-        scrollToPhase(scrollTarget);
+        scrollToCategoryInPhase(scrollTarget, category);
       } else {
-        // Specific phase
+        // Specific phase: expand that phase
         setExpandedPhases(prev => {
           const next = new Set(prev);
           next.add(targetPhaseId);
           return next;
         });
         
-        scrollToPhase(targetPhaseId);
+        scrollToCategoryInPhase(targetPhaseId, category);
       }
     },
   }), [phases, items]);

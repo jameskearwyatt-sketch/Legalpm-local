@@ -347,8 +347,7 @@ export function CategoryFeeAllocationDialog({
     ? <>Adjust the subtotal for <strong>{phaseName}</strong>. The change will be distributed pro-rata across categories first, then within each category across {affectedItems.length} work item(s).</>
     : <>Adjust the total fee for <strong>{categoryName}</strong>{phaseName && <> in <strong>{phaseName}</strong></>}. The change will be distributed pro-rata across {affectedItems.length} work item(s).</>;
   
-  // Max for any single slider (the full total, since others can go to 0)
-  const sliderMax = newTotal;
+  // Each slider's max = its current value + unallocated budget
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

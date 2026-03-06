@@ -568,6 +568,7 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
       <Card 
         key={phaseId} 
         className="transition-all"
+        data-phase-id={phaseId}
         ref={(el) => { phaseRefs.current[phaseId] = el; }}
       >
         <Collapsible open={isExpanded} onOpenChange={() => togglePhaseExpansion(phaseId)}>

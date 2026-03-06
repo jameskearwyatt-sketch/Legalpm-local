@@ -124,6 +124,62 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
   const [catAllocPhaseId, setCatAllocPhaseId] = useState<string | null>(null);
   const [catAllocPhaseName, setCatAllocPhaseName] = useState<string | null>(null);
 
+  // Category fee allocation: handler to open dialog from category header
+  const handleCategoryHeaderEdit = useCallback((phaseId: string, phaseName: string, category: string) => {
+    setCatAllocPhaseId(phaseId === 'unassigned' ? null : phaseId);
+    setCatAllocPhaseName(phaseName);
+    setCatAllocCategory(category);
+    setCatAllocDialogOpen(true);
+  }, []);
+
+  // Affected items for category allocation dialog
+  const catAllocAffectedItems = useMemo(() => {
+    if (!catAllocDialogOpen || !catAllocCategory) return [];
+    const validPhaseIds = new Set(phases.map(p => p.id));
+    return items
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => {
+        const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
+        if (!isIncluded) return false;
+        const itemCategory = item.category || 'Other';
+        if (itemCategory !== catAllocCategory) return false;
+        if (catAllocPhaseId === null) {
+          // unassigned phase
+          return !item.phase_id || !validPhaseIds.has(item.phase_id);
+        }
+        return item.phase_id === catAllocPhaseId;
+      })
+      .filter(({ item }) => getFeeUpper(item) > 0)
+      .filter(({ item }) => {
+        const itemPhaseKey = item.phase_id || 'global';
+        const lockKey = `${itemPhaseKey}:${item.category || 'Other'}`;
+        return !lockedCategories.has(lockKey);
+      })
+      .map(({ item, index }) => ({
+        index,
+        workItem: item.work_item,
+        currentFee: getFeeUpper(item),
+        category: item.category || 'Other',
+        phaseId: item.phase_id || null,
+      }));
+  }, [catAllocDialogOpen, catAllocCategory, catAllocPhaseId, items, phases, lockedCategories]);
+
+  const catAllocCurrentTotal = useMemo(() => {
+    return catAllocAffectedItems.reduce((sum, item) => sum + item.currentFee, 0);
+  }, [catAllocAffectedItems]);
+
+  const handleCatAllocApply = useCallback((allocations: Map<number, number>) => {
+    const newItems = items.map((item, index) => {
+      const newFeeUpper = allocations.get(index);
+      if (newFeeUpper !== undefined) {
+        const { fee_lower, fee_amount } = calculateFeeRange(newFeeUpper, item.category);
+        return { ...item, fee_upper: newFeeUpper, fee_lower, fee_amount };
+      }
+      return item;
+    });
+    onItemsChange(newItems);
+  }, [items, onItemsChange]);
+
   // Refs for each phase card (for scroll navigation)
   const phaseRefs = useRef<Record<string, HTMLDivElement | null>>({});
 

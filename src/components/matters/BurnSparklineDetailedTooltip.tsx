@@ -55,6 +55,7 @@ export function BurnSparklineDetailedTooltip({
   rawBurn,
   dataPoints,
   matterName,
+  matterId,
 }: BurnSparklineDetailedTooltipProps) {
   const tooltipRef = useRef<HTMLDivElement>(null);
   // Larger chart dimensions (1.5x scale)

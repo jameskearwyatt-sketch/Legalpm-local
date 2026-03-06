@@ -55,8 +55,15 @@ import {
 import { cn } from '@/lib/utils';
 import { DraftProposalItem, ProposalPhase, BUDGET_CATEGORIES } from '@/lib/hooks/usePricingProposals';
 import { DraggableProposalItem } from './DraggableProposalItem';
+import { CategoryFeeAllocationDialog } from './CategoryFeeAllocationDialog';
+import { calculateFeeRange } from '@/lib/feeSpreadUtils';
 import { categoryBgColors, categoryTextColors } from './CategorizedProposalView';
 import { InternalInputDeptSelector, DEPT_COLORS, getDeptColorIndex } from './InternalInputDeptSelector';
+
+// Helper to get fee_upper from item (for category fee allocation)
+function getFeeUpper(item: DraftProposalItem): number {
+  return item.fee_upper ?? item.fee_amount ?? 0;
+}
 
 interface PhasedWorkItemsViewProps {
   items: DraftProposalItem[];
@@ -73,6 +80,8 @@ interface PhasedWorkItemsViewProps {
   onAddCustomCategory: (category: string) => void;
   existingInputDepts: string[]; // Unique list of departments used across all items
   assumptionNarratives?: string[]; // Scope assumption narratives for linking
+  currencySymbol?: string;
+  lockedCategories?: Set<string>;
 }
 
 // Expose methods for external navigation
@@ -97,6 +106,8 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
   onAddCustomCategory,
   existingInputDepts,
   assumptionNarratives = [],
+  currencySymbol = '£',
+  lockedCategories = new Set(),
 }, ref) {
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(() => 
     new Set(['unassigned', ...phases.map(p => p.id)])
@@ -106,6 +117,68 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
   const [isAddPhaseDialogOpen, setIsAddPhaseDialogOpen] = useState(false);
   const [newPhaseName, setNewPhaseName] = useState('');
   const [isDeleteSelectedDialogOpen, setIsDeleteSelectedDialogOpen] = useState(false);
+
+  // Category fee allocation dialog state
+  const [catAllocDialogOpen, setCatAllocDialogOpen] = useState(false);
+  const [catAllocCategory, setCatAllocCategory] = useState<string | null>(null);
+  const [catAllocPhaseId, setCatAllocPhaseId] = useState<string | null>(null);
+  const [catAllocPhaseName, setCatAllocPhaseName] = useState<string | null>(null);
+
+  // Category fee allocation: handler to open dialog from category header
+  const handleCategoryHeaderEdit = useCallback((phaseId: string, phaseName: string, category: string) => {
+    setCatAllocPhaseId(phaseId === 'unassigned' ? null : phaseId);
+    setCatAllocPhaseName(phaseName);
+    setCatAllocCategory(category);
+    setCatAllocDialogOpen(true);
+  }, []);
+
+  // Affected items for category allocation dialog
+  const catAllocAffectedItems = useMemo(() => {
+    if (!catAllocDialogOpen || !catAllocCategory) return [];
+    const validPhaseIds = new Set(phases.map(p => p.id));
+    return items
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => {
+        const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
+        if (!isIncluded) return false;
+        const itemCategory = item.category || 'Other';
+        if (itemCategory !== catAllocCategory) return false;
+        if (catAllocPhaseId === null) {
+          // unassigned phase
+          return !item.phase_id || !validPhaseIds.has(item.phase_id);
+        }
+        return item.phase_id === catAllocPhaseId;
+      })
+      .filter(({ item }) => getFeeUpper(item) > 0)
+      .filter(({ item }) => {
+        const itemPhaseKey = item.phase_id || 'global';
+        const lockKey = `${itemPhaseKey}:${item.category || 'Other'}`;
+        return !lockedCategories.has(lockKey);
+      })
+      .map(({ item, index }) => ({
+        index,
+        workItem: item.work_item,
+        currentFee: getFeeUpper(item),
+        category: item.category || 'Other',
+        phaseId: item.phase_id || null,
+      }));
+  }, [catAllocDialogOpen, catAllocCategory, catAllocPhaseId, items, phases, lockedCategories]);
+
+  const catAllocCurrentTotal = useMemo(() => {
+    return catAllocAffectedItems.reduce((sum, item) => sum + item.currentFee, 0);
+  }, [catAllocAffectedItems]);
+
+  const handleCatAllocApply = useCallback((allocations: Map<number, number>) => {
+    const newItems = items.map((item, index) => {
+      const newFeeUpper = allocations.get(index);
+      if (newFeeUpper !== undefined) {
+        const { fee_lower, fee_amount } = calculateFeeRange(newFeeUpper, item.category);
+        return { ...item, fee_upper: newFeeUpper, fee_lower, fee_amount };
+      }
+      return item;
+    });
+    onItemsChange(newItems);
+  }, [items, onItemsChange]);
 
   // Refs for each phase card (for scroll navigation)
   const phaseRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -710,11 +783,30 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
                               return (
                                 <React.Fragment key={`${phaseId}-${category}`}>
                                   {/* Category header row */}
-                                  <TableRow className={cn("border-b-0", bgColor)}>
+                                  <TableRow className={cn("border-b-0 group/cathdr", bgColor)}>
                                     <TableCell colSpan={14} className="py-1.5">
-                                      <span className={cn("text-xs font-semibold uppercase tracking-wide", textColor)}>
-                                        {category}
-                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <span className={cn("text-xs font-semibold uppercase tracking-wide", textColor)}>
+                                          {category}
+                                        </span>
+                                        {!viewingHistoricalVersion && (
+                                          <TooltipProvider>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <button
+                                                  className="opacity-0 group-hover/cathdr:opacity-100 transition-opacity p-0.5 rounded hover:bg-accent"
+                                                  onClick={() => handleCategoryHeaderEdit(phaseId, phaseName, category)}
+                                                >
+                                                  <Pencil className="h-3 w-3 text-muted-foreground" />
+                                                </button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                <p>Adjust fee for this category</p>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        )}
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                   
@@ -951,6 +1043,20 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Category Fee Allocation Dialog (from category header pencil) */}
+      <CategoryFeeAllocationDialog
+        open={catAllocDialogOpen}
+        onOpenChange={setCatAllocDialogOpen}
+        categoryName={catAllocCategory}
+        phaseName={catAllocPhaseName}
+        currentTotal={catAllocCurrentTotal}
+        affectedItems={catAllocAffectedItems}
+        formatCurrency={formatCurrency}
+        currencySymbol={currencySymbol}
+        onApply={handleCatAllocApply}
+        isSubtotalEdit={false}
+      />
     </div>
   );
 });

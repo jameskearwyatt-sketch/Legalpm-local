@@ -544,7 +544,7 @@ export function CategorizedProposalView({
                         <Lock className="h-3 w-3 text-amber-400 dark:text-amber-500 opacity-60" />
                       )}
                     </div>
-                    <div className={cn('text-sm font-semibold flex items-center gap-1', textColor)}>
+                    <div className={cn('text-sm font-semibold flex items-center gap-1', textColor, isExcluded && 'line-through')}>
                       <span>{formatCurrency(categoryTotal)}</span>
                       {onToggleLock && (
                         <Tooltip>

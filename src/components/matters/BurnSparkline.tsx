@@ -420,6 +420,7 @@ export function BurnSparkline({
           dataPoints={dataPoints}
           matterName={matterName}
           matterId={matterId}
+          clientName={clientName}
         />
       </HoverCardContent>
     </HoverCard>

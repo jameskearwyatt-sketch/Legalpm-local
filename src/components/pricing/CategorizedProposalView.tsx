@@ -587,6 +587,19 @@ export function CategorizedProposalView({
                         </Tooltip>
                       )}
                     </div>
+                    {/* Exclude cross button */}
+                    <button
+                      className={cn(
+                        'absolute bottom-1 right-1 h-3.5 w-3.5 rounded-sm flex items-center justify-center transition-all',
+                        isExcluded
+                          ? 'bg-destructive/80 text-destructive-foreground'
+                          : 'opacity-0 group-hover:opacity-60 hover:!opacity-100 bg-destructive/20 text-destructive hover:bg-destructive/80 hover:text-destructive-foreground'
+                      )}
+                      onClick={(e) => toggleCategoryExclude(null, category, e)}
+                      title={isExcluded ? 'Include category' : 'Exclude category'}
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
                   </div>
                 </TooltipProvider>
               );

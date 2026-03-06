@@ -441,6 +441,8 @@ export function CategorizedProposalView({
             const textColor = isStandardCategory ? categoryTextColors[category as BudgetCategory] : 'text-slate-700 dark:text-slate-300';
             const borderColor = isStandardCategory ? categoryBorderColors[category as BudgetCategory] : 'border-slate-300 dark:border-slate-600';
             
+          const reviewKey = `${phaseId ?? 'agg'}:${category}`;
+          
             if (isAggregate) {
               // Aggregate category tiles: interactive with pencil + lock (operates across all phases)
               const isLockedInAllPhases = phases.length > 0 && phases.every(p => lockedCategories.has(`${p.id}:${category}`));

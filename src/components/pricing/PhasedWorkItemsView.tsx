@@ -789,7 +789,10 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
                               return (
                                 <React.Fragment key={`${phaseId}-${category}`}>
                                   {/* Category header row */}
-                                  <TableRow className={cn("border-b-0 group/cathdr", bgColor)}>
+                                  <TableRow 
+                                    className={cn("border-b-0 group/cathdr", bgColor)}
+                                    data-phase-category={`${phaseId}::${category}`}
+                                  >
                                     <TableCell colSpan={14} className="py-1.5">
                                       <div className="flex items-center gap-2">
                                         <span className={cn("text-xs font-semibold uppercase tracking-wide", textColor)}>

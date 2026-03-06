@@ -732,7 +732,9 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
       pxPerHour,
       maxWidthPx,
     };
-    setDragState({ key, hours: startHours, widthPx: startWidth });
+    const newState = { key, hours: startHours, widthPx: startWidth };
+    dragStateRef.current = newState;
+    setDragState(newState);
   }, [teamMembers]);
 
   useEffect(() => {

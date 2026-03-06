@@ -881,7 +881,7 @@ export function CategorizedProposalView({
         <div className="space-y-4">
           {phaseBreakdowns.map(({ phase, totals, grandTotal: phaseTotal }) => (
             <div key={phase.id}>
-              {renderCategoryBreakdown(totals, phaseTotal, phase.id, phase.name, false)}
+              {renderCategoryBreakdown(totals, phaseTotal, phase.id, phase.name, false, items.filter(i => i.phase_id === phase.id))}
             </div>
           ))}
           

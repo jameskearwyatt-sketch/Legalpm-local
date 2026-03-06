@@ -393,6 +393,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
           } : null}
           rawBurn={rawBurn}
           matterName={ctx.matter.matter_name}
+          matterId={ctx.matter.id}
         />
       );
     },

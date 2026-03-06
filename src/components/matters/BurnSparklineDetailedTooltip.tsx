@@ -57,6 +57,8 @@ export function BurnSparklineDetailedTooltip({
   matterName,
   matterId,
 }: BurnSparklineDetailedTooltipProps) {
+  const { drafts } = useBudgetDrafts(matterId);
+  const latestDraft = drafts.length > 0 ? drafts[0] : null; // Already sorted by created_at desc
   const tooltipRef = useRef<HTMLDivElement>(null);
   // Larger chart dimensions (1.5x scale)
   const width = 420;

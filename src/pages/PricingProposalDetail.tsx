@@ -123,6 +123,7 @@ export default function PricingProposalDetail() {
     latestVersion,
     items: savedItems, 
     isLoading,
+    isLoadingItems,
     updateProposal,
     updateCurrentVersion,
     saveVersion,
@@ -301,11 +302,11 @@ export default function PricingProposalDetail() {
       }
       
       setIsInitialized(true);
-    } else if (proposal && latestVersion) {
-      // New proposal with no items yet — still mark as initialized so phases can be saved
+    } else if (proposal && latestVersion && !isLoadingItems) {
+      // New proposal with no items yet — only mark initialized once items query has finished loading
       setIsInitialized(true);
     }
-  }, [savedItems, isInitialized, proposal, latestVersion]);
+  }, [savedItems, isInitialized, proposal, latestVersion, isLoadingItems]);
 
   // Auto-save: Uses a debounced approach - saves 3 seconds after user stops making changes
   // This ensures data is persisted without being disruptive on every keystroke

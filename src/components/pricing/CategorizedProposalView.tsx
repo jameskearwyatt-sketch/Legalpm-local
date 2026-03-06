@@ -159,6 +159,36 @@ export function CategorizedProposalView({
 }: CategorizedProposalViewProps) {
   const [isCategorizing, setIsCategorizing] = useState(false);
   
+  // Review checkboxes state (visual aid only)
+  const [reviewedItems, setReviewedItems] = useState<Set<string>>(new Set());
+  
+  const toggleReviewed = useCallback((key: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setReviewedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+  
+  // Toggle all categories in a phase at once
+  const togglePhaseReviewed = useCallback((phaseId: string, categoryKeys: string[], e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setReviewedItems(prev => {
+      const next = new Set(prev);
+      const phaseKey = `phase:${phaseId}`;
+      const allChecked = categoryKeys.every(k => prev.has(k)) && prev.has(phaseKey);
+      if (allChecked) {
+        next.delete(phaseKey);
+        categoryKeys.forEach(k => next.delete(k));
+      } else {
+        next.add(phaseKey);
+        categoryKeys.forEach(k => next.add(k));
+      }
+      return next;
+    });
+  }, []);
+
   // Allocation dialog state
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -411,6 +441,8 @@ export function CategorizedProposalView({
             const textColor = isStandardCategory ? categoryTextColors[category as BudgetCategory] : 'text-slate-700 dark:text-slate-300';
             const borderColor = isStandardCategory ? categoryBorderColors[category as BudgetCategory] : 'border-slate-300 dark:border-slate-600';
             
+          const reviewKey = `${phaseId ?? 'agg'}:${category}`;
+          
             if (isAggregate) {
               // Aggregate category tiles: interactive with pencil + lock (operates across all phases)
               const isLockedInAllPhases = phases.length > 0 && phases.every(p => lockedCategories.has(`${p.id}:${category}`));
@@ -434,6 +466,13 @@ export function CategorizedProposalView({
                       }
                     }}
                   >
+                    {/* Review checkbox */}
+                    <Checkbox
+                      checked={reviewedItems.has(reviewKey)}
+                      onCheckedChange={() => toggleReviewed(reviewKey)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute top-1 right-1 h-3 w-3 rounded-[3px] border-muted-foreground/30 data-[state=checked]:bg-primary/60 data-[state=checked]:border-primary/60"
+                    />
                     <div className={cn('text-xs font-medium flex items-center gap-1', textColor)}>
                       <span>{category}</span>
                       {isLockedInAllPhases && (
@@ -445,7 +484,6 @@ export function CategorizedProposalView({
                     </div>
                     <div className={cn('text-sm font-semibold flex items-center gap-1', textColor)}>
                       <span>{formatCurrency(categoryTotal)}</span>
-                      {/* Lock/unlock button - toggles across all phases */}
                       {onToggleLock && (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -456,7 +494,6 @@ export function CategorizedProposalView({
                               )}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Toggle lock for this category across ALL phases
                                 onToggleLock(`aggregate:${category}`);
                               }}
                             >
@@ -472,7 +509,6 @@ export function CategorizedProposalView({
                           </TooltipContent>
                         </Tooltip>
                       )}
-                      {/* Edit button - hidden when locked in all phases */}
                       {!isLockedInAllPhases && (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -515,6 +551,13 @@ export function CategorizedProposalView({
                     }
                   }}
                 >
+                    {/* Review checkbox */}
+                    <Checkbox
+                      checked={reviewedItems.has(reviewKey)}
+                      onCheckedChange={() => toggleReviewed(reviewKey)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute top-1 right-1 h-3 w-3 rounded-[3px] border-muted-foreground/30 data-[state=checked]:bg-primary/60 data-[state=checked]:border-primary/60"
+                    />
                   <div className={cn('text-xs font-medium flex items-center gap-1', textColor)}>
                     <span>{category}</span>
                     {isLocked && (
@@ -572,18 +615,35 @@ export function CategorizedProposalView({
           })}
           
           {/* Phase/Section Total Box */}
-          {total > 0 && (
+          {total > 0 && (() => {
+            // Compute active category keys for this phase for the "select all" checkbox
+            const activeCategoryKeys = isPhaseRow && phaseId
+              ? allCategories.filter(c => totals[c] > 0).map(c => `${phaseId}:${c}`)
+              : [];
+            const phaseReviewKey = phaseId ? `phase:${phaseId}` : null;
+            const allCatsChecked = isPhaseRow && phaseId
+              ? activeCategoryKeys.length > 0 && activeCategoryKeys.every(k => reviewedItems.has(k))
+              : false;
+            
+            return (
             <TooltipProvider>
               <div className={cn(
-                'rounded-md px-3 py-2 border bg-primary/10 border-primary/30',
+                'rounded-md px-3 py-2 border bg-primary/10 border-primary/30 relative',
                 (isPhaseRow || isAggregate) && 'group'
               )}>
+                {/* Phase-level review checkbox (select all categories) */}
+                {isPhaseRow && phaseId && activeCategoryKeys.length > 0 && (
+                  <Checkbox
+                    checked={allCatsChecked}
+                    onCheckedChange={() => togglePhaseReviewed(phaseId, activeCategoryKeys)}
+                    className="absolute top-1 right-1 h-3 w-3 rounded-[3px] border-primary/40 data-[state=checked]:bg-primary/60 data-[state=checked]:border-primary/60"
+                  />
+                )}
                 <div className="text-xs font-medium text-primary">
                   {isAggregate ? 'Total' : 'Subtotal'}
                 </div>
                 <div className="text-sm font-semibold text-primary flex items-center gap-1">
                   <span>{formatCurrency(total)}</span>
-                  {/* Subtotal/Total edit button - for phase rows and aggregate */}
                   {isPhaseRow && phaseId && phaseName && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -617,7 +677,8 @@ export function CategorizedProposalView({
                 </div>
               </div>
             </TooltipProvider>
-          )}
+            );
+          })()}
         </div>
       </div>
     );

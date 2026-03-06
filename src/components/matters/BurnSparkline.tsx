@@ -59,6 +59,7 @@ export function BurnSparkline({
   rawBurn,
   matterName,
   matterId,
+  clientName,
 }: BurnSparklineProps) {
   // Dimensions for the sparkline
   const width = 90;

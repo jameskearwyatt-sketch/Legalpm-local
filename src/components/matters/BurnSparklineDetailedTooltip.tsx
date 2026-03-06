@@ -283,6 +283,18 @@ export function BurnSparklineDetailedTooltip({
 
   return (
     <div ref={tooltipRef} className="flex flex-col gap-4 min-w-[450px]">
+      {/* Client & Matter name header */}
+      {(clientName || matterName) && (
+        <div className="px-1">
+          {clientName && (
+            <div className="text-sm font-semibold text-foreground leading-tight">{clientName}</div>
+          )}
+          {matterName && (
+            <div className="text-xs text-muted-foreground leading-tight mt-0.5">{matterName}</div>
+          )}
+        </div>
+      )}
+
       {/* Header with status */}
       <div className={`flex items-center justify-between px-4 py-3 rounded-lg ${statusColors.bg}`}>
         <div className="flex items-center gap-3">

@@ -190,15 +190,24 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
   useImperativeHandle(ref, () => ({
     navigateToPhaseCategory: (phaseId: string | null, category: string) => {
       const targetPhaseId = phaseId ?? 'unassigned';
+      console.log('[NAV] navigateToPhaseCategory called', { phaseId, category, targetPhaseId });
+      console.log('[NAV] Available phases:', phases.map(p => ({ id: p.id, name: p.name })));
+      console.log('[NAV] phaseRefs keys:', Object.keys(phaseRefs.current));
       
-      // Helper to scroll to a phase element using data attribute (more reliable than refs with SortableContext)
+      // Helper to scroll to a phase element
       const scrollToPhase = (id: string) => {
         setTimeout(() => {
-          // Try data attribute first, then fall back to ref
-          const el = document.querySelector(`[data-phase-id="${id}"]`) as HTMLElement
-            || phaseRefs.current[id];
+          const byData = document.querySelector(`[data-phase-id="${id}"]`) as HTMLElement;
+          const byRef = phaseRefs.current[id];
+          console.log('[NAV] scrollToPhase', { id, foundByData: !!byData, foundByRef: !!byRef });
+          console.log('[NAV] All data-phase-id elements:', 
+            Array.from(document.querySelectorAll('[data-phase-id]')).map(el => el.getAttribute('data-phase-id'))
+          );
+          const el = byData || byRef;
           if (el) {
             el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } else {
+            console.warn('[NAV] No element found for phase', id);
           }
         }, 150);
       };
@@ -207,7 +216,6 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
         // Aggregate: expand all phases
         setExpandedPhases(new Set(['unassigned', ...phases.map(p => p.id)]));
         
-        // Find the first phase that has items in this category
         const validIds = new Set(phases.map(p => p.id));
         const firstPhaseWithCategory = phases.find(phase => {
           return items.some(item => {
@@ -223,9 +231,10 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
         });
         
         const scrollTarget = hasUnassignedInCategory ? 'unassigned' : (firstPhaseWithCategory?.id || 'unassigned');
+        console.log('[NAV] Aggregate scroll target:', scrollTarget);
         scrollToPhase(scrollTarget);
       } else {
-        // Specific phase: expand just that phase
+        // Specific phase
         setExpandedPhases(prev => {
           const next = new Set(prev);
           next.add(targetPhaseId);

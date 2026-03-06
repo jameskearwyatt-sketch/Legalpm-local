@@ -282,43 +282,19 @@ export function CategoryFeeAllocationDialog({
     }
   }, [initialAllocations, hasChanges]);
   
-  // Handle slider change: adjust one item, redistribute remainder proportionally among others
+  // Handle slider change: independent budget-buffer model — no auto-redistribution
   const handleSliderChange = useCallback((changedIndex: number, newValue: number) => {
     setSliderValues(prev => {
       const next = new Map(prev);
-      const oldValue = prev.get(changedIndex) ?? 0;
-      const delta = newValue - oldValue;
-      
-      if (Math.abs(delta) < 1) return prev;
-      
-      // Collect other items and their current values
-      const others: { index: number; value: number }[] = [];
+      // Calculate budget used by all OTHER items
       let othersTotal = 0;
       prev.forEach((val, idx) => {
-        if (idx !== changedIndex) {
-          others.push({ index: idx, value: val });
-          othersTotal += val;
-        }
+        if (idx !== changedIndex) othersTotal += val;
       });
-      
-      // Clamp the changed value so others don't go below 0
-      const clampedValue = Math.max(0, Math.min(newValue, newTotal));
-      const remainingBudget = newTotal - clampedValue;
-      
-      next.set(changedIndex, clampedValue);
-      
-      // Redistribute remaining budget proportionally among others
-      if (othersTotal > 0) {
-        others.forEach(other => {
-          const proportion = other.value / othersTotal;
-          next.set(other.index, Math.max(0, proportion * remainingBudget));
-        });
-      } else if (others.length > 0) {
-        // All others are zero — distribute equally
-        const equalShare = remainingBudget / others.length;
-        others.forEach(other => next.set(other.index, equalShare));
-      }
-      
+      // Cap: can't exceed total budget minus what others are using
+      const maxAllowed = Math.max(0, newTotal - othersTotal);
+      const clamped = Math.max(0, Math.min(newValue, maxAllowed));
+      next.set(changedIndex, clamped);
       return next;
     });
   }, [newTotal]);

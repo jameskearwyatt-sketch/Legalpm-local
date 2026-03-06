@@ -159,6 +159,36 @@ export function CategorizedProposalView({
 }: CategorizedProposalViewProps) {
   const [isCategorizing, setIsCategorizing] = useState(false);
   
+  // Review checkboxes state (visual aid only)
+  const [reviewedItems, setReviewedItems] = useState<Set<string>>(new Set());
+  
+  const toggleReviewed = useCallback((key: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setReviewedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
+  
+  // Toggle all categories in a phase at once
+  const togglePhaseReviewed = useCallback((phaseId: string, categoryKeys: string[], e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setReviewedItems(prev => {
+      const next = new Set(prev);
+      const phaseKey = `phase:${phaseId}`;
+      const allChecked = categoryKeys.every(k => prev.has(k)) && prev.has(phaseKey);
+      if (allChecked) {
+        next.delete(phaseKey);
+        categoryKeys.forEach(k => next.delete(k));
+      } else {
+        next.add(phaseKey);
+        categoryKeys.forEach(k => next.add(k));
+      }
+      return next;
+    });
+  }, []);
+
   // Allocation dialog state
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);

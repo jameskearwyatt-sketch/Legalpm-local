@@ -2756,6 +2756,8 @@ export default function PricingProposalDetail() {
                   onAddCustomCategory={addCustomCategory}
                   existingInputDepts={existingInputDepts}
                   assumptionNarratives={getAssumptionNarratives(scopeAssumptions)}
+                  currencySymbol={currencySymbol}
+                  lockedCategories={lockedCategories}
                 />
               </CardContent>
             </Card>

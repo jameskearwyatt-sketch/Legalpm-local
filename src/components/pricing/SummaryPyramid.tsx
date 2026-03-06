@@ -767,14 +767,13 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
     const handleTouchEnd = () => {
       if (!dragRef.current) return;
       const { key } = dragRef.current;
-      setDragState(prev => {
-        if (prev && onMemberHoursCommit) {
-          const rounded = Math.round(prev.hours * 2) / 2;
-          onMemberHoursCommit(key, rounded);
-        }
-        return null;
-      });
+      const currentDrag = dragState;
+      setDragState(null);
       dragRef.current = null;
+      if (currentDrag && onMemberHoursCommit) {
+        const rounded = Math.round(currentDrag.hours * 2) / 2;
+        onMemberHoursCommit(key, rounded);
+      }
     };
 
     window.addEventListener("mousemove", handleMouseMove);

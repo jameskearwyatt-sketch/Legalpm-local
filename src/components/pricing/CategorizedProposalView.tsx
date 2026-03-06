@@ -615,18 +615,35 @@ export function CategorizedProposalView({
           })}
           
           {/* Phase/Section Total Box */}
-          {total > 0 && (
+          {total > 0 && (() => {
+            // Compute active category keys for this phase for the "select all" checkbox
+            const activeCategoryKeys = isPhaseRow && phaseId
+              ? allCategories.filter(c => totals[c] > 0).map(c => `${phaseId}:${c}`)
+              : [];
+            const phaseReviewKey = phaseId ? `phase:${phaseId}` : null;
+            const allCatsChecked = isPhaseRow && phaseId
+              ? activeCategoryKeys.length > 0 && activeCategoryKeys.every(k => reviewedItems.has(k))
+              : false;
+            
+            return (
             <TooltipProvider>
               <div className={cn(
-                'rounded-md px-3 py-2 border bg-primary/10 border-primary/30',
+                'rounded-md px-3 py-2 border bg-primary/10 border-primary/30 relative',
                 (isPhaseRow || isAggregate) && 'group'
               )}>
+                {/* Phase-level review checkbox (select all categories) */}
+                {isPhaseRow && phaseId && activeCategoryKeys.length > 0 && (
+                  <Checkbox
+                    checked={allCatsChecked}
+                    onCheckedChange={() => togglePhaseReviewed(phaseId, activeCategoryKeys)}
+                    className="absolute top-1 right-1 h-3 w-3 rounded-[3px] border-primary/40 data-[state=checked]:bg-primary/60 data-[state=checked]:border-primary/60"
+                  />
+                )}
                 <div className="text-xs font-medium text-primary">
                   {isAggregate ? 'Total' : 'Subtotal'}
                 </div>
                 <div className="text-sm font-semibold text-primary flex items-center gap-1">
                   <span>{formatCurrency(total)}</span>
-                  {/* Subtotal/Total edit button - for phase rows and aggregate */}
                   {isPhaseRow && phaseId && phaseName && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -660,7 +677,8 @@ export function CategorizedProposalView({
                 </div>
               </div>
             </TooltipProvider>
-          )}
+            );
+          })()}
         </div>
       </div>
     );

@@ -1043,6 +1043,20 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Category Fee Allocation Dialog (from category header pencil) */}
+      <CategoryFeeAllocationDialog
+        open={catAllocDialogOpen}
+        onOpenChange={setCatAllocDialogOpen}
+        categoryName={catAllocCategory}
+        phaseName={catAllocPhaseName}
+        currentTotal={catAllocCurrentTotal}
+        affectedItems={catAllocAffectedItems}
+        formatCurrency={formatCurrency}
+        currencySymbol={currencySymbol}
+        onApply={handleCatAllocApply}
+        isSubtotalEdit={false}
+      />
     </div>
   );
 });

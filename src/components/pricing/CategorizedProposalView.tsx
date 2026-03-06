@@ -208,7 +208,6 @@ export function CategorizedProposalView({
 
   // Handle tile click for navigation
   const handleTileClick = useCallback((phaseId: string | null, category: string) => {
-    console.log('[TILE-CLICK] phaseId:', phaseId, 'category:', category);
     if (onNavigateToCategory) {
       onNavigateToCategory(phaseId, category);
     }

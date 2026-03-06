@@ -492,6 +492,12 @@ export function BurnSparklineDetailedTooltip({
           <div className="text-muted-foreground text-xs">
             Remaining: {formatCurrency(Math.max(0, bmBudget - currentBurn), currency)}
           </div>
+          {latestDraft && (
+            <div className="flex items-center gap-1 mt-1 text-xs text-blue-600 dark:text-blue-400">
+              <FileEdit className="h-3 w-3" />
+              <span>Draft: {formatCurrency(latestDraft.bm_total, currency)}</span>
+            </div>
+          )}
         </div>
 
         {/* Burn Rate */}

@@ -551,6 +551,13 @@ export function CategorizedProposalView({
                     }
                   }}
                 >
+                    {/* Review checkbox */}
+                    <Checkbox
+                      checked={reviewedItems.has(reviewKey)}
+                      onCheckedChange={() => toggleReviewed(reviewKey)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute top-1 right-1 h-3 w-3 rounded-[3px] border-muted-foreground/30 data-[state=checked]:bg-primary/60 data-[state=checked]:border-primary/60"
+                    />
                   <div className={cn('text-xs font-medium flex items-center gap-1', textColor)}>
                     <span>{category}</span>
                     {isLocked && (

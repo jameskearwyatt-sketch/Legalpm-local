@@ -783,11 +783,30 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
                               return (
                                 <React.Fragment key={`${phaseId}-${category}`}>
                                   {/* Category header row */}
-                                  <TableRow className={cn("border-b-0", bgColor)}>
+                                  <TableRow className={cn("border-b-0 group/cathdr", bgColor)}>
                                     <TableCell colSpan={14} className="py-1.5">
-                                      <span className={cn("text-xs font-semibold uppercase tracking-wide", textColor)}>
-                                        {category}
-                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <span className={cn("text-xs font-semibold uppercase tracking-wide", textColor)}>
+                                          {category}
+                                        </span>
+                                        {!viewingHistoricalVersion && (
+                                          <TooltipProvider>
+                                            <Tooltip>
+                                              <TooltipTrigger asChild>
+                                                <button
+                                                  className="opacity-0 group-hover/cathdr:opacity-100 transition-opacity p-0.5 rounded hover:bg-accent"
+                                                  onClick={() => handleCategoryHeaderEdit(phaseId, phaseName, category)}
+                                                >
+                                                  <Pencil className="h-3 w-3 text-muted-foreground" />
+                                                </button>
+                                              </TooltipTrigger>
+                                              <TooltipContent>
+                                                <p>Adjust fee for this category</p>
+                                              </TooltipContent>
+                                            </Tooltip>
+                                          </TooltipProvider>
+                                        )}
+                                      </div>
                                     </TableCell>
                                   </TableRow>
                                   

@@ -466,6 +466,13 @@ export function CategorizedProposalView({
                       }
                     }}
                   >
+                    {/* Review checkbox */}
+                    <Checkbox
+                      checked={reviewedItems.has(reviewKey)}
+                      onCheckedChange={() => toggleReviewed(reviewKey)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="absolute top-1 right-1 h-3 w-3 rounded-[3px] border-muted-foreground/30 data-[state=checked]:bg-primary/60 data-[state=checked]:border-primary/60"
+                    />
                     <div className={cn('text-xs font-medium flex items-center gap-1', textColor)}>
                       <span>{category}</span>
                       {isLockedInAllPhases && (
@@ -477,7 +484,6 @@ export function CategorizedProposalView({
                     </div>
                     <div className={cn('text-sm font-semibold flex items-center gap-1', textColor)}>
                       <span>{formatCurrency(categoryTotal)}</span>
-                      {/* Lock/unlock button - toggles across all phases */}
                       {onToggleLock && (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -488,7 +494,6 @@ export function CategorizedProposalView({
                               )}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                // Toggle lock for this category across ALL phases
                                 onToggleLock(`aggregate:${category}`);
                               }}
                             >
@@ -504,7 +509,6 @@ export function CategorizedProposalView({
                           </TooltipContent>
                         </Tooltip>
                       )}
-                      {/* Edit button - hidden when locked in all phases */}
                       {!isLockedInAllPhases && (
                         <Tooltip>
                           <TooltipTrigger asChild>

@@ -57,6 +57,7 @@ export function BurnSparklineDetailedTooltip({
   dataPoints,
   matterName,
   matterId,
+  clientName,
 }: BurnSparklineDetailedTooltipProps) {
   const { drafts } = useBudgetDrafts(matterId);
   const latestDraft = drafts.length > 0 ? drafts[0] : null; // Already sorted by created_at desc

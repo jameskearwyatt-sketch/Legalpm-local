@@ -240,9 +240,9 @@ export function CategoryFeeAllocationDialog({
   isSubtotalEdit = false,
 }: CategoryFeeAllocationDialogProps) {
   const [newTotalInput, setNewTotalInput] = useState('');
-  // Continuous (unrounded) slider values keyed by item index
+  // Slider values keyed by item index — start at CURRENT fees, user adjusts manually
   const [sliderValues, setSliderValues] = useState<Map<number, number>>(new Map());
-  const [slidersInitialized, setSlidersInitialized] = useState(false);
+  const [showSliders, setShowSliders] = useState(false);
   
   const newTotal = useMemo(() => {
     const parsed = parseFloat(newTotalInput.replace(/,/g, ''));
@@ -253,7 +253,7 @@ export function CategoryFeeAllocationDialog({
   useEffect(() => {
     if (open) {
       setNewTotalInput(currentTotal.toString());
-      setSlidersInitialized(false);
+      setShowSliders(false);
       setSliderValues(new Map());
     }
   }, [open, currentTotal]);
@@ -262,64 +262,87 @@ export function CategoryFeeAllocationDialog({
   const percentChange = currentTotal > 0 ? (difference / currentTotal) * 100 : 0;
   const hasChanges = difference !== 0;
   
-  // Initial pro-rata allocation (used as starting point for sliders)
-  const initialAllocations = useMemo(() => {
-    if (!hasChanges) return new Map<number, number>();
-    if (isSubtotalEdit) {
-      return distributeTwoTier(affectedItems, newTotal);
-    }
-    return distributeProRata(
-      affectedItems.map(item => ({ index: item.index, currentFee: item.currentFee })),
-      newTotal
-    );
-  }, [affectedItems, newTotal, isSubtotalEdit, hasChanges]);
-  
-  // Initialize slider values from pro-rata when total changes
+  // Initialize sliders at CURRENT fees when user changes the total
   useEffect(() => {
-    if (hasChanges && initialAllocations.size > 0) {
-      setSliderValues(new Map(initialAllocations));
-      setSlidersInitialized(true);
+    if (hasChanges) {
+      const initial = new Map<number, number>();
+      affectedItems.forEach(item => {
+        initial.set(item.index, item.currentFee);
+      });
+      setSliderValues(initial);
+      setShowSliders(true);
+    } else {
+      setShowSliders(false);
     }
-  }, [initialAllocations, hasChanges]);
+  }, [hasChanges, newTotal, affectedItems]);
   
-  // Handle slider change: independent budget-buffer model — no auto-redistribution
+  // Calculate totals from slider positions
+  const sliderTotal = useMemo(() => {
+    let sum = 0;
+    sliderValues.forEach(v => sum += v);
+    return sum;
+  }, [sliderValues]);
+  
+  const unallocated = newTotal - sliderTotal;
+  const isFullyAllocated = Math.abs(unallocated) < 500; // within rounding tolerance
+
+  // Handle slider change: can only go right if there's unallocated budget
   const handleSliderChange = useCallback((changedIndex: number, newValue: number) => {
     setSliderValues(prev => {
       const next = new Map(prev);
-      // Calculate budget used by all OTHER items
-      let othersTotal = 0;
-      prev.forEach((val, idx) => {
-        if (idx !== changedIndex) othersTotal += val;
-      });
-      // Cap: can't exceed total budget minus what others are using
-      const maxAllowed = Math.max(0, newTotal - othersTotal);
-      const clamped = Math.max(0, Math.min(newValue, maxAllowed));
-      next.set(changedIndex, clamped);
+      const currentValue = prev.get(changedIndex) ?? 0;
+      
+      if (newValue > currentValue) {
+        // Sliding RIGHT — only allowed up to unallocated budget
+        let othersTotal = 0;
+        prev.forEach((val, idx) => { if (idx !== changedIndex) othersTotal += val; });
+        const maxAllowed = Math.max(0, newTotal - othersTotal);
+        next.set(changedIndex, Math.min(newValue, maxAllowed));
+      } else {
+        // Sliding LEFT — always allowed (down to 0)
+        next.set(changedIndex, Math.max(0, newValue));
+      }
       return next;
     });
   }, [newTotal]);
   
-  // Reset sliders to pro-rata
+  // Auto-distribute: spread the difference pro-rata from current fees
+  const handleAutoDistribute = useCallback(() => {
+    let allocations: Map<number, number>;
+    if (isSubtotalEdit) {
+      allocations = distributeTwoTier(affectedItems, newTotal);
+    } else {
+      allocations = distributeProRata(
+        affectedItems.map(item => ({ index: item.index, currentFee: item.currentFee })),
+        newTotal
+      );
+    }
+    // Set raw (unrounded) values proportionally
+    const currentItemTotal = affectedItems.reduce((s, i) => s + i.currentFee, 0);
+    const rawMap = new Map<number, number>();
+    if (currentItemTotal === 0) {
+      const share = newTotal / affectedItems.length;
+      affectedItems.forEach(item => rawMap.set(item.index, share));
+    } else {
+      affectedItems.forEach(item => {
+        rawMap.set(item.index, (item.currentFee / currentItemTotal) * newTotal);
+      });
+    }
+    setSliderValues(rawMap);
+  }, [affectedItems, newTotal, isSubtotalEdit]);
+  
+  // Reset sliders to current fees
   const handleResetSliders = useCallback(() => {
-    setSliderValues(new Map(initialAllocations));
-  }, [initialAllocations]);
+    const initial = new Map<number, number>();
+    affectedItems.forEach(item => initial.set(item.index, item.currentFee));
+    setSliderValues(initial);
+  }, [affectedItems]);
   
-  // Final snapped values for display and apply
+  // Snap values for apply
   const snappedValues = useMemo(() => {
-    if (!slidersInitialized || sliderValues.size === 0) return new Map<number, number>();
+    if (sliderValues.size === 0) return new Map<number, number>();
     return snapToCleanValues(sliderValues, newTotal);
-  }, [sliderValues, newTotal, slidersInitialized]);
-  
-  // Preview items
-  const previewItems = useMemo(() => {
-    const source = slidersInitialized ? snappedValues : initialAllocations;
-    return affectedItems.map(item => ({
-      ...item,
-      newFee: source.get(item.index) ?? item.currentFee,
-      rawFee: sliderValues.get(item.index) ?? item.currentFee,
-      change: (source.get(item.index) ?? item.currentFee) - item.currentFee,
-    }));
-  }, [affectedItems, snappedValues, initialAllocations, sliderValues, slidersInitialized]);
+  }, [sliderValues, newTotal]);
   
   const formatNumber = (value: string): string => {
     const num = parseFloat(value.replace(/,/g, ''));
@@ -328,26 +351,18 @@ export function CategoryFeeAllocationDialog({
   };
   
   const handleApply = () => {
-    onApply(snappedValues.size > 0 ? snappedValues : initialAllocations);
+    onApply(snappedValues);
     onOpenChange(false);
   };
   
   const dialogTitle = isSubtotalEdit ? 'Adjust Phase Subtotal' : 'Adjust Category Fee';
 
-  // Budget buffer: how much is unallocated
-  const allocatedTotal = useMemo(() => {
-    let sum = 0;
-    sliderValues.forEach(v => sum += v);
-    return sum;
-  }, [sliderValues]);
-  const unallocated = newTotal - allocatedTotal;
-  const isFullyAllocated = Math.abs(unallocated) < 100;
-
   const dialogDescription = isSubtotalEdit
-    ? <>Adjust the subtotal for <strong>{phaseName}</strong>. The change will be distributed pro-rata across categories first, then within each category across {affectedItems.length} work item(s).</>
-    : <>Adjust the total fee for <strong>{categoryName}</strong>{phaseName && <> in <strong>{phaseName}</strong></>}. The change will be distributed pro-rata across {affectedItems.length} work item(s).</>;
-  
-  // Each slider's max = its current value + unallocated budget
+    ? <>Adjust the subtotal for <strong>{phaseName}</strong>. The change will be distributed across {affectedItems.length} work item(s).</>
+    : <>Adjust the total fee for <strong>{categoryName}</strong>{phaseName && <> in <strong>{phaseName}</strong></>}. Adjust across {affectedItems.length} work item(s).</>;
+
+  // Slider visual max: use newTotal so all sliders share a consistent scale
+  const sliderMax = Math.max(newTotal, currentTotal, 1);
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -402,43 +417,54 @@ export function CategoryFeeAllocationDialog({
           )}
           
           {/* Slider-based allocation */}
-          {hasChanges && slidersInitialized && (
+          {hasChanges && showSliders && (
             <div className="border rounded-md">
               <div className="px-3 py-2 bg-muted/50 border-b flex items-center justify-between">
-                <span className="text-sm font-medium">Adjust Balance</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleResetSliders}
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  Reset
-                </Button>
+                <span className="text-sm font-medium">Adjust Individual Items</span>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleAutoDistribute}
+                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    Auto-spread
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleResetSliders}
+                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <RotateCcw className="h-3 w-3 mr-1" />
+                    Reset
+                  </Button>
+                </div>
               </div>
               
-              {/* Budget buffer indicator */}
-              <div className="px-4 py-2 border-b min-h-[40px] flex items-center justify-center">
+              {/* Budget status */}
+              <div className="px-4 py-2 border-b flex items-center justify-center">
                 {isFullyAllocated ? (
                   <span className="text-xs font-medium text-green-700 dark:text-green-400">
-                    ✓ Fully allocated
+                    ✓ Fully allocated — ready to apply
                   </span>
                 ) : unallocated > 0 ? (
                   <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
-                    Unallocated: {formatCurrency(unallocated)} remaining
+                    {formatCurrency(smartRound(unallocated))} still to allocate — slide items right
                   </span>
-                ) : null}
+                ) : (
+                  <span className="text-xs font-medium text-red-700 dark:text-red-400">
+                    Over-allocated by {formatCurrency(smartRound(Math.abs(unallocated)))} — slide items left
+                  </span>
+                )}
               </div>
 
               <div className="max-h-[320px] overflow-y-auto px-4 py-3 space-y-4">
-                {previewItems.map((item) => {
-                  const rawValue = sliderValues.get(item.index) ?? 0;
-                  // Display independently-rounded value per item (no cross-item redistribution)
+                {affectedItems.map((item) => {
+                  const rawValue = sliderValues.get(item.index) ?? item.currentFee;
                   const displayValue = smartRound(rawValue);
-                  const pctOfTotal = newTotal > 0 ? (rawValue / newTotal) * 100 : 0;
                   const changeFromCurrent = displayValue - item.currentFee;
-                  // Per-item max: current value + whatever is unallocated
-                  const itemMax = rawValue + Math.max(0, unallocated);
+                  const pctOfTotal = newTotal > 0 ? (rawValue / newTotal) * 100 : 0;
                   
                   return (
                     <div key={item.index} className="space-y-1.5">
@@ -447,12 +473,15 @@ export function CategoryFeeAllocationDialog({
                           {item.workItem || '(No description)'}
                         </span>
                         <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs text-muted-foreground tabular-nums">
+                            was {formatCurrency(item.currentFee)}
+                          </span>
                           <span className="text-sm font-semibold tabular-nums min-w-[80px] text-right">
                             {formatCurrency(displayValue)}
                           </span>
                           {changeFromCurrent !== 0 && (
                             <span className={cn(
-                              "text-xs tabular-nums",
+                              "text-xs tabular-nums min-w-[60px] text-right",
                               changeFromCurrent > 0 ? "text-green-600" : "text-red-600"
                             )}>
                               {changeFromCurrent > 0 ? '+' : ''}{formatCurrency(changeFromCurrent)}
@@ -464,8 +493,8 @@ export function CategoryFeeAllocationDialog({
                         <Slider
                           value={[rawValue]}
                           min={0}
-                          max={Math.max(itemMax, 1)}
-                          step={newTotal / 200}
+                          max={sliderMax}
+                          step={Math.max(1000, sliderMax / 200)}
                           onValueChange={([v]) => handleSliderChange(item.index, v)}
                           className="flex-1"
                         />
@@ -473,15 +502,12 @@ export function CategoryFeeAllocationDialog({
                           {pctOfTotal.toFixed(0)}%
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>Was: {formatCurrency(item.currentFee)}</span>
-                      </div>
                     </div>
                   );
                 })}
               </div>
               <div className="px-4 py-2 border-t bg-muted/30 text-xs text-muted-foreground text-center">
-                Slide to adjust · Budget-capped · Snaps to nearest {currencySymbol}1,000 on apply
+                Sliders start at current fees · Slide right to add budget · Snaps to nearest {currencySymbol}1,000 on apply
               </div>
             </div>
           )}
@@ -497,7 +523,7 @@ export function CategoryFeeAllocationDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleApply} disabled={!hasChanges}>
+          <Button onClick={handleApply} disabled={!hasChanges || !isFullyAllocated}>
             Apply Allocation
           </Button>
         </DialogFooter>

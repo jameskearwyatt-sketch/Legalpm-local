@@ -607,15 +607,17 @@ export function CategorizedProposalView({
             
             const lockKey = `${phaseId || 'global'}:${category}`;
             const isLocked = lockedCategories.has(lockKey);
+            const isExcludedPhase = isCategoryExcluded(phaseId, category);
             
             return (
               <TooltipProvider key={category}>
                 <div
                   className={cn(
-                    'rounded-md px-3 py-2 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
+                    'rounded-md px-3 py-2 pb-5 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
                     bgColor,
                     borderColor,
-                    isLocked && 'opacity-75 border-dashed'
+                    isLocked && 'opacity-75 border-dashed',
+                    isExcludedPhase && 'opacity-40'
                   )}
                   onClick={() => handleTileClick(phaseId, category)}
                   role="button"
@@ -639,9 +641,8 @@ export function CategorizedProposalView({
                       <Lock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                     )}
                   </div>
-                  <div className={cn('text-sm font-semibold flex items-center gap-1', textColor)}>
+                  <div className={cn('text-sm font-semibold flex items-center gap-1', textColor, isExcludedPhase && 'line-through')}>
                     <span>{formatCurrency(categoryTotal)}</span>
-                    {/* Lock/unlock button */}
                     {onToggleLock && (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -667,7 +668,6 @@ export function CategorizedProposalView({
                         </TooltipContent>
                       </Tooltip>
                     )}
-                    {/* Edit button - hidden when locked */}
                     {!isLocked && (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -684,6 +684,19 @@ export function CategorizedProposalView({
                       </Tooltip>
                     )}
                   </div>
+                  {/* Exclude cross button */}
+                  <button
+                    className={cn(
+                      'absolute bottom-1 right-1 h-3.5 w-3.5 rounded-sm flex items-center justify-center transition-all',
+                      isExcludedPhase
+                        ? 'bg-destructive/80 text-destructive-foreground'
+                        : 'opacity-0 group-hover:opacity-60 hover:!opacity-100 bg-destructive/20 text-destructive hover:bg-destructive/80 hover:text-destructive-foreground'
+                    )}
+                    onClick={(e) => toggleCategoryExclude(phaseId, category, e)}
+                    title={isExcludedPhase ? 'Include category' : 'Exclude category'}
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
                 </div>
               </TooltipProvider>
             );

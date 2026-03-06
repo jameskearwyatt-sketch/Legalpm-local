@@ -123,6 +123,7 @@ export default function PricingProposalDetail() {
     latestVersion,
     items: savedItems, 
     isLoading,
+    isLoadingItems,
     updateProposal,
     updateCurrentVersion,
     saveVersion,

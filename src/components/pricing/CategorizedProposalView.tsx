@@ -482,9 +482,17 @@ export function CategorizedProposalView({
     total: number,
     phaseId: string | null,
     phaseName: string | null,
-    isAggregate: boolean = false
+    isAggregate: boolean = false,
+    sourceItems: DraftProposalItem[] = items
   ) => {
     const isPhaseRow = phaseId !== null && !isAggregate;
+    
+    // Track which categories have any items (even excluded) so tiles stay visible
+    const categoriesWithItems = new Set<string>();
+    sourceItems.forEach(item => {
+      const cat = item.category || 'Other';
+      categoriesWithItems.add(cat);
+    });
     
     return (
       <div className="space-y-2">
@@ -494,7 +502,8 @@ export function CategorizedProposalView({
         <div className="flex flex-wrap gap-2">
           {allCategories.map(category => {
             const categoryTotal = totals[category];
-            if (categoryTotal === 0) return null;
+            // Show tile if it has a total OR if it has items (they might be excluded)
+            if (categoryTotal === 0 && !categoriesWithItems.has(category)) return null;
             
             const isStandardCategory = (BUDGET_CATEGORIES as readonly string[]).includes(category);
             const bgColor = isStandardCategory ? categoryBgColors[category as BudgetCategory] : 'bg-slate-100 dark:bg-slate-800/50';

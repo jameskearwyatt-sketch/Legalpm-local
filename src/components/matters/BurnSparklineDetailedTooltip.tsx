@@ -1,8 +1,9 @@
 import { useMemo, useRef, useCallback } from 'react';
 import { format, parseISO, differenceInMonths, differenceInDays } from 'date-fns';
 import { formatCurrency } from '@/lib/currencyUtils';
-import { TrendingUp, TrendingDown, Calendar, Target, Clock, AlertTriangle, CheckCircle, Download } from 'lucide-react';
+import { TrendingUp, TrendingDown, Calendar, Target, Clock, AlertTriangle, CheckCircle, Download, FileEdit } from 'lucide-react';
 import { toPng } from 'html-to-image';
+import { useBudgetDrafts } from '@/lib/hooks/useBudgetDrafts';
 
 interface SnapshotPoint {
   as_of_date: string;
@@ -37,6 +38,7 @@ interface BurnSparklineDetailedTooltipProps {
   rawBurn?: number;
   dataPoints: DataPoint[];
   matterName?: string;
+  matterId?: string;
 }
 
 export function BurnSparklineDetailedTooltip({
@@ -53,7 +55,10 @@ export function BurnSparklineDetailedTooltip({
   rawBurn,
   dataPoints,
   matterName,
+  matterId,
 }: BurnSparklineDetailedTooltipProps) {
+  const { drafts } = useBudgetDrafts(matterId);
+  const latestDraft = drafts.length > 0 ? drafts[0] : null; // Already sorted by created_at desc
   const tooltipRef = useRef<HTMLDivElement>(null);
   // Larger chart dimensions (1.5x scale)
   const width = 420;
@@ -487,6 +492,12 @@ export function BurnSparklineDetailedTooltip({
           <div className="text-muted-foreground text-xs">
             Remaining: {formatCurrency(Math.max(0, bmBudget - currentBurn), currency)}
           </div>
+          {latestDraft && (
+            <div className="flex items-center gap-1 mt-1 text-xs text-blue-600 dark:text-blue-400">
+              <FileEdit className="h-3 w-3" />
+              <span>Draft: {formatCurrency(latestDraft.bm_total, currency)}</span>
+            </div>
+          )}
         </div>
 
         {/* Burn Rate */}

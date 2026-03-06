@@ -35,6 +35,7 @@ interface BurnSparklineProps {
   proposalData?: ProposalData | null;
   rawBurn?: number;
   matterName?: string;
+  matterId?: string;
 }
 
 interface DataPoint {
@@ -56,6 +57,7 @@ export function BurnSparkline({
   proposalData,
   rawBurn,
   matterName,
+  matterId,
 }: BurnSparklineProps) {
   // Dimensions for the sparkline
   const width = 90;
@@ -415,6 +417,7 @@ export function BurnSparkline({
           rawBurn={rawBurn}
           dataPoints={dataPoints}
           matterName={matterName}
+          matterId={matterId}
         />
       </HoverCardContent>
     </HoverCard>
@@ -575,6 +578,7 @@ export function BurnSparkline({
           rawBurn={rawBurn}
           dataPoints={dataPoints}
           matterName={matterName}
+          matterId={matterId}
         />
       </HoverCardContent>
     </HoverCard>

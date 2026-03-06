@@ -90,7 +90,7 @@ function calculateCategoryTotals(
   
   items.forEach(item => {
     const category = item.category || 'Other';
-    const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
+    const isIncluded = item.is_included !== false && (!item.is_optional || (item.is_optional && item.is_included !== false));
     if (isIncluded) {
       if (totals[category] === undefined) {
         totals[category] = 0;

@@ -189,6 +189,66 @@ export function CategorizedProposalView({
     });
   }, []);
 
+  // Toggle exclude for all items in a category (and optionally a phase)
+  const toggleCategoryExclude = useCallback((phaseId: string | null, category: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const validPhaseIds = new Set(phases.map(p => p.id));
+    
+    // Find matching items
+    const matchingIndices: number[] = [];
+    items.forEach((item, index) => {
+      const itemCategory = item.category || 'Other';
+      if (itemCategory !== category) return;
+      if (phaseId !== null) {
+        if (phaseId === 'unassigned') {
+          if (item.phase_id && validPhaseIds.has(item.phase_id)) return;
+        } else {
+          if (item.phase_id !== phaseId) return;
+        }
+      }
+      matchingIndices.push(index);
+    });
+    
+    if (matchingIndices.length === 0) return;
+    
+    // Check if all matching are currently excluded
+    const allExcluded = matchingIndices.every(i => items[i].is_included === false);
+    const newIncluded = allExcluded; // toggle: if all excluded → include, else exclude all
+    
+    const newItems = items.map((item, index) => {
+      if (matchingIndices.includes(index)) {
+        return { ...item, is_included: newIncluded };
+      }
+      return item;
+    });
+    onItemsChange(newItems);
+    
+    const count = matchingIndices.length;
+    if (newIncluded) {
+      toast.success(`Included ${count} ${category} item${count > 1 ? 's' : ''}`);
+    } else {
+      toast.success(`Excluded ${count} ${category} item${count > 1 ? 's' : ''}`);
+    }
+  }, [items, phases, onItemsChange]);
+
+  // Check if a category in a phase is fully excluded
+  const isCategoryExcluded = useCallback((phaseId: string | null, category: string): boolean => {
+    const validPhaseIds = new Set(phases.map(p => p.id));
+    const matchingItems = items.filter((item) => {
+      const itemCategory = item.category || 'Other';
+      if (itemCategory !== category) return false;
+      if (phaseId !== null) {
+        if (phaseId === 'unassigned') {
+          if (item.phase_id && validPhaseIds.has(item.phase_id)) return false;
+        } else {
+          if (item.phase_id !== phaseId) return false;
+        }
+      }
+      return true;
+    });
+    return matchingItems.length > 0 && matchingItems.every(item => item.is_included === false);
+  }, [items, phases]);
+
   // Allocation dialog state
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);

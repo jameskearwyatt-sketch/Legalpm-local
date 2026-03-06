@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'react';
-import { Loader2, Wand2, Pencil, HelpCircle, Lock, LockOpen } from 'lucide-react';
+import { Loader2, Wand2, Pencil, HelpCircle, Lock, LockOpen, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -90,7 +90,7 @@ function calculateCategoryTotals(
   
   items.forEach(item => {
     const category = item.category || 'Other';
-    const isIncluded = !item.is_optional || (item.is_optional && item.is_included !== false);
+    const isIncluded = item.is_included !== false;
     if (isIncluded) {
       if (totals[category] === undefined) {
         totals[category] = 0;
@@ -188,6 +188,66 @@ export function CategorizedProposalView({
       return next;
     });
   }, []);
+
+  // Toggle exclude for all items in a category (and optionally a phase)
+  const toggleCategoryExclude = useCallback((phaseId: string | null, category: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const validPhaseIds = new Set(phases.map(p => p.id));
+    
+    // Find matching items
+    const matchingIndices: number[] = [];
+    items.forEach((item, index) => {
+      const itemCategory = item.category || 'Other';
+      if (itemCategory !== category) return;
+      if (phaseId !== null) {
+        if (phaseId === 'unassigned') {
+          if (item.phase_id && validPhaseIds.has(item.phase_id)) return;
+        } else {
+          if (item.phase_id !== phaseId) return;
+        }
+      }
+      matchingIndices.push(index);
+    });
+    
+    if (matchingIndices.length === 0) return;
+    
+    // Check if all matching are currently excluded
+    const allExcluded = matchingIndices.every(i => items[i].is_included === false);
+    const newIncluded = allExcluded; // toggle: if all excluded → include, else exclude all
+    
+    const newItems = items.map((item, index) => {
+      if (matchingIndices.includes(index)) {
+        return { ...item, is_included: newIncluded };
+      }
+      return item;
+    });
+    onItemsChange(newItems);
+    
+    const count = matchingIndices.length;
+    if (newIncluded) {
+      toast.success(`Included ${count} ${category} item${count > 1 ? 's' : ''}`);
+    } else {
+      toast.success(`Excluded ${count} ${category} item${count > 1 ? 's' : ''}`);
+    }
+  }, [items, phases, onItemsChange]);
+
+  // Check if a category in a phase is fully excluded
+  const isCategoryExcluded = useCallback((phaseId: string | null, category: string): boolean => {
+    const validPhaseIds = new Set(phases.map(p => p.id));
+    const matchingItems = items.filter((item) => {
+      const itemCategory = item.category || 'Other';
+      if (itemCategory !== category) return false;
+      if (phaseId !== null) {
+        if (phaseId === 'unassigned') {
+          if (item.phase_id && validPhaseIds.has(item.phase_id)) return false;
+        } else {
+          if (item.phase_id !== phaseId) return false;
+        }
+      }
+      return true;
+    });
+    return matchingItems.length > 0 && matchingItems.every(item => item.is_included === false);
+  }, [items, phases]);
 
   // Allocation dialog state
   const [allocationDialogOpen, setAllocationDialogOpen] = useState(false);
@@ -422,9 +482,17 @@ export function CategorizedProposalView({
     total: number,
     phaseId: string | null,
     phaseName: string | null,
-    isAggregate: boolean = false
+    isAggregate: boolean = false,
+    sourceItems: DraftProposalItem[] = items
   ) => {
     const isPhaseRow = phaseId !== null && !isAggregate;
+    
+    // Track which categories have any items (even excluded) so tiles stay visible
+    const categoriesWithItems = new Set<string>();
+    sourceItems.forEach(item => {
+      const cat = item.category || 'Other';
+      categoriesWithItems.add(cat);
+    });
     
     return (
       <div className="space-y-2">
@@ -434,7 +502,8 @@ export function CategorizedProposalView({
         <div className="flex flex-wrap gap-2">
           {allCategories.map(category => {
             const categoryTotal = totals[category];
-            if (categoryTotal === 0) return null;
+            // Show tile if it has a total OR if it has items (they might be excluded)
+            if (categoryTotal === 0 && !categoriesWithItems.has(category)) return null;
             
             const isStandardCategory = (BUDGET_CATEGORIES as readonly string[]).includes(category);
             const bgColor = isStandardCategory ? categoryBgColors[category as BudgetCategory] : 'bg-slate-100 dark:bg-slate-800/50';
@@ -447,15 +516,17 @@ export function CategorizedProposalView({
               // Aggregate category tiles: interactive with pencil + lock (operates across all phases)
               const isLockedInAllPhases = phases.length > 0 && phases.every(p => lockedCategories.has(`${p.id}:${category}`));
               const isLockedInSomePhases = phases.some(p => lockedCategories.has(`${p.id}:${category}`));
+              const isExcluded = isCategoryExcluded(null, category);
               
               return (
                 <TooltipProvider key={category}>
                   <div
                     className={cn(
-                      'rounded-md px-3 py-2 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
+                      'rounded-md px-3 py-2 pb-5 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
                       bgColor,
                       borderColor,
-                      isLockedInAllPhases && 'opacity-75 border-dashed'
+                      isLockedInAllPhases && 'opacity-75 border-dashed',
+                      isExcluded && 'opacity-40'
                     )}
                     onClick={() => handleTileClick(null, category)}
                     role="button"
@@ -482,7 +553,7 @@ export function CategorizedProposalView({
                         <Lock className="h-3 w-3 text-amber-400 dark:text-amber-500 opacity-60" />
                       )}
                     </div>
-                    <div className={cn('text-sm font-semibold flex items-center gap-1', textColor)}>
+                    <div className={cn('text-sm font-semibold flex items-center gap-1', textColor, isExcluded && 'line-through')}>
                       <span>{formatCurrency(categoryTotal)}</span>
                       {onToggleLock && (
                         <Tooltip>
@@ -525,6 +596,19 @@ export function CategorizedProposalView({
                         </Tooltip>
                       )}
                     </div>
+                    {/* Exclude cross button */}
+                    <button
+                      className={cn(
+                        'absolute bottom-1 right-1 h-3.5 w-3.5 rounded-sm flex items-center justify-center transition-all',
+                        isExcluded
+                          ? 'bg-destructive/80 text-destructive-foreground'
+                          : 'opacity-0 group-hover:opacity-60 hover:!opacity-100 bg-destructive/20 text-destructive hover:bg-destructive/80 hover:text-destructive-foreground'
+                      )}
+                      onClick={(e) => toggleCategoryExclude(null, category, e)}
+                      title={isExcluded ? 'Include category' : 'Exclude category'}
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
                   </div>
                 </TooltipProvider>
               );
@@ -532,15 +616,17 @@ export function CategorizedProposalView({
             
             const lockKey = `${phaseId || 'global'}:${category}`;
             const isLocked = lockedCategories.has(lockKey);
+            const isExcludedPhase = isCategoryExcluded(phaseId, category);
             
             return (
               <TooltipProvider key={category}>
                 <div
                   className={cn(
-                    'rounded-md px-3 py-2 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
+                    'rounded-md px-3 py-2 pb-5 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
                     bgColor,
                     borderColor,
-                    isLocked && 'opacity-75 border-dashed'
+                    isLocked && 'opacity-75 border-dashed',
+                    isExcludedPhase && 'opacity-40'
                   )}
                   onClick={() => handleTileClick(phaseId, category)}
                   role="button"
@@ -564,9 +650,8 @@ export function CategorizedProposalView({
                       <Lock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                     )}
                   </div>
-                  <div className={cn('text-sm font-semibold flex items-center gap-1', textColor)}>
+                  <div className={cn('text-sm font-semibold flex items-center gap-1', textColor, isExcludedPhase && 'line-through')}>
                     <span>{formatCurrency(categoryTotal)}</span>
-                    {/* Lock/unlock button */}
                     {onToggleLock && (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -592,7 +677,6 @@ export function CategorizedProposalView({
                         </TooltipContent>
                       </Tooltip>
                     )}
-                    {/* Edit button - hidden when locked */}
                     {!isLocked && (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -609,6 +693,19 @@ export function CategorizedProposalView({
                       </Tooltip>
                     )}
                   </div>
+                  {/* Exclude cross button */}
+                  <button
+                    className={cn(
+                      'absolute bottom-1 right-1 h-3.5 w-3.5 rounded-sm flex items-center justify-center transition-all',
+                      isExcludedPhase
+                        ? 'bg-destructive/80 text-destructive-foreground'
+                        : 'opacity-0 group-hover:opacity-60 hover:!opacity-100 bg-destructive/20 text-destructive hover:bg-destructive/80 hover:text-destructive-foreground'
+                    )}
+                    onClick={(e) => toggleCategoryExclude(phaseId, category, e)}
+                    title={isExcludedPhase ? 'Include category' : 'Exclude category'}
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
                 </div>
               </TooltipProvider>
             );
@@ -784,7 +881,7 @@ export function CategorizedProposalView({
         <div className="space-y-4">
           {phaseBreakdowns.map(({ phase, totals, grandTotal: phaseTotal }) => (
             <div key={phase.id}>
-              {renderCategoryBreakdown(totals, phaseTotal, phase.id, phase.name, false)}
+              {renderCategoryBreakdown(totals, phaseTotal, phase.id, phase.name, false, items.filter(i => i.phase_id === phase.id))}
             </div>
           ))}
           

@@ -55,6 +55,8 @@ import {
 import { cn } from '@/lib/utils';
 import { DraftProposalItem, ProposalPhase, BUDGET_CATEGORIES } from '@/lib/hooks/usePricingProposals';
 import { DraggableProposalItem } from './DraggableProposalItem';
+import { CategoryFeeAllocationDialog } from './CategoryFeeAllocationDialog';
+import { calculateFeeRange } from '@/lib/feeSpreadUtils';
 import { categoryBgColors, categoryTextColors } from './CategorizedProposalView';
 import { InternalInputDeptSelector, DEPT_COLORS, getDeptColorIndex } from './InternalInputDeptSelector';
 

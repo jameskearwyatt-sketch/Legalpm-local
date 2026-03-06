@@ -250,7 +250,10 @@ export default function PricingProposalDetail() {
   // Initialize draft items from saved items and extract custom categories
   // Only initialize once when savedItems first arrive, not on every re-render
   useEffect(() => {
-    if (savedItems.length > 0 && !isInitialized) {
+    if (isInitialized) return;
+    
+    // Initialize when we have saved items OR when proposal is loaded (for new proposals with no items)
+    if (savedItems.length > 0) {
       // Map saved items to draft items - MUST preserve all fields including fee_lower/fee_upper
       setDraftItems(savedItems.map(item => ({
         id: item.id,
@@ -298,8 +301,11 @@ export default function PricingProposalDetail() {
       }
       
       setIsInitialized(true);
+    } else if (proposal && latestVersion) {
+      // New proposal with no items yet — still mark as initialized so phases can be saved
+      setIsInitialized(true);
     }
-  }, [savedItems, isInitialized]);
+  }, [savedItems, isInitialized, proposal, latestVersion]);
 
   // Auto-save: Uses a debounced approach - saves 3 seconds after user stops making changes
   // This ensures data is persisted without being disruptive on every keystroke

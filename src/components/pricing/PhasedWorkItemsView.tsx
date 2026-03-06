@@ -60,6 +60,11 @@ import { calculateFeeRange } from '@/lib/feeSpreadUtils';
 import { categoryBgColors, categoryTextColors } from './CategorizedProposalView';
 import { InternalInputDeptSelector, DEPT_COLORS, getDeptColorIndex } from './InternalInputDeptSelector';
 
+// Helper to get fee_upper from item (for category fee allocation)
+function getFeeUpper(item: DraftProposalItem): number {
+  return item.fee_upper ?? item.fee_amount ?? 0;
+}
+
 interface PhasedWorkItemsViewProps {
   items: DraftProposalItem[];
   phases: ProposalPhase[];
@@ -75,6 +80,8 @@ interface PhasedWorkItemsViewProps {
   onAddCustomCategory: (category: string) => void;
   existingInputDepts: string[]; // Unique list of departments used across all items
   assumptionNarratives?: string[]; // Scope assumption narratives for linking
+  currencySymbol?: string;
+  lockedCategories?: Set<string>;
 }
 
 // Expose methods for external navigation

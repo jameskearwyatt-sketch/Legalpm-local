@@ -507,6 +507,7 @@ export function CategorizedProposalView({
               // Aggregate category tiles: interactive with pencil + lock (operates across all phases)
               const isLockedInAllPhases = phases.length > 0 && phases.every(p => lockedCategories.has(`${p.id}:${category}`));
               const isLockedInSomePhases = phases.some(p => lockedCategories.has(`${p.id}:${category}`));
+              const isExcluded = isCategoryExcluded(null, category);
               
               return (
                 <TooltipProvider key={category}>

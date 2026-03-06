@@ -700,6 +700,7 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
 
   // Drag state: tracks hours and pixel width for the bar being dragged
   const [dragState, setDragState] = useState<{ key: string; hours: number; widthPx: number } | null>(null);
+  const dragStateRef = useRef<{ key: string; hours: number; widthPx: number } | null>(null);
   const dragRef = useRef<{
     key: string;
     barLeftEdge: number;

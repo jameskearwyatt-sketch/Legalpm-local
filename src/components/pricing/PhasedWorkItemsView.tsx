@@ -106,6 +106,8 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
   onAddCustomCategory,
   existingInputDepts,
   assumptionNarratives = [],
+  currencySymbol = '£',
+  lockedCategories = new Set(),
 }, ref) {
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(() => 
     new Set(['unassigned', ...phases.map(p => p.id)])
@@ -115,6 +117,12 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
   const [isAddPhaseDialogOpen, setIsAddPhaseDialogOpen] = useState(false);
   const [newPhaseName, setNewPhaseName] = useState('');
   const [isDeleteSelectedDialogOpen, setIsDeleteSelectedDialogOpen] = useState(false);
+
+  // Category fee allocation dialog state
+  const [catAllocDialogOpen, setCatAllocDialogOpen] = useState(false);
+  const [catAllocCategory, setCatAllocCategory] = useState<string | null>(null);
+  const [catAllocPhaseId, setCatAllocPhaseId] = useState<string | null>(null);
+  const [catAllocPhaseName, setCatAllocPhaseName] = useState<string | null>(null);
 
   // Refs for each phase card (for scroll navigation)
   const phaseRefs = useRef<Record<string, HTMLDivElement | null>>({});

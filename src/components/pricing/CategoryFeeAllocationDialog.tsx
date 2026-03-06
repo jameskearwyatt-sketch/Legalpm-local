@@ -333,6 +333,16 @@ export function CategoryFeeAllocationDialog({
   };
   
   const dialogTitle = isSubtotalEdit ? 'Adjust Phase Subtotal' : 'Adjust Category Fee';
+
+  // Budget buffer: how much is unallocated
+  const allocatedTotal = useMemo(() => {
+    let sum = 0;
+    sliderValues.forEach(v => sum += v);
+    return sum;
+  }, [sliderValues]);
+  const unallocated = newTotal - allocatedTotal;
+  const isFullyAllocated = Math.abs(unallocated) < 100;
+
   const dialogDescription = isSubtotalEdit
     ? <>Adjust the subtotal for <strong>{phaseName}</strong>. The change will be distributed pro-rata across categories first, then within each category across {affectedItems.length} work item(s).</>
     : <>Adjust the total fee for <strong>{categoryName}</strong>{phaseName && <> in <strong>{phaseName}</strong></>}. The change will be distributed pro-rata across {affectedItems.length} work item(s).</>;

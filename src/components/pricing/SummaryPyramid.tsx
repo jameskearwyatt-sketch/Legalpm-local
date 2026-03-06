@@ -741,13 +741,16 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
       const { barLeftEdge, maxHours, pxPerHour, maxWidthPx } = dragRef.current;
       const desiredWidth = Math.max(20, Math.min(e.clientX - barLeftEdge, maxWidthPx));
       const newHours = Math.min(Math.max(0, desiredWidth / pxPerHour), maxHours);
-      setDragState({ key: dragRef.current.key, hours: newHours, widthPx: desiredWidth });
+      const newState = { key: dragRef.current.key, hours: newHours, widthPx: desiredWidth };
+      dragStateRef.current = newState;
+      setDragState(newState);
     };
 
     const handleMouseUp = () => {
       if (!dragRef.current) return;
       const { key } = dragRef.current;
-      const currentDrag = dragState;
+      const currentDrag = dragStateRef.current;
+      dragStateRef.current = null;
       setDragState(null);
       dragRef.current = null;
       if (currentDrag && onMemberHoursCommit) {
@@ -762,13 +765,16 @@ const SummaryPyramid = React.memo(function SummaryPyramid({
       const { barLeftEdge, maxHours, pxPerHour, maxWidthPx } = dragRef.current;
       const desiredWidth = Math.max(20, Math.min(touch.clientX - barLeftEdge, maxWidthPx));
       const newHours = Math.min(Math.max(0, desiredWidth / pxPerHour), maxHours);
-      setDragState({ key: dragRef.current.key, hours: newHours, widthPx: desiredWidth });
+      const newState = { key: dragRef.current.key, hours: newHours, widthPx: desiredWidth };
+      dragStateRef.current = newState;
+      setDragState(newState);
     };
 
     const handleTouchEnd = () => {
       if (!dragRef.current) return;
       const { key } = dragRef.current;
-      const currentDrag = dragState;
+      const currentDrag = dragStateRef.current;
+      dragStateRef.current = null;
       setDragState(null);
       dragRef.current = null;
       if (currentDrag && onMemberHoursCommit) {

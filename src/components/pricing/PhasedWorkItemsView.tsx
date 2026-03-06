@@ -189,10 +189,20 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
   // Expose navigation method via ref
   useImperativeHandle(ref, () => ({
     navigateToPhaseCategory: (phaseId: string | null, category: string) => {
-      // For aggregate (phaseId === null), expand all phases that have the category
-      // For specific phase, expand just that phase
       const targetPhaseId = phaseId ?? 'unassigned';
       
+      // Helper to scroll to a phase element using data attribute (more reliable than refs with SortableContext)
+      const scrollToPhase = (id: string) => {
+        setTimeout(() => {
+          // Try data attribute first, then fall back to ref
+          const el = document.querySelector(`[data-phase-id="${id}"]`) as HTMLElement
+            || phaseRefs.current[id];
+          if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 150);
+      };
+
       if (phaseId === null) {
         // Aggregate: expand all phases
         setExpandedPhases(new Set(['unassigned', ...phases.map(p => p.id)]));
@@ -206,7 +216,6 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
           });
         });
         
-        // Also check unassigned
         const hasUnassignedInCategory = items.some(item => {
           const itemCategory = item.category || 'Other';
           const itemPhaseId = item.phase_id;
@@ -214,14 +223,7 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
         });
         
         const scrollTarget = hasUnassignedInCategory ? 'unassigned' : (firstPhaseWithCategory?.id || 'unassigned');
-        
-        // Scroll to the target phase after a brief delay to allow expansion
-        setTimeout(() => {
-          const el = phaseRefs.current[scrollTarget];
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 100);
+        scrollToPhase(scrollTarget);
       } else {
         // Specific phase: expand just that phase
         setExpandedPhases(prev => {
@@ -230,13 +232,7 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
           return next;
         });
         
-        // Scroll to that phase
-        setTimeout(() => {
-          const el = phaseRefs.current[targetPhaseId];
-          if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 100);
+        scrollToPhase(targetPhaseId);
       }
     },
   }), [phases, items]);

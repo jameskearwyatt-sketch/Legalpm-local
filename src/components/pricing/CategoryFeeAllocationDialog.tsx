@@ -433,9 +433,10 @@ export function CategoryFeeAllocationDialog({
               <div className="max-h-[320px] overflow-y-auto px-4 py-3 space-y-4">
                 {previewItems.map((item) => {
                   const rawValue = sliderValues.get(item.index) ?? 0;
-                  const snappedValue = snappedValues.get(item.index) ?? 0;
+                  // Display independently-rounded value per item (no cross-item redistribution)
+                  const displayValue = smartRound(rawValue);
                   const pctOfTotal = newTotal > 0 ? (rawValue / newTotal) * 100 : 0;
-                  const changeFromCurrent = snappedValue - item.currentFee;
+                  const changeFromCurrent = displayValue - item.currentFee;
                   // Per-item max: current value + whatever is unallocated
                   const itemMax = rawValue + Math.max(0, unallocated);
                   
@@ -447,7 +448,7 @@ export function CategoryFeeAllocationDialog({
                         </span>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-sm font-semibold tabular-nums min-w-[80px] text-right">
-                            {formatCurrency(snappedValue)}
+                            {formatCurrency(displayValue)}
                           </span>
                           {changeFromCurrent !== 0 && (
                             <span className={cn(
@@ -463,7 +464,7 @@ export function CategoryFeeAllocationDialog({
                         <Slider
                           value={[rawValue]}
                           min={0}
-                          max={Math.max(itemMax, 1)} // prevent max=0
+                          max={Math.max(itemMax, 1)}
                           step={newTotal / 200}
                           onValueChange={([v]) => handleSliderChange(item.index, v)}
                           className="flex-1"

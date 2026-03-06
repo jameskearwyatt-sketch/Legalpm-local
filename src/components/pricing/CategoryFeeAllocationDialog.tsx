@@ -416,12 +416,28 @@ export function CategoryFeeAllocationDialog({
                   Reset
                 </Button>
               </div>
-              <div className="max-h-[350px] overflow-y-auto px-4 py-3 space-y-4">
+              
+              {/* Budget buffer indicator */}
+              <div className="px-4 py-2 border-b min-h-[40px] flex items-center justify-center">
+                {isFullyAllocated ? (
+                  <span className="text-xs font-medium text-green-700 dark:text-green-400">
+                    ✓ Fully allocated
+                  </span>
+                ) : unallocated > 0 ? (
+                  <span className="text-xs font-medium text-blue-700 dark:text-blue-400">
+                    Unallocated: {formatCurrency(unallocated)} remaining
+                  </span>
+                ) : null}
+              </div>
+
+              <div className="max-h-[320px] overflow-y-auto px-4 py-3 space-y-4">
                 {previewItems.map((item) => {
                   const rawValue = sliderValues.get(item.index) ?? 0;
                   const snappedValue = snappedValues.get(item.index) ?? 0;
                   const pctOfTotal = newTotal > 0 ? (rawValue / newTotal) * 100 : 0;
                   const changeFromCurrent = snappedValue - item.currentFee;
+                  // Per-item max: current value + whatever is unallocated
+                  const itemMax = rawValue + Math.max(0, unallocated);
                   
                   return (
                     <div key={item.index} className="space-y-1.5">
@@ -447,8 +463,8 @@ export function CategoryFeeAllocationDialog({
                         <Slider
                           value={[rawValue]}
                           min={0}
-                          max={sliderMax}
-                          step={sliderMax / 200} // smooth ~0.5% increments
+                          max={Math.max(itemMax, 1)} // prevent max=0
+                          step={newTotal / 200}
                           onValueChange={([v]) => handleSliderChange(item.index, v)}
                           className="flex-1"
                         />
@@ -464,7 +480,7 @@ export function CategoryFeeAllocationDialog({
                 })}
               </div>
               <div className="px-4 py-2 border-t bg-muted/30 text-xs text-muted-foreground text-center">
-                Drag sliders to rebalance visually · Values snap to nearest {currencySymbol}1,000 on apply
+                Slide to adjust · Budget-capped · Snaps to nearest {currencySymbol}1,000 on apply
               </div>
             </div>
           )}

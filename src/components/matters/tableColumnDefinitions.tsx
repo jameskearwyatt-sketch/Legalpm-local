@@ -394,6 +394,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
           rawBurn={rawBurn}
           matterName={ctx.matter.matter_name}
           matterId={ctx.matter.id}
+          clientName={getClientDisplayName(ctx.matter.clients)}
         />
       );
     },

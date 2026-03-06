@@ -417,6 +417,7 @@ export function BurnSparkline({
           rawBurn={rawBurn}
           dataPoints={dataPoints}
           matterName={matterName}
+          matterId={matterId}
         />
       </HoverCardContent>
     </HoverCard>

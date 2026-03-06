@@ -513,10 +513,11 @@ export function CategorizedProposalView({
                 <TooltipProvider key={category}>
                   <div
                     className={cn(
-                      'rounded-md px-3 py-2 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
+                      'rounded-md px-3 py-2 pb-5 border cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] group relative',
                       bgColor,
                       borderColor,
-                      isLockedInAllPhases && 'opacity-75 border-dashed'
+                      isLockedInAllPhases && 'opacity-75 border-dashed',
+                      isExcluded && 'opacity-40'
                     )}
                     onClick={() => handleTileClick(null, category)}
                     role="button"

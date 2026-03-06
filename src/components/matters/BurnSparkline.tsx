@@ -36,6 +36,7 @@ interface BurnSparklineProps {
   rawBurn?: number;
   matterName?: string;
   matterId?: string;
+  clientName?: string;
 }
 
 interface DataPoint {

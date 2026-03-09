@@ -23,7 +23,7 @@ export function TableScrollControls({ children, className }: TableScrollControls
 
   // Find the actual scrollable element
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !mounted) return;
     
     const findScrollable = () => {
       const container = containerRef.current;
@@ -33,29 +33,38 @@ export function TableScrollControls({ children, className }: TableScrollControls
       for (const el of candidates) {
         const style = window.getComputedStyle(el);
         if (style.overflowX === 'auto' || style.overflow === 'auto') {
-          if (el.scrollWidth > el.clientWidth) {
-            return el as HTMLElement;
-          }
+          // Accept elements that have overflow-x:auto even if not yet overflowing
+          // The scroll state check will handle visibility
+          return el as HTMLElement;
         }
       }
       return null;
     };
 
-    const t1 = setTimeout(() => {
+    const tryFind = () => {
       const el = findScrollable();
-      if (el) setScrollableEl(el);
-    }, 100);
-    
-    const t2 = setTimeout(() => {
-      const el = findScrollable();
-      if (el) setScrollableEl(el);
-    }, 500);
+      if (el && el !== scrollableEl) setScrollableEl(el);
+    };
+
+    // Try immediately and at intervals to catch late-loading content
+    tryFind();
+    const t1 = setTimeout(tryFind, 100);
+    const t2 = setTimeout(tryFind, 500);
+    const t3 = setTimeout(tryFind, 1500);
+
+    // Also watch for DOM changes (new table rows loading)
+    const observer = new MutationObserver(() => {
+      tryFind();
+    });
+    observer.observe(containerRef.current, { childList: true, subtree: true });
 
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
+      clearTimeout(t3);
+      observer.disconnect();
     };
-  }, [mounted]);
+  }, [mounted, scrollableEl]);
 
   const updateScrollState = useCallback(() => {
     const el = scrollableEl;

@@ -12,6 +12,8 @@ import { ITSupplyWhatsMarketDialog } from './ITSupplyWhatsMarketDialog';
 import { IT_SUPPLY_ALL_CATEGORIES, IT_SUPPLY_TYPES } from '@/lib/itSupplyCategories';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
 
 const MIN_DEALS_FOR_BENCHMARKING = 3;
 

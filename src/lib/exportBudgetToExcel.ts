@@ -82,7 +82,7 @@ export async function exportBudgetToExcel({
   clientCell.value = `Client: ${clientName}`;
   clientCell.font = subtitleFont;
 
-  worksheet.mergeCells('A3:J3');
+  worksheet.mergeCells('A3:K3');
   const matterCell = worksheet.getCell('A3');
   matterCell.value = `Matter: ${matterName}`;
   matterCell.font = subtitleFont;

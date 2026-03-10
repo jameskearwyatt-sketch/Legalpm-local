@@ -874,7 +874,7 @@ export function QuickToDoButton() {
   // Triage debouncing - track tasks being actively triaged
   // Key: taskId, Value: { lastTriageTime, previousQuadrant }
   const [tasksBeingTriaged, setTasksBeingTriaged] = useState<Map<string, { lastTriageTime: number; previousQuadrant: EisenhowerQuadrant }>>(new Map());
-  const triageTimeoutRefs = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const triageTimeoutRefs = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   // Dragging state
   const [isDragging, setIsDragging] = useState(false);

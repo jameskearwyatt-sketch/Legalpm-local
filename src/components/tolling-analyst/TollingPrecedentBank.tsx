@@ -37,6 +37,7 @@ export function TollingPrecedentBank() {
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
   const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<TollingPrecedent[]>([]);
   const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
+  const [sortOrder, setSortOrder] = useState<'contract' | 'volatility'>('contract');
 
   // Compute technology/stage statistics
   const stats = useMemo(() => {

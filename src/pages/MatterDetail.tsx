@@ -86,6 +86,9 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { JurisdictionsMultiSelect } from '@/components/matters/JurisdictionsMultiSelect';
 import { exportBudgetToExcel } from '@/lib/exportBudgetToExcel';
+import { useUnallocatedLcDisbursements } from '@/lib/hooks/useUnallocatedLcDisbursements';
+import { UnallocatedLcBanner } from '@/components/matters/UnallocatedLcBanner';
+import { AllocateLcDialog } from '@/components/matters/AllocateLcDialog';
 
 const practiceAreas = [
   'Voluntary Carbon', 'PPAs', 'Nuclear', 'SAF', 'Renewables',

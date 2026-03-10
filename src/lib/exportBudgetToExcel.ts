@@ -101,6 +101,7 @@ export async function exportBudgetToExcel({
   headerRow.values = [
     'Category',
     'Work Item',
+    'Description',
     'Provider',
     'LC Firm',
     `Budget (${currency})`,

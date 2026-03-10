@@ -410,9 +410,9 @@ export async function exportAFAProposalToExcel({
     'Other': 'FFF9FAFB',
   };
 
-  // Get valid items for export
+  // Get valid items for export — only included items with non-empty work item names
   const validItems = filterResult.items.filter(item => 
-    item.work_item.trim() !== '' && (item.is_included !== false || !item.is_optional)
+    item.work_item.trim() !== '' && item.is_included !== false
   );
 
   let grandTotal = 0;

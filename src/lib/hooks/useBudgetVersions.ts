@@ -58,6 +58,7 @@ export interface BudgetVersion {
 export interface DraftLineItem {
   id?: string;
   work_item: string;
+  detail?: string | null;
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
   lc_firm_name?: string;

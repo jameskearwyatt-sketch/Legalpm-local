@@ -52,6 +52,7 @@ import { PPA_ALL_CATEGORIES, PPA_CATEGORY_GROUPS, PPACategoryGroup } from '@/lib
 import { WhatsMarketDialog } from './WhatsMarketDialog';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
 
 // Market position config for display
 const marketPositionConfig: Record<string, { label: string; color: string; bg: string; icon: typeof TrendingUp }> = {

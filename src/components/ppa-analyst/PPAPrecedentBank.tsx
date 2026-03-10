@@ -738,13 +738,17 @@ export function PPAPrecedentBank() {
             ) : viewMode === 'grouped' ? (
               /* Grouped View */
               <div className="space-y-3">
-                {Object.entries(groupedPrecedents)
-                  .sort((a, b) => {
-                    const indexA = PPA_ALL_CATEGORIES.findIndex(c => c.label === a[0]);
-                    const indexB = PPA_ALL_CATEGORIES.findIndex(c => c.label === b[0]);
-                    // Unknown categories go to the end
-                    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-                  })
+                {(() => {
+                  const volatilityScores = computeVolatilityScores(groupedPrecedents);
+                  const entries = Object.entries(groupedPrecedents);
+                  const sorted = sortOrder === 'volatility'
+                    ? sortByVolatility(entries as [string, any[]][], volatilityScores) as [string, PPAPrecedent[]][]
+                    : entries.sort((a, b) => {
+                        const indexA = PPA_ALL_CATEGORIES.findIndex(c => c.label === a[0]);
+                        const indexB = PPA_ALL_CATEGORIES.findIndex(c => c.label === b[0]);
+                        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+                      });
+                  return sorted;
                   .map(([category, categoryPrecedents]) => {
                     const isExpanded = expandedCategories.includes(category);
                     const catInfo = PPA_ALL_CATEGORIES.find(c => c.label === category);

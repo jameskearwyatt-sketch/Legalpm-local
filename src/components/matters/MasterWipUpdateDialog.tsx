@@ -162,6 +162,7 @@ export function MasterWipUpdateDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { format, isLoading: formatLoading, saveFormat, deleteFormat, checkFormatMatch, createHeaderSignature } = useReportFormats();
   const { mappings: savedMappings, saveMapping, isLoading: mappingsLoading } = useReportMatterMappings();
+  const { findDecision: findSavedAggDecision, saveDecision: saveAggDecision } = useAggregationDecisions();
   const [showFormatDetails, setShowFormatDetails] = useState(false);
   const [isDeletingFormat, setIsDeletingFormat] = useState(false);
 

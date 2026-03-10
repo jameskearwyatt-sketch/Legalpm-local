@@ -26,6 +26,7 @@ export function CloudComputePrecedentBank() {
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
   const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<CloudComputePrecedent[]>([]);
   const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
+  const [sortOrder, setSortOrder] = useState<'contract' | 'volatility'>('contract');
 
   const filteredPrecedents = useMemo(() => precedents.filter(p => {
     if (p.is_gold_standard) return false;

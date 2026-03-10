@@ -165,7 +165,7 @@ export async function exportBudgetToExcel({
 
     // Category header row
     const catHeaderRow = worksheet.getRow(rowIndex);
-    worksheet.mergeCells(`A${rowIndex}:J${rowIndex}`);
+    worksheet.mergeCells(`A${rowIndex}:K${rowIndex}`);
     catHeaderRow.getCell(1).value = category;
     catHeaderRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FF1E3A5F' } };
     catHeaderRow.getCell(1).fill = {

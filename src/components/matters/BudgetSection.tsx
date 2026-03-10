@@ -567,8 +567,18 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       setDraftItems(latestLineItems.map(item => ({
         id: item.id,
         work_item: item.work_item,
+        detail: (item as any).detail || null,
         provider: item.provider,
         fee_amount: item.fee_amount,
+        lc_firm_name: item.lc_firm_name || undefined,
+        is_optional: item.is_optional,
+        is_included: item.is_included,
+        is_capped: item.is_capped,
+        is_additional_scope: item.is_additional_scope,
+        category: item.category || undefined,
+        wip_amount: item.wip_amount,
+        wip_write_off: item.wip_write_off,
+        wip_updated_at: item.wip_updated_at,
       })));
     }
     setNotes('');

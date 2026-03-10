@@ -166,6 +166,7 @@ export function useBudgetVersions(matterId?: string) {
           matter_id: input.matter_id,
           user_id: user!.id,
           work_item: item.work_item,
+          detail: item.detail || null,
           provider: item.provider,
           fee_amount: item.fee_amount,
           sort_order: index,

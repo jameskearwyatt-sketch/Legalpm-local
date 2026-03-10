@@ -53,6 +53,9 @@ import { WhatsMarketDialog } from './WhatsMarketDialog';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
+import { computeVolatilityScores, sortByVolatility } from '@/lib/precedentVolatility';
+import { Select as SortSelect, SelectContent as SortSelectContent, SelectItem as SortSelectItem, SelectTrigger as SortSelectTrigger, SelectValue as SortSelectValue } from '@/components/ui/select';
+import { ArrowUpDown } from 'lucide-react';
 
 // Market position config for display
 const marketPositionConfig: Record<string, { label: string; color: string; bg: string; icon: typeof TrendingUp }> = {

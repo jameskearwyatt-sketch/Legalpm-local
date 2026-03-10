@@ -123,13 +123,21 @@ export function CarbonPrecedentBank() {
               </div>
             ) : (
               <div className="space-y-3">
-                {Object.entries(groupedPrecedents).sort((a, b) => {
-                  const indexA = CARBON_ALL_CATEGORIES.findIndex(c => c.label === a[0]);
-                  const indexB = CARBON_ALL_CATEGORIES.findIndex(c => c.label === b[0]);
-                  return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-                }).map(([category, categoryPrecedents]) => {
+                {(() => {
+                  const volatilityScores = computeVolatilityScores(groupedPrecedents);
+                  const entries = Object.entries(groupedPrecedents);
+                  const sorted = sortOrder === 'volatility'
+                    ? sortByVolatility(entries as [string, any[]][], volatilityScores)
+                    : entries.sort((a, b) => {
+                        const indexA = CARBON_ALL_CATEGORIES.findIndex(c => c.label === a[0]);
+                        const indexB = CARBON_ALL_CATEGORIES.findIndex(c => c.label === b[0]);
+                        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+                      });
+                  return sorted;
+                })().map(([category, categoryPrecedents]) => {
                   const isExpanded = expandedCategories.includes(category);
                   const catInfo = CARBON_ALL_CATEGORIES.find(c => c.label === category);
+                  const volScore = sortOrder === 'volatility' ? computeVolatilityScores(groupedPrecedents)[category] : null;
                   return (
                     <Collapsible key={category} open={isExpanded} onOpenChange={() => toggleCategory(category)}>
                       <CollapsibleTrigger asChild>
@@ -142,7 +150,15 @@ export function CarbonPrecedentBank() {
                           />
                           {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                           <div className="flex-1">
-                            <div className="flex items-center gap-2"><span className="font-medium">{category}</span><Badge variant="secondary">{categoryPrecedents.length}</Badge></div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{category}</span>
+                              <Badge variant="secondary">{categoryPrecedents.length}</Badge>
+                              {volScore && (
+                                <Badge variant="outline" className={cn('text-xs', volScore.level === 'high' ? 'border-destructive/50 text-destructive bg-destructive/10' : volScore.level === 'medium' ? 'border-amber-500/50 text-amber-700 bg-amber-50' : 'border-green-500/50 text-green-700 bg-green-50')}>
+                                  {volScore.level === 'high' ? '🔴' : volScore.level === 'medium' ? '🟡' : '🟢'} {volScore.level}
+                                </Badge>
+                              )}
+                            </div>
                             {catInfo && <span className="text-xs text-muted-foreground">{catInfo.group}</span>}
                           </div>
                           <Button variant="outline" size="sm" className="h-7 text-xs gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20" onClick={(e) => { e.stopPropagation(); setWhatsMarketCategory(category); setWhatsMarketPrecedents(categoryPrecedents); }}>

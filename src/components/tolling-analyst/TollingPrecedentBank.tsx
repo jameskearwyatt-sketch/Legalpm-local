@@ -21,6 +21,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
+import { computeVolatilityScores, sortByVolatility } from '@/lib/precedentVolatility';
+import { ArrowUpDown } from 'lucide-react';
 
 const MIN_DEALS_FOR_BENCHMARKING = 3;
 

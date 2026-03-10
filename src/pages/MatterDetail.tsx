@@ -265,6 +265,17 @@ export default function MatterDetail() {
     isLoading: lcLoading 
   } = useLocalCounsels(id);
 
+  // Unallocated LC disbursements
+  const {
+    unallocated: unallocatedLcDisbursements,
+    totalUnallocatedWip,
+    totalUnallocatedAr,
+    totalUnallocatedPaid,
+    markAllocated: markLcAllocated,
+    deleteUnallocated: deleteLcUnallocated,
+  } = useUnallocatedLcDisbursements(id);
+  const [showAllocateLcDialog, setShowAllocateLcDialog] = useState(false);
+
   // Calculate BM and LC WIP totals from budget line items (NOT from financial snapshots)
   const budgetLineItemTotals = useMemo(() => {
     // BM items

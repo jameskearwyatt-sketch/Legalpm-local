@@ -745,7 +745,7 @@ export function PPAPrecedentBank() {
                   const volatilityScores = computeVolatilityScores(groupedPrecedents);
                   const entries = Object.entries(groupedPrecedents);
                   const sorted = sortOrder === 'volatility'
-                    ? sortByVolatility(entries as [string, any[]][], volatilityScores) as [string, PPAPrecedent[]][]
+                    ? sortByVolatility(entries, volatilityScores)
                     : entries.sort((a, b) => {
                         const indexA = PPA_ALL_CATEGORIES.findIndex(c => c.label === a[0]);
                         const indexB = PPA_ALL_CATEGORIES.findIndex(c => c.label === b[0]);

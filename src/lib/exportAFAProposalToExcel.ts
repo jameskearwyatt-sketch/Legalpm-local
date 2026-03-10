@@ -499,9 +499,9 @@ export async function exportAFAProposalToExcel({
         detailDisplay,
         providerDisplay,
       ];
-      if (exportLower) rowValues.push(feeAmount); // TODO: use lower fee if available
-      if (exportMidpoint) rowValues.push(feeAmount);
-      if (exportUpper) rowValues.push(feeAmount); // TODO: use upper fee if available
+      if (exportLower) rowValues.push(feeLower);
+      if (exportMidpoint) rowValues.push(feeMidpoint);
+      if (exportUpper) rowValues.push(feeUpper);
       if (!hideUpperAndPcSum) {
         rowValues.push(item.is_pc_sum ? 'Yes' : '');
       }

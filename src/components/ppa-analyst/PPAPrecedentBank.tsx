@@ -94,6 +94,7 @@ export function PPAPrecedentBank() {
   const [viewMode, setViewMode] = useState<'grouped' | 'list'>('grouped');
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
   const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<PPAPrecedent[]>([]);
+  const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
 
   // Derive unique values for filters
   const uniqueJurisdictions = useMemo(() => {

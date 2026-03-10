@@ -2843,7 +2843,7 @@ export default function PricingProposalDetail() {
                         showAssumptionsNotTrue && altTotals ? "text-amber-600 dark:text-amber-400" : "invisible"
                       )}>
                         {showAssumptionsNotTrue && altTotals
-                          ? `If assumptions not all true: ${formatCurrency(altTotals.bmTotal)}`
+                          ? `If assumptions not all true: ${formatCurrency(altTotals.upperTotal)}`
                           : '\u00A0'}
                       </p>
                     </div>

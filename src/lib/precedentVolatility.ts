@@ -113,10 +113,10 @@ export function computeVolatilityScores<T extends PrecedentLike>(
   return results;
 }
 
-export function sortByVolatility(
-  entries: [string, unknown[]][],
+export function sortByVolatility<T>(
+  entries: [string, T[]][],
   scores: Record<string, VolatilityScore>
-): [string, unknown[]][] {
+): [string, T[]][] {
   return [...entries].sort((a, b) => {
     const scoreA = scores[a[0]]?.score ?? 0;
     const scoreB = scores[b[0]]?.score ?? 0;

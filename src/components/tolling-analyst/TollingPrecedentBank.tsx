@@ -285,6 +285,11 @@ export function TollingPrecedentBank() {
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{category}</span>
                                 <Badge variant="secondary">{categoryPrecedents.length}</Badge>
+                                {volScore && (
+                                  <Badge variant="outline" className={cn('text-xs', volScore.level === 'high' ? 'border-destructive/50 text-destructive bg-destructive/10' : volScore.level === 'medium' ? 'border-amber-500/50 text-amber-700 bg-amber-50' : 'border-green-500/50 text-green-700 bg-green-50')}>
+                                    {volScore.level === 'high' ? '🔴' : volScore.level === 'medium' ? '🟡' : '🟢'} {volScore.level}
+                                  </Badge>
+                                )}
                               </div>
                               {catInfo && <span className="text-xs text-muted-foreground">{catInfo.group}</span>}
                             </div>

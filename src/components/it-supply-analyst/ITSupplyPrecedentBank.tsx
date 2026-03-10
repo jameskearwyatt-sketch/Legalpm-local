@@ -95,8 +95,16 @@ export function ITSupplyPrecedentBank() {
               <div className="text-center py-12"><Database className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><p className="text-lg font-medium text-muted-foreground">{search || supplyTypeFilter !== 'all' ? 'No precedents match your filters' : 'No precedents banked yet'}</p></div>
             ) : (
               <div className="space-y-3">
-                {Object.entries(groupedPrecedents).sort((a, b) => { const iA = IT_SUPPLY_ALL_CATEGORIES.findIndex(c => c.label === a[0]); const iB = IT_SUPPLY_ALL_CATEGORIES.findIndex(c => c.label === b[0]); return (iA === -1 ? 999 : iA) - (iB === -1 ? 999 : iB); }).map(([category, cp]) => {
+                {(() => {
+                  const volatilityScores = computeVolatilityScores(groupedPrecedents);
+                  const entries = Object.entries(groupedPrecedents);
+                  const sorted = sortOrder === 'volatility'
+                    ? sortByVolatility(entries, volatilityScores)
+                    : entries.sort((a, b) => { const iA = IT_SUPPLY_ALL_CATEGORIES.findIndex(c => c.label === a[0]); const iB = IT_SUPPLY_ALL_CATEGORIES.findIndex(c => c.label === b[0]); return (iA === -1 ? 999 : iA) - (iB === -1 ? 999 : iB); });
+                  return sorted;
+                })().map(([category, cp]) => {
                   const isExpanded = expandedCategories.includes(category);
+                  const volScore = sortOrder === 'volatility' ? computeVolatilityScores(groupedPrecedents)[category] : null;
                   return (
                     <Collapsible key={category} open={isExpanded} onOpenChange={() => toggleCategory(category)}>
                       <CollapsibleTrigger asChild>
@@ -108,7 +116,7 @@ export function ITSupplyPrecedentBank() {
                             className="shrink-0"
                           />
                           {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                          <div className="flex-1"><div className="flex items-center gap-2"><span className="font-medium">{category}</span><Badge variant="secondary">{cp.length}</Badge></div></div>
+                          <div className="flex-1"><div className="flex items-center gap-2"><span className="font-medium">{category}</span><Badge variant="secondary">{cp.length}</Badge>{volScore && <Badge variant="outline" className={cn('text-xs', volScore.level === 'high' ? 'border-destructive/50 text-destructive bg-destructive/10' : volScore.level === 'medium' ? 'border-amber-500/50 text-amber-700 bg-amber-50' : 'border-green-500/50 text-green-700 bg-green-50')}>{volScore.level === 'high' ? '🔴' : volScore.level === 'medium' ? '🟡' : '🟢'} {volScore.level}</Badge>}</div></div>
                           <Button variant="outline" size="sm" className="h-7 text-xs gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20" onClick={(e) => { e.stopPropagation(); setWhatsMarketCategory(category); setWhatsMarketPrecedents(cp); }}><Scale className="h-3.5 w-3.5" /> What's Market?</Button>
                         </div>
                       </CollapsibleTrigger>

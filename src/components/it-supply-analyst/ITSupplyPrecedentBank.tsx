@@ -100,7 +100,7 @@ export function ITSupplyPrecedentBank() {
                   const entries = Object.entries(groupedPrecedents);
                   const sorted = sortOrder === 'volatility'
                     ? sortByVolatility(entries, volatilityScores)
-                    : entries.sort((a, b) => { const iA = IT_SUPPLY_ALL_CATEGORIES.findIndex(c => c.label === a[0]); const iB = IT_SUPPLY_ALL_CATEGORIES.findIndex(c => c.label === b[0]); return (iA === -1 ? 999 : iA) - (iB === -1 ? 999 : iB); });
+                    : [...entries].sort((a, b) => { const iA = IT_SUPPLY_ALL_CATEGORIES.findIndex(c => c.label === a[0]); const iB = IT_SUPPLY_ALL_CATEGORIES.findIndex(c => c.label === b[0]); return (iA === -1 ? 999 : iA) - (iB === -1 ? 999 : iB); });
                   return sorted;
                 })().map(([category, cp]) => {
                   const isExpanded = expandedCategories.includes(category);

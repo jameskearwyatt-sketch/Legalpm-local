@@ -128,7 +128,7 @@ export function CarbonPrecedentBank() {
                   const entries = Object.entries(groupedPrecedents);
                   const sorted = sortOrder === 'volatility'
                     ? sortByVolatility(entries, volatilityScores)
-                    : entries.sort((a, b) => {
+                    : [...entries].sort((a, b) => {
                         const indexA = CARBON_ALL_CATEGORIES.findIndex(c => c.label === a[0]);
                         const indexB = CARBON_ALL_CATEGORIES.findIndex(c => c.label === b[0]);
                         return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);

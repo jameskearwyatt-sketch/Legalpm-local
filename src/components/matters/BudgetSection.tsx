@@ -197,6 +197,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       setDraftItems(latestLineItems.map(item => ({
         id: item.id,
         work_item: item.work_item,
+        detail: (item as any).detail || null,
         provider: item.provider,
         fee_amount: item.fee_amount,
         lc_firm_name: item.lc_firm_name || undefined,

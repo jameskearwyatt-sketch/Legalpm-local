@@ -194,6 +194,7 @@ export async function exportBudgetToExcel({
       dataRow.values = [
         item.category || 'Other',
         item.work_item,
+        item.detail || '',
         item.provider,
         item.lc_firm_name || '',
         budget,

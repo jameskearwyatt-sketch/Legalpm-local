@@ -445,8 +445,14 @@ export async function exportAFAProposalToExcel({
 
     // Add items
     for (const item of categoryItems) {
-      const mult = (item.is_multiplied && item.multiplier_qty && item.multiplier_qty > 1) ? item.multiplier_qty : 1;
-      const feeAmount = (item.fee_amount || 0) * mult;
+      // Multiplier already applied by applyAFAFilters — do not double-apply
+      const mult = 1;
+      const feeAmount = item.fee_amount || 0;
+      // Calculate per-column fee values (lower/upper from original item, with same multiplier treatment)
+      const origMult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
+      const feeLower = smartRound((item.fee_lower ?? item.fee_amount ?? 0) * origMult);
+      const feeUpper = smartRound((item.fee_upper ?? item.fee_amount ?? 0) * origMult);
+      const feeMidpoint = feeAmount; // Already the base figure from AFA filter
       categoryTotal += feeAmount;
       grandTotal += feeAmount;
       

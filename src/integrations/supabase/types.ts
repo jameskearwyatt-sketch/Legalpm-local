@@ -3979,6 +3979,56 @@ export type Database = {
           },
         ]
       }
+      unallocated_lc_disbursements: {
+        Row: {
+          allocated_at: string | null
+          ar_amount: number | null
+          created_at: string | null
+          id: string
+          matter_id: string
+          notes: string | null
+          paid_amount: number | null
+          source: string | null
+          updated_at: string | null
+          user_id: string
+          wip_amount: number | null
+        }
+        Insert: {
+          allocated_at?: string | null
+          ar_amount?: number | null
+          created_at?: string | null
+          id?: string
+          matter_id: string
+          notes?: string | null
+          paid_amount?: number | null
+          source?: string | null
+          updated_at?: string | null
+          user_id: string
+          wip_amount?: number | null
+        }
+        Update: {
+          allocated_at?: string | null
+          ar_amount?: number | null
+          created_at?: string | null
+          id?: string
+          matter_id?: string
+          notes?: string | null
+          paid_amount?: number | null
+          source?: string | null
+          updated_at?: string | null
+          user_id?: string
+          wip_amount?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "unallocated_lc_disbursements_matter_id_fkey"
+            columns: ["matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_report_formats: {
         Row: {
           column_mappings: Json

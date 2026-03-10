@@ -42,6 +42,11 @@ export interface DisbursementReviewResult {
   matterId: string;
   isLocalCounselFee: boolean;
   allocations: DisbursementAllocation[];
+  allocateLater?: boolean;
+  // Original disbursement amounts (for deferred allocation tracking)
+  wipDisbursement?: number;
+  arDisbursement?: number;
+  paidDisbursement?: number;
 }
 
 interface DisbursementReviewDialogProps {
@@ -133,11 +138,14 @@ export function DisbursementReviewDialog({
     }));
   };
 
-  const saveCurrentAndNext = (partialResult: { isLocalCounselFee: boolean; allocations: DisbursementAllocation[] }) => {
+  const saveCurrentAndNext = (partialResult: { isLocalCounselFee: boolean; allocations: DisbursementAllocation[]; allocateLater?: boolean }) => {
     if (!current) return;
     
     const result: DisbursementReviewResult = {
       matterId: current.matterId,
+      wipDisbursement: current.wipDisbursement,
+      arDisbursement: current.arDisbursement,
+      paidDisbursement: current.paidDisbursement,
       ...partialResult,
     };
     
@@ -247,21 +255,31 @@ export function DisbursementReviewDialog({
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-2">
+                <div className="flex flex-col gap-2 pt-2">
+                  <div className="flex gap-3">
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => handleConfirmLcFee(false)}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      No, regular disbursement
+                    </Button>
+                    <Button 
+                      className="flex-1"
+                      onClick={() => handleConfirmLcFee(true)}
+                    >
+                      <Check className="h-4 w-4 mr-2" />
+                      Yes, allocate to firm now
+                    </Button>
+                  </div>
                   <Button 
-                    variant="outline" 
-                    className="flex-1"
-                    onClick={() => handleConfirmLcFee(false)}
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => saveCurrentAndNext({ isLocalCounselFee: true, allocations: [], allocateLater: true })}
                   >
-                    <X className="h-4 w-4 mr-2" />
-                    No, it's a regular disbursement
-                  </Button>
-                  <Button 
-                    className="flex-1"
-                    onClick={() => handleConfirmLcFee(true)}
-                  >
-                    <Check className="h-4 w-4 mr-2" />
-                    Yes, this is a local counsel fee
+                    <Building2 className="h-4 w-4 mr-2" />
+                    Yes, but allocate to specific firm later
                   </Button>
                 </div>
               </div>

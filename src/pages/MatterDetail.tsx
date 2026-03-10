@@ -86,6 +86,9 @@ import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { JurisdictionsMultiSelect } from '@/components/matters/JurisdictionsMultiSelect';
 import { exportBudgetToExcel } from '@/lib/exportBudgetToExcel';
+import { useUnallocatedLcDisbursements } from '@/lib/hooks/useUnallocatedLcDisbursements';
+import { UnallocatedLcBanner } from '@/components/matters/UnallocatedLcBanner';
+import { AllocateLcDialog } from '@/components/matters/AllocateLcDialog';
 
 const practiceAreas = [
   'Voluntary Carbon', 'PPAs', 'Nuclear', 'SAF', 'Renewables',
@@ -261,6 +264,17 @@ export default function MatterDetail() {
     totalBurn: lcTotalBurn,
     isLoading: lcLoading 
   } = useLocalCounsels(id);
+
+  // Unallocated LC disbursements
+  const {
+    unallocated: unallocatedLcDisbursements,
+    totalUnallocatedWip,
+    totalUnallocatedAr,
+    totalUnallocatedPaid,
+    markAllocated: markLcAllocated,
+    deleteUnallocated: deleteLcUnallocated,
+  } = useUnallocatedLcDisbursements(id);
+  const [showAllocateLcDialog, setShowAllocateLcDialog] = useState(false);
 
   // Calculate BM and LC WIP totals from budget line items (NOT from financial snapshots)
   const budgetLineItemTotals = useMemo(() => {
@@ -1690,6 +1704,16 @@ export default function MatterDetail() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Unallocated LC disbursements banner */}
+              {(totalUnallocatedWip > 0 || totalUnallocatedAr > 0 || totalUnallocatedPaid > 0) && (
+                <UnallocatedLcBanner
+                  totalWip={totalUnallocatedWip}
+                  totalAr={totalUnallocatedAr}
+                  totalPaid={totalUnallocatedPaid}
+                  currency={currency}
+                  onAllocateNow={() => setShowAllocateLcDialog(true)}
+                />
+              )}
               {lcLoading ? (
                 <div className="flex justify-center py-4">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -2549,6 +2573,18 @@ export default function MatterDetail() {
           </div>
         )}
       </div>
+
+      {/* Allocate LC Dialog */}
+      <AllocateLcDialog
+        isOpen={showAllocateLcDialog}
+        onClose={() => setShowAllocateLcDialog(false)}
+        unallocated={unallocatedLcDisbursements}
+        localCounsels={localCounsels}
+        currency={currency}
+        matterId={id || ''}
+        onMarkAllocated={async (itemId) => { await markLcAllocated.mutateAsync(itemId); }}
+        onDeleteUnallocated={async (itemId) => { await deleteLcUnallocated.mutateAsync(itemId); }}
+      />
     </AppLayout>
   );
 }

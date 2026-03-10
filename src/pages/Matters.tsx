@@ -1545,7 +1545,30 @@ export default function Matters() {
           // Apply local counsel allocations if provided and capture before values
           if (lcAllocations && lcAllocations.length > 0) {
             for (const allocation of lcAllocations) {
-              if (!allocation.isLocalCounselFee || allocation.allocations.length === 0) continue;
+              if (!allocation.isLocalCounselFee) continue;
+
+              // Handle "allocate later" — save to unallocated_lc_disbursements
+              if (allocation.allocateLater) {
+                if (user?.id) {
+                  const { error } = await supabase
+                    .from('unallocated_lc_disbursements' as any)
+                    .insert({
+                      matter_id: allocation.matterId,
+                      user_id: user.id,
+                      wip_amount: allocation.wipDisbursement || 0,
+                      ar_amount: allocation.arDisbursement || 0,
+                      paid_amount: allocation.paidDisbursement || 0,
+                      source: 'master_update',
+                      notes: `From master update on ${today}`,
+                    });
+                  if (error) {
+                    console.error('Failed to save unallocated LC disbursement:', error);
+                  }
+                }
+                continue;
+              }
+
+              if (allocation.allocations.length === 0) continue;
               
               for (const lcAlloc of allocation.allocations) {
                 // Fetch current LC values before updating
@@ -1586,10 +1609,15 @@ export default function Matters() {
             
             // Invalidate local counsel queries
             queryClient.invalidateQueries({ queryKey: ['local-counsels'] });
+            queryClient.invalidateQueries({ queryKey: ['unallocated-lc-disbursements'] });
             
             const lcCount = lcAllocations.filter(a => a.isLocalCounselFee && a.allocations.length > 0).length;
+            const deferredCount = lcAllocations.filter(a => a.allocateLater).length;
             if (lcCount > 0) {
               toast.success(`Updated local counsel data for ${lcCount} matter(s)`);
+            }
+            if (deferredCount > 0) {
+              toast.info(`${deferredCount} LC fee(s) saved for later allocation`);
             }
           }
 

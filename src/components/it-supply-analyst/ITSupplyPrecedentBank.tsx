@@ -25,6 +25,7 @@ export function ITSupplyPrecedentBank() {
   const [supplyTypeFilter, setSupplyTypeFilter] = useState<string>('all');
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
   const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<ITSupplyPrecedent[]>([]);
+  const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
 
   const filteredPrecedents = useMemo(() => {
     return precedents.filter(p => {

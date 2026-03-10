@@ -206,11 +206,16 @@ export async function exportBudgetToExcel({
       ];
 
       // Format currency cells
-      [5, 6, 7, 8, 9].forEach((col) => {
+      [6, 7, 8, 9, 10].forEach((col) => {
         const cell = dataRow.getCell(col);
         cell.numFmt = '#,##0.00';
         cell.alignment = { horizontal: 'right' };
       });
+
+      // Format percentage
+      dataRow.getCell(11).numFmt = '0.0%';
+      dataRow.getCell(11).value = burnPct / 100;
+      dataRow.getCell(11).alignment = { horizontal: 'center' };
 
       // Format percentage
       dataRow.getCell(10).numFmt = '0.0%';

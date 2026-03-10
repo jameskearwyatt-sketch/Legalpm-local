@@ -349,6 +349,41 @@ export function DraggableBudgetItem({
           disabled={hasExistingBudget}
           className="text-sm"
         />
+        {/* Detail in view mode */}
+        {item.detail && hasExistingBudget && (
+          <button
+            type="button"
+            onClick={() => setIsDetailExpanded(!isDetailExpanded)}
+            className="text-xs text-muted-foreground hover:text-foreground mt-0.5 flex items-center gap-0.5"
+          >
+            {isDetailExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            Description
+          </button>
+        )}
+        {item.detail && hasExistingBudget && isDetailExpanded && (
+          <p className="text-xs text-muted-foreground mt-1 pl-1 whitespace-pre-wrap">{item.detail}</p>
+        )}
+        {/* Detail in new budget creation mode */}
+        {!hasExistingBudget && (
+          <>
+            <button
+              type="button"
+              onClick={() => setIsDetailExpanded(!isDetailExpanded)}
+              className="text-xs text-muted-foreground hover:text-foreground mt-0.5 flex items-center gap-0.5"
+            >
+              {isDetailExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              {item.detail ? 'Description' : 'Add description'}
+            </button>
+            {isDetailExpanded && (
+              <Textarea
+                value={item.detail || ''}
+                onChange={(e) => onEdit(index, 'detail' as keyof DraftLineItem, e.target.value)}
+                placeholder="Detailed description of this work item..."
+                className="text-xs mt-1 min-h-[60px]"
+              />
+            )}
+          </>
+        )}
       </div>
 
       {/* Provider */}

@@ -279,6 +279,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         }
       } else if (field === 'lc_firm_name') {
         newItem.lc_firm_name = value as string;
+      } else if (field === 'detail') {
+        newItem.detail = value as string || null;
       } else {
         newItem.work_item = value as string;
       }

@@ -98,6 +98,12 @@ export function ITSupplyPrecedentBank() {
                     <Collapsible key={category} open={isExpanded} onOpenChange={() => toggleCategory(category)}>
                       <CollapsibleTrigger asChild>
                         <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">
+                          <Checkbox
+                            checked={selectedForExport.includes(category)}
+                            onCheckedChange={(checked) => setSelectedForExport(prev => checked ? [...prev, category] : prev.filter(c => c !== category))}
+                            onClick={(e) => e.stopPropagation()}
+                            className="shrink-0"
+                          />
                           {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                           <div className="flex-1"><div className="flex items-center gap-2"><span className="font-medium">{category}</span><Badge variant="secondary">{cp.length}</Badge></div></div>
                           <Button variant="outline" size="sm" className="h-7 text-xs gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20" onClick={(e) => { e.stopPropagation(); setWhatsMarketCategory(category); setWhatsMarketPrecedents(cp); }}><Scale className="h-3.5 w-3.5" /> What's Market?</Button>

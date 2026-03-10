@@ -752,7 +752,7 @@ export function PPAPrecedentBank() {
                         return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
                       });
                   return sorted;
-                })()
+                })().map(([category, categoryPrecedents]) => {
                     const isExpanded = expandedCategories.includes(category);
                     const catInfo = PPA_ALL_CATEGORIES.find(c => c.label === category);
                     const volScore = sortOrder === 'volatility' ? computeVolatilityScores(groupedPrecedents)[category] : null;

@@ -140,6 +140,7 @@ export function MasterWipUpdateDialog({
   
   // Multi-client aggregation state
   const [potentialAggregations, setPotentialAggregations] = useState<PotentialAggregation[]>([]);
+  const [autoApplyAggregation, setAutoApplyAggregation] = useState(false);
   
   // Manual data overwrite confirmation state
   const [showManualOverwriteConfirm, setShowManualOverwriteConfirm] = useState(false);

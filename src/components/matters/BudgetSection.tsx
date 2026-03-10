@@ -322,8 +322,11 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       // Convert to draft items and append to existing items
       const newItems: DraftLineItem[] = items.map((item: any) => ({
         work_item: item.work_item?.substring(0, 100) || '',
+        detail: item.detail || null,
         provider: item.provider === 'Local Counsel' ? 'Local Counsel' : 'Baker McKenzie',
         fee_amount: Number(item.fee_amount) || 0,
+        category: item.category || null,
+        is_additional_scope: hasExistingBudget ? true : false,
       }));
 
       // Filter out empty placeholder items and add new ones

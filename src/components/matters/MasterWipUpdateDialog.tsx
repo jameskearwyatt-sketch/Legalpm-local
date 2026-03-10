@@ -941,6 +941,14 @@ export function MasterWipUpdateDialog({
     onClose();
   };
 
+  // Auto-proceed from aggregation step when all decisions are pre-filled from saved data
+  useEffect(() => {
+    if (autoApplyAggregation && step === 'aggregate-confirm' && potentialAggregations.length > 0) {
+      setAutoApplyAggregation(false);
+      proceedFromAggregation();
+    }
+  }, [autoApplyAggregation, step, potentialAggregations]);
+
   // Handle aggregation decisions
   const setAggregationDecision = (index: number, decision: 'aggregate' | 'separate') => {
     setPotentialAggregations(prev => prev.map((agg, i) => 

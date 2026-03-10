@@ -87,7 +87,7 @@ export function ITSupplyPrecedentBank() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">{filteredUniqueDeals} deal{filteredUniqueDeals !== 1 ? 's' : ''} · {filteredPrecedents.length} position{filteredPrecedents.length !== 1 ? 's' : ''}</CardTitle>
-              {Object.keys(groupedPrecedents).length > 0 && <div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={expandAll} className="text-xs">Expand all</Button><Button variant="ghost" size="sm" onClick={collapseAll} className="text-xs">Collapse all</Button></div>}
+              {Object.keys(groupedPrecedents).length > 0 && <div className="flex items-center gap-2"><Select value={sortOrder} onValueChange={(v) => setSortOrder(v as 'contract' | 'volatility')}><SelectTrigger className="h-7 w-[180px] text-xs"><ArrowUpDown className="h-3 w-3 mr-1" /><SelectValue /></SelectTrigger><SelectContent><SelectItem value="contract">Contract Order</SelectItem><SelectItem value="volatility">Negotiation Volatility</SelectItem></SelectContent></Select><Button variant="ghost" size="sm" onClick={expandAll} className="text-xs">Expand all</Button><Button variant="ghost" size="sm" onClick={collapseAll} className="text-xs">Collapse all</Button></div>}
             </div>
           </CardHeader>
           <CardContent>

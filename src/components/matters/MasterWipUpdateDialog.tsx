@@ -963,6 +963,17 @@ export function MasterWipUpdateDialog({
   };
 
   const proceedFromAggregation = () => {
+    // Save all aggregation decisions for future imports
+    for (const agg of potentialAggregations) {
+      if (agg.decision) {
+        saveAggDecision.mutate({
+          matter_name: agg.matterName,
+          decision: agg.decision,
+          target_matter_id: agg.decision === 'aggregate' ? agg.targetMatterId || null : null,
+        });
+      }
+    }
+
     // Apply aggregation decisions to importedData
     for (const agg of potentialAggregations) {
       if (agg.decision === 'aggregate' && agg.targetMatterId) {

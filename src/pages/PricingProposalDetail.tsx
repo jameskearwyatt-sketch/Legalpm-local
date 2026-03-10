@@ -2837,13 +2837,13 @@ export default function PricingProposalDetail() {
                   <div className="flex items-center justify-between">
                     <div className="min-w-[140px]">
                       <p className="text-sm font-medium text-muted-foreground">Upper Estimate (Target)</p>
-                      <p className="text-2xl font-bold tabular-nums">{formatCurrency(workItemTotals.upperTotal)}</p>
+                      <p className="text-2xl font-bold tabular-nums">{formatCurrency(summary.bmUpperTarget)}</p>
                       <p className={cn(
                         "text-xs mt-1 min-h-[1rem]",
                         showAssumptionsNotTrue && altTotals ? "text-amber-600 dark:text-amber-400" : "invisible"
                       )}>
                         {showAssumptionsNotTrue && altTotals
-                          ? `If assumptions not all true: ${formatCurrency(altTotals.upperTotal)}`
+                          ? `If assumptions not all true: ${formatCurrency(altTotals.bmTotal)}`
                           : '\u00A0'}
                       </p>
                     </div>

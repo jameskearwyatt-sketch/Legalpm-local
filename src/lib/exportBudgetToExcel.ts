@@ -88,7 +88,7 @@ export async function exportBudgetToExcel({
   matterCell.font = subtitleFont;
 
   // Version and date info
-  worksheet.mergeCells('A4:J4');
+  worksheet.mergeCells('A4:K4');
   const versionCell = worksheet.getCell('A4');
   versionCell.value = `Budget Version: ${versionNumber || 'N/A'} | Report Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`;
   versionCell.font = subtitleFont;

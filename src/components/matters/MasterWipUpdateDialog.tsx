@@ -37,6 +37,7 @@ import { ReportFormatTrainingDialog } from './ReportFormatTrainingDialog';
 import { DisbursementReviewDialog, DisbursementData, DisbursementReviewResult } from './DisbursementReviewDialog';
 import { useAuth } from '@/lib/auth';
 import { LocalCounsel } from '@/lib/hooks/useLocalCounsels';
+import { useAggregationDecisions } from '@/lib/hooks/useAggregationDecisions';
 
 interface MasterWipUpdateDialogProps {
   isOpen: boolean;
@@ -139,6 +140,7 @@ export function MasterWipUpdateDialog({
   
   // Multi-client aggregation state
   const [potentialAggregations, setPotentialAggregations] = useState<PotentialAggregation[]>([]);
+  const [autoApplyAggregation, setAutoApplyAggregation] = useState(false);
   
   // Manual data overwrite confirmation state
   const [showManualOverwriteConfirm, setShowManualOverwriteConfirm] = useState(false);
@@ -161,6 +163,7 @@ export function MasterWipUpdateDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { format, isLoading: formatLoading, saveFormat, deleteFormat, checkFormatMatch, createHeaderSignature } = useReportFormats();
   const { mappings: savedMappings, saveMapping, isLoading: mappingsLoading } = useReportMatterMappings();
+  const { findDecision: findSavedAggDecision, saveDecision: saveAggDecision } = useAggregationDecisions();
   const [showFormatDetails, setShowFormatDetails] = useState(false);
   const [isDeletingFormat, setIsDeletingFormat] = useState(false);
 
@@ -415,18 +418,45 @@ export function MasterWipUpdateDialog({
       setLowConfidenceData(lowConf);
       setUnmatchedData(unmatched);
 
-      // Store potential aggregations from edge function
-      const aggCandidates: PotentialAggregation[] = (data.potentialAggregations || []).map((a: any) => ({
-        ...a,
-        decision: null,
-        targetMatterId: null,
-      }));
+      // Store potential aggregations from edge function, auto-applying saved decisions
+      const aggCandidates: PotentialAggregation[] = (data.potentialAggregations || []).map((a: any) => {
+        const saved = findSavedAggDecision(a.matterName);
+        if (saved) {
+          // Check target matter still exists if it was an aggregate decision
+          const targetStillExists = saved.decision === 'aggregate' 
+            ? matters.some(m => m.id === saved.target_matter_id)
+            : true;
+          return {
+            ...a,
+            decision: targetStillExists ? saved.decision : null,
+            targetMatterId: targetStillExists ? saved.target_matter_id : null,
+          };
+        }
+        return {
+          ...a,
+          decision: null,
+          targetMatterId: null,
+        };
+      });
       setPotentialAggregations(aggCandidates);
 
-      // If there are potential aggregations, show that step first
+      // Check if ALL aggregation candidates have saved decisions (auto-skip the step)
+      const allDecided = aggCandidates.length > 0 && aggCandidates.every(
+        a => a.decision !== null && a.decision !== undefined && 
+             (a.decision !== 'aggregate' || a.targetMatterId)
+      );
+
+      // If there are potential aggregations, show that step (or auto-proceed if all remembered)
       if (aggCandidates.length > 0) {
-        setStep('aggregate-confirm');
-        toast.info(`${aggCandidates.length} potential multi-client group(s) detected — please review`);
+        if (allDecided) {
+          // Auto-apply without showing the step - set flag for effect
+          toast.success(`${aggCandidates.length} multi-client group(s) auto-applied from previous decisions`);
+          setAutoApplyAggregation(true);
+          setStep('aggregate-confirm');
+        } else {
+          setStep('aggregate-confirm');
+          toast.info(`${aggCandidates.length} potential multi-client group(s) detected — please review`);
+        }
       } else if (lowConf.length > 0) {
         // If there are low confidence matches, show confirmation step
         setStep('confirm-matches');
@@ -911,6 +941,14 @@ export function MasterWipUpdateDialog({
     onClose();
   };
 
+  // Auto-proceed from aggregation step when all decisions are pre-filled from saved data
+  useEffect(() => {
+    if (autoApplyAggregation && step === 'aggregate-confirm' && potentialAggregations.length > 0) {
+      setAutoApplyAggregation(false);
+      proceedFromAggregation();
+    }
+  }, [autoApplyAggregation, step, potentialAggregations]);
+
   // Handle aggregation decisions
   const setAggregationDecision = (index: number, decision: 'aggregate' | 'separate') => {
     setPotentialAggregations(prev => prev.map((agg, i) => 
@@ -925,6 +963,17 @@ export function MasterWipUpdateDialog({
   };
 
   const proceedFromAggregation = () => {
+    // Save all aggregation decisions for future imports
+    for (const agg of potentialAggregations) {
+      if (agg.decision) {
+        saveAggDecision.mutate({
+          matter_name: agg.matterName,
+          decision: agg.decision,
+          target_matter_id: agg.decision === 'aggregate' ? agg.targetMatterId || null : null,
+        });
+      }
+    }
+
     // Apply aggregation decisions to importedData
     for (const agg of potentialAggregations) {
       if (agg.decision === 'aggregate' && agg.targetMatterId) {
@@ -1424,9 +1473,9 @@ export function MasterWipUpdateDialog({
                   <p className="font-medium text-blue-800 dark:text-blue-200">
                     Potential Multi-Client Matters Detected ({potentialAggregations.length})
                   </p>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
-                    These rows share the same matter name but have different matter numbers or client names. Should they be aggregated into a single matter, or kept as separate entries?
-                  </p>
+                   <p className="text-sm text-blue-700 dark:text-blue-300">
+                     These rows share the same matter name but have different matter numbers or client names. Should they be aggregated into a single matter, or kept as separate entries? Your choices will be remembered for future imports.
+                   </p>
                 </div>
               </div>
 
@@ -1447,7 +1496,11 @@ export function MasterWipUpdateDialog({
                           variant={agg.decision === 'aggregate' ? 'default' : agg.decision === 'separate' ? 'secondary' : 'outline'}
                           className="text-xs"
                         >
-                          {agg.decision === 'aggregate' ? 'Will aggregate' : agg.decision === 'separate' ? 'Keep separate' : 'Pending'}
+                          {agg.decision === 'aggregate' 
+                            ? (findSavedAggDecision(agg.matterName) ? '✓ Remembered — aggregate' : 'Will aggregate') 
+                            : agg.decision === 'separate' 
+                              ? (findSavedAggDecision(agg.matterName) ? '✓ Remembered — separate' : 'Keep separate')
+                              : 'Pending'}
                         </Badge>
                       </div>
 

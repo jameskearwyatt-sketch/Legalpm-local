@@ -1565,10 +1565,6 @@ export default function Matters() {
                     console.error('Failed to save unallocated LC disbursement:', error);
                   }
                 }
-                  if (error) {
-                    console.error('Failed to save unallocated LC disbursement:', error);
-                  }
-                }
                 continue;
               }
 

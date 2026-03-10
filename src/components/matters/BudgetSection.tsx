@@ -197,6 +197,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       setDraftItems(latestLineItems.map(item => ({
         id: item.id,
         work_item: item.work_item,
+        detail: (item as any).detail || null,
         provider: item.provider,
         fee_amount: item.fee_amount,
         lc_firm_name: item.lc_firm_name || undefined,
@@ -278,6 +279,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
         }
       } else if (field === 'lc_firm_name') {
         newItem.lc_firm_name = value as string;
+      } else if (field === 'detail') {
+        newItem.detail = value as string || null;
       } else {
         newItem.work_item = value as string;
       }
@@ -321,8 +324,11 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       // Convert to draft items and append to existing items
       const newItems: DraftLineItem[] = items.map((item: any) => ({
         work_item: item.work_item?.substring(0, 100) || '',
+        detail: item.detail || null,
         provider: item.provider === 'Local Counsel' ? 'Local Counsel' : 'Baker McKenzie',
         fee_amount: Number(item.fee_amount) || 0,
+        category: item.category || null,
+        is_additional_scope: hasExistingBudget ? true : false,
       }));
 
       // Filter out empty placeholder items and add new ones
@@ -563,8 +569,18 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       setDraftItems(latestLineItems.map(item => ({
         id: item.id,
         work_item: item.work_item,
+        detail: (item as any).detail || null,
         provider: item.provider,
         fee_amount: item.fee_amount,
+        lc_firm_name: item.lc_firm_name || undefined,
+        is_optional: item.is_optional,
+        is_included: item.is_included,
+        is_capped: item.is_capped,
+        is_additional_scope: item.is_additional_scope,
+        category: item.category || undefined,
+        wip_amount: item.wip_amount,
+        wip_write_off: item.wip_write_off,
+        wip_updated_at: item.wip_updated_at,
       })));
     }
     setNotes('');

@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2, Layers } from 'lucide-react';
+import { GripVertical, Trash2, Layers, ChevronDown, ChevronRight } from 'lucide-react';
 import { DraftLineItem, BUDGET_CATEGORIES } from '@/lib/hooks/useBudgetVersions';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
@@ -94,6 +96,8 @@ export function DraggableBudgetItem({
   onToggleAdditionalScope,
   canDelete,
 }: DraggableBudgetItemProps) {
+  const [isDetailExpanded, setIsDetailExpanded] = useState(false);
+  
   const {
     attributes,
     listeners,
@@ -154,6 +158,23 @@ export function DraggableBudgetItem({
               isNewItem && !isAiSuggested && 'border-green-400 dark:border-green-600'
             )}
           />
+          {/* Detail toggle */}
+          <button
+            type="button"
+            onClick={() => setIsDetailExpanded(!isDetailExpanded)}
+            className="text-xs text-muted-foreground hover:text-foreground mt-0.5 flex items-center gap-0.5"
+          >
+            {isDetailExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            {item.detail ? 'Description' : 'Add description'}
+          </button>
+          {isDetailExpanded && (
+            <Textarea
+              value={item.detail || ''}
+              onChange={(e) => onEdit(index, 'detail' as keyof DraftLineItem, e.target.value)}
+              placeholder="Detailed description of this work item..."
+              className="text-xs mt-1 min-h-[60px]"
+            />
+          )}
         </div>
 
         {/* Provider */}
@@ -328,6 +349,41 @@ export function DraggableBudgetItem({
           disabled={hasExistingBudget}
           className="text-sm"
         />
+        {/* Detail in view mode */}
+        {item.detail && hasExistingBudget && (
+          <button
+            type="button"
+            onClick={() => setIsDetailExpanded(!isDetailExpanded)}
+            className="text-xs text-muted-foreground hover:text-foreground mt-0.5 flex items-center gap-0.5"
+          >
+            {isDetailExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            Description
+          </button>
+        )}
+        {item.detail && hasExistingBudget && isDetailExpanded && (
+          <p className="text-xs text-muted-foreground mt-1 pl-1 whitespace-pre-wrap">{item.detail}</p>
+        )}
+        {/* Detail in new budget creation mode */}
+        {!hasExistingBudget && (
+          <>
+            <button
+              type="button"
+              onClick={() => setIsDetailExpanded(!isDetailExpanded)}
+              className="text-xs text-muted-foreground hover:text-foreground mt-0.5 flex items-center gap-0.5"
+            >
+              {isDetailExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              {item.detail ? 'Description' : 'Add description'}
+            </button>
+            {isDetailExpanded && (
+              <Textarea
+                value={item.detail || ''}
+                onChange={(e) => onEdit(index, 'detail' as keyof DraftLineItem, e.target.value)}
+                placeholder="Detailed description of this work item..."
+                className="text-xs mt-1 min-h-[60px]"
+              />
+            )}
+          </>
+        )}
       </div>
 
       {/* Provider */}

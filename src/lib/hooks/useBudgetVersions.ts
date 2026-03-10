@@ -9,6 +9,7 @@ export interface BudgetLineItem {
   matter_id: string;
   user_id: string;
   work_item: string;
+  detail: string | null;
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
   sort_order: number;
@@ -58,6 +59,7 @@ export interface BudgetVersion {
 export interface DraftLineItem {
   id?: string;
   work_item: string;
+  detail?: string | null;
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
   lc_firm_name?: string;
@@ -165,6 +167,7 @@ export function useBudgetVersions(matterId?: string) {
           matter_id: input.matter_id,
           user_id: user!.id,
           work_item: item.work_item,
+          detail: item.detail || null,
           provider: item.provider,
           fee_amount: item.fee_amount,
           sort_order: index,

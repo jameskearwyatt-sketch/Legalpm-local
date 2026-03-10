@@ -36,6 +36,7 @@ export async function exportBudgetToExcel({
   worksheet.columns = [
     { key: 'category', width: 18 },
     { key: 'workItem', width: 40 },
+    { key: 'description', width: 50 },
     { key: 'provider', width: 16 },
     { key: 'lcFirmName', width: 20 },
     { key: 'budget', width: 15 },
@@ -68,7 +69,7 @@ export async function exportBudgetToExcel({
   };
 
   // Title section
-  worksheet.mergeCells('A1:J1');
+  worksheet.mergeCells('A1:K1');
   const titleCell = worksheet.getCell('A1');
   titleCell.value = 'Detailed Budget Utilisation Report';
   titleCell.font = titleFont;
@@ -76,18 +77,18 @@ export async function exportBudgetToExcel({
   worksheet.getRow(1).height = 24;
 
   // Client and Matter info
-  worksheet.mergeCells('A2:J2');
+  worksheet.mergeCells('A2:K2');
   const clientCell = worksheet.getCell('A2');
   clientCell.value = `Client: ${clientName}`;
   clientCell.font = subtitleFont;
 
-  worksheet.mergeCells('A3:J3');
+  worksheet.mergeCells('A3:K3');
   const matterCell = worksheet.getCell('A3');
   matterCell.value = `Matter: ${matterName}`;
   matterCell.font = subtitleFont;
 
   // Version and date info
-  worksheet.mergeCells('A4:J4');
+  worksheet.mergeCells('A4:K4');
   const versionCell = worksheet.getCell('A4');
   versionCell.value = `Budget Version: ${versionNumber || 'N/A'} | Report Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`;
   versionCell.font = subtitleFont;
@@ -100,6 +101,7 @@ export async function exportBudgetToExcel({
   headerRow.values = [
     'Category',
     'Work Item',
+    'Description',
     'Provider',
     'LC Firm',
     `Budget (${currency})`,
@@ -163,7 +165,7 @@ export async function exportBudgetToExcel({
 
     // Category header row
     const catHeaderRow = worksheet.getRow(rowIndex);
-    worksheet.mergeCells(`A${rowIndex}:J${rowIndex}`);
+    worksheet.mergeCells(`A${rowIndex}:K${rowIndex}`);
     catHeaderRow.getCell(1).value = category;
     catHeaderRow.getCell(1).font = { bold: true, size: 11, color: { argb: 'FF1E3A5F' } };
     catHeaderRow.getCell(1).fill = {
@@ -192,6 +194,7 @@ export async function exportBudgetToExcel({
       dataRow.values = [
         item.category || 'Other',
         item.work_item,
+        item.detail || '',
         item.provider,
         item.lc_firm_name || '',
         budget,
@@ -203,29 +206,29 @@ export async function exportBudgetToExcel({
       ];
 
       // Format currency cells
-      [5, 6, 7, 8, 9].forEach((col) => {
+      [6, 7, 8, 9, 10].forEach((col) => {
         const cell = dataRow.getCell(col);
         cell.numFmt = '#,##0.00';
         cell.alignment = { horizontal: 'right' };
       });
 
       // Format percentage
-      dataRow.getCell(10).numFmt = '0.0%';
-      dataRow.getCell(10).value = burnPct / 100;
-      dataRow.getCell(10).alignment = { horizontal: 'center' };
+      dataRow.getCell(11).numFmt = '0.0%';
+      dataRow.getCell(11).value = burnPct / 100;
+      dataRow.getCell(11).alignment = { horizontal: 'center' };
 
       // Highlight write-offs in red
       if (writeOff > 0) {
-        dataRow.getCell(7).font = { color: { argb: 'FFDC2626' }, bold: true };
+        dataRow.getCell(8).font = { color: { argb: 'FFDC2626' }, bold: true };
       }
 
       // Color burn percentage
       if (burnPct > 100) {
-        dataRow.getCell(10).font = { color: { argb: 'FFDC2626' }, bold: true };
+        dataRow.getCell(11).font = { color: { argb: 'FFDC2626' }, bold: true };
       } else if (burnPct >= 80) {
-        dataRow.getCell(10).font = { color: { argb: 'FFD97706' } };
+        dataRow.getCell(11).font = { color: { argb: 'FFD97706' } };
       } else {
-        dataRow.getCell(10).font = { color: { argb: 'FF059669' } };
+        dataRow.getCell(11).font = { color: { argb: 'FF059669' } };
       }
 
       // Alternate row colors within category
@@ -253,6 +256,7 @@ export async function exportBudgetToExcel({
       `${category} Subtotal`,
       '',
       '',
+      '',
       categoryBudget,
       categoryRawWip,
       categoryWriteOff,
@@ -262,15 +266,15 @@ export async function exportBudgetToExcel({
     ];
     subtotalRow.font = { bold: true };
     subtotalRow.getCell(2).alignment = { horizontal: 'right' };
-    [5, 6, 7, 8, 9].forEach((col) => {
+    [6, 7, 8, 9, 10].forEach((col) => {
       subtotalRow.getCell(col).numFmt = '#,##0.00';
       subtotalRow.getCell(col).alignment = { horizontal: 'right' };
     });
-    subtotalRow.getCell(10).numFmt = '0.0%';
-    subtotalRow.getCell(10).alignment = { horizontal: 'center' };
+    subtotalRow.getCell(11).numFmt = '0.0%';
+    subtotalRow.getCell(11).alignment = { horizontal: 'center' };
 
     if (categoryWriteOff > 0) {
-      subtotalRow.getCell(7).font = { color: { argb: 'FFDC2626' }, bold: true };
+      subtotalRow.getCell(8).font = { color: { argb: 'FFDC2626' }, bold: true };
     }
 
     subtotalRow.eachCell((cell) => {
@@ -299,6 +303,7 @@ export async function exportBudgetToExcel({
     'GRAND TOTAL',
     '',
     '',
+    '',
     grandTotalBudget,
     grandTotalRawWip,
     grandTotalWriteOff,
@@ -308,7 +313,7 @@ export async function exportBudgetToExcel({
   ];
   totalRow.font = { bold: true, size: 12 };
   totalRow.getCell(2).alignment = { horizontal: 'right' };
-  [5, 6, 7, 8, 9].forEach((col) => {
+  [6, 7, 8, 9, 10].forEach((col) => {
     totalRow.getCell(col).numFmt = '#,##0.00';
     totalRow.getCell(col).alignment = { horizontal: 'right' };
     totalRow.getCell(col).fill = {
@@ -317,16 +322,16 @@ export async function exportBudgetToExcel({
       fgColor: { argb: 'FFE5E7EB' },
     };
   });
-  totalRow.getCell(10).numFmt = '0.0%';
-  totalRow.getCell(10).alignment = { horizontal: 'center' };
-  totalRow.getCell(10).fill = {
+  totalRow.getCell(11).numFmt = '0.0%';
+  totalRow.getCell(11).alignment = { horizontal: 'center' };
+  totalRow.getCell(11).fill = {
     type: 'pattern',
     pattern: 'solid',
     fgColor: { argb: 'FFE5E7EB' },
   };
 
   if (grandTotalWriteOff > 0) {
-    totalRow.getCell(7).font = { color: { argb: 'FFDC2626' }, bold: true, size: 12 };
+    totalRow.getCell(8).font = { color: { argb: 'FFDC2626' }, bold: true, size: 12 };
   }
 
   totalRow.eachCell((cell) => {
@@ -338,13 +343,13 @@ export async function exportBudgetToExcel({
 
   // Summary section for write-offs
   rowIndex += 3;
-  worksheet.mergeCells(`A${rowIndex}:J${rowIndex}`);
+  worksheet.mergeCells(`A${rowIndex}:K${rowIndex}`);
   const writeOffSummaryHeader = worksheet.getCell(`A${rowIndex}`);
   writeOffSummaryHeader.value = 'Write-Off Summary (for Billing Department)';
   writeOffSummaryHeader.font = { bold: true, size: 12, color: { argb: 'FFDC2626' } };
   rowIndex++;
 
-  worksheet.mergeCells(`A${rowIndex}:J${rowIndex}`);
+  worksheet.mergeCells(`A${rowIndex}:K${rowIndex}`);
   const writeOffTotal = worksheet.getCell(`A${rowIndex}`);
   writeOffTotal.value = `Total Write-Off Amount: ${formatCurrency(grandTotalWriteOff, currency)}`;
   writeOffTotal.font = { bold: true, size: 11 };
@@ -354,9 +359,9 @@ export async function exportBudgetToExcel({
   const itemsWithWriteOff = items.filter((item) => (item.wip_write_off || 0) > 0);
   if (itemsWithWriteOff.length > 0) {
     const woHeaderRow = worksheet.getRow(rowIndex);
-    woHeaderRow.values = ['Category', 'Work Item', 'Provider', 'LC Firm', '', '', `Write-Off (${currency})`, '', '', ''];
+    woHeaderRow.values = ['Category', 'Work Item', 'Description', 'Provider', 'LC Firm', '', '', `Write-Off (${currency})`, '', '', ''];
     woHeaderRow.font = { bold: true };
-    woHeaderRow.getCell(7).alignment = { horizontal: 'right' };
+    woHeaderRow.getCell(8).alignment = { horizontal: 'right' };
     rowIndex++;
 
     for (const item of itemsWithWriteOff) {
@@ -364,6 +369,7 @@ export async function exportBudgetToExcel({
       woRow.values = [
         item.category || 'Other',
         item.work_item,
+        item.detail || '',
         item.provider,
         item.lc_firm_name || '',
         '',
@@ -373,9 +379,9 @@ export async function exportBudgetToExcel({
         '',
         '',
       ];
-      woRow.getCell(7).numFmt = '#,##0.00';
-      woRow.getCell(7).alignment = { horizontal: 'right' };
-      woRow.getCell(7).font = { color: { argb: 'FFDC2626' } };
+      woRow.getCell(8).numFmt = '#,##0.00';
+      woRow.getCell(8).alignment = { horizontal: 'right' };
+      woRow.getCell(8).font = { color: { argb: 'FFDC2626' } };
       rowIndex++;
     }
   }

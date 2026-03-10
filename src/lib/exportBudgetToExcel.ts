@@ -69,7 +69,7 @@ export async function exportBudgetToExcel({
   };
 
   // Title section
-  worksheet.mergeCells('A1:J1');
+  worksheet.mergeCells('A1:K1');
   const titleCell = worksheet.getCell('A1');
   titleCell.value = 'Detailed Budget Utilisation Report';
   titleCell.font = titleFont;

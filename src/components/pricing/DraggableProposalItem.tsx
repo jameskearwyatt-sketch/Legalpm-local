@@ -75,7 +75,7 @@ function DraggableProposalItemInner({
   // Local state for text inputs to avoid triggering parent re-renders on every keystroke
   const [localWorkItem, setLocalWorkItem] = useState(item.work_item);
   const [localDetail, setLocalDetail] = useState(item.detail || '');
-  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   
   // Sync local state when item changes from parent (e.g., after save/load)
   useEffect(() => {

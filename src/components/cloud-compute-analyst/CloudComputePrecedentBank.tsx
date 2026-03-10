@@ -11,6 +11,8 @@ import { useCloudComputePrecedentBank, CloudComputePrecedent } from '@/lib/hooks
 import { CloudComputeWhatsMarketDialog } from './CloudComputeWhatsMarketDialog';
 import { CLOUD_COMPUTE_ALL_CATEGORIES, CLOUD_SERVICE_TYPES } from '@/lib/cloudComputeCategories';
 import { format } from 'date-fns';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
 
 export function CloudComputePrecedentBank() {
   const { precedents, isLoading, deletePrecedent, uniqueProjectCount } = useCloudComputePrecedentBank();
@@ -20,6 +22,7 @@ export function CloudComputePrecedentBank() {
   const [serviceTypeFilter, setServiceTypeFilter] = useState<string>('all');
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
   const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<CloudComputePrecedent[]>([]);
+  const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
 
   const filteredPrecedents = useMemo(() => precedents.filter(p => {
     if (p.is_gold_standard) return false;
@@ -54,7 +57,7 @@ export function CloudComputePrecedentBank() {
                   const isExpanded = expandedCategories.includes(category);
                   return (
                     <Collapsible key={category} open={isExpanded} onOpenChange={() => toggleCategory(category)}>
-                      <CollapsibleTrigger asChild><div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">{isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}<div className="flex-1"><div className="flex items-center gap-2"><span className="font-medium">{category}</span><Badge variant="secondary">{cp.length}</Badge></div></div><Button variant="outline" size="sm" className="h-7 text-xs gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20" onClick={(e) => { e.stopPropagation(); setWhatsMarketCategory(category); setWhatsMarketPrecedents(cp); }}><Scale className="h-3.5 w-3.5" /> What's Market?</Button></div></CollapsibleTrigger>
+                      <CollapsibleTrigger asChild><div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors"><Checkbox checked={selectedForExport.includes(category)} onCheckedChange={(checked) => setSelectedForExport(prev => checked ? [...prev, category] : prev.filter(c => c !== category))} onClick={(e) => e.stopPropagation()} className="shrink-0" />{isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}<div className="flex-1"><div className="flex items-center gap-2"><span className="font-medium">{category}</span><Badge variant="secondary">{cp.length}</Badge></div></div><Button variant="outline" size="sm" className="h-7 text-xs gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20" onClick={(e) => { e.stopPropagation(); setWhatsMarketCategory(category); setWhatsMarketPrecedents(cp); }}><Scale className="h-3.5 w-3.5" /> What's Market?</Button></div></CollapsibleTrigger>
                       <CollapsibleContent><div className="mt-2 ml-7 space-y-2">
                         {cp.map(p => (
                           <div key={p.id} className="p-3 border rounded-lg"><div className="flex items-start justify-between"><div className="flex-1 min-w-0 space-y-1"><div className="flex items-center gap-2 flex-wrap"><span className="font-medium text-sm">{p.project_name}</span><Badge variant="outline" className="text-xs">{p.perspective === 'tenant' ? 'Tenant' : 'Provider'}</Badge>{p.jurisdiction && <Badge variant="outline" className="text-xs border-primary/30 text-primary">{p.jurisdiction}</Badge>}</div><div className="text-sm text-foreground whitespace-pre-line">{p.position_summary}</div><p className="text-xs text-muted-foreground">{format(new Date(p.banked_at), 'PP')}</p></div><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setDeleteConfirmId(p.id)}><Trash2 className="h-4 w-4" /></Button></div></div>
@@ -70,6 +73,14 @@ export function CloudComputePrecedentBank() {
       </div>
       <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Remove Precedent?</AlertDialogTitle><AlertDialogDescription>This will remove this position from your precedent bank.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Remove</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       {whatsMarketCategory && <CloudComputeWhatsMarketDialog open={!!whatsMarketCategory} onOpenChange={(o) => { if (!o) { setWhatsMarketCategory(null); setWhatsMarketPrecedents([]); } }} category={whatsMarketCategory} precedents={whatsMarketPrecedents} />}
+
+      <ExportMarketCommentaryButton
+        selectedCategories={selectedForExport}
+        groupedPrecedents={groupedPrecedents}
+        context="cloud_compute"
+        analystTitle="Cloud Compute Analyst"
+        onClearSelection={() => setSelectedForExport([])}
+      />
     </>
   );
 }

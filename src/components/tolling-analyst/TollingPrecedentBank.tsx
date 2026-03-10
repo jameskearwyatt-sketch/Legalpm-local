@@ -19,6 +19,8 @@ import { TollingWhatsMarketDialog } from './TollingWhatsMarketDialog';
 import { TOLLING_ALL_CATEGORIES, TOLLING_TECHNOLOGY_TYPES, TOLLING_FACILITY_STAGES } from '@/lib/tollingCategories';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
 
 const MIN_DEALS_FOR_BENCHMARKING = 3;
 
@@ -32,6 +34,7 @@ export function TollingPrecedentBank() {
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
   const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<TollingPrecedent[]>([]);
+  const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
 
   // Compute technology/stage statistics
   const stats = useMemo(() => {
@@ -251,7 +254,13 @@ export function TollingPrecedentBank() {
                     return (
                       <Collapsible key={category} open={isExpanded} onOpenChange={() => toggleCategory(category)}>
                         <CollapsibleTrigger asChild>
-                          <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">
+                        <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">
+                            <Checkbox
+                              checked={selectedForExport.includes(category)}
+                              onCheckedChange={(checked) => setSelectedForExport(prev => checked ? [...prev, category] : prev.filter(c => c !== category))}
+                              onClick={(e) => e.stopPropagation()}
+                              className="shrink-0"
+                            />
                             {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
@@ -320,6 +329,14 @@ export function TollingPrecedentBank() {
           precedents={whatsMarketPrecedents}
         />
       )}
+
+      <ExportMarketCommentaryButton
+        selectedCategories={selectedForExport}
+        groupedPrecedents={groupedPrecedents}
+        context="tolling"
+        analystTitle="Tolling Analyst"
+        onClearSelection={() => setSelectedForExport([])}
+      />
     </>
   );
 }

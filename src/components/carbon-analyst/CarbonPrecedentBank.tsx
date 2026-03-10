@@ -12,6 +12,8 @@ import { CarbonWhatsMarketDialog } from './CarbonWhatsMarketDialog';
 import { CARBON_ALL_CATEGORIES, CARBON_PROJECT_TYPES, CARBON_PROJECT_STAGES } from '@/lib/carbonCategories';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
 
 const MIN_DEALS_FOR_BENCHMARKING = 3;
 
@@ -23,6 +25,7 @@ export function CarbonPrecedentBank() {
   const [creditTypeFilter, setCreditTypeFilter] = useState<string>('all');
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
   const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<CarbonPrecedent[]>([]);
+  const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
 
   const filteredPrecedents = useMemo(() => {
     return precedents.filter(p => {
@@ -118,6 +121,12 @@ export function CarbonPrecedentBank() {
                     <Collapsible key={category} open={isExpanded} onOpenChange={() => toggleCategory(category)}>
                       <CollapsibleTrigger asChild>
                         <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">
+                          <Checkbox
+                            checked={selectedForExport.includes(category)}
+                            onCheckedChange={(checked) => setSelectedForExport(prev => checked ? [...prev, category] : prev.filter(c => c !== category))}
+                            onClick={(e) => e.stopPropagation()}
+                            className="shrink-0"
+                          />
                           {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                           <div className="flex-1">
                             <div className="flex items-center gap-2"><span className="font-medium">{category}</span><Badge variant="secondary">{categoryPrecedents.length}</Badge></div>
@@ -163,6 +172,14 @@ export function CarbonPrecedentBank() {
       </AlertDialog>
 
       {whatsMarketCategory && <CarbonWhatsMarketDialog open={!!whatsMarketCategory} onOpenChange={(open) => { if (!open) { setWhatsMarketCategory(null); setWhatsMarketPrecedents([]); } }} category={whatsMarketCategory} precedents={whatsMarketPrecedents} />}
+
+      <ExportMarketCommentaryButton
+        selectedCategories={selectedForExport}
+        groupedPrecedents={groupedPrecedents}
+        context="carbon"
+        analystTitle="Carbon Credit Analyst"
+        onClearSelection={() => setSelectedForExport([])}
+      />
     </>
   );
 }

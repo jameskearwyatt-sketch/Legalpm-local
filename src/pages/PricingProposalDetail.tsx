@@ -315,7 +315,7 @@ export default function PricingProposalDetail() {
   
   // Track if we have pending changes that need saving
   const pendingChangesRef = useRef(false);
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSavingRef = useRef(false);
   
   // Store latest values in refs for the save function
@@ -1005,7 +1005,7 @@ export default function PricingProposalDetail() {
   }, []);
 
 
-  const summaryAutoSaveRef = useRef<NodeJS.Timeout | null>(null);
+  const summaryAutoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const assumptionsRef = useRef(assumptions);
   useEffect(() => { assumptionsRef.current = assumptions; }, [assumptions]);
   const summaryChangeCountRef = useRef(0);

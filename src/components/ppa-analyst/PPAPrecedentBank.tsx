@@ -52,6 +52,7 @@ import { PPA_ALL_CATEGORIES, PPA_CATEGORY_GROUPS, PPACategoryGroup } from '@/lib
 import { WhatsMarketDialog } from './WhatsMarketDialog';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
 
 // Market position config for display
 const marketPositionConfig: Record<string, { label: string; color: string; bg: string; icon: typeof TrendingUp }> = {
@@ -93,6 +94,7 @@ export function PPAPrecedentBank() {
   const [viewMode, setViewMode] = useState<'grouped' | 'list'>('grouped');
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
   const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<PPAPrecedent[]>([]);
+  const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
 
   // Derive unique values for filters
   const uniqueJurisdictions = useMemo(() => {
@@ -744,6 +746,14 @@ export function PPAPrecedentBank() {
                       >
                         <CollapsibleTrigger asChild>
                           <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">
+                            <Checkbox
+                              checked={selectedForExport.includes(category)}
+                              onCheckedChange={(checked) => {
+                                setSelectedForExport(prev => checked ? [...prev, category] : prev.filter(c => c !== category));
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="shrink-0"
+                            />
                             {isExpanded ? (
                               <ChevronDown className="h-4 w-4 text-muted-foreground" />
                             ) : (
@@ -849,6 +859,14 @@ export function PPAPrecedentBank() {
           precedents={whatsMarketPrecedents}
         />
       )}
+
+      <ExportMarketCommentaryButton
+        selectedCategories={selectedForExport}
+        groupedPrecedents={groupedPrecedents}
+        context="ppa"
+        analystTitle="PPA Analyst"
+        onClearSelection={() => setSelectedForExport([])}
+      />
     </>
   );
 }

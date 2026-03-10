@@ -43,6 +43,10 @@ export interface DisbursementReviewResult {
   isLocalCounselFee: boolean;
   allocations: DisbursementAllocation[];
   allocateLater?: boolean;
+  // Original disbursement amounts (for deferred allocation tracking)
+  wipDisbursement?: number;
+  arDisbursement?: number;
+  paidDisbursement?: number;
 }
 
 interface DisbursementReviewDialogProps {

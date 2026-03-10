@@ -448,14 +448,10 @@ export function MasterWipUpdateDialog({
       // If there are potential aggregations, show that step (or auto-proceed if all remembered)
       if (aggCandidates.length > 0) {
         if (allDecided) {
-          // Auto-apply without showing the step
+          // Auto-apply without showing the step - set flag for effect
           toast.success(`${aggCandidates.length} multi-client group(s) auto-applied from previous decisions`);
-          // We need to defer proceedFromAggregation since state may not be set yet
-          setTimeout(() => {
-            // Trigger proceed programmatically
-            document.dispatchEvent(new CustomEvent('auto-proceed-aggregation'));
-          }, 100);
-          setStep('aggregate-confirm'); // briefly show, will auto-proceed
+          setAutoApplyAggregation(true);
+          setStep('aggregate-confirm');
         } else {
           setStep('aggregate-confirm');
           toast.info(`${aggCandidates.length} potential multi-client group(s) detected — please review`);

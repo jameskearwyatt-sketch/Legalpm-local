@@ -752,7 +752,10 @@ export default function PricingProposalDetail() {
   const bmUpperTarget = useMemo(() => {
     return draftItems
       .filter(item => item.provider === 'Baker McKenzie' && item.is_included !== false)
-      .reduce((sum, item) => sum + (item.fee_upper || item.fee_amount || 0), 0);
+      .reduce((sum, item) => {
+        const mult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
+        return sum + (item.fee_upper || item.fee_amount || 0) * mult;
+      }, 0);
   }, [draftItems]);
 
   // Initialize summary hours (once)

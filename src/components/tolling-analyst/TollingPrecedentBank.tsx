@@ -254,15 +254,21 @@ export function TollingPrecedentBank() {
               </div>
             ) : (
               <div className="space-y-3">
-                {Object.entries(groupedPrecedents)
-                  .sort((a, b) => {
-                    const indexA = TOLLING_ALL_CATEGORIES.findIndex(c => c.label === a[0]);
-                    const indexB = TOLLING_ALL_CATEGORIES.findIndex(c => c.label === b[0]);
-                    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-                  })
-                  .map(([category, categoryPrecedents]) => {
+                {(() => {
+                  const volatilityScores = computeVolatilityScores(groupedPrecedents);
+                  const entries = Object.entries(groupedPrecedents);
+                  const sorted = sortOrder === 'volatility'
+                    ? sortByVolatility(entries, volatilityScores)
+                    : entries.sort((a, b) => {
+                        const indexA = TOLLING_ALL_CATEGORIES.findIndex(c => c.label === a[0]);
+                        const indexB = TOLLING_ALL_CATEGORIES.findIndex(c => c.label === b[0]);
+                        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+                      });
+                  return sorted;
+                })().map(([category, categoryPrecedents]) => {
                     const isExpanded = expandedCategories.includes(category);
                     const catInfo = TOLLING_ALL_CATEGORIES.find(c => c.label === category);
+                    const volScore = sortOrder === 'volatility' ? computeVolatilityScores(groupedPrecedents)[category] : null;
 
                     return (
                       <Collapsible key={category} open={isExpanded} onOpenChange={() => toggleCategory(category)}>

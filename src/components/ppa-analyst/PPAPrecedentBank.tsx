@@ -692,6 +692,16 @@ export function PPAPrecedentBank() {
               </div>
               {viewMode === 'grouped' && Object.keys(groupedPrecedents).length > 0 && (
                 <div className="flex items-center gap-2">
+                  <SortSelect value={sortOrder} onValueChange={(v) => setSortOrder(v as 'contract' | 'volatility')}>
+                    <SortSelectTrigger className="h-7 w-[180px] text-xs">
+                      <ArrowUpDown className="h-3 w-3 mr-1" />
+                      <SortSelectValue />
+                    </SortSelectTrigger>
+                    <SortSelectContent>
+                      <SortSelectItem value="contract">Contract Order</SortSelectItem>
+                      <SortSelectItem value="volatility">Negotiation Volatility</SortSelectItem>
+                    </SortSelectContent>
+                  </SortSelect>
                   <Button variant="ghost" size="sm" onClick={expandAll} className="text-xs">
                     Expand all
                   </Button>

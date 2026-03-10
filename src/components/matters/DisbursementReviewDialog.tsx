@@ -143,6 +143,9 @@ export function DisbursementReviewDialog({
     
     const result: DisbursementReviewResult = {
       matterId: current.matterId,
+      wipDisbursement: current.wipDisbursement,
+      arDisbursement: current.arDisbursement,
+      paidDisbursement: current.paidDisbursement,
       ...partialResult,
     };
     

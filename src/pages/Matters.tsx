@@ -1549,21 +1549,22 @@ export default function Matters() {
 
               // Handle "allocate later" — save to unallocated_lc_disbursements
               if (allocation.allocateLater) {
-                const matter = matters.find(m => m.id === allocation.matterId);
-                // Find the corresponding update to get the disbursement amounts
-                const update = updates.find(u => u.matter_id === allocation.matterId);
                 if (user?.id) {
                   const { error } = await supabase
                     .from('unallocated_lc_disbursements' as any)
                     .insert({
                       matter_id: allocation.matterId,
                       user_id: user.id,
-                      wip_amount: 0, // We don't have exact disbursement amounts here, they were in the DisbursementData
-                      ar_amount: 0,
-                      paid_amount: 0,
+                      wip_amount: allocation.wipDisbursement || 0,
+                      ar_amount: allocation.arDisbursement || 0,
+                      paid_amount: allocation.paidDisbursement || 0,
                       source: 'master_update',
                       notes: `From master update on ${today}`,
                     });
+                  if (error) {
+                    console.error('Failed to save unallocated LC disbursement:', error);
+                  }
+                }
                   if (error) {
                     console.error('Failed to save unallocated LC disbursement:', error);
                   }

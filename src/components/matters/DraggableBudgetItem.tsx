@@ -96,6 +96,8 @@ export function DraggableBudgetItem({
   onToggleAdditionalScope,
   canDelete,
 }: DraggableBudgetItemProps) {
+  const [isDetailExpanded, setIsDetailExpanded] = useState(false);
+  
   const {
     attributes,
     listeners,

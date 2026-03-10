@@ -134,7 +134,7 @@ export function DisbursementReviewDialog({
     }));
   };
 
-  const saveCurrentAndNext = (partialResult: { isLocalCounselFee: boolean; allocations: DisbursementAllocation[] }) => {
+  const saveCurrentAndNext = (partialResult: { isLocalCounselFee: boolean; allocations: DisbursementAllocation[]; allocateLater?: boolean }) => {
     if (!current) return;
     
     const result: DisbursementReviewResult = {

@@ -14,6 +14,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
+import { computeVolatilityScores, sortByVolatility } from '@/lib/precedentVolatility';
+import { ArrowUpDown } from 'lucide-react';
 
 const MIN_DEALS_FOR_BENCHMARKING = 3;
 
@@ -26,6 +28,7 @@ export function ITSupplyPrecedentBank() {
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
   const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<ITSupplyPrecedent[]>([]);
   const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
+  const [sortOrder, setSortOrder] = useState<'contract' | 'volatility'>('contract');
 
   const filteredPrecedents = useMemo(() => {
     return precedents.filter(p => {
@@ -84,7 +87,7 @@ export function ITSupplyPrecedentBank() {
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">{filteredUniqueDeals} deal{filteredUniqueDeals !== 1 ? 's' : ''} · {filteredPrecedents.length} position{filteredPrecedents.length !== 1 ? 's' : ''}</CardTitle>
-              {Object.keys(groupedPrecedents).length > 0 && <div className="flex items-center gap-2"><Button variant="ghost" size="sm" onClick={expandAll} className="text-xs">Expand all</Button><Button variant="ghost" size="sm" onClick={collapseAll} className="text-xs">Collapse all</Button></div>}
+              {Object.keys(groupedPrecedents).length > 0 && <div className="flex items-center gap-2"><Select value={sortOrder} onValueChange={(v) => setSortOrder(v as 'contract' | 'volatility')}><SelectTrigger className="h-7 w-[180px] text-xs"><ArrowUpDown className="h-3 w-3 mr-1" /><SelectValue /></SelectTrigger><SelectContent><SelectItem value="contract">Contract Order</SelectItem><SelectItem value="volatility">Negotiation Volatility</SelectItem></SelectContent></Select><Button variant="ghost" size="sm" onClick={expandAll} className="text-xs">Expand all</Button><Button variant="ghost" size="sm" onClick={collapseAll} className="text-xs">Collapse all</Button></div>}
             </div>
           </CardHeader>
           <CardContent>
@@ -92,8 +95,16 @@ export function ITSupplyPrecedentBank() {
               <div className="text-center py-12"><Database className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" /><p className="text-lg font-medium text-muted-foreground">{search || supplyTypeFilter !== 'all' ? 'No precedents match your filters' : 'No precedents banked yet'}</p></div>
             ) : (
               <div className="space-y-3">
-                {Object.entries(groupedPrecedents).sort((a, b) => { const iA = IT_SUPPLY_ALL_CATEGORIES.findIndex(c => c.label === a[0]); const iB = IT_SUPPLY_ALL_CATEGORIES.findIndex(c => c.label === b[0]); return (iA === -1 ? 999 : iA) - (iB === -1 ? 999 : iB); }).map(([category, cp]) => {
+                {(() => {
+                  const volatilityScores = computeVolatilityScores(groupedPrecedents);
+                  const entries = Object.entries(groupedPrecedents);
+                  const sorted = sortOrder === 'volatility'
+                    ? sortByVolatility(entries, volatilityScores)
+                    : entries.sort((a, b) => { const iA = IT_SUPPLY_ALL_CATEGORIES.findIndex(c => c.label === a[0]); const iB = IT_SUPPLY_ALL_CATEGORIES.findIndex(c => c.label === b[0]); return (iA === -1 ? 999 : iA) - (iB === -1 ? 999 : iB); });
+                  return sorted;
+                })().map(([category, cp]) => {
                   const isExpanded = expandedCategories.includes(category);
+                  const volScore = sortOrder === 'volatility' ? computeVolatilityScores(groupedPrecedents)[category] : null;
                   return (
                     <Collapsible key={category} open={isExpanded} onOpenChange={() => toggleCategory(category)}>
                       <CollapsibleTrigger asChild>
@@ -105,7 +116,7 @@ export function ITSupplyPrecedentBank() {
                             className="shrink-0"
                           />
                           {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-                          <div className="flex-1"><div className="flex items-center gap-2"><span className="font-medium">{category}</span><Badge variant="secondary">{cp.length}</Badge></div></div>
+                          <div className="flex-1"><div className="flex items-center gap-2"><span className="font-medium">{category}</span><Badge variant="secondary">{cp.length}</Badge>{volScore && <Badge variant="outline" className={cn('text-xs', volScore.level === 'high' ? 'border-destructive/50 text-destructive bg-destructive/10' : volScore.level === 'medium' ? 'border-amber-500/50 text-amber-700 bg-amber-50' : 'border-green-500/50 text-green-700 bg-green-50')}>{volScore.level === 'high' ? '🔴' : volScore.level === 'medium' ? '🟡' : '🟢'} {volScore.level}</Badge>}</div></div>
                           <Button variant="outline" size="sm" className="h-7 text-xs gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20" onClick={(e) => { e.stopPropagation(); setWhatsMarketCategory(category); setWhatsMarketPrecedents(cp); }}><Scale className="h-3.5 w-3.5" /> What's Market?</Button>
                         </div>
                       </CollapsibleTrigger>

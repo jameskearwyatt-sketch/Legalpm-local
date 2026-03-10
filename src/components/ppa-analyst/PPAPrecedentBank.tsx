@@ -53,6 +53,9 @@ import { WhatsMarketDialog } from './WhatsMarketDialog';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
+import { computeVolatilityScores, sortByVolatility } from '@/lib/precedentVolatility';
+import { Select as SortSelect, SelectContent as SortSelectContent, SelectItem as SortSelectItem, SelectTrigger as SortSelectTrigger, SelectValue as SortSelectValue } from '@/components/ui/select';
+import { ArrowUpDown } from 'lucide-react';
 
 // Market position config for display
 const marketPositionConfig: Record<string, { label: string; color: string; bg: string; icon: typeof TrendingUp }> = {
@@ -95,6 +98,7 @@ export function PPAPrecedentBank() {
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
   const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<PPAPrecedent[]>([]);
   const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
+  const [sortOrder, setSortOrder] = useState<'contract' | 'volatility'>('contract');
 
   // Derive unique values for filters
   const uniqueJurisdictions = useMemo(() => {
@@ -691,6 +695,16 @@ export function PPAPrecedentBank() {
               </div>
               {viewMode === 'grouped' && Object.keys(groupedPrecedents).length > 0 && (
                 <div className="flex items-center gap-2">
+                  <SortSelect value={sortOrder} onValueChange={(v) => setSortOrder(v as 'contract' | 'volatility')}>
+                    <SortSelectTrigger className="h-7 w-[180px] text-xs">
+                      <ArrowUpDown className="h-3 w-3 mr-1" />
+                      <SortSelectValue />
+                    </SortSelectTrigger>
+                    <SortSelectContent>
+                      <SortSelectItem value="contract">Contract Order</SortSelectItem>
+                      <SortSelectItem value="volatility">Negotiation Volatility</SortSelectItem>
+                    </SortSelectContent>
+                  </SortSelect>
                   <Button variant="ghost" size="sm" onClick={expandAll} className="text-xs">
                     Expand all
                   </Button>
@@ -727,17 +741,22 @@ export function PPAPrecedentBank() {
             ) : viewMode === 'grouped' ? (
               /* Grouped View */
               <div className="space-y-3">
-                {Object.entries(groupedPrecedents)
-                  .sort((a, b) => {
-                    const indexA = PPA_ALL_CATEGORIES.findIndex(c => c.label === a[0]);
-                    const indexB = PPA_ALL_CATEGORIES.findIndex(c => c.label === b[0]);
-                    // Unknown categories go to the end
-                    return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-                  })
-                  .map(([category, categoryPrecedents]) => {
+                {(() => {
+                  const volatilityScores = computeVolatilityScores(groupedPrecedents);
+                  const entries = Object.entries(groupedPrecedents);
+                  const sorted = sortOrder === 'volatility'
+                    ? sortByVolatility(entries, volatilityScores)
+                    : entries.sort((a, b) => {
+                        const indexA = PPA_ALL_CATEGORIES.findIndex(c => c.label === a[0]);
+                        const indexB = PPA_ALL_CATEGORIES.findIndex(c => c.label === b[0]);
+                        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+                      });
+                  return sorted;
+                })().map(([category, categoryPrecedents]) => {
                     const isExpanded = expandedCategories.includes(category);
                     const catInfo = PPA_ALL_CATEGORIES.find(c => c.label === category);
-                    
+                    const volScore = sortOrder === 'volatility' ? computeVolatilityScores(groupedPrecedents)[category] : null;
+
                     return (
                       <Collapsible 
                         key={category} 
@@ -763,6 +782,11 @@ export function PPAPrecedentBank() {
                               <div className="flex items-center gap-2">
                                 <span className="font-medium">{category}</span>
                                 <Badge variant="secondary">{categoryPrecedents.length}</Badge>
+                                {volScore && (
+                                  <Badge variant="outline" className={cn('text-xs', volScore.level === 'high' ? 'border-destructive/50 text-destructive bg-destructive/10' : volScore.level === 'medium' ? 'border-amber-500/50 text-amber-700 bg-amber-50' : 'border-green-500/50 text-green-700 bg-green-50')}>
+                                    {volScore.level === 'high' ? '🔴' : volScore.level === 'medium' ? '🟡' : '🟢'} {volScore.level}
+                                  </Badge>
+                                )}
                               </div>
                               {catInfo && (
                                 <span className="text-xs text-muted-foreground">{catInfo.group}</span>

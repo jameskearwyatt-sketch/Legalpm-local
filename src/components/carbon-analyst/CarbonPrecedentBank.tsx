@@ -14,6 +14,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
+import { computeVolatilityScores, sortByVolatility } from '@/lib/precedentVolatility';
+import { ArrowUpDown } from 'lucide-react';
 
 const MIN_DEALS_FOR_BENCHMARKING = 3;
 
@@ -26,6 +28,7 @@ export function CarbonPrecedentBank() {
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
   const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<CarbonPrecedent[]>([]);
   const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
+  const [sortOrder, setSortOrder] = useState<'contract' | 'volatility'>('contract');
 
   const filteredPrecedents = useMemo(() => {
     return precedents.filter(p => {
@@ -94,6 +97,16 @@ export function CarbonPrecedentBank() {
               <CardTitle className="text-base">{filteredUniqueDeals} deal{filteredUniqueDeals !== 1 ? 's' : ''} · {filteredPrecedents.length} position{filteredPrecedents.length !== 1 ? 's' : ''}</CardTitle>
               {Object.keys(groupedPrecedents).length > 0 && (
                 <div className="flex items-center gap-2">
+                  <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as 'contract' | 'volatility')}>
+                    <SelectTrigger className="h-7 w-[180px] text-xs">
+                      <ArrowUpDown className="h-3 w-3 mr-1" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="contract">Contract Order</SelectItem>
+                      <SelectItem value="volatility">Negotiation Volatility</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Button variant="ghost" size="sm" onClick={expandAll} className="text-xs">Expand all</Button>
                   <Button variant="ghost" size="sm" onClick={collapseAll} className="text-xs">Collapse all</Button>
                 </div>
@@ -110,13 +123,21 @@ export function CarbonPrecedentBank() {
               </div>
             ) : (
               <div className="space-y-3">
-                {Object.entries(groupedPrecedents).sort((a, b) => {
-                  const indexA = CARBON_ALL_CATEGORIES.findIndex(c => c.label === a[0]);
-                  const indexB = CARBON_ALL_CATEGORIES.findIndex(c => c.label === b[0]);
-                  return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
-                }).map(([category, categoryPrecedents]) => {
+                {(() => {
+                  const volatilityScores = computeVolatilityScores(groupedPrecedents);
+                  const entries = Object.entries(groupedPrecedents);
+                  const sorted = sortOrder === 'volatility'
+                    ? sortByVolatility(entries, volatilityScores)
+                    : entries.sort((a, b) => {
+                        const indexA = CARBON_ALL_CATEGORIES.findIndex(c => c.label === a[0]);
+                        const indexB = CARBON_ALL_CATEGORIES.findIndex(c => c.label === b[0]);
+                        return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
+                      });
+                  return sorted;
+                })().map(([category, categoryPrecedents]) => {
                   const isExpanded = expandedCategories.includes(category);
                   const catInfo = CARBON_ALL_CATEGORIES.find(c => c.label === category);
+                  const volScore = sortOrder === 'volatility' ? computeVolatilityScores(groupedPrecedents)[category] : null;
                   return (
                     <Collapsible key={category} open={isExpanded} onOpenChange={() => toggleCategory(category)}>
                       <CollapsibleTrigger asChild>
@@ -129,7 +150,15 @@ export function CarbonPrecedentBank() {
                           />
                           {isExpanded ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
                           <div className="flex-1">
-                            <div className="flex items-center gap-2"><span className="font-medium">{category}</span><Badge variant="secondary">{categoryPrecedents.length}</Badge></div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{category}</span>
+                              <Badge variant="secondary">{categoryPrecedents.length}</Badge>
+                              {volScore && (
+                                <Badge variant="outline" className={cn('text-xs', volScore.level === 'high' ? 'border-destructive/50 text-destructive bg-destructive/10' : volScore.level === 'medium' ? 'border-amber-500/50 text-amber-700 bg-amber-50' : 'border-green-500/50 text-green-700 bg-green-50')}>
+                                  {volScore.level === 'high' ? '🔴' : volScore.level === 'medium' ? '🟡' : '🟢'} {volScore.level}
+                                </Badge>
+                              )}
+                            </div>
                             {catInfo && <span className="text-xs text-muted-foreground">{catInfo.group}</span>}
                           </div>
                           <Button variant="outline" size="sm" className="h-7 text-xs gap-1 bg-primary/5 hover:bg-primary/10 text-primary border-primary/20" onClick={(e) => { e.stopPropagation(); setWhatsMarketCategory(category); setWhatsMarketPrecedents(categoryPrecedents); }}>

@@ -61,13 +61,13 @@ function averagePairwiseJaccard(summaries: string[]): number {
       }
     }
   } else {
-    // Random sampling
-    for (let p = 0; p < maxPairs; p++) {
-      const i = Math.floor(Math.random() * tokenSets.length);
-      let j = Math.floor(Math.random() * (tokenSets.length - 1));
-      if (j >= i) j++;
-      totalDist += jaccardDistance(tokenSets[i], tokenSets[j]);
-      pairs++;
+    // Deterministic evenly-spaced sampling of pairs
+    const step = Math.max(1, Math.floor(tokenSets.length / 5));
+    for (let i = 0; i < tokenSets.length && pairs < maxPairs; i += step) {
+      for (let j = i + 1; j < tokenSets.length && pairs < maxPairs; j += step) {
+        totalDist += jaccardDistance(tokenSets[i], tokenSets[j]);
+        pairs++;
+      }
     }
   }
   return pairs === 0 ? 0 : totalDist / pairs;

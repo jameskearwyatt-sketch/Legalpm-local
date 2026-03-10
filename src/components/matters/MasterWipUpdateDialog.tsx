@@ -417,18 +417,49 @@ export function MasterWipUpdateDialog({
       setLowConfidenceData(lowConf);
       setUnmatchedData(unmatched);
 
-      // Store potential aggregations from edge function
-      const aggCandidates: PotentialAggregation[] = (data.potentialAggregations || []).map((a: any) => ({
-        ...a,
-        decision: null,
-        targetMatterId: null,
-      }));
+      // Store potential aggregations from edge function, auto-applying saved decisions
+      const aggCandidates: PotentialAggregation[] = (data.potentialAggregations || []).map((a: any) => {
+        const saved = findSavedAggDecision(a.matterName);
+        if (saved) {
+          // Check target matter still exists if it was an aggregate decision
+          const targetStillExists = saved.decision === 'aggregate' 
+            ? matters.some(m => m.id === saved.target_matter_id)
+            : true;
+          return {
+            ...a,
+            decision: targetStillExists ? saved.decision : null,
+            targetMatterId: targetStillExists ? saved.target_matter_id : null,
+          };
+        }
+        return {
+          ...a,
+          decision: null,
+          targetMatterId: null,
+        };
+      });
       setPotentialAggregations(aggCandidates);
 
-      // If there are potential aggregations, show that step first
+      // Check if ALL aggregation candidates have saved decisions (auto-skip the step)
+      const allDecided = aggCandidates.length > 0 && aggCandidates.every(
+        a => a.decision !== null && a.decision !== undefined && 
+             (a.decision !== 'aggregate' || a.targetMatterId)
+      );
+
+      // If there are potential aggregations, show that step (or auto-proceed if all remembered)
       if (aggCandidates.length > 0) {
-        setStep('aggregate-confirm');
-        toast.info(`${aggCandidates.length} potential multi-client group(s) detected — please review`);
+        if (allDecided) {
+          // Auto-apply without showing the step
+          toast.success(`${aggCandidates.length} multi-client group(s) auto-applied from previous decisions`);
+          // We need to defer proceedFromAggregation since state may not be set yet
+          setTimeout(() => {
+            // Trigger proceed programmatically
+            document.dispatchEvent(new CustomEvent('auto-proceed-aggregation'));
+          }, 100);
+          setStep('aggregate-confirm'); // briefly show, will auto-proceed
+        } else {
+          setStep('aggregate-confirm');
+          toast.info(`${aggCandidates.length} potential multi-client group(s) detected — please review`);
+        }
       } else if (lowConf.length > 0) {
         // If there are low confidence matches, show confirmation step
         setStep('confirm-matches');

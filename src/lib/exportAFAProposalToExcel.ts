@@ -445,14 +445,22 @@ export async function exportAFAProposalToExcel({
 
     // Add items
     for (const item of categoryItems) {
-      // Multiplier already applied by applyAFAFilters — do not double-apply
-      const mult = 1;
+      // Multiplier already applied by applyAFAFilters to fee_amount — do not double-apply
       const feeAmount = item.fee_amount || 0;
-      // Calculate per-column fee values (lower/upper from original item, with same multiplier treatment)
+      // Calculate per-column fee values from original item properties
+      // The AFA filter already applied multiplier to fee_amount, so use original_fee_amount
+      // to determine scale factor, then derive lower/upper consistently
       const origMult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
-      const feeLower = smartRound((item.fee_lower ?? item.fee_amount ?? 0) * origMult);
-      const feeUpper = smartRound((item.fee_upper ?? item.fee_amount ?? 0) * origMult);
-      const feeMidpoint = feeAmount; // Already the base figure from AFA filter
+      const rawLower = (item.fee_lower ?? item.fee_amount ?? 0) * origMult;
+      const rawUpper = (item.fee_upper ?? item.fee_amount ?? 0) * origMult;
+      const rawMidpoint = feeAmount; // Already base figure × mult from AFA filter
+      
+      // Use the AFA-filtered feeAmount (properly LRM-rounded) for the column matching baseFigure
+      // For other columns, apply smartRound individually
+      const feeLower = baseFigure === 'lower' ? feeAmount : smartRound(rawLower);
+      const feeMidpoint = baseFigure === 'midpoint' ? feeAmount : smartRound(rawMidpoint);
+      const feeUpper = baseFigure === 'upper' ? feeAmount : smartRound(rawUpper);
+      
       categoryTotal += feeAmount;
       grandTotal += feeAmount;
       

@@ -495,8 +495,8 @@ export async function exportAFAProposalToExcel({
       
       // Build detail with multiplier narrative
       let detailDisplay = item.detail || '';
-      if (mult > 1) {
-        const multNarrative = `For the purposes of this estimate, we have assumed ${mult} instances of this item.`;
+      if (origMult > 1) {
+        const multNarrative = `For the purposes of this estimate, we have assumed ${origMult} instances of this item.`;
         detailDisplay = detailDisplay ? `${detailDisplay}\n\n${multNarrative}` : multNarrative;
       }
       

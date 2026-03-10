@@ -751,11 +751,13 @@ export function PPAPrecedentBank() {
                         const indexB = PPA_ALL_CATEGORIES.findIndex(c => c.label === b[0]);
                         return (indexA === -1 ? 999 : indexA) - (indexB === -1 ? 999 : indexB);
                       });
-                  return sorted;
+                  return sorted
+                  })()
                   .map(([category, categoryPrecedents]) => {
                     const isExpanded = expandedCategories.includes(category);
                     const catInfo = PPA_ALL_CATEGORIES.find(c => c.label === category);
-                    
+                    const volScore = sortOrder === 'volatility' ? computeVolatilityScores(groupedPrecedents)[category] : null;
+
                     return (
                       <Collapsible 
                         key={category} 

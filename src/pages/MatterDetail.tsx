@@ -2573,6 +2573,18 @@ export default function MatterDetail() {
           </div>
         )}
       </div>
+
+      {/* Allocate LC Dialog */}
+      <AllocateLcDialog
+        isOpen={showAllocateLcDialog}
+        onClose={() => setShowAllocateLcDialog(false)}
+        unallocated={unallocatedLcDisbursements}
+        localCounsels={localCounsels}
+        currency={currency}
+        matterId={id || ''}
+        onMarkAllocated={async (itemId) => { await markLcAllocated.mutateAsync(itemId); }}
+        onDeleteUnallocated={async (itemId) => { await deleteLcUnallocated.mutateAsync(itemId); }}
+      />
     </AppLayout>
   );
 }

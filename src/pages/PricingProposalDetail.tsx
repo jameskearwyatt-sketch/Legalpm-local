@@ -1005,7 +1005,7 @@ export default function PricingProposalDetail() {
   }, []);
 
 
-  const summaryAutoSaveRef = useRef<NodeJS.Timeout | null>(null);
+  const summaryAutoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const assumptionsRef = useRef(assumptions);
   useEffect(() => { assumptionsRef.current = assumptions; }, [assumptions]);
   const summaryChangeCountRef = useRef(0);

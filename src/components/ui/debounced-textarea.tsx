@@ -17,7 +17,7 @@ interface DebouncedTextareaProps extends Omit<React.TextareaHTMLAttributes<HTMLT
 export const DebouncedTextarea = React.forwardRef<HTMLTextAreaElement, DebouncedTextareaProps>(
   ({ value, onChange, debounceMs = 300, className, ...props }, forwardedRef) => {
     const [localValue, setLocalValue] = useState(value);
-    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isFirstMount = useRef(true);
     const internalRef = useRef<HTMLTextAreaElement | null>(null);
     const hadFocusRef = useRef(false);

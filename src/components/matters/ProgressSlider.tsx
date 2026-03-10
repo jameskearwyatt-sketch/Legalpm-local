@@ -25,7 +25,7 @@ export function ProgressSlider({
   const [localProgress, setLocalProgress] = useState(initialProgress);
   const [isDragging, setIsDragging] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedValueRef = useRef(initialProgress);
 
   // Sync with external changes only when props catch up to our saved value

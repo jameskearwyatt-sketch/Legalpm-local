@@ -50,7 +50,7 @@ export default function Dashboard() {
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
   const isHoveringTooltipRef = useRef(false);
-  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // "Not my matters" checkbox defaults to unchecked (meaning they're excluded by default)
   const [notMyMattersIncluded, setNotMyMattersIncluded] = useState(false);
   const { data: stats, isLoading } = useDashboard(excludedMatterIds, excludedPipelineMatterIds);

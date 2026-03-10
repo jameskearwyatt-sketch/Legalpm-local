@@ -318,7 +318,7 @@ export default function MatterDetail() {
   
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
-  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const autoSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isAutoSavingRef = useRef(false);
   const hasChangesRef = useRef(false);
   const performAutoSaveRef = useRef<(() => Promise<void>) | null>(null);

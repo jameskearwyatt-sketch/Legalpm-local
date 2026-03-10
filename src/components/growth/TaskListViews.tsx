@@ -106,7 +106,7 @@ const TaskRow = ({
   
   // Hover-controlled triage expansion
   const [triageExpanded, setTriageExpanded] = useState(false);
-  const triageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const triageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
   
   // Email drafting state

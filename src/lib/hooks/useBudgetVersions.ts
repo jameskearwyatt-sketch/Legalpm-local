@@ -9,6 +9,7 @@ export interface BudgetLineItem {
   matter_id: string;
   user_id: string;
   work_item: string;
+  detail: string | null;
   provider: 'Baker McKenzie' | 'Local Counsel';
   fee_amount: number;
   sort_order: number;

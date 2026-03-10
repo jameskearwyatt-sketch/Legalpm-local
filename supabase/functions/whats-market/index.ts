@@ -149,11 +149,24 @@ Please respond in the following JSON format (no markdown, just raw JSON):
     // Parse the JSON response - handle markdown code blocks
     let parsed;
     try {
-      const cleaned = content.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
-      parsed = JSON.parse(cleaned);
-    } catch (parseErr) {
-      console.error("[whats-market] Failed to parse AI response:", content);
-      throw new Error("Failed to parse AI analysis response");
+      // Strategy 1: Try direct parse
+      parsed = JSON.parse(content.trim());
+    } catch {
+      try {
+        // Strategy 2: Strip markdown code fences
+        const cleaned = content.replace(/^```(?:json)?\s*\n?/gm, '').replace(/\n?```\s*$/gm, '').trim();
+        parsed = JSON.parse(cleaned);
+      } catch {
+        try {
+          // Strategy 3: Extract JSON object via regex
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (!jsonMatch) throw new Error("No JSON object found");
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch (parseErr) {
+          console.error("[whats-market] Failed to parse AI response:", content);
+          throw new Error("Failed to parse AI analysis response");
+        }
+      }
     }
 
     console.log(`[whats-market] Successfully analyzed "${category}"`);

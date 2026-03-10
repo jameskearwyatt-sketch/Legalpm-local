@@ -14,6 +14,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      aggregation_decisions: {
+        Row: {
+          created_at: string
+          decision: string
+          id: string
+          matter_name: string
+          target_matter_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decision: string
+          id?: string
+          matter_name: string
+          target_matter_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decision?: string
+          id?: string
+          matter_name?: string
+          target_matter_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "aggregation_decisions_target_matter_id_fkey"
+            columns: ["target_matter_id"]
+            isOneToOne: false
+            referencedRelation: "matters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bm_contact_shortlists: {
         Row: {
           created_at: string

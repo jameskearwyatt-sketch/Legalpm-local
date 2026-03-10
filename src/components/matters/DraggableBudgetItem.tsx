@@ -158,6 +158,23 @@ export function DraggableBudgetItem({
               isNewItem && !isAiSuggested && 'border-green-400 dark:border-green-600'
             )}
           />
+          {/* Detail toggle */}
+          <button
+            type="button"
+            onClick={() => setIsDetailExpanded(!isDetailExpanded)}
+            className="text-xs text-muted-foreground hover:text-foreground mt-0.5 flex items-center gap-0.5"
+          >
+            {isDetailExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            {item.detail ? 'Description' : 'Add description'}
+          </button>
+          {isDetailExpanded && (
+            <Textarea
+              value={item.detail || ''}
+              onChange={(e) => onEdit(index, 'detail' as keyof DraftLineItem, e.target.value)}
+              placeholder="Detailed description of this work item..."
+              className="text-xs mt-1 min-h-[60px]"
+            />
+          )}
         </div>
 
         {/* Provider */}

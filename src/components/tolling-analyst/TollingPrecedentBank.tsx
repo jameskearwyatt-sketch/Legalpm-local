@@ -34,6 +34,7 @@ export function TollingPrecedentBank() {
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
   const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<TollingPrecedent[]>([]);
+  const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
 
   // Compute technology/stage statistics
   const stats = useMemo(() => {

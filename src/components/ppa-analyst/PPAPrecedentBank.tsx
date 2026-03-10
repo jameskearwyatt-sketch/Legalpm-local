@@ -746,6 +746,14 @@ export function PPAPrecedentBank() {
                       >
                         <CollapsibleTrigger asChild>
                           <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">
+                            <Checkbox
+                              checked={selectedForExport.includes(category)}
+                              onCheckedChange={(checked) => {
+                                setSelectedForExport(prev => checked ? [...prev, category] : prev.filter(c => c !== category));
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                              className="shrink-0"
+                            />
                             {isExpanded ? (
                               <ChevronDown className="h-4 w-4 text-muted-foreground" />
                             ) : (

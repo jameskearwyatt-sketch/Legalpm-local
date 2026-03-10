@@ -2122,7 +2122,7 @@ export function QuickToDoButton() {
     const [editedTitle, setEditedTitle] = useState(task.title);
     const [triageExpanded, setTriageExpanded] = useState(false);
     const editInputRef = useRef<HTMLInputElement>(null);
-    const triageTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const triageTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const rowRef = useRef<HTMLDivElement>(null);
     const isTriaged = isFullyTriaged(task);
 

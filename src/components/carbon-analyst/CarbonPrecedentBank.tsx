@@ -25,6 +25,7 @@ export function CarbonPrecedentBank() {
   const [creditTypeFilter, setCreditTypeFilter] = useState<string>('all');
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
   const [whatsMarketPrecedents, setWhatsMarketPrecedents] = useState<CarbonPrecedent[]>([]);
+  const [selectedForExport, setSelectedForExport] = useState<string[]>([]);
 
   const filteredPrecedents = useMemo(() => {
     return precedents.filter(p => {

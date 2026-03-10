@@ -1704,6 +1704,16 @@ export default function MatterDetail() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Unallocated LC disbursements banner */}
+              {(totalUnallocatedWip > 0 || totalUnallocatedAr > 0 || totalUnallocatedPaid > 0) && (
+                <UnallocatedLcBanner
+                  totalWip={totalUnallocatedWip}
+                  totalAr={totalUnallocatedAr}
+                  totalPaid={totalUnallocatedPaid}
+                  currency={currency}
+                  onAllocateNow={() => setShowAllocateLcDialog(true)}
+                />
+              )}
               {lcLoading ? (
                 <div className="flex justify-center py-4">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />

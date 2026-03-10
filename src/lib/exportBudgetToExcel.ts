@@ -36,6 +36,7 @@ export async function exportBudgetToExcel({
   worksheet.columns = [
     { key: 'category', width: 18 },
     { key: 'workItem', width: 40 },
+    { key: 'description', width: 50 },
     { key: 'provider', width: 16 },
     { key: 'lcFirmName', width: 20 },
     { key: 'budget', width: 15 },

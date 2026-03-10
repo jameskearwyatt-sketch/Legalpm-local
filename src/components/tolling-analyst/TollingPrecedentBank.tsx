@@ -329,6 +329,14 @@ export function TollingPrecedentBank() {
           precedents={whatsMarketPrecedents}
         />
       )}
+
+      <ExportMarketCommentaryButton
+        selectedCategories={selectedForExport}
+        groupedPrecedents={groupedPrecedents}
+        context="tolling"
+        analystTitle="Tolling Analyst"
+        onClearSelection={() => setSelectedForExport([])}
+      />
     </>
   );
 }

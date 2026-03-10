@@ -73,6 +73,14 @@ export function CloudComputePrecedentBank() {
       </div>
       <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Remove Precedent?</AlertDialogTitle><AlertDialogDescription>This will remove this position from your precedent bank.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Remove</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       {whatsMarketCategory && <CloudComputeWhatsMarketDialog open={!!whatsMarketCategory} onOpenChange={(o) => { if (!o) { setWhatsMarketCategory(null); setWhatsMarketPrecedents([]); } }} category={whatsMarketCategory} precedents={whatsMarketPrecedents} />}
+
+      <ExportMarketCommentaryButton
+        selectedCategories={selectedForExport}
+        groupedPrecedents={groupedPrecedents}
+        context="cloud_compute"
+        analystTitle="Cloud Compute Analyst"
+        onClearSelection={() => setSelectedForExport([])}
+      />
     </>
   );
 }

@@ -172,6 +172,14 @@ export function CarbonPrecedentBank() {
       </AlertDialog>
 
       {whatsMarketCategory && <CarbonWhatsMarketDialog open={!!whatsMarketCategory} onOpenChange={(open) => { if (!open) { setWhatsMarketCategory(null); setWhatsMarketPrecedents([]); } }} category={whatsMarketCategory} precedents={whatsMarketPrecedents} />}
+
+      <ExportMarketCommentaryButton
+        selectedCategories={selectedForExport}
+        groupedPrecedents={groupedPrecedents}
+        context="carbon"
+        analystTitle="Carbon Credit Analyst"
+        onClearSelection={() => setSelectedForExport([])}
+      />
     </>
   );
 }

@@ -859,6 +859,14 @@ export function PPAPrecedentBank() {
           precedents={whatsMarketPrecedents}
         />
       )}
+
+      <ExportMarketCommentaryButton
+        selectedCategories={selectedForExport}
+        groupedPrecedents={groupedPrecedents}
+        context="ppa"
+        analystTitle="PPA Analyst"
+        onClearSelection={() => setSelectedForExport([])}
+      />
     </>
   );
 }

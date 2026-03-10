@@ -135,6 +135,14 @@ export function ITSupplyPrecedentBank() {
       </div>
       <AlertDialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Remove Precedent?</AlertDialogTitle><AlertDialogDescription>This will remove this position from your precedent bank.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">Remove</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       {whatsMarketCategory && <ITSupplyWhatsMarketDialog open={!!whatsMarketCategory} onOpenChange={(open) => { if (!open) { setWhatsMarketCategory(null); setWhatsMarketPrecedents([]); } }} category={whatsMarketCategory} precedents={whatsMarketPrecedents} />}
+
+      <ExportMarketCommentaryButton
+        selectedCategories={selectedForExport}
+        groupedPrecedents={groupedPrecedents}
+        context="it_supply"
+        analystTitle="IT Supply Analyst"
+        onClearSelection={() => setSelectedForExport([])}
+      />
     </>
   );
 }

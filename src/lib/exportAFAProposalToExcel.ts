@@ -410,9 +410,9 @@ export async function exportAFAProposalToExcel({
     'Other': 'FFF9FAFB',
   };
 
-  // Get valid items for export
+  // Get valid items for export — only included items with non-empty work item names
   const validItems = filterResult.items.filter(item => 
-    item.work_item.trim() !== '' && (item.is_included !== false || !item.is_optional)
+    item.work_item.trim() !== '' && item.is_included !== false
   );
 
   let grandTotal = 0;
@@ -445,8 +445,22 @@ export async function exportAFAProposalToExcel({
 
     // Add items
     for (const item of categoryItems) {
-      const mult = (item.is_multiplied && item.multiplier_qty && item.multiplier_qty > 1) ? item.multiplier_qty : 1;
-      const feeAmount = (item.fee_amount || 0) * mult;
+      // Multiplier already applied by applyAFAFilters to fee_amount — do not double-apply
+      const feeAmount = item.fee_amount || 0;
+      // Calculate per-column fee values from original item properties
+      // The AFA filter already applied multiplier to fee_amount, so use original_fee_amount
+      // to determine scale factor, then derive lower/upper consistently
+      const origMult = (item.is_multiplied && item.multiplier_qty) ? item.multiplier_qty : 1;
+      const rawLower = (item.fee_lower ?? item.fee_amount ?? 0) * origMult;
+      const rawUpper = (item.fee_upper ?? item.fee_amount ?? 0) * origMult;
+      const rawMidpoint = feeAmount; // Already base figure × mult from AFA filter
+      
+      // Use the AFA-filtered feeAmount (properly LRM-rounded) for the column matching baseFigure
+      // For other columns, apply smartRound individually
+      const feeLower = baseFigure === 'lower' ? feeAmount : smartRound(rawLower);
+      const feeMidpoint = baseFigure === 'midpoint' ? feeAmount : smartRound(rawMidpoint);
+      const feeUpper = baseFigure === 'upper' ? feeAmount : smartRound(rawUpper);
+      
       categoryTotal += feeAmount;
       grandTotal += feeAmount;
       
@@ -481,8 +495,8 @@ export async function exportAFAProposalToExcel({
       
       // Build detail with multiplier narrative
       let detailDisplay = item.detail || '';
-      if (mult > 1) {
-        const multNarrative = `For the purposes of this estimate, we have assumed ${mult} instances of this item.`;
+      if (origMult > 1) {
+        const multNarrative = `For the purposes of this estimate, we have assumed ${origMult} instances of this item.`;
         detailDisplay = detailDisplay ? `${detailDisplay}\n\n${multNarrative}` : multNarrative;
       }
       
@@ -493,9 +507,9 @@ export async function exportAFAProposalToExcel({
         detailDisplay,
         providerDisplay,
       ];
-      if (exportLower) rowValues.push(feeAmount); // TODO: use lower fee if available
-      if (exportMidpoint) rowValues.push(feeAmount);
-      if (exportUpper) rowValues.push(feeAmount); // TODO: use upper fee if available
+      if (exportLower) rowValues.push(feeLower);
+      if (exportMidpoint) rowValues.push(feeMidpoint);
+      if (exportUpper) rowValues.push(feeUpper);
       if (!hideUpperAndPcSum) {
         rowValues.push(item.is_pc_sum ? 'Yes' : '');
       }

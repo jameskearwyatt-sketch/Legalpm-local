@@ -77,7 +77,7 @@ export async function exportBudgetToExcel({
   worksheet.getRow(1).height = 24;
 
   // Client and Matter info
-  worksheet.mergeCells('A2:J2');
+  worksheet.mergeCells('A2:K2');
   const clientCell = worksheet.getCell('A2');
   clientCell.value = `Client: ${clientName}`;
   clientCell.font = subtitleFont;

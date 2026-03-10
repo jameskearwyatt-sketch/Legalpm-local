@@ -12,6 +12,8 @@ import { CarbonWhatsMarketDialog } from './CarbonWhatsMarketDialog';
 import { CARBON_ALL_CATEGORIES, CARBON_PROJECT_TYPES, CARBON_PROJECT_STAGES } from '@/lib/carbonCategories';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
 
 const MIN_DEALS_FOR_BENCHMARKING = 3;
 

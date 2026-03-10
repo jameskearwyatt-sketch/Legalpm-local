@@ -42,6 +42,7 @@ export interface DisbursementReviewResult {
   matterId: string;
   isLocalCounselFee: boolean;
   allocations: DisbursementAllocation[];
+  allocateLater?: boolean;
 }
 
 interface DisbursementReviewDialogProps {

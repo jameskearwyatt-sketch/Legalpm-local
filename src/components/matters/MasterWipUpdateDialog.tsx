@@ -1496,7 +1496,11 @@ export function MasterWipUpdateDialog({
                           variant={agg.decision === 'aggregate' ? 'default' : agg.decision === 'separate' ? 'secondary' : 'outline'}
                           className="text-xs"
                         >
-                          {agg.decision === 'aggregate' ? 'Will aggregate' : agg.decision === 'separate' ? 'Keep separate' : 'Pending'}
+                          {agg.decision === 'aggregate' 
+                            ? (findSavedAggDecision(agg.matterName) ? '✓ Remembered — aggregate' : 'Will aggregate') 
+                            : agg.decision === 'separate' 
+                              ? (findSavedAggDecision(agg.matterName) ? '✓ Remembered — separate' : 'Keep separate')
+                              : 'Pending'}
                         </Badge>
                       </div>
 

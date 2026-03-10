@@ -13,6 +13,9 @@ import { CLOUD_COMPUTE_ALL_CATEGORIES, CLOUD_SERVICE_TYPES } from '@/lib/cloudCo
 import { format } from 'date-fns';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
+import { computeVolatilityScores, sortByVolatility } from '@/lib/precedentVolatility';
+import { ArrowUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 export function CloudComputePrecedentBank() {
   const { precedents, isLoading, deletePrecedent, uniqueProjectCount } = useCloudComputePrecedentBank();

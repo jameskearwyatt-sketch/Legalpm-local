@@ -37,6 +37,7 @@ import { ReportFormatTrainingDialog } from './ReportFormatTrainingDialog';
 import { DisbursementReviewDialog, DisbursementData, DisbursementReviewResult } from './DisbursementReviewDialog';
 import { useAuth } from '@/lib/auth';
 import { LocalCounsel } from '@/lib/hooks/useLocalCounsels';
+import { useAggregationDecisions } from '@/lib/hooks/useAggregationDecisions';
 
 interface MasterWipUpdateDialogProps {
   isOpen: boolean;

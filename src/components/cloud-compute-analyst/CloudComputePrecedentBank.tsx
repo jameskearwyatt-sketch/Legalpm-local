@@ -11,6 +11,8 @@ import { useCloudComputePrecedentBank, CloudComputePrecedent } from '@/lib/hooks
 import { CloudComputeWhatsMarketDialog } from './CloudComputeWhatsMarketDialog';
 import { CLOUD_COMPUTE_ALL_CATEGORIES, CLOUD_SERVICE_TYPES } from '@/lib/cloudComputeCategories';
 import { format } from 'date-fns';
+import { Checkbox } from '@/components/ui/checkbox';
+import { ExportMarketCommentaryButton } from '@/components/shared/ExportMarketCommentaryButton';
 
 export function CloudComputePrecedentBank() {
   const { precedents, isLoading, deletePrecedent, uniqueProjectCount } = useCloudComputePrecedentBank();

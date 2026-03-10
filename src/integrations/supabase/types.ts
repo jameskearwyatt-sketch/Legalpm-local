@@ -271,6 +271,7 @@ export type Database = {
           budget_version_id: string
           category: string | null
           created_at: string
+          detail: string | null
           fee_amount: number
           id: string
           is_additional_scope: boolean
@@ -295,6 +296,7 @@ export type Database = {
           budget_version_id: string
           category?: string | null
           created_at?: string
+          detail?: string | null
           fee_amount?: number
           id?: string
           is_additional_scope?: boolean
@@ -319,6 +321,7 @@ export type Database = {
           budget_version_id?: string
           category?: string | null
           created_at?: string
+          detail?: string | null
           fee_amount?: number
           id?: string
           is_additional_scope?: boolean

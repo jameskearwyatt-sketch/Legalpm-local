@@ -1473,9 +1473,9 @@ export function MasterWipUpdateDialog({
                   <p className="font-medium text-blue-800 dark:text-blue-200">
                     Potential Multi-Client Matters Detected ({potentialAggregations.length})
                   </p>
-                  <p className="text-sm text-blue-700 dark:text-blue-300">
-                    These rows share the same matter name but have different matter numbers or client names. Should they be aggregated into a single matter, or kept as separate entries?
-                  </p>
+                   <p className="text-sm text-blue-700 dark:text-blue-300">
+                     These rows share the same matter name but have different matter numbers or client names. Should they be aggregated into a single matter, or kept as separate entries? Your choices will be remembered for future imports.
+                   </p>
                 </div>
               </div>
 

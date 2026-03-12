@@ -85,7 +85,7 @@ export function TableScrollControls({ children, className }: TableScrollControls
     // The native horizontal scrollbar becomes visible when the bottom of the container is in view
     // We hide the floating scrollbar when the bottom of the table (with some buffer for the scrollbar) is visible
     const scrollbarHeight = 20; // Approximate height of native scrollbar area
-    const bottomBuffer = 100; // Buffer zone - hide floating bar when bottom is within this distance of viewport bottom
+    const bottomBuffer = 30; // Buffer zone - hide floating bar when native scrollbar is visible
     const isAtBottom = rect.bottom <= viewportHeight + bottomBuffer;
     
     // Only show floating scrollbar if table is in view, has overflow, AND user hasn't scrolled to bottom

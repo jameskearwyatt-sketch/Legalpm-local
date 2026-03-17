@@ -157,20 +157,34 @@ Extract ALL amounts. Match as many as possible. Put anything you can't match in 
       }),
     });
 
+    const responseText = await response.text();
+    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI gateway error:', errorText);
-      throw new Error(`AI gateway returned ${response.status}: ${errorText}`);
+      console.error('AI gateway error:', response.status, responseText.substring(0, 500));
+      throw new Error(`AI gateway returned ${response.status}: ${responseText.substring(0, 200)}`);
     }
 
-    const aiResponse = await response.json();
+    if (!responseText || responseText.trim().length === 0) {
+      console.error('AI gateway returned empty response body');
+      throw new Error('AI gateway returned empty response');
+    }
+
+    let aiResponse;
+    try {
+      aiResponse = JSON.parse(responseText);
+    } catch (parseErr) {
+      console.error('Failed to parse AI gateway response:', responseText.substring(0, 500));
+      throw new Error('AI gateway returned invalid JSON');
+    }
+
     const content_response = aiResponse.choices?.[0]?.message?.content;
 
     if (!content_response) {
+      console.error('No content in AI response:', JSON.stringify(aiResponse).substring(0, 500));
       throw new Error('No response from AI');
     }
 
-    console.log('AI response received');
+    console.log('AI response received, length:', content_response.length);
 
     // Parse the AI response - extract JSON from anywhere in the response
     let parsedResult;

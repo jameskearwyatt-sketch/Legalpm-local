@@ -274,8 +274,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="fixed inset-0 bg-foreground/20" onClick={() => setMobileMenuOpen(false)} />
-          <div className="fixed inset-y-0 left-0 w-72 bg-sidebar animate-slide-up">
-            <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
+          <div className="fixed inset-y-0 left-0 w-72 bg-sidebar animate-slide-up flex flex-col overflow-hidden">
+            <div className="flex h-16 shrink-0 items-center justify-between px-6 border-b border-sidebar-border">
               <div className="flex items-center gap-2">
                 <Scale className="h-6 w-6 text-sidebar-primary" />
                 <span className="font-heading font-semibold text-sidebar-foreground">Legal Practice Manager</span>
@@ -287,7 +287,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <X className="h-5 w-5 text-sidebar-foreground" />
               </button>
             </div>
-            <nav className="space-y-1 px-3 py-4">
+            <nav className="flex-1 overflow-y-auto overscroll-contain space-y-1 px-3 py-4">
               {navigation.map((entry, index) => {
                 if ('type' in entry && entry.type === 'separator') {
                   return <div key={`sep-m-${index}`} className="my-2 mx-2 border-t border-dotted border-sidebar-border/60" />;

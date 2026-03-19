@@ -134,7 +134,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 const groupActive = group.children.some((c) =>
                   'type' in c && c.type === 'subgroup'
                     ? c.children.some((sc) => location.pathname.startsWith(sc.href))
-                    : location.pathname.startsWith(c.href)
+                    : 'href' in c && location.pathname.startsWith(c.href)
                 );
                 return (
                   <Collapsible key={group.name} open={analystOpen} onOpenChange={setAnalystOpen}>

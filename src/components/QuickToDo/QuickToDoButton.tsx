@@ -3200,7 +3200,7 @@ export function QuickToDoButton() {
                   <CheckSquare className="h-4 w-4 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-sm">To Do List <span className="ml-1 inline-flex items-center rounded-full bg-yellow-400 px-1.5 py-0.5 text-[9px] font-bold text-yellow-900 uppercase tracking-wide">v2</span></h3>
+                  <h3 className="font-bold text-white text-sm">To Do List</h3>
                   <p className="text-[10px] text-white/80">
                     {incompleteTasks.length} pending
                     {groupedTasks.untriaged.length > 0 && ` • ${groupedTasks.untriaged.length} untriaged`}

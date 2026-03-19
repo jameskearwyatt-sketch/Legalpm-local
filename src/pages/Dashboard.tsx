@@ -390,10 +390,6 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <div className="p-6 lg:p-8 space-y-8">
-        {/* Test banner - remove after confirming deploy works */}
-        <div className="rounded-lg bg-yellow-400 px-4 py-3 text-center text-yellow-900 font-bold text-lg shadow-md">
-          Claude was here — deploy pipeline is working!
-        </div>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>

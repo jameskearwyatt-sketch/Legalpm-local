@@ -2723,6 +2723,7 @@ export function QuickToDoButton() {
       {isSlateOpen && (
         <div
           ref={slateRef}
+          data-compact-panel
           className={cn(
             "fixed z-50 rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
             (isDraggingSlate || isResizingSlate) && "select-none"

@@ -123,10 +123,33 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
   }
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading font-semibold tracking-tight;
+  }
+
+  /* Touch-friendly interactive elements on touch devices */
+  @media (pointer: coarse) {
+    button, [role="button"], a, select, input[type="checkbox"], input[type="radio"] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    input, textarea, select {
+      font-size: 16px; /* Prevents iOS zoom on focus */
+    }
+  }
+
+  /* Safe area insets for notched devices */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
   }
 }
 
@@ -260,6 +283,47 @@
 
   .badge-neutral {
     @apply bg-muted text-muted-foreground border-border;
+  }
+
+  /* Responsive page padding */
+  .page-padding {
+    @apply px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8;
+  }
+
+  /* Responsive page header with stacked layout on mobile */
+  .page-header {
+    @apply flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4;
+  }
+
+  /* Mobile-friendly card grid */
+  .card-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
+  }
+
+  /* Responsive table wrapper - ensures horizontal scroll on mobile */
+  .table-responsive {
+    @apply -mx-4 sm:mx-0 overflow-x-auto;
+  }
+
+  /* Hide on mobile, show on tablet+ */
+  .tablet-up {
+    @apply hidden md:block;
+  }
+
+  /* Hide on mobile/tablet, show on desktop */
+  .desktop-only {
+    @apply hidden lg:block;
+  }
+
+  /* Touch-friendly spacing for list items */
+  .touch-list > * {
+    @apply py-3;
+  }
+
+  @media (pointer: coarse) {
+    .touch-list > * {
+      @apply py-4;
+    }
   }
 }
 

@@ -21,10 +21,10 @@ export default function ITSupplyAnalyst() {
 
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8">
-        <div className="mb-6 flex items-start justify-between">
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-heading font-bold text-foreground flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-heading font-bold text-foreground flex items-center gap-2">
               <Cpu className="h-6 w-6" />
               IT Supply Analyst
             </h1>

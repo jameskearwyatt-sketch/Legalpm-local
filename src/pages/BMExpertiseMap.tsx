@@ -206,11 +206,11 @@ export default function BMExpertiseMap() {
 
   return (
     <AppLayout>
-      <div className="p-6 max-w-[1800px] mx-auto">
+      <div className="p-4 sm:p-6 max-w-[1800px] mx-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4 sm:mb-6">
           <div>
-            <h1 className="text-2xl font-heading font-bold text-foreground">
+            <h1 className="text-xl sm:text-2xl font-heading font-bold text-foreground">
               BM EMI Expertise Map
             </h1>
             <p className="text-muted-foreground mt-1">

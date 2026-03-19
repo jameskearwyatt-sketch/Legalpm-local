@@ -176,15 +176,15 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 safe-area-top safe-area-bottom">
       <div className="w-full max-w-md animate-fade-in">
-        <div className="flex items-center justify-center gap-3 mb-8">
+        <div className="flex items-center justify-center gap-3 mb-6 sm:mb-8">
           <div className="p-2 rounded-lg bg-primary">
-            <Scale className="h-8 w-8 text-primary-foreground" />
+            <Scale className="h-6 w-6 sm:h-8 sm:w-8 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="text-2xl font-heading font-bold text-foreground">Legal Practice Manager</h1>
-            <p className="text-sm text-muted-foreground">Legal Financial Tracking</p>
+            <h1 className="text-xl sm:text-2xl font-heading font-bold text-foreground">Legal Practice Manager</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Legal Financial Tracking</p>
           </div>
         </div>
 

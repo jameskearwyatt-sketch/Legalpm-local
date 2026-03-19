@@ -729,11 +729,11 @@ export default function MatterDetail() {
 
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8 space-y-6 max-w-6xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 max-w-6xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-          <div className="flex items-start gap-4">
-            <Button variant="ghost" size="icon" asChild className="-ml-2">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+          <div className="flex items-start gap-2 sm:gap-4">
+            <Button variant="ghost" size="icon" asChild className="-ml-2 shrink-0">
               <Link to="/matters" state={{ tab: matter?.category === 'Pipeline' ? 'Pipeline' : undefined }}>
                 <ArrowLeft className="h-5 w-5" />
               </Link>
@@ -808,7 +808,7 @@ export default function MatterDetail() {
               </div>
             </div>
           </div>
-          <div className="flex gap-2 ml-10 sm:ml-0">
+          <div className="flex gap-2 ml-8 sm:ml-0 shrink-0">
             {hasChanges && (
               <Button onClick={handleSave} disabled={isSaving}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
@@ -867,7 +867,7 @@ export default function MatterDetail() {
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             {/* Budget overview */}
             <Card className="shadow-card">
               <CardHeader className="flex flex-row items-start justify-between">

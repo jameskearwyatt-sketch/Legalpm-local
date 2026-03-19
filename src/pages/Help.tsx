@@ -13,9 +13,9 @@ import {
 export default function Help() {
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-8">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6 sm:space-y-8">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-heading font-bold text-foreground">Help & Documentation</h1>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-heading font-bold text-foreground">Help & Documentation</h1>
           <p className="text-muted-foreground mt-1">
             Learn how Legal Practice Manager works and how to get the most from it
           </p>

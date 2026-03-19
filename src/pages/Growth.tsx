@@ -108,28 +108,28 @@ const Growth = () => {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-              <Rocket className="h-8 w-8 text-primary" />
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight flex items-center gap-2 sm:gap-3">
+              <Rocket className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
               Growth
             </h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">
               Track your business, professional, and learning development
             </p>
           </div>
           {overdueCount > 0 && (
-            <Badge variant="destructive" className="text-sm px-3 py-1">
-              <Clock className="h-4 w-4 mr-1" />
-              {overdueCount} overdue {overdueCount === 1 ? 'task' : 'tasks'}
+            <Badge variant="destructive" className="text-xs sm:text-sm px-2 sm:px-3 py-1">
+              <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
+              {overdueCount} overdue
             </Badge>
           )}
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           {/* Tab Navigation Bar - always visible for easy navigation */}
-          <div className="flex items-center gap-2 mb-6 flex-wrap">
+          <div className="flex items-center gap-2 mb-4 sm:mb-6 flex-wrap overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
             <Button
               variant={activeTab === 'overview' ? 'default' : 'outline'}
               size="sm"
@@ -169,7 +169,7 @@ const Growth = () => {
           </div>
 
           <TabsContent value="overview" className="mt-0">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
               <OverviewCard
                 title="Business Development"
                 description="Client relationships, BD initiatives, and growth opportunities"

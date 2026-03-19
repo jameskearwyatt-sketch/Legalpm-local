@@ -251,37 +251,62 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </aside>
 
       {/* Mobile header */}
-      <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-card px-4 lg:hidden">
-        <button
-          onClick={() => setMobileMenuOpen(true)}
-          className="p-2 -ml-2 rounded-lg hover:bg-muted"
-        >
-          <Menu className="h-6 w-6" />
-        </button>
+      <header className="sticky top-0 z-40 flex h-14 sm:h-16 items-center justify-between gap-2 border-b bg-card px-3 sm:px-4 lg:hidden safe-area-top">
         <div className="flex items-center gap-2">
-          <Scale className="h-6 w-6 text-primary" />
-          <span className="font-heading font-semibold">Legal Practice Manager</span>
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="p-2 -ml-2 rounded-lg hover:bg-muted touch-manipulation"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+          <div className="flex items-center gap-2 min-w-0">
+            <Scale className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
+            <span className="font-heading font-semibold text-sm sm:text-base truncate">Legal PM</span>
+          </div>
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="p-1 rounded-full hover:bg-muted transition-colors touch-manipulation">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                  {userInitials}
+                </AvatarFallback>
+              </Avatar>
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel className="truncate">{user?.email}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate('/settings')}>
+              <Settings className="mr-2 h-4 w-4" />
+              Settings
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleSignOut}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </header>
 
       {/* Mobile menu overlay */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="fixed inset-0 bg-foreground/20" onClick={() => setMobileMenuOpen(false)} />
-          <div className="fixed inset-y-0 left-0 w-72 bg-sidebar animate-slide-up flex flex-col overflow-hidden">
-            <div className="flex h-16 shrink-0 items-center justify-between px-6 border-b border-sidebar-border">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+          <div className="fixed inset-y-0 left-0 w-[280px] sm:w-72 bg-sidebar flex flex-col overflow-hidden shadow-2xl transition-transform duration-300 safe-area-top">
+            <div className="flex h-14 sm:h-16 shrink-0 items-center justify-between px-4 sm:px-6 border-b border-sidebar-border">
               <div className="flex items-center gap-2">
-                <Scale className="h-6 w-6 text-sidebar-primary" />
-                <span className="font-heading font-semibold text-sidebar-foreground">Legal Practice Manager</span>
+                <Scale className="h-5 w-5 text-sidebar-primary" />
+                <span className="font-heading font-semibold text-sm sm:text-base text-sidebar-foreground">Legal Practice Manager</span>
               </div>
               <button
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2 rounded-lg hover:bg-sidebar-accent/50"
+                className="p-2 rounded-lg hover:bg-sidebar-accent/50 touch-manipulation"
               >
                 <X className="h-5 w-5 text-sidebar-foreground" />
               </button>
             </div>
-            <nav className="flex-1 overflow-y-auto overscroll-contain space-y-1 px-3 py-4">
+            <nav className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch space-y-1 px-3 py-4">
               {navigation.map((entry, index) => {
                 if ('type' in entry && entry.type === 'separator') {
                   return <div key={`sep-m-${index}`} className="my-2 mx-2 border-t border-dotted border-sidebar-border/60" />;
@@ -352,7 +377,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     to={item.href}
                     onClick={() => setMobileMenuOpen(false)}
                     className={cn(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                      'flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors touch-manipulation',
                       isActive
                         ? 'bg-sidebar-accent text-sidebar-accent-foreground'
                         : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
@@ -364,13 +389,31 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 );
               })}
             </nav>
+            {/* Mobile menu user section */}
+            <div className="border-t border-sidebar-border p-4 safe-area-bottom">
+              <div className="flex items-center gap-3 px-3 py-2">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
+                <p className="text-sm text-sidebar-foreground truncate flex-1">{user?.email}</p>
+              </div>
+              <button
+                onClick={() => { handleSignOut(); setMobileMenuOpen(false); }}
+                className="flex w-full items-center gap-3 px-3 py-3 mt-1 rounded-lg text-sm font-medium text-sidebar-foreground/70 hover:bg-sidebar-accent/50 touch-manipulation"
+              >
+                <LogOut className="h-5 w-5" />
+                Sign out
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Main content */}
       <main className="lg:pl-64">
-        <div className="min-h-[calc(100vh-4rem)] lg:min-h-screen">
+        <div className="min-h-[calc(100vh-3.5rem)] sm:min-h-[calc(100vh-4rem)] lg:min-h-screen safe-area-bottom">
           {children}
         </div>
       </main>

@@ -75,17 +75,17 @@ export default function PPAAnalyst() {
 
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8">
-        <div className="mb-6 flex items-start justify-between">
+      <div className="p-4 sm:p-6 lg:p-8">
+        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-heading font-bold text-foreground">PPA Analyst</h1>
+            <h1 className="text-xl sm:text-2xl font-heading font-bold text-foreground">PPA Analyst</h1>
             <p className="text-muted-foreground mt-1">
               Analyze PPAs and term sheets against market standards and precedents
             </p>
           </div>
           
           {/* Market Comparison Status */}
-          <Card className="w-80">
+          <Card className="w-full sm:w-80">
             <CardHeader className="py-3 px-4">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Settings2 className="h-4 w-4" />

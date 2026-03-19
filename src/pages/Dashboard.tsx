@@ -389,28 +389,29 @@ export default function Dashboard() {
 
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8 space-y-8">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 lg:space-y-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-2xl lg:text-3xl font-heading font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">Overview of your legal matter finances</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-heading font-bold text-foreground">Dashboard</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">Overview of your legal matter finances</p>
           </div>
-          <div className="flex gap-3">
-            <Button asChild variant="outline">
+          <div className="flex gap-2 sm:gap-3">
+            <Button asChild variant="outline" size="sm" className="sm:h-10 sm:px-4 sm:py-2">
               <Link to="/matters">View All Matters</Link>
             </Button>
-            <Button asChild>
+            <Button asChild size="sm" className="sm:h-10 sm:px-4 sm:py-2">
               <Link to="/matters/new">
-                <Briefcase className="mr-2 h-4 w-4" />
-                New Matter
+                <Briefcase className="mr-1 sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">New Matter</span>
+                <span className="sm:hidden">New</span>
               </Link>
             </Button>
           </div>
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-4">
           {kpiCards.map((card) => (
             <StatCard
               key={card.title}
@@ -426,14 +427,14 @@ export default function Dashboard() {
         </div>
 
         {/* Budget Summary - Live, Pipeline & Grand Total */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-4 bg-primary/5 rounded-lg border border-primary/10">
           {/* Live Matters Total */}
           <Card className="shadow-card">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Live Matters BM Budget</p>
-                  <p className="text-2xl font-heading font-bold text-foreground">{formatCurrency(stats?.totalBudget || 0, 'USD')}</p>
+                <div className="space-y-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Live Matters BM Budget</p>
+                  <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency(stats?.totalBudget || 0, 'USD')}</p>
                   <p className="text-xs text-muted-foreground">{stats?.openMattersCount || 0} live matters</p>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10 text-primary">
@@ -445,11 +446,11 @@ export default function Dashboard() {
 
           {/* Pipeline Total (Potential) */}
           <Card className="shadow-card">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Pipeline (Potential)</p>
-                  <p className="text-2xl font-heading font-bold text-foreground">{formatCurrency(stats?.totalPipelineValueUsd || 0, 'USD')}</p>
+                <div className="space-y-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Pipeline (Potential)</p>
+                  <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency(stats?.totalPipelineValueUsd || 0, 'USD')}</p>
                   <p className="text-xs text-muted-foreground">{stats?.pipelineMattersCount || 0} pipeline matters</p>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10 text-primary">
@@ -461,11 +462,11 @@ export default function Dashboard() {
 
           {/* Grand Total (Theoretical) */}
           <Card className="shadow-card">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Grand Total (Theoretical)</p>
-                  <p className="text-2xl font-heading font-bold text-foreground">{formatCurrency((stats?.totalBudget || 0) + (stats?.totalPipelineValueUsd || 0), 'USD')}</p>
+                <div className="space-y-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Grand Total (Theoretical)</p>
+                  <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency((stats?.totalBudget || 0) + (stats?.totalPipelineValueUsd || 0), 'USD')}</p>
                   <p className="text-xs text-muted-foreground">Live + Pipeline if all won</p>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10 text-primary">
@@ -478,13 +479,13 @@ export default function Dashboard() {
 
         {/* Live Matters Filter Section */}
         <Card className="shadow-card">
-          <CardHeader className="flex flex-row items-center justify-between py-3">
-            <CardTitle className="font-heading text-lg flex items-center gap-2">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between py-3 gap-1">
+            <CardTitle className="font-heading text-base sm:text-lg flex items-center gap-2">
               <ListChecks className="h-5 w-5 text-primary" />
               Live Matters
             </CardTitle>
-            <span className="text-sm text-muted-foreground">
-              {includedMatterIds.size} of {stats?.liveMatters?.length || 0} included in financials
+            <span className="text-xs sm:text-sm text-muted-foreground">
+              {includedMatterIds.size} of {stats?.liveMatters?.length || 0} included
             </span>
           </CardHeader>
           <CardContent className="pt-0">
@@ -492,7 +493,7 @@ export default function Dashboard() {
               <>
                 {/* Master Toggle Checkboxes */}
                 {userName && (
-                  <div className="flex flex-wrap gap-6 mb-4 pb-3 border-b border-border">
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-6 mb-4 pb-3 border-b border-border">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         checked={myMattersAllIncluded}
@@ -522,7 +523,7 @@ export default function Dashboard() {
                   </div>
                 )}
                 {/* Individual Matter Checkboxes */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-2 max-h-48 overflow-y-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 sm:gap-x-8 gap-y-1 sm:gap-y-2 max-h-48 overflow-y-auto">
                   {stats.liveMatters.map((matter) => {
                     const isIncluded = !excludedMatterIds.includes(matter.id);
                     return (
@@ -558,7 +559,7 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             {hasData ? (
-              <div className="h-72 relative">
+              <div className="h-52 sm:h-64 lg:h-72 relative -mx-2 sm:mx-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trendData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -653,7 +654,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Red Flags and Pipeline Flags - Side by Side */}
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Red Flags */}
           <Card className="shadow-card">
             <CardHeader className="flex flex-row items-center justify-between">

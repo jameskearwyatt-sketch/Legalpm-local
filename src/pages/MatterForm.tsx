@@ -426,7 +426,7 @@ export default function MatterForm() {
 
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8 max-w-5xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-5xl mx-auto">
         <div className="flex items-center gap-4 mb-6">
           <Button variant="ghost" size="icon" asChild className="-ml-2">
             <Link to={isEditing ? `/matters/${id}` : '/matters'}>

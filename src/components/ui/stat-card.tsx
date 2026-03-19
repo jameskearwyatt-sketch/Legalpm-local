@@ -41,11 +41,11 @@ export function StatCard({ title, value, icon, trend, variant = 'default', class
 
   return (
     <Card className={cn('shadow-card hover:shadow-card-hover transition-shadow', variantStyles[variant], className)}>
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
+      <CardContent className="p-3 sm:p-6">
+        <div className="flex items-start justify-between gap-2">
+          <div className="space-y-0.5 sm:space-y-1 min-w-0">
             <div className="flex items-center gap-1.5">
-              <p className="text-sm font-medium text-muted-foreground">{title}</p>
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground truncate">{title}</p>
               {infoTooltip && (
                 <TooltipProvider>
                   <Tooltip>
@@ -59,7 +59,7 @@ export function StatCard({ title, value, icon, trend, variant = 'default', class
                 </TooltipProvider>
               )}
             </div>
-            <p className="text-2xl font-heading font-bold text-foreground">{value}</p>
+            <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{value}</p>
             {note && (
               <p className={cn(
                 'text-xs mt-0.5',
@@ -92,7 +92,7 @@ export function StatCard({ title, value, icon, trend, variant = 'default', class
             )}
           </div>
           {icon && (
-            <div className={cn('p-3 rounded-lg', iconStyles[variant])}>
+            <div className={cn('p-2 sm:p-3 rounded-lg shrink-0', iconStyles[variant])}>
               {icon}
             </div>
           )}

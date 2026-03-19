@@ -1033,82 +1033,87 @@ export default function Matters() {
 
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8 space-y-6">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl lg:text-3xl font-heading font-bold text-foreground">Matters</h1>
-            <p className="text-muted-foreground mt-1">Track live transactions, pipeline, and closed matters</p>
-          </div>
-          <div className="flex items-center gap-2">
-            {isLive && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline"
-                    onClick={() => setShowMasterWipHistoryDialog(true)}
-                    size="sm"
-                  >
-                    <History className="mr-2 h-4 w-4" />
-                    History
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    onClick={() => setShowWipClientUpdateDialog(true)}
-                  >
-                    <Mail className="mr-2 h-4 w-4" />
-                    Update Clients on WIP
-                  </Button>
-                  <Button 
-                    variant="default" 
-                    onClick={() => setShowMasterWipDialog(true)}
-                    className="bg-amber-600 hover:bg-amber-700 text-white"
-                  >
-                    <Upload className="mr-2 h-4 w-4" />
-                    Master Financial Snapshot Update
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2 justify-end">
-                  <Checkbox
-                    id="highlight-movements-master"
-                    checked={masterHighlightEnabled}
-                    onCheckedChange={(checked) => toggleMasterHighlight(!!checked)}
-                    className="h-4 w-4"
-                  />
-                  <label 
-                    htmlFor="highlight-movements-master" 
-                    className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1"
-                  >
-                    <Eye className="h-3 w-3" />
-                    Highlight Recent Movements
-                  </label>
-                </div>
-              </div>
-            )}
-            {!isSpecialTab && (
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" onClick={() => setShowExportDialog(true)}>
-                    <Download className="mr-2 h-4 w-4" />
-                    Export Matters
+        <div className="flex flex-col gap-3 sm:gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-heading font-bold text-foreground">Matters</h1>
+              <p className="text-sm sm:text-base text-muted-foreground mt-1">Track live transactions, pipeline, and closed matters</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {!isSpecialTab && (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => setShowExportDialog(true)}>
+                    <Download className="mr-1.5 h-4 w-4" />
+                    <span className="hidden sm:inline">Export</span>
                   </Button>
                   {!isClosed && (
-                    <Button asChild>
+                    <Button asChild size="sm">
                       <Link to="/matters/new">
-                        <Plus className="mr-2 h-4 w-4" />
-                        New Matter
+                        <Plus className="mr-1.5 h-4 w-4" />
+                        <span className="hidden sm:inline">New Matter</span>
+                        <span className="sm:hidden">New</span>
                       </Link>
                     </Button>
                   )}
-                </div>
-              </div>
-            )}
+                </>
+              )}
+            </div>
           </div>
+          {isLive && (
+            <div className="flex flex-col sm:flex-row flex-wrap items-start sm:items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setShowMasterWipHistoryDialog(true)}
+                size="sm"
+              >
+                <History className="mr-1.5 h-4 w-4" />
+                History
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setShowWipClientUpdateDialog(true)}
+                size="sm"
+              >
+                <Mail className="mr-1.5 h-4 w-4" />
+                <span className="hidden md:inline">Update Clients on WIP</span>
+                <span className="md:hidden">Client WIP</span>
+              </Button>
+              <Button
+                variant="default"
+                onClick={() => setShowMasterWipDialog(true)}
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+                size="sm"
+              >
+                <Upload className="mr-1.5 h-4 w-4" />
+                <span className="hidden md:inline">Master Financial Snapshot Update</span>
+                <span className="md:hidden">Snapshot Update</span>
+              </Button>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="highlight-movements-master"
+                  checked={masterHighlightEnabled}
+                  onCheckedChange={(checked) => toggleMasterHighlight(!!checked)}
+                  className="h-4 w-4"
+                />
+                <label
+                  htmlFor="highlight-movements-master"
+                  className="text-xs text-muted-foreground cursor-pointer flex items-center gap-1"
+                >
+                  <Eye className="h-3 w-3" />
+                  <span className="hidden sm:inline">Highlight Recent Movements</span>
+                  <span className="sm:hidden">Highlights</span>
+                </label>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Category Tabs */}
         <Tabs value={tabFilter} onValueChange={(v) => setTabFilter(v as TabFilter)}>
-          <TabsList className="grid w-full grid-cols-6 lg:w-auto lg:inline-grid">
+          <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className="inline-flex w-auto min-w-full sm:min-w-0 sm:grid sm:grid-cols-6">
             {(['Live', 'Pipeline', 'Closed', 'Lost'] as MatterCategory[]).map((cat) => (
               <TabsTrigger key={cat} value={cat} className="gap-2">
                 {categoryIcons[cat]}
@@ -1133,6 +1138,7 @@ export default function Matters() {
               </span>
             </TabsTrigger>
           </TabsList>
+          </div>
         </Tabs>
 
         {/* Summary & Filters - Hide for Clients tab */}
@@ -1141,13 +1147,13 @@ export default function Matters() {
             "shadow-card transition-all",
             hasActiveFilters && "ring-2 ring-destructive"
           )}>
-            <CardContent className="pt-6">
-              <div className="flex flex-col lg:flex-row lg:items-center gap-4 justify-between">
-                <div className="flex flex-col sm:flex-row gap-4 flex-1 items-start sm:items-center flex-wrap">
-                  <div className="relative flex-1 max-w-md">
+            <CardContent className="p-4 sm:pt-6">
+              <div className="flex flex-col gap-3 sm:gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-1 items-stretch sm:items-center flex-wrap">
+                  <div className="relative flex-1 min-w-0 sm:max-w-md">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder="Search matters, clients, partners, jurisdictions..."
+                      placeholder="Search matters, clients..."
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       className="pl-9"
@@ -1292,10 +1298,10 @@ export default function Matters() {
 
         {/* Table - Hide for Clients tab */}
         {!isClientsTab && (
-          <Card className="shadow-card">
+          <Card className="shadow-card overflow-hidden">
             <CardContent className="p-0">
               {isLoading ? (
-                <div className="flex items-center justify-center py-16">
+                <div className="flex items-center justify-center py-12 sm:py-16">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : filteredMatters.length === 0 ? (

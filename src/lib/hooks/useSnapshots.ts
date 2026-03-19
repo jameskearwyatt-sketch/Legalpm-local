@@ -85,55 +85,63 @@ export function useSnapshots(matterId?: string) {
     }) => {
       const today = new Date().toISOString().split('T')[0];
       const now = new Date().toISOString();
-      
-      // Check if a snapshot exists for today
-      const { data: existing } = await supabase
+
+      // Try to update an existing snapshot for today first (avoids race condition)
+      const { data: updated, error: updateError } = await supabase
+        .from('financial_snapshots')
+        .update({ [field]: value, updated_at: now, update_source: updateSource })
+        .eq('matter_id', matterId)
+        .eq('as_of_date', today)
+        .select()
+        .maybeSingle();
+
+      if (updateError) throw updateError;
+
+      if (updated) {
+        return { data: updated, matterId };
+      }
+
+      // No snapshot for today exists — get the latest to copy other values
+      const { data: latestSnapshot } = await supabase
         .from('financial_snapshots')
         .select('*')
         .eq('matter_id', matterId)
-        .eq('as_of_date', today)
+        .order('as_of_date', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (existing) {
-        // Update existing snapshot - explicitly set updated_at to now
-        const { data, error } = await supabase
+      // Create new snapshot with today's date
+      const { data: inserted, error: insertError } = await supabase
+        .from('financial_snapshots')
+        .insert({
+          matter_id: matterId,
+          user_id: user!.id,
+          as_of_date: today,
+          wip_amount: field === 'wip_amount' ? value : (latestSnapshot?.wip_amount || 0),
+          wip_write_off_amount: field === 'wip_write_off_amount' ? value : (latestSnapshot?.wip_write_off_amount || 0),
+          billed_amount: field === 'billed_amount' ? value : (latestSnapshot?.billed_amount || 0),
+          accounts_receivable: field === 'accounts_receivable' ? value : (latestSnapshot?.accounts_receivable || 0),
+          paid_amount: field === 'paid_amount' ? value : (latestSnapshot?.paid_amount || 0),
+          updated_at: now,
+          update_source: updateSource,
+        })
+        .select()
+        .single();
+
+      // If insert fails due to race (another request created the row), retry as update
+      if (insertError) {
+        const { data: retryUpdate, error: retryError } = await supabase
           .from('financial_snapshots')
           .update({ [field]: value, updated_at: now, update_source: updateSource })
-          .eq('id', existing.id)
-          .select()
-          .single();
-        if (error) throw error;
-        return { data, matterId };
-      } else {
-        // Get the latest snapshot to copy other values
-        const { data: latestSnapshot } = await supabase
-          .from('financial_snapshots')
-          .select('*')
           .eq('matter_id', matterId)
-          .order('as_of_date', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        // Create new snapshot with today's date
-        const { data, error } = await supabase
-          .from('financial_snapshots')
-          .insert({
-            matter_id: matterId,
-            user_id: user!.id,
-            as_of_date: today,
-            wip_amount: field === 'wip_amount' ? value : (latestSnapshot?.wip_amount || 0),
-            wip_write_off_amount: field === 'wip_write_off_amount' ? value : (latestSnapshot?.wip_write_off_amount || 0),
-            billed_amount: field === 'billed_amount' ? value : (latestSnapshot?.billed_amount || 0),
-            accounts_receivable: field === 'accounts_receivable' ? value : (latestSnapshot?.accounts_receivable || 0),
-            paid_amount: field === 'paid_amount' ? value : (latestSnapshot?.paid_amount || 0),
-            updated_at: now,
-            update_source: updateSource,
-          })
+          .eq('as_of_date', today)
           .select()
           .single();
-        if (error) throw error;
-        return { data, matterId };
+        if (retryError) throw retryError;
+        return { data: retryUpdate, matterId };
       }
+
+      return { data: inserted, matterId };
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['snapshots'] });

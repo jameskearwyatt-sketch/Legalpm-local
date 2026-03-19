@@ -133,22 +133,22 @@
 
   /* Touch-friendly interactive elements on touch devices — exclude small UI controls */
   @media (pointer: coarse) {
-    :is(button, [role="button"], a, select):not([role="checkbox"]):not([role="radio"]):not([role="switch"]):not(.compact-touch) {
+    :is(button, [role="button"], a, select):not([role="checkbox"]):not([role="radio"]):not([role="switch"]):not(.compact-touch):not([data-compact-panel] *) {
       min-height: 44px;
       min-width: 44px;
     }
 
     /* Override: keep table header buttons compact */
-    th :is(button, [role="button"], a, select),
-    thead :is(button, [role="button"], a, select) {
-      min-height: unset;
-      min-width: unset;
+    th :is(button, [role="button"], a, select):not([role="checkbox"]):not([role="radio"]):not([role="switch"]),
+    thead :is(button, [role="button"], a, select):not([role="checkbox"]):not([role="radio"]):not([role="switch"]) {
+      min-height: unset !important;
+      min-width: unset !important;
     }
 
     /* Override: keep floating panel (todo/slate) buttons compact */
-    [data-compact-panel] :is(button, [role="button"], a, select) {
-      min-height: unset;
-      min-width: unset;
+    [data-compact-panel] :is(button, [role="button"], a, select):not([role="checkbox"]):not([role="radio"]):not([role="switch"]) {
+      min-height: unset !important;
+      min-width: unset !important;
     }
 
     input, textarea, select {

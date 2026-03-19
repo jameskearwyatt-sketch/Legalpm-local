@@ -133,12 +133,16 @@
 
   /* Touch-friendly interactive elements on touch devices — exclude small UI controls */
   @media (pointer: coarse) {
-    button:not([role="checkbox"]):not([role="radio"]):not([role="switch"]):not(th button):not(thead button),
-    [role="button"]:not(th [role="button"]),
-    a:not(th a),
-    select:not(th select) {
+    :is(button, [role="button"], a, select):not([role="checkbox"]):not([role="radio"]):not([role="switch"]) {
       min-height: 44px;
       min-width: 44px;
+    }
+
+    /* Override: keep table header buttons compact */
+    th :is(button, [role="button"], a, select),
+    thead :is(button, [role="button"], a, select) {
+      min-height: unset;
+      min-width: unset;
     }
 
     input, textarea, select {

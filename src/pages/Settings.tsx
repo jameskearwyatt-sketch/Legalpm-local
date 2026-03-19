@@ -73,6 +73,8 @@ export default function Settings() {
   }, [user]);
 
   const handleRegisterPasskey = async () => {
+    if (!user?.id) return;
+
     const deviceName = navigator.userAgent.includes('iPhone') || navigator.userAgent.includes('iPad')
       ? 'iPhone/iPad Face ID'
       : navigator.userAgent.includes('Mac')
@@ -80,7 +82,7 @@ export default function Settings() {
         : 'Device Biometric';
 
     const result = await registerPasskey(deviceName);
-    
+
     if (result.success) {
       toast({
         title: 'Face ID registered',
@@ -90,7 +92,7 @@ export default function Settings() {
       const { data } = await supabase
         .from('passkeys')
         .select('id, device_name, created_at, last_used_at')
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       if (data) setPasskeys(data);
     } else {

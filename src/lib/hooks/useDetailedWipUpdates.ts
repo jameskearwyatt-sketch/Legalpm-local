@@ -187,35 +187,42 @@ export function useDetailedWipUpdates(matterId?: string) {
 
         if (previousItems) {
           for (const item of previousItems) {
-            await supabase
+            const { error: restoreErr } = await supabase
               .from('budget_line_items')
-              .update({ 
+              .update({
                 wip_amount: item.wip_amount,
                 wip_write_off: item.write_off_amount || 0,
                 wip_updated_at: previousUpdate.created_at
               })
               .eq('id', item.budget_line_item_id);
+            if (restoreErr) {
+              console.error(`Failed to restore budget line item ${item.budget_line_item_id}:`, restoreErr);
+            }
           }
         }
       } else if (isLatest) {
         // No previous updates, reset WIP to 0 on all line items
-        // Get the latest budget version's line items
-        const { data: budgetVersions } = await supabase
+        const { data: budgetVersions, error: bvError } = await supabase
           .from('budget_versions')
           .select('id')
           .eq('matter_id', matterId)
           .order('version_number', { ascending: false })
           .limit(1);
 
-        if (budgetVersions && budgetVersions.length > 0) {
-          await supabase
+        if (bvError) {
+          console.error('Failed to fetch budget versions for WIP reset:', bvError);
+        } else if (budgetVersions && budgetVersions.length > 0) {
+          const { error: resetErr } = await supabase
             .from('budget_line_items')
-            .update({ 
+            .update({
               wip_amount: 0,
               wip_write_off: 0,
               wip_updated_at: null
             })
             .eq('budget_version_id', budgetVersions[0].id);
+          if (resetErr) {
+            console.error('Failed to reset WIP on budget line items:', resetErr);
+          }
         }
       }
 

@@ -88,6 +88,8 @@ export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }
           }
         });
         setErrors(fieldErrors);
+      } else {
+        setErrors({ as_of_date: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.' });
       }
     } finally {
       setIsSubmitting(false);

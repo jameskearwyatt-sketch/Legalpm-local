@@ -1,0 +1,126 @@
+# CLAUDE.md — Legal Practice Manager
+
+## Project Overview
+
+Legal Practice Management application built with React 18, TypeScript, Vite, Supabase (auth + PostgreSQL + edge functions), TanStack Query, shadcn/ui, and Tailwind CSS. Handles confidential legal and client data including matters, billing, pricing, contacts, and contract analysis.
+
+## Tech Stack
+
+- **Frontend**: React 18 + TypeScript + Vite
+- **UI**: shadcn/ui + Tailwind CSS + Radix primitives
+- **Backend**: Supabase (auth, PostgreSQL, edge functions, RLS)
+- **State/Data**: TanStack React Query (5min staleTime, 1 retry), React Context (auth)
+- **Validation**: Zod + react-hook-form
+- **Charts**: Recharts
+- **Excel**: ExcelJS + xlsx
+
+## Project Structure
+
+```
+src/
+├── App.tsx                          # Root: routing, auth guard, AdminRoute, providers
+├── main.tsx                         # ReactDOM entry
+├── pages/                           # 23 page components (Auth, Dashboard, Matters, Contacts, Growth, Pricing, 5x Analyst, Settings, Flags, etc.)
+├── components/
+│   ├── ui/                          # ~60 shadcn/ui primitives
+│   ├── matters/                     # Matter management (budget, WIP, billing, snapshots)
+│   ├── pricing/                     # Pricing engine, proposals, AFA, rate cards
+│   ├── contacts/                    # Distribution contacts CRM
+│   ├── growth/                      # BD pipeline tracking
+│   ├── forms/                       # ClientForm, InvoiceForm, SnapshotForm
+│   ├── *-analyst/                   # 5 contract analyst modules (PPA, Tolling, Carbon, IT Supply, Cloud Compute)
+│   ├── layout/AppLayout.tsx         # Sidebar nav + mobile menu
+│   └── AskAI/, QuickToDo/          # Floating action buttons
+├── lib/
+│   ├── auth.tsx                     # AuthContext + Supabase auth
+│   ├── hooks/                       # ~55 custom data hooks (entire data layer)
+│   │   └── useUserRole.ts           # RBAC hook for admin/user role checking
+│   ├── utils.ts                     # cn() utility
+│   └── *Utils.ts, *Categories.ts   # Domain helpers
+└── integrations/supabase/
+    ├── client.ts                    # Supabase client init
+    └── types.ts                     # Auto-generated DB types (78 tables)
+supabase/
+└── migrations/                      # 20+ SQL migration files
+```
+
+## Database
+
+- 78 PostgreSQL tables via Supabase
+- RLS enabled on all tables with user-based policies
+- RBAC framework: `user_roles` table with admin/user enum + `has_role()` function
+- All tables have `created_at` / `updated_at` timestamps
+- All tables now have proper `user_id` FK constraints to `auth.users(id) ON DELETE CASCADE`
+- Key tables have `created_by` / `updated_by` audit fields (matters, financial_snapshots, budget_amendments, budget_versions, pricing_proposals, invoices, growth_projects)
+- Unique constraint on `financial_snapshots(matter_id, as_of_date)` prevents duplicate daily snapshots
+
+## Architecture Decisions
+
+- All data access goes through custom hooks in `src/lib/hooks/` using TanStack Query
+- Auth is React Context-based (`AuthProvider` in `src/lib/auth.tsx`)
+- Route protection via `ProtectedRoute` wrapper in `App.tsx`; `AdminRoute` for admin-only pages
+- Supabase anon key is used client-side (standard Supabase pattern); RLS enforces data isolation
+- No server-side rendering — pure SPA
+- HTML rendered via `dangerouslySetInnerHTML` is sanitized with DOMPurify
+- Contact filtering uses SQL-level queries where possible (countries, owners, dates, sectors, EMI focus areas); only NAICS-derived sectors use JS filtering
+
+## Completed Fixes (March 2025 Audit)
+
+All 18 issues from the original audit have been resolved:
+
+| # | Issue | Fix | Commit |
+|---|-------|-----|--------|
+| 1 | `.env` committed to git | Added to `.gitignore`, removed from tracking | CRITICAL |
+| 2 | XSS via `dangerouslySetInnerHTML` | DOMPurify sanitization added | CRITICAL |
+| 3 | 6-char password minimum | Increased to 12 characters | CRITICAL |
+| 4 | `useMemo` for side effects | Changed to `useEffect` | CRITICAL |
+| 5 | Form errors silently swallowed | Added non-Zod error handling | HIGH |
+| 6 | WebAuthn debug logs | Removed `console.log` statements | HIGH |
+| 7 | Undefined `user_id` in Settings | Added null guard | HIGH |
+| 8 | Snapshot upsert race condition | Update-first pattern with retry | HIGH |
+| 9 | localStorage session tokens | XSS vectors fixed (DOMPurify); CSP recommended | HIGH |
+| 10 | No RBAC in UI | `AdminRoute` + `useUserRole` hook added | MEDIUM |
+| 11 | 63 tables missing FK constraints | Migration adds all FK constraints | MEDIUM |
+| 12 | No audit trail | `created_by`/`updated_by` on key tables | MEDIUM |
+| 13 | Unbounded snapshot loading | 6-month window with fallback for latest | MEDIUM |
+| 14 | Client-side contact filtering | Moved to SQL (overlaps, in, gte) | MEDIUM |
+| 15 | Multi-step mutations no error handling | Error tracking added to all loops | MEDIUM |
+| 16 | QueryClient no defaults | 5min staleTime, retry config | LOW |
+| 17 | Unused `analystChildren` variable | Removed | LOW |
+| 18 | `as any` type cast | Fixed `NavGroup` type definition | LOW |
+
+## Remaining Recommendations
+
+- **Rotate Supabase credentials** — The anon key was previously committed to git history. Rotate in Supabase dashboard.
+- **Content Security Policy** — Add CSP headers via hosting config to further mitigate XSS risk.
+- **Multi-step mutations** — Consider moving `markAsAgreed` (usePricingProposals) and `revertMasterUpdate` (useMasterWipUpdates) to Supabase Edge Functions with PostgreSQL transactions for true atomicity.
+- **Populate audit fields** — The `created_by`/`updated_by` columns exist but need to be populated in the mutation hooks.
+
+## Development Commands
+
+```bash
+npm run dev          # Start dev server
+npm run build        # Production build
+npm run lint         # ESLint
+npm run preview      # Preview production build
+```
+
+## Conventions
+
+- Components use PascalCase filenames
+- Hooks use camelCase with `use` prefix
+- All database access goes through hooks in `src/lib/hooks/`
+- UI primitives live in `src/components/ui/` (shadcn — do not edit manually)
+- Pages are in `src/pages/` and wrapped with `AppLayout` internally
+- Supabase types are auto-generated in `src/integrations/supabase/types.ts` — do not edit manually
+- Tailwind for styling, no CSS modules
+- Zod for form validation
+- Toast notifications via sonner (`toast()`) and shadcn toast (`useToast()`)
+- After each task step, commit progress to GitHub before moving to the next step
+
+## Important Notes
+
+- This app handles attorney-client privileged data. Security fixes take priority over features.
+- The Supabase types file (`types.ts`) is auto-generated by Lovable/Supabase. Schema changes should be done via migrations.
+- Admin-only routes use `AdminRoute` wrapper; regular auth uses `ProtectedRoute`.
+- The migration `20260319000001_add_missing_fk_constraints_and_audit_fields.sql` must be applied to the database before the audit fields and FK constraints take effect.

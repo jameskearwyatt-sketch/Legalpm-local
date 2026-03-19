@@ -52,6 +52,8 @@ export function ClientForm({ client, onSuccess }: ClientFormProps) {
           }
         });
         setErrors(fieldErrors);
+      } else {
+        setErrors({ name: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.' });
       }
     } finally {
       setIsSubmitting(false);

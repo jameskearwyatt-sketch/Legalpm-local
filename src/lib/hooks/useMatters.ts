@@ -197,12 +197,40 @@ export function useMatters() {
       
       if (matterIds.length === 0) return [];
 
-      // Get the latest snapshot for each matter
+      // Get snapshots limited to last 6 months for sparkline history performance
+      // This prevents loading unbounded snapshot history for long-running matters
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      const cutoffDate = sixMonthsAgo.toISOString().split('T')[0];
+
       const { data: snapshots } = await supabase
         .from('financial_snapshots')
         .select('*')
         .in('matter_id', matterIds)
+        .gte('as_of_date', cutoffDate)
         .order('as_of_date', { ascending: false });
+
+      // Also fetch the single latest snapshot per matter in case it's older than 6 months
+      // (matters that haven't been updated recently)
+      const coveredMatterIds = new Set(snapshots?.map(s => s.matter_id) || []);
+      const uncoveredMatterIds = matterIds.filter(id => !coveredMatterIds.has(id));
+      let latestOnlySnapshots: typeof snapshots = [];
+      if (uncoveredMatterIds.length > 0) {
+        const { data: oldSnapshots } = await supabase
+          .from('financial_snapshots')
+          .select('*')
+          .in('matter_id', uncoveredMatterIds)
+          .order('as_of_date', { ascending: false });
+        // Deduplicate to only the latest per matter
+        const seen = new Set<string>();
+        latestOnlySnapshots = (oldSnapshots || []).filter(s => {
+          if (seen.has(s.matter_id)) return false;
+          seen.add(s.matter_id);
+          return true;
+        });
+      }
+
+      const allSnapshots = [...(snapshots || []), ...latestOnlySnapshots];
       
       // Get all local counsel data for aggregation
       const { data: localCounsels } = await supabase
@@ -221,7 +249,7 @@ export function useMatters() {
       const snapshotMap = new Map<string, any>();
       // Also create a map of matter_id to ALL snapshots for sparkline history
       const snapshotHistoryMap = new Map<string, SnapshotHistoryPoint[]>();
-      snapshots?.forEach(snap => {
+      allSnapshots?.forEach(snap => {
         if (!snapshotMap.has(snap.matter_id)) {
           snapshotMap.set(snap.matter_id, snap);
         }

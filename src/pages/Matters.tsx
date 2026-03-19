@@ -105,7 +105,7 @@ function MmaBpTableRow({ matter, userProfile, updateMatter }: MmaBpTableRowProps
   const [isSaving, setIsSaving] = useState(false);
 
   // Update local state when matter changes
-  useMemo(() => {
+  useEffect(() => {
     setBpValue(matter.lead_partner || '');
     setMmaValue(matter.matter_managing_attorney || '');
     setIsBpMe(!!userProfile?.full_name && matter.lead_partner === userProfile.full_name);
@@ -408,7 +408,7 @@ function ClientRowWithDelete({ client, updateClient, showDelete, onDelete, isDel
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
 
-  useMemo(() => {
+  useEffect(() => {
     setNameValue(client.name);
     setDisplayNameValue(client.display_name || '');
     setHasChanges(false);

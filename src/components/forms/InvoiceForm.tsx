@@ -79,6 +79,8 @@ export function InvoiceForm({ matterId, invoice, onSuccess, currency = 'GBP' }: 
           }
         });
         setErrors(fieldErrors);
+      } else {
+        setErrors({ invoice_number: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.' });
       }
     } finally {
       setIsSubmitting(false);

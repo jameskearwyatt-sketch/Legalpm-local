@@ -48,18 +48,12 @@ interface AppLayoutProps {
 
 type NavItem = { name: string; href: string; icon: typeof LayoutDashboard };
 type NavSeparator = { type: 'separator' };
-type NavGroup = { type: 'group'; name: string; icon: typeof LayoutDashboard; children: NavItem[] };
+type NavSubGroup = { type: 'subgroup'; name: string; children: NavItem[] };
+type NavGroupChild = NavItem | NavSubGroup;
+type NavGroup = { type: 'group'; name: string; icon: typeof LayoutDashboard; children: NavGroupChild[] };
 type NavEntry = NavItem | NavSeparator | NavGroup;
 
 import { Leaf } from 'lucide-react';
-
-const analystChildren: NavItem[] = [
-  { name: 'PPA Analyst', href: '/ppa-analyst', icon: FileSearch },
-  { name: 'Tolling Analyst', href: '/tolling-analyst', icon: FlaskConical },
-];
-
-type NavSubGroup = { type: 'subgroup'; name: string; children: NavItem[] };
-type NavGroupChild = NavItem | NavSubGroup;
 
 const carbonRemovalsChildren: NavItem[] = [
   { name: 'Carbon Credit Offtake', href: '/carbon-credit-analyst', icon: Leaf },
@@ -70,7 +64,7 @@ const dataCenterSuiteChildren: NavItem[] = [
   { name: 'Cloud Compute Services', href: '/cloud-compute-analyst', icon: Cloud },
 ];
 
-const analystNavigation: (NavGroupChild)[] = [
+const analystNavigation: NavGroupChild[] = [
   { name: 'PPA Analyst', href: '/ppa-analyst', icon: FileSearch },
   { name: 'Tolling Analyst', href: '/tolling-analyst', icon: FlaskConical },
   { type: 'subgroup', name: 'Carbon Removals Suite', children: carbonRemovalsChildren },
@@ -78,7 +72,7 @@ const analystNavigation: (NavGroupChild)[] = [
 ];
 
 const navigation: NavEntry[] = [
-  { type: 'group', name: 'Analyst', icon: FileSearch, children: analystNavigation as any },
+  { type: 'group', name: 'Analyst', icon: FileSearch, children: analystNavigation },
   { type: 'separator' },
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Matters', href: '/matters', icon: Briefcase },

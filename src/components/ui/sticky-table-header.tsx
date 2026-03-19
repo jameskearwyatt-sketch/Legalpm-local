@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import DOMPurify from 'dompurify';
 import { cn } from '@/lib/utils';
 
 interface StickyTableHeaderProps {
@@ -177,7 +178,7 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
               <thead 
                 ref={clonedTheadRef}
                 className="bg-background [&_tr]:border-b border-b shadow-sm cursor-pointer"
-                dangerouslySetInnerHTML={{ __html: headerInfo.html }}
+                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(headerInfo.html) }}
                 onClick={handleClonedHeaderClick}
               />
             </table>

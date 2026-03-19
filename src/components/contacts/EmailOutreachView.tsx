@@ -1,4 +1,5 @@
 import { useState } from "react";
+import DOMPurify from "dompurify";
 import { format } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -202,7 +203,7 @@ export function EmailOutreachView() {
                             <p className="text-xs font-medium text-muted-foreground mb-1">Email Body</p>
                             <div 
                               className="text-sm bg-background p-3 rounded border max-h-[200px] overflow-y-auto whitespace-pre-wrap"
-                              dangerouslySetInnerHTML={{ __html: draft.body }}
+                              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(draft.body) }}
                             />
                           </div>
                           <div>

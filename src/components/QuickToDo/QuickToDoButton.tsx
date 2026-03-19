@@ -3180,6 +3180,7 @@ export function QuickToDoButton() {
       {isOpen && (
         <div
           ref={panelRef}
+          data-compact-panel
           className={cn(
             "z-50 rounded-xl border-0 shadow-2xl shadow-teal-500/20 overflow-hidden animate-scale-in bg-background transition-all duration-300 flex flex-col"
           )}

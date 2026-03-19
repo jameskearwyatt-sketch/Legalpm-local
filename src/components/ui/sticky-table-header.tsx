@@ -13,6 +13,7 @@ interface HeaderInfo {
   tableWidth: number;
   viewportLeft: number;
   viewportWidth: number;
+  topOffset: number;
   columnWidths: number[];
   scrollLeft: number;
 }
@@ -53,6 +54,36 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
     return table.parentElement instanceof HTMLElement ? table.parentElement : container;
   }, []);
 
+  const getTopOffset = useCallback((viewportLeft: number, viewportWidth: number) => {
+    const probeX = Math.min(
+      window.innerWidth - 1,
+      Math.max(1, Math.round(viewportLeft + Math.min(24, viewportWidth / 2))),
+    );
+
+    const pinnedTop = document
+      .elementsFromPoint(probeX, 1)
+      .reduce((maxBottom, element) => {
+        if (element.closest('[data-sticky-table-header-clone="true"]')) {
+          return maxBottom;
+        }
+
+        const style = window.getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        const isPinnedTop =
+          (style.position === 'fixed' || style.position === 'sticky') &&
+          rect.top <= 0 &&
+          rect.bottom > 0;
+
+        if (!isPinnedTop) {
+          return maxBottom;
+        }
+
+        return Math.max(maxBottom, rect.bottom);
+      }, 0);
+
+    return Math.max(0, Math.round(pinnedTop));
+  }, []);
+
   const updateHeader = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -71,9 +102,13 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
     const tableRect = table.getBoundingClientRect();
     const theadRect = thead.getBoundingClientRect();
     const viewportRect = scrollable.getBoundingClientRect();
+    const topOffset = getTopOffset(viewportRect.left, viewportRect.width);
 
-    // Stick only while table body still has vertical room below the viewport top.
-    const shouldStick = tableRect.top < 0 && tableRect.bottom > theadRect.height;
+    // Stick exactly once header crosses its natural top offset, and unstick at table bottom.
+    const shouldStick =
+      theadRect.top <= topOffset &&
+      tableRect.bottom > topOffset + theadRect.height;
+
     setIsSticky(shouldStick);
 
     if (!shouldStick) {
@@ -95,10 +130,11 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
       tableWidth,
       viewportLeft: viewportRect.left,
       viewportWidth: viewportRect.width,
+      topOffset,
       columnWidths,
       scrollLeft: scrollable.scrollLeft,
     });
-  }, [getScrollableElement]);
+  }, [getScrollableElement, getTopOffset]);
 
   useEffect(() => {
     updateHeader();
@@ -169,9 +205,10 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
 
       {isSticky && headerInfo && createPortal(
         <div
+          data-sticky-table-header-clone="true"
           style={{
             position: 'fixed',
-            top: 0,
+            top: headerInfo.topOffset,
             left: headerInfo.viewportLeft,
             width: headerInfo.viewportWidth,
             zIndex: 20, // Below sticky action bars/dialog triggers

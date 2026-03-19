@@ -133,7 +133,7 @@
 
   /* Touch-friendly interactive elements on touch devices */
   @media (pointer: coarse) {
-    button, [role="button"], a, select {
+    button:not([role="checkbox"]):not([role="radio"]):not([role="switch"]), [role="button"], a, select {
       min-height: 44px;
       min-width: 44px;
     }

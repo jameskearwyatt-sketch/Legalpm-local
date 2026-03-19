@@ -119,7 +119,7 @@ export function useDistributionContacts(filters?: ContactFilters) {
         .eq("user_id", user.id)
         .order("full_name", { ascending: true });
 
-      // Single-value country filter (legacy)
+      // Apply SQL-level filters where possible to reduce data transfer
       if (filters?.country) {
         query = query.eq("country", filters.country);
       }
@@ -129,7 +129,6 @@ export function useDistributionContacts(filters?: ContactFilters) {
       if (filters?.company) {
         query = query.ilike("company", `%${filters.company}%`);
       }
-      // Single-value relationship_owner filter (legacy)
       if (filters?.relationship_owner) {
         query = query.eq("relationship_owner", filters.relationship_owner);
       }
@@ -140,78 +139,59 @@ export function useDistributionContacts(filters?: ContactFilters) {
         query = query.or(`full_name.ilike.%${filters.search}%,email.ilike.%${filters.search}%,company.ilike.%${filters.search}%`);
       }
 
+      // Multi-select country filter — apply at SQL level
+      if (filters?.countries && filters.countries.length > 0) {
+        query = query.in("country", filters.countries);
+      }
+
+      // Multi-select relationship owner filter — apply at SQL level
+      if (filters?.relationship_owners && filters.relationship_owners.length > 0) {
+        query = query.in("relationship_owner", filters.relationship_owners);
+      }
+
+      // Date-based filters — apply at SQL level
+      if (filters?.updatedPeriod) {
+        const cutoff = getPeriodCutoff(filters.updatedPeriod);
+        if (cutoff) {
+          query = query.gte("updated_at", cutoff.toISOString());
+        }
+      }
+      if (filters?.enrichedPeriod) {
+        const cutoff = getPeriodCutoff(filters.enrichedPeriod);
+        if (cutoff) {
+          query = query.not("last_enriched_at", "is", null);
+          query = query.gte("last_enriched_at", cutoff.toISOString());
+        }
+      }
+
+      // Array overlap filters — apply at SQL level using Supabase overlaps
+      if (filters?.sectors && filters.sectors.length > 0) {
+        query = query.overlaps("sectors", filters.sectors);
+      }
+      if (filters?.emiFocusAreas && filters.emiFocusAreas.length > 0) {
+        query = query.overlaps("emi_focus_areas", filters.emiFocusAreas);
+      } else if (filters?.emiFocusArea) {
+        query = query.contains("emi_focus_areas", [filters.emiFocusArea]);
+      }
+
       const { data, error } = await query;
 
       if (error) throw error;
 
-      // Filter by sectors in JS (array overlap)
+      // Filters that require JS-side processing (computed values not in DB)
       let contacts = (data || []) as DistributionContact[];
-      if (filters?.sectors && filters.sectors.length > 0) {
-        contacts = contacts.filter(c => 
-          c.sectors.some(s => filters.sectors!.includes(s))
-        );
-      }
-      
-      // Filter by updated period in JS
-      if (filters?.updatedPeriod) {
-        const cutoff = getPeriodCutoff(filters.updatedPeriod);
-        if (cutoff) {
-          const cutoffStr = cutoff.toISOString();
-          contacts = contacts.filter(c => c.updated_at >= cutoffStr);
-        }
-      }
-      
-      // Filter by enriched period in JS
-      if (filters?.enrichedPeriod) {
-        const cutoff = getPeriodCutoff(filters.enrichedPeriod);
-        if (cutoff) {
-          const cutoffStr = cutoff.toISOString();
-          contacts = contacts.filter(c => 
-            c.last_enriched_at && c.last_enriched_at >= cutoffStr
-          );
-        }
-      }
-      
-      // Multi-select: Filter by NAICS-derived sectors (OR within, AND with other filters)
+
+      // NAICS-derived sectors require JS computation (derived from naics_codes array)
       if (filters?.naicsSectors && filters.naicsSectors.length > 0) {
         contacts = contacts.filter(c => {
           const sector = getPrimaryNaicsSector(c.naics_codes);
           return sector && filters.naicsSectors!.includes(sector);
         });
-      }
-      // Legacy single-value NAICS sector filter
-      else if (filters?.naicsSector) {
+      } else if (filters?.naicsSector) {
         contacts = contacts.filter(c => {
           const sector = getPrimaryNaicsSector(c.naics_codes);
           return sector === filters.naicsSector;
         });
-      }
-      
-      // Multi-select: Filter by countries (OR within, AND with other filters)
-      if (filters?.countries && filters.countries.length > 0) {
-        contacts = contacts.filter(c => 
-          c.country && filters.countries!.includes(c.country)
-        );
-      }
-      
-      // Multi-select: Filter by relationship owners (OR within, AND with other filters)
-      if (filters?.relationship_owners && filters.relationship_owners.length > 0) {
-        contacts = contacts.filter(c => 
-          c.relationship_owner && filters.relationship_owners!.includes(c.relationship_owner)
-        );
-      }
-      
-      // Multi-select: Filter by EMI Focus Areas (OR within, AND with other filters)
-      if (filters?.emiFocusAreas && filters.emiFocusAreas.length > 0) {
-        contacts = contacts.filter(c => 
-          c.emi_focus_areas?.some(area => filters.emiFocusAreas!.includes(area))
-        );
-      }
-      // Legacy single-value EMI Focus Area filter
-      else if (filters?.emiFocusArea) {
-        contacts = contacts.filter(c => 
-          c.emi_focus_areas?.includes(filters.emiFocusArea!)
-        );
       }
 
       // Note: excludeLawFirms and excludeConsultants are applied at the UI level

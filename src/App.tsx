@@ -31,6 +31,7 @@ import CloudComputeAnalyst from "./pages/CloudComputeAnalyst";
 import AdaptPricingWizard from "./pages/AdaptPricingWizard";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
+import { useUserRole } from "@/lib/hooks/useUserRole";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,29 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading } = useAuth();
+  const { isAdmin, isLoading: roleLoading } = useUserRole();
+
+  if (loading || roleLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -74,7 +98,7 @@ function AppRoutes() {
       <Route path="/cloud-compute-analyst" element={<ProtectedRoute><CloudComputeAnalyst /></ProtectedRoute>} />
       <Route path="/growth" element={<ProtectedRoute><Growth /></ProtectedRoute>} />
       <Route path="/growth/:projectId" element={<ProtectedRoute><GrowthProjectDetail /></ProtectedRoute>} />
-      <Route path="/flags" element={<ProtectedRoute><Flags /></ProtectedRoute>} />
+      <Route path="/flags" element={<AdminRoute><Flags /></AdminRoute>} />
       <Route path="/red-flags" element={<ProtectedRoute><RedFlags /></ProtectedRoute>} />
       <Route path="/pipeline-flags" element={<ProtectedRoute><PipelineFlags /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

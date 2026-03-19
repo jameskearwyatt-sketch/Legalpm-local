@@ -133,7 +133,7 @@
 
   /* Touch-friendly interactive elements on touch devices — exclude small UI controls */
   @media (pointer: coarse) {
-    :is(button, [role="button"], a, select):not([role="checkbox"]):not([role="radio"]):not([role="switch"]) {
+    :is(button, [role="button"], a, select):not([role="checkbox"]):not([role="radio"]):not([role="switch"]):not(.compact-touch) {
       min-height: 44px;
       min-width: 44px;
     }
@@ -141,6 +141,12 @@
     /* Override: keep table header buttons compact */
     th :is(button, [role="button"], a, select),
     thead :is(button, [role="button"], a, select) {
+      min-height: unset;
+      min-width: unset;
+    }
+
+    /* Override: keep floating panel (todo/slate) buttons compact */
+    [data-compact-panel] :is(button, [role="button"], a, select) {
       min-height: unset;
       min-width: unset;
     }

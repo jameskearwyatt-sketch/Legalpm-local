@@ -8,10 +8,19 @@ interface StickyTableHeaderProps {
   className?: string;
 }
 
+interface HeaderInfo {
+  html: string;
+  tableWidth: number;
+  viewportLeft: number;
+  viewportWidth: number;
+  columnWidths: number[];
+  scrollLeft: number;
+}
+
 /**
  * Provides sticky header behavior for tables that also need horizontal scrolling.
  * Uses JavaScript to clone and fix the header when it scrolls out of view.
- * 
+ *
  * IMPORTANT: This component clones the thead element for sticky display.
  * Event handlers on the original thead buttons continue to work because
  * we forward click events from the cloned header to the original.
@@ -19,78 +28,108 @@ interface StickyTableHeaderProps {
 export function StickyTableHeader({ children, className }: StickyTableHeaderProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const clonedTheadRef = useRef<HTMLTableSectionElement>(null);
+  const scrollableRef = useRef<HTMLElement | null>(null);
   const [isSticky, setIsSticky] = useState(false);
-  const [headerInfo, setHeaderInfo] = useState<{
-    html: string;
-    width: number;
-    left: number;
-    columnWidths: number[];
-    scrollLeft: number;
-  } | null>(null);
+  const [headerInfo, setHeaderInfo] = useState<HeaderInfo | null>(null);
+
+  const getScrollableElement = useCallback((container: HTMLElement, table: HTMLTableElement) => {
+    let node: HTMLElement | null = table.parentElement;
+
+    while (node && node !== container) {
+      const style = window.getComputedStyle(node);
+      const canScrollX =
+        style.overflowX === 'auto' ||
+        style.overflowX === 'scroll' ||
+        style.overflow === 'auto' ||
+        style.overflow === 'scroll';
+
+      if (canScrollX) {
+        return node;
+      }
+
+      node = node.parentElement;
+    }
+
+    return table.parentElement instanceof HTMLElement ? table.parentElement : container;
+  }, []);
 
   const updateHeader = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const thead = container.querySelector('thead');
     const table = container.querySelector('table');
-    const scrollableDiv = container.querySelector('div[style*="overflow"]') || 
-                          container.querySelector('.overflow-x-auto') ||
-                          container.querySelector('div');
-    
-    if (!thead || !table) return;
+    const thead = container.querySelector('thead');
+    if (!(table instanceof HTMLTableElement) || !(thead instanceof HTMLTableSectionElement)) {
+      setIsSticky(false);
+      setHeaderInfo(null);
+      return;
+    }
 
+    const scrollable = getScrollableElement(container, table);
+    scrollableRef.current = scrollable;
+
+    const tableRect = table.getBoundingClientRect();
     const theadRect = thead.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-    
-    // Check if thead is above viewport (scrolled past)
-    const shouldStick = theadRect.top < 0 && containerRect.bottom > thead.offsetHeight;
-    
+    const viewportRect = scrollable.getBoundingClientRect();
+
+    // Stick only while table body still has vertical room below the viewport top.
+    const shouldStick = tableRect.top < 0 && tableRect.bottom > theadRect.height;
     setIsSticky(shouldStick);
 
-    if (shouldStick) {
-      // Get column widths from th elements
-      const ths = thead.querySelectorAll('th');
-      const columnWidths: number[] = [];
-      ths.forEach(th => {
-        columnWidths.push(th.getBoundingClientRect().width);
-      });
-
-      // Get scroll position of the scrollable container
-      const scrollLeft = scrollableDiv instanceof HTMLElement ? scrollableDiv.scrollLeft : 0;
-
-      setHeaderInfo({
-        html: thead.innerHTML,
-        width: table.offsetWidth,
-        left: containerRect.left,
-        columnWidths,
-        scrollLeft,
-      });
+    if (!shouldStick) {
+      setHeaderInfo(null);
+      return;
     }
-  }, []);
+
+    const ths = Array.from(thead.querySelectorAll('th'));
+    const columnWidths = ths.map((th) => th.getBoundingClientRect().width);
+
+    const tableWidth = table.getBoundingClientRect().width;
+    if (tableWidth <= 0 || columnWidths.length === 0) {
+      setHeaderInfo(null);
+      return;
+    }
+
+    setHeaderInfo({
+      html: thead.innerHTML,
+      tableWidth,
+      viewportLeft: viewportRect.left,
+      viewportWidth: viewportRect.width,
+      columnWidths,
+      scrollLeft: scrollable.scrollLeft,
+    });
+  }, [getScrollableElement]);
 
   useEffect(() => {
     updateHeader();
-    
+
     window.addEventListener('scroll', updateHeader, true);
     window.addEventListener('resize', updateHeader);
-    
-    // Also listen for horizontal scroll on scrollable containers
+
     const container = containerRef.current;
-    if (container) {
-      const scrollable = container.querySelector('div[style*="overflow"]') || 
-                        container.querySelector('.overflow-x-auto') ||
-                        container.querySelector('div');
-      if (scrollable) {
-        scrollable.addEventListener('scroll', updateHeader);
-      }
+    const table = container?.querySelector('table');
+    const scrollable = container && table instanceof HTMLTableElement
+      ? getScrollableElement(container, table)
+      : null;
+
+    if (scrollable) {
+      scrollableRef.current = scrollable;
+      scrollable.addEventListener('scroll', updateHeader);
     }
+
+    const resizeObserver = new ResizeObserver(updateHeader);
+    if (table instanceof HTMLTableElement) resizeObserver.observe(table);
+    if (scrollable) resizeObserver.observe(scrollable);
 
     return () => {
       window.removeEventListener('scroll', updateHeader, true);
       window.removeEventListener('resize', updateHeader);
+      if (scrollableRef.current) {
+        scrollableRef.current.removeEventListener('scroll', updateHeader);
+      }
+      resizeObserver.disconnect();
     };
-  }, [updateHeader]);
+  }, [getScrollableElement, updateHeader]);
 
   // Handle clicks on the cloned header - forward them to the original header buttons
   const handleClonedHeaderClick = useCallback((e: React.MouseEvent<HTMLTableSectionElement>) => {
@@ -98,11 +137,9 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
     const container = containerRef.current;
     if (!container) return;
 
-    // Find the clicked button or its parent button
     const clickedButton = target.closest('button');
     if (!clickedButton) return;
 
-    // Get the index of the th containing this button
     const clickedTh = clickedButton.closest('th');
     if (!clickedTh) return;
 
@@ -111,10 +148,8 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
 
     const allClonedThs = Array.from(clonedThead.querySelectorAll('th'));
     const thIndex = allClonedThs.indexOf(clickedTh);
-    
     if (thIndex === -1) return;
 
-    // Find the corresponding th in the original thead
     const originalThead = container.querySelector('thead');
     if (!originalThead) return;
 
@@ -122,52 +157,39 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
     const originalTh = originalThs[thIndex];
     if (!originalTh) return;
 
-    // Find and click the button in the original th
     const originalButton = originalTh.querySelector('button');
     if (originalButton) {
       originalButton.click();
     }
   }, []);
 
-  // Sync scroll position when clicking on fixed header
-  const handleFixedHeaderScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const container = containerRef.current;
-    if (!container) return;
-    
-    const scrollable = container.querySelector('div[style*="overflow"]') || 
-                      container.querySelector('.overflow-x-auto') ||
-                      container.querySelector('div');
-    if (scrollable instanceof HTMLElement) {
-      scrollable.scrollLeft = e.currentTarget.scrollLeft;
-    }
-  };
-
   return (
-    <div ref={containerRef} className={cn("relative", className)}>
+    <div ref={containerRef} className={cn('relative', className)}>
       {children}
-      
+
       {isSticky && headerInfo && createPortal(
         <div
           style={{
             position: 'fixed',
             top: 0,
-            left: headerInfo.left,
-            width: `calc(100vw - ${headerInfo.left}px - 16px)`,
-            zIndex: 20, // Below the sticky action bar (z-30)
+            left: headerInfo.viewportLeft,
+            width: headerInfo.viewportWidth,
+            zIndex: 20, // Below sticky action bars/dialog triggers
             overflow: 'hidden',
           }}
         >
           <div
             style={{
-              width: headerInfo.width,
+              width: headerInfo.tableWidth,
               transform: `translateX(-${headerInfo.scrollLeft}px)`,
             }}
           >
-            <table 
+            <table
               className="w-full caption-bottom text-sm"
-              style={{ 
+              style={{
                 tableLayout: 'fixed',
-                width: headerInfo.width,
+                width: headerInfo.tableWidth,
+                minWidth: headerInfo.tableWidth,
               }}
             >
               <colgroup>
@@ -175,7 +197,7 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
                   <col key={i} style={{ width }} />
                 ))}
               </colgroup>
-              <thead 
+              <thead
                 ref={clonedTheadRef}
                 className="bg-background [&_tr]:border-b border-b shadow-sm cursor-pointer"
                 dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(headerInfo.html) }}
@@ -184,7 +206,7 @@ export function StickyTableHeader({ children, className }: StickyTableHeaderProp
             </table>
           </div>
         </div>,
-        document.body
+        document.body,
       )}
     </div>
   );

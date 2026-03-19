@@ -33,7 +33,17 @@ import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 import { useUserRole } from "@/lib/hooks/useUserRole";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      retry: 1,
+    },
+    mutations: {
+      retry: 0,
+    },
+  },
+});
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();

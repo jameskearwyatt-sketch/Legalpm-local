@@ -710,10 +710,12 @@ export function usePricingProposal(proposalId?: string) {
       }
 
       // Update proposal current_version
-      await supabase
+      const { error: versionUpdateError } = await supabase
         .from('pricing_proposals')
         .update({ current_version: nextVersionNumber })
         .eq('id', proposalId!);
+
+      if (versionUpdateError) throw versionUpdateError;
 
       return version;
     },

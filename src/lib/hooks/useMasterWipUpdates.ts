@@ -230,17 +230,17 @@ export function useMasterWipUpdates() {
         // Continue anyway - we'll still revert the snapshot changes
       }
 
-      // Process each snapshot change
+      // Process each snapshot change with error tracking
+      const revertErrors: string[] = [];
       for (const change of changes) {
         if (change.was_new_snapshot && change.snapshot_id) {
-          // This was a new snapshot - delete it entirely
-          await supabase
+          const { error: delErr } = await supabase
             .from('financial_snapshots')
             .delete()
             .eq('id', change.snapshot_id);
+          if (delErr) revertErrors.push(`Delete snapshot ${change.snapshot_id}: ${delErr.message}`);
         } else if (change.snapshot_id) {
-          // This was an update to existing snapshot - restore previous values
-          await supabase
+          const { error: updErr } = await supabase
             .from('financial_snapshots')
             .update({
               wip_amount: change.before_wip_amount,
@@ -250,7 +250,12 @@ export function useMasterWipUpdates() {
               wip_write_off_amount: change.before_wip_write_off_amount,
             })
             .eq('id', change.snapshot_id);
+          if (updErr) revertErrors.push(`Revert snapshot ${change.snapshot_id}: ${updErr.message}`);
         }
+      }
+      if (revertErrors.length > 0) {
+        console.error('Partial revert failures:', revertErrors);
+        throw new Error(`Revert partially failed: ${revertErrors.join('; ')}`);
       }
 
       // Revert local counsel changes

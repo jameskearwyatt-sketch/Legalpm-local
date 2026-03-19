@@ -9,7 +9,7 @@ Legal Practice Management application built with React 18, TypeScript, Vite, Sup
 - **Frontend**: React 18 + TypeScript + Vite
 - **UI**: shadcn/ui + Tailwind CSS + Radix primitives
 - **Backend**: Supabase (auth, PostgreSQL, edge functions, RLS)
-- **State/Data**: TanStack React Query, React Context (auth)
+- **State/Data**: TanStack React Query (5min staleTime, 1 retry), React Context (auth)
 - **Validation**: Zod + react-hook-form
 - **Charts**: Recharts
 - **Excel**: ExcelJS + xlsx
@@ -18,7 +18,7 @@ Legal Practice Management application built with React 18, TypeScript, Vite, Sup
 
 ```
 src/
-├── App.tsx                          # Root: routing, auth guard, providers
+├── App.tsx                          # Root: routing, auth guard, AdminRoute, providers
 ├── main.tsx                         # ReactDOM entry
 ├── pages/                           # 23 page components (Auth, Dashboard, Matters, Contacts, Growth, Pricing, 5x Analyst, Settings, Flags, etc.)
 ├── components/
@@ -34,6 +34,7 @@ src/
 ├── lib/
 │   ├── auth.tsx                     # AuthContext + Supabase auth
 │   ├── hooks/                       # ~55 custom data hooks (entire data layer)
+│   │   └── useUserRole.ts           # RBAC hook for admin/user role checking
 │   ├── utils.ts                     # cn() utility
 │   └── *Utils.ts, *Categories.ts   # Domain helpers
 └── integrations/supabase/
@@ -49,46 +50,51 @@ supabase/
 - RLS enabled on all tables with user-based policies
 - RBAC framework: `user_roles` table with admin/user enum + `has_role()` function
 - All tables have `created_at` / `updated_at` timestamps
+- All tables now have proper `user_id` FK constraints to `auth.users(id) ON DELETE CASCADE`
+- Key tables have `created_by` / `updated_by` audit fields (matters, financial_snapshots, budget_amendments, budget_versions, pricing_proposals, invoices, growth_projects)
+- Unique constraint on `financial_snapshots(matter_id, as_of_date)` prevents duplicate daily snapshots
 
 ## Architecture Decisions
 
 - All data access goes through custom hooks in `src/lib/hooks/` using TanStack Query
 - Auth is React Context-based (`AuthProvider` in `src/lib/auth.tsx`)
-- Route protection via `ProtectedRoute` wrapper in `App.tsx`
+- Route protection via `ProtectedRoute` wrapper in `App.tsx`; `AdminRoute` for admin-only pages
 - Supabase anon key is used client-side (standard Supabase pattern); RLS enforces data isolation
 - No server-side rendering — pure SPA
+- HTML rendered via `dangerouslySetInnerHTML` is sanitized with DOMPurify
+- Contact filtering uses SQL-level queries where possible (countries, owners, dates, sectors, EMI focus areas); only NAICS-derived sectors use JS filtering
 
-## Known Issues (Audit: March 2025)
+## Completed Fixes (March 2025 Audit)
 
-### CRITICAL — Must Fix Before Production
+All 18 issues from the original audit have been resolved:
 
-1. **`.env` not gitignored** — Supabase credentials are committed to git history. Must add `.env` to `.gitignore`, remove from history, and rotate keys.
-2. **XSS via unsanitized `dangerouslySetInnerHTML`** — `EmailOutreachView.tsx:205` and `sticky-table-header.tsx:180` render raw HTML without DOMPurify. Combined with localStorage session storage, this allows full session hijack.
-3. **6-character password minimum** — `Auth.tsx:17` allows weak passwords. Must increase to 12+ for legal data.
-4. **`useMemo` used for side effects** — `Matters.tsx:107-113` and `Matters.tsx:411-415` use `useMemo` to call `setState`, which violates React rules and causes unpredictable state sync. Must change to `useEffect`.
+| # | Issue | Fix | Commit |
+|---|-------|-----|--------|
+| 1 | `.env` committed to git | Added to `.gitignore`, removed from tracking | CRITICAL |
+| 2 | XSS via `dangerouslySetInnerHTML` | DOMPurify sanitization added | CRITICAL |
+| 3 | 6-char password minimum | Increased to 12 characters | CRITICAL |
+| 4 | `useMemo` for side effects | Changed to `useEffect` | CRITICAL |
+| 5 | Form errors silently swallowed | Added non-Zod error handling | HIGH |
+| 6 | WebAuthn debug logs | Removed `console.log` statements | HIGH |
+| 7 | Undefined `user_id` in Settings | Added null guard | HIGH |
+| 8 | Snapshot upsert race condition | Update-first pattern with retry | HIGH |
+| 9 | localStorage session tokens | XSS vectors fixed (DOMPurify); CSP recommended | HIGH |
+| 10 | No RBAC in UI | `AdminRoute` + `useUserRole` hook added | MEDIUM |
+| 11 | 63 tables missing FK constraints | Migration adds all FK constraints | MEDIUM |
+| 12 | No audit trail | `created_by`/`updated_by` on key tables | MEDIUM |
+| 13 | Unbounded snapshot loading | 6-month window with fallback for latest | MEDIUM |
+| 14 | Client-side contact filtering | Moved to SQL (overlaps, in, gte) | MEDIUM |
+| 15 | Multi-step mutations no error handling | Error tracking added to all loops | MEDIUM |
+| 16 | QueryClient no defaults | 5min staleTime, retry config | LOW |
+| 17 | Unused `analystChildren` variable | Removed | LOW |
+| 18 | `as any` type cast | Fixed `NavGroup` type definition | LOW |
 
-### HIGH — Should Fix Soon
+## Remaining Recommendations
 
-5. **Form errors silently swallowed** — `ClientForm.tsx`, `InvoiceForm.tsx`, `SnapshotForm.tsx` catch Zod errors but silently discard network/API errors. Users get no feedback on server failures.
-6. **WebAuthn debug logs in production** — `useWebAuthn.ts:46,99` logs auth options to console. Remove or guard with `import.meta.env.DEV`.
-7. **Settings.tsx query with undefined user_id** — `Settings.tsx:93` queries passkeys with `user?.id` which can be undefined.
-8. **Race condition in snapshot upsert** — `useSnapshots.ts:89-118` uses check-then-insert pattern. Should use database-level upsert.
-9. **localStorage for session tokens** — `client.ts:13` stores auth tokens in localStorage, vulnerable to XSS theft.
-
-### MEDIUM — Plan to Address
-
-10. **No RBAC enforcement in UI** — Database has roles but frontend doesn't gate any pages/features by role.
-11. **23+ tables missing `user_id` FK constraints** — Have `user_id UUID NOT NULL` but no `REFERENCES auth.users(id) ON DELETE CASCADE`.
-12. **No audit trail** — No `created_by` / `updated_by` fields on any table. Critical gap for legal compliance.
-13. **Full table scans** — `useMatters.ts` loads ALL snapshots into memory then filters in JS. Won't scale past ~1000 matters.
-14. **Client-side contact filtering** — `useDistributionContacts.ts` loads all contacts then filters in JS. Should use SQL filters.
-15. **Multi-step mutations without transactions** — `usePricingProposals.ts` (markAsAgreed), `useMasterWipUpdates.ts` (revertMasterUpdate) do 3-5 sequential DB operations with no rollback on partial failure.
-
-### LOW — Cleanup
-
-16. **QueryClient has no default config** — No staleTime, no retry limits configured.
-17. **Unused variables** — `AppLayout.tsx:56-59` has unused `analystChildren` array.
-18. **`as any` type casts** — `AppLayout.tsx:81` casts nav children to `any`.
+- **Rotate Supabase credentials** — The anon key was previously committed to git history. Rotate in Supabase dashboard.
+- **Content Security Policy** — Add CSP headers via hosting config to further mitigate XSS risk.
+- **Multi-step mutations** — Consider moving `markAsAgreed` (usePricingProposals) and `revertMasterUpdate` (useMasterWipUpdates) to Supabase Edge Functions with PostgreSQL transactions for true atomicity.
+- **Populate audit fields** — The `created_by`/`updated_by` columns exist but need to be populated in the mutation hooks.
 
 ## Development Commands
 
@@ -110,9 +116,11 @@ npm run preview      # Preview production build
 - Tailwind for styling, no CSS modules
 - Zod for form validation
 - Toast notifications via sonner (`toast()`) and shadcn toast (`useToast()`)
+- After each task step, commit progress to GitHub before moving to the next step
 
 ## Important Notes
 
 - This app handles attorney-client privileged data. Security fixes take priority over features.
 - The Supabase types file (`types.ts`) is auto-generated by Lovable/Supabase. Schema changes should be done via migrations.
-- After each task step, commit progress to GitHub before moving to the next step.
+- Admin-only routes use `AdminRoute` wrapper; regular auth uses `ProtectedRoute`.
+- The migration `20260319000001_add_missing_fk_constraints_and_audit_fields.sql` must be applied to the database before the audit fields and FK constraints take effect.

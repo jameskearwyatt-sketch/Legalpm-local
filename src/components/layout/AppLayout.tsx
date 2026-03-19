@@ -131,7 +131,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
               }
               if ('type' in entry && entry.type === 'group') {
                 const group = entry as NavGroup;
-                const groupActive = group.children.some(c => location.pathname.startsWith(c.href));
+                const groupActive = group.children.some((c) =>
+                  'type' in c && c.type === 'subgroup'
+                    ? c.children.some((sc) => location.pathname.startsWith(sc.href))
+                    : location.pathname.startsWith(c.href)
+                );
                 return (
                   <Collapsible key={group.name} open={analystOpen} onOpenChange={setAnalystOpen}>
                     <CollapsibleTrigger className={cn(

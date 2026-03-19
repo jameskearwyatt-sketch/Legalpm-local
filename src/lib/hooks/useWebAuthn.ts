@@ -43,8 +43,6 @@ export function useWebAuthn() {
 
       const { options, challenge } = optionsData;
       
-      console.log('WebAuthn registration options:', JSON.stringify(options, null, 2));
-
       // Start the WebAuthn registration ceremony (triggers Face ID/Touch ID)
       const credential = await startRegistration({ optionsJSON: options });
 
@@ -95,8 +93,6 @@ export function useWebAuthn() {
       }
 
       const { options, challenge, userId } = optionsData;
-
-      console.log('WebAuthn authentication options:', JSON.stringify(options, null, 2));
 
       // Start the WebAuthn authentication ceremony (triggers Face ID/Touch ID)
       const credential = await startAuthentication({ optionsJSON: options });

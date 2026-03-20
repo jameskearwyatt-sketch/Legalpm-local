@@ -340,7 +340,20 @@
   }
 
   /* Slate panel: full-screen on mobile, overriding inline styles */
-  @media (max-width: 639px) {
+  @media (max-width: 768px) {
+    [data-slate-panel] {
+      top: 8px !important;
+      left: 8px !important;
+      right: 8px !important;
+      bottom: 8px !important;
+      width: auto !important;
+      height: auto !important;
+      transform: none !important;
+    }
+  }
+
+  /* Also catch touch-primary devices regardless of viewport width */
+  @media (pointer: coarse) and (hover: none) {
     [data-slate-panel] {
       top: 8px !important;
       left: 8px !important;

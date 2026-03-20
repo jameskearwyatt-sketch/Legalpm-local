@@ -2730,15 +2730,26 @@ export function QuickToDoButton() {
             (isDraggingSlate || isResizingSlate) && "select-none"
           )}
           style={{
-            width: slateSize.width,
-            height: slateSize.height,
-            ...(slatePosition ? {
-              left: slatePosition.x,
-              top: slatePosition.y,
+            ...(window.innerWidth < 768 ? {
+              // Mobile: full screen with small margins — same as QuickToDo panel
+              left: 8,
+              right: 8,
+              top: 8,
+              bottom: 8,
+              width: 'auto',
+              height: 'auto',
             } : {
-              left: '17rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
+              // Desktop: custom size and position
+              width: slateSize.width,
+              height: slateSize.height,
+              ...(slatePosition ? {
+                left: slatePosition.x,
+                top: slatePosition.y,
+              } : {
+                left: '17rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+              }),
             }),
             boxShadow: '0 0 20px rgba(59, 130, 246, 0.3), 0 0 40px rgba(99, 102, 241, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           }}

@@ -2726,25 +2726,34 @@ export function QuickToDoButton() {
           data-compact-panel
           className={cn(
             "fixed z-50 rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
+            // Mobile: full-screen with small inset, centered
+            "inset-2 sm:inset-auto",
             (isDraggingSlate || isResizingSlate) && "select-none"
           )}
           style={{
-            width: slateSize.width,
-            height: slateSize.height,
-            ...(slatePosition ? {
-              left: slatePosition.x,
-              top: slatePosition.y,
+            // Only apply custom size/position on non-mobile
+            ...(window.innerWidth >= 640 ? {
+              width: slateSize.width,
+              height: slateSize.height,
+              ...(slatePosition ? {
+                left: slatePosition.x,
+                top: slatePosition.y,
+              } : {
+                left: '17rem',
+                top: '50%',
+                transform: 'translateY(-50%)',
+              }),
             } : {
-              left: '17rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
+              // Mobile: override inset-2 positioning, no explicit width/height needed
+              width: 'auto',
+              height: 'auto',
             }),
             boxShadow: '0 0 20px rgba(59, 130, 246, 0.3), 0 0 40px rgba(99, 102, 241, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           }}
         >
-          {/* Resize Handle - Top Right Corner */}
+          {/* Resize Handle - Top Right Corner (hidden on mobile) */}
           <div
-            className="absolute top-0 right-0 w-6 h-6 z-10 cursor-ne-resize"
+            className="absolute top-0 right-0 w-6 h-6 z-10 cursor-ne-resize hidden sm:block"
             onMouseDown={handleSlateResizeMouseDown}
           />
           {/* Slate Header - Draggable */}

@@ -338,5 +338,18 @@
       @apply py-4;
     }
   }
+
+  /* Slate panel: full-screen on mobile, overriding inline styles */
+  @media (max-width: 639px) {
+    [data-slate-panel] {
+      top: 8px !important;
+      left: 8px !important;
+      right: 8px !important;
+      bottom: 8px !important;
+      width: auto !important;
+      height: auto !important;
+      transform: none !important;
+    }
+  }
 }
 

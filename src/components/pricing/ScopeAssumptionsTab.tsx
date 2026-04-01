@@ -1528,7 +1528,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                                   ? { ...a, enabled: false, narrative: '', inputValue: undefined }
                                   : a
                               );
-                              setState(prev => ({ ...prev, simpleAssumptions: updated, processNarrativeOverride: undefined }));
+                              updateState({ ...state, simpleAssumptions: updated, processNarrativeOverride: undefined });
                             }}
                             title="Remove process assumptions"
                           >

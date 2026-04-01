@@ -3304,10 +3304,13 @@ export default function PricingProposalDetail() {
               onChange={async (newState) => {
                 setScopeAssumptions(newState);
                 // Auto-save scope assumptions
-                await supabase
+                const { error } = await supabase
                   .from('pricing_proposals')
                   .update({ scope_assumptions: newState as any })
                   .eq('id', proposalId);
+                if (error) {
+                  console.error('Failed to save scope assumptions:', error);
+                }
               }}
               currency={proposal?.currency || 'GBP'}
               workItems={draftItems}

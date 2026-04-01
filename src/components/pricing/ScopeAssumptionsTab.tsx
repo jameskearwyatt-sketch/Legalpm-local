@@ -1429,7 +1429,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                                     ? { ...a, enabled: false, narrative: '', inputValue: undefined }
                                     : a
                                 );
-                                setState(prev => ({ ...prev, simpleAssumptions: updated }));
+                                updateState({ ...state, simpleAssumptions: updated });
                               }}
                               title="Remove assumption"
                             >

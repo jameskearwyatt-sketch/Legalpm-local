@@ -1429,7 +1429,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                                     ? { ...a, enabled: false, narrative: '', inputValue: undefined }
                                     : a
                                 );
-                                setState(prev => ({ ...prev, simpleAssumptions: updated }));
+                                updateState({ ...state, simpleAssumptions: updated });
                               }}
                               title="Remove assumption"
                             >
@@ -1528,7 +1528,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                                   ? { ...a, enabled: false, narrative: '', inputValue: undefined }
                                   : a
                               );
-                              setState(prev => ({ ...prev, simpleAssumptions: updated, processNarrativeOverride: undefined }));
+                              updateState({ ...state, simpleAssumptions: updated, processNarrativeOverride: undefined });
                             }}
                             title="Remove process assumptions"
                           >
@@ -1606,7 +1606,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                               onClick={() => {
                                 const updated = [...(state.documentNarratives || [])];
                                 updated.splice(index, 1);
-                                setState(prev => ({ ...prev, documentNarratives: updated }));
+                                updateState({ ...state, documentNarratives: updated });
                               }}
                               title="Remove assumption"
                             >

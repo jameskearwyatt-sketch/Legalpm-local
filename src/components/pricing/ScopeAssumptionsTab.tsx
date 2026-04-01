@@ -523,7 +523,30 @@ function generateProcessNarrative(enabledProcessAssumptions: SimpleAssumptionVal
 }
 
 export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] }: ScopeAssumptionsTabProps) {
-  const [state, setState] = useState<ScopeAssumptionsState>(value || createDefaultState());
+  // Initialize state once from value prop; subsequent changes managed locally
+  const [initializedFromProp, setInitializedFromProp] = useState(false);
+  const [state, setState] = useState<ScopeAssumptionsState>(() => {
+    if (value) {
+      const mergedSimple = SIMPLE_ASSUMPTIONS.map(def => {
+        const existing = value.simpleAssumptions?.find(a => a.assumptionId === def.id);
+        return existing || {
+          assumptionId: def.id,
+          enabled: false,
+          inputValue: undefined,
+          narrative: '',
+        };
+      });
+      return {
+        noAssumptionsApply: value.noAssumptionsApply,
+        simpleAssumptions: mergedSimple,
+        documentAssumptions: value.documentAssumptions || DEFAULT_DOCUMENT_STATE,
+        documentNarratives: value.documentNarratives || [],
+        customAssumptions: value.customAssumptions || [],
+        processNarrativeOverride: value.processNarrativeOverride,
+      };
+    }
+    return createDefaultState();
+  });
   const [editingNarrative, setEditingNarrative] = useState<string | null>(null);
   const [editedText, setEditedText] = useState('');
   const [docSectionOpen, setDocSectionOpen] = useState(false);
@@ -540,10 +563,9 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
     );
   }, [workItems]);
 
-  // Sync with prop changes (but preserve selections)
+  // Sync with prop ONLY on first non-null value (handles async load)
   useEffect(() => {
-    if (value) {
-      // Merge incoming value with defaults to handle new assumptions
+    if (value && !initializedFromProp) {
       const mergedSimple = SIMPLE_ASSUMPTIONS.map(def => {
         const existing = value.simpleAssumptions?.find(a => a.assumptionId === def.id);
         return existing || {
@@ -561,8 +583,9 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
         customAssumptions: value.customAssumptions || [],
         processNarrativeOverride: value.processNarrativeOverride,
       });
+      setInitializedFromProp(true);
     }
-  }, [value]);
+  }, [value, initializedFromProp]);
 
   // Regenerate document narratives when configs change
   useEffect(() => {

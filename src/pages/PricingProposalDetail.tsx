@@ -1011,6 +1011,9 @@ export default function PricingProposalDetail() {
   const summaryAutoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const assumptionsRef = useRef(assumptions);
   useEffect(() => { assumptionsRef.current = assumptions; }, [assumptions]);
+  const scopeAssumptionsAutoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scopeAssumptionsRef = useRef(scopeAssumptions);
+  useEffect(() => { scopeAssumptionsRef.current = scopeAssumptions; }, [scopeAssumptions]);
   const summaryChangeCountRef = useRef(0);
 
   useEffect(() => {
@@ -1035,6 +1038,30 @@ export default function PricingProposalDetail() {
       if (summaryAutoSaveRef.current) clearTimeout(summaryAutoSaveRef.current);
     };
   }, [assumptions.summaryHours, assumptions.summaryLevelOverrides, summaryInitialized, proposalId]);
+
+  useEffect(() => {
+    if (!proposalId || !scopeAssumptionsInitialized) return;
+
+    if (scopeAssumptionsAutoSaveRef.current) clearTimeout(scopeAssumptionsAutoSaveRef.current);
+    scopeAssumptionsAutoSaveRef.current = setTimeout(async () => {
+      try {
+        const { error } = await supabase
+          .from('pricing_proposals')
+          .update({ scope_assumptions: scopeAssumptionsRef.current as any })
+          .eq('id', proposalId);
+
+        if (error) {
+          console.error('Failed to save scope assumptions:', error);
+        }
+      } catch (err) {
+        console.error('Failed to save scope assumptions:', err);
+      }
+    }, 400);
+
+    return () => {
+      if (scopeAssumptionsAutoSaveRef.current) clearTimeout(scopeAssumptionsAutoSaveRef.current);
+    };
+  }, [scopeAssumptions, scopeAssumptionsInitialized, proposalId]);
 
   // Summary aggregates
   const summary = useMemo(() => {
@@ -3301,16 +3328,9 @@ export default function PricingProposalDetail() {
           <TabsContent value="scope-assumptions" className="space-y-4">
             <ScopeAssumptionsTab
               value={scopeAssumptions}
-              onChange={async (newState) => {
+              onChange={(newState) => {
+                setScopeAssumptionsInitialized(true);
                 setScopeAssumptions(newState);
-                // Auto-save scope assumptions
-                const { error } = await supabase
-                  .from('pricing_proposals')
-                  .update({ scope_assumptions: newState as any })
-                  .eq('id', proposalId);
-                if (error) {
-                  console.error('Failed to save scope assumptions:', error);
-                }
               }}
               currency={proposal?.currency || 'GBP'}
               workItems={draftItems}

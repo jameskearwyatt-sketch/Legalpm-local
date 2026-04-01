@@ -1547,7 +1547,15 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                                   ? { ...a, enabled: false, narrative: '', inputValue: undefined }
                                   : a
                               );
-                              updateState({ ...state, simpleAssumptions: updated, processNarrativeOverride: undefined });
+                              updateState(prev => ({
+                                ...prev,
+                                simpleAssumptions: (prev.simpleAssumptions || []).map(a =>
+                                  combinableIds.includes(a.assumptionId)
+                                    ? { ...a, enabled: false, narrative: '', inputValue: undefined }
+                                    : a
+                                ),
+                                processNarrativeOverride: undefined,
+                              }));
                             }}
                             title="Remove process assumptions"
                           >

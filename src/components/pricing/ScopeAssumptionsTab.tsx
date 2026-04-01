@@ -1606,7 +1606,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                               onClick={() => {
                                 const updated = [...(state.documentNarratives || [])];
                                 updated.splice(index, 1);
-                                setState(prev => ({ ...prev, documentNarratives: updated }));
+                                updateState({ ...state, documentNarratives: updated });
                               }}
                               title="Remove assumption"
                             >

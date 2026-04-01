@@ -1631,17 +1631,24 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                               variant="ghost"
                               className="h-7 w-7 text-muted-foreground hover:text-destructive"
                               onClick={() => {
-                                const narrativeToRemove = narrative;
-                                const updatedConfigs = (state.documentAssumptions?.configs || []).filter(
-                                  (config) => generateDocumentNarrative(config) !== narrativeToRemove
-                                );
-                                updateState({
-                                  ...state,
-                                  documentAssumptions: {
-                                    ...(state.documentAssumptions || DEFAULT_DOCUMENT_STATE),
-                                    configs: updatedConfigs,
-                                  },
-                                  documentNarratives: (state.documentNarratives || []).filter((_, i) => i !== index),
+                                updateState(prev => {
+                                  const currentDocState = prev.documentAssumptions || DEFAULT_DOCUMENT_STATE;
+                                  const narrativeConfigs = (currentDocState.configs || []).filter(
+                                    config => config.turns !== undefined || config.whoDrafts !== undefined || config.clientForm
+                                  );
+                                  const configToRemove = narrativeConfigs[index];
+                                  const updatedConfigs = configToRemove
+                                    ? (currentDocState.configs || []).filter(config => config !== configToRemove)
+                                    : (currentDocState.configs || []);
+
+                                  return {
+                                    ...prev,
+                                    documentAssumptions: {
+                                      ...currentDocState,
+                                      configs: updatedConfigs,
+                                    },
+                                    documentNarratives: (prev.documentNarratives || []).filter((_, i) => i !== index),
+                                  };
                                 });
                               }}
                               title="Remove assumption"

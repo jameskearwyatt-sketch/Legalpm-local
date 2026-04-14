@@ -10,7 +10,7 @@ export interface TrendDataPoint {
   date: string;
   rawDate: string; // Original ISO date for deletion
   wip: number;
-  billed: number;
+  ar: number;
   paid: number;
 }
 
@@ -508,7 +508,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
 
       // Group all snapshots by date and aggregate (excluding excluded matters)
       // Also track how many matters have data for each date to detect incomplete data
-      const trendByDate = new Map<string, { wip: number; billed: number; paid: number; matterCount: number }>();
+      const trendByDate = new Map<string, { wip: number; ar: number; paid: number; matterCount: number }>();
       snapshots?.forEach(snap => {
         // Skip excluded matters for trend data
         if (excludedSet.has(snap.matter_id)) return;
@@ -518,10 +518,13 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         const exchangeRate = matterData?.exchangeRate || 1;
         const feeCurrency = matterData?.feeCurrency || 'GBP';
         
-        const existing = trendByDate.get(dateKey) || { wip: 0, billed: 0, paid: 0, matterCount: 0 };
+        const billedUsd = convertToUsd(Number(snap.billed_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+        const paidUsd = convertToUsd(Number(snap.paid_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+        
+        const existing = trendByDate.get(dateKey) || { wip: 0, ar: 0, paid: 0, matterCount: 0 };
         existing.wip += convertToUsd(Number(snap.wip_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-        existing.billed += convertToUsd(Number(snap.billed_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-        existing.paid += convertToUsd(Number(snap.paid_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+        existing.ar += Math.max(billedUsd - paidUsd, 0);
+        existing.paid += paidUsd;
         existing.matterCount += 1;
         trendByDate.set(dateKey, existing);
       });
@@ -544,7 +547,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           date: format(parseISO(dateStr), 'MMM d'),
           rawDate: dateStr,
           wip: Math.round(values.wip),
-          billed: Math.round(values.billed),
+          ar: Math.round(values.ar),
           paid: Math.round(values.paid),
         }));
 

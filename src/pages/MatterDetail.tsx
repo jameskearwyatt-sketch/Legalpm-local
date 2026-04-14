@@ -1946,7 +1946,7 @@ export default function MatterDetail() {
                     <Line 
                       type="monotone" 
                       dataKey="ar" 
-                      name="Total Billed"
+                      name="AR"
                       stroke="hsl(var(--chart-1))" 
                       strokeWidth={2}
                       dot={{ fill: 'hsl(var(--chart-1))' }}

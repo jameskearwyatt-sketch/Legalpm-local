@@ -5,9 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Upload, FileText, ArrowRight, Loader2, AlertCircle, Cpu } from 'lucide-react';
+import { Upload, FileText, ArrowRight, AlertCircle, Cpu } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useITSupplyAnalyses, useITSupplyPositions, useITSupplyPrecedentBank, ITSupplyAnalysisType, ITSupplyPerspective } from '@/lib/hooks/useITSupplyAnalyses';
 import { useITSupplyLearnings } from '@/lib/hooks/useITSupplyLearnings';
@@ -16,6 +15,7 @@ import { IT_SUPPLY_TYPES, IT_SUPPLY_CONTRACT_STAGES, type ITSupplyContractStage 
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
+import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
 const JURISDICTIONS = ['United States', 'United Kingdom', 'EU', 'Taiwan', 'South Korea', 'Japan', 'China', 'Singapore', 'Other'];
 
@@ -39,11 +39,10 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
   const [buyerName, setBuyerName] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [contractFile, setContractFile] = useState<File | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
+  const progress = useAnalystProgress();
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -64,17 +63,15 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
     if (!projectName.trim()) { toast.error('Please enter a project name'); return; }
 
     setStep('analyzing');
-    setAnalysisProgress(0);
     setError(null);
+    progress.reset();
+    progress.setPhase('extract');
 
     // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
     const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
     let piiTotalRedactions = 0;
 
     try {
-      setAnalysisStatus('Extracting text from document...');
-      setAnalysisProgress(10);
-
       const formData = new FormData();
       formData.append('file', contractFile);
       const { data: sessionData } = await supabase.auth.getSession();
@@ -92,7 +89,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
       }
 
       const { text: contractText } = await parseResponse.json();
-      setAnalysisProgress(30);
+      progress.setPhase('retrieve');
 
       // Optional PII redaction before any text leaves the browser.
       let contractTextForLLM = contractText;
@@ -106,7 +103,6 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
         }
       }
 
-      setAnalysisStatus('Building precedent intelligence...');
       // Semantic top-K retrieval with graceful fallback to all-active.
       const retrievalQuery = (contractTextForLLM || '').slice(0, 15_000);
       const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
@@ -131,8 +127,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
       const userLearningsPrompt = formatLearningsForPrompt(selectedLearnings);
       if (selectedLearnings.length > 0) console.log(`Including ${selectedLearnings.length} IT supply learnings (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
 
-      setAnalysisProgress(50);
-      setAnalysisStatus('Running AI analysis...');
+      progress.setPhase('analyze');
 
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
         const controller = new AbortController();
@@ -154,7 +149,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
         } catch (fetchError) {
           clearTimeout(timeoutId);
           if (retryCount < 3 && fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('fetch'))) {
-            setAnalysisStatus(`Retrying (attempt ${retryCount + 2}/4)...`);
+            progress.setStatusOverride(`Retrying (attempt ${retryCount + 2}/4)…`);
             await new Promise(resolve => setTimeout(resolve, 3000));
             return callAnalyzeApi(retryCount + 1);
           }
@@ -172,8 +167,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
       }
 
       const analyzeResponse = await analyzeRes.json();
-      setAnalysisProgress(80);
-      setAnalysisStatus('Saving analysis results...');
+      progress.setPhase('save');
 
       void logLlmCall({
         analystType: 'it_supply',
@@ -231,7 +225,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
         positions: positionsPayload,
       });
 
-      setAnalysisProgress(100);
+      progress.setPhase('complete');
       setCreatedAnalysisId(analysisResult.id);
       setStep('results');
       toast.success('Analysis complete!');
@@ -254,6 +248,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
       });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
+      progress.reset();
       toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
@@ -262,6 +257,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
     setStep('upload'); setContractFile(null); setProjectName(''); setJurisdiction('');
     setAnalysisType('contract_vs_bible'); setPerspective('buyer');
     setCreatedAnalysisId(null); setError(null);
+    progress.reset();
   };
 
   if (step === 'results' && createdAnalysisId) {
@@ -270,17 +266,14 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
 
   if (step === 'analyzing') {
     return (
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle>Analyzing {analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Supply Contract'}</CardTitle>
-          <CardDescription>{analysisStatus}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <Progress value={analysisProgress} className="h-2" />
-          <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-          <p className="text-center text-sm text-muted-foreground">This may take a minute or two for large documents...</p>
-        </CardContent>
-      </Card>
+      <AnalystAnalysisProgress
+        title={`Analyzing ${analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Supply Contract'}`}
+        phase={progress.phase}
+        progress={progress.progress}
+        narrative={progress.narrative}
+        elapsedMs={progress.elapsedMs}
+        statusOverride={progress.statusOverride ?? undefined}
+      />
     );
   }
 

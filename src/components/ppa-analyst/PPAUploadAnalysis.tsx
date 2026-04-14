@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle, Settings2, Brain } from 'lucide-react';
  import { X } from 'lucide-react';
@@ -18,6 +17,7 @@ import { generateMarketIntelligence, formatIntelligenceForPrompt } from '@/lib/p
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
+import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
 // Pre-fill data for re-analysis
 interface PreFillData {
@@ -78,13 +78,12 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
   const [sellerNormalized, setSellerNormalized] = useState('');
   const [ppaFile, setPpaFile] = useState<File | null>(null);
   const [comparisonFile, setComparisonFile] = useState<File | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDetectingMetadata, setIsDetectingMetadata] = useState(false);
   const [detectionNotes, setDetectionNotes] = useState<string | null>(null);
   const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
+  const progress = useAnalystProgress();
 
   // Auto-detect PPA metadata after file upload
   const detectPPAMetadata = useCallback(async (file: File) => {
@@ -266,8 +265,9 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
     }
 
     setStep('analyzing');
-    setAnalysisProgress(0);
     setError(null);
+    progress.reset();
+    progress.setPhase('extract');
 
     // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
     const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
@@ -275,9 +275,6 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
 
     try {
       // Step 1: Parse the PPA document
-      setAnalysisStatus('Extracting text from document...');
-      setAnalysisProgress(10);
-
       const formData = new FormData();
       formData.append('file', ppaFile);
 
@@ -301,13 +298,13 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
       }
 
       const { text: ppaText } = await parseResponse.json();
-      setAnalysisProgress(30);
+      progress.setPhase('retrieve');
 
       // Step 2: Parse comparison document if provided
       let comparisonText = null;
       if (comparisonFile && analysisType === 'ppa_vs_termsheet') {
-        setAnalysisStatus('Extracting text from comparison document...');
-        
+        progress.setStatusOverride('Extracting text from comparison document…');
+
         const compFormData = new FormData();
         compFormData.append('file', comparisonFile);
 
@@ -326,13 +323,10 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
           const { text } = await compParseResponse.json();
           comparisonText = text;
         }
-        setAnalysisProgress(50);
-      } else {
-        setAnalysisProgress(50);
+        progress.setStatusOverride(null);
       }
 
       // Step 3: Generate Market Intelligence from precedent bank
-      setAnalysisStatus('Generating market intelligence from precedent bank...');
       
       // Generate comprehensive market intelligence with context awareness
       const marketIntelligence = generateMarketIntelligence(
@@ -424,7 +418,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
          console.log(`Including ${selectedLearnings.length} user learnings for AI guidance (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
        }
        
-      setAnalysisStatus('Running AI analysis with market intelligence...');
+      progress.setPhase('analyze');
       
       // Helper function to make the API call with retry
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
@@ -469,7 +463,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
           // Retry on network errors (connection closed, timeout, etc.) up to 3 times
           if (retryCount < 3 && (fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('fetch')))) {
             console.log(`Analysis attempt ${retryCount + 1} failed, retrying...`);
-            setAnalysisStatus(`Analysis taking longer than expected, retrying (attempt ${retryCount + 2}/4)...`);
+            progress.setStatusOverride(`Analysis taking longer than expected, retrying (attempt ${retryCount + 2}/4)…`);
             await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3 seconds before retry
             return callAnalyzeApi(retryCount + 1);
           }
@@ -497,8 +491,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
 
       // Error already thrown above if response not ok
 
-      setAnalysisProgress(80);
-      setAnalysisStatus('Saving analysis results...');
+      progress.setPhase('save');
 
       const { positions: extractedPositions } = analyzeResponse.data;
 
@@ -577,7 +570,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         positions: positionsPayload,
       });
 
-      setAnalysisProgress(100);
+      progress.setPhase('complete');
       setCreatedAnalysisId(analysisResult.id);
       setStep('results');
       toast.success('Analysis complete!');
@@ -602,6 +595,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
       });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
+      progress.reset();
       toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
@@ -616,6 +610,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
     setPerspective('buyer');
     setCreatedAnalysisId(null);
     setError(null);
+    progress.reset();
   };
 
   if (step === 'results' && createdAnalysisId) {
@@ -630,21 +625,14 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
 
   if (step === 'analyzing') {
     return (
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle>Analyzing {analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'PPA'}</CardTitle>
-          <CardDescription>{analysisStatus}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <Progress value={analysisProgress} className="h-2" />
-          <div className="flex justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-          <p className="text-center text-sm text-muted-foreground">
-            This may take a minute or two for large documents...
-          </p>
-        </CardContent>
-      </Card>
+      <AnalystAnalysisProgress
+        title={`Analyzing ${analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'PPA'}`}
+        phase={progress.phase}
+        progress={progress.progress}
+        narrative={progress.narrative}
+        elapsedMs={progress.elapsedMs}
+        statusOverride={progress.statusOverride ?? undefined}
+      />
     );
   }
 

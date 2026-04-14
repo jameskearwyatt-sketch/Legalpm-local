@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle, Leaf, Brain } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -16,6 +15,7 @@ import { CARBON_PROJECT_TYPES, CARBON_PROJECT_STAGES, CARBON_CREDIT_CLASSES, get
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
+import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
 const JURISDICTIONS = [
   'United Kingdom', 'United States', 'European Union', 'Switzerland',
@@ -44,14 +44,13 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
   const [buyerNormalized, setBuyerNormalized] = useState('');
   const [sellerNormalized, setSellerNormalized] = useState('');
   const [carbonFile, setCarbonFile] = useState<File | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDetectingMetadata, setIsDetectingMetadata] = useState(false);
   const [detectionNotes, setDetectionNotes] = useState<string | null>(null);
   const [detectedFramework, setDetectedFramework] = useState<string | null>(null);
   const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
+  const progress = useAnalystProgress();
 
   // Auto-detect carbon metadata after clicking Start Analysis
   const detectCarbonMetadata = useCallback(async (file: File) => {
@@ -185,17 +184,15 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
     if (!projectName.trim()) { toast.error('Please enter a project name'); return; }
 
     setStep('analyzing');
-    setAnalysisProgress(0);
     setError(null);
+    progress.reset();
+    progress.setPhase('extract');
 
     // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
     const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
     let piiTotalRedactions = 0;
 
     try {
-      setAnalysisStatus('Extracting text from document...');
-      setAnalysisProgress(10);
-
       const formData = new FormData();
       formData.append('file', carbonFile);
       const { data: sessionData } = await supabase.auth.getSession();
@@ -206,7 +203,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
       });
       if (!parseResponse.ok) { const errorData = await parseResponse.json(); throw new Error(errorData.error || 'Failed to parse document'); }
       const { text: documentText } = await parseResponse.json();
-      setAnalysisProgress(40);
+      progress.setPhase('retrieve');
 
       // Optional PII redaction before any text leaves the browser.
       let documentTextForLLM = documentText;
@@ -220,7 +217,6 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
         }
       }
 
-      setAnalysisStatus('Building precedent intelligence...');
       // Semantic top-K retrieval with graceful fallback to all-active.
       const retrievalQuery = (documentTextForLLM || '').slice(0, 15_000);
       const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
@@ -245,8 +241,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
       const userLearningsPrompt = formatLearningsForPrompt(selectedLearnings);
       if (selectedLearnings.length > 0) console.log(`Including ${selectedLearnings.length} carbon learnings (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
 
-      setAnalysisStatus('Running AI analysis...');
-      setAnalysisProgress(50);
+      progress.setPhase('analyze');
 
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
         const controller = new AbortController();
@@ -269,7 +264,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
         } catch (fetchError) {
           clearTimeout(timeoutId);
           if (retryCount < 3 && fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('fetch'))) {
-            setAnalysisStatus(`Retrying (attempt ${retryCount + 2}/4)...`);
+            progress.setStatusOverride(`Retrying (attempt ${retryCount + 2}/4)…`);
             await new Promise(resolve => setTimeout(resolve, 3000));
             return callAnalyzeApi(retryCount + 1);
           }
@@ -287,8 +282,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
       }
 
       const analyzeResponse = await analyzeRes.json();
-      setAnalysisProgress(80);
-      setAnalysisStatus('Saving analysis results...');
+      progress.setPhase('save');
 
       void logLlmCall({
         analystType: 'carbon',
@@ -349,7 +343,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
         positions: positionsPayload,
       });
 
-      setAnalysisProgress(100);
+      progress.setPhase('complete');
       setCreatedAnalysisId(analysisResult.id);
       setStep('results');
       toast.success('Analysis complete!');
@@ -375,6 +369,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
       });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
+      progress.reset();
       toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
@@ -385,6 +380,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
     setCarbonType(''); setProjectStage('' as any); setCounterpartyType('');
     setBuyerName(''); setSellerName(''); setBuyerNormalized(''); setSellerNormalized('');
     setDetectionNotes(null); setDetectedFramework(null);
+    progress.reset();
   };
 
   if (step === 'results' && createdAnalysisId) {
@@ -393,17 +389,14 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
 
   if (step === 'analyzing') {
     return (
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle>Analyzing {analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Carbon Credit Offtake Agreement'}</CardTitle>
-          <CardDescription>{analysisStatus}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <Progress value={analysisProgress} className="h-2" />
-          <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-          <p className="text-center text-sm text-muted-foreground">This may take a minute or two for large documents...</p>
-        </CardContent>
-      </Card>
+      <AnalystAnalysisProgress
+        title={`Analyzing ${analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Carbon Credit Offtake Agreement'}`}
+        phase={progress.phase}
+        progress={progress.progress}
+        narrative={progress.narrative}
+        elapsedMs={progress.elapsedMs}
+        statusOverride={progress.statusOverride ?? undefined}
+      />
     );
   }
 
@@ -666,8 +659,8 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
                   <Button variant="outline" onClick={() => setStep('configure')} className="flex-1">
                     Back
                   </Button>
-                  <Button onClick={handleConfirmAndAnalyze} className="flex-1 gap-2" disabled={createAnalysis.isPending}>
-                    {createAnalysis.isPending ? (
+                  <Button onClick={handleConfirmAndAnalyze} className="flex-1 gap-2" disabled={createAnalysisWithPositions.isPending}>
+                    {createAnalysisWithPositions.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <Scale className="h-4 w-4" />

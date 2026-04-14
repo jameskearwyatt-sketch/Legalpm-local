@@ -104,7 +104,7 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 | 7 | Observability & telemetry | **Done** (Apr 2026) |
 | 8 | Cross-analyst reuse / shared component refactor | **Done** (Apr 2026) — learnings hook + LearningsTab + TeachFeedbackDialog (phase 1), analyses/positions/precedent-bank factory (phase 2), WhatsMarketDialog + AnalysisTable (phase 3), PrecedentBank (phase 4) |
 | 9 | PII redaction + LLM call audit log | **Done** (Apr 2026) |
-| 10 | Streaming / batch / Word export | **Partial** (Apr 2026) — Word export shipped for all 5 analyst reports; streaming pending; batch deferred |
+| 10 | Streaming / batch / Word export | **Done** (Apr 2026) — Word export shipped for all 5 analyst reports; perceived streaming progress UX shipped for all 5 upload flows; batch deferred |
 
 ### Applied-Learnings Trace (#2) — Shipped
 
@@ -223,6 +223,24 @@ Each analyst report (PPA, Tolling, Carbon, IT Supply, Cloud Compute) previously 
   - IT Supply: `supply_type` + `contract_stage`
   - Cloud Compute: `service_type` + `deployment_model`
 - Filename format: `{AnalystTitle} - {ProjectName} - {yyyy-MM-dd}.doc`.
+
+### Perceived Streaming Progress UX (#10, part 2) — Shipped
+
+The analyst upload flows previously showed a static `Loader2` spinner and a single frozen status line for the 30–90 seconds the LLM took to complete. Users frequently assumed the app had hung and refreshed the page mid-analysis, losing the extracted text + retrieved precedents and forcing a re-run. True SSE streaming was evaluated and rejected: each `analyze-*` edge function now uses `response_format: { type: "json_object" }` (see #6), so partial JSON mid-flight is unparseable by the client; piping raw bytes through the gateway would also require refactoring ~2000 LOC of edge-function code for no user-visible gain (the UI renders the positions table only once the full JSON has been validated and atomically inserted via the `create_*_analysis_with_positions` RPC). Perceived streaming — a smooth client-side animated progress bar with an elapsed timer and a rotating narrative sub-caption — delivers 80%+ of the "something is happening" benefit at zero edge-function risk.
+
+- Shared `src/components/shared/AnalystAnalysisProgress.tsx` (~270 LOC) exports:
+  - `AnalystAnalysisProgress` React component — Card with animated `Progress` bar, elapsed-time counter (`1m 23s` format), centred `Loader2` spinner, fade-in rotating narrative line, and a footer note ("Large contracts can take 1–2 minutes. Feel free to keep this tab open in the background.").
+  - `useAnalystProgress()` hook returning `{phase, progress, narrative, elapsedMs, setPhase, setStatusOverride, statusOverride, reset}`. The hook owns a `requestAnimationFrame` loop that interpolates smoothly toward the current phase's target using ease-out, asymptotically capped at 95% of the phase range so the bar never hits 100% during `analyze` (only the caller advancing to `save`/`complete` completes it). A 3.5s `setInterval` rotates through the phase's narrative array; a 1s `setInterval` ticks the elapsed counter so it re-renders every second.
+  - `AnalystProgressPhase` union: `'idle' | 'extract' | 'retrieve' | 'analyze' | 'save' | 'complete'`. Each phase has `{status, target, expectedMs, narrative}`:
+    - `extract` — target 15%, 5s, 3 narrative lines (Reading PDF structure / Normalising clauses / Preparing text)
+    - `retrieve` — target 35%, 6s, 4 narrative lines (Embedding into semantic space / Finding closest precedents / Selecting correction history / Assembling gold-standards)
+    - `analyze` — target 85%, 60s, 8 narrative lines (Reading the agreement / Extracting positions / Cross-referencing precedents / Benchmarking market / Assessing favorability / Flagging off-market / Marking confidence / Finalising output)
+    - `save` — target 98%, 3s, 2 narrative lines
+    - `complete` — snaps to 100%, no narrative
+  - `statusOverride` is used for one-off messages like "Retrying (attempt 2/4)…" or "Extracting text from comparison document…" without disrupting the phase model.
+- All 5 analyst upload components (`PPAUploadAnalysis`, `TollingUploadAnalysis`, `CarbonUploadAnalysis`, `ITSupplyUploadAnalysis`, `CloudComputeUploadAnalysis`) now wire the hook in place of the prior `analysisProgress`/`analysisStatus` state pair. The shape of the flow is identical across all 5: `progress.reset(); progress.setPhase('extract')` → parse document → `progress.setPhase('retrieve')` → semantic top-K retrieval → `progress.setPhase('analyze')` → LLM call (with `progress.setStatusOverride(...)` inside the retry loop) → `progress.setPhase('save')` → transactional insert → `progress.setPhase('complete')`. Error and reset paths call `progress.reset()`.
+- Net effect: the `analyzing` screen is now the shared `AnalystAnalysisProgress` render, not a bespoke per-analyst `<Card>`. ~120 LOC of duplicate analyzing-screen JSX + progress/status state collapsed into a single consumer of the shared hook+component. Typecheck clean across all 5.
+- Batch processing remains deferred — the user flow (one contract uploaded manually at a time) doesn't show demand, and the edge-function cost model (per-request gateway call with no bulk-discount currently) doesn't benefit from batching.
 
 ## Remaining Recommendations
 

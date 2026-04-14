@@ -5,9 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle, FlaskConical } from 'lucide-react';
+import { Upload, FileText, Scale, ArrowRight, AlertCircle, FlaskConical } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTollingAnalyses, useTollingPositions, useTollingPrecedentBank, TollingAnalysisType, TollingPerspective } from '@/lib/hooks/useTollingAnalyses';
 import { useTollingLearnings } from '@/lib/hooks/useTollingLearnings';
@@ -31,6 +30,7 @@ import { TOLLING_TECHNOLOGY_TYPES, TOLLING_FACILITY_STAGES, type TollingFacility
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
+import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
 interface TollingUploadAnalysisProps {
   onAnalysisComplete?: () => void;
@@ -53,11 +53,10 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
   const [generatorName, setGeneratorName] = useState('');
   const [tollingFile, setTollingFile] = useState<File | null>(null);
   const [comparisonFile, setComparisonFile] = useState<File | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
+  const progress = useAnalystProgress();
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>, type: 'tolling' | 'comparison') => {
     const file = e.target.files?.[0];
@@ -97,8 +96,9 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
     }
 
     setStep('analyzing');
-    setAnalysisProgress(0);
     setError(null);
+    progress.reset();
+    progress.setPhase('extract');
 
     // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
     const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
@@ -106,9 +106,6 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
 
     try {
       // Step 1: Parse the document
-      setAnalysisStatus('Extracting text from document...');
-      setAnalysisProgress(10);
-
       const formData = new FormData();
       formData.append('file', tollingFile);
 
@@ -130,12 +127,12 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
       }
 
       const { text: tollingText } = await parseResponse.json();
-      setAnalysisProgress(30);
+      progress.setPhase('retrieve');
 
       // Step 2: Parse comparison document if provided
       let comparisonText = null;
       if (comparisonFile && analysisType === 'tolling_vs_termsheet') {
-        setAnalysisStatus('Extracting text from comparison document...');
+        progress.setStatusOverride('Extracting text from comparison document…');
         const compFormData = new FormData();
         compFormData.append('file', comparisonFile);
         const compParseResponse = await fetch(
@@ -150,9 +147,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
           const { text } = await compParseResponse.json();
           comparisonText = text;
         }
-        setAnalysisProgress(50);
-      } else {
-        setAnalysisProgress(50);
+        progress.setStatusOverride(null);
       }
 
       // Optional PII redaction before any text leaves the browser.
@@ -176,7 +171,6 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
 
       // Step 3: Build precedent context (semantic top-K retrieval with
       // graceful fallback to all-active when embeddings aren't available).
-      setAnalysisStatus('Building precedent intelligence...');
       const retrievalQuery = (tollingTextForLLM || '').slice(0, 15_000);
       const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
         getRelevantLearnings(retrievalQuery, 15),
@@ -205,7 +199,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         console.log(`Including ${selectedLearnings.length} tolling learnings (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
       }
 
-      setAnalysisStatus('Running AI analysis...');
+      progress.setPhase('analyze');
 
       // Step 4: Call analyze-tolling edge function
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
@@ -244,7 +238,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         } catch (fetchError) {
           clearTimeout(timeoutId);
           if (retryCount < 3 && fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('fetch'))) {
-            setAnalysisStatus(`Retrying (attempt ${retryCount + 2}/4)...`);
+            progress.setStatusOverride(`Retrying (attempt ${retryCount + 2}/4)…`);
             await new Promise(resolve => setTimeout(resolve, 3000));
             return callAnalyzeApi(retryCount + 1);
           }
@@ -268,8 +262,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
       }
 
       const analyzeResponse = await analyzeRes.json();
-      setAnalysisProgress(80);
-      setAnalysisStatus('Saving analysis results...');
+      progress.setPhase('save');
 
       void logLlmCall({
         analystType: 'tolling',
@@ -346,7 +339,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         positions: positionsPayload,
       });
 
-      setAnalysisProgress(100);
+      progress.setPhase('complete');
       setCreatedAnalysisId(analysisResult.id);
       setStep('results');
       toast.success('Analysis complete!');
@@ -372,6 +365,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
       });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
+      progress.reset();
       toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
@@ -386,6 +380,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
     setPerspective('offtaker');
     setCreatedAnalysisId(null);
     setError(null);
+    progress.reset();
   };
 
   if (step === 'results' && createdAnalysisId) {
@@ -400,21 +395,14 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
 
   if (step === 'analyzing') {
     return (
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle>Analyzing {analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Tolling Agreement'}</CardTitle>
-          <CardDescription>{analysisStatus}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <Progress value={analysisProgress} className="h-2" />
-          <div className="flex justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-          <p className="text-center text-sm text-muted-foreground">
-            This may take a minute or two for large documents...
-          </p>
-        </CardContent>
-      </Card>
+      <AnalystAnalysisProgress
+        title={`Analyzing ${analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Tolling Agreement'}`}
+        phase={progress.phase}
+        progress={progress.progress}
+        narrative={progress.narrative}
+        elapsedMs={progress.elapsedMs}
+        statusOverride={progress.statusOverride ?? undefined}
+      />
     );
   }
 

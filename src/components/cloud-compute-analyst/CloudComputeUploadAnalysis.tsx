@@ -5,9 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Upload, FileText, ArrowRight, Loader2, AlertCircle, Cloud } from 'lucide-react';
+import { Upload, FileText, ArrowRight, AlertCircle, Cloud } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCloudComputeAnalyses, useCloudComputePrecedentBank, CloudComputeAnalysisType, CloudComputePerspective } from '@/lib/hooks/useCloudComputeAnalyses';
 import { useCloudComputeLearnings } from '@/lib/hooks/useCloudComputeLearnings';
@@ -16,6 +15,7 @@ import { CLOUD_SERVICE_TYPES, CLOUD_DEPLOYMENT_MODELS, type CloudDeploymentModel
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
+import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
 const JURISDICTIONS = ['United States', 'United Kingdom', 'EU', 'Germany', 'Ireland', 'Singapore', 'Japan', 'Australia', 'Other'];
 
@@ -37,11 +37,10 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
   const [tenantName, setTenantName] = useState('');
   const [providerName, setProviderName] = useState('');
   const [contractFile, setContractFile] = useState<File | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
+  const progress = useAnalystProgress();
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -55,21 +54,21 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
   const handleStartAnalysis = async () => {
     if (!contractFile) { toast.error('Please upload a contract'); return; }
     if (!projectName.trim()) { toast.error('Please enter a project name'); return; }
-    setStep('analyzing'); setAnalysisProgress(0); setError(null);
+    setStep('analyzing'); setError(null);
+    progress.reset(); progress.setPhase('extract');
 
     // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
     const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
     let piiTotalRedactions = 0;
 
     try {
-      setAnalysisStatus('Extracting text from document...'); setAnalysisProgress(10);
       const formData = new FormData(); formData.append('file', contractFile);
       const { data: sd } = await supabase.auth.getSession();
       const token = sd?.session?.access_token;
       const parseResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-document-text`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData });
       if (!parseResponse.ok) { const ed = await parseResponse.json(); throw new Error(ed.error || 'Failed to parse document'); }
       const { text: contractText } = await parseResponse.json();
-      setAnalysisProgress(30);
+      progress.setPhase('retrieve');
 
       // Optional PII redaction before any text leaves the browser.
       let contractTextForLLM = contractText;
@@ -83,7 +82,6 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
         }
       }
 
-      setAnalysisStatus('Building precedent intelligence...');
       // Semantic top-K retrieval with graceful fallback to all-active.
       const retrievalQuery = (contractTextForLLM || '').slice(0, 15_000);
       const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
@@ -100,7 +98,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       const appliedGoldStandardIds = appliedGoldStandardPrecedents.map(p => p.id);
       const userLearningsPrompt = formatLearningsForPrompt(selectedLearnings);
       if (selectedLearnings.length > 0) console.log(`Including ${selectedLearnings.length} cloud compute learnings (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
-      setAnalysisProgress(50); setAnalysisStatus('Running AI analysis...');
+      progress.setPhase('analyze');
 
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
         const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 300000);
@@ -111,7 +109,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
             body: JSON.stringify({ contractText: contractTextForLLM, analysisType, perspective, jurisdiction, projectName, serviceType, deploymentModel, counterpartyType: counterpartyType || null, precedents: relevantPrecedents, userLearnings: userLearningsPrompt }),
             signal: controller.signal,
           }); clearTimeout(timeoutId); return res;
-        } catch (fe) { clearTimeout(timeoutId); if (retryCount < 3 && fe instanceof Error && (fe.name === 'AbortError' || fe.message.includes('fetch'))) { setAnalysisStatus(`Retrying (attempt ${retryCount + 2}/4)...`); await new Promise(r => setTimeout(r, 3000)); return callAnalyzeApi(retryCount + 1); } throw fe; }
+        } catch (fe) { clearTimeout(timeoutId); if (retryCount < 3 && fe instanceof Error && (fe.name === 'AbortError' || fe.message.includes('fetch'))) { progress.setStatusOverride(`Retrying (attempt ${retryCount + 2}/4)…`); await new Promise(r => setTimeout(r, 3000)); return callAnalyzeApi(retryCount + 1); } throw fe; }
       };
 
       const analysisStartTs = Date.now();
@@ -119,7 +117,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       const analysisDurationMs = Date.now() - analysisStartTs;
       if (!analyzeRes.ok) { let em = 'Failed to analyze contract'; try { const ed = await analyzeRes.json(); em = ed.error || em; } catch {} throw new Error(em); }
       const analyzeResponse = await analyzeRes.json();
-      setAnalysisProgress(80); setAnalysisStatus('Saving analysis results...');
+      progress.setPhase('save');
       void logLlmCall({
         analystType: 'cloud_compute',
         functionName: 'analyze-cloud-compute',
@@ -173,7 +171,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
         positions: positionsPayload,
       });
 
-      setAnalysisProgress(100); setCreatedAnalysisId(analysisResult.id); setStep('results'); toast.success('Analysis complete!');
+      progress.setPhase('complete'); setCreatedAnalysisId(analysisResult.id); setStep('results'); toast.success('Analysis complete!');
     } catch (err) {
       console.error('Analysis error:', err);
       void logLlmCall({
@@ -194,14 +192,24 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
+      progress.reset();
       toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
 
-  const handleReset = () => { setStep('upload'); setContractFile(null); setProjectName(''); setJurisdiction(''); setAnalysisType('agreement_vs_bible'); setPerspective('tenant'); setCreatedAnalysisId(null); setError(null); };
+  const handleReset = () => { setStep('upload'); setContractFile(null); setProjectName(''); setJurisdiction(''); setAnalysisType('agreement_vs_bible'); setPerspective('tenant'); setCreatedAnalysisId(null); setError(null); progress.reset(); };
 
   if (step === 'results' && createdAnalysisId) return <CloudComputeAnalysisReport analysisId={createdAnalysisId} onNewAnalysis={handleReset} onViewHistory={onAnalysisComplete} />;
-  if (step === 'analyzing') return <Card className="max-w-2xl mx-auto"><CardHeader className="text-center"><CardTitle>Analyzing {analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Cloud Compute Agreement'}</CardTitle><CardDescription>{analysisStatus}</CardDescription></CardHeader><CardContent className="space-y-6"><Progress value={analysisProgress} className="h-2" /><div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div><p className="text-center text-sm text-muted-foreground">This may take a minute or two for large documents...</p></CardContent></Card>;
+  if (step === 'analyzing') return (
+    <AnalystAnalysisProgress
+      title={`Analyzing ${analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Cloud Compute Agreement'}`}
+      phase={progress.phase}
+      progress={progress.progress}
+      narrative={progress.narrative}
+      elapsedMs={progress.elapsedMs}
+      statusOverride={progress.statusOverride ?? undefined}
+    />
+  );
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">

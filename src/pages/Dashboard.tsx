@@ -50,6 +50,7 @@ export default function Dashboard() {
   const [activeTooltipData, setActiveTooltipData] = useState<{ dataPoint: TrendDataPoint; payload: any[] } | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRange>("all");
   const isHoveringTooltipRef = useRef(false);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // "Not my matters" checkbox defaults to unchecked (meaning they're excluded by default)

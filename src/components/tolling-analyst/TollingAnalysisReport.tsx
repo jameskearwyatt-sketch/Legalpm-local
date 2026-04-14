@@ -13,6 +13,8 @@ import { useTollingLearnings } from '@/lib/hooks/useTollingLearnings';
 import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
 import { ExportAnalystReportButton, type AnalystReportExport } from '@/components/shared/ExportAnalystReportButton';
 import { ExportAnalystExcelButton } from '@/components/shared/ExportAnalystExcelButton';
+import { SaveAsRegressionCaseButton } from '@/components/shared/SaveAsRegressionCaseButton';
+import type { ActualPositionShape } from '@/lib/analyst/regressionHarness';
 import { TollingTeachFeedbackDialog } from './TollingTeachFeedbackDialog';
 import { TollingWhatsMarketDialog } from './TollingWhatsMarketDialog';
 import { TOLLING_CATEGORY_GROUPS, TOLLING_ALL_CATEGORIES } from '@/lib/tollingCategories';
@@ -312,6 +314,26 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
             <div className="flex gap-2">
               {exportPayload && <ExportAnalystReportButton payload={exportPayload} />}
               {exportPayload && <ExportAnalystExcelButton payload={exportPayload} />}
+              {analysis && (
+                <SaveAsRegressionCaseButton
+                  analyst="tolling"
+                  analystLabel="Tolling"
+                  analysisId={analysis.id}
+                  projectName={analysis.project_name}
+                  positions={positions as unknown as ActualPositionShape[]}
+                  defaultConfig={{
+                    analysisType: analysis.analysis_type,
+                    perspective: analysis.perspective,
+                    jurisdiction: analysis.jurisdiction,
+                    projectName: analysis.project_name,
+                    tollingType: analysis.tolling_type,
+                    facilityStage: analysis.facility_stage,
+                    counterpartyType: analysis.counterparty_type || null,
+                    precedents: [],
+                    userLearnings: '',
+                  }}
+                />
+              )}
               <Button variant="outline" size="sm" onClick={onNewAnalysis}>
                 <Plus className="h-4 w-4 mr-1" /> New Analysis
               </Button>

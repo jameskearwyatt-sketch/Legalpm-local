@@ -13,6 +13,8 @@ import { useCarbonLearnings } from '@/lib/hooks/useCarbonLearnings';
 import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
 import { ExportAnalystReportButton, type AnalystReportExport } from '@/components/shared/ExportAnalystReportButton';
 import { ExportAnalystExcelButton } from '@/components/shared/ExportAnalystExcelButton';
+import { SaveAsRegressionCaseButton } from '@/components/shared/SaveAsRegressionCaseButton';
+import type { ActualPositionShape } from '@/lib/analyst/regressionHarness';
 import { CarbonTeachFeedbackDialog } from './CarbonTeachFeedbackDialog';
 import { CarbonWhatsMarketDialog } from './CarbonWhatsMarketDialog';
 import { CARBON_CATEGORY_GROUPS, CARBON_ALL_CATEGORIES, CARBON_PROJECT_TYPES } from '@/lib/carbonCategories';
@@ -205,6 +207,26 @@ export function CarbonAnalysisReport({ analysisId, onNewAnalysis, onViewHistory 
             <div className="flex gap-2">
               {exportPayload && <ExportAnalystReportButton payload={exportPayload} />}
               {exportPayload && <ExportAnalystExcelButton payload={exportPayload} />}
+              {analysis && (
+                <SaveAsRegressionCaseButton
+                  analyst="carbon"
+                  analystLabel="Carbon"
+                  analysisId={analysis.id}
+                  projectName={analysis.project_name}
+                  positions={positions as unknown as ActualPositionShape[]}
+                  defaultConfig={{
+                    analysisType: analysis.analysis_type,
+                    perspective: analysis.perspective,
+                    jurisdiction: analysis.jurisdiction,
+                    projectName: analysis.project_name,
+                    carbonType: analysis.carbon_type,
+                    projectStage: analysis.project_stage,
+                    counterpartyType: null,
+                    precedents: [],
+                    userLearnings: '',
+                  }}
+                />
+              )}
               <Button variant="outline" size="sm" onClick={onNewAnalysis}><Plus className="h-4 w-4 mr-1" /> New Analysis</Button>
               <Button variant="outline" size="sm" onClick={onViewHistory}><History className="h-4 w-4 mr-1" /> View History</Button>
             </div>

@@ -6,12 +6,36 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { Loader2, Lightbulb, Send, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { LearningConflictWarning } from '@/components/shared/LearningConflictWarning';
 import type { AnalystType } from '@/lib/analyst/semanticRetrieval';
 import type { BaseAnalystLearning, LearningsHookResult } from '@/lib/analyst/createLearningsHook';
+
+/**
+ * Structured feedback tags — mirror the CHECK constraint on the
+ * *_learnings.feedback_type column (migration 20260420000001).
+ */
+export type FeedbackType =
+  | 'wrong_category'
+  | 'wrong_summary'
+  | 'wrong_market_assessment'
+  | 'missing_context'
+  | 'wrong_confidence'
+  | 'other';
+
+const FEEDBACK_TYPE_OPTIONS: { value: FeedbackType; label: string; description: string }[] = [
+  { value: 'wrong_category',          label: 'Wrong category',          description: 'Position was mis-categorised' },
+  { value: 'wrong_summary',           label: 'Wrong summary',           description: 'Summary misrepresents the clause' },
+  { value: 'wrong_market_assessment', label: 'Wrong market assessment', description: 'Market-position / favorability is off' },
+  { value: 'missing_context',         label: 'Missing context',         description: 'Correct but incomplete' },
+  { value: 'wrong_confidence',        label: 'Wrong confidence',        description: 'Confidence level is over/understated' },
+  { value: 'other',                   label: 'Other',                   description: 'Doesn\'t fit the above categories' },
+];
 
 export interface TeachFeedbackPosition {
   id: string;
@@ -49,6 +73,7 @@ export function AnalystTeachFeedbackDialog<T extends BaseAnalystLearning>({
   analystLabel, placeholder, learningsHook, onPositionUpdated,
 }: AnalystTeachFeedbackDialogProps<T>) {
   const [feedback, setFeedback] = useState('');
+  const [feedbackType, setFeedbackType] = useState<FeedbackType | ''>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [correctedPosition, setCorrectedPosition] = useState<string | null>(null);
   const { createLearning } = learningsHook;
@@ -71,6 +96,7 @@ export function AnalystTeachFeedbackDialog<T extends BaseAnalystLearning>({
         correction_reason: feedback,
         analysis_id: analysisId,
         is_active: true,
+        ...(feedbackType ? { feedback_type: feedbackType } : {}),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any);
 
@@ -95,6 +121,7 @@ export function AnalystTeachFeedbackDialog<T extends BaseAnalystLearning>({
 
   const handleClose = () => {
     setFeedback('');
+    setFeedbackType('');
     setCorrectedPosition(null);
     onOpenChange(false);
   };
@@ -121,6 +148,31 @@ export function AnalystTeachFeedbackDialog<T extends BaseAnalystLearning>({
             {position.source_text && (
               <div className="text-xs text-muted-foreground">Source: {position.source_text}</div>
             )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="feedback-type" className="text-sm font-medium">
+              What kind of mistake? <span className="text-muted-foreground font-normal">(optional)</span>
+            </Label>
+            <Select
+              value={feedbackType}
+              onValueChange={(v) => setFeedbackType(v as FeedbackType)}
+              disabled={isProcessing || !!correctedPosition}
+            >
+              <SelectTrigger id="feedback-type">
+                <SelectValue placeholder="Select a category so we can aggregate error modes..." />
+              </SelectTrigger>
+              <SelectContent>
+                {FEEDBACK_TYPE_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    <div className="flex flex-col">
+                      <span className="text-sm">{opt.label}</span>
+                      <span className="text-xs text-muted-foreground">{opt.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">

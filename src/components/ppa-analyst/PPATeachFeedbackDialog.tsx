@@ -11,12 +11,25 @@
  import { Textarea } from '@/components/ui/textarea';
  import { Label } from '@/components/ui/label';
  import { Badge } from '@/components/ui/badge';
+ import {
+   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+ } from '@/components/ui/select';
  import { Loader2, Lightbulb, Send, Sparkles } from 'lucide-react';
  import { toast } from 'sonner';
  import { supabase } from '@/integrations/supabase/client';
  import { usePPALearnings } from '@/lib/hooks/usePPALearnings';
  import { PPAExtractedPosition } from '@/lib/hooks/usePPAAnalyses';
 import { LearningConflictWarning } from '@/components/shared/LearningConflictWarning';
+import type { FeedbackType } from '@/components/shared/AnalystTeachFeedbackDialog';
+
+const FEEDBACK_TYPE_OPTIONS: { value: FeedbackType; label: string; description: string }[] = [
+  { value: 'wrong_category',          label: 'Wrong category',          description: 'Position was mis-categorised' },
+  { value: 'wrong_summary',           label: 'Wrong summary',           description: 'Summary misrepresents the clause' },
+  { value: 'wrong_market_assessment', label: 'Wrong market assessment', description: 'Market-position / favorability is off' },
+  { value: 'missing_context',         label: 'Missing context',         description: 'Correct but incomplete' },
+  { value: 'wrong_confidence',        label: 'Wrong confidence',        description: 'Confidence level is over/understated' },
+  { value: 'other',                   label: 'Other',                   description: "Doesn't fit the above categories" },
+];
  
  interface PPATeachFeedbackDialogProps {
    open: boolean;
@@ -42,6 +55,7 @@ import { LearningConflictWarning } from '@/components/shared/LearningConflictWar
   varianceNotes,
  }: PPATeachFeedbackDialogProps) {
    const [feedback, setFeedback] = useState('');
+  const [feedbackType, setFeedbackType] = useState<FeedbackType | ''>('');
    const [isProcessing, setIsProcessing] = useState(false);
    const [correctedPosition, setCorrectedPosition] = useState<string | null>(null);
   const [correctedMarketPosition, setCorrectedMarketPosition] = useState<string | null>(null);
@@ -90,7 +104,9 @@ import { LearningConflictWarning } from '@/components/shared/LearningConflictWar
          jurisdiction,
          ppa_type: ppaType,
          is_active: true,
-       });
+         ...(feedbackType ? { feedback_type: feedbackType } : {}),
+       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+       } as any);
  
       // Update the position in the database (including variance_notes for market position)
        const { error: updateError } = await supabase
@@ -118,6 +134,7 @@ import { LearningConflictWarning } from '@/components/shared/LearningConflictWar
  
    const handleClose = () => {
      setFeedback('');
+    setFeedbackType('');
      setCorrectedPosition(null);
     setCorrectedMarketPosition(null);
      onOpenChange(false);
@@ -174,6 +191,32 @@ import { LearningConflictWarning } from '@/components/shared/LearningConflictWar
              )}
            </div>
  
+           {/* Feedback Type Selector */}
+           <div className="space-y-2">
+             <Label htmlFor="feedback-type" className="text-sm font-medium">
+               What kind of mistake? <span className="text-muted-foreground font-normal">(optional)</span>
+             </Label>
+             <Select
+               value={feedbackType}
+               onValueChange={(v) => setFeedbackType(v as FeedbackType)}
+               disabled={isProcessing || !!correctedPosition}
+             >
+               <SelectTrigger id="feedback-type">
+                 <SelectValue placeholder="Select a category so we can aggregate error modes..." />
+               </SelectTrigger>
+               <SelectContent>
+                 {FEEDBACK_TYPE_OPTIONS.map(opt => (
+                   <SelectItem key={opt.value} value={opt.value}>
+                     <div className="flex flex-col">
+                       <span className="text-sm">{opt.label}</span>
+                       <span className="text-xs text-muted-foreground">{opt.description}</span>
+                     </div>
+                   </SelectItem>
+                 ))}
+               </SelectContent>
+             </Select>
+           </div>
+
            {/* Feedback Input */}
            <div className="space-y-2">
              <Label htmlFor="feedback" className="text-sm font-medium">

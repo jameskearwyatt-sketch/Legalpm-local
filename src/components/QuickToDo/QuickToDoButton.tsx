@@ -2115,6 +2115,40 @@ export function QuickToDoButton() {
     };
 };
 
+  const getSlatePanelStyle = (): React.CSSProperties => {
+    const isMobile = window.innerWidth < 768;
+
+    // Mobile: full screen with small margins — identical to getPanelStyle mobile branch
+    if (isMobile) {
+      return {
+        position: 'fixed',
+        left: 8,
+        right: 8,
+        top: 8,
+        bottom: 8,
+        width: 'auto',
+        height: 'auto',
+        boxShadow: '0 0 20px rgba(59, 130, 246, 0.3), 0 0 40px rgba(99, 102, 241, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+      };
+    }
+
+    // Desktop: custom size and position
+    return {
+      position: 'fixed',
+      width: slateSize.width,
+      height: slateSize.height,
+      ...(slatePosition ? {
+        left: slatePosition.x,
+        top: slatePosition.y,
+      } : {
+        left: '17rem',
+        top: '50%',
+        transform: 'translateY(-50%)',
+      }),
+      boxShadow: '0 0 20px rgba(59, 130, 246, 0.3), 0 0 40px rgba(99, 102, 241, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    };
+  };
+
   const activeProjects = projects?.filter(p => p.status === 'active') || [];
 
   // Task Row Component
@@ -2730,7 +2764,7 @@ export function QuickToDoButton() {
             "z-50 rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
             (isDraggingSlate || isResizingSlate) && "select-none"
           )}
-          style={getPanelStyle()}
+          style={getSlatePanelStyle()}
         >
           {/* Resize Handle - Top Right Corner (hidden on mobile) */}
           <div

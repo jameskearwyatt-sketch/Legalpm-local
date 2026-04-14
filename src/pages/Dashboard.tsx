@@ -397,10 +397,6 @@ export default function Dashboard() {
   return (
     <AppLayout>
       <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 lg:space-y-8">
-        {/* Test sticker - confirms deploy pipeline */}
-        <div className="rounded-lg bg-red-600 px-4 py-3 text-center text-white font-bold text-lg shadow-md">
-          Claude Code Was Here!
-        </div>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>

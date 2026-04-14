@@ -147,6 +147,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           liveMatters: liveMattersForUI,
           pipelineMatters: pipelineMattersForUI,
           hasActiveWipProposals: false,
+          matterBreakdowns: [],
         } as DashboardStats;
       }
 

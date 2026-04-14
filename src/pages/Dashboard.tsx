@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { TimeRangeSelector, TimeRange, getTimeRangeCutoff } from '@/components/ui/time-range-selector';
 import { Link } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/ui/stat-card';
@@ -49,6 +50,7 @@ export default function Dashboard() {
   const [activeTooltipData, setActiveTooltipData] = useState<{ dataPoint: TrendDataPoint; payload: any[] } | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRange>("all");
   const isHoveringTooltipRef = useRef(false);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // "Not my matters" checkbox defaults to unchecked (meaning they're excluded by default)
@@ -383,8 +385,13 @@ export default function Dashboard() {
     },
   ];
 
-  // Use actual trend data from snapshots
-  const trendData = stats?.trendData || [];
+  // Use actual trend data from snapshots, filtered by time range
+  const allTrendData = stats?.trendData || [];
+  const trendData = useMemo(() => {
+    const cutoff = getTimeRangeCutoff(dashboardTimeRange);
+    if (!cutoff) return allTrendData;
+    return allTrendData.filter(d => new Date(d.rawDate || d.date) >= cutoff);
+  }, [allTrendData, dashboardTimeRange]);
   const hasData = trendData.length > 0;
 
   return (
@@ -554,8 +561,9 @@ export default function Dashboard() {
 
         {/* Financial Trends - Full Width */}
         <Card className="shadow-card">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="font-heading text-lg">Financial Trends</CardTitle>
+            <TimeRangeSelector value={dashboardTimeRange} onChange={setDashboardTimeRange} />
           </CardHeader>
           <CardContent>
             {hasData ? (

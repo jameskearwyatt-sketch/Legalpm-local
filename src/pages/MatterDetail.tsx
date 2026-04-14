@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { TimeRangeSelector, TimeRange, getTimeRangeCutoff } from '@/components/ui/time-range-selector';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';
@@ -327,6 +328,7 @@ export default function MatterDetail() {
   const [showProposalDialog, setShowProposalDialog] = useState(false);
   const [showProposalList, setShowProposalList] = useState(false);
   const [editingProposal, setEditingProposal] = useState<typeof selectedProposal>(null);
+  const [chartTimeRange, setChartTimeRange] = useState<TimeRange>("all");
   
   // Highlight movements for individual matter
   const { highlightEnabled, toggleHighlight } = useMatterHighlightMovements(id || '');
@@ -1880,16 +1882,18 @@ export default function MatterDetail() {
         {/* Financial Trends Chart - only for non-pipeline matters with snapshots */}
         {!isPipeline && snapshots && snapshots.length > 0 && (
           <Card className="shadow-card">
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-lg font-heading">Financial Trends</CardTitle>
+              <TimeRangeSelector value={chartTimeRange} onChange={setChartTimeRange} />
             </CardHeader>
             <CardContent>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart 
                     data={(() => {
-                      // Sort snapshots by date and format for chart
+                      const cutoff = getTimeRangeCutoff(chartTimeRange);
                       const sortedSnapshots = [...snapshots]
+                        .filter(snap => !cutoff || new Date(snap.as_of_date) >= cutoff)
                         .sort((a, b) => a.as_of_date.localeCompare(b.as_of_date))
                         .map(snap => ({
                           date: format(new Date(snap.as_of_date), 'MMM d'),

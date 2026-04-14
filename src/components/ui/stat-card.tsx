@@ -59,7 +59,7 @@ export function StatCard({ title, value, icon, trend, variant = 'default', class
                 </TooltipProvider>
               )}
             </div>
-            <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{value}</p>
+            <p className="text-base sm:text-lg font-heading font-bold text-foreground">{value}</p>
             {note && (
               <p className={cn(
                 'text-xs mt-0.5',

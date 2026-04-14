@@ -192,6 +192,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       let hasActiveWipProposals = false; // Track if any proposals are affecting WIP
       const alerts: Alert[] = [];
       const pipelineAlerts: PipelineAlert[] = [];
+      const matterBreakdowns: MatterBreakdown[] = [];
 
       // Calculate total pipeline value (respecting excluded pipeline matters)
       let includedPipelineCount = 0;

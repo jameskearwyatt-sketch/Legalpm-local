@@ -151,7 +151,30 @@ export function useCarbonAnalyses() {
     onError: (error) => toast.error('Failed to delete analysis: ' + error.message),
   });
 
-  return { analyses: analyses || [], isLoading, error, createAnalysis, updateAnalysis, deleteAnalysis };
+  const createAnalysisWithPositions = useMutation({
+    mutationFn: async (args: {
+      analysis: Omit<CarbonAnalysis, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'is_agreed' | 'agreed_at'>;
+      positions: Omit<CarbonExtractedPosition, 'id' | 'analysis_id' | 'user_id' | 'created_at'>[];
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+      const { data, error } = await supabase.rpc(
+        'create_carbon_analysis_with_positions' as never,
+        {
+          analysis_data: args.analysis as never,
+          positions_data: (args.positions ?? []) as never,
+        },
+      );
+      if (error) throw error;
+      return data as unknown as CarbonAnalysis;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['carbon-analyses'] });
+      queryClient.invalidateQueries({ queryKey: ['carbon-positions'] });
+    },
+    onError: (error) => toast.error('Failed to save analysis: ' + error.message),
+  });
+
+  return { analyses: analyses || [], isLoading, error, createAnalysis, createAnalysisWithPositions, updateAnalysis, deleteAnalysis };
 }
 
 export function useCarbonPositions(analysisId: string | null) {

@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Upload, FileText, ArrowRight, Loader2, AlertCircle, Cloud } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useCloudComputeAnalyses, useCloudComputePositions, useCloudComputePrecedentBank, CloudComputeAnalysisType, CloudComputePerspective } from '@/lib/hooks/useCloudComputeAnalyses';
+import { useCloudComputeAnalyses, useCloudComputePrecedentBank, CloudComputeAnalysisType, CloudComputePerspective } from '@/lib/hooks/useCloudComputeAnalyses';
 import { useCloudComputeLearnings } from '@/lib/hooks/useCloudComputeLearnings';
 import { CloudComputeAnalysisReport } from './CloudComputeAnalysisReport';
 import { CLOUD_SERVICE_TYPES, CLOUD_DEPLOYMENT_MODELS, type CloudDeploymentModel } from '@/lib/cloudComputeCategories';
@@ -19,8 +19,7 @@ const JURISDICTIONS = ['United States', 'United Kingdom', 'EU', 'Germany', 'Irel
 interface Props { onAnalysisComplete?: () => void; }
 
 export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
-  const { createAnalysis } = useCloudComputeAnalyses();
-  const { createPositions } = useCloudComputePositions(null);
+  const { createAnalysisWithPositions } = useCloudComputeAnalyses();
   const { getRelevantPrecedents } = useCloudComputePrecedentBank();
   const { formatLearningsForPrompt, activeLearnings, getRelevantLearnings } = useCloudComputeLearnings();
 
@@ -103,31 +102,37 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       setAnalysisProgress(80); setAnalysisStatus('Saving analysis results...');
       const { positions: extractedPositions } = analyzeResponse;
 
-      const analysisResult = await createAnalysis.mutateAsync({
-        analysis_type: analysisType, perspective, project_name: projectName.trim(), jurisdiction: jurisdiction || null,
-        document_file_name: contractFile.name, document_file_url: null, comparison_file_name: null, comparison_file_url: null,
-        notes: null, parent_analysis_id: null, version_number: 1, is_comparison: false, service_type: serviceType,
-        deployment_model: deploymentModel, complexity_score: null, key_risk_areas: [], counterparty_type: counterpartyType || null,
-        tenant_name: tenantName || null, provider_name: providerName || null, tenant_normalized: tenantName || null, provider_normalized: providerName || null,
-        applied_learning_ids: appliedLearningIds,
-        applied_precedent_ids: appliedPrecedentIds,
-        applied_gold_standard_ids: appliedGoldStandardIds,
-        model_used: analyzeResponse?.model_used ?? null,
-        analysis_duration_ms: analysisDurationMs,
-        input_token_count: analyzeResponse?.input_token_count ?? null,
-        output_token_count: analyzeResponse?.output_token_count ?? null,
-      });
+      const positionsPayload = (extractedPositions ?? []).map((pos: any) => ({
+        category: pos.category,
+        position_summary: pos.position_summary,
+        source_text: pos.clause_references || pos.source_text || null,
+        confidence: pos.confidence || 'medium',
+        bible_reference: pos.bible_reference || null,
+        comparison_position: pos.market_comparison || pos.comparison_position || null,
+        variance_notes: pos.market_position ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim() : pos.variance_notes || null,
+        previous_position: null,
+        change_summary: null,
+        change_type: null,
+        market_benchmark: pos.market_benchmark || null,
+      }));
 
-      if (extractedPositions?.length > 0) {
-        await createPositions.mutateAsync(extractedPositions.map((pos: any) => ({
-          analysis_id: analysisResult.id, user_id: analysisResult.user_id, category: pos.category,
-          position_summary: pos.position_summary, source_text: pos.clause_references || pos.source_text || null,
-          confidence: pos.confidence || 'medium', bible_reference: pos.bible_reference || null,
-          comparison_position: pos.market_comparison || pos.comparison_position || null,
-          variance_notes: pos.market_position ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim() : pos.variance_notes || null,
-          market_benchmark: pos.market_benchmark || null,
-        })));
-      }
+      const analysisResult = await createAnalysisWithPositions.mutateAsync({
+        analysis: {
+          analysis_type: analysisType, perspective, project_name: projectName.trim(), jurisdiction: jurisdiction || null,
+          document_file_name: contractFile.name, document_file_url: null, comparison_file_name: null, comparison_file_url: null,
+          notes: null, parent_analysis_id: null, version_number: 1, is_comparison: false, service_type: serviceType,
+          deployment_model: deploymentModel, complexity_score: null, key_risk_areas: [], counterparty_type: counterpartyType || null,
+          tenant_name: tenantName || null, provider_name: providerName || null, tenant_normalized: tenantName || null, provider_normalized: providerName || null,
+          applied_learning_ids: appliedLearningIds,
+          applied_precedent_ids: appliedPrecedentIds,
+          applied_gold_standard_ids: appliedGoldStandardIds,
+          model_used: analyzeResponse?.model_used ?? null,
+          analysis_duration_ms: analysisDurationMs,
+          input_token_count: analyzeResponse?.input_token_count ?? null,
+          output_token_count: analyzeResponse?.output_token_count ?? null,
+        },
+        positions: positionsPayload,
+      });
 
       setAnalysisProgress(100); setCreatedAnalysisId(analysisResult.id); setStep('results'); toast.success('Analysis complete!');
     } catch (err) { console.error('Analysis error:', err); setError(err instanceof Error ? err.message : 'Analysis failed'); setStep('configure'); toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error')); }

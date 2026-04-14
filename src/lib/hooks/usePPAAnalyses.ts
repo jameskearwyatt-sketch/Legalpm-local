@@ -171,7 +171,7 @@ export function usePPAAnalyses() {
         .from('ppa_analyses')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -183,11 +183,43 @@ export function usePPAAnalyses() {
     },
   });
 
+  /**
+   * Create an analysis row AND its extracted positions in a single
+   * Postgres transaction. If position insertion fails, the analysis
+   * row is rolled back — no more orphan analyses when the network
+   * drops mid-upload.
+   */
+  const createAnalysisWithPositions = useMutation({
+    mutationFn: async (args: {
+      analysis: Omit<PPAAnalysis, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'is_agreed' | 'agreed_at'>;
+      positions: Omit<PPAExtractedPosition, 'id' | 'analysis_id' | 'user_id' | 'created_at'>[];
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+      const { data, error } = await supabase.rpc(
+        'create_ppa_analysis_with_positions' as never,
+        {
+          analysis_data: args.analysis as never,
+          positions_data: (args.positions ?? []) as never,
+        },
+      );
+      if (error) throw error;
+      return data as unknown as PPAAnalysis;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ppa-analyses'] });
+      queryClient.invalidateQueries({ queryKey: ['ppa-positions'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save analysis: ' + error.message);
+    },
+  });
+
   return {
     analyses: analyses || [],
     isLoading,
     error,
     createAnalysis,
+    createAnalysisWithPositions,
     updateAnalysis,
     deleteAnalysis,
   };

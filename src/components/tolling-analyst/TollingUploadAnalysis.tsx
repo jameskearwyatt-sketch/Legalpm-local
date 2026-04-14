@@ -34,8 +34,7 @@ interface TollingUploadAnalysisProps {
 }
 
 export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnalysisProps) {
-  const { createAnalysis } = useTollingAnalyses();
-  const { createPositions } = useTollingPositions(null);
+  const { createAnalysisWithPositions } = useTollingAnalyses();
   const { getRelevantPrecedents } = useTollingPrecedentBank();
   const { formatLearningsForPrompt, activeLearnings, getRelevantLearnings } = useTollingLearnings();
 
@@ -247,59 +246,56 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
 
       const { positions: extractedPositions } = analyzeResponse;
 
-      // Step 5: Create analysis record
-      const analysisResult = await createAnalysis.mutateAsync({
-        analysis_type: analysisType,
-        perspective,
-        project_name: projectName.trim(),
-        jurisdiction: jurisdiction || null,
-        document_file_name: tollingFile.name,
-        document_file_url: null,
-        comparison_file_name: comparisonFile?.name || null,
-        comparison_file_url: null,
-        notes: null,
-        parent_analysis_id: null,
-        version_number: 1,
-        is_comparison: false,
-        tolling_type: tollingType,
-        facility_stage: facilityStage,
-        complexity_score: null,
-        key_risk_areas: [],
-        counterparty_type: counterpartyType || null,
-        offtaker_name: offtakerName || null,
-        generator_name: generatorName || null,
-        offtaker_normalized: offtakerName || null,
-        generator_normalized: generatorName || null,
-        // Applied-context trace
-        applied_learning_ids: appliedLearningIds,
-        applied_precedent_ids: appliedPrecedentIds,
-        applied_gold_standard_ids: appliedGoldStandardIds,
-        // Telemetry
-        model_used: analyzeResponse?.model_used ?? null,
-        analysis_duration_ms: analysisDurationMs,
-        input_token_count: analyzeResponse?.input_token_count ?? null,
-        output_token_count: analyzeResponse?.output_token_count ?? null,
-      });
+      // Step 5: Atomically insert the analysis record + its positions
+      // in a single Postgres transaction (no orphan rows on network drop).
+      const positionsPayload = (extractedPositions || []).map((pos: any) => ({
+        category: pos.category,
+        position_summary: pos.position_summary,
+        source_text: pos.clause_references || pos.source_text || null,
+        confidence: pos.confidence || 'medium',
+        bible_reference: pos.bible_reference || null,
+        comparison_position: pos.market_comparison || pos.comparison_position || null,
+        variance_notes: pos.market_position
+          ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim()
+          : pos.variance_notes || null,
+        market_benchmark: pos.market_benchmark || null,
+      }));
 
-      // Step 6: Save extracted positions
-      if (extractedPositions && extractedPositions.length > 0) {
-        await createPositions.mutateAsync(
-          extractedPositions.map((pos: any) => ({
-            analysis_id: analysisResult.id,
-            user_id: analysisResult.user_id,
-            category: pos.category,
-            position_summary: pos.position_summary,
-            source_text: pos.clause_references || pos.source_text || null,
-            confidence: pos.confidence || 'medium',
-            bible_reference: pos.bible_reference || null,
-            comparison_position: pos.market_comparison || pos.comparison_position || null,
-            variance_notes: pos.market_position
-              ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim()
-              : pos.variance_notes || null,
-            market_benchmark: pos.market_benchmark || null,
-          }))
-        );
-      }
+      const analysisResult = await createAnalysisWithPositions.mutateAsync({
+        analysis: {
+          analysis_type: analysisType,
+          perspective,
+          project_name: projectName.trim(),
+          jurisdiction: jurisdiction || null,
+          document_file_name: tollingFile.name,
+          document_file_url: null,
+          comparison_file_name: comparisonFile?.name || null,
+          comparison_file_url: null,
+          notes: null,
+          parent_analysis_id: null,
+          version_number: 1,
+          is_comparison: false,
+          tolling_type: tollingType,
+          facility_stage: facilityStage,
+          complexity_score: null,
+          key_risk_areas: [],
+          counterparty_type: counterpartyType || null,
+          offtaker_name: offtakerName || null,
+          generator_name: generatorName || null,
+          offtaker_normalized: offtakerName || null,
+          generator_normalized: generatorName || null,
+          // Applied-context trace
+          applied_learning_ids: appliedLearningIds,
+          applied_precedent_ids: appliedPrecedentIds,
+          applied_gold_standard_ids: appliedGoldStandardIds,
+          // Telemetry
+          model_used: analyzeResponse?.model_used ?? null,
+          analysis_duration_ms: analysisDurationMs,
+          input_token_count: analyzeResponse?.input_token_count ?? null,
+          output_token_count: analyzeResponse?.output_token_count ?? null,
+        },
+        positions: positionsPayload,
+      });
 
       setAnalysisProgress(100);
       setCreatedAnalysisId(analysisResult.id);

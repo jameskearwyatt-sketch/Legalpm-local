@@ -58,8 +58,7 @@ const EUROPEAN_JURISDICTIONS = [
 ];
 
 export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill }: PPAUploadAnalysisProps) {
-  const { createAnalysis } = usePPAAnalyses();
-  const { createPositions } = usePPAPositions(null);
+  const { createAnalysisWithPositions } = usePPAAnalyses();
   const { precedents, goldStandardPrecedents, getRelevantPrecedents } = usePPAPrecedentBank();
    const { formatLearningsForPrompt, activeLearnings, getRelevantLearnings } = usePPALearnings();
   const { ppaPrecedentThreshold } = useUserSettings();
@@ -472,59 +471,57 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
 
       const { positions: extractedPositions } = analyzeResponse.data;
 
-      // Step 4: Create analysis record with enhanced learning fields
-      const analysisResult = await createAnalysis.mutateAsync({
-        analysis_type: analysisType,
-        perspective,
-        project_name: projectName.trim(),
-        jurisdiction: jurisdiction || null,
-        document_file_name: ppaFile.name,
-        document_file_url: null,
-        comparison_file_name: comparisonFile?.name || null,
-        comparison_file_url: null,
-        notes: null,
-        parent_analysis_id: null,
-        version_number: 1,
-        is_comparison: false,
-        // New learning fields
-        ppa_type: ppaType,
-        complexity_score: null, // Will be set after analysis
-        key_risk_areas: [],
-        counterparty_type: counterpartyType || null,
-        // Party names
-        buyer_name: buyerName || null,
-        seller_name: sellerName || null,
-        // Normalized names for intelligent search
-        buyer_normalized: buyerNormalized || null,
-        seller_normalized: sellerNormalized || null,
-        // Applied-context trace (what shaped this analysis)
-        applied_learning_ids: appliedLearningIds,
-        applied_precedent_ids: appliedPrecedentIds,
-        applied_gold_standard_ids: appliedGoldStandardIds,
-        // Telemetry
-        model_used: analyzeResponse.data?.model_used ?? null,
-        analysis_duration_ms: analysisDurationMs,
-        input_token_count: analyzeResponse.data?.input_token_count ?? null,
-        output_token_count: analyzeResponse.data?.output_token_count ?? null,
-      });
+      // Step 4: Atomically insert the analysis row + all extracted
+      // positions in a single Postgres transaction. If position insert
+      // fails, the analysis row is rolled back — no more orphan rows.
+      const positionsPayload = (extractedPositions || []).map((pos: any) => ({
+        category: pos.category,
+        position_summary: pos.position_summary,
+        source_text: pos.clause_references || pos.source_text || null,
+        confidence: pos.confidence || 'medium',
+        bible_reference: pos.bible_reference || null,
+        comparison_position: pos.market_comparison || pos.comparison_position || null,
+        variance_notes: pos.market_position ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim() : (pos.variance_notes || null),
+        market_benchmark: pos.market_benchmark || null,
+      }));
 
-      // Step 5: Save extracted positions
-      if (extractedPositions && extractedPositions.length > 0) {
-        await createPositions.mutateAsync(
-          extractedPositions.map((pos: any) => ({
-            analysis_id: analysisResult.id,
-            user_id: analysisResult.user_id,
-            category: pos.category,
-            position_summary: pos.position_summary,
-            source_text: pos.clause_references || pos.source_text || null,
-            confidence: pos.confidence || 'medium',
-            bible_reference: pos.bible_reference || null,
-            comparison_position: pos.market_comparison || pos.comparison_position || null,
-            variance_notes: pos.market_position ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim() : (pos.variance_notes || null),
-            market_benchmark: pos.market_benchmark || null,
-          }))
-        );
-      }
+      const analysisResult = await createAnalysisWithPositions.mutateAsync({
+        analysis: {
+          analysis_type: analysisType,
+          perspective,
+          project_name: projectName.trim(),
+          jurisdiction: jurisdiction || null,
+          document_file_name: ppaFile.name,
+          document_file_url: null,
+          comparison_file_name: comparisonFile?.name || null,
+          comparison_file_url: null,
+          notes: null,
+          parent_analysis_id: null,
+          version_number: 1,
+          is_comparison: false,
+          // New learning fields
+          ppa_type: ppaType,
+          complexity_score: null, // Will be set after analysis
+          key_risk_areas: [],
+          counterparty_type: counterpartyType || null,
+          // Party names
+          buyer_name: buyerName || null,
+          seller_name: sellerName || null,
+          // Normalized names for intelligent search
+          buyer_normalized: buyerNormalized || null,
+          seller_normalized: sellerNormalized || null,
+          // Applied-context trace (what shaped this analysis)
+          applied_learning_ids: appliedLearningIds,
+          applied_precedent_ids: appliedPrecedentIds,
+          applied_gold_standard_ids: appliedGoldStandardIds,
+          // Telemetry
+          model_used: analyzeResponse.data?.model_used ?? null,
+          analysis_duration_ms: analysisDurationMs,
+          input_token_count: analyzeResponse.data?.input_token_count ?? null,
+          output_token_count: analyzeResponse.data?.output_token_count ?? null,
+        },
+        positions: positionsPayload,
+      });
 
       setAnalysisProgress(100);
       setCreatedAnalysisId(analysisResult.id);

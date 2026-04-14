@@ -98,7 +98,7 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 | 2 | Applied-learnings trace (audit / provenance per analysis) | **Done** (Apr 2026) |
 | 1 | Embedding-based retrieval of relevant learnings/precedents | **Done** (Apr 2026) |
 | 3 | Prompt caching | Blocked (codebase uses Lovable AI Gateway → Gemini, not Anthropic Messages API) |
-| 4 | Postgres transactions for multi-step analyst mutations | Pending |
+| 4 | Postgres transactions for multi-step analyst mutations | **Done** (Apr 2026) |
 | 5 | Learning quality controls (conflict detection, golden-set regression) | Pending |
 | 6 | Structured output (JSON schema / tool use) | Pending |
 | 7 | Observability & telemetry | Partial (duration + token counts captured) |
@@ -122,6 +122,12 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 - All 5 precedent-bank hooks (inside `useXxxAnalyses.ts`) embed on `bankPositions` and expose `getRelevantPrecedents(queryText, k, onlyGoldStandard)`.
 - All 5 upload components (`PPAUploadAnalysis`, `TollingUploadAnalysis`, `CarbonUploadAnalysis`, `ITSupplyUploadAnalysis`, `CloudComputeUploadAnalysis`) now issue a top-K semantic query against the extracted contract text (first 15k chars) in parallel for learnings, regular precedents, and gold-standard precedents, and pass only those to the LLM. The applied-IDs audit trail (#2) automatically captures the narrower set.
 - Backfill path for pre-existing learnings/precedents: rows with `embedding IS NULL` are simply excluded from `match_*` RPC results, so until re-embedded they contribute nothing to semantic retrieval but the all-active fallback still covers them when OpenAI isn't configured. A follow-up script can backfill by streaming rows through `embed-text` and updating the row.
+
+### Atomic Analysis + Positions Inserts (#4) — Shipped
+
+- Migration `20260416000001_add_analyst_transactional_inserts.sql` adds 5 `SECURITY INVOKER` PL/pgSQL RPC functions (`create_{ppa,tolling,carbon,it_supply,cloud_compute}_analysis_with_positions`). Each function accepts `analysis_data jsonb` + `positions_data jsonb`, force-sets `user_id := auth.uid()` on every row (prevents impersonation), uses `jsonb_populate_record(set)` so new columns Just Work without function changes, and runs the analysis INSERT + positions INSERT inside a single implicit transaction. If either INSERT fails, the whole operation rolls back — no orphan analysis rows without positions, no orphan positions without an analysis.
+- All 5 `useXxxAnalyses` hooks expose `createAnalysisWithPositions` which calls the RPC and invalidates both the analyses and positions query keys. The legacy `createAnalysis` / `createPositions` mutations are retained for backwards compatibility.
+- All 5 upload components (`PPAUploadAnalysis`, `TollingUploadAnalysis`, `CarbonUploadAnalysis`, `ITSupplyUploadAnalysis`, `CloudComputeUploadAnalysis`) plus `PPACompareUpload` now issue a single transactional call instead of the previous 2-step `createAnalysis → createPositions` pattern. RLS is still enforced because `SECURITY INVOKER` means the function runs with the caller's role.
 
 ## Remaining Recommendations
 

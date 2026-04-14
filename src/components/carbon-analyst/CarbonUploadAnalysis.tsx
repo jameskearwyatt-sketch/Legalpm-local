@@ -24,8 +24,7 @@ interface CarbonUploadAnalysisProps {
 }
 
 export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysisProps) {
-  const { createAnalysis } = useCarbonAnalyses();
-  const { createPositions } = useCarbonPositions(null);
+  const { createAnalysisWithPositions } = useCarbonAnalyses();
   const { getRelevantPrecedents } = useCarbonPrecedentBank();
   const { formatLearningsForPrompt, activeLearnings, getRelevantLearnings } = useCarbonLearnings();
 
@@ -273,39 +272,40 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
 
       const { positions: extractedPositions } = analyzeResponse;
 
-      const analysisResult = await createAnalysis.mutateAsync({
-        analysis_type: analysisType, perspective, project_name: projectName.trim(),
-        jurisdiction: jurisdiction || null, document_file_name: carbonFile.name,
-        document_file_url: null, comparison_file_name: null, comparison_file_url: null,
-        notes: null, parent_analysis_id: null, version_number: 1, is_comparison: false,
-        carbon_type: carbonType, project_stage: projectStage, complexity_score: null,
-        key_risk_areas: [], counterparty_type: counterpartyType || null,
-        buyer_name: buyerName || null, seller_name: sellerName || null,
-        buyer_normalized: buyerNormalized || buyerName || null, seller_normalized: sellerNormalized || sellerName || null,
-        // Applied-context trace
-        applied_learning_ids: appliedLearningIds,
-        applied_precedent_ids: appliedPrecedentIds,
-        applied_gold_standard_ids: appliedGoldStandardIds,
-        // Telemetry
-        model_used: analyzeResponse?.model_used ?? null,
-        analysis_duration_ms: analysisDurationMs,
-        input_token_count: analyzeResponse?.input_token_count ?? null,
-        output_token_count: analyzeResponse?.output_token_count ?? null,
-      });
+      // Atomically insert analysis + positions in one transaction.
+      const positionsPayload = (extractedPositions || []).map((pos: any) => ({
+        category: pos.category, position_summary: pos.position_summary,
+        source_text: pos.clause_references || pos.source_text || null,
+        confidence: pos.confidence || 'medium', bible_reference: pos.bible_reference || null,
+        comparison_position: pos.market_comparison || pos.comparison_position || null,
+        variance_notes: pos.market_position
+          ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim()
+          : pos.variance_notes || null,
+        market_benchmark: pos.market_benchmark || null,
+      }));
 
-      if (extractedPositions && extractedPositions.length > 0) {
-        await createPositions.mutateAsync(extractedPositions.map((pos: any) => ({
-          analysis_id: analysisResult.id, user_id: analysisResult.user_id,
-          category: pos.category, position_summary: pos.position_summary,
-          source_text: pos.clause_references || pos.source_text || null,
-          confidence: pos.confidence || 'medium', bible_reference: pos.bible_reference || null,
-          comparison_position: pos.market_comparison || pos.comparison_position || null,
-          variance_notes: pos.market_position
-            ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim()
-            : pos.variance_notes || null,
-          market_benchmark: pos.market_benchmark || null,
-        })));
-      }
+      const analysisResult = await createAnalysisWithPositions.mutateAsync({
+        analysis: {
+          analysis_type: analysisType, perspective, project_name: projectName.trim(),
+          jurisdiction: jurisdiction || null, document_file_name: carbonFile.name,
+          document_file_url: null, comparison_file_name: null, comparison_file_url: null,
+          notes: null, parent_analysis_id: null, version_number: 1, is_comparison: false,
+          carbon_type: carbonType, project_stage: projectStage, complexity_score: null,
+          key_risk_areas: [], counterparty_type: counterpartyType || null,
+          buyer_name: buyerName || null, seller_name: sellerName || null,
+          buyer_normalized: buyerNormalized || buyerName || null, seller_normalized: sellerNormalized || sellerName || null,
+          // Applied-context trace
+          applied_learning_ids: appliedLearningIds,
+          applied_precedent_ids: appliedPrecedentIds,
+          applied_gold_standard_ids: appliedGoldStandardIds,
+          // Telemetry
+          model_used: analyzeResponse?.model_used ?? null,
+          analysis_duration_ms: analysisDurationMs,
+          input_token_count: analyzeResponse?.input_token_count ?? null,
+          output_token_count: analyzeResponse?.output_token_count ?? null,
+        },
+        positions: positionsPayload,
+      });
 
       setAnalysisProgress(100);
       setCreatedAnalysisId(analysisResult.id);

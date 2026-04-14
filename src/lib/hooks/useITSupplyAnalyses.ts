@@ -151,7 +151,30 @@ export function useITSupplyAnalyses() {
     onError: (error) => toast.error('Failed to delete analysis: ' + error.message),
   });
 
-  return { analyses: analyses || [], isLoading, error, createAnalysis, updateAnalysis, deleteAnalysis };
+  const createAnalysisWithPositions = useMutation({
+    mutationFn: async (args: {
+      analysis: Omit<ITSupplyAnalysis, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'is_agreed' | 'agreed_at'>;
+      positions: Omit<ITSupplyExtractedPosition, 'id' | 'analysis_id' | 'user_id' | 'created_at'>[];
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+      const { data, error } = await supabase.rpc(
+        'create_it_supply_analysis_with_positions' as never,
+        {
+          analysis_data: args.analysis as never,
+          positions_data: (args.positions ?? []) as never,
+        },
+      );
+      if (error) throw error;
+      return data as unknown as ITSupplyAnalysis;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['it-supply-analyses'] });
+      queryClient.invalidateQueries({ queryKey: ['it-supply-positions'] });
+    },
+    onError: (error) => toast.error('Failed to save analysis: ' + error.message),
+  });
+
+  return { analyses: analyses || [], isLoading, error, createAnalysis, createAnalysisWithPositions, updateAnalysis, deleteAnalysis };
 }
 
 export function useITSupplyPositions(analysisId: string | null) {

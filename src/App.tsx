@@ -30,6 +30,7 @@ import ITSupplyAnalyst from "./pages/ITSupplyAnalyst";
 import CloudComputeAnalyst from "./pages/CloudComputeAnalyst";
 import AdaptPricingWizard from "./pages/AdaptPricingWizard";
 import AdminAnalystBackfill from "./pages/AdminAnalystBackfill";
+import AdminAnalystTelemetry from "./pages/AdminAnalystTelemetry";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 import { useUserRole } from "@/lib/hooks/useUserRole";
@@ -111,6 +112,7 @@ function AppRoutes() {
       <Route path="/growth/:projectId" element={<ProtectedRoute><GrowthProjectDetail /></ProtectedRoute>} />
       <Route path="/flags" element={<AdminRoute><Flags /></AdminRoute>} />
       <Route path="/admin/analyst-backfill" element={<AdminRoute><AdminAnalystBackfill /></AdminRoute>} />
+      <Route path="/admin/analyst-telemetry" element={<AdminRoute><AdminAnalystTelemetry /></AdminRoute>} />
       <Route path="/red-flags" element={<ProtectedRoute><RedFlags /></ProtectedRoute>} />
       <Route path="/pipeline-flags" element={<ProtectedRoute><PipelineFlags /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

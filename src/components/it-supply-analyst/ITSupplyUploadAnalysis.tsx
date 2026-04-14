@@ -14,6 +14,8 @@ import { useITSupplyLearnings } from '@/lib/hooks/useITSupplyLearnings';
 import { ITSupplyAnalysisReport } from './ITSupplyAnalysisReport';
 import { IT_SUPPLY_TYPES, IT_SUPPLY_CONTRACT_STAGES, type ITSupplyContractStage } from '@/lib/itSupplyCategories';
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
+import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 
 const JURISDICTIONS = ['United States', 'United Kingdom', 'EU', 'Taiwan', 'South Korea', 'Japan', 'China', 'Singapore', 'Other'];
 
@@ -41,6 +43,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
   const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -63,6 +66,10 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
     setStep('analyzing');
     setAnalysisProgress(0);
     setError(null);
+
+    // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
+    const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
+    let piiTotalRedactions = 0;
 
     try {
       setAnalysisStatus('Extracting text from document...');
@@ -87,9 +94,21 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
       const { text: contractText } = await parseResponse.json();
       setAnalysisProgress(30);
 
+      // Optional PII redaction before any text leaves the browser.
+      let contractTextForLLM = contractText;
+      if (redactPIIEnabled) {
+        const r1 = redactPII(contractText || '');
+        contractTextForLLM = r1.redacted;
+        (Object.keys(piiCounts) as (keyof typeof piiCounts)[]).forEach(k => { piiCounts[k] += r1.counts[k]; });
+        piiTotalRedactions += r1.totalRedactions;
+        if (piiTotalRedactions > 0) {
+          toast.success(`PII redaction: ${summarizeRedaction(piiCounts)}`);
+        }
+      }
+
       setAnalysisStatus('Building precedent intelligence...');
       // Semantic top-K retrieval with graceful fallback to all-active.
-      const retrievalQuery = (contractText || '').slice(0, 15_000);
+      const retrievalQuery = (contractTextForLLM || '').slice(0, 15_000);
       const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
         getRelevantLearnings(retrievalQuery, 15),
         getRelevantPrecedents(retrievalQuery, 20, false),
@@ -124,7 +143,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sd2?.session?.access_token}` },
             body: JSON.stringify({
-              contractText, analysisType, perspective, jurisdiction, projectName,
+              contractText: contractTextForLLM, analysisType, perspective, jurisdiction, projectName,
               supplyType, contractStage, counterpartyType: counterpartyType || null,
               precedents: relevantPrecedents, userLearnings: userLearningsPrompt,
             }),
@@ -160,12 +179,19 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
         analystType: 'it_supply',
         functionName: 'analyze-it-supply',
         status: 'success',
-        inputChars: contractText?.length ?? 0,
+        inputChars: contractTextForLLM?.length ?? 0,
         inputTokenCount: analyzeResponse?.input_token_count ?? null,
         outputTokenCount: analyzeResponse?.output_token_count ?? null,
         modelUsed: analyzeResponse?.model_used ?? null,
         durationMs: analysisDurationMs,
-        metadata: { analysisType, perspective, supplyType },
+        metadata: {
+          analysisType,
+          perspective,
+          supplyType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
       });
 
       const { positions: extractedPositions } = analyzeResponse;
@@ -217,7 +243,14 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
         status: 'failure',
         errorType: classifyLlmError(err),
         errorMessage: err instanceof Error ? err.message : String(err),
-        metadata: { analysisType, perspective, supplyType },
+        metadata: {
+          analysisType,
+          perspective,
+          supplyType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
       });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
@@ -371,9 +404,12 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
               </div>
             </div>
             {step === 'configure' && (
-              <Button onClick={handleStartAnalysis} className="w-full" disabled={!contractFile || !projectName.trim()}>
-                <Cpu className="h-4 w-4 mr-2" /> Start Analysis
-              </Button>
+              <>
+                <PIIRedactionToggle checked={redactPIIEnabled} onCheckedChange={setRedactPIIEnabled} />
+                <Button onClick={handleStartAnalysis} className="w-full" disabled={!contractFile || !projectName.trim()}>
+                  <Cpu className="h-4 w-4 mr-2" /> Start Analysis
+                </Button>
+              </>
             )}
           </CardContent>
         </Card>

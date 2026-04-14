@@ -14,6 +14,8 @@ import { useCloudComputeLearnings } from '@/lib/hooks/useCloudComputeLearnings';
 import { CloudComputeAnalysisReport } from './CloudComputeAnalysisReport';
 import { CLOUD_SERVICE_TYPES, CLOUD_DEPLOYMENT_MODELS, type CloudDeploymentModel } from '@/lib/cloudComputeCategories';
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
+import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 
 const JURISDICTIONS = ['United States', 'United Kingdom', 'EU', 'Germany', 'Ireland', 'Singapore', 'Japan', 'Australia', 'Other'];
 
@@ -39,6 +41,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
   const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -54,6 +57,10 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
     if (!projectName.trim()) { toast.error('Please enter a project name'); return; }
     setStep('analyzing'); setAnalysisProgress(0); setError(null);
 
+    // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
+    const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
+    let piiTotalRedactions = 0;
+
     try {
       setAnalysisStatus('Extracting text from document...'); setAnalysisProgress(10);
       const formData = new FormData(); formData.append('file', contractFile);
@@ -64,9 +71,21 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       const { text: contractText } = await parseResponse.json();
       setAnalysisProgress(30);
 
+      // Optional PII redaction before any text leaves the browser.
+      let contractTextForLLM = contractText;
+      if (redactPIIEnabled) {
+        const r1 = redactPII(contractText || '');
+        contractTextForLLM = r1.redacted;
+        (Object.keys(piiCounts) as (keyof typeof piiCounts)[]).forEach(k => { piiCounts[k] += r1.counts[k]; });
+        piiTotalRedactions += r1.totalRedactions;
+        if (piiTotalRedactions > 0) {
+          toast.success(`PII redaction: ${summarizeRedaction(piiCounts)}`);
+        }
+      }
+
       setAnalysisStatus('Building precedent intelligence...');
       // Semantic top-K retrieval with graceful fallback to all-active.
-      const retrievalQuery = (contractText || '').slice(0, 15_000);
+      const retrievalQuery = (contractTextForLLM || '').slice(0, 15_000);
       const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
         getRelevantLearnings(retrievalQuery, 15),
         getRelevantPrecedents(retrievalQuery, 20, false),
@@ -89,7 +108,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
         try {
           const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-cloud-compute`, {
             method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sd2?.session?.access_token}` },
-            body: JSON.stringify({ contractText, analysisType, perspective, jurisdiction, projectName, serviceType, deploymentModel, counterpartyType: counterpartyType || null, precedents: relevantPrecedents, userLearnings: userLearningsPrompt }),
+            body: JSON.stringify({ contractText: contractTextForLLM, analysisType, perspective, jurisdiction, projectName, serviceType, deploymentModel, counterpartyType: counterpartyType || null, precedents: relevantPrecedents, userLearnings: userLearningsPrompt }),
             signal: controller.signal,
           }); clearTimeout(timeoutId); return res;
         } catch (fe) { clearTimeout(timeoutId); if (retryCount < 3 && fe instanceof Error && (fe.name === 'AbortError' || fe.message.includes('fetch'))) { setAnalysisStatus(`Retrying (attempt ${retryCount + 2}/4)...`); await new Promise(r => setTimeout(r, 3000)); return callAnalyzeApi(retryCount + 1); } throw fe; }
@@ -105,12 +124,20 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
         analystType: 'cloud_compute',
         functionName: 'analyze-cloud-compute',
         status: 'success',
-        inputChars: contractText?.length ?? 0,
+        inputChars: contractTextForLLM?.length ?? 0,
         inputTokenCount: analyzeResponse?.input_token_count ?? null,
         outputTokenCount: analyzeResponse?.output_token_count ?? null,
         modelUsed: analyzeResponse?.model_used ?? null,
         durationMs: analysisDurationMs,
-        metadata: { analysisType, perspective, serviceType, deploymentModel },
+        metadata: {
+          analysisType,
+          perspective,
+          serviceType,
+          deploymentModel,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
       });
       const { positions: extractedPositions } = analyzeResponse;
 
@@ -155,7 +182,15 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
         status: 'failure',
         errorType: classifyLlmError(err),
         errorMessage: err instanceof Error ? err.message : String(err),
-        metadata: { analysisType, perspective, serviceType, deploymentModel },
+        metadata: {
+          analysisType,
+          perspective,
+          serviceType,
+          deploymentModel,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
       });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
@@ -208,7 +243,12 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
               <div className="space-y-2"><Label>Tenant Name (optional)</Label><Input value={tenantName} onChange={(e) => setTenantName(e.target.value)} placeholder="e.g., Amazon" /></div>
               <div className="space-y-2"><Label>Provider Name (optional)</Label><Input value={providerName} onChange={(e) => setProviderName(e.target.value)} placeholder="e.g., Equinix" /></div>
             </div>
-            {step === 'configure' && <Button onClick={handleStartAnalysis} className="w-full" disabled={!contractFile || !projectName.trim()}><Cloud className="h-4 w-4 mr-2" /> Start Analysis</Button>}
+            {step === 'configure' && (
+              <>
+                <PIIRedactionToggle checked={redactPIIEnabled} onCheckedChange={setRedactPIIEnabled} />
+                <Button onClick={handleStartAnalysis} className="w-full" disabled={!contractFile || !projectName.trim()}><Cloud className="h-4 w-4 mr-2" /> Start Analysis</Button>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

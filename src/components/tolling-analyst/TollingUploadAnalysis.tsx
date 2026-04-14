@@ -29,6 +29,8 @@ const JURISDICTIONS = [
 
 import { TOLLING_TECHNOLOGY_TYPES, TOLLING_FACILITY_STAGES, type TollingFacilityStage } from '@/lib/tollingCategories';
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
+import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 
 interface TollingUploadAnalysisProps {
   onAnalysisComplete?: () => void;
@@ -55,6 +57,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
   const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>, type: 'tolling' | 'comparison') => {
     const file = e.target.files?.[0];
@@ -96,6 +99,10 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
     setStep('analyzing');
     setAnalysisProgress(0);
     setError(null);
+
+    // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
+    const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
+    let piiTotalRedactions = 0;
 
     try {
       // Step 1: Parse the document
@@ -148,10 +155,29 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         setAnalysisProgress(50);
       }
 
+      // Optional PII redaction before any text leaves the browser.
+      let tollingTextForLLM = tollingText;
+      let comparisonTextForLLM = comparisonText;
+      if (redactPIIEnabled) {
+        const r1 = redactPII(tollingText || '');
+        tollingTextForLLM = r1.redacted;
+        (Object.keys(piiCounts) as (keyof typeof piiCounts)[]).forEach(k => { piiCounts[k] += r1.counts[k]; });
+        piiTotalRedactions += r1.totalRedactions;
+        if (comparisonText) {
+          const r2 = redactPII(comparisonText);
+          comparisonTextForLLM = r2.redacted;
+          (Object.keys(piiCounts) as (keyof typeof piiCounts)[]).forEach(k => { piiCounts[k] += r2.counts[k]; });
+          piiTotalRedactions += r2.totalRedactions;
+        }
+        if (piiTotalRedactions > 0) {
+          toast.success(`PII redaction: ${summarizeRedaction(piiCounts)}`);
+        }
+      }
+
       // Step 3: Build precedent context (semantic top-K retrieval with
       // graceful fallback to all-active when embeddings aren't available).
       setAnalysisStatus('Building precedent intelligence...');
-      const retrievalQuery = (tollingText || '').slice(0, 15_000);
+      const retrievalQuery = (tollingTextForLLM || '').slice(0, 15_000);
       const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
         getRelevantLearnings(retrievalQuery, 15),
         getRelevantPrecedents(retrievalQuery, 20, false),
@@ -198,8 +224,8 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
                 Authorization: `Bearer ${authToken}`,
               },
               body: JSON.stringify({
-                tollingText,
-                comparisonText,
+                tollingText: tollingTextForLLM,
+                comparisonText: comparisonTextForLLM,
                 analysisType,
                 perspective,
                 jurisdiction,
@@ -249,12 +275,19 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         analystType: 'tolling',
         functionName: 'analyze-tolling',
         status: 'success',
-        inputChars: (tollingText?.length ?? 0) + (comparisonText?.length ?? 0),
+        inputChars: (tollingTextForLLM?.length ?? 0) + (comparisonTextForLLM?.length ?? 0),
         inputTokenCount: analyzeResponse?.input_token_count ?? null,
         outputTokenCount: analyzeResponse?.output_token_count ?? null,
         modelUsed: analyzeResponse?.model_used ?? null,
         durationMs: analysisDurationMs,
-        metadata: { analysisType, perspective, tollingType },
+        metadata: {
+          analysisType,
+          perspective,
+          tollingType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
       });
 
       const { positions: extractedPositions } = analyzeResponse;
@@ -322,7 +355,14 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         status: 'failure',
         errorType: classifyLlmError(err),
         errorMessage: err instanceof Error ? err.message : String(err),
-        metadata: { analysisType, perspective, tollingType },
+        metadata: {
+          analysisType,
+          perspective,
+          tollingType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
       });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
@@ -627,6 +667,8 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
             <p className="text-xs text-muted-foreground -mt-3">
               Party names help search precedents by counterparty later
             </p>
+
+            <PIIRedactionToggle checked={redactPIIEnabled} onCheckedChange={setRedactPIIEnabled} />
 
             {/* Start Analysis */}
             <Button

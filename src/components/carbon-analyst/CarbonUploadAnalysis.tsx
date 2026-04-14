@@ -14,6 +14,8 @@ import { useCarbonLearnings } from '@/lib/hooks/useCarbonLearnings';
 import { CarbonAnalysisReport } from './CarbonAnalysisReport';
 import { CARBON_PROJECT_TYPES, CARBON_PROJECT_STAGES, CARBON_CREDIT_CLASSES, getCreditClassForType, type CarbonProjectStage, type CarbonCreditClass } from '@/lib/carbonCategories';
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
+import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 
 const JURISDICTIONS = [
   'United Kingdom', 'United States', 'European Union', 'Switzerland',
@@ -49,6 +51,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
   const [isDetectingMetadata, setIsDetectingMetadata] = useState(false);
   const [detectionNotes, setDetectionNotes] = useState<string | null>(null);
   const [detectedFramework, setDetectedFramework] = useState<string | null>(null);
+  const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
 
   // Auto-detect carbon metadata after clicking Start Analysis
   const detectCarbonMetadata = useCallback(async (file: File) => {
@@ -185,6 +188,10 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
     setAnalysisProgress(0);
     setError(null);
 
+    // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
+    const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
+    let piiTotalRedactions = 0;
+
     try {
       setAnalysisStatus('Extracting text from document...');
       setAnalysisProgress(10);
@@ -201,9 +208,21 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
       const { text: documentText } = await parseResponse.json();
       setAnalysisProgress(40);
 
+      // Optional PII redaction before any text leaves the browser.
+      let documentTextForLLM = documentText;
+      if (redactPIIEnabled) {
+        const r1 = redactPII(documentText || '');
+        documentTextForLLM = r1.redacted;
+        (Object.keys(piiCounts) as (keyof typeof piiCounts)[]).forEach(k => { piiCounts[k] += r1.counts[k]; });
+        piiTotalRedactions += r1.totalRedactions;
+        if (piiTotalRedactions > 0) {
+          toast.success(`PII redaction: ${summarizeRedaction(piiCounts)}`);
+        }
+      }
+
       setAnalysisStatus('Building precedent intelligence...');
       // Semantic top-K retrieval with graceful fallback to all-active.
-      const retrievalQuery = (documentText || '').slice(0, 15_000);
+      const retrievalQuery = (documentTextForLLM || '').slice(0, 15_000);
       const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
         getRelevantLearnings(retrievalQuery, 15),
         getRelevantPrecedents(retrievalQuery, 20, false),
@@ -238,7 +257,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sd2?.session?.access_token}` },
             body: JSON.stringify({
-              documentText, analysisType, perspective, jurisdiction, projectName,
+              documentText: documentTextForLLM, analysisType, perspective, jurisdiction, projectName,
               carbonType, projectStage, counterpartyType: counterpartyType || null,
               creditClass: getCreditClassForType(carbonType),
               precedents: relevantPrecedents, userLearnings: userLearningsPrompt,
@@ -275,12 +294,19 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
         analystType: 'carbon',
         functionName: 'analyze-carbon-credit',
         status: 'success',
-        inputChars: documentText?.length ?? 0,
+        inputChars: documentTextForLLM?.length ?? 0,
         inputTokenCount: analyzeResponse?.input_token_count ?? null,
         outputTokenCount: analyzeResponse?.output_token_count ?? null,
         modelUsed: analyzeResponse?.model_used ?? null,
         durationMs: analysisDurationMs,
-        metadata: { analysisType, perspective, carbonType },
+        metadata: {
+          analysisType,
+          perspective,
+          carbonType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
       });
 
       const { positions: extractedPositions } = analyzeResponse;
@@ -332,7 +358,14 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
         status: 'failure',
         errorType: classifyLlmError(err),
         errorMessage: err instanceof Error ? err.message : String(err),
-        metadata: { analysisType, perspective, carbonType },
+        metadata: {
+          analysisType,
+          perspective,
+          carbonType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
       });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
@@ -494,6 +527,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
               </div>
             </div>
             <p className="text-xs text-muted-foreground -mt-3">Party names help search precedents by counterparty later</p>
+            <PIIRedactionToggle checked={redactPIIEnabled} onCheckedChange={setRedactPIIEnabled} />
             <Button onClick={handleDetectAndConfirm} className="w-full gap-2" disabled={!carbonFile || !projectName.trim() || isDetectingMetadata}>
               {isDetectingMetadata ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

@@ -16,6 +16,8 @@ import { useUserSettings } from '@/lib/hooks/useUserSettings';
 import { PPAAnalysisReport } from './PPAAnalysisReport';
 import { generateMarketIntelligence, formatIntelligenceForPrompt } from '@/lib/ppaPrecedentIntelligence';
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
+import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 
 // Pre-fill data for re-analysis
 interface PreFillData {
@@ -82,6 +84,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
   const [error, setError] = useState<string | null>(null);
   const [isDetectingMetadata, setIsDetectingMetadata] = useState(false);
   const [detectionNotes, setDetectionNotes] = useState<string | null>(null);
+  const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
 
   // Auto-detect PPA metadata after file upload
   const detectPPAMetadata = useCallback(async (file: File) => {
@@ -266,6 +269,10 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
     setAnalysisProgress(0);
     setError(null);
 
+    // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
+    const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
+    let piiTotalRedactions = 0;
+
     try {
       // Step 1: Parse the PPA document
       setAnalysisStatus('Extracting text from document...');
@@ -344,10 +351,33 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
       console.log(`  PPA Type Intelligence: ${marketIntelligence.ppaTypeAnalysis.typeRecommendation || 'N/A'}`);
       console.log(`  Learning Velocity: ${marketIntelligence.learningMetrics.learningVelocity}`);
       
+      // Optional PII redaction: if the user opted in, mask emails/phones/
+      // tax IDs/card numbers BEFORE any of the text leaves the browser
+      // (including before embedding for retrieval). Original document is
+      // unchanged — we only redact the text we pass on to the LLM.
+      let ppaTextForLLM = ppaText;
+      let comparisonTextForLLM = comparisonText;
+      if (redactPIIEnabled) {
+        const r1 = redactPII(ppaText || '');
+        ppaTextForLLM = r1.redacted;
+        (Object.keys(piiCounts) as (keyof typeof piiCounts)[]).forEach(k => { piiCounts[k] += r1.counts[k]; });
+        piiTotalRedactions += r1.totalRedactions;
+        if (comparisonText) {
+          const r2 = redactPII(comparisonText);
+          comparisonTextForLLM = r2.redacted;
+          (Object.keys(piiCounts) as (keyof typeof piiCounts)[]).forEach(k => { piiCounts[k] += r2.counts[k]; });
+          piiTotalRedactions += r2.totalRedactions;
+        }
+        if (piiTotalRedactions > 0) {
+          const summary = summarizeRedaction(piiCounts);
+          toast.success(`PII redaction: ${summary}`);
+        }
+      }
+
       // Semantic top-K retrieval: use the PPA text as the query and only
       // pass the most relevant precedents / learnings to the LLM. Falls back
       // to all-active when embeddings aren't available.
-      const retrievalQuery = (ppaText || '').slice(0, 15_000);
+      const retrievalQuery = (ppaTextForLLM || '').slice(0, 15_000);
       const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
         getRelevantLearnings(retrievalQuery, 15),
         getRelevantPrecedents(retrievalQuery, 20, false),
@@ -415,8 +445,8 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
                 'Authorization': `Bearer ${authToken}`,
               },
               body: JSON.stringify({
-                ppaText,
-                comparisonText,
+                ppaText: ppaTextForLLM,
+                comparisonText: comparisonTextForLLM,
                 analysisType,
                 perspective,
                 jurisdiction,
@@ -491,12 +521,19 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         analystType: 'ppa',
         functionName: 'analyze-ppa',
         status: 'success',
-        inputChars: (ppaText?.length ?? 0) + (comparisonText?.length ?? 0),
+        inputChars: (ppaTextForLLM?.length ?? 0) + (comparisonTextForLLM?.length ?? 0),
         inputTokenCount: analyzeResponse.data?.input_token_count ?? null,
         outputTokenCount: analyzeResponse.data?.output_token_count ?? null,
         modelUsed: analyzeResponse.data?.model_used ?? null,
         durationMs: analysisDurationMs,
-        metadata: { analysisType, perspective, ppaType },
+        metadata: {
+          analysisType,
+          perspective,
+          ppaType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
       });
 
       const analysisResult = await createAnalysisWithPositions.mutateAsync({
@@ -550,7 +587,14 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         status: 'failure',
         errorType: classifyLlmError(err),
         errorMessage: err instanceof Error ? err.message : String(err),
-        metadata: { analysisType, perspective, ppaType },
+        metadata: {
+          analysisType,
+          perspective,
+          ppaType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
       });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
@@ -891,9 +935,11 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
               Party names help you search precedents by counterparty later
             </p>
 
+            <PIIRedactionToggle checked={redactPIIEnabled} onCheckedChange={setRedactPIIEnabled} />
+
             {/* Start Analysis - triggers metadata detection first */}
-            <Button 
-              onClick={handleDetectAndConfirm} 
+            <Button
+              onClick={handleDetectAndConfirm}
               className="w-full gap-2"
               disabled={!ppaFile || !projectName.trim() || isDetectingMetadata}
             >

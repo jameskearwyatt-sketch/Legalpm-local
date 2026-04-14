@@ -103,7 +103,7 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 | 6 | Structured output (JSON schema / tool use) | Pending |
 | 7 | Observability & telemetry | **Done** (Apr 2026) |
 | 8 | Cross-analyst reuse / shared component refactor | Pending |
-| 9 | PII redaction + LLM call audit log | Pending |
+| 9 | PII redaction + LLM call audit log | **Done** (Apr 2026) |
 | 10 | Streaming / batch / Word export | Pending |
 
 ### Applied-Learnings Trace (#2) — Shipped
@@ -144,6 +144,14 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 - Client helper `src/lib/analyst/llmCallLog.ts` exposes `logLlmCall(entry)` (fire-and-forget) and `classifyLlmError(err)` which maps any error to one of `timeout | auth | server_error | parse_error | network | rate_limit | not_configured | unknown`.
 - All 5 upload components log both the success and failure paths of their analyze-contract call with input size, token counts, duration, model, and a small metadata object (analysis_type, perspective, contract sub-type). Logging never blocks the user flow — failures in the logger are swallowed.
 - Future extensions (not in this ship): logging embed-text and feedback calls; an admin dashboard that aggregates this table into success-rate / p95-latency / error-breakdown charts per analyst tool.
+
+### PII Redaction (#9) — Shipped
+
+- Client-side regex helper `src/lib/analyst/piiRedaction.ts` exposes `redactPII(text)` which masks six PII classes with typed placeholders (`[EMAIL_REDACTED]`, `[PHONE_REDACTED]`, `[SSN_REDACTED]`, `[EIN_REDACTED]`, `[IBAN_REDACTED]`, `[CARD_REDACTED]`) and returns per-class counts plus a `totalRedactions` tally. Patterns are deliberately conservative (precision-over-recall): emails require dot-in-domain, phones require a separator between digit groups to avoid eating clause numbers, SSN rejects invalid area codes (000/666/9xx), EIN is 2-7, IBAN is 2 letters + 2 check digits + 11-30 alphanumerics, card runs through a Luhn check before redaction. Phone regex runs last so it can't swallow SSN-like sequences. Party names, addresses, and contract terms are never touched.
+- Shared UI `src/components/shared/PIIRedactionToggle.tsx` — opt-in checkbox with ShieldCheck icon, inline explainer and a tooltip listing exactly what is masked and what is not. OFF by default (contract analysis usually benefits from seeing incidental notice emails). Rendered in all 5 upload components immediately above the Start Analysis button (Tolling, IT Supply, Cloud Compute) or next to the existing action button (PPA, Carbon).
+- All 5 upload components (`PPAUploadAnalysis`, `TollingUploadAnalysis`, `CarbonUploadAnalysis`, `ITSupplyUploadAnalysis`, `CloudComputeUploadAnalysis`) now apply `redactPII` to the extracted contract text (and comparison text where applicable) BEFORE any of it leaves the browser — including before embedding for top-K retrieval. The redacted text is what's passed to the analyze-* edge function and what's counted into `inputChars`. The original document upload is never modified.
+- Redaction counts + total are written into the LLM call log metadata (`pii_redacted`, `pii_redaction_counts`, `pii_total_redactions`) on both success and failure paths, so admins can see how often the toggle is used and what classes of PII are being masked. A toast also surfaces the per-run summary (e.g. "3 emails, 1 phone redacted") to the user.
+- No server-side work required — redaction happens entirely client-side. No migration. No new edge function. Fails closed in the sense that if `redactPII` itself throws, the catch block already logs the failure and aborts analysis before any text is sent.
 
 ## Remaining Recommendations
 

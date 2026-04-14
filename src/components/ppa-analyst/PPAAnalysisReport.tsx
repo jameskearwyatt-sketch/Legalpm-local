@@ -28,6 +28,7 @@ import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAExtractedPosit
 import { usePPALearnings } from '@/lib/hooks/usePPALearnings';
 import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
 import { ExportAnalystReportButton, type AnalystReportExport } from '@/components/shared/ExportAnalystReportButton';
+import { ExportAnalystExcelButton } from '@/components/shared/ExportAnalystExcelButton';
 import { PPATeachFeedbackDialog } from './PPATeachFeedbackDialog';
 import { WhatsMarketDialog } from './WhatsMarketDialog';
 import { getCategoryById, PPA_CATEGORY_GROUPS, PPA_ALL_CATEGORIES } from '@/lib/ppaCategories';
@@ -434,6 +435,7 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
             </div>
             <div className="flex gap-2">
               {exportPayload && <ExportAnalystReportButton payload={exportPayload} />}
+              {exportPayload && <ExportAnalystExcelButton payload={exportPayload} />}
               <Button variant="outline" size="sm" onClick={onCompareNewDraft}>
                 <GitCompare className="h-4 w-4 mr-1" />
                 Compare New Draft

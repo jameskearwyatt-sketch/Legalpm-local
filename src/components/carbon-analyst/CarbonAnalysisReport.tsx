@@ -12,6 +12,7 @@ import { useCarbonAnalyses, useCarbonPositions, useCarbonPrecedentBank, CarbonEx
 import { useCarbonLearnings } from '@/lib/hooks/useCarbonLearnings';
 import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
 import { ExportAnalystReportButton, type AnalystReportExport } from '@/components/shared/ExportAnalystReportButton';
+import { ExportAnalystExcelButton } from '@/components/shared/ExportAnalystExcelButton';
 import { CarbonTeachFeedbackDialog } from './CarbonTeachFeedbackDialog';
 import { CarbonWhatsMarketDialog } from './CarbonWhatsMarketDialog';
 import { CARBON_CATEGORY_GROUPS, CARBON_ALL_CATEGORIES, CARBON_PROJECT_TYPES } from '@/lib/carbonCategories';
@@ -203,6 +204,7 @@ export function CarbonAnalysisReport({ analysisId, onNewAnalysis, onViewHistory 
             </div>
             <div className="flex gap-2">
               {exportPayload && <ExportAnalystReportButton payload={exportPayload} />}
+              {exportPayload && <ExportAnalystExcelButton payload={exportPayload} />}
               <Button variant="outline" size="sm" onClick={onNewAnalysis}><Plus className="h-4 w-4 mr-1" /> New Analysis</Button>
               <Button variant="outline" size="sm" onClick={onViewHistory}><History className="h-4 w-4 mr-1" /> View History</Button>
             </div>

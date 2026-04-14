@@ -9,6 +9,7 @@ import { useITSupplyAnalyses, useITSupplyPositions, useITSupplyPrecedentBank, IT
 import { useITSupplyLearnings } from '@/lib/hooks/useITSupplyLearnings';
 import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
 import { ExportAnalystReportButton, type AnalystReportExport } from '@/components/shared/ExportAnalystReportButton';
+import { ExportAnalystExcelButton } from '@/components/shared/ExportAnalystExcelButton';
 import { ITSupplyTeachFeedbackDialog } from './ITSupplyTeachFeedbackDialog';
 import { ITSupplyWhatsMarketDialog } from './ITSupplyWhatsMarketDialog';
 import { IT_SUPPLY_CATEGORY_GROUPS, IT_SUPPLY_ALL_CATEGORIES } from '@/lib/itSupplyCategories';
@@ -197,6 +198,7 @@ export function ITSupplyAnalysisReport({ analysisId, onNewAnalysis, onViewHistor
             </div>
             <div className="flex gap-2">
               {exportPayload && <ExportAnalystReportButton payload={exportPayload} />}
+              {exportPayload && <ExportAnalystExcelButton payload={exportPayload} />}
               <Button variant="outline" size="sm" onClick={onNewAnalysis}><Plus className="h-4 w-4 mr-1" /> New Analysis</Button>
               <Button variant="outline" size="sm" onClick={onViewHistory}><History className="h-4 w-4 mr-1" /> View History</Button>
             </div>

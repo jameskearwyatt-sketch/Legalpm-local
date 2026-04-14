@@ -345,6 +345,14 @@ export default function Dashboard() {
   const outstandingAR = (stats?.totalBilled || 0) - (stats?.totalPaid || 0);
   const totalLockup = (stats?.totalWip || 0) + outstandingAR;
 
+  const handleTileClick = (tile: 'wip' | 'ar' | 'paid') => {
+    setExpandedTile(prev => prev === tile ? null : tile);
+    // Scroll to breakdown after a tick
+    setTimeout(() => {
+      breakdownRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+  };
+
   const kpiCards = [
     {
       title: 'Work in Progress',
@@ -352,30 +360,35 @@ export default function Dashboard() {
       icon: <Clock className="h-5 w-5" />,
       variant: 'default' as const,
       hasProposalAdjustment: stats?.hasActiveWipProposals || false,
+      tileKey: 'wip' as const,
     },
     {
       title: 'Total AR',
       value: formatCurrency(outstandingAR, 'USD'),
       icon: <FileText className="h-5 w-5" />,
       variant: 'default' as const,
+      tileKey: 'ar' as const,
     },
     {
       title: 'Total Lock-up',
       value: formatCurrency(totalLockup, 'USD'),
       icon: <DollarSign className="h-5 w-5" />,
       variant: 'default' as const,
+      tileKey: null,
     },
     {
       title: 'Total Billed',
       value: formatCurrency(stats?.totalBilled || 0, 'USD'),
       icon: <FileText className="h-5 w-5" />,
       variant: 'default' as const,
+      tileKey: null,
     },
     {
       title: 'Total Paid',
       value: formatCurrency(stats?.totalPaid || 0, 'USD'),
       icon: <CheckCircle className="h-5 w-5" />,
       variant: 'success' as const,
+      tileKey: 'paid' as const,
     },
     {
       title: 'Realization Rate',
@@ -383,6 +396,7 @@ export default function Dashboard() {
       icon: <Percent className="h-5 w-5" />,
       variant: (stats?.realizationRate || 0) >= 80 ? 'success' as const : (stats?.realizationRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
       infoTooltip: 'Realization Rate measures the percentage of worked time that was actually collected as revenue. WIP write-offs hurt this rate. E.g., if you bill £100k, write off £50k, and collect £50k, your collection rate is 100% but realization rate is 50%.',
+      tileKey: null,
     },
     {
       title: 'Collection Rate',
@@ -390,8 +404,31 @@ export default function Dashboard() {
       icon: <TrendingUp className="h-5 w-5" />,
       variant: (stats?.avgCollectionRate || 0) >= 80 ? 'success' as const : (stats?.avgCollectionRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
       infoTooltip: 'Collection Rate measures the percentage of billed amounts that have been collected. WIP write-offs do not affect this rate — it only looks at bills issued vs. payments received.',
+      tileKey: null,
     },
   ];
+
+  const breakdownData = useMemo(() => {
+    if (!expandedTile || !stats?.matterBreakdowns) return [];
+    const sorted = [...stats.matterBreakdowns];
+    if (expandedTile === 'wip') {
+      return sorted.filter(m => m.wipAmount > 0).sort((a, b) => b.wipAmount - a.wipAmount);
+    }
+    if (expandedTile === 'ar') {
+      return sorted.filter(m => m.arAmount > 0).sort((a, b) => b.arAmount - a.arAmount);
+    }
+    if (expandedTile === 'paid') {
+      return sorted.filter(m => m.paidAmount > 0).sort((a, b) => b.paidAmount - a.paidAmount);
+    }
+    return [];
+  }, [expandedTile, stats?.matterBreakdowns]);
+
+  const breakdownTitle = expandedTile === 'wip' ? 'Work in Progress' : expandedTile === 'ar' ? 'Accounts Receivable' : 'Paid';
+  const getBreakdownValue = (m: MatterBreakdown) => {
+    if (expandedTile === 'wip') return m.wipAmount;
+    if (expandedTile === 'ar') return m.arAmount;
+    return m.paidAmount;
+  };
 
   // Use actual trend data from snapshots, filtered by time range
   const allTrendData = stats?.trendData || [];

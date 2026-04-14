@@ -514,7 +514,15 @@ Return ONLY valid JSON:
       response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: "google/gemini-2.5-pro", messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }], temperature: 0.2 }),
+        body: JSON.stringify({
+          model: "google/gemini-2.5-pro",
+          messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
+          temperature: 0.2,
+          // Structured output: force Gemini via Lovable gateway to
+          // return a JSON object so the defensive parsing below only
+          // has to run as a safety net (see #6 structured output).
+          response_format: { type: "json_object" },
+        }),
         signal: controller.signal,
       });
     } catch (fetchErr) { clearTimeout(timeoutId); throw new Error('Connection to AI timed out.'); }

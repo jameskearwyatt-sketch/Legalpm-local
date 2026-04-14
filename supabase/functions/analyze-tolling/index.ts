@@ -537,6 +537,10 @@ Return ONLY valid JSON:
             { role: "user", content: userPrompt }
           ],
           temperature: 0.2,
+          // Structured output: force Gemini via Lovable gateway to
+          // return a JSON object so the defensive parsing below only
+          // has to run as a safety net (see #6 structured output).
+          response_format: { type: "json_object" },
         }),
         signal: controller.signal,
       });

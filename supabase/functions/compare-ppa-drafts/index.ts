@@ -114,6 +114,9 @@ IMPORTANT:
           { role: "user", content: userPrompt }
         ],
         temperature: 0.2,
+        // Structured output: force JSON so we don't have to peel off
+        // markdown fences in the parsing below (see #6 structured output).
+        response_format: { type: "json_object" },
       }),
     });
 

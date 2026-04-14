@@ -100,7 +100,7 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 | 3 | Prompt caching | Blocked (codebase uses Lovable AI Gateway → Gemini, not Anthropic Messages API) |
 | 4 | Postgres transactions for multi-step analyst mutations | **Done** (Apr 2026) |
 | 5 | Learning quality controls (conflict detection, golden-set regression) | **Done** (Apr 2026) — conflict detection + regression harness |
-| 6 | Structured output (JSON schema / tool use) | Pending |
+| 6 | Structured output (JSON schema / tool use) | **Done** (Apr 2026) — `response_format: json_object` on 5 analyst edge functions |
 | 7 | Observability & telemetry | **Done** (Apr 2026) |
 | 8 | Cross-analyst reuse / shared component refactor | **In progress** (Apr 2026) — learnings hook + LearningsTab + TeachFeedbackDialog shared |
 | 9 | PII redaction + LLM call audit log | **Done** (Apr 2026) |
@@ -159,6 +159,16 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 - All 5 upload components (`PPAUploadAnalysis`, `TollingUploadAnalysis`, `CarbonUploadAnalysis`, `ITSupplyUploadAnalysis`, `CloudComputeUploadAnalysis`) now apply `redactPII` to the extracted contract text (and comparison text where applicable) BEFORE any of it leaves the browser — including before embedding for top-K retrieval. The redacted text is what's passed to the analyze-* edge function and what's counted into `inputChars`. The original document upload is never modified.
 - Redaction counts + total are written into the LLM call log metadata (`pii_redacted`, `pii_redaction_counts`, `pii_total_redactions`) on both success and failure paths, so admins can see how often the toggle is used and what classes of PII are being masked. A toast also surfaces the per-run summary (e.g. "3 emails, 1 phone redacted") to the user.
 - No server-side work required — redaction happens entirely client-side. No migration. No new edge function. Fails closed in the sense that if `redactPII` itself throws, the catch block already logs the failure and aborts analysis before any text is sent.
+
+### Structured Output (#6) — Shipped
+
+The three analyst edge functions (`analyze-ppa`, `analyze-tolling`, `analyze-carbon-credit`) plus the two PPA-support functions (`process-ppa-feedback`, `compare-ppa-drafts`) previously asked Gemini for JSON in free-form prose and then ran a ladder of defensive parsers — direct `JSON.parse`, markdown-fence stripping, regex extraction of the `positions` array, control-character scrubbing, trailing-comma repair. When the model returned a markdown-fenced block with a stray explanatory sentence, or produced a `"""`-quoted string, the parsing would eventually succeed but with an unbounded failure tail. When it failed entirely, every position was stubbed `review_required`.
+
+- All five functions now pass `response_format: { type: "json_object" }` to the Lovable AI Gateway. The gateway forwards this to Gemini's OpenAI-compatible endpoint, which enforces valid-JSON output at decoding time. The `parse-master-wip` function already shipped with this flag, which confirmed gateway support.
+- The existing defensive parsing ladders are left in place as a safety net — if the gateway ever returns something non-JSON (e.g. an error payload, a future model change), the fallback still produces a usable result rather than throwing. But the expected path is now a single `JSON.parse`.
+- All three analyst upload components (`PPAUploadAnalysis`, `TollingUploadAnalysis`, `CarbonUploadAnalysis`) tag their LLM call log entries with `structured_output: true` on both success and failure paths, so the admin telemetry view in `analyst_llm_call_log` can measure parse-error rates before/after the flag (filter: `metadata->>'structured_output' = 'true'` vs. older rows without the marker).
+- Temperature (0.2–0.3) and model selection are unchanged. No schema file is introduced — Gemini's JSON mode guarantees valid JSON structure but not adherence to a specific schema; adherence continues to be enforced by the prompt and the post-parse normalisation (category matching, variance-notes tagging, default field population). Promoting to `response_format: { type: "json_schema", json_schema: {...} }` would add structural guarantees per category but requires a schema definition per analyst and per analysis-type; that's follow-up work.
+- Note on the two analyst edge functions not in this repo (`analyze-it-supply`, `analyze-cloud-compute`): they live outside the tracked codebase. Their upload components don't yet tag `structured_output: true` — that should be added when those edge functions are updated to pass the same flag.
 
 ### Cross-Analyst Shared Components (#8, phase 1) — Shipped
 

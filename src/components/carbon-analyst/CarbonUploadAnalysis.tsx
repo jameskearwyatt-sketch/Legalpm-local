@@ -306,6 +306,9 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
           pii_redacted: redactPIIEnabled,
           pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
           pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+          // Edge function now uses JSON response_format; parse errors
+          // should be rare. See #6 structured output.
+          structured_output: true,
         },
       });
 
@@ -365,6 +368,9 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
           pii_redacted: redactPIIEnabled,
           pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
           pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+          // Edge function now uses JSON response_format; parse errors
+          // should be rare. See #6 structured output.
+          structured_output: true,
         },
       });
       setError(err instanceof Error ? err.message : 'Analysis failed');

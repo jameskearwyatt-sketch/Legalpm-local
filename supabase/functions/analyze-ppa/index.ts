@@ -1421,6 +1421,12 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
           { role: "user", content: userPrompt }
         ],
         temperature: 0.2,
+        // Structured output: force the model to return a JSON object.
+        // The Lovable AI Gateway passes this through to Gemini's
+        // OpenAI-compatible endpoint which supports JSON mode. This
+        // kills the bulk of parse errors; the defensive fallback
+        // parsing below is kept as a safety net.
+        response_format: { type: "json_object" },
       }),
     });
 

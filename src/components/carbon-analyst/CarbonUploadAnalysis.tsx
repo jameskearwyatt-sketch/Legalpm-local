@@ -13,6 +13,7 @@ import { useCarbonAnalyses, useCarbonPositions, useCarbonPrecedentBank, CarbonAn
 import { useCarbonLearnings } from '@/lib/hooks/useCarbonLearnings';
 import { CarbonAnalysisReport } from './CarbonAnalysisReport';
 import { CARBON_PROJECT_TYPES, CARBON_PROJECT_STAGES, CARBON_CREDIT_CLASSES, getCreditClassForType, type CarbonProjectStage, type CarbonCreditClass } from '@/lib/carbonCategories';
+import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 
 const JURISDICTIONS = [
   'United Kingdom', 'United States', 'European Union', 'Switzerland',
@@ -270,6 +271,18 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
       setAnalysisProgress(80);
       setAnalysisStatus('Saving analysis results...');
 
+      void logLlmCall({
+        analystType: 'carbon',
+        functionName: 'analyze-carbon-credit',
+        status: 'success',
+        inputChars: documentText?.length ?? 0,
+        inputTokenCount: analyzeResponse?.input_token_count ?? null,
+        outputTokenCount: analyzeResponse?.output_token_count ?? null,
+        modelUsed: analyzeResponse?.model_used ?? null,
+        durationMs: analysisDurationMs,
+        metadata: { analysisType, perspective, carbonType },
+      });
+
       const { positions: extractedPositions } = analyzeResponse;
 
       // Atomically insert analysis + positions in one transaction.
@@ -313,6 +326,14 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
       toast.success('Analysis complete!');
     } catch (err) {
       console.error('Analysis error:', err);
+      void logLlmCall({
+        analystType: 'carbon',
+        functionName: 'analyze-carbon-credit',
+        status: 'failure',
+        errorType: classifyLlmError(err),
+        errorMessage: err instanceof Error ? err.message : String(err),
+        metadata: { analysisType, perspective, carbonType },
+      });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
       toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));

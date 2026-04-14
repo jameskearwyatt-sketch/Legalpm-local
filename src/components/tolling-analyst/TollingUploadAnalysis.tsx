@@ -28,6 +28,7 @@ const JURISDICTIONS = [
 ];
 
 import { TOLLING_TECHNOLOGY_TYPES, TOLLING_FACILITY_STAGES, type TollingFacilityStage } from '@/lib/tollingCategories';
+import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 
 interface TollingUploadAnalysisProps {
   onAnalysisComplete?: () => void;
@@ -244,6 +245,18 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
       setAnalysisProgress(80);
       setAnalysisStatus('Saving analysis results...');
 
+      void logLlmCall({
+        analystType: 'tolling',
+        functionName: 'analyze-tolling',
+        status: 'success',
+        inputChars: (tollingText?.length ?? 0) + (comparisonText?.length ?? 0),
+        inputTokenCount: analyzeResponse?.input_token_count ?? null,
+        outputTokenCount: analyzeResponse?.output_token_count ?? null,
+        modelUsed: analyzeResponse?.model_used ?? null,
+        durationMs: analysisDurationMs,
+        metadata: { analysisType, perspective, tollingType },
+      });
+
       const { positions: extractedPositions } = analyzeResponse;
 
       // Step 5: Atomically insert the analysis record + its positions
@@ -303,6 +316,14 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
       toast.success('Analysis complete!');
     } catch (err) {
       console.error('Analysis error:', err);
+      void logLlmCall({
+        analystType: 'tolling',
+        functionName: 'analyze-tolling',
+        status: 'failure',
+        errorType: classifyLlmError(err),
+        errorMessage: err instanceof Error ? err.message : String(err),
+        metadata: { analysisType, perspective, tollingType },
+      });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
       toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));

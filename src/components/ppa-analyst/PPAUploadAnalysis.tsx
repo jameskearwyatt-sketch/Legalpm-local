@@ -15,6 +15,7 @@ import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAAnalysisType, 
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
 import { PPAAnalysisReport } from './PPAAnalysisReport';
 import { generateMarketIntelligence, formatIntelligenceForPrompt } from '@/lib/ppaPrecedentIntelligence';
+import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 
 // Pre-fill data for re-analysis
 interface PreFillData {
@@ -485,6 +486,19 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         market_benchmark: pos.market_benchmark || null,
       }));
 
+      // Observability: log successful analyze call (metadata only, no content).
+      void logLlmCall({
+        analystType: 'ppa',
+        functionName: 'analyze-ppa',
+        status: 'success',
+        inputChars: (ppaText?.length ?? 0) + (comparisonText?.length ?? 0),
+        inputTokenCount: analyzeResponse.data?.input_token_count ?? null,
+        outputTokenCount: analyzeResponse.data?.output_token_count ?? null,
+        modelUsed: analyzeResponse.data?.model_used ?? null,
+        durationMs: analysisDurationMs,
+        metadata: { analysisType, perspective, ppaType },
+      });
+
       const analysisResult = await createAnalysisWithPositions.mutateAsync({
         analysis: {
           analysis_type: analysisType,
@@ -530,6 +544,14 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
 
     } catch (err) {
       console.error('Analysis error:', err);
+      void logLlmCall({
+        analystType: 'ppa',
+        functionName: 'analyze-ppa',
+        status: 'failure',
+        errorType: classifyLlmError(err),
+        errorMessage: err instanceof Error ? err.message : String(err),
+        metadata: { analysisType, perspective, ppaType },
+      });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
       toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));

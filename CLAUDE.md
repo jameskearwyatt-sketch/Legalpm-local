@@ -101,7 +101,7 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 | 4 | Postgres transactions for multi-step analyst mutations | **Done** (Apr 2026) |
 | 5 | Learning quality controls (conflict detection, golden-set regression) | **Partial** — conflict detection shipped Apr 2026; regression harness pending |
 | 6 | Structured output (JSON schema / tool use) | Pending |
-| 7 | Observability & telemetry | Partial (duration + token counts captured) |
+| 7 | Observability & telemetry | **Done** (Apr 2026) |
 | 8 | Cross-analyst reuse / shared component refactor | Pending |
 | 9 | PII redaction + LLM call audit log | Pending |
 | 10 | Streaming / batch / Word export | Pending |
@@ -136,6 +136,14 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 - Shared UI `src/components/shared/LearningConflictWarning.tsx` is an inline amber banner that debounces (600ms) a similarity search while the user types a new correction, and shows up to 5 existing learnings in the same category with their similarity percentage, active/inactive state, and age. It's collapsible and fully silent until conflicts pass the threshold.
 - All 5 `XxxTeachFeedbackDialog` components (PPA, Tolling, Carbon, IT Supply, Cloud Compute) render the warning below the feedback textarea. The warning does not block submission — the intent is to inform the user so they can choose to merge/override the existing learning manually, rather than silently layering contradictory instructions.
 - Next phase (pending): golden-set regression harness — a curated set of contract snippets with expected outputs that can be re-run after learnings change, to detect when a new learning breaks previously-correct behaviour.
+
+### Observability & Telemetry (#7) — Shipped
+
+- Migration `20260418000001_add_analyst_llm_call_log.sql` adds an append-only `analyst_llm_call_log` table that records every LLM invocation (analyze-contract, embed-text, feedback processing, compare drafts, etc.). Unlike the per-analysis telemetry on the `*_analyses` tables, this log captures FAILURES too — the analyses tables cannot, because no row is created on failure. The table stores only metadata (analyst type, function name, status, error_type, error_message truncated to 500 chars, input_chars, token counts, model, duration_ms, optional metadata jsonb). No prompt or response content is stored so attorney-client privilege is preserved.
+- RLS: owners read their own rows; admins read all; only owner can insert. There is no UPDATE/DELETE policy — the log is append-only. Three indexes: `(user_id, created_at DESC)`, `(analyst_type, status, created_at DESC)`, and a partial index on `analysis_id`.
+- Client helper `src/lib/analyst/llmCallLog.ts` exposes `logLlmCall(entry)` (fire-and-forget) and `classifyLlmError(err)` which maps any error to one of `timeout | auth | server_error | parse_error | network | rate_limit | not_configured | unknown`.
+- All 5 upload components log both the success and failure paths of their analyze-contract call with input size, token counts, duration, model, and a small metadata object (analysis_type, perspective, contract sub-type). Logging never blocks the user flow — failures in the logger are swallowed.
+- Future extensions (not in this ship): logging embed-text and feedback calls; an admin dashboard that aggregates this table into success-rate / p95-latency / error-breakdown charts per analyst tool.
 
 ## Remaining Recommendations
 

@@ -13,6 +13,7 @@ import { useCloudComputeAnalyses, useCloudComputePrecedentBank, CloudComputeAnal
 import { useCloudComputeLearnings } from '@/lib/hooks/useCloudComputeLearnings';
 import { CloudComputeAnalysisReport } from './CloudComputeAnalysisReport';
 import { CLOUD_SERVICE_TYPES, CLOUD_DEPLOYMENT_MODELS, type CloudDeploymentModel } from '@/lib/cloudComputeCategories';
+import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 
 const JURISDICTIONS = ['United States', 'United Kingdom', 'EU', 'Germany', 'Ireland', 'Singapore', 'Japan', 'Australia', 'Other'];
 
@@ -100,6 +101,17 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       if (!analyzeRes.ok) { let em = 'Failed to analyze contract'; try { const ed = await analyzeRes.json(); em = ed.error || em; } catch {} throw new Error(em); }
       const analyzeResponse = await analyzeRes.json();
       setAnalysisProgress(80); setAnalysisStatus('Saving analysis results...');
+      void logLlmCall({
+        analystType: 'cloud_compute',
+        functionName: 'analyze-cloud-compute',
+        status: 'success',
+        inputChars: contractText?.length ?? 0,
+        inputTokenCount: analyzeResponse?.input_token_count ?? null,
+        outputTokenCount: analyzeResponse?.output_token_count ?? null,
+        modelUsed: analyzeResponse?.model_used ?? null,
+        durationMs: analysisDurationMs,
+        metadata: { analysisType, perspective, serviceType, deploymentModel },
+      });
       const { positions: extractedPositions } = analyzeResponse;
 
       const positionsPayload = (extractedPositions ?? []).map((pos: any) => ({
@@ -135,7 +147,20 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       });
 
       setAnalysisProgress(100); setCreatedAnalysisId(analysisResult.id); setStep('results'); toast.success('Analysis complete!');
-    } catch (err) { console.error('Analysis error:', err); setError(err instanceof Error ? err.message : 'Analysis failed'); setStep('configure'); toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error')); }
+    } catch (err) {
+      console.error('Analysis error:', err);
+      void logLlmCall({
+        analystType: 'cloud_compute',
+        functionName: 'analyze-cloud-compute',
+        status: 'failure',
+        errorType: classifyLlmError(err),
+        errorMessage: err instanceof Error ? err.message : String(err),
+        metadata: { analysisType, perspective, serviceType, deploymentModel },
+      });
+      setError(err instanceof Error ? err.message : 'Analysis failed');
+      setStep('configure');
+      toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
   };
 
   const handleReset = () => { setStep('upload'); setContractFile(null); setProjectName(''); setJurisdiction(''); setAnalysisType('agreement_vs_bible'); setPerspective('tenant'); setCreatedAnalysisId(null); setError(null); };

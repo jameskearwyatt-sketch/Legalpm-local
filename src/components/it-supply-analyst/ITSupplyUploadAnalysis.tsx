@@ -13,6 +13,7 @@ import { useITSupplyAnalyses, useITSupplyPositions, useITSupplyPrecedentBank, IT
 import { useITSupplyLearnings } from '@/lib/hooks/useITSupplyLearnings';
 import { ITSupplyAnalysisReport } from './ITSupplyAnalysisReport';
 import { IT_SUPPLY_TYPES, IT_SUPPLY_CONTRACT_STAGES, type ITSupplyContractStage } from '@/lib/itSupplyCategories';
+import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 
 const JURISDICTIONS = ['United States', 'United Kingdom', 'EU', 'Taiwan', 'South Korea', 'Japan', 'China', 'Singapore', 'Other'];
 
@@ -155,6 +156,18 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
       setAnalysisProgress(80);
       setAnalysisStatus('Saving analysis results...');
 
+      void logLlmCall({
+        analystType: 'it_supply',
+        functionName: 'analyze-it-supply',
+        status: 'success',
+        inputChars: contractText?.length ?? 0,
+        inputTokenCount: analyzeResponse?.input_token_count ?? null,
+        outputTokenCount: analyzeResponse?.output_token_count ?? null,
+        modelUsed: analyzeResponse?.model_used ?? null,
+        durationMs: analysisDurationMs,
+        metadata: { analysisType, perspective, supplyType },
+      });
+
       const { positions: extractedPositions } = analyzeResponse;
 
       const positionsPayload = (extractedPositions ?? []).map((pos: any) => ({
@@ -198,6 +211,14 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
       toast.success('Analysis complete!');
     } catch (err) {
       console.error('Analysis error:', err);
+      void logLlmCall({
+        analystType: 'it_supply',
+        functionName: 'analyze-it-supply',
+        status: 'failure',
+        errorType: classifyLlmError(err),
+        errorMessage: err instanceof Error ? err.message : String(err),
+        metadata: { analysisType, perspective, supplyType },
+      });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
       toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));

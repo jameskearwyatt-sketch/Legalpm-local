@@ -131,7 +131,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
   const [currentEmailIndex, setCurrentEmailIndex] = useState(0);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [contactSearch, setContactSearch] = useState("");
+  const [contactSearchByClient, setContactSearchByClient] = useState<Record<string, string>>({});
   const [amalgamatedNarrativeOverrides, setAmalgamatedNarrativeOverrides] = useState<Map<number, string>>(new Map());
 
   // Filter to only show Live matters

@@ -345,17 +345,23 @@ export default function Dashboard() {
 
   const kpiCards = [
     {
-      title: 'Total Lock-up',
-      value: formatCurrency(totalLockup, 'USD'),
-      icon: <DollarSign className="h-5 w-5" />,
-      variant: 'default' as const,
-    },
-    {
       title: 'Work in Progress',
       value: formatCurrency(stats?.totalWip || 0, 'USD'),
       icon: <Clock className="h-5 w-5" />,
       variant: 'default' as const,
       hasProposalAdjustment: stats?.hasActiveWipProposals || false,
+    },
+    {
+      title: 'Total AR',
+      value: formatCurrency(outstandingAR, 'USD'),
+      icon: <FileText className="h-5 w-5" />,
+      variant: 'default' as const,
+    },
+    {
+      title: 'Total Lock-up',
+      value: formatCurrency(totalLockup, 'USD'),
+      icon: <DollarSign className="h-5 w-5" />,
+      variant: 'default' as const,
     },
     {
       title: 'Total Billed',

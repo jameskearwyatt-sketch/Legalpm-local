@@ -273,10 +273,10 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
             id: matter.id,
             matterName: matter.matter_name,
             clientName: getMatterClientDisplayName(matter),
-            wipAmount: wipUsd,
-            arAmount: billedUsd - paidUsd,
-            paidAmount: paidUsd,
-            billedAmount: billedUsd,
+            wipAmount: wipAmount,
+            arAmount: billedAmount - paidAmount,
+            paidAmount: paidAmount,
+            billedAmount: billedAmount,
             currency: feeCurrency,
           });
         }

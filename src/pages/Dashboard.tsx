@@ -514,7 +514,7 @@ export default function Dashboard() {
                           </td>
                           <td className="py-2 pr-2 text-xs text-muted-foreground hidden sm:table-cell">{m.clientName}</td>
                           <td className="py-2 text-right text-xs sm:text-sm font-medium text-foreground">
-                            {formatCurrency(getBreakdownValue(m), 'USD')}
+                            {formatCurrency(getBreakdownValue(m), m.currency)}
                           </td>
                         </tr>
                       ))}

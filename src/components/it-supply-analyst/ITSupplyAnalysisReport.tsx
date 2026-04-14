@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Plus, History, CheckCircle2, AlertCircle, HelpCircle, Database, ChevronDown, ChevronRight, Loader2, Filter, X, Lightbulb, Scale } from 'lucide-react';
+import { FileText, Plus, History, CheckCircle2, AlertCircle, HelpCircle, Database, ChevronDown, ChevronRight, Loader2, Filter, X, Lightbulb, Scale, MessageCircleQuestion } from 'lucide-react';
 import { useITSupplyAnalyses, useITSupplyPositions, useITSupplyPrecedentBank, ITSupplyExtractedPosition } from '@/lib/hooks/useITSupplyAnalyses';
 import { useITSupplyLearnings } from '@/lib/hooks/useITSupplyLearnings';
 import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
@@ -13,6 +13,7 @@ import { ExportAnalystExcelButton } from '@/components/shared/ExportAnalystExcel
 import { SaveAsRegressionCaseButton } from '@/components/shared/SaveAsRegressionCaseButton';
 import type { ActualPositionShape } from '@/lib/analyst/regressionHarness';
 import { ITSupplyTeachFeedbackDialog } from './ITSupplyTeachFeedbackDialog';
+import { AnalystAskAIDialog } from '@/components/shared/AnalystAskAIDialog';
 import { ITSupplyWhatsMarketDialog } from './ITSupplyWhatsMarketDialog';
 import { IT_SUPPLY_CATEGORY_GROUPS, IT_SUPPLY_ALL_CATEGORIES } from '@/lib/itSupplyCategories';
 import { format } from 'date-fns';
@@ -58,6 +59,7 @@ export function ITSupplyAnalysisReport({ analysisId, onNewAnalysis, onViewHistor
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterState>({ confidence: new Set(), marketPosition: new Set() });
   const [teachDialogPosition, setTeachDialogPosition] = useState<ITSupplyExtractedPosition | null>(null);
+  const [askAIPosition, setAskAIPosition] = useState<ITSupplyExtractedPosition | null>(null);
   const [positionUpdates, setPositionUpdates] = useState<Record<string, string>>({});
   const [varianceNotesUpdates, setVarianceNotesUpdates] = useState<Record<string, string>>({});
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
@@ -289,6 +291,7 @@ export function ITSupplyAnalysisReport({ analysisId, onNewAnalysis, onViewHistor
                               <div className="flex items-center gap-1">
                                 {stats.count > 0 && <Badge variant="outline" className="text-xs">{stats.count} in bank</Badge>}
                                 {stats.count >= 1 && <Button variant="ghost" size="sm" className="h-8 px-2 text-primary hover:text-primary hover:bg-primary/10" onClick={() => setWhatsMarketCategory(position.category)}><Scale className="h-4 w-4 mr-1" /><span className="text-xs">Market</span></Button>}
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-primary hover:text-primary/80 hover:bg-primary/10" onClick={() => setAskAIPosition(position)} title="Ask AI about this clause"><MessageCircleQuestion className="h-4 w-4" /></Button>
                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950" onClick={() => setTeachDialogPosition(position)}><Lightbulb className="h-4 w-4" /></Button>
                               </div>
                             </div>
@@ -322,6 +325,25 @@ export function ITSupplyAnalysisReport({ analysisId, onNewAnalysis, onViewHistor
       </Card>
 
       {teachDialogPosition && analysis && <ITSupplyTeachFeedbackDialog open={!!teachDialogPosition} onOpenChange={(open) => !open && setTeachDialogPosition(null)} position={teachDialogPosition} analysisId={analysisId} projectName={analysis.project_name} onPositionUpdated={(ns, nv) => handlePositionUpdated(teachDialogPosition.id, ns, nv)} />}
+      {askAIPosition && analysis && (
+        <AnalystAskAIDialog
+          open={!!askAIPosition}
+          onOpenChange={(o) => !o && setAskAIPosition(null)}
+          analyst="it_supply"
+          analystLabel="IT supply"
+          position={{
+            category: askAIPosition.category,
+            positionSummary: positionUpdates[askAIPosition.id] ?? askAIPosition.position_summary,
+            sourceText: askAIPosition.source_text,
+            marketPosition: getMarketPositionFromNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+            confidence: askAIPosition.confidence,
+            varianceNotes: cleanVarianceNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+          }}
+          projectName={analysis.project_name}
+          jurisdiction={analysis.jurisdiction}
+          contractType={analysis.supply_type}
+        />
+      )}
       {whatsMarketCategory && <ITSupplyWhatsMarketDialog open={!!whatsMarketCategory} onOpenChange={(open) => !open && setWhatsMarketCategory(null)} category={whatsMarketCategory} precedents={(bankPrecedents || []).filter(p => p.category === whatsMarketCategory)} />}
     </div>
   );

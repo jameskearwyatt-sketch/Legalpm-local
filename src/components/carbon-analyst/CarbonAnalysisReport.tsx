@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import {
   FileText, Plus, History, CheckCircle2, AlertCircle, HelpCircle,
-  Database, ChevronDown, ChevronRight, Loader2, Filter, X, Lightbulb, Scale,
+  Database, ChevronDown, ChevronRight, Loader2, Filter, X, Lightbulb, Scale, MessageCircleQuestion,
 } from 'lucide-react';
 import { useCarbonAnalyses, useCarbonPositions, useCarbonPrecedentBank, CarbonExtractedPosition } from '@/lib/hooks/useCarbonAnalyses';
 import { useCarbonLearnings } from '@/lib/hooks/useCarbonLearnings';
@@ -16,6 +16,7 @@ import { ExportAnalystExcelButton } from '@/components/shared/ExportAnalystExcel
 import { SaveAsRegressionCaseButton } from '@/components/shared/SaveAsRegressionCaseButton';
 import type { ActualPositionShape } from '@/lib/analyst/regressionHarness';
 import { CarbonTeachFeedbackDialog } from './CarbonTeachFeedbackDialog';
+import { AnalystAskAIDialog } from '@/components/shared/AnalystAskAIDialog';
 import { CarbonWhatsMarketDialog } from './CarbonWhatsMarketDialog';
 import { CARBON_CATEGORY_GROUPS, CARBON_ALL_CATEGORIES, CARBON_PROJECT_TYPES } from '@/lib/carbonCategories';
 import { format } from 'date-fns';
@@ -65,6 +66,7 @@ export function CarbonAnalysisReport({ analysisId, onNewAnalysis, onViewHistory 
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterState>({ confidence: new Set(), marketPosition: new Set() });
   const [teachDialogPosition, setTeachDialogPosition] = useState<CarbonExtractedPosition | null>(null);
+  const [askAIPosition, setAskAIPosition] = useState<CarbonExtractedPosition | null>(null);
   const [positionUpdates, setPositionUpdates] = useState<Record<string, string>>({});
   const [varianceNotesUpdates, setVarianceNotesUpdates] = useState<Record<string, string>>({});
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
@@ -331,6 +333,9 @@ export function CarbonAnalysisReport({ analysisId, onNewAnalysis, onViewHistory 
                                     <Scale className="h-4 w-4 mr-1" /><span className="text-xs">Market</span>
                                   </Button>
                                 )}
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-primary hover:text-primary/80 hover:bg-primary/10" onClick={() => setAskAIPosition(position)} title="Ask AI about this clause">
+                                  <MessageCircleQuestion className="h-4 w-4" />
+                                </Button>
                                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950" onClick={() => setTeachDialogPosition(position)} title="Teach AI">
                                   <Lightbulb className="h-4 w-4" />
                                 </Button>
@@ -374,6 +379,26 @@ export function CarbonAnalysisReport({ analysisId, onNewAnalysis, onViewHistory 
 
       {teachDialogPosition && analysis && (
         <CarbonTeachFeedbackDialog open={!!teachDialogPosition} onOpenChange={(open) => !open && setTeachDialogPosition(null)} position={teachDialogPosition} analysisId={analysisId} projectName={analysis.project_name} onPositionUpdated={(newSummary, newVarianceNotes) => handlePositionUpdated(teachDialogPosition.id, newSummary, newVarianceNotes)} />
+      )}
+
+      {askAIPosition && analysis && (
+        <AnalystAskAIDialog
+          open={!!askAIPosition}
+          onOpenChange={(o) => !o && setAskAIPosition(null)}
+          analyst="carbon"
+          analystLabel="carbon credit"
+          position={{
+            category: askAIPosition.category,
+            positionSummary: positionUpdates[askAIPosition.id] ?? askAIPosition.position_summary,
+            sourceText: askAIPosition.source_text,
+            marketPosition: getMarketPositionFromNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+            confidence: askAIPosition.confidence,
+            varianceNotes: cleanVarianceNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+          }}
+          projectName={analysis.project_name}
+          jurisdiction={analysis.jurisdiction}
+          contractType={analysis.carbon_type}
+        />
       )}
 
       {whatsMarketCategory && (

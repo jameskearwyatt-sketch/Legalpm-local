@@ -6,7 +6,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import {
   FileText, Plus, History, CheckCircle2, AlertCircle, HelpCircle,
-  Database, ChevronDown, ChevronRight, Loader2, Filter, X, Lightbulb, Scale,
+  Database, ChevronDown, ChevronRight, Loader2, Filter, X, Lightbulb, Scale, MessageCircleQuestion,
 } from 'lucide-react';
 import { useTollingAnalyses, useTollingPositions, useTollingPrecedentBank, TollingExtractedPosition } from '@/lib/hooks/useTollingAnalyses';
 import { useTollingLearnings } from '@/lib/hooks/useTollingLearnings';
@@ -16,6 +16,7 @@ import { ExportAnalystExcelButton } from '@/components/shared/ExportAnalystExcel
 import { SaveAsRegressionCaseButton } from '@/components/shared/SaveAsRegressionCaseButton';
 import type { ActualPositionShape } from '@/lib/analyst/regressionHarness';
 import { TollingTeachFeedbackDialog } from './TollingTeachFeedbackDialog';
+import { AnalystAskAIDialog } from '@/components/shared/AnalystAskAIDialog';
 import { TollingWhatsMarketDialog } from './TollingWhatsMarketDialog';
 import { TOLLING_CATEGORY_GROUPS, TOLLING_ALL_CATEGORIES } from '@/lib/tollingCategories';
 import { format } from 'date-fns';
@@ -74,6 +75,7 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterState>({ confidence: new Set(), marketPosition: new Set() });
   const [teachDialogPosition, setTeachDialogPosition] = useState<TollingExtractedPosition | null>(null);
+  const [askAIPosition, setAskAIPosition] = useState<TollingExtractedPosition | null>(null);
   const [positionUpdates, setPositionUpdates] = useState<Record<string, string>>({});
   const [varianceNotesUpdates, setVarianceNotesUpdates] = useState<Record<string, string>>({});
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
@@ -527,6 +529,15 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
                                 <Button
                                   variant="ghost"
                                   size="sm"
+                                  className="h-8 w-8 p-0 text-primary hover:text-primary/80 hover:bg-primary/10"
+                                  onClick={() => setAskAIPosition(position)}
+                                  title="Ask AI about this clause"
+                                >
+                                  <MessageCircleQuestion className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
                                   onClick={() => setTeachDialogPosition(position)}
                                   title="Teach AI"
@@ -597,6 +608,27 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
           onPositionUpdated={(newSummary, newVarianceNotes) => {
             handlePositionUpdated(teachDialogPosition.id, newSummary, newVarianceNotes);
           }}
+        />
+      )}
+
+      {/* Ask AI about this clause */}
+      {askAIPosition && analysis && (
+        <AnalystAskAIDialog
+          open={!!askAIPosition}
+          onOpenChange={(open) => !open && setAskAIPosition(null)}
+          analyst="tolling"
+          analystLabel="tolling"
+          position={{
+            category: askAIPosition.category,
+            positionSummary: positionUpdates[askAIPosition.id] ?? askAIPosition.position_summary,
+            sourceText: askAIPosition.source_text,
+            marketPosition: getMarketPositionFromNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+            confidence: askAIPosition.confidence,
+            varianceNotes: cleanVarianceNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+          }}
+          projectName={analysis.project_name}
+          jurisdiction={analysis.jurisdiction}
+          contractType={analysis.tolling_type}
         />
       )}
 

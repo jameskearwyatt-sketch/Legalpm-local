@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { FileText, Plus, History, CheckCircle2, AlertCircle, HelpCircle, Database, ChevronDown, ChevronRight, Loader2, Filter, X, Lightbulb, Scale } from 'lucide-react';
+import { FileText, Plus, History, CheckCircle2, AlertCircle, HelpCircle, Database, ChevronDown, ChevronRight, Loader2, Filter, X, Lightbulb, Scale, MessageCircleQuestion } from 'lucide-react';
 import { useCloudComputeAnalyses, useCloudComputePositions, useCloudComputePrecedentBank, CloudComputeExtractedPosition } from '@/lib/hooks/useCloudComputeAnalyses';
 import { useCloudComputeLearnings } from '@/lib/hooks/useCloudComputeLearnings';
 import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
@@ -13,6 +13,7 @@ import { ExportAnalystExcelButton } from '@/components/shared/ExportAnalystExcel
 import { SaveAsRegressionCaseButton } from '@/components/shared/SaveAsRegressionCaseButton';
 import type { ActualPositionShape } from '@/lib/analyst/regressionHarness';
 import { CloudComputeTeachFeedbackDialog } from './CloudComputeTeachFeedbackDialog';
+import { AnalystAskAIDialog } from '@/components/shared/AnalystAskAIDialog';
 import { CloudComputeWhatsMarketDialog } from './CloudComputeWhatsMarketDialog';
 import { CLOUD_COMPUTE_CATEGORY_GROUPS, CLOUD_COMPUTE_ALL_CATEGORIES } from '@/lib/cloudComputeCategories';
 import { format } from 'date-fns';
@@ -58,6 +59,7 @@ export function CloudComputeAnalysisReport({ analysisId, onNewAnalysis, onViewHi
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterState>({ confidence: new Set(), marketPosition: new Set() });
   const [teachDialogPosition, setTeachDialogPosition] = useState<CloudComputeExtractedPosition | null>(null);
+  const [askAIPosition, setAskAIPosition] = useState<CloudComputeExtractedPosition | null>(null);
   const [positionUpdates, setPositionUpdates] = useState<Record<string, string>>({});
   const [varianceNotesUpdates, setVarianceNotesUpdates] = useState<Record<string, string>>({});
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
@@ -172,6 +174,7 @@ export function CloudComputeAnalysisReport({ analysisId, onNewAnalysis, onViewHi
                             <div className="flex items-center gap-1">
                               {stats.count > 0 && <Badge variant="outline" className="text-xs">{stats.count} in bank</Badge>}
                               {stats.count >= 1 && <Button variant="ghost" size="sm" className="h-8 px-2 text-primary hover:text-primary hover:bg-primary/10" onClick={() => setWhatsMarketCategory(position.category)}><Scale className="h-4 w-4 mr-1" /><span className="text-xs">Market</span></Button>}
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-primary hover:text-primary/80 hover:bg-primary/10" onClick={() => setAskAIPosition(position)} title="Ask AI about this clause"><MessageCircleQuestion className="h-4 w-4" /></Button>
                               <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950" onClick={() => setTeachDialogPosition(position)}><Lightbulb className="h-4 w-4" /></Button>
                             </div>
                           </div>
@@ -189,6 +192,25 @@ export function CloudComputeAnalysisReport({ analysisId, onNewAnalysis, onViewHi
       <Card><CardContent className="py-4"><div className="flex items-center justify-between"><div className="space-y-1">{!analysis.is_agreed ? <><p className="font-medium">Mark this agreement as agreed?</p><p className="text-sm text-muted-foreground">Once agreed, you can bank positions</p></> : <><p className="font-medium">Bank positions to precedent library</p><p className="text-sm text-muted-foreground">Select positions and bank them</p></>}</div><div className="flex gap-2">{!analysis.is_agreed ? <Button onClick={handleMarkAsAgreed} disabled={updateAnalysis.isPending}>{updateAnalysis.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}<CheckCircle2 className="h-4 w-4 mr-2" /> Mark as Agreed</Button> : <><Button variant="outline" onClick={handleSelectAll}>{selectedForBanking.size === positions.length ? 'Deselect All' : 'Select All'}</Button><Button onClick={handleBankSelected} disabled={selectedForBanking.size === 0 || bankPositions.isPending}>{bankPositions.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}<Database className="h-4 w-4 mr-2" /> Bank ({selectedForBanking.size})</Button></>}</div></div></CardContent></Card>
 
       {teachDialogPosition && analysis && <CloudComputeTeachFeedbackDialog open={!!teachDialogPosition} onOpenChange={(o) => !o && setTeachDialogPosition(null)} position={teachDialogPosition} analysisId={analysisId} projectName={analysis.project_name} onPositionUpdated={(ns, nv) => handlePositionUpdated(teachDialogPosition.id, ns, nv)} />}
+      {askAIPosition && analysis && (
+        <AnalystAskAIDialog
+          open={!!askAIPosition}
+          onOpenChange={(o) => !o && setAskAIPosition(null)}
+          analyst="cloud_compute"
+          analystLabel="cloud compute"
+          position={{
+            category: askAIPosition.category,
+            positionSummary: positionUpdates[askAIPosition.id] ?? askAIPosition.position_summary,
+            sourceText: askAIPosition.source_text,
+            marketPosition: getMarketPositionFromNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+            confidence: askAIPosition.confidence,
+            varianceNotes: cleanVarianceNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+          }}
+          projectName={analysis.project_name}
+          jurisdiction={analysis.jurisdiction}
+          contractType={analysis.service_type}
+        />
+      )}
       {whatsMarketCategory && <CloudComputeWhatsMarketDialog open={!!whatsMarketCategory} onOpenChange={(o) => !o && setWhatsMarketCategory(null)} category={whatsMarketCategory} precedents={(bankPrecedents || []).filter(p => p.category === whatsMarketCategory)} />}
     </div>
   );

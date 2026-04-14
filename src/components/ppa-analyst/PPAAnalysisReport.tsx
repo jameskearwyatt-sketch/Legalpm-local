@@ -23,6 +23,7 @@ import {
   Building2,
   Lightbulb,
   Scale,
+  MessageCircleQuestion,
 } from 'lucide-react';
 import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAExtractedPosition } from '@/lib/hooks/usePPAAnalyses';
 import { usePPALearnings } from '@/lib/hooks/usePPALearnings';
@@ -32,6 +33,7 @@ import { ExportAnalystExcelButton } from '@/components/shared/ExportAnalystExcel
 import { SaveAsRegressionCaseButton } from '@/components/shared/SaveAsRegressionCaseButton';
 import type { ActualPositionShape } from '@/lib/analyst/regressionHarness';
 import { PPATeachFeedbackDialog } from './PPATeachFeedbackDialog';
+import { AnalystAskAIDialog } from '@/components/shared/AnalystAskAIDialog';
 import { WhatsMarketDialog } from './WhatsMarketDialog';
 import { getCategoryById, PPA_CATEGORY_GROUPS, PPA_ALL_CATEGORIES } from '@/lib/ppaCategories';
 import { format } from 'date-fns';
@@ -127,6 +129,7 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
     partyFavorability: new Set(),
   });
   const [teachDialogPosition, setTeachDialogPosition] = useState<PPAExtractedPosition | null>(null);
+  const [askAIPosition, setAskAIPosition] = useState<PPAExtractedPosition | null>(null);
   const [positionUpdates, setPositionUpdates] = useState<Record<string, string>>({});
   const [varianceNotesUpdates, setVarianceNotesUpdates] = useState<Record<string, string>>({});
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
@@ -726,6 +729,16 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                                     <span className="text-xs">Market</span>
                                   </Button>
                                 )}
+                                {/* Ask AI Button */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-primary hover:text-primary/80 hover:bg-primary/10"
+                                  onClick={() => setAskAIPosition(position)}
+                                  title="Ask AI about this clause"
+                                >
+                                  <MessageCircleQuestion className="h-4 w-4" />
+                                </Button>
                                 {/* Teach AI Button */}
                                 <Button
                                   variant="ghost"
@@ -812,6 +825,28 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
            onPositionUpdated={(newSummary, newVarianceNotes) => {
              handlePositionUpdated(teachDialogPosition.id, newSummary, newVarianceNotes);
            }}
+         />
+       )}
+
+       {/* Ask AI Dialog */}
+       {askAIPosition && analysis && (
+         <AnalystAskAIDialog
+           open={!!askAIPosition}
+           onOpenChange={(open) => !open && setAskAIPosition(null)}
+           analyst="ppa"
+           analystLabel="PPA"
+           position={{
+             category: askAIPosition.category,
+             positionSummary: positionUpdates[askAIPosition.id] ?? askAIPosition.position_summary,
+             sourceText: askAIPosition.source_text,
+             marketPosition: getMarketPositionFromNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+             partyFavorability: getPartyFavorabilityFromNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes, positionUpdates[askAIPosition.id] ?? askAIPosition.position_summary),
+             confidence: askAIPosition.confidence,
+             varianceNotes: cleanVarianceNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+           }}
+           projectName={analysis.project_name}
+           jurisdiction={analysis.jurisdiction}
+           contractType={(analysis as { ppa_type?: string | null }).ppa_type ?? null}
          />
        )}
 

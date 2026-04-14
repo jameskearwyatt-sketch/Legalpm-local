@@ -387,11 +387,11 @@ export default function Dashboard() {
 
   // Use actual trend data from snapshots, filtered by time range
   const allTrendData = stats?.trendData || [];
-  const trendData = useMemo(() => {
+  const trendData = allTrendData.filter(d => {
     const cutoff = getTimeRangeCutoff(dashboardTimeRange);
-    if (!cutoff) return allTrendData;
-    return allTrendData.filter(d => new Date(d.rawDate || d.date) >= cutoff);
-  }, [allTrendData, dashboardTimeRange]);
+    if (!cutoff) return true;
+    return new Date(d.rawDate || d.date) >= cutoff;
+  });
   const hasData = trendData.length > 0;
 
   return (

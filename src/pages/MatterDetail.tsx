@@ -328,6 +328,7 @@ export default function MatterDetail() {
   const [showProposalDialog, setShowProposalDialog] = useState(false);
   const [showProposalList, setShowProposalList] = useState(false);
   const [editingProposal, setEditingProposal] = useState<typeof selectedProposal>(null);
+  const [chartTimeRange, setChartTimeRange] = useState<TimeRange>("all");
   
   // Highlight movements for individual matter
   const { highlightEnabled, toggleHighlight } = useMatterHighlightMovements(id || '');

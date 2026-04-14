@@ -376,18 +376,18 @@ export default function Dashboard() {
       variant: 'success' as const,
     },
     {
-      title: 'Collection Rate',
-      value: `${(stats?.avgCollectionRate || 0).toFixed(1)}%`,
-      icon: <TrendingUp className="h-5 w-5" />,
-      variant: (stats?.avgCollectionRate || 0) >= 80 ? 'success' as const : (stats?.avgCollectionRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
-      infoTooltip: 'Collection Rate measures the percentage of billed amounts that have been collected. WIP write-offs do not affect this rate — it only looks at bills issued vs. payments received.',
-    },
-    {
       title: 'Realization Rate',
       value: `${(stats?.realizationRate || 0).toFixed(1)}%`,
       icon: <Percent className="h-5 w-5" />,
       variant: (stats?.realizationRate || 0) >= 80 ? 'success' as const : (stats?.realizationRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
       infoTooltip: 'Realization Rate measures the percentage of worked time that was actually collected as revenue. WIP write-offs hurt this rate. E.g., if you bill £100k, write off £50k, and collect £50k, your collection rate is 100% but realization rate is 50%.',
+    },
+    {
+      title: 'Collection Rate',
+      value: `${(stats?.avgCollectionRate || 0).toFixed(1)}%`,
+      icon: <TrendingUp className="h-5 w-5" />,
+      variant: (stats?.avgCollectionRate || 0) >= 80 ? 'success' as const : (stats?.avgCollectionRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
+      infoTooltip: 'Collection Rate measures the percentage of billed amounts that have been collected. WIP write-offs do not affect this rate — it only looks at bills issued vs. payments received.',
     },
   ];
 

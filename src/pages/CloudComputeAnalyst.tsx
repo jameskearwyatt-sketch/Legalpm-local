@@ -2,11 +2,12 @@ import { useState, useCallback } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { FileSearch, History, Database, Brain, Cloud } from 'lucide-react';
+import { FileSearch, History, Database, Brain, Cloud, Beaker } from 'lucide-react';
 import { CloudComputeUploadAnalysis } from '@/components/cloud-compute-analyst/CloudComputeUploadAnalysis';
 import { CloudComputeAnalysisList } from '@/components/cloud-compute-analyst/CloudComputeAnalysisList';
 import { CloudComputePrecedentBank } from '@/components/cloud-compute-analyst/CloudComputePrecedentBank';
 import { CloudComputeLearningsTab } from '@/components/cloud-compute-analyst/CloudComputeLearningsTab';
+import { AnalystRegressionHarness } from '@/components/shared/AnalystRegressionHarness';
 import { useCloudComputePrecedentBank } from '@/lib/hooks/useCloudComputeAnalyses';
 import { useCloudComputeLearnings } from '@/lib/hooks/useCloudComputeLearnings';
 
@@ -46,12 +47,14 @@ export default function CloudComputeAnalyst() {
               <Brain className="h-4 w-4" /> AI Learnings
               {activeLearnings.length > 0 && <Badge variant="secondary" className="ml-1 h-5 px-1.5">{activeLearnings.length}</Badge>}
             </TabsTrigger>
+            <TabsTrigger value="regression" className="gap-2"><Beaker className="h-4 w-4" /> Regression</TabsTrigger>
           </TabsList>
 
           <TabsContent value="new-analysis"><CloudComputeUploadAnalysis onAnalysisComplete={handleAnalysisComplete} /></TabsContent>
           <TabsContent value="history"><CloudComputeAnalysisList /></TabsContent>
           <TabsContent value="precedent-bank"><CloudComputePrecedentBank /></TabsContent>
           <TabsContent value="learnings"><CloudComputeLearningsTab /></TabsContent>
+          <TabsContent value="regression"><AnalystRegressionHarness analyst="cloud_compute" analystLabel="Cloud Compute" /></TabsContent>
         </Tabs>
       </div>
     </AppLayout>

@@ -9,7 +9,8 @@ import { PPAUploadAnalysis } from '@/components/ppa-analyst/PPAUploadAnalysis';
 import { PPAAnalysisList } from '@/components/ppa-analyst/PPAAnalysisList';
 import { PPAPrecedentBank } from '@/components/ppa-analyst/PPAPrecedentBank';
  import { PPALearningsTab } from '@/components/ppa-analyst/PPALearningsTab';
- import { FileSearch, History, Database, Settings2, Brain } from 'lucide-react';
+ import { FileSearch, History, Database, Settings2, Brain, Beaker } from 'lucide-react';
+import { AnalystRegressionHarness } from '@/components/shared/AnalystRegressionHarness';
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
  import { usePPAPrecedentBank, PPAAnalysis, PPAStructureType, PPAPerspective, PPAAnalysisType } from '@/lib/hooks/usePPAAnalyses';
  import { usePPALearnings } from '@/lib/hooks/usePPALearnings';
@@ -151,6 +152,10 @@ export default function PPAAnalyst() {
                  </Badge>
                )}
              </TabsTrigger>
+            <TabsTrigger value="regression" className="gap-2">
+              <Beaker className="h-4 w-4" />
+              Regression
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="new-analysis">
@@ -172,6 +177,10 @@ export default function PPAAnalyst() {
            <TabsContent value="learnings">
              <PPALearningsTab />
            </TabsContent>
+
+          <TabsContent value="regression">
+            <AnalystRegressionHarness analyst="ppa" analystLabel="PPA" />
+          </TabsContent>
         </Tabs>
       </div>
     </AppLayout>

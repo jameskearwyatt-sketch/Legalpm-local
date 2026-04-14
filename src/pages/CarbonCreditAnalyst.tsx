@@ -2,11 +2,12 @@ import { useState, useCallback } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { FileSearch, History, Database, Brain, Leaf } from 'lucide-react';
+import { FileSearch, History, Database, Brain, Leaf, Beaker } from 'lucide-react';
 import { CarbonUploadAnalysis } from '@/components/carbon-analyst/CarbonUploadAnalysis';
 import { CarbonAnalysisList } from '@/components/carbon-analyst/CarbonAnalysisList';
 import { CarbonPrecedentBank } from '@/components/carbon-analyst/CarbonPrecedentBank';
 import { CarbonLearningsTab } from '@/components/carbon-analyst/CarbonLearningsTab';
+import { AnalystRegressionHarness } from '@/components/shared/AnalystRegressionHarness';
 import { useCarbonPrecedentBank } from '@/lib/hooks/useCarbonAnalyses';
 import { useCarbonLearnings } from '@/lib/hooks/useCarbonLearnings';
 
@@ -62,6 +63,10 @@ export default function CarbonCreditAnalyst() {
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="regression" className="gap-2">
+              <Beaker className="h-4 w-4" />
+              Regression
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="new-analysis">
@@ -78,6 +83,10 @@ export default function CarbonCreditAnalyst() {
 
           <TabsContent value="learnings">
             <CarbonLearningsTab />
+          </TabsContent>
+
+          <TabsContent value="regression">
+            <AnalystRegressionHarness analyst="carbon" analystLabel="Carbon Credit" />
           </TabsContent>
         </Tabs>
       </div>

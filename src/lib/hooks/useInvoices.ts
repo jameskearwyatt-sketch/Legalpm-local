@@ -63,6 +63,8 @@ export function useInvoices(matterId?: string) {
         .insert({
           ...input,
           user_id: user!.id,
+          created_by: user!.id,
+          updated_by: user!.id,
         })
         .select()
         .single();
@@ -84,7 +86,7 @@ export function useInvoices(matterId?: string) {
     mutationFn: async ({ id, ...input }: Partial<CreateInvoiceInput> & { id: string }) => {
       const { data, error } = await supabase
         .from('invoices')
-        .update(input)
+        .update({ ...input, updated_by: user!.id })
         .eq('id', id)
         .select()
         .single();

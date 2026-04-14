@@ -333,6 +333,8 @@ export function usePricingProposals() {
         .from('pricing_proposals')
         .insert({
           user_id: user!.id,
+          created_by: user!.id,
+          updated_by: user!.id,
           client_id: input.client_id,
           name: input.name,
           description: input.description || null,
@@ -478,7 +480,7 @@ export function usePricingProposal(proposalId?: string) {
     mutationFn: async (updates: Partial<Pick<PricingProposal, 'name' | 'description' | 'currency' | 'team_rate_currency' | 'status' | 'rate_card' | 'work_phases' | 'assumptions'>>) => {
       const { error } = await supabase
         .from('pricing_proposals')
-        .update(updates as any)
+        .update({ ...updates, updated_by: user!.id } as any)
         .eq('id', proposalId!);
 
       if (error) throw error;
@@ -712,7 +714,7 @@ export function usePricingProposal(proposalId?: string) {
       // Update proposal current_version
       const { error: versionUpdateError } = await supabase
         .from('pricing_proposals')
-        .update({ current_version: nextVersionNumber })
+        .update({ current_version: nextVersionNumber, updated_by: user!.id })
         .eq('id', proposalId!);
 
       if (versionUpdateError) throw versionUpdateError;
@@ -737,9 +739,10 @@ export function usePricingProposal(proposalId?: string) {
       // Update proposal status and link to matter
       await supabase
         .from('pricing_proposals')
-        .update({ 
+        .update({
           status: 'Agreed',
-          linked_matter_id: matterId || null
+          linked_matter_id: matterId || null,
+          updated_by: user!.id
         })
         .eq('id', proposalId!);
 
@@ -1037,9 +1040,10 @@ export function usePricingProposal(proposalId?: string) {
       // Reset proposal status to Draft and clear linked matter
       await supabase
         .from('pricing_proposals')
-        .update({ 
+        .update({
           status: 'Draft',
-          linked_matter_id: null
+          linked_matter_id: null,
+          updated_by: user!.id
         })
         .eq('id', proposalId!);
     },

@@ -56,6 +56,7 @@ export function useBudgetAmendments(matterId?: string) {
         .insert({
           ...input,
           user_id: user!.id,
+          created_by: user!.id,
           amendment_date: new Date().toISOString().split('T')[0],
         })
         .select()

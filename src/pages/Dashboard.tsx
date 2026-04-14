@@ -53,6 +53,9 @@ export default function Dashboard() {
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRange>("all");
   const isHoveringTooltipRef = useRef(false);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [expandedTile, setExpandedTile] = useState<'wip' | 'ar' | 'paid' | null>(null);
+  const breakdownRef = useRef<HTMLDivElement>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // "Not my matters" checkbox defaults to unchecked (meaning they're excluded by default)
   const [notMyMattersIncluded, setNotMyMattersIncluded] = useState(false);
   const { data: stats, isLoading } = useDashboard(excludedMatterIds, excludedPipelineMatterIds);

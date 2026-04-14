@@ -26,6 +26,17 @@ export interface PipelineMatter {
   clientName: string;
 }
 
+export interface MatterBreakdown {
+  id: string;
+  matterName: string;
+  clientName: string;
+  wipAmount: number;
+  arAmount: number;
+  paidAmount: number;
+  billedAmount: number;
+  currency: string;
+}
+
 export interface DashboardStats {
   totalBudget: number;
   totalWip: number;
@@ -42,7 +53,8 @@ export interface DashboardStats {
   trendData: TrendDataPoint[];
   liveMatters: LiveMatter[];
   pipelineMatters: PipelineMatter[];
-  hasActiveWipProposals: boolean; // Track if any WIP shaping proposals are affecting figures
+  hasActiveWipProposals: boolean;
+  matterBreakdowns: MatterBreakdown[];
 }
 
 export interface Alert {
@@ -135,6 +147,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           liveMatters: liveMattersForUI,
           pipelineMatters: pipelineMattersForUI,
           hasActiveWipProposals: false,
+          matterBreakdowns: [],
         } as DashboardStats;
       }
 
@@ -179,6 +192,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       let hasActiveWipProposals = false; // Track if any proposals are affecting WIP
       const alerts: Alert[] = [];
       const pipelineAlerts: PipelineAlert[] = [];
+      const matterBreakdowns: MatterBreakdown[] = [];
 
       // Calculate total pipeline value (respecting excluded pipeline matters)
       let includedPipelineCount = 0;
@@ -244,13 +258,27 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         // Only include in financial totals if not excluded
         if (!isExcluded) {
           // Convert to USD using live rates for accuracy
+          const wipUsd = convertToUsd(wipAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          const billedUsd = convertToUsd(billedAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          const paidUsd = convertToUsd(paidAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          
           totalBmFeesUsd += convertToUsd(effectiveBmFee, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-          // Use net WIP (after proposal write-offs) for the dashboard WIP figure
-          totalWipUsd += convertToUsd(wipAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-          totalBilledUsd += convertToUsd(billedAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-          totalPaidUsd += convertToUsd(paidAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          totalWipUsd += wipUsd;
+          totalBilledUsd += billedUsd;
+          totalPaidUsd += paidUsd;
           // Only use ACTUAL write-offs for realization rate - never proposal write-offs
           totalWipWriteOffUsd += convertToUsd(actualWipWriteOffAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+
+          matterBreakdowns.push({
+            id: matter.id,
+            matterName: matter.matter_name,
+            clientName: getMatterClientDisplayName(matter),
+            wipAmount: wipUsd,
+            arAmount: billedUsd - paidUsd,
+            paidAmount: paidUsd,
+            billedAmount: billedUsd,
+            currency: feeCurrency,
+          });
         }
 
         // Budget burn = WIP + AR + Paid (each value is mutually exclusive)
@@ -545,6 +573,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         liveMatters: liveMattersForUI,
         pipelineMatters: pipelineMattersForUI,
         hasActiveWipProposals,
+        matterBreakdowns: matterBreakdowns.sort((a, b) => b.wipAmount - a.wipAmount),
       } as DashboardStats;
     },
     enabled: !!user,

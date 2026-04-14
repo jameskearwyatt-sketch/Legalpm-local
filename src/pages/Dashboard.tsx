@@ -7,7 +7,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useDashboard, TrendDataPoint } from '@/lib/hooks/useDashboard';
+import { useDashboard, TrendDataPoint, MatterBreakdown } from '@/lib/hooks/useDashboard';
 import { useMatters } from '@/lib/hooks/useMatters';
 import { useAuth } from '@/lib/auth';
 import { formatCurrency } from '@/lib/currencyUtils';
@@ -53,6 +53,8 @@ export default function Dashboard() {
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRange>("all");
   const isHoveringTooltipRef = useRef(false);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [expandedTile, setExpandedTile] = useState<'wip' | 'ar' | 'paid' | null>(null);
+  const breakdownRef = useRef<HTMLDivElement>(null);
   // "Not my matters" checkbox defaults to unchecked (meaning they're excluded by default)
   const [notMyMattersIncluded, setNotMyMattersIncluded] = useState(false);
   const { data: stats, isLoading } = useDashboard(excludedMatterIds, excludedPipelineMatterIds);
@@ -328,6 +330,20 @@ export default function Dashboard() {
 
   // Use shared formatCurrency from currencyUtils - imported at top
 
+  const breakdownData = useMemo(() => {
+    if (!expandedTile || !stats?.matterBreakdowns) return [];
+    const sorted = [...stats.matterBreakdowns];
+    if (expandedTile === 'wip') {
+      return sorted.filter(m => m.wipAmount > 0).sort((a, b) => b.wipAmount - a.wipAmount);
+    }
+    if (expandedTile === 'ar') {
+      return sorted.filter(m => m.arAmount > 0).sort((a, b) => b.arAmount - a.arAmount);
+    }
+    if (expandedTile === 'paid') {
+      return sorted.filter(m => m.paidAmount > 0).sort((a, b) => b.paidAmount - a.paidAmount);
+    }
+    return [];
+  }, [expandedTile, stats?.matterBreakdowns]);
 
   if (isLoading) {
     return (
@@ -343,6 +359,14 @@ export default function Dashboard() {
   const outstandingAR = (stats?.totalBilled || 0) - (stats?.totalPaid || 0);
   const totalLockup = (stats?.totalWip || 0) + outstandingAR;
 
+  const handleTileClick = (tile: 'wip' | 'ar' | 'paid') => {
+    setExpandedTile(prev => prev === tile ? null : tile);
+    // Scroll to breakdown after a tick
+    setTimeout(() => {
+      breakdownRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+  };
+
   const kpiCards = [
     {
       title: 'Work in Progress',
@@ -350,30 +374,35 @@ export default function Dashboard() {
       icon: <Clock className="h-5 w-5" />,
       variant: 'default' as const,
       hasProposalAdjustment: stats?.hasActiveWipProposals || false,
+      tileKey: 'wip' as const,
     },
     {
       title: 'Total AR',
       value: formatCurrency(outstandingAR, 'USD'),
       icon: <FileText className="h-5 w-5" />,
       variant: 'default' as const,
+      tileKey: 'ar' as const,
     },
     {
       title: 'Total Lock-up',
       value: formatCurrency(totalLockup, 'USD'),
       icon: <DollarSign className="h-5 w-5" />,
       variant: 'default' as const,
+      tileKey: null,
     },
     {
       title: 'Total Billed',
       value: formatCurrency(stats?.totalBilled || 0, 'USD'),
       icon: <FileText className="h-5 w-5" />,
       variant: 'default' as const,
+      tileKey: null,
     },
     {
       title: 'Total Paid',
       value: formatCurrency(stats?.totalPaid || 0, 'USD'),
       icon: <CheckCircle className="h-5 w-5" />,
       variant: 'success' as const,
+      tileKey: 'paid' as const,
     },
     {
       title: 'Realization Rate',
@@ -381,6 +410,7 @@ export default function Dashboard() {
       icon: <Percent className="h-5 w-5" />,
       variant: (stats?.realizationRate || 0) >= 80 ? 'success' as const : (stats?.realizationRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
       infoTooltip: 'Realization Rate measures the percentage of worked time that was actually collected as revenue. WIP write-offs hurt this rate. E.g., if you bill £100k, write off £50k, and collect £50k, your collection rate is 100% but realization rate is 50%.',
+      tileKey: null,
     },
     {
       title: 'Collection Rate',
@@ -388,8 +418,17 @@ export default function Dashboard() {
       icon: <TrendingUp className="h-5 w-5" />,
       variant: (stats?.avgCollectionRate || 0) >= 80 ? 'success' as const : (stats?.avgCollectionRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
       infoTooltip: 'Collection Rate measures the percentage of billed amounts that have been collected. WIP write-offs do not affect this rate — it only looks at bills issued vs. payments received.',
+      tileKey: null,
     },
   ];
+
+
+  const breakdownTitle = expandedTile === 'wip' ? 'Work in Progress' : expandedTile === 'ar' ? 'Accounts Receivable' : 'Paid';
+  const getBreakdownValue = (m: MatterBreakdown) => {
+    if (expandedTile === 'wip') return m.wipAmount;
+    if (expandedTile === 'ar') return m.arAmount;
+    return m.paidAmount;
+  };
 
   // Use actual trend data from snapshots, filtered by time range
   const allTrendData = stats?.trendData || [];
@@ -435,9 +474,57 @@ export default function Dashboard() {
               infoTooltip={'infoTooltip' in card ? card.infoTooltip : undefined}
               note={'hasProposalAdjustment' in card && card.hasProposalAdjustment ? 'Adjusted for WIP proposals' : undefined}
               noteVariant={'hasProposalAdjustment' in card && card.hasProposalAdjustment ? 'amber' : undefined}
+              onClick={card.tileKey ? () => handleTileClick(card.tileKey!) : undefined}
+              isExpanded={card.tileKey ? expandedTile === card.tileKey : false}
             />
           ))}
         </div>
+
+        {/* Matter Breakdown Panel */}
+        {expandedTile && breakdownData.length > 0 && (
+          <div ref={breakdownRef}>
+            <Card className="shadow-card animate-in slide-in-from-top-2 duration-200">
+              <CardHeader className="pb-2 pt-4 px-4 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-foreground">
+                    {breakdownTitle} by Matter ({breakdownData.length})
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setExpandedTile(null)} className="text-xs text-muted-foreground">
+                    Close
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6 pb-4 pt-0">
+                <div className="max-h-64 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 pr-2 text-xs font-medium text-muted-foreground">Matter</th>
+                        <th className="text-left py-2 pr-2 text-xs font-medium text-muted-foreground hidden sm:table-cell">Client</th>
+                        <th className="text-right py-2 text-xs font-medium text-muted-foreground">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {breakdownData.map((m) => (
+                        <tr key={m.id} className="border-b border-border/50 hover:bg-muted/50">
+                          <td className="py-2 pr-2">
+                            <Link to={`/matters/${m.id}`} className="text-primary hover:underline text-xs sm:text-sm">
+                              {m.matterName}
+                            </Link>
+                          </td>
+                          <td className="py-2 pr-2 text-xs text-muted-foreground hidden sm:table-cell">{m.clientName}</td>
+                          <td className="py-2 text-right text-xs sm:text-sm font-medium text-foreground">
+                            {formatCurrency(getBreakdownValue(m), 'USD')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Budget Summary - Live, Pipeline & Grand Total */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-4 bg-primary/5 rounded-lg border border-primary/10">

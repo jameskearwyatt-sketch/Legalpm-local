@@ -20,11 +20,13 @@ interface StatCardProps {
   variant?: 'default' | 'success' | 'warning' | 'danger';
   className?: string;
   infoTooltip?: string;
-  note?: string; // Optional note to display below the value (e.g., for WIP proposals)
+  note?: string;
   noteVariant?: 'default' | 'amber' | 'info';
+  onClick?: () => void;
+  isExpanded?: boolean;
 }
 
-export function StatCard({ title, value, icon, trend, variant = 'default', className, infoTooltip, note, noteVariant = 'default' }: StatCardProps) {
+export function StatCard({ title, value, icon, trend, variant = 'default', className, infoTooltip, note, noteVariant = 'default', onClick, isExpanded }: StatCardProps) {
   const variantStyles = {
     default: 'bg-card',
     success: 'bg-success/5 border-success/20',
@@ -40,7 +42,7 @@ export function StatCard({ title, value, icon, trend, variant = 'default', class
   };
 
   return (
-    <Card className={cn('shadow-card hover:shadow-card-hover transition-shadow', variantStyles[variant], className)}>
+    <Card className={cn('shadow-card hover:shadow-card-hover transition-shadow', variantStyles[variant], onClick && 'cursor-pointer ring-offset-background hover:ring-2 hover:ring-primary/20', isExpanded && 'ring-2 ring-primary/40', className)} onClick={onClick}>
       <CardContent className="p-3 sm:p-6">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-0.5 sm:space-y-1 min-w-0">

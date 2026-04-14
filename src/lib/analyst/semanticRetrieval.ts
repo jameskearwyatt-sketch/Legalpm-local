@@ -29,6 +29,14 @@ const PRECEDENTS_RPC: Record<AnalystType, string> = {
   cloud_compute: 'match_cloud_compute_precedents',
 };
 
+const SIMILAR_LEARNINGS_RPC: Record<AnalystType, string> = {
+  ppa: 'find_similar_ppa_learnings',
+  tolling: 'find_similar_tolling_learnings',
+  carbon: 'find_similar_carbon_learnings',
+  it_supply: 'find_similar_it_supply_learnings',
+  cloud_compute: 'find_similar_cloud_compute_learnings',
+};
+
 const LEARNING_TABLES: Record<AnalystType, string> = {
   ppa: 'ppa_ai_learnings',
   tolling: 'tolling_learnings',
@@ -150,6 +158,57 @@ export async function matchPrecedents<T = unknown>(
     return null;
   }
   return (data || []) as T[];
+}
+
+/**
+ * Shape returned by the `find_similar_*_learnings` RPC family.
+ * Different analysts have slightly different learning columns (PPA has
+ * `user_feedback`; the other 4 have `correction_reason`), but the shared
+ * columns below are always present.
+ */
+export interface SimilarLearning {
+  id: string;
+  category: string;
+  original_position: string | null;
+  corrected_position: string | null;
+  user_feedback?: string | null;
+  correction_reason?: string | null;
+  is_active: boolean;
+  created_at: string;
+  similarity: number;
+}
+
+/**
+ * Given a category + free text, returns existing learnings in the same
+ * category that are semantically similar above `matchThreshold` (cosine
+ * similarity). Intended for conflict detection in the "add correction"
+ * dialog — if the new correction overlaps an existing one, the user should
+ * be asked to merge/override instead of silently layering.
+ *
+ * Returns `null` when the embedding backend is unavailable (caller should
+ * skip the warning UI). Returns `[]` if no conflicts.
+ */
+export async function findSimilarLearnings(
+  analyst: AnalystType,
+  category: string,
+  text: string,
+  matchCount: number = 5,
+  matchThreshold: number = 0.55,
+): Promise<SimilarLearning[] | null> {
+  if (!category || !text || !text.trim()) return [];
+  const embedding = await embedText(text);
+  if (!embedding) return null;
+  const { data, error } = await supabase.rpc(SIMILAR_LEARNINGS_RPC[analyst] as never, {
+    query_embedding: embedding as never,
+    filter_category: category,
+    match_count: matchCount,
+    match_threshold: matchThreshold,
+  });
+  if (error) {
+    console.warn(`${SIMILAR_LEARNINGS_RPC[analyst]} RPC failed:`, error);
+    return null;
+  }
+  return (data || []) as SimilarLearning[];
 }
 
 /**

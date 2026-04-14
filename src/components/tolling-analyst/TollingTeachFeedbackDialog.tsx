@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useTollingLearnings } from '@/lib/hooks/useTollingLearnings';
 import { TollingExtractedPosition } from '@/lib/hooks/useTollingAnalyses';
+import { LearningConflictWarning } from '@/components/shared/LearningConflictWarning';
 
 interface TollingTeachFeedbackDialogProps {
   open: boolean;
@@ -115,6 +116,13 @@ export function TollingTeachFeedbackDialog({
             <p className="text-xs text-muted-foreground">
               Be specific about what the AI got wrong and what the correct interpretation should be.
             </p>
+            {!correctedPosition && (
+              <LearningConflictWarning
+                analyst="tolling"
+                category={position.category}
+                text={feedback}
+              />
+            )}
           </div>
 
           {correctedPosition && (

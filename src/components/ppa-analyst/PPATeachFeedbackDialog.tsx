@@ -16,6 +16,7 @@
  import { supabase } from '@/integrations/supabase/client';
  import { usePPALearnings } from '@/lib/hooks/usePPALearnings';
  import { PPAExtractedPosition } from '@/lib/hooks/usePPAAnalyses';
+import { LearningConflictWarning } from '@/components/shared/LearningConflictWarning';
  
  interface PPATeachFeedbackDialogProps {
    open: boolean;
@@ -189,6 +190,13 @@
              <p className="text-xs text-muted-foreground">
                Be specific about what the AI got wrong and what the correct interpretation should be.
              </p>
+            {!correctedPosition && (
+              <LearningConflictWarning
+                analyst="ppa"
+                category={position.category}
+                text={feedback}
+              />
+            )}
            </div>
  
            {/* Corrected Position (after processing) */}

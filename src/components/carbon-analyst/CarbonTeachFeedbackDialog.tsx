@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCarbonLearnings } from '@/lib/hooks/useCarbonLearnings';
 import { CarbonExtractedPosition } from '@/lib/hooks/useCarbonAnalyses';
+import { LearningConflictWarning } from '@/components/shared/LearningConflictWarning';
 
 interface CarbonTeachFeedbackDialogProps {
   open: boolean;
@@ -53,6 +54,9 @@ export function CarbonTeachFeedbackDialog({ open, onOpenChange, position, analys
             <Label htmlFor="feedback" className="text-sm font-medium">Your Correction / Feedback</Label>
             <Textarea id="feedback" placeholder="e.g., 'The vintage window is actually 2025-2030, not 2024-2028. See Schedule 2...'" value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={4} disabled={isProcessing || !!correctedPosition} />
             <p className="text-xs text-muted-foreground">Be specific about what the AI got wrong and what the correct interpretation should be.</p>
+            {!correctedPosition && (
+              <LearningConflictWarning analyst="carbon" category={position.category} text={feedback} />
+            )}
           </div>
           {correctedPosition && <div className="space-y-2"><Label className="text-sm font-medium flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Learning Saved</Label><Badge variant="secondary" className="text-xs">✓ AI will remember this for future analyses in "{position.category}"</Badge></div>}
         </div>

@@ -99,7 +99,7 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 | 1 | Embedding-based retrieval of relevant learnings/precedents | **Done** (Apr 2026) |
 | 3 | Prompt caching | Blocked (codebase uses Lovable AI Gateway → Gemini, not Anthropic Messages API) |
 | 4 | Postgres transactions for multi-step analyst mutations | **Done** (Apr 2026) |
-| 5 | Learning quality controls (conflict detection, golden-set regression) | Pending |
+| 5 | Learning quality controls (conflict detection, golden-set regression) | **Partial** — conflict detection shipped Apr 2026; regression harness pending |
 | 6 | Structured output (JSON schema / tool use) | Pending |
 | 7 | Observability & telemetry | Partial (duration + token counts captured) |
 | 8 | Cross-analyst reuse / shared component refactor | Pending |
@@ -128,6 +128,14 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 - Migration `20260416000001_add_analyst_transactional_inserts.sql` adds 5 `SECURITY INVOKER` PL/pgSQL RPC functions (`create_{ppa,tolling,carbon,it_supply,cloud_compute}_analysis_with_positions`). Each function accepts `analysis_data jsonb` + `positions_data jsonb`, force-sets `user_id := auth.uid()` on every row (prevents impersonation), uses `jsonb_populate_record(set)` so new columns Just Work without function changes, and runs the analysis INSERT + positions INSERT inside a single implicit transaction. If either INSERT fails, the whole operation rolls back — no orphan analysis rows without positions, no orphan positions without an analysis.
 - All 5 `useXxxAnalyses` hooks expose `createAnalysisWithPositions` which calls the RPC and invalidates both the analyses and positions query keys. The legacy `createAnalysis` / `createPositions` mutations are retained for backwards compatibility.
 - All 5 upload components (`PPAUploadAnalysis`, `TollingUploadAnalysis`, `CarbonUploadAnalysis`, `ITSupplyUploadAnalysis`, `CloudComputeUploadAnalysis`) plus `PPACompareUpload` now issue a single transactional call instead of the previous 2-step `createAnalysis → createPositions` pattern. RLS is still enforced because `SECURITY INVOKER` means the function runs with the caller's role.
+
+### Learning Conflict Detection (#5, phase 1) — Shipped
+
+- Migration `20260417000001_add_learning_conflict_detection.sql` adds 5 `find_similar_{ppa,tolling,carbon,it_supply,cloud_compute}_learnings` RPC functions. Each accepts a query embedding + a required `filter_category` parameter + a similarity threshold (default 0.55, deliberately stricter than the 0.30 used for prompt-context retrieval) and returns the top-K existing learnings in that category with their cosine similarity scores. `SECURITY INVOKER` preserves RLS.
+- `src/lib/analyst/semanticRetrieval.ts` exposes `findSimilarLearnings(analyst, category, text, k?, threshold?)` returning `SimilarLearning[] | null`; null signals the embedding backend is unavailable so callers can silently skip the warning UI.
+- Shared UI `src/components/shared/LearningConflictWarning.tsx` is an inline amber banner that debounces (600ms) a similarity search while the user types a new correction, and shows up to 5 existing learnings in the same category with their similarity percentage, active/inactive state, and age. It's collapsible and fully silent until conflicts pass the threshold.
+- All 5 `XxxTeachFeedbackDialog` components (PPA, Tolling, Carbon, IT Supply, Cloud Compute) render the warning below the feedback textarea. The warning does not block submission — the intent is to inform the user so they can choose to merge/override the existing learning manually, rather than silently layering contradictory instructions.
+- Next phase (pending): golden-set regression harness — a curated set of contract snippets with expected outputs that can be re-run after learnings change, to detect when a new learning breaks previously-correct behaviour.
 
 ## Remaining Recommendations
 

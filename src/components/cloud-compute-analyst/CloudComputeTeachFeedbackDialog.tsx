@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useCloudComputeLearnings } from '@/lib/hooks/useCloudComputeLearnings';
 import { CloudComputeExtractedPosition } from '@/lib/hooks/useCloudComputeAnalyses';
+import { LearningConflictWarning } from '@/components/shared/LearningConflictWarning';
 
 interface Props { open: boolean; onOpenChange: (open: boolean) => void; position: CloudComputeExtractedPosition; analysisId: string; projectName: string; onPositionUpdated?: (ns: string, nv?: string) => void; }
 
@@ -39,7 +40,7 @@ export function CloudComputeTeachFeedbackDialog({ open, onOpenChange, position, 
         <DialogHeader><DialogTitle className="flex items-center gap-2"><Lightbulb className="h-5 w-5 text-amber-500" /> Teach AI - {position.category}</DialogTitle><DialogDescription>Provide feedback for future cloud compute analyses.</DialogDescription></DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2"><Label>Current Analysis</Label><div className="p-3 bg-muted rounded-lg text-sm whitespace-pre-line">{position.position_summary}</div></div>
-          <div className="space-y-2"><Label htmlFor="feedback">Your Correction</Label><Textarea id="feedback" placeholder="e.g., 'The SLA is actually 99.99%, not 99.9%...'" value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={4} disabled={isProcessing || !!correctedPosition} /></div>
+          <div className="space-y-2"><Label htmlFor="feedback">Your Correction</Label><Textarea id="feedback" placeholder="e.g., 'The SLA is actually 99.99%, not 99.9%...'" value={feedback} onChange={(e) => setFeedback(e.target.value)} rows={4} disabled={isProcessing || !!correctedPosition} />{!correctedPosition && <LearningConflictWarning analyst="cloud_compute" category={position.category} text={feedback} />}</div>
           {correctedPosition && <div className="space-y-2"><Label className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Learning Saved</Label><Badge variant="secondary" className="text-xs">✓ AI will remember this</Badge></div>}
         </div>
         <DialogFooter><Button variant="outline" onClick={handleClose}>{correctedPosition ? 'Done' : 'Cancel'}</Button>{!correctedPosition && <Button onClick={handleSubmitFeedback} disabled={isProcessing || !feedback.trim()}>{isProcessing ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Saving...</> : <><Send className="h-4 w-4 mr-2" /> Submit</>}</Button>}</DialogFooter>

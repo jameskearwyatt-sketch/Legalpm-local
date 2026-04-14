@@ -917,15 +917,15 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                               placeholder="Search contacts or enter new..."
-                              value={contactSearch}
-                              onChange={(e) => setContactSearch(e.target.value)}
+                              value={contactSearchByClient[clientId] || ""}
+                              onChange={(e) => setContactSearchByClient(prev => ({ ...prev, [clientId]: e.target.value }))}
                               className="pl-9"
                             />
                           </div>
                           
-                          {filteredContacts.length > 0 && contactSearch && (
+                          {getFilteredContacts(clientId).length > 0 && contactSearchByClient[clientId] && (
                             <div className="border rounded-md max-h-32 overflow-y-auto">
-                              {filteredContacts.map(contact => (
+                              {getFilteredContacts(clientId).map(contact => (
                                 <button
                                   key={contact.id}
                                   className="w-full text-left px-3 py-2 hover:bg-muted/50 text-sm"
@@ -935,7 +935,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
                                       name: contact.full_name,
                                       email: contact.email,
                                     });
-                                    setContactSearch("");
+                                    setContactSearchByClient(prev => ({ ...prev, [clientId]: "" }));
                                   }}
                                 >
                                   <span className="font-medium">{formatDisplayName(contact.full_name)}</span>

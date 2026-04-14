@@ -408,20 +408,6 @@ export default function Dashboard() {
     },
   ];
 
-  const breakdownData = useMemo(() => {
-    if (!expandedTile || !stats?.matterBreakdowns) return [];
-    const sorted = [...stats.matterBreakdowns];
-    if (expandedTile === 'wip') {
-      return sorted.filter(m => m.wipAmount > 0).sort((a, b) => b.wipAmount - a.wipAmount);
-    }
-    if (expandedTile === 'ar') {
-      return sorted.filter(m => m.arAmount > 0).sort((a, b) => b.arAmount - a.arAmount);
-    }
-    if (expandedTile === 'paid') {
-      return sorted.filter(m => m.paidAmount > 0).sort((a, b) => b.paidAmount - a.paidAmount);
-    }
-    return [];
-  }, [expandedTile, stats?.matterBreakdowns]);
 
   const breakdownTitle = expandedTile === 'wip' ? 'Work in Progress' : expandedTile === 'ar' ? 'Accounts Receivable' : 'Paid';
   const getBreakdownValue = (m: MatterBreakdown) => {

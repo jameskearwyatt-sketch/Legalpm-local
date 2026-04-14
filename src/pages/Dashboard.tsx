@@ -309,7 +309,7 @@ export default function Dashboard() {
     // Build the payload array for all three metrics
     const fullPayload = [
       { name: 'WIP', value: payload.wip, color: 'hsl(var(--chart-3))' },
-      { name: 'Billed', value: payload.billed, color: 'hsl(var(--chart-1))' },
+      { name: 'AR', value: payload.ar, color: 'hsl(var(--chart-1))' },
       { name: 'Paid', value: payload.paid, color: 'hsl(var(--chart-2))' },
     ];
     
@@ -681,8 +681,8 @@ export default function Dashboard() {
                     />
                     <Line 
                       type="monotone" 
-                      dataKey="billed" 
-                      name="Billed"
+                      dataKey="ar" 
+                      name="AR"
                       stroke="hsl(var(--chart-1))" 
                       strokeWidth={2}
                       dot={<CustomDot />}

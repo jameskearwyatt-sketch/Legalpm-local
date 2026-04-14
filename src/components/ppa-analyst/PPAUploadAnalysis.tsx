@@ -346,16 +346,16 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
       
       // Filter relevant precedents for raw comparison (exclude gold standard from regular precedents)
       const regularPrecedents = precedents.filter(p => !p.is_gold_standard);
-      const relevantPrecedents = regularPrecedents.length >= ppaPrecedentThreshold
-        ? regularPrecedents.map(p => ({
-            category: p.category,
-            position_summary: p.position_summary,
-            project_name: p.project_name,
-            jurisdiction: p.jurisdiction,
-            perspective: p.perspective,
-          }))
-        : [];
-      
+      const includeRawPrecedents = regularPrecedents.length >= ppaPrecedentThreshold;
+      const appliedRegularPrecedents = includeRawPrecedents ? regularPrecedents : [];
+      const relevantPrecedents = appliedRegularPrecedents.map(p => ({
+        category: p.category,
+        position_summary: p.position_summary,
+        project_name: p.project_name,
+        jurisdiction: p.jurisdiction,
+        perspective: p.perspective,
+      }));
+
       // Always include gold standard precedents for comparison (regardless of threshold)
       const goldStandardForAnalysis = goldStandardPrecedents.map(p => ({
         category: p.category,
@@ -365,6 +365,12 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         perspective: p.perspective,
         template_name: p.template_name,
       }));
+
+      // Capture IDs of what we're about to send to the AI so we can persist
+      // them on the analysis record as an audit/provenance trail.
+      const appliedLearningIds = activeLearnings.map(l => l.id);
+      const appliedPrecedentIds = appliedRegularPrecedents.map(p => p.id);
+      const appliedGoldStandardIds = goldStandardPrecedents.map(p => p.id);
       
       console.log(`Passing ${relevantPrecedents.length} raw precedents + synthesized intelligence (threshold: ${ppaPrecedentThreshold})`);
       console.log(`Passing ${goldStandardForAnalysis.length} gold standard template positions`);
@@ -428,7 +434,9 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         }
       };
       
+      const analysisStartTs = Date.now();
       const analyzeRes = await callAnalyzeApi();
+      const analysisDurationMs = Date.now() - analysisStartTs;
       
       if (!analyzeRes.ok) {
         let errorMessage = 'Failed to analyze PPA';
@@ -476,6 +484,15 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         // Normalized names for intelligent search
         buyer_normalized: buyerNormalized || null,
         seller_normalized: sellerNormalized || null,
+        // Applied-context trace (what shaped this analysis)
+        applied_learning_ids: appliedLearningIds,
+        applied_precedent_ids: appliedPrecedentIds,
+        applied_gold_standard_ids: appliedGoldStandardIds,
+        // Telemetry
+        model_used: analyzeResponse.data?.model_used ?? null,
+        analysis_duration_ms: analysisDurationMs,
+        input_token_count: analyzeResponse.data?.input_token_count ?? null,
+        output_token_count: analyzeResponse.data?.output_token_count ?? null,
       });
 
       // Step 5: Save extracted positions

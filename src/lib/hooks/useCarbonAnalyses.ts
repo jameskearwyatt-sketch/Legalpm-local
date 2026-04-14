@@ -34,6 +34,15 @@ export interface CarbonAnalysis {
   seller_name: string | null;
   buyer_normalized: string | null;
   seller_normalized: string | null;
+  // Applied-context trace: which learnings / precedents shaped this analysis
+  applied_learning_ids: string[];
+  applied_precedent_ids: string[];
+  applied_gold_standard_ids: string[];
+  // Telemetry
+  model_used: string | null;
+  analysis_duration_ms: number | null;
+  input_token_count: number | null;
+  output_token_count: number | null;
   created_at: string;
   updated_at: string;
 }

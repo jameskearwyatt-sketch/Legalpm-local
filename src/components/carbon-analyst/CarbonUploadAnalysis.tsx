@@ -202,10 +202,17 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
       setAnalysisProgress(40);
 
       setAnalysisStatus('Building precedent intelligence...');
-      const relevantPrecedents = precedents.filter(p => !p.is_gold_standard).map(p => ({
+      const appliedRegularPrecedents = precedents.filter(p => !p.is_gold_standard);
+      const appliedGoldStandardPrecedents = precedents.filter(p => p.is_gold_standard);
+      const relevantPrecedents = appliedRegularPrecedents.map(p => ({
         category: p.category, position_summary: p.position_summary, project_name: p.project_name,
         jurisdiction: p.jurisdiction, perspective: p.perspective,
       }));
+
+      // Capture IDs for applied-context audit trail
+      const appliedLearningIds = activeLearnings.map(l => l.id);
+      const appliedPrecedentIds = appliedRegularPrecedents.map(p => p.id);
+      const appliedGoldStandardIds = appliedGoldStandardPrecedents.map(p => p.id);
 
       const userLearningsPrompt = formatLearningsForPrompt();
       if (activeLearnings.length > 0) console.log(`Including ${activeLearnings.length} carbon learnings`);
@@ -242,7 +249,9 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
         }
       };
 
+      const analysisStartTs = Date.now();
       const analyzeRes = await callAnalyzeApi();
+      const analysisDurationMs = Date.now() - analysisStartTs;
       if (!analyzeRes.ok) {
         let errorMessage = 'Failed to analyze carbon credit offtake agreement';
         try { const errorData = await analyzeRes.json(); errorMessage = errorData.error || errorMessage; } catch { errorMessage = `Analysis failed with status ${analyzeRes.status}`; }
@@ -264,6 +273,15 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
         key_risk_areas: [], counterparty_type: counterpartyType || null,
         buyer_name: buyerName || null, seller_name: sellerName || null,
         buyer_normalized: buyerNormalized || buyerName || null, seller_normalized: sellerNormalized || sellerName || null,
+        // Applied-context trace
+        applied_learning_ids: appliedLearningIds,
+        applied_precedent_ids: appliedPrecedentIds,
+        applied_gold_standard_ids: appliedGoldStandardIds,
+        // Telemetry
+        model_used: analyzeResponse?.model_used ?? null,
+        analysis_duration_ms: analysisDurationMs,
+        input_token_count: analyzeResponse?.input_token_count ?? null,
+        output_token_count: analyzeResponse?.output_token_count ?? null,
       });
 
       if (extractedPositions && extractedPositions.length > 0) {

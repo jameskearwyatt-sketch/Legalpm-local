@@ -9,6 +9,8 @@ import {
   Database, ChevronDown, ChevronRight, Loader2, Filter, X, Lightbulb, Scale,
 } from 'lucide-react';
 import { useCarbonAnalyses, useCarbonPositions, useCarbonPrecedentBank, CarbonExtractedPosition } from '@/lib/hooks/useCarbonAnalyses';
+import { useCarbonLearnings } from '@/lib/hooks/useCarbonLearnings';
+import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
 import { CarbonTeachFeedbackDialog } from './CarbonTeachFeedbackDialog';
 import { CarbonWhatsMarketDialog } from './CarbonWhatsMarketDialog';
 import { CARBON_CATEGORY_GROUPS, CARBON_ALL_CATEGORIES, CARBON_PROJECT_TYPES } from '@/lib/carbonCategories';
@@ -52,6 +54,7 @@ export function CarbonAnalysisReport({ analysisId, onNewAnalysis, onViewHistory 
   const { analyses, updateAnalysis } = useCarbonAnalyses();
   const { positions, isLoading: positionsLoading } = useCarbonPositions(analysisId);
   const { bankPositions, getCategoryStats, precedents: bankPrecedents } = useCarbonPrecedentBank();
+  const { learnings } = useCarbonLearnings();
 
   const [selectedForBanking, setSelectedForBanking] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(CARBON_CATEGORY_GROUPS.map(g => g)));
@@ -145,6 +148,29 @@ export function CarbonAnalysisReport({ analysisId, onNewAnalysis, onViewHistory 
                   {analysis.is_agreed && <Badge className="bg-primary/10 text-primary border border-primary/30">Agreed</Badge>}
                 </div>
                 <p className="text-sm">Analyzed: {format(new Date(analysis.created_at), 'PPp')}</p>
+                <div className="pt-1">
+                  <AnalystAppliedContextBadge
+                    appliedLearningIds={analysis.applied_learning_ids || []}
+                    appliedPrecedentIds={analysis.applied_precedent_ids || []}
+                    appliedGoldStandardIds={analysis.applied_gold_standard_ids || []}
+                    learnings={(learnings || []).map(l => ({
+                      id: l.id,
+                      category: l.category,
+                      user_feedback: l.correction_reason || `"${l.original_position}" should be "${l.corrected_position}"`,
+                      corrected_position: l.corrected_position,
+                      created_at: l.created_at,
+                    }))}
+                    precedents={(bankPrecedents || []).map(p => ({
+                      id: p.id,
+                      category: p.category,
+                      project_name: p.project_name,
+                      jurisdiction: p.jurisdiction,
+                      is_gold_standard: p.is_gold_standard,
+                      template_name: p.template_name,
+                    }))}
+                    analysisCreatedAt={analysis.created_at}
+                  />
+                </div>
               </CardDescription>
             </div>
             <div className="flex gap-2">

@@ -9,6 +9,8 @@ import {
   Database, ChevronDown, ChevronRight, Loader2, Filter, X, Lightbulb, Scale,
 } from 'lucide-react';
 import { useTollingAnalyses, useTollingPositions, useTollingPrecedentBank, TollingExtractedPosition } from '@/lib/hooks/useTollingAnalyses';
+import { useTollingLearnings } from '@/lib/hooks/useTollingLearnings';
+import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
 import { TollingTeachFeedbackDialog } from './TollingTeachFeedbackDialog';
 import { TollingWhatsMarketDialog } from './TollingWhatsMarketDialog';
 import { TOLLING_CATEGORY_GROUPS, TOLLING_ALL_CATEGORIES } from '@/lib/tollingCategories';
@@ -61,6 +63,7 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
   const { analyses, updateAnalysis } = useTollingAnalyses();
   const { positions, isLoading: positionsLoading } = useTollingPositions(analysisId);
   const { bankPositions, getCategoryStats, precedents: bankPrecedents } = useTollingPrecedentBank();
+  const { learnings } = useTollingLearnings();
 
   const [selectedForBanking, setSelectedForBanking] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(TOLLING_CATEGORY_GROUPS.map(g => g)));
@@ -250,6 +253,29 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
                   )}
                 </div>
                 <p className="text-sm">Analyzed: {format(new Date(analysis.created_at), 'PPp')}</p>
+                <div className="pt-1">
+                  <AnalystAppliedContextBadge
+                    appliedLearningIds={analysis.applied_learning_ids || []}
+                    appliedPrecedentIds={analysis.applied_precedent_ids || []}
+                    appliedGoldStandardIds={analysis.applied_gold_standard_ids || []}
+                    learnings={(learnings || []).map(l => ({
+                      id: l.id,
+                      category: l.category,
+                      user_feedback: l.correction_reason || `"${l.original_position}" should be "${l.corrected_position}"`,
+                      corrected_position: l.corrected_position,
+                      created_at: l.created_at,
+                    }))}
+                    precedents={(bankPrecedents || []).map(p => ({
+                      id: p.id,
+                      category: p.category,
+                      project_name: p.project_name,
+                      jurisdiction: p.jurisdiction,
+                      is_gold_standard: p.is_gold_standard,
+                      template_name: p.template_name,
+                    }))}
+                    analysisCreatedAt={analysis.created_at}
+                  />
+                </div>
               </CardDescription>
             </div>
             <div className="flex gap-2">

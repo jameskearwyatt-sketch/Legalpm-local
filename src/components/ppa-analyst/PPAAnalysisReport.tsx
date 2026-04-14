@@ -25,6 +25,8 @@ import {
   Scale,
 } from 'lucide-react';
 import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAExtractedPosition } from '@/lib/hooks/usePPAAnalyses';
+import { usePPALearnings } from '@/lib/hooks/usePPALearnings';
+import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
 import { PPATeachFeedbackDialog } from './PPATeachFeedbackDialog';
 import { WhatsMarketDialog } from './WhatsMarketDialog';
 import { getCategoryById, PPA_CATEGORY_GROUPS, PPA_ALL_CATEGORIES } from '@/lib/ppaCategories';
@@ -110,6 +112,7 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
   const { analyses, updateAnalysis } = usePPAAnalyses();
   const { positions, isLoading: positionsLoading } = usePPAPositions(analysisId);
   const { bankPositions, precedents, getCategoryStats } = usePPAPrecedentBank();
+  const { learnings } = usePPALearnings();
   
   const [selectedForBanking, setSelectedForBanking] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(PPA_CATEGORY_GROUPS));
@@ -382,6 +385,23 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                 <p className="text-sm">
                   Analyzed: {format(new Date(analysis.created_at), 'PPp')}
                 </p>
+                <div className="pt-1">
+                  <AnalystAppliedContextBadge
+                    appliedLearningIds={analysis.applied_learning_ids || []}
+                    appliedPrecedentIds={analysis.applied_precedent_ids || []}
+                    appliedGoldStandardIds={analysis.applied_gold_standard_ids || []}
+                    learnings={learnings}
+                    precedents={precedents.map(p => ({
+                      id: p.id,
+                      category: p.category,
+                      project_name: p.project_name,
+                      jurisdiction: p.jurisdiction,
+                      is_gold_standard: p.is_gold_standard,
+                      template_name: p.template_name,
+                    }))}
+                    analysisCreatedAt={analysis.created_at}
+                  />
+                </div>
               </CardDescription>
             </div>
             <div className="flex gap-2">

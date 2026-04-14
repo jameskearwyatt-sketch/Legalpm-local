@@ -65,7 +65,12 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       setAnalysisProgress(30);
 
       setAnalysisStatus('Building precedent intelligence...');
-      const relevantPrecedents = precedents.filter(p => !p.is_gold_standard).map(p => ({ category: p.category, position_summary: p.position_summary, project_name: p.project_name, jurisdiction: p.jurisdiction, perspective: p.perspective }));
+      const appliedRegularPrecedents = precedents.filter(p => !p.is_gold_standard);
+      const appliedGoldStandardPrecedents = precedents.filter(p => p.is_gold_standard);
+      const relevantPrecedents = appliedRegularPrecedents.map(p => ({ category: p.category, position_summary: p.position_summary, project_name: p.project_name, jurisdiction: p.jurisdiction, perspective: p.perspective }));
+      const appliedLearningIds = activeLearnings.map(l => l.id);
+      const appliedPrecedentIds = appliedRegularPrecedents.map(p => p.id);
+      const appliedGoldStandardIds = appliedGoldStandardPrecedents.map(p => p.id);
       const userLearningsPrompt = formatLearningsForPrompt();
       if (activeLearnings.length > 0) console.log(`Including ${activeLearnings.length} cloud compute learnings`);
       setAnalysisProgress(50); setAnalysisStatus('Running AI analysis...');
@@ -82,7 +87,9 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
         } catch (fe) { clearTimeout(timeoutId); if (retryCount < 3 && fe instanceof Error && (fe.name === 'AbortError' || fe.message.includes('fetch'))) { setAnalysisStatus(`Retrying (attempt ${retryCount + 2}/4)...`); await new Promise(r => setTimeout(r, 3000)); return callAnalyzeApi(retryCount + 1); } throw fe; }
       };
 
+      const analysisStartTs = Date.now();
       const analyzeRes = await callAnalyzeApi();
+      const analysisDurationMs = Date.now() - analysisStartTs;
       if (!analyzeRes.ok) { let em = 'Failed to analyze contract'; try { const ed = await analyzeRes.json(); em = ed.error || em; } catch {} throw new Error(em); }
       const analyzeResponse = await analyzeRes.json();
       setAnalysisProgress(80); setAnalysisStatus('Saving analysis results...');
@@ -94,6 +101,13 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
         notes: null, parent_analysis_id: null, version_number: 1, is_comparison: false, service_type: serviceType,
         deployment_model: deploymentModel, complexity_score: null, key_risk_areas: [], counterparty_type: counterpartyType || null,
         tenant_name: tenantName || null, provider_name: providerName || null, tenant_normalized: tenantName || null, provider_normalized: providerName || null,
+        applied_learning_ids: appliedLearningIds,
+        applied_precedent_ids: appliedPrecedentIds,
+        applied_gold_standard_ids: appliedGoldStandardIds,
+        model_used: analyzeResponse?.model_used ?? null,
+        analysis_duration_ms: analysisDurationMs,
+        input_token_count: analyzeResponse?.input_token_count ?? null,
+        output_token_count: analyzeResponse?.output_token_count ?? null,
       });
 
       if (extractedPositions?.length > 0) {

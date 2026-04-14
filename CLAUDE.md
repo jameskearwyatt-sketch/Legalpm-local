@@ -89,6 +89,30 @@ All 18 issues from the original audit have been resolved:
 | 17 | Unused `analystChildren` variable | Removed | LOW |
 | 18 | `as any` type cast | Fixed `NavGroup` type definition | LOW |
 
+## Analyst Suite — April 2026 Upgrade Track
+
+Cross-analyst improvements are being delivered coherently across PPA, Tolling, Carbon, IT Supply, and Cloud Compute. Status:
+
+| # | Upgrade | Status |
+|---|---------|--------|
+| 2 | Applied-learnings trace (audit / provenance per analysis) | **Done** (Apr 2026) |
+| 1 | Embedding-based retrieval of relevant learnings/precedents | Pending |
+| 3 | Prompt caching | Blocked (codebase uses Lovable AI Gateway → Gemini, not Anthropic Messages API) |
+| 4 | Postgres transactions for multi-step analyst mutations | Pending |
+| 5 | Learning quality controls (conflict detection, golden-set regression) | Pending |
+| 6 | Structured output (JSON schema / tool use) | Pending |
+| 7 | Observability & telemetry | Partial (duration + token counts captured) |
+| 8 | Cross-analyst reuse / shared component refactor | Pending |
+| 9 | PII redaction + LLM call audit log | Pending |
+| 10 | Streaming / batch / Word export | Pending |
+
+### Applied-Learnings Trace (#2) — Shipped
+
+- Migration `20260414000001_add_analyst_applied_context_tracking.sql` adds `applied_learning_ids`, `applied_precedent_ids`, `applied_gold_standard_ids`, `model_used`, `analysis_duration_ms`, `input_token_count`, `output_token_count` to all 5 `*_analyses` tables, with GIN indexes on the ID arrays for future "which analyses used learning X" queries.
+- All 5 upload components capture the IDs of every learning / raw precedent / gold-standard template passed to the LLM and persist them on the analysis row along with wall-clock duration.
+- Shared UI `src/components/shared/AnalystAppliedContextBadge.tsx` renders an "Informed by N corrections, M gold-standards, K precedents" pill on each analysis report. Clicking opens a dialog listing exactly which items shaped the analysis, with timestamps.
+- Edge functions may optionally return `model_used`, `input_token_count`, `output_token_count`; these are persisted if returned, otherwise stored as `null` (edge function updates are a small follow-up).
+
 ## Remaining Recommendations
 
 - **Rotate Supabase credentials** — The anon key was previously committed to git history. Rotate in Supabase dashboard.

@@ -6,6 +6,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { FileText, Plus, History, CheckCircle2, AlertCircle, HelpCircle, Database, ChevronDown, ChevronRight, Loader2, Filter, X, Lightbulb, Scale } from 'lucide-react';
 import { useITSupplyAnalyses, useITSupplyPositions, useITSupplyPrecedentBank, ITSupplyExtractedPosition } from '@/lib/hooks/useITSupplyAnalyses';
+import { useITSupplyLearnings } from '@/lib/hooks/useITSupplyLearnings';
+import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
 import { ITSupplyTeachFeedbackDialog } from './ITSupplyTeachFeedbackDialog';
 import { ITSupplyWhatsMarketDialog } from './ITSupplyWhatsMarketDialog';
 import { IT_SUPPLY_CATEGORY_GROUPS, IT_SUPPLY_ALL_CATEGORIES } from '@/lib/itSupplyCategories';
@@ -45,6 +47,7 @@ export function ITSupplyAnalysisReport({ analysisId, onNewAnalysis, onViewHistor
   const { analyses, updateAnalysis } = useITSupplyAnalyses();
   const { positions, isLoading: positionsLoading } = useITSupplyPositions(analysisId);
   const { bankPositions, getCategoryStats, precedents: bankPrecedents } = useITSupplyPrecedentBank();
+  const { learnings } = useITSupplyLearnings();
 
   const [selectedForBanking, setSelectedForBanking] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(IT_SUPPLY_CATEGORY_GROUPS.map(g => g)));
@@ -140,6 +143,29 @@ export function ITSupplyAnalysisReport({ analysisId, onNewAnalysis, onViewHistor
                   {analysis.is_agreed && <Badge className="bg-primary/10 text-primary border border-primary/30">Agreed</Badge>}
                 </div>
                 <p className="text-sm">Analyzed: {format(new Date(analysis.created_at), 'PPp')}</p>
+                <div className="pt-1">
+                  <AnalystAppliedContextBadge
+                    appliedLearningIds={analysis.applied_learning_ids || []}
+                    appliedPrecedentIds={analysis.applied_precedent_ids || []}
+                    appliedGoldStandardIds={analysis.applied_gold_standard_ids || []}
+                    learnings={(learnings || []).map(l => ({
+                      id: l.id,
+                      category: l.category,
+                      user_feedback: l.correction_reason || `"${l.original_position}" should be "${l.corrected_position}"`,
+                      corrected_position: l.corrected_position,
+                      created_at: l.created_at,
+                    }))}
+                    precedents={(bankPrecedents || []).map(p => ({
+                      id: p.id,
+                      category: p.category,
+                      project_name: p.project_name,
+                      jurisdiction: p.jurisdiction,
+                      is_gold_standard: p.is_gold_standard,
+                      template_name: p.template_name,
+                    }))}
+                    analysisCreatedAt={analysis.created_at}
+                  />
+                </div>
               </CardDescription>
             </div>
             <div className="flex gap-2">

@@ -20,11 +20,13 @@ interface StatCardProps {
   variant?: 'default' | 'success' | 'warning' | 'danger';
   className?: string;
   infoTooltip?: string;
-  note?: string; // Optional note to display below the value (e.g., for WIP proposals)
+  note?: string;
   noteVariant?: 'default' | 'amber' | 'info';
+  onClick?: () => void;
+  isExpanded?: boolean;
 }
 
-export function StatCard({ title, value, icon, trend, variant = 'default', className, infoTooltip, note, noteVariant = 'default' }: StatCardProps) {
+export function StatCard({ title, value, icon, trend, variant = 'default', className, infoTooltip, note, noteVariant = 'default', onClick, isExpanded }: StatCardProps) {
   const variantStyles = {
     default: 'bg-card',
     success: 'bg-success/5 border-success/20',

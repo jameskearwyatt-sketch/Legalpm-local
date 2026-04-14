@@ -7,7 +7,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useDashboard, TrendDataPoint } from '@/lib/hooks/useDashboard';
+import { useDashboard, TrendDataPoint, MatterBreakdown } from '@/lib/hooks/useDashboard';
 import { useMatters } from '@/lib/hooks/useMatters';
 import { useAuth } from '@/lib/auth';
 import { formatCurrency } from '@/lib/currencyUtils';

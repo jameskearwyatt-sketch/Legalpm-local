@@ -385,8 +385,13 @@ export default function Dashboard() {
     },
   ];
 
-  // Use actual trend data from snapshots
-  const trendData = stats?.trendData || [];
+  // Use actual trend data from snapshots, filtered by time range
+  const allTrendData = stats?.trendData || [];
+  const trendData = useMemo(() => {
+    const cutoff = getTimeRangeCutoff(dashboardTimeRange);
+    if (!cutoff) return allTrendData;
+    return allTrendData.filter(d => new Date(d.rawDate || d.date) >= cutoff);
+  }, [allTrendData, dashboardTimeRange]);
   const hasData = trendData.length > 0;
 
   return (

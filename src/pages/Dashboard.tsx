@@ -483,7 +483,7 @@ export default function Dashboard() {
         {/* Matter Breakdown Panel */}
         {expandedTile && breakdownData.length > 0 && (
           <div ref={breakdownRef}>
-            <Card className="shadow-card animate-in slide-in-from-top-2 duration-200">
+            <Card className="shadow-card animate-in slide-in-from-top-2 duration-200 max-w-2xl">
               <CardHeader className="pb-2 pt-4 px-4 sm:px-6">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm font-medium text-foreground">

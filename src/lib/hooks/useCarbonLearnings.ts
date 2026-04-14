@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
+import { embedAndStore, embedText, matchLearnings } from '@/lib/analyst/semanticRetrieval';
 
 export interface CarbonLearning {
   id: string;
@@ -45,6 +46,9 @@ export function useCarbonLearnings() {
         .select()
         .single();
       if (error) throw error;
+      const embedSource = [learning.category, learning.original_position, learning.corrected_position, learning.correction_reason ?? '']
+        .filter(Boolean).join('\n');
+      void embedAndStore('carbon', 'learning', (data as { id: string }).id, embedSource);
       return data as unknown as CarbonLearning;
     },
     onSuccess: () => {
@@ -82,10 +86,11 @@ export function useCarbonLearnings() {
     },
   });
 
-  const formatLearningsForPrompt = (): string => {
-    if (activeLearnings.length === 0) return '';
+  const formatLearningsForPrompt = (override?: CarbonLearning[]): string => {
+    const source = override ?? activeLearnings;
+    if (source.length === 0) return '';
     const byCategory: Record<string, CarbonLearning[]> = {};
-    for (const l of activeLearnings) {
+    for (const l of source) {
       if (!byCategory[l.category]) byCategory[l.category] = [];
       byCategory[l.category].push(l);
     }
@@ -102,6 +107,22 @@ export function useCarbonLearnings() {
     return prompt;
   };
 
+  const getRelevantLearnings = async (
+    queryText: string,
+    k: number = 10,
+  ): Promise<{ learnings: CarbonLearning[]; usedSemanticRetrieval: boolean }> => {
+    const embedding = await embedText(queryText);
+    const matched = await matchLearnings<{ id: string }>('carbon', embedding, k);
+    if (matched && matched.length > 0) {
+      const byId = new Map(activeLearnings.map(l => [l.id, l]));
+      const hydrated = matched.map(m => byId.get(m.id)).filter((l): l is CarbonLearning => !!l);
+      if (hydrated.length > 0) {
+        return { learnings: hydrated, usedSemanticRetrieval: true };
+      }
+    }
+    return { learnings: activeLearnings, usedSemanticRetrieval: false };
+  };
+
   return {
     learnings: learnings || [],
     activeLearnings,
@@ -111,5 +132,6 @@ export function useCarbonLearnings() {
     deleteLearning,
     toggleActive,
     formatLearningsForPrompt,
+    getRelevantLearnings,
   };
 }

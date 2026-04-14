@@ -60,8 +60,8 @@ const EUROPEAN_JURISDICTIONS = [
 export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill }: PPAUploadAnalysisProps) {
   const { createAnalysis } = usePPAAnalyses();
   const { createPositions } = usePPAPositions(null);
-  const { precedents, goldStandardPrecedents } = usePPAPrecedentBank();
-   const { formatLearningsForPrompt, activeLearnings } = usePPALearnings();
+  const { precedents, goldStandardPrecedents, getRelevantPrecedents } = usePPAPrecedentBank();
+   const { formatLearningsForPrompt, activeLearnings, getRelevantLearnings } = usePPALearnings();
   const { ppaPrecedentThreshold } = useUserSettings();
   const [step, setStep] = useState<'upload' | 'configure' | 'confirming' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<PPAAnalysisType>(preFill?.analysisType || 'ppa_vs_bible');
@@ -344,10 +344,21 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
       console.log(`  PPA Type Intelligence: ${marketIntelligence.ppaTypeAnalysis.typeRecommendation || 'N/A'}`);
       console.log(`  Learning Velocity: ${marketIntelligence.learningMetrics.learningVelocity}`);
       
-      // Filter relevant precedents for raw comparison (exclude gold standard from regular precedents)
-      const regularPrecedents = precedents.filter(p => !p.is_gold_standard);
-      const includeRawPrecedents = regularPrecedents.length >= ppaPrecedentThreshold;
-      const appliedRegularPrecedents = includeRawPrecedents ? regularPrecedents : [];
+      // Semantic top-K retrieval: use the PPA text as the query and only
+      // pass the most relevant precedents / learnings to the LLM. Falls back
+      // to all-active when embeddings aren't available.
+      const retrievalQuery = (ppaText || '').slice(0, 15_000);
+      const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
+        getRelevantLearnings(retrievalQuery, 15),
+        getRelevantPrecedents(retrievalQuery, 20, false),
+        getRelevantPrecedents(retrievalQuery, 10, true),
+      ]);
+
+      // Strip gold-standard rows out of the regular pool (the getRelevant
+      // call with onlyGoldStandard=false can return either; keep them split).
+      const regularOnly = relevantRegularRes.precedents.filter(p => !p.is_gold_standard);
+      const includeRawPrecedents = regularOnly.length >= ppaPrecedentThreshold;
+      const appliedRegularPrecedents = includeRawPrecedents ? regularOnly : [];
       const relevantPrecedents = appliedRegularPrecedents.map(p => ({
         category: p.category,
         position_summary: p.position_summary,
@@ -356,8 +367,8 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         perspective: p.perspective,
       }));
 
-      // Always include gold standard precedents for comparison (regardless of threshold)
-      const goldStandardForAnalysis = goldStandardPrecedents.map(p => ({
+      const selectedGoldStandard = relevantGoldRes.precedents;
+      const goldStandardForAnalysis = selectedGoldStandard.map(p => ({
         category: p.category,
         position_summary: p.position_summary,
         project_name: p.project_name,
@@ -366,19 +377,21 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         template_name: p.template_name,
       }));
 
+      const selectedLearnings = relevantLearningsRes.learnings;
+
       // Capture IDs of what we're about to send to the AI so we can persist
       // them on the analysis record as an audit/provenance trail.
-      const appliedLearningIds = activeLearnings.map(l => l.id);
+      const appliedLearningIds = selectedLearnings.map(l => l.id);
       const appliedPrecedentIds = appliedRegularPrecedents.map(p => p.id);
-      const appliedGoldStandardIds = goldStandardPrecedents.map(p => p.id);
-      
-      console.log(`Passing ${relevantPrecedents.length} raw precedents + synthesized intelligence (threshold: ${ppaPrecedentThreshold})`);
-      console.log(`Passing ${goldStandardForAnalysis.length} gold standard template positions`);
-      
-       // Format user learnings for the AI
-       const userLearningsPrompt = formatLearningsForPrompt();
-       if (activeLearnings.length > 0) {
-         console.log(`Including ${activeLearnings.length} user learnings for AI guidance`);
+      const appliedGoldStandardIds = selectedGoldStandard.map(p => p.id);
+
+      console.log(`Passing ${relevantPrecedents.length} raw precedents (semantic=${relevantRegularRes.usedSemanticRetrieval}, threshold: ${ppaPrecedentThreshold})`);
+      console.log(`Passing ${goldStandardForAnalysis.length} gold standard template positions (semantic=${relevantGoldRes.usedSemanticRetrieval})`);
+
+       // Format user learnings for the AI (semantic top-K subset)
+       const userLearningsPrompt = formatLearningsForPrompt(selectedLearnings);
+       if (selectedLearnings.length > 0) {
+         console.log(`Including ${selectedLearnings.length} user learnings for AI guidance (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
        }
        
       setAnalysisStatus('Running AI analysis with market intelligence...');

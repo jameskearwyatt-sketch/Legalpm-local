@@ -36,8 +36,8 @@ interface TollingUploadAnalysisProps {
 export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnalysisProps) {
   const { createAnalysis } = useTollingAnalyses();
   const { createPositions } = useTollingPositions(null);
-  const { precedents } = useTollingPrecedentBank();
-  const { formatLearningsForPrompt, activeLearnings } = useTollingLearnings();
+  const { getRelevantPrecedents } = useTollingPrecedentBank();
+  const { formatLearningsForPrompt, activeLearnings, getRelevantLearnings } = useTollingLearnings();
 
   const [step, setStep] = useState<'upload' | 'configure' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<TollingAnalysisType>('tolling_vs_bible');
@@ -148,10 +148,17 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         setAnalysisProgress(50);
       }
 
-      // Step 3: Build precedent context
+      // Step 3: Build precedent context (semantic top-K retrieval with
+      // graceful fallback to all-active when embeddings aren't available).
       setAnalysisStatus('Building precedent intelligence...');
-      const appliedRegularPrecedents = precedents.filter(p => !p.is_gold_standard);
-      const appliedGoldStandardPrecedents = precedents.filter(p => p.is_gold_standard);
+      const retrievalQuery = (tollingText || '').slice(0, 15_000);
+      const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
+        getRelevantLearnings(retrievalQuery, 15),
+        getRelevantPrecedents(retrievalQuery, 20, false),
+        getRelevantPrecedents(retrievalQuery, 10, true),
+      ]);
+      const appliedRegularPrecedents = relevantRegularRes.precedents.filter(p => !p.is_gold_standard);
+      const appliedGoldStandardPrecedents = relevantGoldRes.precedents;
       const relevantPrecedents = appliedRegularPrecedents.map(p => ({
         category: p.category,
         position_summary: p.position_summary,
@@ -160,14 +167,16 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         perspective: p.perspective,
       }));
 
+      const selectedLearnings = relevantLearningsRes.learnings;
+
       // Capture IDs for audit trail
-      const appliedLearningIds = activeLearnings.map(l => l.id);
+      const appliedLearningIds = selectedLearnings.map(l => l.id);
       const appliedPrecedentIds = appliedRegularPrecedents.map(p => p.id);
       const appliedGoldStandardIds = appliedGoldStandardPrecedents.map(p => p.id);
 
-      const userLearningsPrompt = formatLearningsForPrompt();
-      if (activeLearnings.length > 0) {
-        console.log(`Including ${activeLearnings.length} tolling learnings`);
+      const userLearningsPrompt = formatLearningsForPrompt(selectedLearnings);
+      if (selectedLearnings.length > 0) {
+        console.log(`Including ${selectedLearnings.length} tolling learnings (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
       }
 
       setAnalysisStatus('Running AI analysis...');

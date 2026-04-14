@@ -96,7 +96,7 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 | # | Upgrade | Status |
 |---|---------|--------|
 | 2 | Applied-learnings trace (audit / provenance per analysis) | **Done** (Apr 2026) |
-| 1 | Embedding-based retrieval of relevant learnings/precedents | Pending |
+| 1 | Embedding-based retrieval of relevant learnings/precedents | **Done** (Apr 2026) |
 | 3 | Prompt caching | Blocked (codebase uses Lovable AI Gateway → Gemini, not Anthropic Messages API) |
 | 4 | Postgres transactions for multi-step analyst mutations | Pending |
 | 5 | Learning quality controls (conflict detection, golden-set regression) | Pending |
@@ -112,6 +112,16 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 - All 5 upload components capture the IDs of every learning / raw precedent / gold-standard template passed to the LLM and persist them on the analysis row along with wall-clock duration.
 - Shared UI `src/components/shared/AnalystAppliedContextBadge.tsx` renders an "Informed by N corrections, M gold-standards, K precedents" pill on each analysis report. Clicking opens a dialog listing exactly which items shaped the analysis, with timestamps.
 - Edge functions may optionally return `model_used`, `input_token_count`, `output_token_count`; these are persisted if returned, otherwise stored as `null` (edge function updates are a small follow-up).
+
+### Embedding-Based Semantic Retrieval (#1) — Shipped
+
+- Migration `20260415000001_add_embedding_vector_retrieval.sql` enables `pgvector` and adds `embedding vector(1536)`, `embedding_model`, `embedded_at` columns plus IVFFlat cosine indexes to all 10 tables (5 `*_learnings` + 5 `*_precedent_bank`). Ships 10 `match_*` RPC functions (one per analyst × {learnings, precedents}) that return top-K rows by cosine similarity, respecting RLS via `SECURITY INVOKER`. Precedent RPCs also support `only_gold_standard` filtering.
+- New Supabase edge function `embed-text` calls OpenAI `text-embedding-3-small` (1536 dims), supports single + batch requests, and returns HTTP 501 when `OPENAI_API_KEY` is not configured so callers fall back cleanly.
+- Shared client helper `src/lib/analyst/semanticRetrieval.ts` exposes `embedText`, `embedTexts`, `matchLearnings`, `matchPrecedents`, and `embedAndStore`. All functions fail soft: when embeddings are unavailable, they return `null`/empty and the caller reverts to the previous all-active behaviour.
+- All 5 learnings hooks (`usePPALearnings`, `useTollingLearnings`, `useCarbonLearnings`, `useITSupplyLearnings`, `useCloudComputeLearnings`) now fire-and-forget embed on `createLearning` and expose `getRelevantLearnings(queryText, k)`. `formatLearningsForPrompt` accepts an optional override list so callers can format only the retrieved top-K.
+- All 5 precedent-bank hooks (inside `useXxxAnalyses.ts`) embed on `bankPositions` and expose `getRelevantPrecedents(queryText, k, onlyGoldStandard)`.
+- All 5 upload components (`PPAUploadAnalysis`, `TollingUploadAnalysis`, `CarbonUploadAnalysis`, `ITSupplyUploadAnalysis`, `CloudComputeUploadAnalysis`) now issue a top-K semantic query against the extracted contract text (first 15k chars) in parallel for learnings, regular precedents, and gold-standard precedents, and pass only those to the LLM. The applied-IDs audit trail (#2) automatically captures the narrower set.
+- Backfill path for pre-existing learnings/precedents: rows with `embedding IS NULL` are simply excluded from `match_*` RPC results, so until re-embedded they contribute nothing to semantic retrieval but the all-active fallback still covers them when OpenAI isn't configured. A follow-up script can backfill by streaming rows through `embed-text` and updating the row.
 
 ## Remaining Recommendations
 

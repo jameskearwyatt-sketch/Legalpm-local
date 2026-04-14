@@ -21,8 +21,8 @@ interface Props { onAnalysisComplete?: () => void; }
 export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
   const { createAnalysis } = useCloudComputeAnalyses();
   const { createPositions } = useCloudComputePositions(null);
-  const { precedents } = useCloudComputePrecedentBank();
-  const { formatLearningsForPrompt, activeLearnings } = useCloudComputeLearnings();
+  const { getRelevantPrecedents } = useCloudComputePrecedentBank();
+  const { formatLearningsForPrompt, activeLearnings, getRelevantLearnings } = useCloudComputeLearnings();
 
   const [step, setStep] = useState<'upload' | 'configure' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<CloudComputeAnalysisType>('agreement_vs_bible');
@@ -65,14 +65,22 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       setAnalysisProgress(30);
 
       setAnalysisStatus('Building precedent intelligence...');
-      const appliedRegularPrecedents = precedents.filter(p => !p.is_gold_standard);
-      const appliedGoldStandardPrecedents = precedents.filter(p => p.is_gold_standard);
+      // Semantic top-K retrieval with graceful fallback to all-active.
+      const retrievalQuery = (contractText || '').slice(0, 15_000);
+      const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
+        getRelevantLearnings(retrievalQuery, 15),
+        getRelevantPrecedents(retrievalQuery, 20, false),
+        getRelevantPrecedents(retrievalQuery, 10, true),
+      ]);
+      const appliedRegularPrecedents = relevantRegularRes.precedents.filter(p => !p.is_gold_standard);
+      const appliedGoldStandardPrecedents = relevantGoldRes.precedents;
       const relevantPrecedents = appliedRegularPrecedents.map(p => ({ category: p.category, position_summary: p.position_summary, project_name: p.project_name, jurisdiction: p.jurisdiction, perspective: p.perspective }));
-      const appliedLearningIds = activeLearnings.map(l => l.id);
+      const selectedLearnings = relevantLearningsRes.learnings;
+      const appliedLearningIds = selectedLearnings.map(l => l.id);
       const appliedPrecedentIds = appliedRegularPrecedents.map(p => p.id);
       const appliedGoldStandardIds = appliedGoldStandardPrecedents.map(p => p.id);
-      const userLearningsPrompt = formatLearningsForPrompt();
-      if (activeLearnings.length > 0) console.log(`Including ${activeLearnings.length} cloud compute learnings`);
+      const userLearningsPrompt = formatLearningsForPrompt(selectedLearnings);
+      if (selectedLearnings.length > 0) console.log(`Including ${selectedLearnings.length} cloud compute learnings (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
       setAnalysisProgress(50); setAnalysisStatus('Running AI analysis...');
 
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {

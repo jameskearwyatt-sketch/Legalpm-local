@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
+import { embedAndStore, embedText, matchPrecedents } from '@/lib/analyst/semanticRetrieval';
 
 export type PPAAnalysisType = 'ppa_vs_bible' | 'ppa_vs_termsheet' | 'termsheet_vs_bible';
 export type PPAPerspective = 'buyer' | 'seller';
@@ -270,6 +271,19 @@ export function usePPAPrecedentBank() {
         .select();
       
       if (error) throw error;
+      // Fire-and-forget embedding writes so semantic retrieval picks up
+      // these precedents on future analyses.
+      for (const row of data as PPAPrecedent[]) {
+        const embedSource = [
+          row.category,
+          row.position_summary,
+          row.project_name,
+          row.template_name ?? '',
+          row.template_description ?? '',
+          row.market_position ?? '',
+        ].filter(Boolean).join('\n');
+        void embedAndStore('ppa', 'precedent', row.id, embedSource);
+      }
       return data as PPAPrecedent[];
     },
     onSuccess: () => {
@@ -321,6 +335,29 @@ export function usePPAPrecedentBank() {
     return uniqueTemplates.size;
   }, [goldStandardPrecedents]);
 
+  /**
+   * Semantic top-K retrieval over the precedent bank. Falls back to all
+   * precedents (or only gold-standard precedents when requested) if
+   * embeddings are unavailable.
+   */
+  const getRelevantPrecedents = async (
+    queryText: string,
+    k: number = 10,
+    onlyGoldStandard: boolean = false,
+  ): Promise<{ precedents: PPAPrecedent[]; usedSemanticRetrieval: boolean }> => {
+    const pool = onlyGoldStandard ? goldStandardPrecedents : (precedents || []);
+    const embedding = await embedText(queryText);
+    const matched = await matchPrecedents<{ id: string }>('ppa', embedding, k, 0.3, onlyGoldStandard);
+    if (matched && matched.length > 0) {
+      const byId = new Map(pool.map(p => [p.id, p]));
+      const hydrated = matched.map(m => byId.get(m.id)).filter((p): p is PPAPrecedent => !!p);
+      if (hydrated.length > 0) {
+        return { precedents: hydrated, usedSemanticRetrieval: true };
+      }
+    }
+    return { precedents: pool, usedSemanticRetrieval: false };
+  };
+
   return {
     precedents: precedents || [],
     goldStandardPrecedents,
@@ -331,5 +368,6 @@ export function usePPAPrecedentBank() {
     getCategoryStats,
     uniqueProjectCount,
     uniqueTemplateCount,
+    getRelevantPrecedents,
   };
 }

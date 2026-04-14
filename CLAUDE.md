@@ -104,7 +104,7 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 | 7 | Observability & telemetry | **Done** (Apr 2026) |
 | 8 | Cross-analyst reuse / shared component refactor | **Done** (Apr 2026) — learnings hook + LearningsTab + TeachFeedbackDialog (phase 1), analyses/positions/precedent-bank factory (phase 2), WhatsMarketDialog + AnalysisTable (phase 3), PrecedentBank (phase 4) |
 | 9 | PII redaction + LLM call audit log | **Done** (Apr 2026) |
-| 10 | Streaming / batch / Word export | Pending |
+| 10 | Streaming / batch / Word export | **Partial** (Apr 2026) — Word export shipped for all 5 analyst reports; streaming pending; batch deferred |
 
 ### Applied-Learnings Trace (#2) — Shipped
 
@@ -207,6 +207,22 @@ Phase 4 closes #8 by collapsing the last big surface: the PrecedentBank componen
 - The 4 per-analyst `XxxPrecedentBank.tsx` wrappers are now ~75 LOC for Cloud Compute / IT Supply / Carbon (config-describing wrappers with trivial inline row rendering) and ~210 LOC for Tolling (which keeps its expandable `PrecedentCard` sub-component inline since no other analyst needs the same expand behaviour).
 - Net phase 4 savings: ~800 LOC of near-duplicate scaffolding collapsed into one 420-LOC shared component. Typecheck clean.
 - Overall #8 delivery: phase 1 shared the learnings-hook factory + `AnalystLearningsTab` + `AnalystTeachFeedbackDialog`; phase 2 shared the analyses/positions/precedent-bank data-hook factory; phase 3 shared `AnalystWhatsMarketDialog` + `AnalystAnalysisTable`; phase 4 shared `AnalystPrecedentBank`. Across all four phases: ~3,400 LOC of near-duplicate analyst code collapsed into shared primitives, with the 4 simple analysts (Tolling, Carbon, IT Supply, Cloud Compute) now composed of thin config-describing wrappers. PPA remains deliberately standalone because its richer domain (ppa_type, compare-drafts flow, dedicated feedback edge function, additional analyst-specific filters/columns) would be obscured by shared abstractions rather than genuinely deduplicated.
+
+### Word Export for Analyst Reports (#10, part 1) — Shipped
+
+Each analyst report (PPA, Tolling, Carbon, IT Supply, Cloud Compute) previously had no way to hand a partner or client a static record of the analysis — everything lived in the app. Attorneys asked for a printable/emailable version that preserved the per-position confidence + market-position badges and the category grouping.
+
+- Shared `src/components/shared/ExportAnalystReportButton.tsx` (~200 LOC) exports `ExportAnalystReportButton` plus a generic `AnalystReportExport` payload interface (`analystTitle`, `projectName`, `analysisTypeLabel`, `perspectiveLabel`, `jurisdiction`, `extraBadges`, `isAgreed`, `createdAt`, `positionsByGroup`). `positionsByGroup` is a flat `Array<{group, positions: ExportPosition[]}>` where each position carries `category`, `confidence`, `marketPosition`, `positionSummary`, `comparisonPosition`, `varianceNotes`, `sourceText`. Per-analyst terminology (Offtaker/Generator vs Tenant/Provider vs Buyer/Seller vs Buyer/Supplier) is resolved by the caller so the shared component stays domain-agnostic.
+- Document generation uses the same HTML-blob-with-`application/msword`-mime trick that `ExportMarketCommentaryButton` already ships: a styled HTML string is wrapped in the Word-compatible Section1 page and served as a `.doc` download. Opens natively in Microsoft Word, Google Docs, and LibreOffice. No new dependencies added (the `docx` package would be ~400KB for marginal benefit over the HTML route, which attorneys already accept).
+- Output includes: title page (analyst brand, project name, date, section/position count), Analysis Overview page (jurisdiction, analysis-type, perspective, extra badges, agreed pill, analysed-at timestamp), then one H2 section per populated category group. Each position renders as a bordered card with the category heading, confidence pill (blue/amber/red), market-position badge (grey/blue/red with bold border for way-off-market), monospace source-text pill, multi-paragraph summary, comparison blockquote if present, and a cleaned variance-notes footer (markers like `[ON MARKET]` / `[BUYER-FRIENDLY]` are stripped). Client-use disclaimer footer.
+- All 5 analyst report components now compute an `exportPayload: AnalystReportExport | null` via `useMemo` and render `<ExportAnalystReportButton payload={exportPayload} />` in the report header next to the "New Analysis" / "View History" buttons. The `useMemo` takes `[analysis, positionsByGroup]` so it refreshes automatically when the attorney applies filters or teaches the AI (which mutates `positionUpdates` → `positionsWithAttributes` → `filteredPositions` → `positionsByGroup`). Filtered views export only what the user is currently looking at, which is the right behaviour for "print what I see".
+- Per-analyst `extraBadges` mapping:
+  - PPA: `ppa_type`
+  - Tolling: `tolling_type` (uppercased) + `facility_stage`
+  - Carbon: `carbon_type` (resolved to `CARBON_PROJECT_TYPES` label) + `project_stage`
+  - IT Supply: `supply_type` + `contract_stage`
+  - Cloud Compute: `service_type` + `deployment_model`
+- Filename format: `{AnalystTitle} - {ProjectName} - {yyyy-MM-dd}.doc`.
 
 ## Remaining Recommendations
 

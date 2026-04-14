@@ -11,6 +11,7 @@ import {
 import { useTollingAnalyses, useTollingPositions, useTollingPrecedentBank, TollingExtractedPosition } from '@/lib/hooks/useTollingAnalyses';
 import { useTollingLearnings } from '@/lib/hooks/useTollingLearnings';
 import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
+import { ExportAnalystReportButton, type AnalystReportExport } from '@/components/shared/ExportAnalystReportButton';
 import { TollingTeachFeedbackDialog } from './TollingTeachFeedbackDialog';
 import { TollingWhatsMarketDialog } from './TollingWhatsMarketDialog';
 import { TOLLING_CATEGORY_GROUPS, TOLLING_ALL_CATEGORIES } from '@/lib/tollingCategories';
@@ -214,6 +215,35 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
     }
   };
 
+  const exportPayload: AnalystReportExport | null = useMemo(() => {
+    if (!analysis) return null;
+    return {
+      analystTitle: 'Tolling Analyst',
+      projectName: analysis.project_name,
+      analysisTypeLabel: analysis.analysis_type === 'tolling_vs_bible' ? 'vs Knowledge Bank' : 'vs Term Sheet',
+      perspectiveLabel: analysis.perspective === 'offtaker' ? 'Offtaker Perspective' : 'Generator Perspective',
+      jurisdiction: analysis.jurisdiction,
+      extraBadges: [
+        analysis.tolling_type?.replace(/_/g, ' ').toUpperCase(),
+        analysis.facility_stage ? analysis.facility_stage.charAt(0).toUpperCase() + analysis.facility_stage.slice(1) : null,
+      ].filter((b): b is string => !!b),
+      isAgreed: !!analysis.is_agreed,
+      createdAt: analysis.created_at,
+      positionsByGroup: TOLLING_CATEGORY_GROUPS.map(g => ({
+        group: g,
+        positions: (positionsByGroup[g] || []).map(p => ({
+          category: p.category,
+          confidence: (p.confidence as 'high' | 'medium' | 'review_required') || null,
+          marketPosition: p.marketPosition,
+          positionSummary: p.position_summary,
+          comparisonPosition: p.comparison_position,
+          varianceNotes: p.variance_notes,
+          sourceText: p.source_text,
+        })),
+      })),
+    };
+  }, [analysis, positionsByGroup]);
+
   if (!analysis) {
     return (
       <Card><CardContent className="py-8 text-center"><p className="text-muted-foreground">Analysis not found</p></CardContent></Card>
@@ -279,6 +309,7 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
               </CardDescription>
             </div>
             <div className="flex gap-2">
+              {exportPayload && <ExportAnalystReportButton payload={exportPayload} />}
               <Button variant="outline" size="sm" onClick={onNewAnalysis}>
                 <Plus className="h-4 w-4 mr-1" /> New Analysis
               </Button>

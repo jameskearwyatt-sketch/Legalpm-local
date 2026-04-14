@@ -27,6 +27,7 @@ import {
 import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAExtractedPosition } from '@/lib/hooks/usePPAAnalyses';
 import { usePPALearnings } from '@/lib/hooks/usePPALearnings';
 import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
+import { ExportAnalystReportButton, type AnalystReportExport } from '@/components/shared/ExportAnalystReportButton';
 import { PPATeachFeedbackDialog } from './PPATeachFeedbackDialog';
 import { WhatsMarketDialog } from './WhatsMarketDialog';
 import { getCategoryById, PPA_CATEGORY_GROUPS, PPA_ALL_CATEGORIES } from '@/lib/ppaCategories';
@@ -336,6 +337,33 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
     }
   };
 
+  const exportPayload: AnalystReportExport | null = useMemo(() => {
+    if (!analysis) return null;
+    const ppaType = (analysis as { ppa_type?: string | null }).ppa_type;
+    return {
+      analystTitle: 'PPA Analyst',
+      projectName: analysis.project_name,
+      analysisTypeLabel: analysis.analysis_type === 'ppa_vs_bible' ? 'PPA vs Bible' : 'PPA vs Term Sheet',
+      perspectiveLabel: analysis.perspective === 'buyer' ? 'Buyer Perspective' : 'Seller Perspective',
+      jurisdiction: analysis.jurisdiction,
+      extraBadges: [ppaType?.replace(/_/g, ' ')].filter((b): b is string => !!b),
+      isAgreed: !!analysis.is_agreed,
+      createdAt: analysis.created_at,
+      positionsByGroup: PPA_CATEGORY_GROUPS.map(g => ({
+        group: g,
+        positions: (positionsByGroup[g] || []).map(p => ({
+          category: p.category,
+          confidence: (p.confidence as 'high' | 'medium' | 'review_required') || null,
+          marketPosition: p.marketPosition,
+          positionSummary: p.position_summary,
+          comparisonPosition: p.comparison_position,
+          varianceNotes: p.variance_notes,
+          sourceText: p.source_text,
+        })),
+      })),
+    };
+  }, [analysis, positionsByGroup]);
+
   if (!analysis) {
     return (
       <Card>
@@ -405,6 +433,7 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
               </CardDescription>
             </div>
             <div className="flex gap-2">
+              {exportPayload && <ExportAnalystReportButton payload={exportPayload} />}
               <Button variant="outline" size="sm" onClick={onCompareNewDraft}>
                 <GitCompare className="h-4 w-4 mr-1" />
                 Compare New Draft

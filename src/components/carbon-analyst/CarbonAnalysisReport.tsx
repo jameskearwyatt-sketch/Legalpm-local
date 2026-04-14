@@ -11,6 +11,7 @@ import {
 import { useCarbonAnalyses, useCarbonPositions, useCarbonPrecedentBank, CarbonExtractedPosition } from '@/lib/hooks/useCarbonAnalyses';
 import { useCarbonLearnings } from '@/lib/hooks/useCarbonLearnings';
 import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
+import { ExportAnalystReportButton, type AnalystReportExport } from '@/components/shared/ExportAnalystReportButton';
 import { CarbonTeachFeedbackDialog } from './CarbonTeachFeedbackDialog';
 import { CarbonWhatsMarketDialog } from './CarbonWhatsMarketDialog';
 import { CARBON_CATEGORY_GROUPS, CARBON_ALL_CATEGORIES, CARBON_PROJECT_TYPES } from '@/lib/carbonCategories';
@@ -129,6 +130,33 @@ export function CarbonAnalysisReport({ analysisId, onNewAnalysis, onViewHistory 
     try { await bankPositions.mutateAsync(positionsToBank); setSelectedForBanking(new Set()); } catch (error) { console.error('Failed:', error); }
   };
 
+  const exportPayload: AnalystReportExport | null = useMemo(() => {
+    if (!analysis) return null;
+    const carbonTypeLabel = analysis.carbon_type ? (CARBON_PROJECT_TYPES.find(t => t.id === analysis.carbon_type)?.label || analysis.carbon_type) : null;
+    return {
+      analystTitle: 'Carbon Credit Analyst',
+      projectName: analysis.project_name,
+      analysisTypeLabel: analysis.analysis_type === 'carbon_vs_bible' ? 'vs Knowledge Bank' : 'vs Term Sheet',
+      perspectiveLabel: analysis.perspective === 'buyer' ? 'Buyer Perspective' : 'Seller Perspective',
+      jurisdiction: analysis.jurisdiction,
+      extraBadges: [carbonTypeLabel, analysis.project_stage?.replace(/_/g, ' ')].filter((b): b is string => !!b),
+      isAgreed: !!analysis.is_agreed,
+      createdAt: analysis.created_at,
+      positionsByGroup: CARBON_CATEGORY_GROUPS.map(g => ({
+        group: g,
+        positions: (positionsByGroup[g] || []).map(p => ({
+          category: p.category,
+          confidence: (p.confidence as 'high' | 'medium' | 'review_required') || null,
+          marketPosition: p.marketPosition,
+          positionSummary: p.position_summary,
+          comparisonPosition: p.comparison_position,
+          varianceNotes: p.variance_notes,
+          sourceText: p.source_text,
+        })),
+      })),
+    };
+  }, [analysis, positionsByGroup]);
+
   if (!analysis) return <Card><CardContent className="py-8 text-center"><p className="text-muted-foreground">Analysis not found</p></CardContent></Card>;
   if (positionsLoading) return <Card><CardContent className="py-8 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></CardContent></Card>;
 
@@ -174,6 +202,7 @@ export function CarbonAnalysisReport({ analysisId, onNewAnalysis, onViewHistory 
               </CardDescription>
             </div>
             <div className="flex gap-2">
+              {exportPayload && <ExportAnalystReportButton payload={exportPayload} />}
               <Button variant="outline" size="sm" onClick={onNewAnalysis}><Plus className="h-4 w-4 mr-1" /> New Analysis</Button>
               <Button variant="outline" size="sm" onClick={onViewHistory}><History className="h-4 w-4 mr-1" /> View History</Button>
             </div>

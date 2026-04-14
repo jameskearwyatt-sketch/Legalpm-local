@@ -8,6 +8,7 @@ import { FileText, Plus, History, CheckCircle2, AlertCircle, HelpCircle, Databas
 import { useITSupplyAnalyses, useITSupplyPositions, useITSupplyPrecedentBank, ITSupplyExtractedPosition } from '@/lib/hooks/useITSupplyAnalyses';
 import { useITSupplyLearnings } from '@/lib/hooks/useITSupplyLearnings';
 import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
+import { ExportAnalystReportButton, type AnalystReportExport } from '@/components/shared/ExportAnalystReportButton';
 import { ITSupplyTeachFeedbackDialog } from './ITSupplyTeachFeedbackDialog';
 import { ITSupplyWhatsMarketDialog } from './ITSupplyWhatsMarketDialog';
 import { IT_SUPPLY_CATEGORY_GROUPS, IT_SUPPLY_ALL_CATEGORIES } from '@/lib/itSupplyCategories';
@@ -124,6 +125,32 @@ export function ITSupplyAnalysisReport({ analysisId, onNewAnalysis, onViewHistor
     try { await bankPositions.mutateAsync(positionsToBank); setSelectedForBanking(new Set()); } catch (e) { console.error(e); }
   };
 
+  const exportPayload: AnalystReportExport | null = useMemo(() => {
+    if (!analysis) return null;
+    return {
+      analystTitle: 'IT Supply Analyst',
+      projectName: analysis.project_name,
+      analysisTypeLabel: analysis.analysis_type === 'contract_vs_bible' ? 'vs Knowledge Bank' : 'vs Term Sheet',
+      perspectiveLabel: analysis.perspective === 'buyer' ? 'Buyer Perspective' : 'Supplier Perspective',
+      jurisdiction: analysis.jurisdiction,
+      extraBadges: [analysis.supply_type?.replace(/_/g, ' '), analysis.contract_stage?.replace(/_/g, ' ')].filter((b): b is string => !!b),
+      isAgreed: !!analysis.is_agreed,
+      createdAt: analysis.created_at,
+      positionsByGroup: IT_SUPPLY_CATEGORY_GROUPS.map(g => ({
+        group: g,
+        positions: (positionsByGroup[g] || []).map(p => ({
+          category: p.category,
+          confidence: (p.confidence as 'high' | 'medium' | 'review_required') || null,
+          marketPosition: p.marketPosition,
+          positionSummary: p.position_summary,
+          comparisonPosition: p.comparison_position,
+          varianceNotes: p.variance_notes,
+          sourceText: p.source_text,
+        })),
+      })),
+    };
+  }, [analysis, positionsByGroup]);
+
   if (!analysis) return <Card><CardContent className="py-8 text-center"><p className="text-muted-foreground">Analysis not found</p></CardContent></Card>;
   if (positionsLoading) return <Card><CardContent className="py-8 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></CardContent></Card>;
 
@@ -169,6 +196,7 @@ export function ITSupplyAnalysisReport({ analysisId, onNewAnalysis, onViewHistor
               </CardDescription>
             </div>
             <div className="flex gap-2">
+              {exportPayload && <ExportAnalystReportButton payload={exportPayload} />}
               <Button variant="outline" size="sm" onClick={onNewAnalysis}><Plus className="h-4 w-4 mr-1" /> New Analysis</Button>
               <Button variant="outline" size="sm" onClick={onViewHistory}><History className="h-4 w-4 mr-1" /> View History</Button>
             </div>

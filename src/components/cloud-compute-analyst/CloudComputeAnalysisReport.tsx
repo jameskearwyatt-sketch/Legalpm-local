@@ -8,6 +8,7 @@ import { FileText, Plus, History, CheckCircle2, AlertCircle, HelpCircle, Databas
 import { useCloudComputeAnalyses, useCloudComputePositions, useCloudComputePrecedentBank, CloudComputeExtractedPosition } from '@/lib/hooks/useCloudComputeAnalyses';
 import { useCloudComputeLearnings } from '@/lib/hooks/useCloudComputeLearnings';
 import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
+import { ExportAnalystReportButton, type AnalystReportExport } from '@/components/shared/ExportAnalystReportButton';
 import { CloudComputeTeachFeedbackDialog } from './CloudComputeTeachFeedbackDialog';
 import { CloudComputeWhatsMarketDialog } from './CloudComputeWhatsMarketDialog';
 import { CLOUD_COMPUTE_CATEGORY_GROUPS, CLOUD_COMPUTE_ALL_CATEGORIES } from '@/lib/cloudComputeCategories';
@@ -103,12 +104,38 @@ export function CloudComputeAnalysisReport({ analysisId, onNewAnalysis, onViewHi
     try { await bankPositions.mutateAsync(positionsToBank); setSelectedForBanking(new Set()); } catch (e) { console.error(e); }
   };
 
+  const exportPayload: AnalystReportExport | null = useMemo(() => {
+    if (!analysis) return null;
+    return {
+      analystTitle: 'Cloud Compute Analyst',
+      projectName: analysis.project_name,
+      analysisTypeLabel: analysis.analysis_type === 'agreement_vs_bible' ? 'vs Knowledge Bank' : 'vs Term Sheet',
+      perspectiveLabel: analysis.perspective === 'tenant' ? 'Tenant Perspective' : 'Provider Perspective',
+      jurisdiction: analysis.jurisdiction,
+      extraBadges: [analysis.service_type?.replace(/_/g, ' '), analysis.deployment_model?.replace(/_/g, ' ')].filter((b): b is string => !!b),
+      isAgreed: !!analysis.is_agreed,
+      createdAt: analysis.created_at,
+      positionsByGroup: CLOUD_COMPUTE_CATEGORY_GROUPS.map(g => ({
+        group: g,
+        positions: (positionsByGroup[g] || []).map(p => ({
+          category: p.category,
+          confidence: (p.confidence as 'high' | 'medium' | 'review_required') || null,
+          marketPosition: p.marketPosition,
+          positionSummary: p.position_summary,
+          comparisonPosition: p.comparison_position,
+          varianceNotes: p.variance_notes,
+          sourceText: p.source_text,
+        })),
+      })),
+    };
+  }, [analysis, positionsByGroup]);
+
   if (!analysis) return <Card><CardContent className="py-8 text-center"><p className="text-muted-foreground">Analysis not found</p></CardContent></Card>;
   if (positionsLoading) return <Card><CardContent className="py-8 flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></CardContent></Card>;
 
   return (
     <div className="space-y-6">
-      <Card><CardHeader><div className="flex items-start justify-between"><div><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />{analysis.project_name}</CardTitle><CardDescription className="mt-1 space-y-1"><div className="flex items-center gap-2 flex-wrap"><Badge variant="outline">{analysis.analysis_type === 'agreement_vs_bible' ? 'vs Knowledge Bank' : 'vs Term Sheet'}</Badge><Badge variant="secondary">{analysis.perspective === 'tenant' ? 'Tenant' : 'Provider'} Perspective</Badge>{analysis.jurisdiction && <Badge variant="secondary">{analysis.jurisdiction}</Badge>}{analysis.service_type && <Badge variant="outline">{analysis.service_type.replace(/_/g, ' ')}</Badge>}{analysis.is_agreed && <Badge className="bg-primary/10 text-primary border border-primary/30">Agreed</Badge>}</div><p className="text-sm">Analyzed: {format(new Date(analysis.created_at), 'PPp')}</p><div className="pt-1"><AnalystAppliedContextBadge appliedLearningIds={analysis.applied_learning_ids || []} appliedPrecedentIds={analysis.applied_precedent_ids || []} appliedGoldStandardIds={analysis.applied_gold_standard_ids || []} learnings={(learnings || []).map(l => ({ id: l.id, category: l.category, user_feedback: l.correction_reason || `"${l.original_position}" should be "${l.corrected_position}"`, corrected_position: l.corrected_position, created_at: l.created_at }))} precedents={(bankPrecedents || []).map(p => ({ id: p.id, category: p.category, project_name: p.project_name, jurisdiction: p.jurisdiction, is_gold_standard: p.is_gold_standard, template_name: p.template_name }))} analysisCreatedAt={analysis.created_at} /></div></CardDescription></div><div className="flex gap-2"><Button variant="outline" size="sm" onClick={onNewAnalysis}><Plus className="h-4 w-4 mr-1" /> New</Button><Button variant="outline" size="sm" onClick={onViewHistory}><History className="h-4 w-4 mr-1" /> History</Button></div></div></CardHeader></Card>
+      <Card><CardHeader><div className="flex items-start justify-between"><div><CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />{analysis.project_name}</CardTitle><CardDescription className="mt-1 space-y-1"><div className="flex items-center gap-2 flex-wrap"><Badge variant="outline">{analysis.analysis_type === 'agreement_vs_bible' ? 'vs Knowledge Bank' : 'vs Term Sheet'}</Badge><Badge variant="secondary">{analysis.perspective === 'tenant' ? 'Tenant' : 'Provider'} Perspective</Badge>{analysis.jurisdiction && <Badge variant="secondary">{analysis.jurisdiction}</Badge>}{analysis.service_type && <Badge variant="outline">{analysis.service_type.replace(/_/g, ' ')}</Badge>}{analysis.is_agreed && <Badge className="bg-primary/10 text-primary border border-primary/30">Agreed</Badge>}</div><p className="text-sm">Analyzed: {format(new Date(analysis.created_at), 'PPp')}</p><div className="pt-1"><AnalystAppliedContextBadge appliedLearningIds={analysis.applied_learning_ids || []} appliedPrecedentIds={analysis.applied_precedent_ids || []} appliedGoldStandardIds={analysis.applied_gold_standard_ids || []} learnings={(learnings || []).map(l => ({ id: l.id, category: l.category, user_feedback: l.correction_reason || `"${l.original_position}" should be "${l.corrected_position}"`, corrected_position: l.corrected_position, created_at: l.created_at }))} precedents={(bankPrecedents || []).map(p => ({ id: p.id, category: p.category, project_name: p.project_name, jurisdiction: p.jurisdiction, is_gold_standard: p.is_gold_standard, template_name: p.template_name }))} analysisCreatedAt={analysis.created_at} /></div></CardDescription></div><div className="flex gap-2">{exportPayload && <ExportAnalystReportButton payload={exportPayload} />}<Button variant="outline" size="sm" onClick={onNewAnalysis}><Plus className="h-4 w-4 mr-1" /> New</Button><Button variant="outline" size="sm" onClick={onViewHistory}><History className="h-4 w-4 mr-1" /> History</Button></div></div></CardHeader></Card>
 
       <Card><CardHeader><div className="flex items-center justify-between"><div className="flex items-center gap-3"><CardTitle>Extracted Positions</CardTitle><span className="text-sm text-muted-foreground">{filteredPositions.length === positions.length ? `${positions.length} positions` : `${filteredPositions.length} of ${positions.length}`}</span></div><Button variant={showFilters ? 'secondary' : 'outline'} size="sm" onClick={() => setShowFilters(!showFilters)}><Filter className="h-4 w-4 mr-1" /> Filters{activeFilterCount > 0 && <Badge variant="default" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-xs">{activeFilterCount}</Badge>}</Button></div></CardHeader>
         <CardContent className="space-y-4">

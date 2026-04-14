@@ -719,10 +719,11 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
     }
   };
 
-  // Filtered contacts for autocomplete
-  const filteredContacts = useMemo(() => {
-    if (!contactSearch.trim()) return contacts.slice(0, 10);
-    const term = contactSearch.toLowerCase();
+  // Filtered contacts for autocomplete - per client
+  const getFilteredContacts = (clientId: string) => {
+    const search = contactSearchByClient[clientId] || "";
+    if (!search.trim()) return contacts.slice(0, 10);
+    const term = search.toLowerCase();
     return contacts
       .filter(c => 
         c.full_name.toLowerCase().includes(term) ||
@@ -730,7 +731,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         (c.company && c.company.toLowerCase().includes(term))
       )
       .slice(0, 10);
-  }, [contacts, contactSearch]);
+  };
 
   // Navigation functions
   const canProceedFromStep = (): boolean => {

@@ -102,7 +102,7 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 | 5 | Learning quality controls (conflict detection, golden-set regression) | **Done** (Apr 2026) — conflict detection + regression harness |
 | 6 | Structured output (JSON schema / tool use) | Pending |
 | 7 | Observability & telemetry | **Done** (Apr 2026) |
-| 8 | Cross-analyst reuse / shared component refactor | Pending |
+| 8 | Cross-analyst reuse / shared component refactor | **In progress** (Apr 2026) — learnings hook + LearningsTab + TeachFeedbackDialog shared |
 | 9 | PII redaction + LLM call audit log | **Done** (Apr 2026) |
 | 10 | Streaming / batch / Word export | Pending |
 
@@ -159,6 +159,16 @@ Cross-analyst improvements are being delivered coherently across PPA, Tolling, C
 - All 5 upload components (`PPAUploadAnalysis`, `TollingUploadAnalysis`, `CarbonUploadAnalysis`, `ITSupplyUploadAnalysis`, `CloudComputeUploadAnalysis`) now apply `redactPII` to the extracted contract text (and comparison text where applicable) BEFORE any of it leaves the browser — including before embedding for top-K retrieval. The redacted text is what's passed to the analyze-* edge function and what's counted into `inputChars`. The original document upload is never modified.
 - Redaction counts + total are written into the LLM call log metadata (`pii_redacted`, `pii_redaction_counts`, `pii_total_redactions`) on both success and failure paths, so admins can see how often the toggle is used and what classes of PII are being masked. A toast also surfaces the per-run summary (e.g. "3 emails, 1 phone redacted") to the user.
 - No server-side work required — redaction happens entirely client-side. No migration. No new edge function. Fails closed in the sense that if `redactPII` itself throws, the catch block already logs the failure and aborts analysis before any text is sent.
+
+### Cross-Analyst Shared Components (#8, phase 1) — Shipped
+
+The four "simple" analyst tools (Tolling, Carbon, IT Supply, Cloud Compute) had near-identical learnings-hook + LearningsTab + TeachFeedbackDialog triples. Over time this meant every bug fix or feature needed to be applied in four places, and drift was already visible (whitespace, minified one-liners, slightly different toast copy). Phase 1 collapses the three triples into one hook factory and two shared components, leaving only a small config-describing wrapper per analyst. PPA is intentionally left alone — its `ppa_ai_learnings` table has extra columns (`user_feedback`, `project_context`, `jurisdiction`, `ppa_type`, `source_position_id`) and the PPA feedback flow calls a dedicated edge function, so folding it in would have obscured real per-analyst behaviour rather than deduplicated it.
+
+- Factory `src/lib/analyst/createLearningsHook.ts` exposes `createLearningsHook<T extends BaseAnalystLearning>({ tableName, queryKey, analystType })` which returns a React Query hook with the same public shape as the previous four `useXxxLearnings` hooks (`learnings`, `activeLearnings`, `isLoading`, `error`, `createLearning`, `deleteLearning`, `toggleActive`, `formatLearningsForPrompt`, `getRelevantLearnings`). The generic parameter lets callers extend the base shape with analyst-specific fields and still get typed mutation payloads. `useTollingLearnings` / `useCarbonLearnings` / `useITSupplyLearnings` / `useCloudComputeLearnings` are now 9-line files that call the factory with their table/key/analyst config.
+- Shared `src/components/shared/AnalystLearningsTab.tsx` accepts the already-invoked hook + a `description` string (e.g. "tolling analysis accuracy") and renders the grouped-by-category collapsibles, empty state, active/inactive switch, and delete confirm. Typed generically so the hook's learning shape flows through without casts. The four per-analyst tab files are now 7 lines each.
+- Shared `src/components/shared/AnalystTeachFeedbackDialog.tsx` wraps the Teach AI flow: writes a `[User correction] …` string to the learnings table via the supplied hook, then updates the extracted position's `position_summary` in the analyst's own positions table (`positionsTableName` prop) so the user sees their correction inline. Props include `analyst` (for `LearningConflictWarning`), `analystLabel` (for the dialog copy), and `placeholder` (analyst-specific example). The four per-analyst dialog files kept their original named export so none of the `*AnalysisReport.tsx` callers needed to change — each is now a 32-line wrapper that injects the per-analyst config.
+- Net effect: ~500 LOC of near-duplicate code collapsed; future bug fixes (e.g. toast copy, empty-state text, conflict-warning placement) land in one file and propagate to all four tools automatically. Typecheck clean.
+- Pending sub-phases (future commits): shared `useXxxAnalyses` factory (biggest remaining duplication — 4× ~325 LOC), shared `WhatsMarketDialog`, shared `AnalysisList` skeleton.
 
 ## Remaining Recommendations
 

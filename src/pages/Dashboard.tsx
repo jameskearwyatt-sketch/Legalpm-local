@@ -561,8 +561,9 @@ export default function Dashboard() {
 
         {/* Financial Trends - Full Width */}
         <Card className="shadow-card">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="font-heading text-lg">Financial Trends</CardTitle>
+            <TimeRangeSelector value={dashboardTimeRange} onChange={setDashboardTimeRange} />
           </CardHeader>
           <CardContent>
             {hasData ? (

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { TimeRangeSelector, TimeRange, getTimeRangeCutoff } from '@/components/ui/time-range-selector';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ReferenceLine } from 'recharts';

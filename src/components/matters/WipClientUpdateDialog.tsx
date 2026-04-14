@@ -667,7 +667,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
       // Only fetch start snapshot if we have a period start date (not "all time")
       if (data.reviewPeriodStart) {
         const { data: startSnapshots } = await supabase
-          .from("financial_snapshot_history")
+          .from("financial_snapshots")
           .select("*")
           .eq("matter_id", matterId)
           .lte("as_of_date", format(data.reviewPeriodStart, "yyyy-MM-dd"))

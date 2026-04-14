@@ -474,9 +474,57 @@ export default function Dashboard() {
               infoTooltip={'infoTooltip' in card ? card.infoTooltip : undefined}
               note={'hasProposalAdjustment' in card && card.hasProposalAdjustment ? 'Adjusted for WIP proposals' : undefined}
               noteVariant={'hasProposalAdjustment' in card && card.hasProposalAdjustment ? 'amber' : undefined}
+              onClick={card.tileKey ? () => handleTileClick(card.tileKey!) : undefined}
+              isExpanded={card.tileKey ? expandedTile === card.tileKey : false}
             />
           ))}
         </div>
+
+        {/* Matter Breakdown Panel */}
+        {expandedTile && breakdownData.length > 0 && (
+          <div ref={breakdownRef}>
+            <Card className="shadow-card animate-in slide-in-from-top-2 duration-200">
+              <CardHeader className="pb-2 pt-4 px-4 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-foreground">
+                    {breakdownTitle} by Matter ({breakdownData.length})
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setExpandedTile(null)} className="text-xs text-muted-foreground">
+                    Close
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6 pb-4 pt-0">
+                <div className="max-h-64 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 pr-2 text-xs font-medium text-muted-foreground">Matter</th>
+                        <th className="text-left py-2 pr-2 text-xs font-medium text-muted-foreground hidden sm:table-cell">Client</th>
+                        <th className="text-right py-2 text-xs font-medium text-muted-foreground">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {breakdownData.map((m) => (
+                        <tr key={m.id} className="border-b border-border/50 hover:bg-muted/50">
+                          <td className="py-2 pr-2">
+                            <Link to={`/matters/${m.id}`} className="text-primary hover:underline text-xs sm:text-sm">
+                              {m.matterName}
+                            </Link>
+                          </td>
+                          <td className="py-2 pr-2 text-xs text-muted-foreground hidden sm:table-cell">{m.clientName}</td>
+                          <td className="py-2 text-right text-xs sm:text-sm font-medium text-foreground">
+                            {formatCurrency(getBreakdownValue(m), 'USD')}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Budget Summary - Live, Pipeline & Grand Total */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-4 bg-primary/5 rounded-lg border border-primary/10">

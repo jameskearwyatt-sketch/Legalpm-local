@@ -26,6 +26,17 @@ export interface PipelineMatter {
   clientName: string;
 }
 
+export interface MatterBreakdown {
+  id: string;
+  matterName: string;
+  clientName: string;
+  wipAmount: number;
+  arAmount: number;
+  paidAmount: number;
+  billedAmount: number;
+  currency: string;
+}
+
 export interface DashboardStats {
   totalBudget: number;
   totalWip: number;
@@ -42,7 +53,8 @@ export interface DashboardStats {
   trendData: TrendDataPoint[];
   liveMatters: LiveMatter[];
   pipelineMatters: PipelineMatter[];
-  hasActiveWipProposals: boolean; // Track if any WIP shaping proposals are affecting figures
+  hasActiveWipProposals: boolean;
+  matterBreakdowns: MatterBreakdown[];
 }
 
 export interface Alert {

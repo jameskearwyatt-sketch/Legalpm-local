@@ -420,9 +420,10 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
           
           // Only fetch start snapshot if we have a period start date (not "all time")
           if (data.reviewPeriodStart) {
-            // Fetch the most recent snapshot AT or BEFORE the review period start
+            // Fetch the most recent canonical snapshot AT or BEFORE the review period start
+            // Use financial_snapshots (not history) to avoid picking up intermediate audit records
             const { data: startSnapshots } = await supabase
-              .from("financial_snapshot_history")
+              .from("financial_snapshots")
               .select("*")
               .eq("matter_id", matterId)
               .lte("as_of_date", format(data.reviewPeriodStart, "yyyy-MM-dd"))
@@ -666,7 +667,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
       // Only fetch start snapshot if we have a period start date (not "all time")
       if (data.reviewPeriodStart) {
         const { data: startSnapshots } = await supabase
-          .from("financial_snapshot_history")
+          .from("financial_snapshots")
           .select("*")
           .eq("matter_id", matterId)
           .lte("as_of_date", format(data.reviewPeriodStart, "yyyy-MM-dd"))

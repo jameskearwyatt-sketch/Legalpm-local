@@ -519,6 +519,41 @@ Return ONLY valid JSON:
 
     console.log('Calling AI for tolling analysis...');
 
+    // JSON schema for structured output. Only category/position_summary/
+    // confidence are required because conditional fields (market_comparison,
+    // gold_standard_*) depend on whether precedents / gold-standards were
+    // retrieved. strict: false so the gateway allows extra optional fields
+    // without rejecting the whole response.
+    const positionsJsonSchema = {
+      name: "tolling_positions",
+      strict: false,
+      schema: {
+        type: "object",
+        required: ["positions"],
+        properties: {
+          positions: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["category", "position_summary", "confidence"],
+              properties: {
+                category: { type: "string" },
+                clause_references: { type: ["string", "null"] },
+                position_summary: { type: "string" },
+                confidence: { type: "string", enum: ["high", "medium", "review_required"] },
+                party_favorability: { type: ["string", "null"], enum: ["offtaker_friendly", "generator_friendly", "balanced", null] },
+                market_benchmark: { type: ["string", "null"] },
+                market_position: { type: ["string", "null"], enum: ["on_market", "off_market", "way_off_market", null] },
+                market_comparison: { type: ["string", "null"] },
+                gold_standard_deviation: { type: ["boolean", "null"] },
+                gold_standard_comparison: { type: ["string", "null"] },
+              },
+            },
+          },
+        },
+      },
+    };
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
 
@@ -538,9 +573,9 @@ Return ONLY valid JSON:
           ],
           temperature: 0.2,
           // Structured output: force Gemini via Lovable gateway to
-          // return a JSON object so the defensive parsing below only
-          // has to run as a safety net (see #6 structured output).
-          response_format: { type: "json_object" },
+          // return JSON conforming to the schema. Defensive parsing
+          // below remains as a safety net (see #6 structured output).
+          response_format: { type: "json_schema", json_schema: positionsJsonSchema },
         }),
         signal: controller.signal,
       });

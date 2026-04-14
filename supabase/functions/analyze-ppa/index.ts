@@ -1408,6 +1408,53 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
 
     console.log('Calling AI gateway for full PPA analysis...');
 
+    // JSON Schema for the positions array — upgrade from `json_object` (any
+    // valid JSON) to `json_schema` (structural guarantees). Each position
+    // must have category + position_summary + confidence; the market /
+    // favorability / gold-standard fields are optional because they're only
+    // requested conditionally in the prompt (based on hasMarketIntelligence,
+    // hasPrecedents, hasGoldStandard). `strict` is deliberately false —
+    // strict-mode schema validation sometimes rejects prompts that emit
+    // extra descriptive fields, which would be strictly *worse* than the
+    // previous permissive behaviour. The existing defensive parsing ladder
+    // further downstream stays in place as a safety net.
+    const positionsJsonSchema = {
+      name: "ppa_positions",
+      strict: false,
+      schema: {
+        type: "object",
+        required: ["positions"],
+        properties: {
+          positions: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["category", "position_summary", "confidence"],
+              properties: {
+                category: { type: "string" },
+                clause_references: { type: ["string", "null"] },
+                position_summary: { type: "string" },
+                confidence: { type: "string", enum: ["high", "medium", "review_required"] },
+                party_favorability: {
+                  type: ["string", "null"],
+                  enum: ["buyer_friendly", "seller_friendly", "balanced", "neutral", null],
+                },
+                flags: { type: ["string", "null"] },
+                market_benchmark: { type: ["string", "null"] },
+                market_position: {
+                  type: ["string", "null"],
+                  enum: ["on_market", "off_market", "way_off_market", null],
+                },
+                market_comparison: { type: ["string", "null"] },
+                gold_standard_deviation: { type: ["boolean", "null"] },
+                gold_standard_comparison: { type: ["string", "null"] },
+              },
+            },
+          },
+        },
+      },
+    };
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -1421,12 +1468,11 @@ IMPORTANT: Extract ALL ${PPA_CATEGORIES.length} categories. Be SPECIFIC and CONC
           { role: "user", content: userPrompt }
         ],
         temperature: 0.2,
-        // Structured output: force the model to return a JSON object.
-        // The Lovable AI Gateway passes this through to Gemini's
-        // OpenAI-compatible endpoint which supports JSON mode. This
-        // kills the bulk of parse errors; the defensive fallback
-        // parsing below is kept as a safety net.
-        response_format: { type: "json_object" },
+        // Structured output via JSON schema (upgrade from plain json_object).
+        // Gives the model structural guarantees on required fields and enum
+        // values, reducing downstream normalisation cost. Defensive parsing
+        // below stays as a safety net in case the gateway ever falls back.
+        response_format: { type: "json_schema", json_schema: positionsJsonSchema },
       }),
     });
 

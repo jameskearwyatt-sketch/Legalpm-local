@@ -506,6 +506,39 @@ Return ONLY valid JSON:
 ⚠️ CRITICAL: Use EXACT category labels as listed above.`;
 
     console.log('Calling AI for carbon credit analysis...');
+
+    // JSON schema for structured output. Only category/position_summary/
+    // confidence are required because market_comparison is conditional on
+    // whether precedents were retrieved. strict: false so the gateway
+    // allows extra optional fields without rejecting the whole response.
+    const positionsJsonSchema = {
+      name: "carbon_positions",
+      strict: false,
+      schema: {
+        type: "object",
+        required: ["positions"],
+        properties: {
+          positions: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["category", "position_summary", "confidence"],
+              properties: {
+                category: { type: "string" },
+                clause_references: { type: ["string", "null"] },
+                position_summary: { type: "string" },
+                confidence: { type: "string", enum: ["high", "medium", "review_required"] },
+                party_favorability: { type: ["string", "null"], enum: ["buyer_friendly", "seller_friendly", "balanced", null] },
+                market_benchmark: { type: ["string", "null"] },
+                market_position: { type: ["string", "null"], enum: ["on_market", "off_market", "way_off_market", null] },
+                market_comparison: { type: ["string", "null"] },
+              },
+            },
+          },
+        },
+      },
+    };
+
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 300000);
 
@@ -519,9 +552,9 @@ Return ONLY valid JSON:
           messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
           temperature: 0.2,
           // Structured output: force Gemini via Lovable gateway to
-          // return a JSON object so the defensive parsing below only
-          // has to run as a safety net (see #6 structured output).
-          response_format: { type: "json_object" },
+          // return JSON conforming to the schema. Defensive parsing
+          // below remains as a safety net (see #6 structured output).
+          response_format: { type: "json_schema", json_schema: positionsJsonSchema },
         }),
         signal: controller.signal,
       });

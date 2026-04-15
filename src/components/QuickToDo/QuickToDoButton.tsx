@@ -2114,6 +2114,41 @@ export function QuickToDoButton() {
       height: 'calc(100vh - 100px)',
     };
 };
+
+  const getSlatePanelStyle = (): React.CSSProperties => {
+    const isMobile = window.innerWidth < 768;
+
+    // Mobile: full screen with small margins — identical to getPanelStyle mobile branch
+    if (isMobile) {
+      return {
+        position: 'fixed',
+        left: 8,
+        right: 8,
+        top: 8,
+        bottom: 8,
+        width: 'auto',
+        height: 'auto',
+        boxShadow: '0 0 20px rgba(59, 130, 246, 0.3), 0 0 40px rgba(99, 102, 241, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+      };
+    }
+
+    // Desktop: custom size and position
+    return {
+      position: 'fixed',
+      width: slateSize.width,
+      height: slateSize.height,
+      ...(slatePosition ? {
+        left: slatePosition.x,
+        top: slatePosition.y,
+      } : {
+        left: '17rem',
+        top: '50%',
+        transform: 'translateY(-50%)',
+      }),
+      boxShadow: '0 0 20px rgba(59, 130, 246, 0.3), 0 0 40px rgba(99, 102, 241, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+    };
+  };
+
   const activeProjects = projects?.filter(p => p.status === 'active') || [];
 
   // Task Row Component
@@ -2723,27 +2758,17 @@ export function QuickToDoButton() {
       {isSlateOpen && (
         <div
           ref={slateRef}
+          data-slate-panel
+          data-compact-panel
           className={cn(
-            "fixed z-50 rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
+            "z-50 rounded-xl border-0 overflow-hidden bg-background flex flex-col animate-[slate-glow_3s_ease-in-out_infinite]",
             (isDraggingSlate || isResizingSlate) && "select-none"
           )}
-          style={{
-            width: slateSize.width,
-            height: slateSize.height,
-            ...(slatePosition ? {
-              left: slatePosition.x,
-              top: slatePosition.y,
-            } : {
-              left: '17rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
-            }),
-            boxShadow: '0 0 20px rgba(59, 130, 246, 0.3), 0 0 40px rgba(99, 102, 241, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.25)',
-          }}
+          style={getSlatePanelStyle()}
         >
-          {/* Resize Handle - Top Right Corner */}
+          {/* Resize Handle - Top Right Corner (hidden on mobile) */}
           <div
-            className="absolute top-0 right-0 w-6 h-6 z-10 cursor-ne-resize"
+            className="absolute top-0 right-0 w-6 h-6 z-10 cursor-ne-resize hidden sm:block"
             onMouseDown={handleSlateResizeMouseDown}
           />
           {/* Slate Header - Draggable */}
@@ -3179,6 +3204,7 @@ export function QuickToDoButton() {
       {isOpen && (
         <div
           ref={panelRef}
+          data-compact-panel
           className={cn(
             "z-50 rounded-xl border-0 shadow-2xl shadow-teal-500/20 overflow-hidden animate-scale-in bg-background transition-all duration-300 flex flex-col"
           )}

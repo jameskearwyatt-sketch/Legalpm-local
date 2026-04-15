@@ -123,10 +123,46 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
   }
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-heading font-semibold tracking-tight;
+  }
+
+  /* Touch-friendly interactive elements on touch devices — exclude small UI controls */
+  @media (pointer: coarse) {
+    :is(button, [role="button"], a, select):not([role="checkbox"]):not([role="radio"]):not([role="switch"]):not(.compact-touch):not([data-compact-panel] *) {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    /* Override: keep table header buttons compact */
+    th :is(button, [role="button"], a, select):not([role="checkbox"]):not([role="radio"]):not([role="switch"]),
+    thead :is(button, [role="button"], a, select):not([role="checkbox"]):not([role="radio"]):not([role="switch"]) {
+      min-height: unset !important;
+      min-width: unset !important;
+    }
+
+    /* Override: keep floating panel (todo/slate) buttons compact */
+    [data-compact-panel] :is(button, [role="button"], a, select):not([role="checkbox"]):not([role="radio"]):not([role="switch"]) {
+      min-height: unset !important;
+      min-width: unset !important;
+    }
+
+    input, textarea, select {
+      font-size: 16px; /* Prevents iOS zoom on focus */
+    }
+  }
+
+  /* Safe area insets for notched devices */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0px);
   }
 }
 
@@ -260,6 +296,73 @@
 
   .badge-neutral {
     @apply bg-muted text-muted-foreground border-border;
+  }
+
+  /* Responsive page padding */
+  .page-padding {
+    @apply px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8;
+  }
+
+  /* Responsive page header with stacked layout on mobile */
+  .page-header {
+    @apply flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4;
+  }
+
+  /* Mobile-friendly card grid */
+  .card-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
+  }
+
+  /* Responsive table wrapper - ensures horizontal scroll on mobile */
+  .table-responsive {
+    @apply -mx-4 sm:mx-0 overflow-x-auto;
+  }
+
+  /* Hide on mobile, show on tablet+ */
+  .tablet-up {
+    @apply hidden md:block;
+  }
+
+  /* Hide on mobile/tablet, show on desktop */
+  .desktop-only {
+    @apply hidden lg:block;
+  }
+
+  /* Touch-friendly spacing for list items */
+  .touch-list > * {
+    @apply py-3;
+  }
+
+  @media (pointer: coarse) {
+    .touch-list > * {
+      @apply py-4;
+    }
+  }
+
+  /* Slate panel: full-screen on mobile, overriding inline styles */
+  @media (max-width: 768px) {
+    [data-slate-panel] {
+      top: 8px !important;
+      left: 8px !important;
+      right: 8px !important;
+      bottom: 8px !important;
+      width: auto !important;
+      height: auto !important;
+      transform: none !important;
+    }
+  }
+
+  /* Also catch touch-primary devices regardless of viewport width */
+  @media (pointer: coarse) and (hover: none) {
+    [data-slate-panel] {
+      top: 8px !important;
+      left: 8px !important;
+      right: 8px !important;
+      bottom: 8px !important;
+      width: auto !important;
+      height: auto !important;
+      transform: none !important;
+    }
   }
 }
 

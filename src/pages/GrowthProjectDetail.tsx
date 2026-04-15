@@ -294,16 +294,16 @@ const GrowthProjectDetail = () => {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex items-start justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="space-y-1">
-            <Button variant="ghost" size="sm" onClick={() => navigate('/growth')} className="mb-2">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/growth')} className="mb-2 -ml-2">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Growth
             </Button>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold">
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+              <h1 className="text-xl sm:text-2xl font-bold">
                 {project.mentee_name || project.name}
               </h1>
               <Badge variant={project.status === 'active' ? 'default' : 'secondary'}>

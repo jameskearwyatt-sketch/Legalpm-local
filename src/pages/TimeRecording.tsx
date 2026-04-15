@@ -2158,7 +2158,7 @@ export default function TimeRecording() {
   if (mattersLoading) {
     return (
       <AppLayout>
-        <div className="p-6 lg:p-8 flex items-center justify-center min-h-[60vh]">
+        <div className="p-4 sm:p-6 lg:p-8 flex items-center justify-center min-h-[60vh]">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       </AppLayout>
@@ -2167,9 +2167,9 @@ export default function TimeRecording() {
 
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-3xl font-heading font-bold text-foreground">Time Recording</h1>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-heading font-bold text-foreground">Time Recording</h1>
           <p className="text-muted-foreground mt-1">
             Record your time with AI-enhanced narratives for your PA
           </p>

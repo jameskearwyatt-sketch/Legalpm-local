@@ -1011,6 +1011,9 @@ export default function PricingProposalDetail() {
   const summaryAutoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const assumptionsRef = useRef(assumptions);
   useEffect(() => { assumptionsRef.current = assumptions; }, [assumptions]);
+  const scopeAssumptionsAutoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scopeAssumptionsRef = useRef(scopeAssumptions);
+  useEffect(() => { scopeAssumptionsRef.current = scopeAssumptions; }, [scopeAssumptions]);
   const summaryChangeCountRef = useRef(0);
 
   useEffect(() => {
@@ -1035,6 +1038,30 @@ export default function PricingProposalDetail() {
       if (summaryAutoSaveRef.current) clearTimeout(summaryAutoSaveRef.current);
     };
   }, [assumptions.summaryHours, assumptions.summaryLevelOverrides, summaryInitialized, proposalId]);
+
+  useEffect(() => {
+    if (!proposalId || !scopeAssumptionsInitialized) return;
+
+    if (scopeAssumptionsAutoSaveRef.current) clearTimeout(scopeAssumptionsAutoSaveRef.current);
+    scopeAssumptionsAutoSaveRef.current = setTimeout(async () => {
+      try {
+        const { error } = await supabase
+          .from('pricing_proposals')
+          .update({ scope_assumptions: scopeAssumptionsRef.current as any })
+          .eq('id', proposalId);
+
+        if (error) {
+          console.error('Failed to save scope assumptions:', error);
+        }
+      } catch (err) {
+        console.error('Failed to save scope assumptions:', err);
+      }
+    }, 400);
+
+    return () => {
+      if (scopeAssumptionsAutoSaveRef.current) clearTimeout(scopeAssumptionsAutoSaveRef.current);
+    };
+  }, [scopeAssumptions, scopeAssumptionsInitialized, proposalId]);
 
   // Summary aggregates
   const summary = useMemo(() => {
@@ -2156,16 +2183,16 @@ export default function PricingProposalDetail() {
 
   return (
     <AppLayout>
-      <div className="space-y-6 pb-20">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 pb-20">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate('/pricing')}>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-start sm:items-center gap-2 sm:gap-4">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/pricing')} className="shrink-0">
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold">{proposal.name}</h1>
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-bold">{proposal.name}</h1>
                 <Badge variant={proposal.status === 'Agreed' ? 'default' : 'secondary'}>
                   {proposal.status}
                 </Badge>
@@ -3301,13 +3328,9 @@ export default function PricingProposalDetail() {
           <TabsContent value="scope-assumptions" className="space-y-4">
             <ScopeAssumptionsTab
               value={scopeAssumptions}
-              onChange={async (newState) => {
+              onChange={(newState) => {
+                setScopeAssumptionsInitialized(true);
                 setScopeAssumptions(newState);
-                // Auto-save scope assumptions
-                await supabase
-                  .from('pricing_proposals')
-                  .update({ scope_assumptions: newState as any })
-                  .eq('id', proposalId);
               }}
               currency={proposal?.currency || 'GBP'}
               workItems={draftItems}

@@ -523,7 +523,30 @@ function generateProcessNarrative(enabledProcessAssumptions: SimpleAssumptionVal
 }
 
 export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] }: ScopeAssumptionsTabProps) {
-  const [state, setState] = useState<ScopeAssumptionsState>(value || createDefaultState());
+  // Initialize state once from value prop; subsequent changes managed locally
+  const [initializedFromProp, setInitializedFromProp] = useState(false);
+  const [state, setState] = useState<ScopeAssumptionsState>(() => {
+    if (value) {
+      const mergedSimple = SIMPLE_ASSUMPTIONS.map(def => {
+        const existing = value.simpleAssumptions?.find(a => a.assumptionId === def.id);
+        return existing || {
+          assumptionId: def.id,
+          enabled: false,
+          inputValue: undefined,
+          narrative: '',
+        };
+      });
+      return {
+        noAssumptionsApply: value.noAssumptionsApply,
+        simpleAssumptions: mergedSimple,
+        documentAssumptions: value.documentAssumptions || DEFAULT_DOCUMENT_STATE,
+        documentNarratives: value.documentNarratives || [],
+        customAssumptions: value.customAssumptions || [],
+        processNarrativeOverride: value.processNarrativeOverride,
+      };
+    }
+    return createDefaultState();
+  });
   const [editingNarrative, setEditingNarrative] = useState<string | null>(null);
   const [editedText, setEditedText] = useState('');
   const [docSectionOpen, setDocSectionOpen] = useState(false);
@@ -540,10 +563,9 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
     );
   }, [workItems]);
 
-  // Sync with prop changes (but preserve selections)
+  // Sync with prop ONLY on first non-null value (handles async load)
   useEffect(() => {
-    if (value) {
-      // Merge incoming value with defaults to handle new assumptions
+    if (value && !initializedFromProp) {
       const mergedSimple = SIMPLE_ASSUMPTIONS.map(def => {
         const existing = value.simpleAssumptions?.find(a => a.assumptionId === def.id);
         return existing || {
@@ -561,8 +583,9 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
         customAssumptions: value.customAssumptions || [],
         processNarrativeOverride: value.processNarrativeOverride,
       });
+      setInitializedFromProp(true);
     }
-  }, [value]);
+  }, [value, initializedFromProp]);
 
   // Regenerate document narratives when configs change
   useEffect(() => {
@@ -583,44 +606,48 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
       .filter(n => n.length > 0);
     
     if (JSON.stringify(newNarratives) !== JSON.stringify(state.documentNarratives || [])) {
-      const newState = { ...state, documentNarratives: newNarratives };
-      setState(newState);
-      onChange(newState);
+      updateState(prev => ({ ...prev, documentNarratives: newNarratives }));
     }
   }, [state.documentAssumptions]);
 
-  const updateState = (newState: ScopeAssumptionsState) => {
-    setState(newState);
-    onChange(newState);
+  const updateState = (
+    updater: ScopeAssumptionsState | ((prev: ScopeAssumptionsState) => ScopeAssumptionsState)
+  ) => {
+    setState(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      onChange(next);
+      return next;
+    });
   };
 
   // Toggle "No Assumptions Apply" - preserves selections, just hides them
   const toggleNoAssumptions = (checked: boolean) => {
-    updateState({
-      ...state,
+    updateState(prev => ({
+      ...prev,
       noAssumptionsApply: checked,
-      // Don't clear anything - just toggle the flag
-    });
+    }));
   };
 
   const toggleSimpleAssumption = (assumptionId: string, enabled: boolean) => {
     const def = SIMPLE_ASSUMPTIONS.find(a => a.id === assumptionId);
     if (!def) return;
 
-    const newAssumptions = (state.simpleAssumptions || []).map(a => {
-      if (a.assumptionId === assumptionId) {
-        const narrative = enabled && !def.requiresInput 
-          ? def.narrativeTemplate() 
-          : (enabled ? a.narrative : '');
-        return { ...a, enabled, narrative };
-      }
-      return a;
-    });
+    updateState(prev => {
+      const newAssumptions = (prev.simpleAssumptions || []).map(a => {
+        if (a.assumptionId === assumptionId) {
+          const narrative = enabled && !def.requiresInput
+            ? def.narrativeTemplate()
+            : (enabled ? a.narrative : '');
+          return { ...a, enabled, narrative };
+        }
+        return a;
+      });
 
-    updateState({
-      ...state,
-      noAssumptionsApply: false,
-      simpleAssumptions: newAssumptions,
+      return {
+        ...prev,
+        noAssumptionsApply: false,
+        simpleAssumptions: newAssumptions,
+      };
     });
   };
 
@@ -630,117 +657,113 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
     const def = SIMPLE_ASSUMPTIONS.find(a => a.id === assumptionId);
     if (!def) return;
 
-    const newAssumptions = (state.simpleAssumptions || []).map(a => {
-      if (LOCAL_COUNSEL_IDS.includes(a.assumptionId)) {
-        // Enable the selected one, disable the other
-        const isSelected = a.assumptionId === assumptionId;
-        const matchingDef = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
-        return { 
-          ...a, 
-          enabled: isSelected,
-          narrative: isSelected && matchingDef ? matchingDef.narrativeTemplate() : '',
-        };
-      }
-      return a;
-    });
+    updateState(prev => {
+      const newAssumptions = (prev.simpleAssumptions || []).map(a => {
+        if (LOCAL_COUNSEL_IDS.includes(a.assumptionId)) {
+          const isSelected = a.assumptionId === assumptionId;
+          const matchingDef = SIMPLE_ASSUMPTIONS.find(d => d.id === a.assumptionId);
+          return {
+            ...a,
+            enabled: isSelected,
+            narrative: isSelected && matchingDef ? matchingDef.narrativeTemplate() : '',
+          };
+        }
+        return a;
+      });
 
-    updateState({
-      ...state,
-      noAssumptionsApply: false,
-      simpleAssumptions: newAssumptions,
+      return {
+        ...prev,
+        noAssumptionsApply: false,
+        simpleAssumptions: newAssumptions,
+      };
     });
   };
 
   // Clear local counsel selection (allow deselecting)
   const clearLocalCounselAssumption = () => {
     const LOCAL_COUNSEL_IDS = ['lc_bm_onbill', 'lc_direct_billing'];
-    
-    const newAssumptions = (state.simpleAssumptions || []).map(a => {
-      if (LOCAL_COUNSEL_IDS.includes(a.assumptionId)) {
-        return { ...a, enabled: false, narrative: '' };
-      }
-      return a;
-    });
 
-    updateState({
-      ...state,
-      simpleAssumptions: newAssumptions,
-    });
+    updateState(prev => ({
+      ...prev,
+      simpleAssumptions: (prev.simpleAssumptions || []).map(a =>
+        LOCAL_COUNSEL_IDS.includes(a.assumptionId)
+          ? { ...a, enabled: false, narrative: '' }
+          : a
+      ),
+    }));
   };
 
   const updateSimpleInputValue = (assumptionId: string, inputValue: string) => {
     const def = SIMPLE_ASSUMPTIONS.find(a => a.id === assumptionId);
     if (!def) return;
 
-    const newAssumptions = (state.simpleAssumptions || []).map(a => {
-      if (a.assumptionId === assumptionId) {
-        return { 
-          ...a, 
-          inputValue, 
-          narrative: def.narrativeTemplate(inputValue),
-        };
-      }
-      return a;
-    });
-
-    updateState({
-      ...state,
-      simpleAssumptions: newAssumptions,
-    });
+    updateState(prev => ({
+      ...prev,
+      simpleAssumptions: (prev.simpleAssumptions || []).map(a =>
+        a.assumptionId === assumptionId
+          ? {
+              ...a,
+              inputValue,
+              narrative: def.narrativeTemplate(inputValue),
+            }
+          : a
+      ),
+    }));
   };
 
   // Document assumption toggles
   const toggleDocumentAssumptionType = (type: DocumentAssumptionType, enabled: boolean) => {
-    const currentDocState = state.documentAssumptions || DEFAULT_DOCUMENT_STATE;
-    const newDocState = { ...currentDocState };
-    
-    if (type === 'turns') newDocState.turnsEnabled = enabled;
-    if (type === 'who_drafts') newDocState.whoDraftsEnabled = enabled;
-    if (type === 'client_form') newDocState.clientFormEnabled = enabled;
+    updateState(prev => {
+      const currentDocState = prev.documentAssumptions || DEFAULT_DOCUMENT_STATE;
+      const newDocState = { ...currentDocState };
 
-    updateState({
-      ...state,
-      noAssumptionsApply: false,
-      documentAssumptions: newDocState,
+      if (type === 'turns') newDocState.turnsEnabled = enabled;
+      if (type === 'who_drafts') newDocState.whoDraftsEnabled = enabled;
+      if (type === 'client_form') newDocState.clientFormEnabled = enabled;
+
+      return {
+        ...prev,
+        noAssumptionsApply: false,
+        documentAssumptions: newDocState,
+      };
     });
-    
+
     if (enabled) setDocSectionOpen(true);
   };
 
   // Toggle a work item for document assumptions
   const toggleWorkItemSelected = (workItemName: string, selected: boolean) => {
-    const currentDocState = state.documentAssumptions || DEFAULT_DOCUMENT_STATE;
-    let configs = [...(currentDocState.configs || [])];
-    
-    if (selected) {
-      // Add if not exists
-      if (!configs.find(c => c.workItemName === workItemName)) {
-        configs.push({ workItemName });
-      }
-    } else {
-      // Remove
-      configs = configs.filter(c => c.workItemName !== workItemName);
-    }
+    updateState(prev => {
+      const currentDocState = prev.documentAssumptions || DEFAULT_DOCUMENT_STATE;
+      let configs = [...(currentDocState.configs || [])];
 
-    updateState({
-      ...state,
-      documentAssumptions: { ...currentDocState, configs },
+      if (selected) {
+        if (!configs.find(c => c.workItemName === workItemName)) {
+          configs.push({ workItemName });
+        }
+      } else {
+        configs = configs.filter(c => c.workItemName !== workItemName);
+      }
+
+      return {
+        ...prev,
+        documentAssumptions: { ...currentDocState, configs },
+      };
     });
   };
 
   // Update document config
   const updateDocumentConfig = (workItemName: string, updates: Partial<DocumentConfig>) => {
-    const currentDocState = state.documentAssumptions || DEFAULT_DOCUMENT_STATE;
-    const configs = (currentDocState.configs || []).map(c => {
-      if (c.workItemName === workItemName) {
-        return { ...c, ...updates };
-      }
-      return c;
-    });
+    updateState(prev => {
+      const currentDocState = prev.documentAssumptions || DEFAULT_DOCUMENT_STATE;
+      const configs = (currentDocState.configs || []).map(c =>
+        c.workItemName === workItemName ? { ...c, ...updates } : c
+      );
 
-    updateState({
-      ...state,
-      documentAssumptions: { ...currentDocState, configs },
+      return {
+        ...prev,
+        documentAssumptions: { ...currentDocState, configs },
+      };
     });
   };
 
@@ -751,26 +774,23 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
   };
 
   const saveSimpleNarrative = (assumptionId: string) => {
-    const newAssumptions = state.simpleAssumptions.map(a => {
-      if (a.assumptionId === assumptionId) {
-        return { ...a, narrative: editedText };
-      }
-      return a;
-    });
-
-    updateState({
-      ...state,
-      simpleAssumptions: newAssumptions,
-    });
+    updateState(prev => ({
+      ...prev,
+      simpleAssumptions: (prev.simpleAssumptions || []).map(a =>
+        a.assumptionId === assumptionId ? { ...a, narrative: editedText } : a
+      ),
+    }));
     setEditingNarrative(null);
   };
 
   const saveDocNarrative = (index: number) => {
-    const newNarratives = [...(state.documentNarratives || [])];
-    newNarratives[index] = editedText;
-    updateState({
-      ...state,
-      documentNarratives: newNarratives,
+    updateState(prev => {
+      const newNarratives = [...(prev.documentNarratives || [])];
+      newNarratives[index] = editedText;
+      return {
+        ...prev,
+        documentNarratives: newNarratives,
+      };
     });
     setEditingNarrative(null);
   };
@@ -782,41 +802,33 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
 
   const regenerateSimpleNarrative = (assumptionId: string) => {
     const def = SIMPLE_ASSUMPTIONS.find(a => a.id === assumptionId);
-    const assumption = (state.simpleAssumptions || []).find(a => a.assumptionId === assumptionId);
-    if (!def || !assumption) return;
+    if (!def) return;
 
-    const newAssumptions = (state.simpleAssumptions || []).map(a => {
-      if (a.assumptionId === assumptionId) {
-        return { 
-          ...a, 
-          narrative: def.narrativeTemplate(a.inputValue),
-        };
-      }
-      return a;
-    });
-
-    updateState({
-      ...state,
-      simpleAssumptions: newAssumptions,
-      // Clear process narrative override when regenerating
+    updateState(prev => ({
+      ...prev,
+      simpleAssumptions: (prev.simpleAssumptions || []).map(a =>
+        a.assumptionId === assumptionId
+          ? { ...a, narrative: def.narrativeTemplate(a.inputValue) }
+          : a
+      ),
       processNarrativeOverride: undefined,
-    });
+    }));
   };
 
   // Process narrative editing
   const saveProcessNarrative = () => {
-    updateState({
-      ...state,
+    updateState(prev => ({
+      ...prev,
       processNarrativeOverride: editedText,
-    });
+    }));
     setEditingNarrative(null);
   };
 
   const regenerateProcessNarrative = () => {
-    updateState({
-      ...state,
+    updateState(prev => ({
+      ...prev,
       processNarrativeOverride: undefined,
-    });
+    }));
     setEditingNarrative(null);
   };
 
@@ -824,34 +836,34 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
   const addCustomAssumption = () => {
     const text = newCustomAssumption.trim();
     if (!text) return;
-    
+
     const newCustom: CustomAssumption = {
       id: `custom-${Date.now()}`,
       text,
       enabled: true,
     };
-    
-    updateState({
-      ...state,
-      customAssumptions: [...(state.customAssumptions || []), newCustom],
-    });
+
+    updateState(prev => ({
+      ...prev,
+      customAssumptions: [...(prev.customAssumptions || []), newCustom],
+    }));
     setNewCustomAssumption('');
   };
 
   const toggleCustomAssumption = (id: string, enabled: boolean) => {
-    updateState({
-      ...state,
-      customAssumptions: (state.customAssumptions || []).map(a =>
+    updateState(prev => ({
+      ...prev,
+      customAssumptions: (prev.customAssumptions || []).map(a =>
         a.id === id ? { ...a, enabled } : a
       ),
-    });
+    }));
   };
 
   const removeCustomAssumption = (id: string) => {
-    updateState({
-      ...state,
-      customAssumptions: (state.customAssumptions || []).filter(a => a.id !== id),
-    });
+    updateState(prev => ({
+      ...prev,
+      customAssumptions: (prev.customAssumptions || []).filter(a => a.id !== id),
+    }));
   };
 
   const handleCustomAssumptionKeyDown = (e: React.KeyboardEvent) => {
@@ -1429,7 +1441,14 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                                     ? { ...a, enabled: false, narrative: '', inputValue: undefined }
                                     : a
                                 );
-                                setState(prev => ({ ...prev, simpleAssumptions: updated }));
+                                updateState(prev => ({
+                                  ...prev,
+                                  simpleAssumptions: (prev.simpleAssumptions || []).map(a =>
+                                    a.assumptionId === assumption.assumptionId
+                                      ? { ...a, enabled: false, narrative: '', inputValue: undefined }
+                                      : a
+                                  ),
+                                }));
                               }}
                               title="Remove assumption"
                             >
@@ -1528,7 +1547,15 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                                   ? { ...a, enabled: false, narrative: '', inputValue: undefined }
                                   : a
                               );
-                              setState(prev => ({ ...prev, simpleAssumptions: updated, processNarrativeOverride: undefined }));
+                              updateState(prev => ({
+                                ...prev,
+                                simpleAssumptions: (prev.simpleAssumptions || []).map(a =>
+                                  combinableIds.includes(a.assumptionId)
+                                    ? { ...a, enabled: false, narrative: '', inputValue: undefined }
+                                    : a
+                                ),
+                                processNarrativeOverride: undefined,
+                              }));
                             }}
                             title="Remove process assumptions"
                           >
@@ -1604,9 +1631,25 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                               variant="ghost"
                               className="h-7 w-7 text-muted-foreground hover:text-destructive"
                               onClick={() => {
-                                const updated = [...(state.documentNarratives || [])];
-                                updated.splice(index, 1);
-                                setState(prev => ({ ...prev, documentNarratives: updated }));
+                                updateState(prev => {
+                                  const currentDocState = prev.documentAssumptions || DEFAULT_DOCUMENT_STATE;
+                                  const narrativeConfigs = (currentDocState.configs || []).filter(
+                                    config => config.turns !== undefined || config.whoDrafts !== undefined || config.clientForm
+                                  );
+                                  const configToRemove = narrativeConfigs[index];
+                                  const updatedConfigs = configToRemove
+                                    ? (currentDocState.configs || []).filter(config => config !== configToRemove)
+                                    : (currentDocState.configs || []);
+
+                                  return {
+                                    ...prev,
+                                    documentAssumptions: {
+                                      ...currentDocState,
+                                      configs: updatedConfigs,
+                                    },
+                                    documentNarratives: (prev.documentNarratives || []).filter((_, i) => i !== index),
+                                  };
+                                });
                               }}
                               title="Remove assumption"
                             >

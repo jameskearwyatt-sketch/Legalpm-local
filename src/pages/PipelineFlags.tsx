@@ -132,11 +132,11 @@ export default function PipelineFlags() {
 
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8 space-y-6">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl lg:text-3xl font-heading font-bold text-foreground flex items-center gap-3">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-heading font-bold text-foreground flex items-center gap-2 sm:gap-3">
               <Rocket className="h-7 w-7 text-amber-500" />
               Pipeline Flags
             </h1>

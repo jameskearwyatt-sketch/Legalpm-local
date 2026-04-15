@@ -68,8 +68,8 @@ Deno.serve(async (req) => {
       
       if (!user) {
         return new Response(
-          JSON.stringify({ error: 'No account found with this email' }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ hasPasskeys: false }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
@@ -81,8 +81,8 @@ Deno.serve(async (req) => {
 
       if (passkeysError || !passkeys || passkeys.length === 0) {
         return new Response(
-          JSON.stringify({ error: 'No passkeys registered for this account', hasPasskeys: false }),
-          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          JSON.stringify({ hasPasskeys: false }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 

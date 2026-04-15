@@ -10,7 +10,7 @@ export interface TrendDataPoint {
   date: string;
   rawDate: string; // Original ISO date for deletion
   wip: number;
-  billed: number;
+  ar: number;
   paid: number;
 }
 
@@ -24,6 +24,17 @@ export interface PipelineMatter {
   id: string;
   matterName: string;
   clientName: string;
+}
+
+export interface MatterBreakdown {
+  id: string;
+  matterName: string;
+  clientName: string;
+  wipAmount: number;
+  arAmount: number;
+  paidAmount: number;
+  billedAmount: number;
+  currency: string;
 }
 
 export interface DashboardStats {
@@ -42,7 +53,8 @@ export interface DashboardStats {
   trendData: TrendDataPoint[];
   liveMatters: LiveMatter[];
   pipelineMatters: PipelineMatter[];
-  hasActiveWipProposals: boolean; // Track if any WIP shaping proposals are affecting figures
+  hasActiveWipProposals: boolean;
+  matterBreakdowns: MatterBreakdown[];
 }
 
 export interface Alert {
@@ -135,6 +147,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           liveMatters: liveMattersForUI,
           pipelineMatters: pipelineMattersForUI,
           hasActiveWipProposals: false,
+          matterBreakdowns: [],
         } as DashboardStats;
       }
 
@@ -179,6 +192,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       let hasActiveWipProposals = false; // Track if any proposals are affecting WIP
       const alerts: Alert[] = [];
       const pipelineAlerts: PipelineAlert[] = [];
+      const matterBreakdowns: MatterBreakdown[] = [];
 
       // Calculate total pipeline value (respecting excluded pipeline matters)
       let includedPipelineCount = 0;
@@ -244,13 +258,27 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         // Only include in financial totals if not excluded
         if (!isExcluded) {
           // Convert to USD using live rates for accuracy
+          const wipUsd = convertToUsd(wipAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          const billedUsd = convertToUsd(billedAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          const paidUsd = convertToUsd(paidAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          
           totalBmFeesUsd += convertToUsd(effectiveBmFee, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-          // Use net WIP (after proposal write-offs) for the dashboard WIP figure
-          totalWipUsd += convertToUsd(wipAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-          totalBilledUsd += convertToUsd(billedAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-          totalPaidUsd += convertToUsd(paidAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          totalWipUsd += wipUsd;
+          totalBilledUsd += billedUsd;
+          totalPaidUsd += paidUsd;
           // Only use ACTUAL write-offs for realization rate - never proposal write-offs
           totalWipWriteOffUsd += convertToUsd(actualWipWriteOffAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+
+          matterBreakdowns.push({
+            id: matter.id,
+            matterName: matter.matter_name,
+            clientName: getMatterClientDisplayName(matter),
+            wipAmount: wipAmount,
+            arAmount: billedAmount - paidAmount,
+            paidAmount: paidAmount,
+            billedAmount: billedAmount,
+            currency: feeCurrency,
+          });
         }
 
         // Budget burn = WIP + AR + Paid (each value is mutually exclusive)
@@ -480,7 +508,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
 
       // Group all snapshots by date and aggregate (excluding excluded matters)
       // Also track how many matters have data for each date to detect incomplete data
-      const trendByDate = new Map<string, { wip: number; billed: number; paid: number; matterCount: number }>();
+      const trendByDate = new Map<string, { wip: number; ar: number; paid: number; matterCount: number }>();
       snapshots?.forEach(snap => {
         // Skip excluded matters for trend data
         if (excludedSet.has(snap.matter_id)) return;
@@ -490,10 +518,13 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         const exchangeRate = matterData?.exchangeRate || 1;
         const feeCurrency = matterData?.feeCurrency || 'GBP';
         
-        const existing = trendByDate.get(dateKey) || { wip: 0, billed: 0, paid: 0, matterCount: 0 };
+        const billedUsd = convertToUsd(Number(snap.billed_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+        const paidUsd = convertToUsd(Number(snap.paid_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+        
+        const existing = trendByDate.get(dateKey) || { wip: 0, ar: 0, paid: 0, matterCount: 0 };
         existing.wip += convertToUsd(Number(snap.wip_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-        existing.billed += convertToUsd(Number(snap.billed_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-        existing.paid += convertToUsd(Number(snap.paid_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+        existing.ar += Math.max(billedUsd - paidUsd, 0);
+        existing.paid += paidUsd;
         existing.matterCount += 1;
         trendByDate.set(dateKey, existing);
       });
@@ -516,7 +547,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           date: format(parseISO(dateStr), 'MMM d'),
           rawDate: dateStr,
           wip: Math.round(values.wip),
-          billed: Math.round(values.billed),
+          ar: Math.round(values.ar),
           paid: Math.round(values.paid),
         }));
 
@@ -545,6 +576,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         liveMatters: liveMattersForUI,
         pipelineMatters: pipelineMattersForUI,
         hasActiveWipProposals,
+        matterBreakdowns: matterBreakdowns.sort((a, b) => b.wipAmount - a.wipAmount),
       } as DashboardStats;
     },
     enabled: !!user,

@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import { TimeRangeSelector, TimeRange, getTimeRangeCutoff } from '@/components/ui/time-range-selector';
 import { Link } from 'react-router-dom';
 import AppLayout from '@/components/layout/AppLayout';
 import { StatCard } from '@/components/ui/stat-card';
@@ -6,7 +7,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useDashboard, TrendDataPoint } from '@/lib/hooks/useDashboard';
+import { useDashboard, TrendDataPoint, MatterBreakdown } from '@/lib/hooks/useDashboard';
 import { useMatters } from '@/lib/hooks/useMatters';
 import { useAuth } from '@/lib/auth';
 import { formatCurrency } from '@/lib/currencyUtils';
@@ -49,8 +50,11 @@ export default function Dashboard() {
   const [activeTooltipData, setActiveTooltipData] = useState<{ dataPoint: TrendDataPoint; payload: any[] } | null>(null);
   const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRange>("all");
   const isHoveringTooltipRef = useRef(false);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [expandedTile, setExpandedTile] = useState<'wip' | 'ar' | 'paid' | null>(null);
+  const breakdownRef = useRef<HTMLDivElement>(null);
   // "Not my matters" checkbox defaults to unchecked (meaning they're excluded by default)
   const [notMyMattersIncluded, setNotMyMattersIncluded] = useState(false);
   const { data: stats, isLoading } = useDashboard(excludedMatterIds, excludedPipelineMatterIds);
@@ -305,7 +309,7 @@ export default function Dashboard() {
     // Build the payload array for all three metrics
     const fullPayload = [
       { name: 'WIP', value: payload.wip, color: 'hsl(var(--chart-3))' },
-      { name: 'Billed', value: payload.billed, color: 'hsl(var(--chart-1))' },
+      { name: 'AR', value: payload.ar, color: 'hsl(var(--chart-1))' },
       { name: 'Paid', value: payload.paid, color: 'hsl(var(--chart-2))' },
     ];
     
@@ -326,6 +330,20 @@ export default function Dashboard() {
 
   // Use shared formatCurrency from currencyUtils - imported at top
 
+  const breakdownData = useMemo(() => {
+    if (!expandedTile || !stats?.matterBreakdowns) return [];
+    const sorted = [...stats.matterBreakdowns];
+    if (expandedTile === 'wip') {
+      return sorted.filter(m => m.wipAmount > 0).sort((a, b) => b.wipAmount - a.wipAmount);
+    }
+    if (expandedTile === 'ar') {
+      return sorted.filter(m => m.arAmount > 0).sort((a, b) => b.arAmount - a.arAmount);
+    }
+    if (expandedTile === 'paid') {
+      return sorted.filter(m => m.paidAmount > 0).sort((a, b) => b.paidAmount - a.paidAmount);
+    }
+    return [];
+  }, [expandedTile, stats?.matterBreakdowns]);
 
   if (isLoading) {
     return (
@@ -341,38 +359,50 @@ export default function Dashboard() {
   const outstandingAR = (stats?.totalBilled || 0) - (stats?.totalPaid || 0);
   const totalLockup = (stats?.totalWip || 0) + outstandingAR;
 
+  const handleTileClick = (tile: 'wip' | 'ar' | 'paid') => {
+    setExpandedTile(prev => prev === tile ? null : tile);
+    // Scroll to breakdown after a tick
+    setTimeout(() => {
+      breakdownRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 50);
+  };
+
   const kpiCards = [
-    {
-      title: 'Total Lock-up',
-      value: formatCurrency(totalLockup, 'USD'),
-      icon: <DollarSign className="h-5 w-5" />,
-      variant: 'default' as const,
-    },
     {
       title: 'Work in Progress',
       value: formatCurrency(stats?.totalWip || 0, 'USD'),
       icon: <Clock className="h-5 w-5" />,
       variant: 'default' as const,
       hasProposalAdjustment: stats?.hasActiveWipProposals || false,
+      tileKey: 'wip' as const,
+    },
+    {
+      title: 'Total AR',
+      value: formatCurrency(outstandingAR, 'USD'),
+      icon: <FileText className="h-5 w-5" />,
+      variant: 'default' as const,
+      tileKey: 'ar' as const,
+    },
+    {
+      title: 'Total Lock-up',
+      value: formatCurrency(totalLockup, 'USD'),
+      icon: <DollarSign className="h-5 w-5" />,
+      variant: 'default' as const,
+      tileKey: null,
     },
     {
       title: 'Total Billed',
       value: formatCurrency(stats?.totalBilled || 0, 'USD'),
       icon: <FileText className="h-5 w-5" />,
       variant: 'default' as const,
+      tileKey: null,
     },
     {
       title: 'Total Paid',
       value: formatCurrency(stats?.totalPaid || 0, 'USD'),
       icon: <CheckCircle className="h-5 w-5" />,
       variant: 'success' as const,
-    },
-    {
-      title: 'Collection Rate',
-      value: `${(stats?.avgCollectionRate || 0).toFixed(1)}%`,
-      icon: <TrendingUp className="h-5 w-5" />,
-      variant: (stats?.avgCollectionRate || 0) >= 80 ? 'success' as const : (stats?.avgCollectionRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
-      infoTooltip: 'Collection Rate measures the percentage of billed amounts that have been collected. WIP write-offs do not affect this rate — it only looks at bills issued vs. payments received.',
+      tileKey: 'paid' as const,
     },
     {
       title: 'Realization Rate',
@@ -380,41 +410,60 @@ export default function Dashboard() {
       icon: <Percent className="h-5 w-5" />,
       variant: (stats?.realizationRate || 0) >= 80 ? 'success' as const : (stats?.realizationRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
       infoTooltip: 'Realization Rate measures the percentage of worked time that was actually collected as revenue. WIP write-offs hurt this rate. E.g., if you bill £100k, write off £50k, and collect £50k, your collection rate is 100% but realization rate is 50%.',
+      tileKey: null,
+    },
+    {
+      title: 'Collection Rate',
+      value: `${(stats?.avgCollectionRate || 0).toFixed(1)}%`,
+      icon: <TrendingUp className="h-5 w-5" />,
+      variant: (stats?.avgCollectionRate || 0) >= 80 ? 'success' as const : (stats?.avgCollectionRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
+      infoTooltip: 'Collection Rate measures the percentage of billed amounts that have been collected. WIP write-offs do not affect this rate — it only looks at bills issued vs. payments received.',
+      tileKey: null,
     },
   ];
 
-  // Use actual trend data from snapshots
-  const trendData = stats?.trendData || [];
+
+  const breakdownTitle = expandedTile === 'wip' ? 'Work in Progress' : expandedTile === 'ar' ? 'Accounts Receivable' : 'Paid';
+  const getBreakdownValue = (m: MatterBreakdown) => {
+    if (expandedTile === 'wip') return m.wipAmount;
+    if (expandedTile === 'ar') return m.arAmount;
+    return m.paidAmount;
+  };
+
+  // Use actual trend data from snapshots, filtered by time range
+  const allTrendData = stats?.trendData || [];
+  const trendData = allTrendData.filter(d => {
+    const cutoff = getTimeRangeCutoff(dashboardTimeRange);
+    if (!cutoff) return true;
+    return new Date(d.rawDate || d.date) >= cutoff;
+  });
   const hasData = trendData.length > 0;
 
   return (
     <AppLayout>
-      <div className="p-6 lg:p-8 space-y-8">
-        {/* Test banner - remove after confirming deploy works */}
-        <div className="rounded-lg bg-yellow-400 px-4 py-3 text-center text-yellow-900 font-bold text-lg shadow-md">
-          Claude was here — deploy pipeline is working!
-        </div>
+      <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 lg:space-y-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-2xl lg:text-3xl font-heading font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground mt-1">Overview of your legal matter finances</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-heading font-bold text-foreground">Dashboard</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1">Overview of your legal matter finances</p>
           </div>
-          <div className="flex gap-3">
-            <Button asChild variant="outline">
+          <div className="flex gap-2 sm:gap-3">
+            <Button asChild variant="outline" size="sm" className="sm:h-10 sm:px-4 sm:py-2">
               <Link to="/matters">View All Matters</Link>
             </Button>
-            <Button asChild>
+            <Button asChild size="sm" className="sm:h-10 sm:px-4 sm:py-2">
               <Link to="/matters/new">
-                <Briefcase className="mr-2 h-4 w-4" />
-                New Matter
+                <Briefcase className="mr-1 sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">New Matter</span>
+                <span className="sm:hidden">New</span>
               </Link>
             </Button>
           </div>
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-4">
           {kpiCards.map((card) => (
             <StatCard
               key={card.title}
@@ -425,19 +474,67 @@ export default function Dashboard() {
               infoTooltip={'infoTooltip' in card ? card.infoTooltip : undefined}
               note={'hasProposalAdjustment' in card && card.hasProposalAdjustment ? 'Adjusted for WIP proposals' : undefined}
               noteVariant={'hasProposalAdjustment' in card && card.hasProposalAdjustment ? 'amber' : undefined}
+              onClick={card.tileKey ? () => handleTileClick(card.tileKey!) : undefined}
+              isExpanded={card.tileKey ? expandedTile === card.tileKey : false}
             />
           ))}
         </div>
 
+        {/* Matter Breakdown Panel */}
+        {expandedTile && breakdownData.length > 0 && (
+          <div ref={breakdownRef}>
+            <Card className="shadow-card animate-in slide-in-from-top-2 duration-200 max-w-2xl">
+              <CardHeader className="pb-2 pt-4 px-4 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-foreground">
+                    {breakdownTitle} by Matter ({breakdownData.length})
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setExpandedTile(null)} className="text-xs text-muted-foreground">
+                    Close
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6 pb-4 pt-0">
+                <div className="max-h-64 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 pr-2 text-xs font-medium text-muted-foreground">Matter</th>
+                        <th className="text-left py-2 pr-2 text-xs font-medium text-muted-foreground hidden sm:table-cell">Client</th>
+                        <th className="text-right py-2 text-xs font-medium text-muted-foreground">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {breakdownData.map((m) => (
+                        <tr key={m.id} className="border-b border-border/50 hover:bg-muted/50">
+                          <td className="py-2 pr-2">
+                            <Link to={`/matters/${m.id}`} className="text-primary hover:underline text-xs sm:text-sm">
+                              {m.matterName}
+                            </Link>
+                          </td>
+                          <td className="py-2 pr-2 text-xs text-muted-foreground hidden sm:table-cell">{m.clientName}</td>
+                          <td className="py-2 text-right text-xs sm:text-sm font-medium text-foreground">
+                            {formatCurrency(getBreakdownValue(m), m.currency)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Budget Summary - Live, Pipeline & Grand Total */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-primary/5 rounded-lg border border-primary/10">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 p-3 sm:p-4 bg-primary/5 rounded-lg border border-primary/10">
           {/* Live Matters Total */}
           <Card className="shadow-card">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Live Matters BM Budget</p>
-                  <p className="text-2xl font-heading font-bold text-foreground">{formatCurrency(stats?.totalBudget || 0, 'USD')}</p>
+                <div className="space-y-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Live Matters BM Budget</p>
+                  <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency(stats?.totalBudget || 0, 'USD')}</p>
                   <p className="text-xs text-muted-foreground">{stats?.openMattersCount || 0} live matters</p>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10 text-primary">
@@ -449,11 +546,11 @@ export default function Dashboard() {
 
           {/* Pipeline Total (Potential) */}
           <Card className="shadow-card">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Pipeline (Potential)</p>
-                  <p className="text-2xl font-heading font-bold text-foreground">{formatCurrency(stats?.totalPipelineValueUsd || 0, 'USD')}</p>
+                <div className="space-y-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Pipeline (Potential)</p>
+                  <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency(stats?.totalPipelineValueUsd || 0, 'USD')}</p>
                   <p className="text-xs text-muted-foreground">{stats?.pipelineMattersCount || 0} pipeline matters</p>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10 text-primary">
@@ -465,11 +562,11 @@ export default function Dashboard() {
 
           {/* Grand Total (Theoretical) */}
           <Card className="shadow-card">
-            <CardContent className="p-6">
+            <CardContent className="p-4 sm:p-6">
               <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Grand Total (Theoretical)</p>
-                  <p className="text-2xl font-heading font-bold text-foreground">{formatCurrency((stats?.totalBudget || 0) + (stats?.totalPipelineValueUsd || 0), 'USD')}</p>
+                <div className="space-y-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-muted-foreground">Grand Total (Theoretical)</p>
+                  <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency((stats?.totalBudget || 0) + (stats?.totalPipelineValueUsd || 0), 'USD')}</p>
                   <p className="text-xs text-muted-foreground">Live + Pipeline if all won</p>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10 text-primary">
@@ -482,13 +579,13 @@ export default function Dashboard() {
 
         {/* Live Matters Filter Section */}
         <Card className="shadow-card">
-          <CardHeader className="flex flex-row items-center justify-between py-3">
-            <CardTitle className="font-heading text-lg flex items-center gap-2">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between py-3 gap-1">
+            <CardTitle className="font-heading text-base sm:text-lg flex items-center gap-2">
               <ListChecks className="h-5 w-5 text-primary" />
               Live Matters
             </CardTitle>
-            <span className="text-sm text-muted-foreground">
-              {includedMatterIds.size} of {stats?.liveMatters?.length || 0} included in financials
+            <span className="text-xs sm:text-sm text-muted-foreground">
+              {includedMatterIds.size} of {stats?.liveMatters?.length || 0} included
             </span>
           </CardHeader>
           <CardContent className="pt-0">
@@ -496,7 +593,7 @@ export default function Dashboard() {
               <>
                 {/* Master Toggle Checkboxes */}
                 {userName && (
-                  <div className="flex flex-wrap gap-6 mb-4 pb-3 border-b border-border">
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-6 mb-4 pb-3 border-b border-border">
                     <label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         checked={myMattersAllIncluded}
@@ -526,7 +623,7 @@ export default function Dashboard() {
                   </div>
                 )}
                 {/* Individual Matter Checkboxes */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-2 max-h-48 overflow-y-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 sm:gap-x-8 gap-y-1 sm:gap-y-2 max-h-48 overflow-y-auto">
                   {stats.liveMatters.map((matter) => {
                     const isIncluded = !excludedMatterIds.includes(matter.id);
                     return (
@@ -557,12 +654,13 @@ export default function Dashboard() {
 
         {/* Financial Trends - Full Width */}
         <Card className="shadow-card">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="font-heading text-lg">Financial Trends</CardTitle>
+            <TimeRangeSelector value={dashboardTimeRange} onChange={setDashboardTimeRange} />
           </CardHeader>
           <CardContent>
             {hasData ? (
-              <div className="h-72 relative">
+              <div className="h-52 sm:h-64 lg:h-72 relative -mx-2 sm:mx-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={trendData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
@@ -583,8 +681,8 @@ export default function Dashboard() {
                     />
                     <Line 
                       type="monotone" 
-                      dataKey="billed" 
-                      name="Billed"
+                      dataKey="ar" 
+                      name="AR"
                       stroke="hsl(var(--chart-1))" 
                       strokeWidth={2}
                       dot={<CustomDot />}
@@ -657,7 +755,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Red Flags and Pipeline Flags - Side by Side */}
-        <div className="grid lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           {/* Red Flags */}
           <Card className="shadow-card">
             <CardHeader className="flex flex-row items-center justify-between">

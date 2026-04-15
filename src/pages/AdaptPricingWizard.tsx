@@ -573,11 +573,11 @@ export default function AdaptPricingWizard() {
 
   return (
     <AppLayout>
-      <div className="space-y-6 max-w-4xl mx-auto">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-6 max-w-4xl mx-auto">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">New Proposal from Precedent</h1>
-          <p className="text-muted-foreground mt-1">
-            Adapt an existing pricing proposal for a new deal using AI-powered analysis
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight">New Proposal from Precedent</h1>
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
+            Adapt a pricing proposal using AI analysis
           </p>
         </div>
 

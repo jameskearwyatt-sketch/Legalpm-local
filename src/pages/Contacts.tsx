@@ -11,13 +11,13 @@ export default function Contacts() {
 
   return (
     <AppLayout>
-      <div className="p-6 max-w-[1600px] mx-auto">
-        <div className="mb-6">
-          <h1 className="text-2xl font-heading font-bold text-foreground">
+      <div className="p-4 sm:p-6 max-w-[1600px] mx-auto">
+        <div className="mb-4 sm:mb-6">
+          <h1 className="text-xl sm:text-2xl font-heading font-bold text-foreground">
             Contacts Distribution Hub
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Manage professional contacts for event invitations, thought leadership, and firm updates
+          <p className="text-sm sm:text-base text-muted-foreground mt-1">
+            Manage contacts for events, thought leadership, and updates
           </p>
         </div>
 

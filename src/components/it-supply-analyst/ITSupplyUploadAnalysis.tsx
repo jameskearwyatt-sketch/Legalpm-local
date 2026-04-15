@@ -5,14 +5,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Upload, FileText, ArrowRight, Loader2, AlertCircle, Cpu } from 'lucide-react';
+import { Upload, FileText, ArrowRight, AlertCircle, Cpu } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useITSupplyAnalyses, useITSupplyPositions, useITSupplyPrecedentBank, ITSupplyAnalysisType, ITSupplyPerspective } from '@/lib/hooks/useITSupplyAnalyses';
 import { useITSupplyLearnings } from '@/lib/hooks/useITSupplyLearnings';
 import { ITSupplyAnalysisReport } from './ITSupplyAnalysisReport';
 import { IT_SUPPLY_TYPES, IT_SUPPLY_CONTRACT_STAGES, type ITSupplyContractStage } from '@/lib/itSupplyCategories';
+import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
+import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
+import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
 const JURISDICTIONS = ['United States', 'United Kingdom', 'EU', 'Taiwan', 'South Korea', 'Japan', 'China', 'Singapore', 'Other'];
 
@@ -21,10 +24,9 @@ interface ITSupplyUploadAnalysisProps {
 }
 
 export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAnalysisProps) {
-  const { createAnalysis } = useITSupplyAnalyses();
-  const { createPositions } = useITSupplyPositions(null);
-  const { precedents } = useITSupplyPrecedentBank();
-  const { formatLearningsForPrompt, activeLearnings } = useITSupplyLearnings();
+  const { createAnalysisWithPositions } = useITSupplyAnalyses();
+  const { getRelevantPrecedents } = useITSupplyPrecedentBank();
+  const { formatLearningsForPrompt, activeLearnings, getRelevantLearnings } = useITSupplyLearnings();
 
   const [step, setStep] = useState<'upload' | 'configure' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<ITSupplyAnalysisType>('contract_vs_bible');
@@ -37,10 +39,10 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
   const [buyerName, setBuyerName] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [contractFile, setContractFile] = useState<File | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
+  const progress = useAnalystProgress();
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -61,13 +63,15 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
     if (!projectName.trim()) { toast.error('Please enter a project name'); return; }
 
     setStep('analyzing');
-    setAnalysisProgress(0);
     setError(null);
+    progress.reset();
+    progress.setPhase('extract');
+
+    // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
+    const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
+    let piiTotalRedactions = 0;
 
     try {
-      setAnalysisStatus('Extracting text from document...');
-      setAnalysisProgress(10);
-
       const formData = new FormData();
       formData.append('file', contractFile);
       const { data: sessionData } = await supabase.auth.getSession();
@@ -85,19 +89,45 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
       }
 
       const { text: contractText } = await parseResponse.json();
-      setAnalysisProgress(30);
+      progress.setPhase('retrieve');
 
-      setAnalysisStatus('Building precedent intelligence...');
-      const relevantPrecedents = precedents.filter(p => !p.is_gold_standard).map(p => ({
+      // Optional PII redaction before any text leaves the browser.
+      let contractTextForLLM = contractText;
+      if (redactPIIEnabled) {
+        const r1 = redactPII(contractText || '');
+        contractTextForLLM = r1.redacted;
+        (Object.keys(piiCounts) as (keyof typeof piiCounts)[]).forEach(k => { piiCounts[k] += r1.counts[k]; });
+        piiTotalRedactions += r1.totalRedactions;
+        if (piiTotalRedactions > 0) {
+          toast.success(`PII redaction: ${summarizeRedaction(piiCounts)}`);
+        }
+      }
+
+      // Semantic top-K retrieval with graceful fallback to all-active.
+      const retrievalQuery = (contractTextForLLM || '').slice(0, 15_000);
+      const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
+        getRelevantLearnings(retrievalQuery, 15),
+        getRelevantPrecedents(retrievalQuery, 20, false),
+        getRelevantPrecedents(retrievalQuery, 10, true),
+      ]);
+      const appliedRegularPrecedents = relevantRegularRes.precedents.filter(p => !p.is_gold_standard);
+      const appliedGoldStandardPrecedents = relevantGoldRes.precedents;
+      const relevantPrecedents = appliedRegularPrecedents.map(p => ({
         category: p.category, position_summary: p.position_summary, project_name: p.project_name,
         jurisdiction: p.jurisdiction, perspective: p.perspective,
       }));
 
-      const userLearningsPrompt = formatLearningsForPrompt();
-      if (activeLearnings.length > 0) console.log(`Including ${activeLearnings.length} IT supply learnings`);
+      const selectedLearnings = relevantLearningsRes.learnings;
 
-      setAnalysisProgress(50);
-      setAnalysisStatus('Running AI analysis...');
+      // Capture IDs for applied-context audit trail
+      const appliedLearningIds = selectedLearnings.map(l => l.id);
+      const appliedPrecedentIds = appliedRegularPrecedents.map(p => p.id);
+      const appliedGoldStandardIds = appliedGoldStandardPrecedents.map(p => p.id);
+
+      const userLearningsPrompt = formatLearningsForPrompt(selectedLearnings);
+      if (selectedLearnings.length > 0) console.log(`Including ${selectedLearnings.length} IT supply learnings (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
+
+      progress.setPhase('analyze');
 
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
         const controller = new AbortController();
@@ -108,7 +138,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sd2?.session?.access_token}` },
             body: JSON.stringify({
-              contractText, analysisType, perspective, jurisdiction, projectName,
+              contractText: contractTextForLLM, analysisType, perspective, jurisdiction, projectName,
               supplyType, contractStage, counterpartyType: counterpartyType || null,
               precedents: relevantPrecedents, userLearnings: userLearningsPrompt,
             }),
@@ -119,7 +149,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
         } catch (fetchError) {
           clearTimeout(timeoutId);
           if (retryCount < 3 && fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('fetch'))) {
-            setAnalysisStatus(`Retrying (attempt ${retryCount + 2}/4)...`);
+            progress.setStatusOverride(`Retrying (attempt ${retryCount + 2}/4)…`);
             await new Promise(resolve => setTimeout(resolve, 3000));
             return callAnalyzeApi(retryCount + 1);
           }
@@ -127,7 +157,9 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
         }
       };
 
+      const analysisStartTs = Date.now();
       const analyzeRes = await callAnalyzeApi();
+      const analysisDurationMs = Date.now() - analysisStartTs;
       if (!analyzeRes.ok) {
         let errorMessage = 'Failed to analyze contract';
         try { const ed = await analyzeRes.json(); errorMessage = ed.error || errorMessage; } catch {}
@@ -135,42 +167,88 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
       }
 
       const analyzeResponse = await analyzeRes.json();
-      setAnalysisProgress(80);
-      setAnalysisStatus('Saving analysis results...');
+      progress.setPhase('save');
+
+      void logLlmCall({
+        analystType: 'it_supply',
+        functionName: 'analyze-it-supply',
+        status: 'success',
+        inputChars: contractTextForLLM?.length ?? 0,
+        inputTokenCount: analyzeResponse?.input_token_count ?? null,
+        outputTokenCount: analyzeResponse?.output_token_count ?? null,
+        modelUsed: analyzeResponse?.model_used ?? null,
+        durationMs: analysisDurationMs,
+        metadata: {
+          analysisType,
+          perspective,
+          supplyType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
+      });
 
       const { positions: extractedPositions } = analyzeResponse;
 
-      const analysisResult = await createAnalysis.mutateAsync({
-        analysis_type: analysisType, perspective, project_name: projectName.trim(),
-        jurisdiction: jurisdiction || null, document_file_name: contractFile.name,
-        document_file_url: null, comparison_file_name: null, comparison_file_url: null,
-        notes: null, parent_analysis_id: null, version_number: 1, is_comparison: false,
-        supply_type: supplyType, contract_stage: contractStage, complexity_score: null,
-        key_risk_areas: [], counterparty_type: counterpartyType || null,
-        buyer_name: buyerName || null, supplier_name: supplierName || null,
-        buyer_normalized: buyerName || null, supplier_normalized: supplierName || null,
+      const positionsPayload = (extractedPositions ?? []).map((pos: any) => ({
+        category: pos.category, position_summary: pos.position_summary,
+        source_text: pos.clause_references || pos.source_text || null,
+        confidence: pos.confidence || 'medium', bible_reference: pos.bible_reference || null,
+        comparison_position: pos.market_comparison || pos.comparison_position || null,
+        variance_notes: pos.market_position ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim() : pos.variance_notes || null,
+        previous_position: null,
+        change_summary: null,
+        change_type: null,
+        market_benchmark: pos.market_benchmark || null,
+      }));
+
+      const analysisResult = await createAnalysisWithPositions.mutateAsync({
+        analysis: {
+          analysis_type: analysisType, perspective, project_name: projectName.trim(),
+          jurisdiction: jurisdiction || null, document_file_name: contractFile.name,
+          document_file_url: null, comparison_file_name: null, comparison_file_url: null,
+          notes: null, parent_analysis_id: null, version_number: 1, is_comparison: false,
+          supply_type: supplyType, contract_stage: contractStage, complexity_score: null,
+          key_risk_areas: [], counterparty_type: counterpartyType || null,
+          buyer_name: buyerName || null, supplier_name: supplierName || null,
+          buyer_normalized: buyerName || null, supplier_normalized: supplierName || null,
+          // Applied-context trace
+          applied_learning_ids: appliedLearningIds,
+          applied_precedent_ids: appliedPrecedentIds,
+          applied_gold_standard_ids: appliedGoldStandardIds,
+          // Telemetry
+          model_used: analyzeResponse?.model_used ?? null,
+          analysis_duration_ms: analysisDurationMs,
+          input_token_count: analyzeResponse?.input_token_count ?? null,
+          output_token_count: analyzeResponse?.output_token_count ?? null,
+        },
+        positions: positionsPayload,
       });
 
-      if (extractedPositions?.length > 0) {
-        await createPositions.mutateAsync(extractedPositions.map((pos: any) => ({
-          analysis_id: analysisResult.id, user_id: analysisResult.user_id,
-          category: pos.category, position_summary: pos.position_summary,
-          source_text: pos.clause_references || pos.source_text || null,
-          confidence: pos.confidence || 'medium', bible_reference: pos.bible_reference || null,
-          comparison_position: pos.market_comparison || pos.comparison_position || null,
-          variance_notes: pos.market_position ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim() : pos.variance_notes || null,
-          market_benchmark: pos.market_benchmark || null,
-        })));
-      }
-
-      setAnalysisProgress(100);
+      progress.setPhase('complete');
       setCreatedAnalysisId(analysisResult.id);
       setStep('results');
       toast.success('Analysis complete!');
     } catch (err) {
       console.error('Analysis error:', err);
+      void logLlmCall({
+        analystType: 'it_supply',
+        functionName: 'analyze-it-supply',
+        status: 'failure',
+        errorType: classifyLlmError(err),
+        errorMessage: err instanceof Error ? err.message : String(err),
+        metadata: {
+          analysisType,
+          perspective,
+          supplyType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
+      });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
+      progress.reset();
       toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
@@ -179,6 +257,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
     setStep('upload'); setContractFile(null); setProjectName(''); setJurisdiction('');
     setAnalysisType('contract_vs_bible'); setPerspective('buyer');
     setCreatedAnalysisId(null); setError(null);
+    progress.reset();
   };
 
   if (step === 'results' && createdAnalysisId) {
@@ -187,17 +266,14 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
 
   if (step === 'analyzing') {
     return (
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle>Analyzing {analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Supply Contract'}</CardTitle>
-          <CardDescription>{analysisStatus}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <Progress value={analysisProgress} className="h-2" />
-          <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-          <p className="text-center text-sm text-muted-foreground">This may take a minute or two for large documents...</p>
-        </CardContent>
-      </Card>
+      <AnalystAnalysisProgress
+        title={`Analyzing ${analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Supply Contract'}`}
+        phase={progress.phase}
+        progress={progress.progress}
+        narrative={progress.narrative}
+        elapsedMs={progress.elapsedMs}
+        statusOverride={progress.statusOverride ?? undefined}
+      />
     );
   }
 
@@ -321,9 +397,12 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
               </div>
             </div>
             {step === 'configure' && (
-              <Button onClick={handleStartAnalysis} className="w-full" disabled={!contractFile || !projectName.trim()}>
-                <Cpu className="h-4 w-4 mr-2" /> Start Analysis
-              </Button>
+              <>
+                <PIIRedactionToggle checked={redactPIIEnabled} onCheckedChange={setRedactPIIEnabled} />
+                <Button onClick={handleStartAnalysis} className="w-full" disabled={!contractFile || !projectName.trim()}>
+                  <Cpu className="h-4 w-4 mr-2" /> Start Analysis
+                </Button>
+              </>
             )}
           </CardContent>
         </Card>

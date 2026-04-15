@@ -110,6 +110,10 @@ Output ONLY the JSON object as specified.`;
            { role: "user", content: userPrompt }
          ],
          temperature: 0.3,
+         // Structured output: force the model to return a JSON object
+         // so the parsing below doesn't have to strip markdown fences
+         // or deal with prose prefixes (see #6 structured output).
+         response_format: { type: "json_object" },
        }),
      });
  

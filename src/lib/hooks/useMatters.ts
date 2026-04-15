@@ -493,6 +493,8 @@ export function useMatters() {
           ...input,
           ...rateModifierOverride,
           user_id: user!.id,
+          created_by: user!.id,
+          updated_by: user!.id,
         })
         .select()
         .single();
@@ -518,7 +520,7 @@ export function useMatters() {
       // First, update the current matter
       const { data, error } = await supabase
         .from('matters')
-        .update(input)
+        .update({ ...input, updated_by: user!.id })
         .eq('id', id)
         .select()
         .single();
@@ -559,6 +561,7 @@ export function useMatters() {
                 rate_modifier: effectiveModifier,
                 rate_modifier_value: effectiveValue,
                 rate_modifier_scope: effectiveScope,
+                updated_by: user!.id,
               })
               .in('id', otherMatterIds);
             

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
+import { embedAndStore, embedText, matchPrecedents } from '@/lib/analyst/semanticRetrieval';
 
 export type PPAAnalysisType = 'ppa_vs_bible' | 'ppa_vs_termsheet' | 'termsheet_vs_bible';
 export type PPAPerspective = 'buyer' | 'seller';
@@ -46,6 +47,15 @@ export interface PPAAnalysis {
   // Normalized names for intelligent grouping
   buyer_normalized: string | null;
   seller_normalized: string | null;
+  // Applied-context trace: which learnings / precedents shaped this analysis
+  applied_learning_ids: string[];
+  applied_precedent_ids: string[];
+  applied_gold_standard_ids: string[];
+  // Telemetry
+  model_used: string | null;
+  analysis_duration_ms: number | null;
+  input_token_count: number | null;
+  output_token_count: number | null;
 }
 
 export type ChangeType = 'unchanged' | 'modified' | 'added' | 'removed';
@@ -161,7 +171,7 @@ export function usePPAAnalyses() {
         .from('ppa_analyses')
         .delete()
         .eq('id', id);
-      
+
       if (error) throw error;
     },
     onSuccess: () => {
@@ -173,11 +183,43 @@ export function usePPAAnalyses() {
     },
   });
 
+  /**
+   * Create an analysis row AND its extracted positions in a single
+   * Postgres transaction. If position insertion fails, the analysis
+   * row is rolled back — no more orphan analyses when the network
+   * drops mid-upload.
+   */
+  const createAnalysisWithPositions = useMutation({
+    mutationFn: async (args: {
+      analysis: Omit<PPAAnalysis, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'is_agreed' | 'agreed_at'>;
+      positions: Omit<PPAExtractedPosition, 'id' | 'analysis_id' | 'user_id' | 'created_at'>[];
+    }) => {
+      if (!user) throw new Error('Not authenticated');
+      const { data, error } = await supabase.rpc(
+        'create_ppa_analysis_with_positions' as never,
+        {
+          analysis_data: args.analysis as never,
+          positions_data: (args.positions ?? []) as never,
+        },
+      );
+      if (error) throw error;
+      return data as unknown as PPAAnalysis;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ppa-analyses'] });
+      queryClient.invalidateQueries({ queryKey: ['ppa-positions'] });
+    },
+    onError: (error) => {
+      toast.error('Failed to save analysis: ' + error.message);
+    },
+  });
+
   return {
     analyses: analyses || [],
     isLoading,
     error,
     createAnalysis,
+    createAnalysisWithPositions,
     updateAnalysis,
     deleteAnalysis,
   };
@@ -261,6 +303,19 @@ export function usePPAPrecedentBank() {
         .select();
       
       if (error) throw error;
+      // Fire-and-forget embedding writes so semantic retrieval picks up
+      // these precedents on future analyses.
+      for (const row of data as PPAPrecedent[]) {
+        const embedSource = [
+          row.category,
+          row.position_summary,
+          row.project_name,
+          row.template_name ?? '',
+          row.template_description ?? '',
+          row.market_position ?? '',
+        ].filter(Boolean).join('\n');
+        void embedAndStore('ppa', 'precedent', row.id, embedSource);
+      }
       return data as PPAPrecedent[];
     },
     onSuccess: () => {
@@ -312,6 +367,29 @@ export function usePPAPrecedentBank() {
     return uniqueTemplates.size;
   }, [goldStandardPrecedents]);
 
+  /**
+   * Semantic top-K retrieval over the precedent bank. Falls back to all
+   * precedents (or only gold-standard precedents when requested) if
+   * embeddings are unavailable.
+   */
+  const getRelevantPrecedents = async (
+    queryText: string,
+    k: number = 10,
+    onlyGoldStandard: boolean = false,
+  ): Promise<{ precedents: PPAPrecedent[]; usedSemanticRetrieval: boolean }> => {
+    const pool = onlyGoldStandard ? goldStandardPrecedents : (precedents || []);
+    const embedding = await embedText(queryText);
+    const matched = await matchPrecedents<{ id: string }>('ppa', embedding, k, 0.3, onlyGoldStandard);
+    if (matched && matched.length > 0) {
+      const byId = new Map(pool.map(p => [p.id, p]));
+      const hydrated = matched.map(m => byId.get(m.id)).filter((p): p is PPAPrecedent => !!p);
+      if (hydrated.length > 0) {
+        return { precedents: hydrated, usedSemanticRetrieval: true };
+      }
+    }
+    return { precedents: pool, usedSemanticRetrieval: false };
+  };
+
   return {
     precedents: precedents || [],
     goldStandardPrecedents,
@@ -322,5 +400,6 @@ export function usePPAPrecedentBank() {
     getCategoryStats,
     uniqueProjectCount,
     uniqueTemplateCount,
+    getRelevantPrecedents,
   };
 }

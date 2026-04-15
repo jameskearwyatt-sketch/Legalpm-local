@@ -56,6 +56,8 @@ export function useSnapshots(matterId?: string) {
         .insert({
           ...input,
           user_id: user!.id,
+          created_by: user!.id,
+          updated_by: user!.id,
         })
         .select()
         .single();
@@ -89,7 +91,7 @@ export function useSnapshots(matterId?: string) {
       // Try to update an existing snapshot for today first (avoids race condition)
       const { data: updated, error: updateError } = await supabase
         .from('financial_snapshots')
-        .update({ [field]: value, updated_at: now, update_source: updateSource })
+        .update({ [field]: value, updated_at: now, update_source: updateSource, updated_by: user!.id })
         .eq('matter_id', matterId)
         .eq('as_of_date', today)
         .select()
@@ -116,6 +118,8 @@ export function useSnapshots(matterId?: string) {
         .insert({
           matter_id: matterId,
           user_id: user!.id,
+          created_by: user!.id,
+          updated_by: user!.id,
           as_of_date: today,
           wip_amount: field === 'wip_amount' ? value : (latestSnapshot?.wip_amount || 0),
           wip_write_off_amount: field === 'wip_write_off_amount' ? value : (latestSnapshot?.wip_write_off_amount || 0),
@@ -132,7 +136,7 @@ export function useSnapshots(matterId?: string) {
       if (insertError) {
         const { data: retryUpdate, error: retryError } = await supabase
           .from('financial_snapshots')
-          .update({ [field]: value, updated_at: now, update_source: updateSource })
+          .update({ [field]: value, updated_at: now, update_source: updateSource, updated_by: user!.id })
           .eq('matter_id', matterId)
           .eq('as_of_date', today)
           .select()
@@ -159,7 +163,7 @@ export function useSnapshots(matterId?: string) {
     mutationFn: async ({ id, ...input }: Partial<CreateSnapshotInput> & { id: string }) => {
       const { data, error } = await supabase
         .from('financial_snapshots')
-        .update(input)
+        .update({ ...input, updated_by: user!.id })
         .eq('id', id)
         .select()
         .single();

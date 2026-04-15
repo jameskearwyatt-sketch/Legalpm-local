@@ -7,7 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Upload, Loader2, GitCompare, ArrowRight } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { usePPAAnalyses, usePPAPositions, PPAAnalysis, PPAExtractedPosition } from '@/lib/hooks/usePPAAnalyses';
+import { usePPAAnalyses, PPAAnalysis, PPAExtractedPosition } from '@/lib/hooks/usePPAAnalyses';
 import { toast } from 'sonner';
 
 interface PPACompareUploadProps {
@@ -23,8 +23,7 @@ export function PPACompareUpload({
   onComplete, 
   onCancel 
 }: PPACompareUploadProps) {
-  const { createAnalysis } = usePPAAnalyses();
-  const { createPositions } = usePPAPositions(null);
+  const { createAnalysisWithPositions } = usePPAAnalyses();
   
   const [newDraftFile, setNewDraftFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -107,53 +106,59 @@ export function PPACompareUpload({
 
       const { positions: comparedPositions, stats } = compareResponse.data;
 
-      // Step 3: Create new analysis record (linked to parent)
+      // Step 3: Create new analysis record (linked to parent) + positions atomically
       const newVersion = (parentAnalysis.version_number || 1) + 1;
-      const analysisResult = await createAnalysis.mutateAsync({
-        analysis_type: parentAnalysis.analysis_type,
-        perspective: parentAnalysis.perspective,
-        project_name: `${parentAnalysis.project_name} (v${newVersion})`,
-        jurisdiction: parentAnalysis.jurisdiction,
-        document_file_name: newDraftFile.name,
-        document_file_url: null,
-        comparison_file_name: null,
-        comparison_file_url: null,
-        notes: `Comparison against ${parentAnalysis.document_file_name}. Changes: ${stats.modified} modified, ${stats.added} new, ${stats.removed} removed.`,
-        parent_analysis_id: parentAnalysis.id,
-        version_number: newVersion,
-        is_comparison: true,
-        // Inherit PPA type from parent analysis
-        ppa_type: parentAnalysis.ppa_type || null,
-        complexity_score: null,
-        key_risk_areas: [],
-        counterparty_type: parentAnalysis.counterparty_type || null,
-        // Inherit party names from parent
-        buyer_name: parentAnalysis.buyer_name || null,
-        seller_name: parentAnalysis.seller_name || null,
-        // Inherit normalized names from parent
-        buyer_normalized: parentAnalysis.buyer_normalized || null,
-        seller_normalized: parentAnalysis.seller_normalized || null,
-      });
+      const positionsPayload = (comparedPositions ?? []).map((pos: any) => ({
+        category: pos.category,
+        position_summary: pos.position_summary,
+        source_text: pos.source_text || null,
+        confidence: pos.confidence || 'review_required',
+        bible_reference: null,
+        comparison_position: pos.comparison_position || null,
+        variance_notes: pos.variance_notes || null,
+        previous_position: pos.previous_position || null,
+        change_summary: pos.change_summary || null,
+        change_type: pos.change_type || null,
+        market_benchmark: null,
+      }));
 
-      // Step 4: Save compared positions
-      if (comparedPositions && comparedPositions.length > 0) {
-        await createPositions.mutateAsync(
-          comparedPositions.map((pos: any) => ({
-            analysis_id: analysisResult.id,
-            user_id: analysisResult.user_id,
-            category: pos.category,
-            position_summary: pos.position_summary,
-            source_text: pos.source_text || null,
-            confidence: pos.confidence || 'review_required',
-            bible_reference: null,
-            comparison_position: pos.comparison_position || null,
-            variance_notes: pos.variance_notes || null,
-            previous_position: pos.previous_position || null,
-            change_summary: pos.change_summary || null,
-            change_type: pos.change_type || null,
-          }))
-        );
-      }
+      const analysisResult = await createAnalysisWithPositions.mutateAsync({
+        analysis: {
+          analysis_type: parentAnalysis.analysis_type,
+          perspective: parentAnalysis.perspective,
+          project_name: `${parentAnalysis.project_name} (v${newVersion})`,
+          jurisdiction: parentAnalysis.jurisdiction,
+          document_file_name: newDraftFile.name,
+          document_file_url: null,
+          comparison_file_name: null,
+          comparison_file_url: null,
+          notes: `Comparison against ${parentAnalysis.document_file_name}. Changes: ${stats.modified} modified, ${stats.added} new, ${stats.removed} removed.`,
+          parent_analysis_id: parentAnalysis.id,
+          version_number: newVersion,
+          is_comparison: true,
+          // Inherit PPA type from parent analysis
+          ppa_type: parentAnalysis.ppa_type || null,
+          complexity_score: null,
+          key_risk_areas: [],
+          counterparty_type: parentAnalysis.counterparty_type || null,
+          // Inherit party names from parent
+          buyer_name: parentAnalysis.buyer_name || null,
+          seller_name: parentAnalysis.seller_name || null,
+          // Inherit normalized names from parent
+          buyer_normalized: parentAnalysis.buyer_normalized || null,
+          seller_normalized: parentAnalysis.seller_normalized || null,
+          // Applied-context trace (comparison flow has no retrieval)
+          applied_learning_ids: [],
+          applied_precedent_ids: [],
+          applied_gold_standard_ids: [],
+          // Telemetry
+          model_used: null,
+          analysis_duration_ms: null,
+          input_token_count: null,
+          output_token_count: null,
+        },
+        positions: positionsPayload,
+      });
 
       setProgress(100);
       setStatus('Complete!');
@@ -167,7 +172,7 @@ export function PPACompareUpload({
     } finally {
       setIsAnalyzing(false);
     }
-  }, [newDraftFile, parentAnalysis, previousPositions, createAnalysis, createPositions, onComplete]);
+  }, [newDraftFile, parentAnalysis, previousPositions, createAnalysisWithPositions, onComplete]);
 
   return (
     <Card>

@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle, Leaf, Brain } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -13,6 +12,10 @@ import { useCarbonAnalyses, useCarbonPositions, useCarbonPrecedentBank, CarbonAn
 import { useCarbonLearnings } from '@/lib/hooks/useCarbonLearnings';
 import { CarbonAnalysisReport } from './CarbonAnalysisReport';
 import { CARBON_PROJECT_TYPES, CARBON_PROJECT_STAGES, CARBON_CREDIT_CLASSES, getCreditClassForType, type CarbonProjectStage, type CarbonCreditClass } from '@/lib/carbonCategories';
+import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
+import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
+import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
 const JURISDICTIONS = [
   'United Kingdom', 'United States', 'European Union', 'Switzerland',
@@ -24,10 +27,9 @@ interface CarbonUploadAnalysisProps {
 }
 
 export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysisProps) {
-  const { createAnalysis } = useCarbonAnalyses();
-  const { createPositions } = useCarbonPositions(null);
-  const { precedents } = useCarbonPrecedentBank();
-  const { formatLearningsForPrompt, activeLearnings } = useCarbonLearnings();
+  const { createAnalysisWithPositions } = useCarbonAnalyses();
+  const { getRelevantPrecedents } = useCarbonPrecedentBank();
+  const { formatLearningsForPrompt, activeLearnings, getRelevantLearnings } = useCarbonLearnings();
 
   const [step, setStep] = useState<'upload' | 'configure' | 'confirming' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<CarbonAnalysisType>('carbon_vs_bible');
@@ -42,13 +44,13 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
   const [buyerNormalized, setBuyerNormalized] = useState('');
   const [sellerNormalized, setSellerNormalized] = useState('');
   const [carbonFile, setCarbonFile] = useState<File | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isDetectingMetadata, setIsDetectingMetadata] = useState(false);
   const [detectionNotes, setDetectionNotes] = useState<string | null>(null);
   const [detectedFramework, setDetectedFramework] = useState<string | null>(null);
+  const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
+  const progress = useAnalystProgress();
 
   // Auto-detect carbon metadata after clicking Start Analysis
   const detectCarbonMetadata = useCallback(async (file: File) => {
@@ -182,13 +184,15 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
     if (!projectName.trim()) { toast.error('Please enter a project name'); return; }
 
     setStep('analyzing');
-    setAnalysisProgress(0);
     setError(null);
+    progress.reset();
+    progress.setPhase('extract');
+
+    // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
+    const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
+    let piiTotalRedactions = 0;
 
     try {
-      setAnalysisStatus('Extracting text from document...');
-      setAnalysisProgress(10);
-
       const formData = new FormData();
       formData.append('file', carbonFile);
       const { data: sessionData } = await supabase.auth.getSession();
@@ -199,19 +203,45 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
       });
       if (!parseResponse.ok) { const errorData = await parseResponse.json(); throw new Error(errorData.error || 'Failed to parse document'); }
       const { text: documentText } = await parseResponse.json();
-      setAnalysisProgress(40);
+      progress.setPhase('retrieve');
 
-      setAnalysisStatus('Building precedent intelligence...');
-      const relevantPrecedents = precedents.filter(p => !p.is_gold_standard).map(p => ({
+      // Optional PII redaction before any text leaves the browser.
+      let documentTextForLLM = documentText;
+      if (redactPIIEnabled) {
+        const r1 = redactPII(documentText || '');
+        documentTextForLLM = r1.redacted;
+        (Object.keys(piiCounts) as (keyof typeof piiCounts)[]).forEach(k => { piiCounts[k] += r1.counts[k]; });
+        piiTotalRedactions += r1.totalRedactions;
+        if (piiTotalRedactions > 0) {
+          toast.success(`PII redaction: ${summarizeRedaction(piiCounts)}`);
+        }
+      }
+
+      // Semantic top-K retrieval with graceful fallback to all-active.
+      const retrievalQuery = (documentTextForLLM || '').slice(0, 15_000);
+      const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
+        getRelevantLearnings(retrievalQuery, 15),
+        getRelevantPrecedents(retrievalQuery, 20, false),
+        getRelevantPrecedents(retrievalQuery, 10, true),
+      ]);
+      const appliedRegularPrecedents = relevantRegularRes.precedents.filter(p => !p.is_gold_standard);
+      const appliedGoldStandardPrecedents = relevantGoldRes.precedents;
+      const relevantPrecedents = appliedRegularPrecedents.map(p => ({
         category: p.category, position_summary: p.position_summary, project_name: p.project_name,
         jurisdiction: p.jurisdiction, perspective: p.perspective,
       }));
 
-      const userLearningsPrompt = formatLearningsForPrompt();
-      if (activeLearnings.length > 0) console.log(`Including ${activeLearnings.length} carbon learnings`);
+      const selectedLearnings = relevantLearningsRes.learnings;
 
-      setAnalysisStatus('Running AI analysis...');
-      setAnalysisProgress(50);
+      // Capture IDs for applied-context audit trail
+      const appliedLearningIds = selectedLearnings.map(l => l.id);
+      const appliedPrecedentIds = appliedRegularPrecedents.map(p => p.id);
+      const appliedGoldStandardIds = appliedGoldStandardPrecedents.map(p => p.id);
+
+      const userLearningsPrompt = formatLearningsForPrompt(selectedLearnings);
+      if (selectedLearnings.length > 0) console.log(`Including ${selectedLearnings.length} carbon learnings (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
+
+      progress.setPhase('analyze');
 
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
         const controller = new AbortController();
@@ -222,7 +252,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sd2?.session?.access_token}` },
             body: JSON.stringify({
-              documentText, analysisType, perspective, jurisdiction, projectName,
+              documentText: documentTextForLLM, analysisType, perspective, jurisdiction, projectName,
               carbonType, projectStage, counterpartyType: counterpartyType || null,
               creditClass: getCreditClassForType(carbonType),
               precedents: relevantPrecedents, userLearnings: userLearningsPrompt,
@@ -234,7 +264,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
         } catch (fetchError) {
           clearTimeout(timeoutId);
           if (retryCount < 3 && fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('fetch'))) {
-            setAnalysisStatus(`Retrying (attempt ${retryCount + 2}/4)...`);
+            progress.setStatusOverride(`Retrying (attempt ${retryCount + 2}/4)…`);
             await new Promise(resolve => setTimeout(resolve, 3000));
             return callAnalyzeApi(retryCount + 1);
           }
@@ -242,7 +272,9 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
         }
       };
 
+      const analysisStartTs = Date.now();
       const analyzeRes = await callAnalyzeApi();
+      const analysisDurationMs = Date.now() - analysisStartTs;
       if (!analyzeRes.ok) {
         let errorMessage = 'Failed to analyze carbon credit offtake agreement';
         try { const errorData = await analyzeRes.json(); errorMessage = errorData.error || errorMessage; } catch { errorMessage = `Analysis failed with status ${analyzeRes.status}`; }
@@ -250,44 +282,94 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
       }
 
       const analyzeResponse = await analyzeRes.json();
-      setAnalysisProgress(80);
-      setAnalysisStatus('Saving analysis results...');
+      progress.setPhase('save');
+
+      void logLlmCall({
+        analystType: 'carbon',
+        functionName: 'analyze-carbon-credit',
+        status: 'success',
+        inputChars: documentTextForLLM?.length ?? 0,
+        inputTokenCount: analyzeResponse?.input_token_count ?? null,
+        outputTokenCount: analyzeResponse?.output_token_count ?? null,
+        modelUsed: analyzeResponse?.model_used ?? null,
+        durationMs: analysisDurationMs,
+        metadata: {
+          analysisType,
+          perspective,
+          carbonType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+          // Edge function now uses JSON response_format; parse errors
+          // should be rare. See #6 structured output.
+          structured_output: true,
+        },
+      });
 
       const { positions: extractedPositions } = analyzeResponse;
 
-      const analysisResult = await createAnalysis.mutateAsync({
-        analysis_type: analysisType, perspective, project_name: projectName.trim(),
-        jurisdiction: jurisdiction || null, document_file_name: carbonFile.name,
-        document_file_url: null, comparison_file_name: null, comparison_file_url: null,
-        notes: null, parent_analysis_id: null, version_number: 1, is_comparison: false,
-        carbon_type: carbonType, project_stage: projectStage, complexity_score: null,
-        key_risk_areas: [], counterparty_type: counterpartyType || null,
-        buyer_name: buyerName || null, seller_name: sellerName || null,
-        buyer_normalized: buyerNormalized || buyerName || null, seller_normalized: sellerNormalized || sellerName || null,
+      // Atomically insert analysis + positions in one transaction.
+      const positionsPayload = (extractedPositions || []).map((pos: any) => ({
+        category: pos.category, position_summary: pos.position_summary,
+        source_text: pos.clause_references || pos.source_text || null,
+        confidence: pos.confidence || 'medium', bible_reference: pos.bible_reference || null,
+        comparison_position: pos.market_comparison || pos.comparison_position || null,
+        variance_notes: pos.market_position
+          ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim()
+          : pos.variance_notes || null,
+        market_benchmark: pos.market_benchmark || null,
+      }));
+
+      const analysisResult = await createAnalysisWithPositions.mutateAsync({
+        analysis: {
+          analysis_type: analysisType, perspective, project_name: projectName.trim(),
+          jurisdiction: jurisdiction || null, document_file_name: carbonFile.name,
+          document_file_url: null, comparison_file_name: null, comparison_file_url: null,
+          notes: null, parent_analysis_id: null, version_number: 1, is_comparison: false,
+          carbon_type: carbonType, project_stage: projectStage, complexity_score: null,
+          key_risk_areas: [], counterparty_type: counterpartyType || null,
+          buyer_name: buyerName || null, seller_name: sellerName || null,
+          buyer_normalized: buyerNormalized || buyerName || null, seller_normalized: sellerNormalized || sellerName || null,
+          // Applied-context trace
+          applied_learning_ids: appliedLearningIds,
+          applied_precedent_ids: appliedPrecedentIds,
+          applied_gold_standard_ids: appliedGoldStandardIds,
+          // Telemetry
+          model_used: analyzeResponse?.model_used ?? null,
+          analysis_duration_ms: analysisDurationMs,
+          input_token_count: analyzeResponse?.input_token_count ?? null,
+          output_token_count: analyzeResponse?.output_token_count ?? null,
+        },
+        positions: positionsPayload,
       });
 
-      if (extractedPositions && extractedPositions.length > 0) {
-        await createPositions.mutateAsync(extractedPositions.map((pos: any) => ({
-          analysis_id: analysisResult.id, user_id: analysisResult.user_id,
-          category: pos.category, position_summary: pos.position_summary,
-          source_text: pos.clause_references || pos.source_text || null,
-          confidence: pos.confidence || 'medium', bible_reference: pos.bible_reference || null,
-          comparison_position: pos.market_comparison || pos.comparison_position || null,
-          variance_notes: pos.market_position
-            ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim()
-            : pos.variance_notes || null,
-          market_benchmark: pos.market_benchmark || null,
-        })));
-      }
-
-      setAnalysisProgress(100);
+      progress.setPhase('complete');
       setCreatedAnalysisId(analysisResult.id);
       setStep('results');
       toast.success('Analysis complete!');
     } catch (err) {
       console.error('Analysis error:', err);
+      void logLlmCall({
+        analystType: 'carbon',
+        functionName: 'analyze-carbon-credit',
+        status: 'failure',
+        errorType: classifyLlmError(err),
+        errorMessage: err instanceof Error ? err.message : String(err),
+        metadata: {
+          analysisType,
+          perspective,
+          carbonType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+          // Edge function now uses JSON response_format; parse errors
+          // should be rare. See #6 structured output.
+          structured_output: true,
+        },
+      });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
+      progress.reset();
       toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
@@ -298,6 +380,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
     setCarbonType(''); setProjectStage('' as any); setCounterpartyType('');
     setBuyerName(''); setSellerName(''); setBuyerNormalized(''); setSellerNormalized('');
     setDetectionNotes(null); setDetectedFramework(null);
+    progress.reset();
   };
 
   if (step === 'results' && createdAnalysisId) {
@@ -306,17 +389,14 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
 
   if (step === 'analyzing') {
     return (
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle>Analyzing {analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Carbon Credit Offtake Agreement'}</CardTitle>
-          <CardDescription>{analysisStatus}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <Progress value={analysisProgress} className="h-2" />
-          <div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
-          <p className="text-center text-sm text-muted-foreground">This may take a minute or two for large documents...</p>
-        </CardContent>
-      </Card>
+      <AnalystAnalysisProgress
+        title={`Analyzing ${analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Carbon Credit Offtake Agreement'}`}
+        phase={progress.phase}
+        progress={progress.progress}
+        narrative={progress.narrative}
+        elapsedMs={progress.elapsedMs}
+        statusOverride={progress.statusOverride ?? undefined}
+      />
     );
   }
 
@@ -446,6 +526,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
               </div>
             </div>
             <p className="text-xs text-muted-foreground -mt-3">Party names help search precedents by counterparty later</p>
+            <PIIRedactionToggle checked={redactPIIEnabled} onCheckedChange={setRedactPIIEnabled} />
             <Button onClick={handleDetectAndConfirm} className="w-full gap-2" disabled={!carbonFile || !projectName.trim() || isDetectingMetadata}>
               {isDetectingMetadata ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -578,8 +659,8 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
                   <Button variant="outline" onClick={() => setStep('configure')} className="flex-1">
                     Back
                   </Button>
-                  <Button onClick={handleConfirmAndAnalyze} className="flex-1 gap-2" disabled={createAnalysis.isPending}>
-                    {createAnalysis.isPending ? (
+                  <Button onClick={handleConfirmAndAnalyze} className="flex-1 gap-2" disabled={createAnalysisWithPositions.isPending}>
+                    {createAnalysisWithPositions.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <Scale className="h-4 w-4" />

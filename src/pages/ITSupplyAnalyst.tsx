@@ -2,11 +2,12 @@ import { useState, useCallback } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { FileSearch, History, Database, Brain, Cpu } from 'lucide-react';
+import { FileSearch, History, Database, Brain, Cpu, Beaker } from 'lucide-react';
 import { ITSupplyUploadAnalysis } from '@/components/it-supply-analyst/ITSupplyUploadAnalysis';
 import { ITSupplyAnalysisList } from '@/components/it-supply-analyst/ITSupplyAnalysisList';
 import { ITSupplyPrecedentBank } from '@/components/it-supply-analyst/ITSupplyPrecedentBank';
 import { ITSupplyLearningsTab } from '@/components/it-supply-analyst/ITSupplyLearningsTab';
+import { AnalystRegressionHarness } from '@/components/shared/AnalystRegressionHarness';
 import { useITSupplyPrecedentBank } from '@/lib/hooks/useITSupplyAnalyses';
 import { useITSupplyLearnings } from '@/lib/hooks/useITSupplyLearnings';
 
@@ -46,12 +47,14 @@ export default function ITSupplyAnalyst() {
               <Brain className="h-4 w-4" /> AI Learnings
               {activeLearnings.length > 0 && <Badge variant="secondary" className="ml-1 h-5 px-1.5">{activeLearnings.length}</Badge>}
             </TabsTrigger>
+            <TabsTrigger value="regression" className="gap-2"><Beaker className="h-4 w-4" /> Regression</TabsTrigger>
           </TabsList>
 
           <TabsContent value="new-analysis"><ITSupplyUploadAnalysis onAnalysisComplete={handleAnalysisComplete} /></TabsContent>
           <TabsContent value="history"><ITSupplyAnalysisList /></TabsContent>
           <TabsContent value="precedent-bank"><ITSupplyPrecedentBank /></TabsContent>
           <TabsContent value="learnings"><ITSupplyLearningsTab /></TabsContent>
+          <TabsContent value="regression"><AnalystRegressionHarness analyst="it_supply" analystLabel="IT Supply" /></TabsContent>
         </Tabs>
       </div>
     </AppLayout>

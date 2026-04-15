@@ -5,24 +5,26 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Upload, FileText, ArrowRight, Loader2, AlertCircle, Cloud } from 'lucide-react';
+import { Upload, FileText, ArrowRight, AlertCircle, Cloud } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useCloudComputeAnalyses, useCloudComputePositions, useCloudComputePrecedentBank, CloudComputeAnalysisType, CloudComputePerspective } from '@/lib/hooks/useCloudComputeAnalyses';
+import { useCloudComputeAnalyses, useCloudComputePrecedentBank, CloudComputeAnalysisType, CloudComputePerspective } from '@/lib/hooks/useCloudComputeAnalyses';
 import { useCloudComputeLearnings } from '@/lib/hooks/useCloudComputeLearnings';
 import { CloudComputeAnalysisReport } from './CloudComputeAnalysisReport';
 import { CLOUD_SERVICE_TYPES, CLOUD_DEPLOYMENT_MODELS, type CloudDeploymentModel } from '@/lib/cloudComputeCategories';
+import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
+import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
+import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
 const JURISDICTIONS = ['United States', 'United Kingdom', 'EU', 'Germany', 'Ireland', 'Singapore', 'Japan', 'Australia', 'Other'];
 
 interface Props { onAnalysisComplete?: () => void; }
 
 export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
-  const { createAnalysis } = useCloudComputeAnalyses();
-  const { createPositions } = useCloudComputePositions(null);
-  const { precedents } = useCloudComputePrecedentBank();
-  const { formatLearningsForPrompt, activeLearnings } = useCloudComputeLearnings();
+  const { createAnalysisWithPositions } = useCloudComputeAnalyses();
+  const { getRelevantPrecedents } = useCloudComputePrecedentBank();
+  const { formatLearningsForPrompt, activeLearnings, getRelevantLearnings } = useCloudComputeLearnings();
 
   const [step, setStep] = useState<'upload' | 'configure' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<CloudComputeAnalysisType>('agreement_vs_bible');
@@ -35,10 +37,10 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
   const [tenantName, setTenantName] = useState('');
   const [providerName, setProviderName] = useState('');
   const [contractFile, setContractFile] = useState<File | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
+  const progress = useAnalystProgress();
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -52,23 +54,51 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
   const handleStartAnalysis = async () => {
     if (!contractFile) { toast.error('Please upload a contract'); return; }
     if (!projectName.trim()) { toast.error('Please enter a project name'); return; }
-    setStep('analyzing'); setAnalysisProgress(0); setError(null);
+    setStep('analyzing'); setError(null);
+    progress.reset(); progress.setPhase('extract');
+
+    // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
+    const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
+    let piiTotalRedactions = 0;
 
     try {
-      setAnalysisStatus('Extracting text from document...'); setAnalysisProgress(10);
       const formData = new FormData(); formData.append('file', contractFile);
       const { data: sd } = await supabase.auth.getSession();
       const token = sd?.session?.access_token;
       const parseResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-document-text`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: formData });
       if (!parseResponse.ok) { const ed = await parseResponse.json(); throw new Error(ed.error || 'Failed to parse document'); }
       const { text: contractText } = await parseResponse.json();
-      setAnalysisProgress(30);
+      progress.setPhase('retrieve');
 
-      setAnalysisStatus('Building precedent intelligence...');
-      const relevantPrecedents = precedents.filter(p => !p.is_gold_standard).map(p => ({ category: p.category, position_summary: p.position_summary, project_name: p.project_name, jurisdiction: p.jurisdiction, perspective: p.perspective }));
-      const userLearningsPrompt = formatLearningsForPrompt();
-      if (activeLearnings.length > 0) console.log(`Including ${activeLearnings.length} cloud compute learnings`);
-      setAnalysisProgress(50); setAnalysisStatus('Running AI analysis...');
+      // Optional PII redaction before any text leaves the browser.
+      let contractTextForLLM = contractText;
+      if (redactPIIEnabled) {
+        const r1 = redactPII(contractText || '');
+        contractTextForLLM = r1.redacted;
+        (Object.keys(piiCounts) as (keyof typeof piiCounts)[]).forEach(k => { piiCounts[k] += r1.counts[k]; });
+        piiTotalRedactions += r1.totalRedactions;
+        if (piiTotalRedactions > 0) {
+          toast.success(`PII redaction: ${summarizeRedaction(piiCounts)}`);
+        }
+      }
+
+      // Semantic top-K retrieval with graceful fallback to all-active.
+      const retrievalQuery = (contractTextForLLM || '').slice(0, 15_000);
+      const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
+        getRelevantLearnings(retrievalQuery, 15),
+        getRelevantPrecedents(retrievalQuery, 20, false),
+        getRelevantPrecedents(retrievalQuery, 10, true),
+      ]);
+      const appliedRegularPrecedents = relevantRegularRes.precedents.filter(p => !p.is_gold_standard);
+      const appliedGoldStandardPrecedents = relevantGoldRes.precedents;
+      const relevantPrecedents = appliedRegularPrecedents.map(p => ({ category: p.category, position_summary: p.position_summary, project_name: p.project_name, jurisdiction: p.jurisdiction, perspective: p.perspective }));
+      const selectedLearnings = relevantLearningsRes.learnings;
+      const appliedLearningIds = selectedLearnings.map(l => l.id);
+      const appliedPrecedentIds = appliedRegularPrecedents.map(p => p.id);
+      const appliedGoldStandardIds = appliedGoldStandardPrecedents.map(p => p.id);
+      const userLearningsPrompt = formatLearningsForPrompt(selectedLearnings);
+      if (selectedLearnings.length > 0) console.log(`Including ${selectedLearnings.length} cloud compute learnings (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
+      progress.setPhase('analyze');
 
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
         const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 300000);
@@ -76,45 +106,110 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
         try {
           const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-cloud-compute`, {
             method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sd2?.session?.access_token}` },
-            body: JSON.stringify({ contractText, analysisType, perspective, jurisdiction, projectName, serviceType, deploymentModel, counterpartyType: counterpartyType || null, precedents: relevantPrecedents, userLearnings: userLearningsPrompt }),
+            body: JSON.stringify({ contractText: contractTextForLLM, analysisType, perspective, jurisdiction, projectName, serviceType, deploymentModel, counterpartyType: counterpartyType || null, precedents: relevantPrecedents, userLearnings: userLearningsPrompt }),
             signal: controller.signal,
           }); clearTimeout(timeoutId); return res;
-        } catch (fe) { clearTimeout(timeoutId); if (retryCount < 3 && fe instanceof Error && (fe.name === 'AbortError' || fe.message.includes('fetch'))) { setAnalysisStatus(`Retrying (attempt ${retryCount + 2}/4)...`); await new Promise(r => setTimeout(r, 3000)); return callAnalyzeApi(retryCount + 1); } throw fe; }
+        } catch (fe) { clearTimeout(timeoutId); if (retryCount < 3 && fe instanceof Error && (fe.name === 'AbortError' || fe.message.includes('fetch'))) { progress.setStatusOverride(`Retrying (attempt ${retryCount + 2}/4)…`); await new Promise(r => setTimeout(r, 3000)); return callAnalyzeApi(retryCount + 1); } throw fe; }
       };
 
+      const analysisStartTs = Date.now();
       const analyzeRes = await callAnalyzeApi();
+      const analysisDurationMs = Date.now() - analysisStartTs;
       if (!analyzeRes.ok) { let em = 'Failed to analyze contract'; try { const ed = await analyzeRes.json(); em = ed.error || em; } catch {} throw new Error(em); }
       const analyzeResponse = await analyzeRes.json();
-      setAnalysisProgress(80); setAnalysisStatus('Saving analysis results...');
+      progress.setPhase('save');
+      void logLlmCall({
+        analystType: 'cloud_compute',
+        functionName: 'analyze-cloud-compute',
+        status: 'success',
+        inputChars: contractTextForLLM?.length ?? 0,
+        inputTokenCount: analyzeResponse?.input_token_count ?? null,
+        outputTokenCount: analyzeResponse?.output_token_count ?? null,
+        modelUsed: analyzeResponse?.model_used ?? null,
+        durationMs: analysisDurationMs,
+        metadata: {
+          analysisType,
+          perspective,
+          serviceType,
+          deploymentModel,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
+      });
       const { positions: extractedPositions } = analyzeResponse;
 
-      const analysisResult = await createAnalysis.mutateAsync({
-        analysis_type: analysisType, perspective, project_name: projectName.trim(), jurisdiction: jurisdiction || null,
-        document_file_name: contractFile.name, document_file_url: null, comparison_file_name: null, comparison_file_url: null,
-        notes: null, parent_analysis_id: null, version_number: 1, is_comparison: false, service_type: serviceType,
-        deployment_model: deploymentModel, complexity_score: null, key_risk_areas: [], counterparty_type: counterpartyType || null,
-        tenant_name: tenantName || null, provider_name: providerName || null, tenant_normalized: tenantName || null, provider_normalized: providerName || null,
+      const positionsPayload = (extractedPositions ?? []).map((pos: any) => ({
+        category: pos.category,
+        position_summary: pos.position_summary,
+        source_text: pos.clause_references || pos.source_text || null,
+        confidence: pos.confidence || 'medium',
+        bible_reference: pos.bible_reference || null,
+        comparison_position: pos.market_comparison || pos.comparison_position || null,
+        variance_notes: pos.market_position ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim() : pos.variance_notes || null,
+        previous_position: null,
+        change_summary: null,
+        change_type: null,
+        market_benchmark: pos.market_benchmark || null,
+      }));
+
+      const analysisResult = await createAnalysisWithPositions.mutateAsync({
+        analysis: {
+          analysis_type: analysisType, perspective, project_name: projectName.trim(), jurisdiction: jurisdiction || null,
+          document_file_name: contractFile.name, document_file_url: null, comparison_file_name: null, comparison_file_url: null,
+          notes: null, parent_analysis_id: null, version_number: 1, is_comparison: false, service_type: serviceType,
+          deployment_model: deploymentModel, complexity_score: null, key_risk_areas: [], counterparty_type: counterpartyType || null,
+          tenant_name: tenantName || null, provider_name: providerName || null, tenant_normalized: tenantName || null, provider_normalized: providerName || null,
+          applied_learning_ids: appliedLearningIds,
+          applied_precedent_ids: appliedPrecedentIds,
+          applied_gold_standard_ids: appliedGoldStandardIds,
+          model_used: analyzeResponse?.model_used ?? null,
+          analysis_duration_ms: analysisDurationMs,
+          input_token_count: analyzeResponse?.input_token_count ?? null,
+          output_token_count: analyzeResponse?.output_token_count ?? null,
+        },
+        positions: positionsPayload,
       });
 
-      if (extractedPositions?.length > 0) {
-        await createPositions.mutateAsync(extractedPositions.map((pos: any) => ({
-          analysis_id: analysisResult.id, user_id: analysisResult.user_id, category: pos.category,
-          position_summary: pos.position_summary, source_text: pos.clause_references || pos.source_text || null,
-          confidence: pos.confidence || 'medium', bible_reference: pos.bible_reference || null,
-          comparison_position: pos.market_comparison || pos.comparison_position || null,
-          variance_notes: pos.market_position ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim() : pos.variance_notes || null,
-          market_benchmark: pos.market_benchmark || null,
-        })));
-      }
-
-      setAnalysisProgress(100); setCreatedAnalysisId(analysisResult.id); setStep('results'); toast.success('Analysis complete!');
-    } catch (err) { console.error('Analysis error:', err); setError(err instanceof Error ? err.message : 'Analysis failed'); setStep('configure'); toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error')); }
+      progress.setPhase('complete'); setCreatedAnalysisId(analysisResult.id); setStep('results'); toast.success('Analysis complete!');
+    } catch (err) {
+      console.error('Analysis error:', err);
+      void logLlmCall({
+        analystType: 'cloud_compute',
+        functionName: 'analyze-cloud-compute',
+        status: 'failure',
+        errorType: classifyLlmError(err),
+        errorMessage: err instanceof Error ? err.message : String(err),
+        metadata: {
+          analysisType,
+          perspective,
+          serviceType,
+          deploymentModel,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+        },
+      });
+      setError(err instanceof Error ? err.message : 'Analysis failed');
+      setStep('configure');
+      progress.reset();
+      toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    }
   };
 
-  const handleReset = () => { setStep('upload'); setContractFile(null); setProjectName(''); setJurisdiction(''); setAnalysisType('agreement_vs_bible'); setPerspective('tenant'); setCreatedAnalysisId(null); setError(null); };
+  const handleReset = () => { setStep('upload'); setContractFile(null); setProjectName(''); setJurisdiction(''); setAnalysisType('agreement_vs_bible'); setPerspective('tenant'); setCreatedAnalysisId(null); setError(null); progress.reset(); };
 
   if (step === 'results' && createdAnalysisId) return <CloudComputeAnalysisReport analysisId={createdAnalysisId} onNewAnalysis={handleReset} onViewHistory={onAnalysisComplete} />;
-  if (step === 'analyzing') return <Card className="max-w-2xl mx-auto"><CardHeader className="text-center"><CardTitle>Analyzing {analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Cloud Compute Agreement'}</CardTitle><CardDescription>{analysisStatus}</CardDescription></CardHeader><CardContent className="space-y-6"><Progress value={analysisProgress} className="h-2" /><div className="flex justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div><p className="text-center text-sm text-muted-foreground">This may take a minute or two for large documents...</p></CardContent></Card>;
+  if (step === 'analyzing') return (
+    <AnalystAnalysisProgress
+      title={`Analyzing ${analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Cloud Compute Agreement'}`}
+      phase={progress.phase}
+      progress={progress.progress}
+      narrative={progress.narrative}
+      elapsedMs={progress.elapsedMs}
+      statusOverride={progress.statusOverride ?? undefined}
+    />
+  );
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -156,7 +251,12 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
               <div className="space-y-2"><Label>Tenant Name (optional)</Label><Input value={tenantName} onChange={(e) => setTenantName(e.target.value)} placeholder="e.g., Amazon" /></div>
               <div className="space-y-2"><Label>Provider Name (optional)</Label><Input value={providerName} onChange={(e) => setProviderName(e.target.value)} placeholder="e.g., Equinix" /></div>
             </div>
-            {step === 'configure' && <Button onClick={handleStartAnalysis} className="w-full" disabled={!contractFile || !projectName.trim()}><Cloud className="h-4 w-4 mr-2" /> Start Analysis</Button>}
+            {step === 'configure' && (
+              <>
+                <PIIRedactionToggle checked={redactPIIEnabled} onCheckedChange={setRedactPIIEnabled} />
+                <Button onClick={handleStartAnalysis} className="w-full" disabled={!contractFile || !projectName.trim()}><Cloud className="h-4 w-4 mr-2" /> Start Analysis</Button>
+              </>
+            )}
           </CardContent>
         </Card>
       )}

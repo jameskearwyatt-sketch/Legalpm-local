@@ -6,10 +6,17 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import {
   FileText, Plus, History, CheckCircle2, AlertCircle, HelpCircle,
-  Database, ChevronDown, ChevronRight, Loader2, Filter, X, Lightbulb, Scale,
+  Database, ChevronDown, ChevronRight, Loader2, Filter, X, Lightbulb, Scale, MessageCircleQuestion,
 } from 'lucide-react';
 import { useTollingAnalyses, useTollingPositions, useTollingPrecedentBank, TollingExtractedPosition } from '@/lib/hooks/useTollingAnalyses';
+import { useTollingLearnings } from '@/lib/hooks/useTollingLearnings';
+import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
+import { ExportAnalystReportButton, type AnalystReportExport } from '@/components/shared/ExportAnalystReportButton';
+import { ExportAnalystExcelButton } from '@/components/shared/ExportAnalystExcelButton';
+import { SaveAsRegressionCaseButton } from '@/components/shared/SaveAsRegressionCaseButton';
+import type { ActualPositionShape } from '@/lib/analyst/regressionHarness';
 import { TollingTeachFeedbackDialog } from './TollingTeachFeedbackDialog';
+import { AnalystAskAIDialog } from '@/components/shared/AnalystAskAIDialog';
 import { TollingWhatsMarketDialog } from './TollingWhatsMarketDialog';
 import { TOLLING_CATEGORY_GROUPS, TOLLING_ALL_CATEGORIES } from '@/lib/tollingCategories';
 import { format } from 'date-fns';
@@ -61,12 +68,14 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
   const { analyses, updateAnalysis } = useTollingAnalyses();
   const { positions, isLoading: positionsLoading } = useTollingPositions(analysisId);
   const { bankPositions, getCategoryStats, precedents: bankPrecedents } = useTollingPrecedentBank();
+  const { learnings } = useTollingLearnings();
 
   const [selectedForBanking, setSelectedForBanking] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(TOLLING_CATEGORY_GROUPS.map(g => g)));
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState<FilterState>({ confidence: new Set(), marketPosition: new Set() });
   const [teachDialogPosition, setTeachDialogPosition] = useState<TollingExtractedPosition | null>(null);
+  const [askAIPosition, setAskAIPosition] = useState<TollingExtractedPosition | null>(null);
   const [positionUpdates, setPositionUpdates] = useState<Record<string, string>>({});
   const [varianceNotesUpdates, setVarianceNotesUpdates] = useState<Record<string, string>>({});
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
@@ -211,6 +220,35 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
     }
   };
 
+  const exportPayload: AnalystReportExport | null = useMemo(() => {
+    if (!analysis) return null;
+    return {
+      analystTitle: 'Tolling Analyst',
+      projectName: analysis.project_name,
+      analysisTypeLabel: analysis.analysis_type === 'tolling_vs_bible' ? 'vs Knowledge Bank' : 'vs Term Sheet',
+      perspectiveLabel: analysis.perspective === 'offtaker' ? 'Offtaker Perspective' : 'Generator Perspective',
+      jurisdiction: analysis.jurisdiction,
+      extraBadges: [
+        analysis.tolling_type?.replace(/_/g, ' ').toUpperCase(),
+        analysis.facility_stage ? analysis.facility_stage.charAt(0).toUpperCase() + analysis.facility_stage.slice(1) : null,
+      ].filter((b): b is string => !!b),
+      isAgreed: !!analysis.is_agreed,
+      createdAt: analysis.created_at,
+      positionsByGroup: TOLLING_CATEGORY_GROUPS.map(g => ({
+        group: g,
+        positions: (positionsByGroup[g] || []).map(p => ({
+          category: p.category,
+          confidence: (p.confidence as 'high' | 'medium' | 'review_required') || null,
+          marketPosition: p.marketPosition,
+          positionSummary: p.position_summary,
+          comparisonPosition: p.comparison_position,
+          varianceNotes: p.variance_notes,
+          sourceText: p.source_text,
+        })),
+      })),
+    };
+  }, [analysis, positionsByGroup]);
+
   if (!analysis) {
     return (
       <Card><CardContent className="py-8 text-center"><p className="text-muted-foreground">Analysis not found</p></CardContent></Card>
@@ -250,9 +288,54 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
                   )}
                 </div>
                 <p className="text-sm">Analyzed: {format(new Date(analysis.created_at), 'PPp')}</p>
+                <div className="pt-1">
+                  <AnalystAppliedContextBadge
+                    appliedLearningIds={analysis.applied_learning_ids || []}
+                    appliedPrecedentIds={analysis.applied_precedent_ids || []}
+                    appliedGoldStandardIds={analysis.applied_gold_standard_ids || []}
+                    learnings={(learnings || []).map(l => ({
+                      id: l.id,
+                      category: l.category,
+                      user_feedback: l.correction_reason || `"${l.original_position}" should be "${l.corrected_position}"`,
+                      corrected_position: l.corrected_position,
+                      created_at: l.created_at,
+                    }))}
+                    precedents={(bankPrecedents || []).map(p => ({
+                      id: p.id,
+                      category: p.category,
+                      project_name: p.project_name,
+                      jurisdiction: p.jurisdiction,
+                      is_gold_standard: p.is_gold_standard,
+                      template_name: p.template_name,
+                    }))}
+                    analysisCreatedAt={analysis.created_at}
+                  />
+                </div>
               </CardDescription>
             </div>
             <div className="flex gap-2">
+              {exportPayload && <ExportAnalystReportButton payload={exportPayload} />}
+              {exportPayload && <ExportAnalystExcelButton payload={exportPayload} />}
+              {analysis && (
+                <SaveAsRegressionCaseButton
+                  analyst="tolling"
+                  analystLabel="Tolling"
+                  analysisId={analysis.id}
+                  projectName={analysis.project_name}
+                  positions={positions as unknown as ActualPositionShape[]}
+                  defaultConfig={{
+                    analysisType: analysis.analysis_type,
+                    perspective: analysis.perspective,
+                    jurisdiction: analysis.jurisdiction,
+                    projectName: analysis.project_name,
+                    tollingType: analysis.tolling_type,
+                    facilityStage: analysis.facility_stage,
+                    counterpartyType: analysis.counterparty_type || null,
+                    precedents: [],
+                    userLearnings: '',
+                  }}
+                />
+              )}
               <Button variant="outline" size="sm" onClick={onNewAnalysis}>
                 <Plus className="h-4 w-4 mr-1" /> New Analysis
               </Button>
@@ -446,6 +529,15 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
                                 <Button
                                   variant="ghost"
                                   size="sm"
+                                  className="h-8 w-8 p-0 text-primary hover:text-primary/80 hover:bg-primary/10"
+                                  onClick={() => setAskAIPosition(position)}
+                                  title="Ask AI about this clause"
+                                >
+                                  <MessageCircleQuestion className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   className="h-8 w-8 p-0 text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950"
                                   onClick={() => setTeachDialogPosition(position)}
                                   title="Teach AI"
@@ -516,6 +608,27 @@ export function TollingAnalysisReport({ analysisId, onNewAnalysis, onViewHistory
           onPositionUpdated={(newSummary, newVarianceNotes) => {
             handlePositionUpdated(teachDialogPosition.id, newSummary, newVarianceNotes);
           }}
+        />
+      )}
+
+      {/* Ask AI about this clause */}
+      {askAIPosition && analysis && (
+        <AnalystAskAIDialog
+          open={!!askAIPosition}
+          onOpenChange={(open) => !open && setAskAIPosition(null)}
+          analyst="tolling"
+          analystLabel="tolling"
+          position={{
+            category: askAIPosition.category,
+            positionSummary: positionUpdates[askAIPosition.id] ?? askAIPosition.position_summary,
+            sourceText: askAIPosition.source_text,
+            marketPosition: getMarketPositionFromNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+            confidence: askAIPosition.confidence,
+            varianceNotes: cleanVarianceNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+          }}
+          projectName={analysis.project_name}
+          jurisdiction={analysis.jurisdiction}
+          contractType={analysis.tolling_type}
         />
       )}
 

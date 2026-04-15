@@ -149,6 +149,7 @@ export function useBudgetVersions(matterId?: string) {
         .insert({
           matter_id: input.matter_id,
           user_id: user!.id,
+          created_by: user!.id,
           version_number: nextVersionNumber,
           total_amount: totalAmount,
           bm_total: bmTotal,

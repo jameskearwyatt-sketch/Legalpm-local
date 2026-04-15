@@ -1,7 +1,8 @@
- import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
- import { supabase } from '@/integrations/supabase/client';
- import { useAuth } from '@/lib/auth';
- import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/lib/auth';
+import { toast } from 'sonner';
+import { embedAndStore, embedText, matchLearnings } from '@/lib/analyst/semanticRetrieval';
  
  export interface PPALearning {
    id: string;
@@ -41,18 +42,23 @@
  
    const activeLearnings = learnings?.filter(l => l.is_active) || [];
  
-   const createLearning = useMutation({
-     mutationFn: async (learning: Omit<PPALearning, 'id' | 'created_at' | 'updated_at'>) => {
-       if (!user) throw new Error('Not authenticated');
-       const { data, error } = await supabase
-         .from('ppa_ai_learnings')
-         .insert({ ...learning, user_id: user.id })
-         .select()
-         .single();
-       
-       if (error) throw error;
-       return data as PPALearning;
-     },
+  const createLearning = useMutation({
+    mutationFn: async (learning: Omit<PPALearning, 'id' | 'created_at' | 'updated_at'>) => {
+      if (!user) throw new Error('Not authenticated');
+      const { data, error } = await supabase
+        .from('ppa_ai_learnings')
+        .insert({ ...learning, user_id: user.id })
+        .select()
+        .single();
+
+      if (error) throw error;
+      // Fire-and-forget embedding write so similarity search picks this up
+      // on future analyses. Does not block the mutation.
+      const embedSource = [learning.category, learning.original_position, learning.corrected_position ?? '', learning.user_feedback ?? '']
+        .filter(Boolean).join('\n');
+      void embedAndStore('ppa', 'learning', data.id, embedSource);
+      return data as PPALearning;
+    },
      onSuccess: () => {
        queryClient.invalidateQueries({ queryKey: ['ppa-learnings'] });
        toast.success('Learning saved - AI will remember this correction');
@@ -114,17 +120,42 @@
  
    // Get learnings for a specific category (for use in analysis)
    const getLearningsForCategory = (category: string): PPALearning[] => {
-     return activeLearnings.filter(l => 
+     return activeLearnings.filter(l =>
        l.category.toLowerCase() === category.toLowerCase()
      );
    };
+
+  /**
+   * Semantic top-K retrieval: embed the query (e.g. the contract being
+   * analysed) and ask the DB for the most relevant active learnings. Falls
+   * back to all active learnings when semantic retrieval is unavailable
+   * (no OPENAI_API_KEY configured, RPC failure, etc.) so the feature
+   * degrades gracefully.
+   */
+  const getRelevantLearnings = async (
+    queryText: string,
+    k: number = 10,
+  ): Promise<{ learnings: PPALearning[]; usedSemanticRetrieval: boolean }> => {
+    const embedding = await embedText(queryText);
+    const matched = await matchLearnings<{ id: string }>('ppa', embedding, k);
+    if (matched && matched.length > 0) {
+      const byId = new Map(activeLearnings.map(l => [l.id, l]));
+      const hydrated = matched.map(m => byId.get(m.id)).filter((l): l is PPALearning => !!l);
+      if (hydrated.length > 0) {
+        return { learnings: hydrated, usedSemanticRetrieval: true };
+      }
+    }
+    return { learnings: activeLearnings, usedSemanticRetrieval: false };
+  };
  
-   // Format learnings for inclusion in AI prompts
-   const formatLearningsForPrompt = (): string => {
-     if (activeLearnings.length === 0) return '';
-     
+   // Format learnings for inclusion in AI prompts. Optionally accepts an
+   // override list (e.g. a semantically-retrieved top-K subset).
+   const formatLearningsForPrompt = (override?: PPALearning[]): string => {
+     const source = override ?? activeLearnings;
+     if (source.length === 0) return '';
+
      const byCategory: Record<string, PPALearning[]> = {};
-     for (const l of activeLearnings) {
+     for (const l of source) {
        if (!byCategory[l.category]) byCategory[l.category] = [];
        byCategory[l.category].push(l);
      }
@@ -157,8 +188,9 @@
      createLearning,
      updateLearning,
      deleteLearning,
-     toggleActive,
-     getLearningsForCategory,
-     formatLearningsForPrompt,
-   };
+    toggleActive,
+    getLearningsForCategory,
+    formatLearningsForPrompt,
+    getRelevantLearnings,
+  };
  }

@@ -23,9 +23,17 @@ import {
   Building2,
   Lightbulb,
   Scale,
+  MessageCircleQuestion,
 } from 'lucide-react';
 import { usePPAAnalyses, usePPAPositions, usePPAPrecedentBank, PPAExtractedPosition } from '@/lib/hooks/usePPAAnalyses';
+import { usePPALearnings } from '@/lib/hooks/usePPALearnings';
+import { AnalystAppliedContextBadge } from '@/components/shared/AnalystAppliedContextBadge';
+import { ExportAnalystReportButton, type AnalystReportExport } from '@/components/shared/ExportAnalystReportButton';
+import { ExportAnalystExcelButton } from '@/components/shared/ExportAnalystExcelButton';
+import { SaveAsRegressionCaseButton } from '@/components/shared/SaveAsRegressionCaseButton';
+import type { ActualPositionShape } from '@/lib/analyst/regressionHarness';
 import { PPATeachFeedbackDialog } from './PPATeachFeedbackDialog';
+import { AnalystAskAIDialog } from '@/components/shared/AnalystAskAIDialog';
 import { WhatsMarketDialog } from './WhatsMarketDialog';
 import { getCategoryById, PPA_CATEGORY_GROUPS, PPA_ALL_CATEGORIES } from '@/lib/ppaCategories';
 import { format } from 'date-fns';
@@ -110,6 +118,7 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
   const { analyses, updateAnalysis } = usePPAAnalyses();
   const { positions, isLoading: positionsLoading } = usePPAPositions(analysisId);
   const { bankPositions, precedents, getCategoryStats } = usePPAPrecedentBank();
+  const { learnings } = usePPALearnings();
   
   const [selectedForBanking, setSelectedForBanking] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(PPA_CATEGORY_GROUPS));
@@ -120,6 +129,7 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
     partyFavorability: new Set(),
   });
   const [teachDialogPosition, setTeachDialogPosition] = useState<PPAExtractedPosition | null>(null);
+  const [askAIPosition, setAskAIPosition] = useState<PPAExtractedPosition | null>(null);
   const [positionUpdates, setPositionUpdates] = useState<Record<string, string>>({});
   const [varianceNotesUpdates, setVarianceNotesUpdates] = useState<Record<string, string>>({});
   const [whatsMarketCategory, setWhatsMarketCategory] = useState<string | null>(null);
@@ -333,6 +343,33 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
     }
   };
 
+  const exportPayload: AnalystReportExport | null = useMemo(() => {
+    if (!analysis) return null;
+    const ppaType = (analysis as { ppa_type?: string | null }).ppa_type;
+    return {
+      analystTitle: 'PPA Analyst',
+      projectName: analysis.project_name,
+      analysisTypeLabel: analysis.analysis_type === 'ppa_vs_bible' ? 'PPA vs Bible' : 'PPA vs Term Sheet',
+      perspectiveLabel: analysis.perspective === 'buyer' ? 'Buyer Perspective' : 'Seller Perspective',
+      jurisdiction: analysis.jurisdiction,
+      extraBadges: [ppaType?.replace(/_/g, ' ')].filter((b): b is string => !!b),
+      isAgreed: !!analysis.is_agreed,
+      createdAt: analysis.created_at,
+      positionsByGroup: PPA_CATEGORY_GROUPS.map(g => ({
+        group: g,
+        positions: (positionsByGroup[g] || []).map(p => ({
+          category: p.category,
+          confidence: (p.confidence as 'high' | 'medium' | 'review_required') || null,
+          marketPosition: p.marketPosition,
+          positionSummary: p.position_summary,
+          comparisonPosition: p.comparison_position,
+          varianceNotes: p.variance_notes,
+          sourceText: p.source_text,
+        })),
+      })),
+    };
+  }, [analysis, positionsByGroup]);
+
   if (!analysis) {
     return (
       <Card>
@@ -382,9 +419,50 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                 <p className="text-sm">
                   Analyzed: {format(new Date(analysis.created_at), 'PPp')}
                 </p>
+                <div className="pt-1">
+                  <AnalystAppliedContextBadge
+                    appliedLearningIds={analysis.applied_learning_ids || []}
+                    appliedPrecedentIds={analysis.applied_precedent_ids || []}
+                    appliedGoldStandardIds={analysis.applied_gold_standard_ids || []}
+                    learnings={learnings}
+                    precedents={precedents.map(p => ({
+                      id: p.id,
+                      category: p.category,
+                      project_name: p.project_name,
+                      jurisdiction: p.jurisdiction,
+                      is_gold_standard: p.is_gold_standard,
+                      template_name: p.template_name,
+                    }))}
+                    analysisCreatedAt={analysis.created_at}
+                  />
+                </div>
               </CardDescription>
             </div>
             <div className="flex gap-2">
+              {exportPayload && <ExportAnalystReportButton payload={exportPayload} />}
+              {exportPayload && <ExportAnalystExcelButton payload={exportPayload} />}
+              {analysis && (
+                <SaveAsRegressionCaseButton
+                  analyst="ppa"
+                  analystLabel="PPA"
+                  analysisId={analysis.id}
+                  projectName={analysis.project_name}
+                  positions={positions as unknown as ActualPositionShape[]}
+                  defaultConfig={{
+                    analysisType: analysis.analysis_type,
+                    perspective: analysis.perspective,
+                    jurisdiction: analysis.jurisdiction,
+                    projectName: analysis.project_name,
+                    ppaType: (analysis as { ppa_type?: string | null }).ppa_type || null,
+                    counterpartyType: null,
+                    precedents: [],
+                    goldStandardPrecedents: [],
+                    marketIntelligence: '',
+                    intelligenceConfidence: null,
+                    userLearnings: '',
+                  }}
+                />
+              )}
               <Button variant="outline" size="sm" onClick={onCompareNewDraft}>
                 <GitCompare className="h-4 w-4 mr-1" />
                 Compare New Draft
@@ -651,6 +729,16 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                                     <span className="text-xs">Market</span>
                                   </Button>
                                 )}
+                                {/* Ask AI Button */}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 text-primary hover:text-primary/80 hover:bg-primary/10"
+                                  onClick={() => setAskAIPosition(position)}
+                                  title="Ask AI about this clause"
+                                >
+                                  <MessageCircleQuestion className="h-4 w-4" />
+                                </Button>
                                 {/* Teach AI Button */}
                                 <Button
                                   variant="ghost"
@@ -737,6 +825,28 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
            onPositionUpdated={(newSummary, newVarianceNotes) => {
              handlePositionUpdated(teachDialogPosition.id, newSummary, newVarianceNotes);
            }}
+         />
+       )}
+
+       {/* Ask AI Dialog */}
+       {askAIPosition && analysis && (
+         <AnalystAskAIDialog
+           open={!!askAIPosition}
+           onOpenChange={(open) => !open && setAskAIPosition(null)}
+           analyst="ppa"
+           analystLabel="PPA"
+           position={{
+             category: askAIPosition.category,
+             positionSummary: positionUpdates[askAIPosition.id] ?? askAIPosition.position_summary,
+             sourceText: askAIPosition.source_text,
+             marketPosition: getMarketPositionFromNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+             partyFavorability: getPartyFavorabilityFromNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes, positionUpdates[askAIPosition.id] ?? askAIPosition.position_summary),
+             confidence: askAIPosition.confidence,
+             varianceNotes: cleanVarianceNotes(varianceNotesUpdates[askAIPosition.id] ?? askAIPosition.variance_notes),
+           }}
+           projectName={analysis.project_name}
+           jurisdiction={analysis.jurisdiction}
+           contractType={(analysis as { ppa_type?: string | null }).ppa_type ?? null}
          />
        )}
 

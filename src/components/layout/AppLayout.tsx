@@ -34,6 +34,8 @@ import {
   FlaskConical,
   Cpu,
   Cloud,
+  Database,
+  Activity,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -84,6 +86,8 @@ const navigation: NavEntry[] = [
   { name: 'Red Flags', href: '/red-flags', icon: AlertTriangle },
   { name: 'Pipeline Flags', href: '/pipeline-flags', icon: Flag },
   { name: 'Admin Flags', href: '/flags', icon: AlertTriangle },
+  { name: 'Analyst Backfill', href: '/admin/analyst-backfill', icon: Database },
+  { name: 'Analyst Telemetry', href: '/admin/analyst-telemetry', icon: Activity },
   { name: 'Settings', href: '/settings', icon: Settings },
   { name: 'Help', href: '/help', icon: HelpCircle },
 ];

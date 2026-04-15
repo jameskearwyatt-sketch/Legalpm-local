@@ -5,9 +5,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Upload, FileText, Scale, ArrowRight, Loader2, AlertCircle, FlaskConical } from 'lucide-react';
+import { Upload, FileText, Scale, ArrowRight, AlertCircle, FlaskConical } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTollingAnalyses, useTollingPositions, useTollingPrecedentBank, TollingAnalysisType, TollingPerspective } from '@/lib/hooks/useTollingAnalyses';
 import { useTollingLearnings } from '@/lib/hooks/useTollingLearnings';
@@ -28,16 +27,19 @@ const JURISDICTIONS = [
 ];
 
 import { TOLLING_TECHNOLOGY_TYPES, TOLLING_FACILITY_STAGES, type TollingFacilityStage } from '@/lib/tollingCategories';
+import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
+import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
+import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
 interface TollingUploadAnalysisProps {
   onAnalysisComplete?: () => void;
 }
 
 export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnalysisProps) {
-  const { createAnalysis } = useTollingAnalyses();
-  const { createPositions } = useTollingPositions(null);
-  const { precedents } = useTollingPrecedentBank();
-  const { formatLearningsForPrompt, activeLearnings } = useTollingLearnings();
+  const { createAnalysisWithPositions } = useTollingAnalyses();
+  const { getRelevantPrecedents } = useTollingPrecedentBank();
+  const { formatLearningsForPrompt, activeLearnings, getRelevantLearnings } = useTollingLearnings();
 
   const [step, setStep] = useState<'upload' | 'configure' | 'analyzing' | 'results'>('upload');
   const [analysisType, setAnalysisType] = useState<TollingAnalysisType>('tolling_vs_bible');
@@ -51,10 +53,10 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
   const [generatorName, setGeneratorName] = useState('');
   const [tollingFile, setTollingFile] = useState<File | null>(null);
   const [comparisonFile, setComparisonFile] = useState<File | null>(null);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [analysisStatus, setAnalysisStatus] = useState('');
   const [createdAnalysisId, setCreatedAnalysisId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
+  const progress = useAnalystProgress();
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>, type: 'tolling' | 'comparison') => {
     const file = e.target.files?.[0];
@@ -94,14 +96,16 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
     }
 
     setStep('analyzing');
-    setAnalysisProgress(0);
     setError(null);
+    progress.reset();
+    progress.setPhase('extract');
+
+    // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
+    const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
+    let piiTotalRedactions = 0;
 
     try {
       // Step 1: Parse the document
-      setAnalysisStatus('Extracting text from document...');
-      setAnalysisProgress(10);
-
       const formData = new FormData();
       formData.append('file', tollingFile);
 
@@ -123,12 +127,12 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
       }
 
       const { text: tollingText } = await parseResponse.json();
-      setAnalysisProgress(30);
+      progress.setPhase('retrieve');
 
       // Step 2: Parse comparison document if provided
       let comparisonText = null;
       if (comparisonFile && analysisType === 'tolling_vs_termsheet') {
-        setAnalysisStatus('Extracting text from comparison document...');
+        progress.setStatusOverride('Extracting text from comparison document…');
         const compFormData = new FormData();
         compFormData.append('file', comparisonFile);
         const compParseResponse = await fetch(
@@ -143,29 +147,59 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
           const { text } = await compParseResponse.json();
           comparisonText = text;
         }
-        setAnalysisProgress(50);
-      } else {
-        setAnalysisProgress(50);
+        progress.setStatusOverride(null);
       }
 
-      // Step 3: Build precedent context
-      setAnalysisStatus('Building precedent intelligence...');
-      const relevantPrecedents = precedents
-        .filter(p => !p.is_gold_standard)
-        .map(p => ({
-          category: p.category,
-          position_summary: p.position_summary,
-          project_name: p.project_name,
-          jurisdiction: p.jurisdiction,
-          perspective: p.perspective,
-        }));
-
-      const userLearningsPrompt = formatLearningsForPrompt();
-      if (activeLearnings.length > 0) {
-        console.log(`Including ${activeLearnings.length} tolling learnings`);
+      // Optional PII redaction before any text leaves the browser.
+      let tollingTextForLLM = tollingText;
+      let comparisonTextForLLM = comparisonText;
+      if (redactPIIEnabled) {
+        const r1 = redactPII(tollingText || '');
+        tollingTextForLLM = r1.redacted;
+        (Object.keys(piiCounts) as (keyof typeof piiCounts)[]).forEach(k => { piiCounts[k] += r1.counts[k]; });
+        piiTotalRedactions += r1.totalRedactions;
+        if (comparisonText) {
+          const r2 = redactPII(comparisonText);
+          comparisonTextForLLM = r2.redacted;
+          (Object.keys(piiCounts) as (keyof typeof piiCounts)[]).forEach(k => { piiCounts[k] += r2.counts[k]; });
+          piiTotalRedactions += r2.totalRedactions;
+        }
+        if (piiTotalRedactions > 0) {
+          toast.success(`PII redaction: ${summarizeRedaction(piiCounts)}`);
+        }
       }
 
-      setAnalysisStatus('Running AI analysis...');
+      // Step 3: Build precedent context (semantic top-K retrieval with
+      // graceful fallback to all-active when embeddings aren't available).
+      const retrievalQuery = (tollingTextForLLM || '').slice(0, 15_000);
+      const [relevantLearningsRes, relevantRegularRes, relevantGoldRes] = await Promise.all([
+        getRelevantLearnings(retrievalQuery, 15),
+        getRelevantPrecedents(retrievalQuery, 20, false),
+        getRelevantPrecedents(retrievalQuery, 10, true),
+      ]);
+      const appliedRegularPrecedents = relevantRegularRes.precedents.filter(p => !p.is_gold_standard);
+      const appliedGoldStandardPrecedents = relevantGoldRes.precedents;
+      const relevantPrecedents = appliedRegularPrecedents.map(p => ({
+        category: p.category,
+        position_summary: p.position_summary,
+        project_name: p.project_name,
+        jurisdiction: p.jurisdiction,
+        perspective: p.perspective,
+      }));
+
+      const selectedLearnings = relevantLearningsRes.learnings;
+
+      // Capture IDs for audit trail
+      const appliedLearningIds = selectedLearnings.map(l => l.id);
+      const appliedPrecedentIds = appliedRegularPrecedents.map(p => p.id);
+      const appliedGoldStandardIds = appliedGoldStandardPrecedents.map(p => p.id);
+
+      const userLearningsPrompt = formatLearningsForPrompt(selectedLearnings);
+      if (selectedLearnings.length > 0) {
+        console.log(`Including ${selectedLearnings.length} tolling learnings (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
+      }
+
+      progress.setPhase('analyze');
 
       // Step 4: Call analyze-tolling edge function
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
@@ -184,8 +218,8 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
                 Authorization: `Bearer ${authToken}`,
               },
               body: JSON.stringify({
-                tollingText,
-                comparisonText,
+                tollingText: tollingTextForLLM,
+                comparisonText: comparisonTextForLLM,
                 analysisType,
                 perspective,
                 jurisdiction,
@@ -204,7 +238,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         } catch (fetchError) {
           clearTimeout(timeoutId);
           if (retryCount < 3 && fetchError instanceof Error && (fetchError.name === 'AbortError' || fetchError.message.includes('fetch'))) {
-            setAnalysisStatus(`Retrying (attempt ${retryCount + 2}/4)...`);
+            progress.setStatusOverride(`Retrying (attempt ${retryCount + 2}/4)…`);
             await new Promise(resolve => setTimeout(resolve, 3000));
             return callAnalyzeApi(retryCount + 1);
           }
@@ -212,7 +246,9 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         }
       };
 
+      const analysisStartTs = Date.now();
       const analyzeRes = await callAnalyzeApi();
+      const analysisDurationMs = Date.now() - analysisStartTs;
 
       if (!analyzeRes.ok) {
         let errorMessage = 'Failed to analyze tolling agreement';
@@ -226,64 +262,110 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
       }
 
       const analyzeResponse = await analyzeRes.json();
-      setAnalysisProgress(80);
-      setAnalysisStatus('Saving analysis results...');
+      progress.setPhase('save');
+
+      void logLlmCall({
+        analystType: 'tolling',
+        functionName: 'analyze-tolling',
+        status: 'success',
+        inputChars: (tollingTextForLLM?.length ?? 0) + (comparisonTextForLLM?.length ?? 0),
+        inputTokenCount: analyzeResponse?.input_token_count ?? null,
+        outputTokenCount: analyzeResponse?.output_token_count ?? null,
+        modelUsed: analyzeResponse?.model_used ?? null,
+        durationMs: analysisDurationMs,
+        metadata: {
+          analysisType,
+          perspective,
+          tollingType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+          // Edge function now uses JSON response_format; parse errors
+          // should be rare. See #6 structured output.
+          structured_output: true,
+        },
+      });
 
       const { positions: extractedPositions } = analyzeResponse;
 
-      // Step 5: Create analysis record
-      const analysisResult = await createAnalysis.mutateAsync({
-        analysis_type: analysisType,
-        perspective,
-        project_name: projectName.trim(),
-        jurisdiction: jurisdiction || null,
-        document_file_name: tollingFile.name,
-        document_file_url: null,
-        comparison_file_name: comparisonFile?.name || null,
-        comparison_file_url: null,
-        notes: null,
-        parent_analysis_id: null,
-        version_number: 1,
-        is_comparison: false,
-        tolling_type: tollingType,
-        facility_stage: facilityStage,
-        complexity_score: null,
-        key_risk_areas: [],
-        counterparty_type: counterpartyType || null,
-        offtaker_name: offtakerName || null,
-        generator_name: generatorName || null,
-        offtaker_normalized: offtakerName || null,
-        generator_normalized: generatorName || null,
+      // Step 5: Atomically insert the analysis record + its positions
+      // in a single Postgres transaction (no orphan rows on network drop).
+      const positionsPayload = (extractedPositions || []).map((pos: any) => ({
+        category: pos.category,
+        position_summary: pos.position_summary,
+        source_text: pos.clause_references || pos.source_text || null,
+        confidence: pos.confidence || 'medium',
+        bible_reference: pos.bible_reference || null,
+        comparison_position: pos.market_comparison || pos.comparison_position || null,
+        variance_notes: pos.market_position
+          ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim()
+          : pos.variance_notes || null,
+        market_benchmark: pos.market_benchmark || null,
+      }));
+
+      const analysisResult = await createAnalysisWithPositions.mutateAsync({
+        analysis: {
+          analysis_type: analysisType,
+          perspective,
+          project_name: projectName.trim(),
+          jurisdiction: jurisdiction || null,
+          document_file_name: tollingFile.name,
+          document_file_url: null,
+          comparison_file_name: comparisonFile?.name || null,
+          comparison_file_url: null,
+          notes: null,
+          parent_analysis_id: null,
+          version_number: 1,
+          is_comparison: false,
+          tolling_type: tollingType,
+          facility_stage: facilityStage,
+          complexity_score: null,
+          key_risk_areas: [],
+          counterparty_type: counterpartyType || null,
+          offtaker_name: offtakerName || null,
+          generator_name: generatorName || null,
+          offtaker_normalized: offtakerName || null,
+          generator_normalized: generatorName || null,
+          // Applied-context trace
+          applied_learning_ids: appliedLearningIds,
+          applied_precedent_ids: appliedPrecedentIds,
+          applied_gold_standard_ids: appliedGoldStandardIds,
+          // Telemetry
+          model_used: analyzeResponse?.model_used ?? null,
+          analysis_duration_ms: analysisDurationMs,
+          input_token_count: analyzeResponse?.input_token_count ?? null,
+          output_token_count: analyzeResponse?.output_token_count ?? null,
+        },
+        positions: positionsPayload,
       });
 
-      // Step 6: Save extracted positions
-      if (extractedPositions && extractedPositions.length > 0) {
-        await createPositions.mutateAsync(
-          extractedPositions.map((pos: any) => ({
-            analysis_id: analysisResult.id,
-            user_id: analysisResult.user_id,
-            category: pos.category,
-            position_summary: pos.position_summary,
-            source_text: pos.clause_references || pos.source_text || null,
-            confidence: pos.confidence || 'medium',
-            bible_reference: pos.bible_reference || null,
-            comparison_position: pos.market_comparison || pos.comparison_position || null,
-            variance_notes: pos.market_position
-              ? `[${pos.market_position.toUpperCase().replace('_', ' ')}] ${pos.variance_notes || ''}`.trim()
-              : pos.variance_notes || null,
-            market_benchmark: pos.market_benchmark || null,
-          }))
-        );
-      }
-
-      setAnalysisProgress(100);
+      progress.setPhase('complete');
       setCreatedAnalysisId(analysisResult.id);
       setStep('results');
       toast.success('Analysis complete!');
     } catch (err) {
       console.error('Analysis error:', err);
+      void logLlmCall({
+        analystType: 'tolling',
+        functionName: 'analyze-tolling',
+        status: 'failure',
+        errorType: classifyLlmError(err),
+        errorMessage: err instanceof Error ? err.message : String(err),
+        metadata: {
+          analysisType,
+          perspective,
+          tollingType,
+          pii_redacted: redactPIIEnabled,
+          pii_redaction_counts: redactPIIEnabled ? piiCounts : undefined,
+          pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
+          // Edge function now uses JSON response_format; parse errors
+          // should be rare. See #6 structured output.
+          structured_output: true,
+        },
+      });
       setError(err instanceof Error ? err.message : 'Analysis failed');
       setStep('configure');
+      progress.reset();
       toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
@@ -298,6 +380,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
     setPerspective('offtaker');
     setCreatedAnalysisId(null);
     setError(null);
+    progress.reset();
   };
 
   if (step === 'results' && createdAnalysisId) {
@@ -312,21 +395,14 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
 
   if (step === 'analyzing') {
     return (
-      <Card className="max-w-2xl mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle>Analyzing {analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Tolling Agreement'}</CardTitle>
-          <CardDescription>{analysisStatus}</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <Progress value={analysisProgress} className="h-2" />
-          <div className="flex justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-          <p className="text-center text-sm text-muted-foreground">
-            This may take a minute or two for large documents...
-          </p>
-        </CardContent>
-      </Card>
+      <AnalystAnalysisProgress
+        title={`Analyzing ${analysisType === 'termsheet_vs_bible' ? 'Term Sheet' : 'Tolling Agreement'}`}
+        phase={progress.phase}
+        progress={progress.progress}
+        narrative={progress.narrative}
+        elapsedMs={progress.elapsedMs}
+        statusOverride={progress.statusOverride ?? undefined}
+      />
     );
   }
 
@@ -585,6 +661,8 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
             <p className="text-xs text-muted-foreground -mt-3">
               Party names help search precedents by counterparty later
             </p>
+
+            <PIIRedactionToggle checked={redactPIIEnabled} onCheckedChange={setRedactPIIEnabled} />
 
             {/* Start Analysis */}
             <Button

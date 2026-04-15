@@ -109,12 +109,13 @@ export function useGrowthProjects(projectType?: GrowthProjectType) {
     mutationFn: async (project: { name: string; project_type: GrowthProjectType; description?: string | null; mentee_name?: string | null }) => {
       const { data, error } = await supabase
         .from('growth_projects')
-        .insert([{ 
+        .insert([{
           name: project.name,
           project_type: project.project_type,
           description: project.description,
           mentee_name: project.mentee_name,
-          user_id: user!.id 
+          user_id: user!.id,
+          created_by: user!.id,
         }])
         .select()
         .single();

@@ -2,11 +2,12 @@ import { useState, useCallback } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { FileSearch, History, Database, Brain, FlaskConical } from 'lucide-react';
+import { FileSearch, History, Database, Brain, FlaskConical, Beaker } from 'lucide-react';
 import { TollingUploadAnalysis } from '@/components/tolling-analyst/TollingUploadAnalysis';
 import { TollingAnalysisList } from '@/components/tolling-analyst/TollingAnalysisList';
 import { TollingPrecedentBank } from '@/components/tolling-analyst/TollingPrecedentBank';
 import { TollingLearningsTab } from '@/components/tolling-analyst/TollingLearningsTab';
+import { AnalystRegressionHarness } from '@/components/shared/AnalystRegressionHarness';
 import { useTollingPrecedentBank } from '@/lib/hooks/useTollingAnalyses';
 import { useTollingLearnings } from '@/lib/hooks/useTollingLearnings';
 
@@ -62,6 +63,10 @@ export default function TollingAnalyst() {
                 </Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="regression" className="gap-2">
+              <Beaker className="h-4 w-4" />
+              Regression
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="new-analysis">
@@ -78,6 +83,10 @@ export default function TollingAnalyst() {
 
           <TabsContent value="learnings">
             <TollingLearningsTab />
+          </TabsContent>
+
+          <TabsContent value="regression">
+            <AnalystRegressionHarness analyst="tolling" analystLabel="Tolling" />
           </TabsContent>
         </Tabs>
       </div>

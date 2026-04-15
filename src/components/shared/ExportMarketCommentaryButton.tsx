@@ -20,7 +20,7 @@ interface WhatsMarketResult {
 interface Precedent {
   project_name: string;
   jurisdiction?: string | null;
-  perspective: string;
+  perspective?: string | null;
   position_summary: string;
   [key: string]: any;
 }

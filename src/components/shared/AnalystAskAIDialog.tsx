@@ -97,10 +97,12 @@ export function AnalystAskAIDialog({
     try {
       const queryText = `${position.category} — ${position.positionSummary} — ${question}`.slice(0, 3000);
       const embedding = await embedText(queryText);
-      const [precedentRows, learningRows] = await Promise.all([
-        matchPrecedents<PrecedentRow>(analyst, embedding, 5, 0.3, false),
-        matchLearnings<LearningRow>(analyst, embedding, 5, 0.3),
-      ]);
+      const [precedentRows, learningRows] = embedding
+        ? await Promise.all([
+            matchPrecedents<PrecedentRow>(analyst, embedding, 5, 0.3, false),
+            matchLearnings<LearningRow>(analyst, embedding, 5, 0.3),
+          ])
+        : [null, null];
 
       const relevantPrecedents = (precedentRows || [])
         .filter(p => p.position_summary)

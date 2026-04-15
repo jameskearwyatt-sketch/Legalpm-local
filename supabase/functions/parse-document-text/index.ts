@@ -23,7 +23,7 @@ async function decompressEntry(fileData: Uint8Array, compressionMethod: number):
     const ds = new DecompressionStream('deflate-raw');
     const writer = ds.writable.getWriter();
     const reader = ds.readable.getReader();
-    writer.write(fileData);
+    writer.write(fileData.buffer.slice(fileData.byteOffset, fileData.byteOffset + fileData.byteLength));
     writer.close();
     const chunks: Uint8Array[] = [];
     while (true) {

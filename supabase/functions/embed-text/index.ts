@@ -28,10 +28,16 @@ serve(async (req) => {
     if (!OPENAI_API_KEY) {
       return new Response(
         JSON.stringify({
-          error:
-            "OPENAI_API_KEY not configured. Semantic retrieval disabled; callers will fall back to all-active learnings.",
+          disabled: true,
+          reason: 'not_configured',
+          message:
+            'OPENAI_API_KEY not configured. Semantic retrieval disabled; callers will fall back to all-active learnings.',
+          embedding: null,
+          embeddings: null,
+          model: MODEL,
+          dimensions: DIMENSIONS,
         }),
-        { status: 501, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 

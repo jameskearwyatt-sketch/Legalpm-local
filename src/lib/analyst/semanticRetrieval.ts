@@ -133,8 +133,8 @@ export async function matchLearnings<T = unknown>(
   matchThreshold: number = 0.3,
 ): Promise<T[] | null> {
   if (!queryEmbedding) return null;
-  const { data, error } = await supabase.rpc(LEARNINGS_RPC[analyst] as never, {
-    query_embedding: queryEmbedding as never,
+  const { data, error } = await (supabase.rpc as any)(LEARNINGS_RPC[analyst], {
+    query_embedding: queryEmbedding,
     match_count: matchCount,
     match_threshold: matchThreshold,
   });
@@ -153,8 +153,8 @@ export async function matchPrecedents<T = unknown>(
   onlyGoldStandard: boolean = false,
 ): Promise<T[] | null> {
   if (!queryEmbedding) return null;
-  const { data, error } = await supabase.rpc(PRECEDENTS_RPC[analyst] as never, {
-    query_embedding: queryEmbedding as never,
+  const { data, error } = await (supabase.rpc as any)(PRECEDENTS_RPC[analyst], {
+    query_embedding: queryEmbedding,
     match_count: matchCount,
     match_threshold: matchThreshold,
     only_gold_standard: onlyGoldStandard,
@@ -204,8 +204,8 @@ export async function findSimilarLearnings(
   if (!category || !text || !text.trim()) return [];
   const embedding = await embedText(text);
   if (!embedding) return null;
-  const { data, error } = await supabase.rpc(SIMILAR_LEARNINGS_RPC[analyst] as never, {
-    query_embedding: embedding as never,
+  const { data, error } = await (supabase.rpc as any)(SIMILAR_LEARNINGS_RPC[analyst], {
+    query_embedding: embedding,
     filter_category: category,
     match_count: matchCount,
     match_threshold: matchThreshold,

@@ -80,6 +80,9 @@ export async function embedText(text: string): Promise<number[] | null> {
       return null;
     }
     const json = await res.json();
+    if (json?.disabled || json?.reason === 'not_configured') {
+      return null;
+    }
     return Array.isArray(json.embedding) ? json.embedding : null;
   } catch (err) {
     console.warn('embed-text failed, falling back:', err);
@@ -108,6 +111,9 @@ export async function embedTexts(texts: string[]): Promise<(number[] | null)[]> 
     );
     if (!res.ok) return texts.map(() => null);
     const json = await res.json();
+    if (json?.disabled || json?.reason === 'not_configured') {
+      return texts.map(() => null);
+    }
     return Array.isArray(json.embeddings)
       ? (json.embeddings as (number[] | null)[])
       : texts.map(() => null);

@@ -483,7 +483,6 @@ export function useMatters() {
             rate_modifier_value: existingMatter.rate_modifier_value,
             rate_modifier_scope: existingMatter.rate_modifier_scope,
           };
-          console.log('Applying client-wide rate modifier to new matter:', rateModifierOverride);
         }
       }
       
@@ -567,8 +566,6 @@ export function useMatters() {
             
             if (updateError) {
               console.error('Failed to propagate rate modifier to other matters:', updateError);
-            } else {
-              console.log(`Propagated rate modifier to ${otherMatters.length} other matters for client ${clientId}`);
             }
           }
         }

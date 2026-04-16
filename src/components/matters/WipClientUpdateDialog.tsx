@@ -535,8 +535,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         // Standard closing paragraph - always added
         const closingParagraph = `Please do let me know if it would be helpful to discuss these figures or if you would like any further information.\n\nKind regards,`;
         fullBody += `\n\n${closingParagraph}`;
-        console.log("Added closing paragraph to email body");
-        
+
         if (emailSignature) {
           fullBody += `\n\n${emailSignature}`;
         }

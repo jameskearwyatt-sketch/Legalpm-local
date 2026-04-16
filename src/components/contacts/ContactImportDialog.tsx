@@ -347,10 +347,6 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
         provenance: "Pasted import (AI parsed)",
       }));
 
-      if (data.notes) {
-        console.log("AI parsing notes:", data.notes);
-      }
-
       toast.success(`AI extracted ${contacts.length} contact${contacts.length !== 1 ? 's' : ''}`);
 
       // Show preview dialog

@@ -1639,12 +1639,10 @@ export default function Matters() {
           // Save the changes to the tracking table (including LC changes)
           if (snapshotChanges.length > 0) {
             try {
-              console.log('Saving master update with changes:', snapshotChanges);
-              await createMasterUpdate.mutateAsync({ 
+              await createMasterUpdate.mutateAsync({
                 updates: snapshotChanges,
                 lcChanges: lcChanges.length > 0 ? lcChanges : undefined,
               });
-              console.log('Master update saved successfully');
             } catch (error) {
               console.error('Failed to save master update tracking:', error);
               toast.error('Warning: Financial updates applied, but history tracking failed. Check console for details.');

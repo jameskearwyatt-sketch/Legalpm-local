@@ -160,21 +160,19 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     if (!version1) return;
     
     fetchLineItems(version1.id).then(items => {
-      // Bella-specific patch: V1 was priced in USD, current budget is GBP
-      // Convert settled amounts from USD→GBP for display comparison only
-      const isBellaMatter = matterId === '43d4a3fd-e461-45d8-b4b5-66872029f580';
-      const usdToGbpRate = 1 / 1.36;
-      
       setSettledItems(items.map(item => ({
         id: item.id,
         work_item: item.work_item,
         provider: item.provider,
-        fee_amount: isBellaMatter ? item.fee_amount * usdToGbpRate : item.fee_amount,
+        fee_amount: item.fee_amount,
         lc_firm_name: item.lc_firm_name || undefined,
         category: item.category || undefined,
       })));
     }).catch(err => {
       console.error('Failed to fetch settled items:', err);
+      toast.error('Failed to load settled budget items', {
+        description: 'Budget creep comparison will be unavailable.',
+      });
       setSettledItems([]);
     });
   }, [versions]);

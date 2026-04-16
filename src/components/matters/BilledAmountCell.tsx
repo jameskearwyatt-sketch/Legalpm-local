@@ -11,6 +11,7 @@ import { Check, X, Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/currencyUtils';
 import { useMatterBills } from '@/lib/hooks/useMatterBills';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
+import { toast } from 'sonner';
 
 interface BilledAmountCellProps {
   matterId: string;
@@ -66,6 +67,9 @@ export function BilledAmountCell({
       setMode('view');
     } catch (error) {
       console.error('Failed to add bill:', error);
+      toast.error('Failed to add bill', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -85,6 +89,9 @@ export function BilledAmountCell({
       setEditingBillId(null);
     } catch (error) {
       console.error('Failed to update bill:', error);
+      toast.error('Failed to update bill', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      });
     } finally {
       setIsSaving(false);
     }
@@ -97,6 +104,9 @@ export function BilledAmountCell({
       await syncSnapshot(totalBilled - amount);
     } catch (error) {
       console.error('Failed to delete bill:', error);
+      toast.error('Failed to delete bill', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      });
     } finally {
       setIsSaving(false);
     }

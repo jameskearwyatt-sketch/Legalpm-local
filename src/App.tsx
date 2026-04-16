@@ -31,6 +31,7 @@ import CloudComputeAnalyst from "./pages/CloudComputeAnalyst";
 import AdaptPricingWizard from "./pages/AdaptPricingWizard";
 import AdminAnalystBackfill from "./pages/AdminAnalystBackfill";
 import AdminAnalystTelemetry from "./pages/AdminAnalystTelemetry";
+import PalettePreview from "./pages/PalettePreview";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 import { useUserRole } from "@/lib/hooks/useUserRole";
@@ -92,6 +93,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/auth" element={<Auth />} />
+      <Route path="/palette-preview" element={<PalettePreview />} />
       <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/matters" element={<ProtectedRoute><Matters /></ProtectedRoute>} />
       <Route path="/matters/new" element={<ProtectedRoute><MatterForm /></ProtectedRoute>} />

@@ -599,7 +599,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         pipelineMatters: pipelineMattersForUI,
         hasActiveWipProposals,
         matterBreakdowns: matterBreakdowns.sort((a, b) => b.wipAmount - a.wipAmount),
-        writeOffsByMatter,
+        writeOffsByMatter: writeOffsByMatter.sort((a, b) => b.writeOffUsd - a.writeOffUsd),
       } as DashboardStats;
     },
     enabled: !!user,

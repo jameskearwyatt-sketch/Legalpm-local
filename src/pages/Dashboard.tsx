@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDashboard, TrendDataPoint, MatterBreakdown } from '@/lib/hooks/useDashboard';
 import { useMatters } from '@/lib/hooks/useMatters';
 import { useAuth } from '@/lib/auth';
@@ -56,6 +57,21 @@ export default function Dashboard() {
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [expandedTile, setExpandedTile] = useState<'wip' | 'ar' | 'paid' | 'realization' | null>(null);
   const [excludedWriteOffYears, setExcludedWriteOffYears] = useState<Set<number>>(new Set());
+  // Financial year start (month 1-12, day 1-31). Persisted to localStorage so it
+  // survives reloads. Default: 1 July (firm's choice — adjustable in the drill-down).
+  const [fyStart, setFyStart] = useState<{ month: number; day: number }>(() => {
+    try {
+      const raw = localStorage.getItem('dashboard:fyStart');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (typeof parsed?.month === 'number' && typeof parsed?.day === 'number') return parsed;
+      }
+    } catch { /* ignore */ }
+    return { month: 7, day: 1 };
+  });
+  useEffect(() => {
+    try { localStorage.setItem('dashboard:fyStart', JSON.stringify(fyStart)); } catch { /* ignore */ }
+  }, [fyStart]);
   const breakdownRef = useRef<HTMLDivElement>(null);
   // "Not my matters" checkbox defaults to unchecked (meaning they're excluded by default)
   const [notMyMattersIncluded, setNotMyMattersIncluded] = useState(false);
@@ -347,18 +363,34 @@ export default function Dashboard() {
     return [];
   }, [expandedTile, stats?.matterBreakdowns]);
 
-  // Write-offs grouped by year (for Realization Rate drill-down)
+  // Attribute a snapshot date to the firm's financial year (by FY-ending calendar year).
+  // Example: FY starts 1 July. A write-off on 30 Jun 2026 → FY 2026 (ends 30 Jun 2026).
+  // A write-off on 1 Jul 2026 → FY 2027 (next FY, ends 30 Jun 2027).
+  const getFiscalYear = useCallback((dateIso: string): number => {
+    const d = new Date(dateIso);
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1; // 1-12
+    const day = d.getDate();
+    if (fyStart.month === 1 && fyStart.day === 1) return y;
+    const onOrAfterFyStart = m > fyStart.month || (m === fyStart.month && day >= fyStart.day);
+    return onOrAfterFyStart ? y + 1 : y;
+  }, [fyStart]);
+
+  // Write-offs grouped by financial year (for Realization Rate drill-down)
   const writeOffsByYear = useMemo(() => {
     const rows = stats?.writeOffsByMatter || [];
     const byYear = new Map<number, { year: number; totalUsd: number; matterCount: number }>();
     rows.forEach(w => {
-      const entry = byYear.get(w.year) || { year: w.year, totalUsd: 0, matterCount: 0 };
+      const fy = getFiscalYear(w.asOfDate);
+      const entry = byYear.get(fy) || { year: fy, totalUsd: 0, matterCount: 0 };
       entry.totalUsd += w.writeOffUsd;
       entry.matterCount += 1;
-      byYear.set(w.year, entry);
+      byYear.set(fy, entry);
     });
     return Array.from(byYear.values()).sort((a, b) => b.year - a.year);
-  }, [stats?.writeOffsByMatter]);
+  }, [stats?.writeOffsByMatter, getFiscalYear]);
+
+  const isFiscalYearCalendar = fyStart.month === 1 && fyStart.day === 1;
 
   // Realization rate adjusted for excluded write-off years.
   // Formula: Paid / (Billed + IncludedWriteOffs). Excluding a year's write-offs
@@ -548,8 +580,41 @@ export default function Dashboard() {
                 </div>
               </CardHeader>
               <CardContent className="px-4 sm:px-6 pb-4 pt-0 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-border/50">
+                  <p className="text-xs text-muted-foreground">
+                    Financial year starts:
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={String(fyStart.day)}
+                      onValueChange={v => setFyStart(prev => ({ ...prev, day: Math.min(parseInt(v, 10) || 1, 28) }))}
+                    >
+                      <SelectTrigger className="h-8 w-[70px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28].map(d => (
+                          <SelectItem key={d} value={String(d)} className="text-xs">{d}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select
+                      value={String(fyStart.month)}
+                      onValueChange={v => setFyStart(prev => ({ ...prev, month: parseInt(v, 10) || 1 }))}
+                    >
+                      <SelectTrigger className="h-8 w-[130px] text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {['January','February','March','April','May','June','July','August','September','October','November','December'].map((name, idx) => (
+                          <SelectItem key={name} value={String(idx + 1)} className="text-xs">{name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  Uncheck a year to remove its write-offs from the realization rate calculation.
+                  Uncheck a financial year to remove its write-offs from the realization rate calculation.
                   Current rate: <span className="font-medium text-foreground">{adjustedRealizationRate.toFixed(1)}%</span>
                   {excludedWriteOffYears.size > 0 && stats && (
                     <span className="text-muted-foreground"> (base {stats.realizationRate.toFixed(1)}%)</span>
@@ -562,7 +627,7 @@ export default function Dashboard() {
                     <thead>
                       <tr className="border-b border-border">
                         <th className="w-8 py-2"></th>
-                        <th className="text-left py-2 pr-2 text-xs font-medium text-muted-foreground">Year</th>
+                        <th className="text-left py-2 pr-2 text-xs font-medium text-muted-foreground">{isFiscalYearCalendar ? 'Year' : 'Financial Year'}</th>
                         <th className="text-left py-2 pr-2 text-xs font-medium text-muted-foreground">Matters</th>
                         <th className="text-right py-2 text-xs font-medium text-muted-foreground">Written off (USD)</th>
                       </tr>
@@ -580,7 +645,7 @@ export default function Dashboard() {
                               />
                             </td>
                             <td className={cn('py-2 pr-2 text-xs sm:text-sm', included ? 'text-foreground' : 'text-muted-foreground line-through')}>
-                              {row.year}
+                              {isFiscalYearCalendar ? row.year : `FY ${row.year}`}
                             </td>
                             <td className={cn('py-2 pr-2 text-xs', included ? 'text-muted-foreground' : 'text-muted-foreground/60')}>
                               {row.matterCount}

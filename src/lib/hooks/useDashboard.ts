@@ -42,7 +42,7 @@ export interface MatterWriteOff {
   matterName: string;
   clientName: string;
   writeOffUsd: number;
-  year: number;
+  asOfDate: string; // ISO date — client attributes to FY using user's financial-year start
 }
 
 export interface DashboardStats {
@@ -293,14 +293,12 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
 
           if (actualWipWriteOffAmount > 0) {
             const writeOffUsd = convertToUsd(actualWipWriteOffAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-            const asOfDate = snapshot?.as_of_date;
-            const year = asOfDate ? new Date(asOfDate).getFullYear() : new Date().getFullYear();
             writeOffsByMatter.push({
               id: matter.id,
               matterName: matter.matter_name,
               clientName: getMatterClientDisplayName(matter),
               writeOffUsd,
-              year,
+              asOfDate: snapshot?.as_of_date || new Date().toISOString().slice(0, 10),
             });
           }
         }

@@ -303,7 +303,6 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
     );
     
     if (orphanedItems.length > 0 && !viewingHistoricalVersion) {
-      console.log('Cleaning up orphaned phase_ids:', orphanedItems.map(i => i.work_item));
       const cleanedItems = items.map(item => {
         if (item.phase_id && !validPhaseIds.has(item.phase_id)) {
           return { ...item, phase_id: null };
@@ -482,37 +481,20 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
   // Handle phase drag end (for reordering phases)
   const handlePhaseDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
-    console.log('[Phase Drag] active:', active.id, 'over:', over?.id);
-    
-    if (!over || active.id === over.id) {
-      console.log('[Phase Drag] No change - same position or no target');
-      return;
-    }
+    if (!over || active.id === over.id) return;
 
     const activeId = active.id as string;
     const overId = over.id as string;
 
-    // Check if both IDs are phases (exist in phases array)
     const isActivePhase = phases.some(p => p.id === activeId);
     const isOverPhase = phases.some(p => p.id === overId);
-    
-    if (!isActivePhase || !isOverPhase) {
-      console.log('[Phase Drag] Not a phase drag - IDs:', activeId, overId, 'isActivePhase:', isActivePhase, 'isOverPhase:', isOverPhase);
-      return;
-    }
+    if (!isActivePhase || !isOverPhase) return;
 
     const activeIndex = phases.findIndex(p => p.id === activeId);
     const overIndex = phases.findIndex(p => p.id === overId);
-
-    console.log('[Phase Drag] Indices - active:', activeIndex, 'over:', overIndex);
-    
-    if (activeIndex === -1 || overIndex === -1) {
-      console.log('[Phase Drag] Invalid indices');
-      return;
-    }
+    if (activeIndex === -1 || overIndex === -1) return;
 
     const newPhases = arrayMove(phases, activeIndex, overIndex);
-    console.log('[Phase Drag] New order:', newPhases.map(p => p.name));
     onPhasesChange(newPhases);
   }, [phases, onPhasesChange]);
 

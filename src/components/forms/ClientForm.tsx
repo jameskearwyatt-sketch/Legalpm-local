@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { useClients, Client, CreateClientInput } from '@/lib/hooks/useClients';
 import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
+import { toast } from 'sonner';
 
 const clientSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200),
@@ -39,8 +40,10 @@ export function ClientForm({ client, onSuccess }: ClientFormProps) {
 
       if (isEditing) {
         await updateClient.mutateAsync({ id: client.id, ...validated });
+        toast.success('Client updated');
       } else {
         await createClient.mutateAsync({ name: validated.name, group_sector: validated.group_sector, billing_contact: validated.billing_contact });
+        toast.success('Client created');
       }
       onSuccess();
     } catch (error) {
@@ -52,8 +55,11 @@ export function ClientForm({ client, onSuccess }: ClientFormProps) {
           }
         });
         setErrors(fieldErrors);
+        toast.error('Please correct the highlighted fields');
       } else {
-        setErrors({ name: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.' });
+        const message = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
+        setErrors({ name: message });
+        toast.error(isEditing ? 'Failed to update client' : 'Failed to create client', { description: message });
       }
     } finally {
       setIsSubmitting(false);

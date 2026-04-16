@@ -23,7 +23,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
-import { Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, X } from 'lucide-react';
 
 export type AnalystProgressPhase =
   | 'idle'
@@ -115,6 +116,8 @@ interface Props {
   statusOverride?: string;
   /** Optional extra note shown at the bottom of the card. */
   footerNote?: string;
+  /** If provided, a Cancel button is shown; invoked when the user clicks it. */
+  onCancel?: () => void;
 }
 
 function formatElapsed(ms: number): string {
@@ -132,6 +135,7 @@ export function AnalystAnalysisProgress({
   elapsedMs,
   statusOverride,
   footerNote = 'Large contracts can take 1–2 minutes. Feel free to keep this tab open in the background.',
+  onCancel,
 }: Props) {
   const status = statusOverride ?? DEFAULT_PHASES[phase].status;
   return (
@@ -160,6 +164,20 @@ export function AnalystAnalysisProgress({
           </p>
         )}
         <p className="text-center text-xs text-muted-foreground/80">{footerNote}</p>
+        {onCancel && phase !== 'complete' && (
+          <div className="flex justify-center">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onCancel}
+              aria-label="Cancel analysis"
+            >
+              <X className="mr-1.5 h-3.5 w-3.5" />
+              Cancel
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

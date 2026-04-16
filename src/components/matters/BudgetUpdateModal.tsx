@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -211,6 +212,9 @@ export function BudgetUpdateModal({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Update Budget Agreement</DialogTitle>
+          <DialogDescription>
+            Adjust the agreed budget, note the reason, and optionally attach supporting documents.
+          </DialogDescription>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-4">

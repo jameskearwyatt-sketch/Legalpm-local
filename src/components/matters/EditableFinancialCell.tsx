@@ -3,6 +3,7 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Check, X, Loader2, Pencil } from 'lucide-react';
 import { formatCurrency } from '@/lib/currencyUtils';
+import { toast } from 'sonner';
 
 interface EditableFinancialCellProps {
   value: number;
@@ -45,6 +46,9 @@ export function EditableFinancialCell({ value, currency, onSave, className, comp
       setIsEditing(false);
     } catch (error) {
       console.error('Failed to save:', error);
+      toast.error('Failed to save', {
+        description: error instanceof Error ? error.message : 'Please try again.',
+      });
     } finally {
       setIsSaving(false);
     }

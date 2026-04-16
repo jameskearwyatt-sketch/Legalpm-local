@@ -182,8 +182,6 @@ export function WipImportDialog({
         return;
       }
 
-      console.log('Processing WIP content, length:', content.length);
-
       const { data, error } = await supabase.functions.invoke('parse-wip-document', {
         body: {
           content,

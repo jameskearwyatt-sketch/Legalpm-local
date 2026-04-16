@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { getCurrencySymbol, formatCurrency } from '@/lib/currencyUtils';
+import { toast } from 'sonner';
 
 const snapshotSchema = z.object({
   as_of_date: z.string().min(1, 'Date is required'),
@@ -65,11 +66,12 @@ export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }
 
       if (isEditing) {
         // Save NET WIP, not raw WIP
-        await updateSnapshot.mutateAsync({ 
-          id: snapshot.id, 
+        await updateSnapshot.mutateAsync({
+          id: snapshot.id,
           ...validated,
           wip_amount: netWip, // Override with NET value
         });
+        toast.success('Snapshot updated');
       } else {
         // Save NET WIP, not raw WIP
         await createSnapshot.mutateAsync({
@@ -77,6 +79,7 @@ export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }
           ...validated,
           wip_amount: netWip, // Override with NET value
         } as CreateSnapshotInput);
+        toast.success('Snapshot added');
       }
       onSuccess();
     } catch (error) {
@@ -88,8 +91,11 @@ export function SnapshotForm({ matterId, snapshot, onSuccess, currency = 'GBP' }
           }
         });
         setErrors(fieldErrors);
+        toast.error('Please correct the highlighted fields');
       } else {
-        setErrors({ as_of_date: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.' });
+        const message = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
+        setErrors({ as_of_date: message });
+        toast.error(isEditing ? 'Failed to update snapshot' : 'Failed to add snapshot', { description: message });
       }
     } finally {
       setIsSubmitting(false);

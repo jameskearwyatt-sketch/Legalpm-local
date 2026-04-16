@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -534,8 +535,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         // Standard closing paragraph - always added
         const closingParagraph = `Please do let me know if it would be helpful to discuss these figures or if you would like any further information.\n\nKind regards,`;
         fullBody += `\n\n${closingParagraph}`;
-        console.log("Added closing paragraph to email body");
-        
+
         if (emailSignature) {
           fullBody += `\n\n${emailSignature}`;
         }
@@ -1314,6 +1314,9 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
             <Mail className="h-5 w-5" />
             Update Clients on Work in Progress
           </DialogTitle>
+          <DialogDescription>
+            Draft and send WIP status emails to selected clients for the matters you choose below.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Step indicator */}

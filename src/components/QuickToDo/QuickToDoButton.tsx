@@ -600,6 +600,7 @@ const SortableSlateItem = ({
             className="h-5 w-5 shrink-0 opacity-60 hover:opacity-100 hover:bg-primary/10"
             onClick={onSnapToTop}
             title="Move to top"
+            aria-label="Move to top"
           >
             <ArrowUp className="h-3.5 w-3.5 text-primary" />
           </Button>
@@ -656,6 +657,7 @@ const SortableSlateItem = ({
           className="h-6 w-6 shrink-0 opacity-60 group-hover:opacity-100 hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
           onClick={onPromoteToTaskList}
           title="Add to main task list"
+          aria-label="Add to main task list"
         >
           <Plus className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
         </Button>
@@ -667,6 +669,7 @@ const SortableSlateItem = ({
         className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100"
         onClick={onRemoveFromSlate}
         title="Remove from Slate"
+        aria-label="Remove from Slate"
       >
         <ClipboardCheck className="h-3.5 w-3.5 text-blue-500" />
       </Button>
@@ -775,6 +778,7 @@ const SortablePersonalTask = ({
         className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100"
         onClick={onDelete}
         title="Remove"
+        aria-label="Remove task"
       >
         <X className="h-3.5 w-3.5 text-rose-500" />
       </Button>
@@ -2276,6 +2280,7 @@ export function QuickToDoButton() {
               )}
               onClick={() => toggleSlate(task.id, task.on_slate || false, task.source)}
               title={task.on_slate ? "Remove from Slate" : "Add to Slate"}
+              aria-label={task.on_slate ? "Remove from Slate" : "Add to Slate"}
             >
               {task.on_slate ? (
                 <ClipboardCheck className="h-3.5 w-3.5" />
@@ -2293,6 +2298,7 @@ export function QuickToDoButton() {
                   className="h-6 w-6"
                   onClick={() => openMoveDialog(task)}
                   title="Move to Growth"
+                  aria-label="Move to Growth"
                 >
                   <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
                 </Button>
@@ -2302,6 +2308,7 @@ export function QuickToDoButton() {
                   className="h-6 w-6"
                   onClick={() => deleteTask(task.id)}
                   title="Delete task"
+                  aria-label="Delete task"
                 >
                   <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
                 </Button>
@@ -2343,6 +2350,7 @@ export function QuickToDoButton() {
                 className="h-5 w-5"
                 onClick={() => toggleGrowthTaskPin(task.id, true)}
                 title="Remove from Task List"
+                aria-label="Remove from Task List"
               >
                 <PinOff className="h-3 w-3 text-muted-foreground" />
               </Button>
@@ -2706,6 +2714,7 @@ export function QuickToDoButton() {
                 orderedSlateTasks.length === 0 && "opacity-60 group-hover:opacity-80"
               )}
               title={`Slate (${orderedSlateTasks.length} tasks)`}
+              aria-label={`Open Slate (${orderedSlateTasks.length} tasks)`}
             >
               <Clipboard className="h-3.5 w-3.5" />
             </button>
@@ -2733,6 +2742,7 @@ export function QuickToDoButton() {
               isDragging && "cursor-grabbing scale-110 shadow-2xl shadow-teal-500/40",
               !isDragging && "cursor-grab"
             )}
+            aria-label={`Open task list (${incompleteTasks.length} incomplete)`}
           >
             <CheckSquare className="h-6 w-6" />
             {/* Badges container - top right corner */}
@@ -3339,6 +3349,7 @@ export function QuickToDoButton() {
                 onClick={addTask}
                 disabled={!newTask.trim() || isLoading}
                 className="h-8 w-8 bg-teal-500 hover:bg-teal-600"
+                aria-label="Add task"
               >
                 <Plus className="h-4 w-4" />
               </Button>
@@ -3432,10 +3443,11 @@ export function QuickToDoButton() {
                                       {format(new Date(task.completed_at), 'MMM d')}
                                     </span>
                                   )}
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0" 
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-5 w-5 opacity-0 group-hover:opacity-100 shrink-0"
+                                    aria-label="Delete completed task"
                                     onClick={() => {
                                       if (task.source === 'growth') {
                                         // Delete growth task

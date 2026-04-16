@@ -16,6 +16,7 @@ import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import { format } from 'date-fns';
 import { getCurrencySymbol } from '@/lib/currencyUtils';
+import { toast } from 'sonner';
 
 const invoiceSchema = z.object({
   invoice_number: z.string().min(1, 'Invoice number is required').max(50),
@@ -63,11 +64,13 @@ export function InvoiceForm({ matterId, invoice, onSuccess, currency = 'GBP' }: 
 
       if (isEditing) {
         await updateInvoice.mutateAsync({ id: invoice.id, ...validated });
+        toast.success('Invoice updated');
       } else {
         await createInvoice.mutateAsync({
           matter_id: matterId,
           ...validated,
         } as CreateInvoiceInput);
+        toast.success('Invoice added');
       }
       onSuccess();
     } catch (error) {
@@ -79,8 +82,11 @@ export function InvoiceForm({ matterId, invoice, onSuccess, currency = 'GBP' }: 
           }
         });
         setErrors(fieldErrors);
+        toast.error('Please correct the highlighted fields');
       } else {
-        setErrors({ invoice_number: error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.' });
+        const message = error instanceof Error ? error.message : 'An unexpected error occurred. Please try again.';
+        setErrors({ invoice_number: message });
+        toast.error(isEditing ? 'Failed to update invoice' : 'Failed to add invoice', { description: message });
       }
     } finally {
       setIsSubmitting(false);

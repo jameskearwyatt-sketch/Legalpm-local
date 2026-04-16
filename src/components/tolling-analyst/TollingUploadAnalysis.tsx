@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,6 +29,7 @@ const JURISDICTIONS = [
 import { TOLLING_TECHNOLOGY_TYPES, TOLLING_FACILITY_STAGES, type TollingFacilityStage } from '@/lib/tollingCategories';
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { validateUploadFile } from '@/lib/analyst/fileValidation';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
@@ -57,6 +58,14 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
   const [error, setError] = useState<string | null>(null);
   const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
   const progress = useAnalystProgress();
+  const cancelledRef = useRef(false);
+
+  const handleCancel = useCallback(() => {
+    cancelledRef.current = true;
+    progress.reset();
+    setStep('configure');
+    toast.info('Analysis cancelled. Server-side processing may continue briefly.');
+  }, [progress]);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>, type: 'tolling' | 'comparison') => {
     const file = e.target.files?.[0];
@@ -70,6 +79,12 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
 
     if (!validTypes.includes(file.type)) {
       toast.error('Please upload a PDF or Word document (.doc/.docx)');
+      return;
+    }
+
+    const sizeCheck = validateUploadFile(file);
+    if (!sizeCheck.ok) {
+      toast.error(sizeCheck.error ?? 'File is invalid.');
       return;
     }
 
@@ -97,6 +112,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
 
     setStep('analyzing');
     setError(null);
+    cancelledRef.current = false;
     progress.reset();
     progress.setPhase('extract');
 
@@ -303,6 +319,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         market_benchmark: pos.market_benchmark || null,
       }));
 
+      if (cancelledRef.current) return;
       const analysisResult = await createAnalysisWithPositions.mutateAsync({
         analysis: {
           analysis_type: analysisType,
@@ -339,11 +356,13 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         positions: positionsPayload,
       });
 
+      if (cancelledRef.current) return;
       progress.setPhase('complete');
       setCreatedAnalysisId(analysisResult.id);
       setStep('results');
       toast.success('Analysis complete!');
     } catch (err) {
+      if (cancelledRef.current) return;
       console.error('Analysis error:', err);
       void logLlmCall({
         analystType: 'tolling',
@@ -402,6 +421,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
         narrative={progress.narrative}
         elapsedMs={progress.elapsedMs}
         statusOverride={progress.statusOverride ?? undefined}
+        onCancel={handleCancel}
       />
     );
   }

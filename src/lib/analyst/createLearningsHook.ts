@@ -97,8 +97,9 @@ export function createLearningsHook<T extends BaseAnalystLearning = BaseAnalystL
           learning.corrected_position,
           learning.correction_reason ?? '',
         ].filter(Boolean).join('\n');
-        void embedAndStore(analystType, 'learning', (data as { id: string }).id, embedSource);
-        return data as unknown as T;
+        const createdRow = data as unknown as T;
+        void embedAndStore(analystType, 'learning', createdRow.id, embedSource);
+        return createdRow;
       },
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: [queryKey] });

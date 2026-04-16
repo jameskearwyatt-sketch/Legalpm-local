@@ -195,13 +195,10 @@ export function createAnalysesHooks<
         positions: Omit<TPosition, 'id' | 'analysis_id' | 'user_id' | 'created_at'>[];
       }) => {
         if (!user) throw new Error('Not authenticated');
-        const { data, error } = await supabase.rpc(
-          createWithPositionsRpc as never,
-          {
-            analysis_data: args.analysis as never,
-            positions_data: (args.positions ?? []) as never,
-          },
-        );
+        const { data, error } = await (supabase.rpc as any)(createWithPositionsRpc, {
+          analysis_data: args.analysis,
+          positions_data: args.positions ?? [],
+        });
         if (error) throw error;
         return data as unknown as TAnalysis;
       },

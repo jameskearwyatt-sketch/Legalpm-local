@@ -1080,9 +1080,9 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
                   <Button 
                     onClick={handleConfirmAndAnalyze} 
                     className="flex-1 gap-2"
-                    disabled={createAnalysis.isPending}
+                    disabled={createAnalysisWithPositions.isPending}
                   >
-                    {createAnalysis.isPending ? (
+                    {createAnalysisWithPositions.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <Scale className="h-4 w-4" />

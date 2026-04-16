@@ -195,13 +195,10 @@ export function usePPAAnalyses() {
       positions: Omit<PPAExtractedPosition, 'id' | 'analysis_id' | 'user_id' | 'created_at'>[];
     }) => {
       if (!user) throw new Error('Not authenticated');
-      const { data, error } = await supabase.rpc(
-        'create_ppa_analysis_with_positions' as never,
-        {
-          analysis_data: args.analysis as never,
-          positions_data: (args.positions ?? []) as never,
-        },
-      );
+      const { data, error } = await (supabase.rpc as any)('create_ppa_analysis_with_positions', {
+        analysis_data: args.analysis,
+        positions_data: args.positions ?? [],
+      });
       if (error) throw error;
       return data as unknown as PPAAnalysis;
     },

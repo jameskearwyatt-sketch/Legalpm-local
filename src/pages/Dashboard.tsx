@@ -367,7 +367,10 @@ export default function Dashboard() {
   // Example: FY starts 1 July. A write-off on 30 Jun 2026 → FY 2026 (ends 30 Jun 2026).
   // A write-off on 1 Jul 2026 → FY 2027 (next FY, ends 30 Jun 2027).
   const getFiscalYear = useCallback((dateIso: string): number => {
-    const d = new Date(dateIso);
+    let d = new Date(dateIso);
+    // Some snapshots may have a malformed or missing as_of_date — fall back to today
+    // so the write-off is still attributed to a real financial year instead of "FY NaN".
+    if (isNaN(d.getTime())) d = new Date();
     const y = d.getFullYear();
     const m = d.getMonth() + 1; // 1-12
     const day = d.getDate();

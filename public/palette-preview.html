@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Legal PM — Palette Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+    --font-heading-serif: 'Cormorant Garamond', 'Times New Roman', serif;
+    --font-heading-sans: 'Outfit', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-body);
+    background: #efefea;
+    padding: 24px;
+    color: #1a1a1a;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  .page-header {
+    max-width: 1200px;
+    margin: 0 auto 24px;
+  }
+  .page-header h1 {
+    font-family: var(--font-heading-serif);
+    font-size: 36px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    margin-bottom: 6px;
+  }
+  .page-header p { font-size: 15px; color: #555; max-width: 680px; }
+  .page-header .legend {
+    margin-top: 18px;
+    font-size: 13px;
+    color: #555;
+    padding: 12px 16px;
+    background: #fff;
+    border-radius: 8px;
+    border: 1px solid #e0ddd5;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  /* Each palette preview acts as its own themed root */
+  .preview {
+    display: flex;
+    flex-direction: column;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 12px 40px -18px rgba(0,0,0,0.3);
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+  .preview-label {
+    padding: 18px 24px;
+    background: #fff;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .preview-label h2 {
+    font-family: var(--font-heading-serif);
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+  }
+  .preview-label .tagline {
+    font-size: 13px;
+    color: #666;
+    font-style: italic;
+  }
+
+  /* App-like layout INSIDE each preview */
+  .app {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: 520px;
+    font-family: var(--font-body);
+  }
+  .sidebar {
+    padding: 22px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--sidebar-bg);
+    color: var(--sidebar-fg);
+  }
+  .sidebar .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+    padding: 0 8px;
+  }
+  .sidebar .logo-icon {
+    width: 22px; height: 22px;
+    border-radius: 4px;
+    background: var(--sidebar-accent);
+  }
+  .sidebar .logo-text {
+    font-family: var(--font-heading-serif);
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--sidebar-fg);
+  }
+  .nav-item {
+    padding: 9px 12px;
+    border-radius: 6px;
+    font-size: 13.5px;
+    color: var(--sidebar-fg-dim);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .nav-item.active {
+    background: var(--sidebar-active-bg);
+    color: var(--sidebar-active-fg);
+    font-weight: 500;
+  }
+  .nav-item .dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: currentColor;
+    opacity: 0.6;
+  }
+
+  .main {
+    background: var(--bg);
+    padding: 28px 32px;
+    color: var(--fg);
+  }
+  .main-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .main-header .titles h3 {
+    font-family: var(--font-heading-serif);
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -0.005em;
+    color: var(--fg);
+    line-height: 1.15;
+  }
+  .main-header .titles p {
+    font-size: 13.5px;
+    color: var(--fg-muted);
+    margin-top: 4px;
+  }
+  .btn {
+    padding: 9px 18px;
+    border-radius: 6px;
+    font-size: 13.5px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.2s;
+    font-family: var(--font-body);
+  }
+  .btn:hover { opacity: 0.9; }
+  .btn-primary {
+    background: var(--primary);
+    color: var(--primary-fg);
+  }
+  .btn-outline {
+    background: transparent;
+    color: var(--fg);
+    border: 1px solid var(--border);
+  }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 22px;
+    box-shadow: 0 1px 3px 0 rgba(0,0,0,0.04);
+  }
+  .card h4 {
+    font-family: var(--font-heading-serif);
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  .card .subtitle {
+    font-size: 12.5px;
+    color: var(--fg-muted);
+    margin-bottom: 16px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    text-align: left;
+    padding: 8px 10px;
+    font-weight: 500;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--fg-muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--muted-bg);
+  }
+  tbody td {
+    padding: 10px;
+    border-bottom: 1px solid var(--border);
+    color: var(--fg);
+  }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+  }
+  .badge-accent {
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+    border: 1px solid var(--accent-border);
+  }
+  .badge-success {
+    background: var(--success-soft);
+    color: var(--success-strong);
+    border: 1px solid var(--success-border);
+  }
+  .badge-warning {
+    background: var(--warning-soft);
+    color: var(--warning-strong);
+    border: 1px solid var(--warning-border);
+  }
+  .badge-danger {
+    background: var(--danger-soft);
+    color: var(--danger-strong);
+    border: 1px solid var(--danger-border);
+  }
+
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  .stat {
+    padding: 14px 16px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .stat .stat-label {
+    font-size: 11.5px;
+    color: var(--fg-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .stat .stat-value {
+    font-family: var(--font-heading-serif);
+    font-size: 24px;
+    font-weight: 500;
+    margin-top: 2px;
+    color: var(--fg);
+  }
+  .stat .stat-delta {
+    font-size: 11.5px;
+    color: var(--success-strong);
+    margin-top: 2px;
+  }
+
+  .swatch-bar {
+    display: flex;
+    gap: 0;
+    border-radius: 0 0 14px 14px;
+    overflow: hidden;
+  }
+  .swatch {
+    flex: 1;
+    padding: 14px 10px;
+    text-align: center;
+    font-size: 10.5px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    color: #fff;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.4);
+  }
+  .swatch.light { color: #333; text-shadow: none; }
+
+  /* ===================== PALETTE 1: Cashmere & Cognac ===================== */
+  .cashmere {
+    --bg: #FAF6EE;
+    --fg: #1F1A14;
+    --fg-muted: #6B5F4D;
+    --card: #FDFAF4;
+    --muted-bg: #F2EBDC;
+    --border: #D4C7B2;
+    --primary: #6B4A2C;
+    --primary-fg: #FDFAF4;
+    --accent-soft: #F0E5D0;
+    --accent-strong: #6B4A2C;
+    --accent-border: #C6AD82;
+    --success-soft: #E6E8D5;
+    --success-strong: #4E5A32;
+    --success-border: #B8BF8F;
+    --warning-soft: #F3E5C7;
+    --warning-strong: #7A5412;
+    --warning-border: #D9B66F;
+    --danger-soft: #EFD8D0;
+    --danger-strong: #6E2D1B;
+    --danger-border: #C58877;
+    --sidebar-bg: #1F1A14;
+    --sidebar-fg: #E8E0D2;
+    --sidebar-fg-dim: #B8AC96;
+    --sidebar-active-bg: #2F271E;
+    --sidebar-active-fg: #D4B88A;
+    --sidebar-accent: #B89968;
+  }
+
+  /* ===================== PALETTE 2: Charcoal & Oatmeal ===================== */
+  .charcoal {
+    --bg: #F5F1EA;
+    --fg: #1C1A18;
+    --fg-muted: #625F58;
+    --card: #FBF8F1;
+    --muted-bg: #ECE6D9;
+    --border: #CFC5B3;
+    --primary: #2B2925;
+    --primary-fg: #F5F1EA;
+    --accent-soft: #E5DBC6;
+    --accent-strong: #5C4623;
+    --accent-border: #BB9F6E;
+    --success-soft: #DDE3D1;
+    --success-strong: #425134;
+    --success-border: #A9B694;
+    --warning-soft: #EEE0C1;
+    --warning-strong: #735012;
+    --warning-border: #D2AE66;
+    --danger-soft: #E8D2C8;
+    --danger-strong: #6A2C1A;
+    --danger-border: #BC8170;
+    --sidebar-bg: #1C1A18;
+    --sidebar-fg: #D6CDB9;
+    --sidebar-fg-dim: #9A917F;
+    --sidebar-active-bg: #2B2925;
+    --sidebar-active-fg: #C4A574;
+    --sidebar-accent: #8A6F47;
+  }
+
+  /* ===================== PALETTE 3: Ivory & Forest ===================== */
+  .forest {
+    --bg: #F8F6F1;
+    --fg: #1A1D1A;
+    --fg-muted: #5A6159;
+    --card: #FDFCF8;
+    --muted-bg: #EDEBE1;
+    --border: #CCC8BC;
+    --primary: #2C3D2E;
+    --primary-fg: #F8F6F1;
+    --accent-soft: #DDE3CF;
+    --accent-strong: #465A39;
+    --accent-border: #9EAE82;
+    --success-soft: #D5DDC8;
+    --success-strong: #3E5131;
+    --success-border: #9CAB88;
+    --warning-soft: #EDE0C0;
+    --warning-strong: #725012;
+    --warning-border: #D1AE66;
+    --danger-soft: #E5D5CE;
+    --danger-strong: #6B2F1F;
+    --danger-border: #BB8876;
+    --sidebar-bg: #2C3D2E;
+    --sidebar-fg: #E6E3DA;
+    --sidebar-fg-dim: #A8AC98;
+    --sidebar-active-bg: #3A4E3C;
+    --sidebar-active-fg: #D9D2B6;
+    --sidebar-accent: #86996A;
+  }
+
+  /* ===================== CURRENT: Navy & Slate ===================== */
+  .current {
+    --bg: #F6F8FA;
+    --fg: #0F172A;
+    --fg-muted: #64748B;
+    --card: #FFFFFF;
+    --muted-bg: #EEF2F6;
+    --border: #D5DCE4;
+    --primary: #1B2B4B;
+    --primary-fg: #FFFFFF;
+    --accent-soft: #DBE6FD;
+    --accent-strong: #1D4ED8;
+    --accent-border: #93B4F8;
+    --success-soft: #D1FAE5;
+    --success-strong: #047857;
+    --success-border: #6EE7B7;
+    --warning-soft: #FEF3C7;
+    --warning-strong: #B45309;
+    --warning-border: #FCD34D;
+    --danger-soft: #FEE2E2;
+    --danger-strong: #B91C1C;
+    --danger-border: #FCA5A5;
+    --sidebar-bg: #0F172A;
+    --sidebar-fg: #D0D7E2;
+    --sidebar-fg-dim: #94A3B8;
+    --sidebar-active-bg: #1E293B;
+    --sidebar-active-fg: #60A5FA;
+    --sidebar-accent: #3B82F6;
+  }
+  .current .main-header .titles h3,
+  .current .card h4,
+  .current .stat .stat-value,
+  .current .preview-label h2,
+  .current .sidebar .logo-text {
+    font-family: var(--font-heading-sans);
+    font-weight: 600;
+  }
+  .current .page-header h1 { font-family: var(--font-heading-sans); font-weight: 600; }
+
+  @media (max-width: 720px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { flex-direction: row; flex-wrap: wrap; padding: 14px; }
+    .stat-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>Legal PM — Palette Preview</h1>
+  <p>Each block below shows the same mock app screen rendered in a different palette. Sidebar, header, stats, table, badges, buttons — all the chrome you'd see day to day. Pick the one that feels right and I'll apply it site-wide.</p>
+  <div class="legend"><strong>Note:</strong> this is a static preview built from the real token values. Fonts and colours shown are exactly what the live app would use after the switch. Status badges (green/amber/red) are tuned so meaning stays clear while the palette changes around them.</div>
+</div>
+
+<div class="container">
+
+  <!-- ================ CURRENT ================ -->
+  <div class="preview current">
+    <div class="preview-label">
+      <div>
+        <h2>Current — Navy &amp; Slate</h2>
+      </div>
+      <div class="tagline">what the app looks like today</div>
+    </div>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="logo"><span class="logo-icon"></span><span class="logo-text">Legal PM</span></div>
+        <div class="nav-item"><span class="dot"></span>Dashboard</div>
+        <div class="nav-item active"><span class="dot"></span>Matters</div>
+        <div class="nav-item"><span class="dot"></span>Pricing</div>
+        <div class="nav-item"><span class="dot"></span>Contacts</div>
+        <div class="nav-item"><span class="dot"></span>Growth</div>
+        <div class="nav-item"><span class="dot"></span>Analysts</div>
+      </aside>
+      <div class="main">
+        <div class="main-header">
+          <div class="titles">
+            <h3>Matters</h3>
+            <p>Active engagements, budgets, and WIP across your portfolio</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline">Filter</button>
+            <button class="btn btn-primary">+ New matter</button>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat"><div class="stat-label">Open matters</div><div class="stat-value">47</div><div class="stat-delta">+3 this month</div></div>
+          <div class="stat"><div class="stat-label">WIP outstanding</div><div class="stat-value">£412k</div><div class="stat-delta">on track</div></div>
+          <div class="stat"><div class="stat-label">Budget burn</div><div class="stat-value">68%</div><div class="stat-delta">avg across matters</div></div>
+        </div>
+        <div class="card">
+          <h4>Recent matters</h4>
+          <div class="subtitle">Sorted by last activity</div>
+          <table>
+            <thead><tr><th>Client</th><th>Matter</th><th>Status</th><th>Budget</th></tr></thead>
+            <tbody>
+              <tr><td>Aurora Energy Ltd</td><td>PPA renegotiation</td><td><span class="badge badge-success">On track</span></td><td>£48k / £60k</td></tr>
+              <tr><td>Harbour Financial</td><td>Supply agreement review</td><td><span class="badge badge-warning">Near budget</span></td><td>£92k / £100k</td></tr>
+              <tr><td>Willow Lake Capital</td><td>Tolling dispute</td><td><span class="badge badge-danger">Over budget</span></td><td>£187k / £150k</td></tr>
+              <tr><td>Meridian Partners</td><td>Carbon credit offtake</td><td><span class="badge badge-accent">Proposal sent</span></td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="swatch-bar">
+      <div class="swatch" style="background:#F6F8FA;color:#333;">#F6F8FA bg</div>
+      <div class="swatch" style="background:#1B2B4B;">#1B2B4B primary</div>
+      <div class="swatch" style="background:#0F172A;">#0F172A sidebar</div>
+      <div class="swatch" style="background:#3B82F6;">#3B82F6 accent</div>
+      <div class="swatch" style="background:#FFFFFF;color:#333;">#FFFFFF card</div>
+    </div>
+  </div>
+
+  <!-- ================ CASHMERE & COGNAC ================ -->
+  <div class="preview cashmere">
+    <div class="preview-label">
+      <div>
+        <h2>Option A — Cashmere &amp; Cognac</h2>
+      </div>
+      <div class="tagline">Loro Piana: warm cream, espresso, cognac, camel</div>
+    </div>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="logo"><span class="logo-icon"></span><span class="logo-text">Legal PM</span></div>
+        <div class="nav-item"><span class="dot"></span>Dashboard</div>
+        <div class="nav-item active"><span class="dot"></span>Matters</div>
+        <div class="nav-item"><span class="dot"></span>Pricing</div>
+        <div class="nav-item"><span class="dot"></span>Contacts</div>
+        <div class="nav-item"><span class="dot"></span>Growth</div>
+        <div class="nav-item"><span class="dot"></span>Analysts</div>
+      </aside>
+      <div class="main">
+        <div class="main-header">
+          <div class="titles">
+            <h3>Matters</h3>
+            <p>Active engagements, budgets, and WIP across your portfolio</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline">Filter</button>
+            <button class="btn btn-primary">+ New matter</button>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat"><div class="stat-label">Open matters</div><div class="stat-value">47</div><div class="stat-delta">+3 this month</div></div>
+          <div class="stat"><div class="stat-label">WIP outstanding</div><div class="stat-value">£412k</div><div class="stat-delta">on track</div></div>
+          <div class="stat"><div class="stat-label">Budget burn</div><div class="stat-value">68%</div><div class="stat-delta">avg across matters</div></div>
+        </div>
+        <div class="card">
+          <h4>Recent matters</h4>
+          <div class="subtitle">Sorted by last activity</div>
+          <table>
+            <thead><tr><th>Client</th><th>Matter</th><th>Status</th><th>Budget</th></tr></thead>
+            <tbody>
+              <tr><td>Aurora Energy Ltd</td><td>PPA renegotiation</td><td><span class="badge badge-success">On track</span></td><td>£48k / £60k</td></tr>
+              <tr><td>Harbour Financial</td><td>Supply agreement review</td><td><span class="badge badge-warning">Near budget</span></td><td>£92k / £100k</td></tr>
+              <tr><td>Willow Lake Capital</td><td>Tolling dispute</td><td><span class="badge badge-danger">Over budget</span></td><td>£187k / £150k</td></tr>
+              <tr><td>Meridian Partners</td><td>Carbon credit offtake</td><td><span class="badge badge-accent">Proposal sent</span></td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="swatch-bar">
+      <div class="swatch light" style="background:#FAF6EE;">#FAF6EE bg</div>
+      <div class="swatch" style="background:#6B4A2C;">#6B4A2C primary</div>
+      <div class="swatch" style="background:#1F1A14;">#1F1A14 sidebar</div>
+      <div class="swatch light" style="background:#B89968;">#B89968 camel</div>
+      <div class="swatch light" style="background:#FDFAF4;">#FDFAF4 card</div>
+    </div>
+  </div>
+
+  <!-- ================ CHARCOAL & OATMEAL ================ -->
+  <div class="preview charcoal">
+    <div class="preview-label">
+      <div>
+        <h2>Option B — Charcoal &amp; Oatmeal</h2>
+      </div>
+      <div class="tagline">Zegna tailoring: oatmeal, charcoal, subtle bronze</div>
+    </div>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="logo"><span class="logo-icon"></span><span class="logo-text">Legal PM</span></div>
+        <div class="nav-item"><span class="dot"></span>Dashboard</div>
+        <div class="nav-item active"><span class="dot"></span>Matters</div>
+        <div class="nav-item"><span class="dot"></span>Pricing</div>
+        <div class="nav-item"><span class="dot"></span>Contacts</div>
+        <div class="nav-item"><span class="dot"></span>Growth</div>
+        <div class="nav-item"><span class="dot"></span>Analysts</div>
+      </aside>
+      <div class="main">
+        <div class="main-header">
+          <div class="titles">
+            <h3>Matters</h3>
+            <p>Active engagements, budgets, and WIP across your portfolio</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline">Filter</button>
+            <button class="btn btn-primary">+ New matter</button>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat"><div class="stat-label">Open matters</div><div class="stat-value">47</div><div class="stat-delta">+3 this month</div></div>
+          <div class="stat"><div class="stat-label">WIP outstanding</div><div class="stat-value">£412k</div><div class="stat-delta">on track</div></div>
+          <div class="stat"><div class="stat-label">Budget burn</div><div class="stat-value">68%</div><div class="stat-delta">avg across matters</div></div>
+        </div>
+        <div class="card">
+          <h4>Recent matters</h4>
+          <div class="subtitle">Sorted by last activity</div>
+          <table>
+            <thead><tr><th>Client</th><th>Matter</th><th>Status</th><th>Budget</th></tr></thead>
+            <tbody>
+              <tr><td>Aurora Energy Ltd</td><td>PPA renegotiation</td><td><span class="badge badge-success">On track</span></td><td>£48k / £60k</td></tr>
+              <tr><td>Harbour Financial</td><td>Supply agreement review</td><td><span class="badge badge-warning">Near budget</span></td><td>£92k / £100k</td></tr>
+              <tr><td>Willow Lake Capital</td><td>Tolling dispute</td><td><span class="badge badge-danger">Over budget</span></td><td>£187k / £150k</td></tr>
+              <tr><td>Meridian Partners</td><td>Carbon credit offtake</td><td><span class="badge badge-accent">Proposal sent</span></td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="swatch-bar">
+      <div class="swatch light" style="background:#F5F1EA;">#F5F1EA bg</div>
+      <div class="swatch" style="background:#2B2925;">#2B2925 primary</div>
+      <div class="swatch" style="background:#1C1A18;">#1C1A18 sidebar</div>
+      <div class="swatch" style="background:#8A6F47;">#8A6F47 bronze</div>
+      <div class="swatch light" style="background:#FBF8F1;">#FBF8F1 card</div>
+    </div>
+  </div>
+
+  <!-- ================ IVORY & FOREST ================ -->
+  <div class="preview forest">
+    <div class="preview-label">
+      <div>
+        <h2>Option C — Ivory &amp; Forest</h2>
+      </div>
+      <div class="tagline">English country-house: ivory, deep forest, sage</div>
+    </div>
+    <div class="app">
+      <aside class="sidebar">
+        <div class="logo"><span class="logo-icon"></span><span class="logo-text">Legal PM</span></div>
+        <div class="nav-item"><span class="dot"></span>Dashboard</div>
+        <div class="nav-item active"><span class="dot"></span>Matters</div>
+        <div class="nav-item"><span class="dot"></span>Pricing</div>
+        <div class="nav-item"><span class="dot"></span>Contacts</div>
+        <div class="nav-item"><span class="dot"></span>Growth</div>
+        <div class="nav-item"><span class="dot"></span>Analysts</div>
+      </aside>
+      <div class="main">
+        <div class="main-header">
+          <div class="titles">
+            <h3>Matters</h3>
+            <p>Active engagements, budgets, and WIP across your portfolio</p>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-outline">Filter</button>
+            <button class="btn btn-primary">+ New matter</button>
+          </div>
+        </div>
+        <div class="stat-row">
+          <div class="stat"><div class="stat-label">Open matters</div><div class="stat-value">47</div><div class="stat-delta">+3 this month</div></div>
+          <div class="stat"><div class="stat-label">WIP outstanding</div><div class="stat-value">£412k</div><div class="stat-delta">on track</div></div>
+          <div class="stat"><div class="stat-label">Budget burn</div><div class="stat-value">68%</div><div class="stat-delta">avg across matters</div></div>
+        </div>
+        <div class="card">
+          <h4>Recent matters</h4>
+          <div class="subtitle">Sorted by last activity</div>
+          <table>
+            <thead><tr><th>Client</th><th>Matter</th><th>Status</th><th>Budget</th></tr></thead>
+            <tbody>
+              <tr><td>Aurora Energy Ltd</td><td>PPA renegotiation</td><td><span class="badge badge-success">On track</span></td><td>£48k / £60k</td></tr>
+              <tr><td>Harbour Financial</td><td>Supply agreement review</td><td><span class="badge badge-warning">Near budget</span></td><td>£92k / £100k</td></tr>
+              <tr><td>Willow Lake Capital</td><td>Tolling dispute</td><td><span class="badge badge-danger">Over budget</span></td><td>£187k / £150k</td></tr>
+              <tr><td>Meridian Partners</td><td>Carbon credit offtake</td><td><span class="badge badge-accent">Proposal sent</span></td><td>—</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="swatch-bar">
+      <div class="swatch light" style="background:#F8F6F1;">#F8F6F1 bg</div>
+      <div class="swatch" style="background:#2C3D2E;">#2C3D2E primary</div>
+      <div class="swatch" style="background:#2C3D2E;">#2C3D2E sidebar</div>
+      <div class="swatch light" style="background:#86996A;">#86996A sage</div>
+      <div class="swatch light" style="background:#FDFCF8;">#FDFCF8 card</div>
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>

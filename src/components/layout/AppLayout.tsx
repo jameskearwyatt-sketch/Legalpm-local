@@ -1,6 +1,7 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
+import { useUserRole } from '@/lib/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
 import { QuickToDoButton } from '@/components/QuickToDo/QuickToDoButton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -47,12 +48,18 @@ interface AppLayoutProps {
   children: ReactNode;
 }
 
-type NavItem = { name: string; href: string; icon: typeof LayoutDashboard };
+type NavItem = { name: string; href: string; icon: typeof LayoutDashboard; adminOnly?: boolean };
 type NavSeparator = { type: 'separator' };
 type NavSubGroup = { type: 'subgroup'; name: string; children: NavItem[] };
 type NavGroupChild = NavItem | NavSubGroup;
 type NavGroup = { type: 'group'; name: string; icon: typeof LayoutDashboard; children: NavGroupChild[] };
 type NavEntry = NavItem | NavSeparator | NavGroup;
+
+function matchesRoute(pathname: string, href: string): boolean {
+  if (href === '/') return pathname === '/';
+  if (pathname === href) return true;
+  return pathname.startsWith(href + '/');
+}
 
 import { Leaf } from 'lucide-react';
 
@@ -84,18 +91,28 @@ const navigation: NavEntry[] = [
   { name: 'Time Recording', href: '/time-recording', icon: Clock },
   { name: 'Red Flags', href: '/red-flags', icon: AlertTriangle },
   { name: 'Pipeline Flags', href: '/pipeline-flags', icon: Flag },
-  { name: 'Admin Flags', href: '/flags', icon: AlertTriangle },
-  { name: 'Analyst Backfill', href: '/admin/analyst-backfill', icon: Database },
-  { name: 'Analyst Telemetry', href: '/admin/analyst-telemetry', icon: Activity },
+  { name: 'Admin Flags', href: '/flags', icon: AlertTriangle, adminOnly: true },
+  { name: 'Analyst Backfill', href: '/admin/analyst-backfill', icon: Database, adminOnly: true },
+  { name: 'Analyst Telemetry', href: '/admin/analyst-telemetry', icon: Activity, adminOnly: true },
   { name: 'Security', href: '/settings', icon: Shield },
   { name: 'Help', href: '/help', icon: HelpCircle },
 ];
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { user, signOut } = useAuth();
+  const { isAdmin } = useUserRole();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const visibleNavigation = useMemo<NavEntry[]>(() => {
+    return navigation.filter((entry) => {
+      if ('type' in entry && entry.type === 'separator') return true;
+      if ('type' in entry && entry.type === 'group') return true;
+      const item = entry as NavItem;
+      return !item.adminOnly || isAdmin;
+    });
+  }, [isAdmin]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -108,7 +125,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     'type' in c && c.type === 'subgroup' ? c.children.map(sc => sc.href) : [(c as NavItem).href]
   );
   const [analystOpen, setAnalystOpen] = useState(() =>
-    allAnalystHrefs.some(h => location.pathname.startsWith(h))
+    allAnalystHrefs.some(h => matchesRoute(location.pathname, h))
   );
 
   useEffect(() => {
@@ -143,7 +160,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
           {/* Navigation */}
           <nav className="flex-1 space-y-1 px-3 py-4">
-            {navigation.map((entry, index) => {
+            {visibleNavigation.map((entry, index) => {
               if ('type' in entry && entry.type === 'separator') {
                 return <div key={`sep-${index}`} className="my-2 mx-2 border-t border-dotted border-sidebar-border/60" />;
               }
@@ -151,8 +168,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 const group = entry as NavGroup;
                 const groupActive = group.children.some((c) =>
                   'type' in c && c.type === 'subgroup'
-                    ? c.children.some((sc) => location.pathname.startsWith(sc.href))
-                    : 'href' in c && location.pathname.startsWith(c.href)
+                    ? c.children.some((sc) => matchesRoute(location.pathname, sc.href))
+                    : 'href' in c && matchesRoute(location.pathname, c.href)
                 );
                 return (
                   <Collapsible key={group.name} open={analystOpen} onOpenChange={setAnalystOpen}>
@@ -175,7 +192,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                 {child.name}
                               </div>
                               {child.children.map(sc => {
-                                const scActive = location.pathname === sc.href || location.pathname.startsWith(sc.href);
+                                const scActive = matchesRoute(location.pathname, sc.href);
                                 return (
                                   <Link
                                     key={sc.name}
@@ -196,7 +213,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                           );
                         }
                         const item = child as NavItem;
-                        const childActive = location.pathname === item.href || location.pathname.startsWith(item.href);
+                        const childActive = matchesRoute(location.pathname, item.href);
                         return (
                           <Link
                             key={item.name}
@@ -218,8 +235,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 );
               }
               const item = entry as NavItem;
-              const isActive = location.pathname === item.href || 
-                (item.href !== '/' && location.pathname.startsWith(item.href));
+              const isActive = matchesRoute(location.pathname, item.href);
               return (
                 <Link
                   key={item.name}
@@ -331,7 +347,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </button>
             </div>
             <nav className="flex-1 overflow-y-auto overscroll-contain -webkit-overflow-scrolling-touch space-y-1 px-3 py-4">
-              {navigation.map((entry, index) => {
+              {visibleNavigation.map((entry, index) => {
                 if ('type' in entry && entry.type === 'separator') {
                   return <div key={`sep-m-${index}`} className="my-2 mx-2 border-t border-dotted border-sidebar-border/60" />;
                 }
@@ -350,7 +366,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                                 {child.name}
                               </div>
                               {child.children.map(sc => {
-                                const scActive = location.pathname.startsWith(sc.href);
+                                const scActive = matchesRoute(location.pathname, sc.href);
                                 return (
                                   <Link
                                     key={sc.name}
@@ -372,7 +388,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                           );
                         }
                         const item = child as NavItem;
-                        const childActive = location.pathname.startsWith(item.href);
+                        const childActive = matchesRoute(location.pathname, item.href);
                         return (
                           <Link
                             key={item.name}
@@ -394,7 +410,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   );
                 }
                 const item = entry as NavItem;
-                const isActive = location.pathname === item.href;
+                const isActive = matchesRoute(location.pathname, item.href);
                 return (
                   <Link
                     key={item.name}

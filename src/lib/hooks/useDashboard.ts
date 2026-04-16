@@ -37,6 +37,14 @@ export interface MatterBreakdown {
   currency: string;
 }
 
+export interface MatterWriteOff {
+  id: string;
+  matterName: string;
+  clientName: string;
+  writeOffUsd: number;
+  year: number;
+}
+
 export interface DashboardStats {
   totalBudget: number;
   totalWip: number;
@@ -55,6 +63,7 @@ export interface DashboardStats {
   pipelineMatters: PipelineMatter[];
   hasActiveWipProposals: boolean;
   matterBreakdowns: MatterBreakdown[];
+  writeOffsByMatter: MatterWriteOff[];
 }
 
 export interface Alert {
@@ -148,6 +157,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           pipelineMatters: pipelineMattersForUI,
           hasActiveWipProposals: false,
           matterBreakdowns: [],
+          writeOffsByMatter: [],
         } as DashboardStats;
       }
 
@@ -193,6 +203,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       const alerts: Alert[] = [];
       const pipelineAlerts: PipelineAlert[] = [];
       const matterBreakdowns: MatterBreakdown[] = [];
+      const writeOffsByMatter: MatterWriteOff[] = [];
 
       // Calculate total pipeline value (respecting excluded pipeline matters)
       let includedPipelineCount = 0;
@@ -279,6 +290,19 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
             billedAmount: billedAmount,
             currency: feeCurrency,
           });
+
+          if (actualWipWriteOffAmount > 0) {
+            const writeOffUsd = convertToUsd(actualWipWriteOffAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+            const asOfDate = snapshot?.as_of_date;
+            const year = asOfDate ? new Date(asOfDate).getFullYear() : new Date().getFullYear();
+            writeOffsByMatter.push({
+              id: matter.id,
+              matterName: matter.matter_name,
+              clientName: getMatterClientDisplayName(matter),
+              writeOffUsd,
+              year,
+            });
+          }
         }
 
         // Budget burn = WIP + AR + Paid (each value is mutually exclusive)
@@ -577,6 +601,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         pipelineMatters: pipelineMattersForUI,
         hasActiveWipProposals,
         matterBreakdowns: matterBreakdowns.sort((a, b) => b.wipAmount - a.wipAmount),
+        writeOffsByMatter: writeOffsByMatter.sort((a, b) => b.writeOffUsd - a.writeOffUsd),
       } as DashboardStats;
     },
     enabled: !!user,

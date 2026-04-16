@@ -11,6 +11,7 @@ import { useDashboard, TrendDataPoint, MatterBreakdown } from '@/lib/hooks/useDa
 import { useMatters } from '@/lib/hooks/useMatters';
 import { useAuth } from '@/lib/auth';
 import { formatCurrency } from '@/lib/currencyUtils';
+import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { 
@@ -53,7 +54,8 @@ export default function Dashboard() {
   const [dashboardTimeRange, setDashboardTimeRange] = useState<TimeRange>("all");
   const isHoveringTooltipRef = useRef(false);
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [expandedTile, setExpandedTile] = useState<'wip' | 'ar' | 'paid' | null>(null);
+  const [expandedTile, setExpandedTile] = useState<'wip' | 'ar' | 'paid' | 'realization' | null>(null);
+  const [excludedWriteOffYears, setExcludedWriteOffYears] = useState<Set<number>>(new Set());
   const breakdownRef = useRef<HTMLDivElement>(null);
   // "Not my matters" checkbox defaults to unchecked (meaning they're excluded by default)
   const [notMyMattersIncluded, setNotMyMattersIncluded] = useState(false);
@@ -345,6 +347,43 @@ export default function Dashboard() {
     return [];
   }, [expandedTile, stats?.matterBreakdowns]);
 
+  // Write-offs grouped by year (for Realization Rate drill-down)
+  const writeOffsByYear = useMemo(() => {
+    const rows = stats?.writeOffsByMatter || [];
+    const byYear = new Map<number, { year: number; totalUsd: number; matterCount: number }>();
+    rows.forEach(w => {
+      const entry = byYear.get(w.year) || { year: w.year, totalUsd: 0, matterCount: 0 };
+      entry.totalUsd += w.writeOffUsd;
+      entry.matterCount += 1;
+      byYear.set(w.year, entry);
+    });
+    return Array.from(byYear.values()).sort((a, b) => b.year - a.year);
+  }, [stats?.writeOffsByMatter]);
+
+  // Realization rate adjusted for excluded write-off years.
+  // Formula: Paid / (Billed + IncludedWriteOffs). Excluding a year's write-offs
+  // removes them from the denominator, which raises the rate.
+  const adjustedRealizationRate = useMemo(() => {
+    if (!stats) return 0;
+    if (excludedWriteOffYears.size === 0) return stats.realizationRate;
+    const excludedUsd = writeOffsByYear
+      .filter(y => excludedWriteOffYears.has(y.year))
+      .reduce((sum, y) => sum + y.totalUsd, 0);
+    const includedWriteOffs = (stats.totalWipWriteOff || 0) - excludedUsd;
+    const denom = (stats.totalBilled || 0) + includedWriteOffs;
+    if (denom <= 0) return 100;
+    return ((stats.totalPaid || 0) / denom) * 100;
+  }, [stats, excludedWriteOffYears, writeOffsByYear]);
+
+  const toggleWriteOffYear = (year: number) => {
+    setExcludedWriteOffYears(prev => {
+      const next = new Set(prev);
+      if (next.has(year)) next.delete(year);
+      else next.add(year);
+      return next;
+    });
+  };
+
   if (isLoading) {
     return (
       <AppLayout>
@@ -359,7 +398,7 @@ export default function Dashboard() {
   const outstandingAR = (stats?.totalBilled || 0) - (stats?.totalPaid || 0);
   const totalLockup = (stats?.totalWip || 0) + outstandingAR;
 
-  const handleTileClick = (tile: 'wip' | 'ar' | 'paid') => {
+  const handleTileClick = (tile: 'wip' | 'ar' | 'paid' | 'realization') => {
     setExpandedTile(prev => prev === tile ? null : tile);
     // Scroll to breakdown after a tick
     setTimeout(() => {
@@ -406,11 +445,13 @@ export default function Dashboard() {
     },
     {
       title: 'Realization Rate',
-      value: `${(stats?.realizationRate || 0).toFixed(1)}%`,
+      value: `${adjustedRealizationRate.toFixed(1)}%`,
       icon: <Percent className="h-5 w-5" />,
-      variant: (stats?.realizationRate || 0) >= 80 ? 'success' as const : (stats?.realizationRate || 0) >= 60 ? 'warning' as const : 'danger' as const,
-      infoTooltip: 'Realization Rate measures the percentage of worked time that was actually collected as revenue. WIP write-offs hurt this rate. E.g., if you bill £100k, write off £50k, and collect £50k, your collection rate is 100% but realization rate is 50%.',
-      tileKey: null,
+      variant: adjustedRealizationRate >= 80 ? 'success' as const : adjustedRealizationRate >= 60 ? 'warning' as const : 'danger' as const,
+      infoTooltip: 'Realization Rate measures the percentage of worked time that was actually collected as revenue. WIP write-offs hurt this rate. Click the tile to see write-offs by year and toggle them in/out of the calculation.',
+      note: excludedWriteOffYears.size > 0 ? `Excluding ${excludedWriteOffYears.size} write-off year${excludedWriteOffYears.size > 1 ? 's' : ''}` : undefined,
+      noteVariant: excludedWriteOffYears.size > 0 ? 'info' as const : undefined,
+      tileKey: 'realization' as const,
     },
     {
       title: 'Collection Rate',
@@ -472,16 +513,94 @@ export default function Dashboard() {
               icon={card.icon}
               variant={card.variant}
               infoTooltip={'infoTooltip' in card ? card.infoTooltip : undefined}
-              note={'hasProposalAdjustment' in card && card.hasProposalAdjustment ? 'Adjusted for WIP proposals' : undefined}
-              noteVariant={'hasProposalAdjustment' in card && card.hasProposalAdjustment ? 'amber' : undefined}
+              note={
+                'note' in card && card.note
+                  ? card.note
+                  : 'hasProposalAdjustment' in card && card.hasProposalAdjustment
+                    ? 'Adjusted for WIP proposals'
+                    : undefined
+              }
+              noteVariant={
+                'noteVariant' in card && card.noteVariant
+                  ? card.noteVariant
+                  : 'hasProposalAdjustment' in card && card.hasProposalAdjustment
+                    ? 'amber'
+                    : undefined
+              }
               onClick={card.tileKey ? () => handleTileClick(card.tileKey!) : undefined}
               isExpanded={card.tileKey ? expandedTile === card.tileKey : false}
             />
           ))}
         </div>
 
+        {/* Realization Rate Drill-down */}
+        {expandedTile === 'realization' && (
+          <div ref={breakdownRef}>
+            <Card className="shadow-card animate-in slide-in-from-top-2 duration-200 max-w-2xl">
+              <CardHeader className="pb-2 pt-4 px-4 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-foreground">
+                    Write-offs by Year
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setExpandedTile(null)} className="text-xs text-muted-foreground">
+                    Close
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6 pb-4 pt-0 space-y-3">
+                <p className="text-xs text-muted-foreground">
+                  Uncheck a year to remove its write-offs from the realization rate calculation.
+                  Current rate: <span className="font-medium text-foreground">{adjustedRealizationRate.toFixed(1)}%</span>
+                  {excludedWriteOffYears.size > 0 && stats && (
+                    <span className="text-muted-foreground"> (base {stats.realizationRate.toFixed(1)}%)</span>
+                  )}
+                </p>
+                {writeOffsByYear.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No write-offs recorded on the included matters.</p>
+                ) : (
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="w-8 py-2"></th>
+                        <th className="text-left py-2 pr-2 text-xs font-medium text-muted-foreground">Year</th>
+                        <th className="text-left py-2 pr-2 text-xs font-medium text-muted-foreground">Matters</th>
+                        <th className="text-right py-2 text-xs font-medium text-muted-foreground">Written off (USD)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {writeOffsByYear.map(row => {
+                        const included = !excludedWriteOffYears.has(row.year);
+                        return (
+                          <tr key={row.year} className="border-b border-border/50 hover:bg-muted/50">
+                            <td className="py-2">
+                              <Checkbox
+                                checked={included}
+                                onCheckedChange={() => toggleWriteOffYear(row.year)}
+                                aria-label={`${included ? 'Exclude' : 'Include'} ${row.year} write-offs`}
+                              />
+                            </td>
+                            <td className={cn('py-2 pr-2 text-xs sm:text-sm', included ? 'text-foreground' : 'text-muted-foreground line-through')}>
+                              {row.year}
+                            </td>
+                            <td className={cn('py-2 pr-2 text-xs', included ? 'text-muted-foreground' : 'text-muted-foreground/60')}>
+                              {row.matterCount}
+                            </td>
+                            <td className={cn('py-2 text-right text-xs sm:text-sm tabular-nums', included ? 'font-medium text-foreground' : 'text-muted-foreground line-through')}>
+                              {formatCurrency(row.totalUsd, 'USD')}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {/* Matter Breakdown Panel */}
-        {expandedTile && breakdownData.length > 0 && (
+        {expandedTile && expandedTile !== 'realization' && breakdownData.length > 0 && (
           <div ref={breakdownRef}>
             <Card className="shadow-card animate-in slide-in-from-top-2 duration-200 max-w-2xl">
               <CardHeader className="pb-2 pt-4 px-4 sm:px-6">

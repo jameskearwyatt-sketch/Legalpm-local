@@ -1,7 +1,7 @@
 import { ReactNode } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { TrendingUp, TrendingDown, Minus, HelpCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, HelpCircle, ChevronDown } from 'lucide-react';
 import {
   Tooltip,
   TooltipContent,
@@ -42,7 +42,15 @@ export function StatCard({ title, value, icon, trend, variant = 'default', class
   };
 
   return (
-    <Card className={cn('shadow-card hover:shadow-card-hover transition-shadow', variantStyles[variant], onClick && 'cursor-pointer ring-offset-background hover:ring-2 hover:ring-primary/20', isExpanded && 'ring-2 ring-primary/40', className)} onClick={onClick}>
+    <Card className={cn('relative shadow-card hover:shadow-card-hover transition-shadow', variantStyles[variant], onClick && 'cursor-pointer ring-offset-background hover:ring-2 hover:ring-primary/20', isExpanded && 'ring-2 ring-primary/40', className)} onClick={onClick}>
+      {onClick && (
+        <div className={cn(
+          'absolute bottom-1.5 right-1.5 flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary/80 transition-transform',
+          isExpanded && 'rotate-180'
+        )}>
+          <ChevronDown className="h-3 w-3" />
+        </div>
+      )}
       <CardContent className="p-3 sm:p-4 lg:p-6">
         <div className="flex items-start justify-between gap-2">
           <div className="space-y-0.5 sm:space-y-1 min-w-0 flex-1">

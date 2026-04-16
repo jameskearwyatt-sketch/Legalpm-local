@@ -1,17 +1,13 @@
 import { useState, useCallback } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { PPAUploadAnalysis } from '@/components/ppa-analyst/PPAUploadAnalysis';
 import { PPAAnalysisList } from '@/components/ppa-analyst/PPAAnalysisList';
 import { PPAPrecedentBank } from '@/components/ppa-analyst/PPAPrecedentBank';
  import { PPALearningsTab } from '@/components/ppa-analyst/PPALearningsTab';
- import { FileSearch, History, Database, Settings2, Brain, Beaker } from 'lucide-react';
+ import { FileSearch, History, Database, Brain, Beaker } from 'lucide-react';
 import { AnalystRegressionHarness } from '@/components/shared/AnalystRegressionHarness';
-import { useUserSettings } from '@/lib/hooks/useUserSettings';
  import { usePPAPrecedentBank, PPAAnalysis, PPAStructureType, PPAPerspective, PPAAnalysisType } from '@/lib/hooks/usePPAAnalyses';
  import { usePPALearnings } from '@/lib/hooks/usePPALearnings';
 import { toast } from 'sonner';
@@ -30,21 +26,11 @@ interface ReanalyzePreFill {
 export default function PPAAnalyst() {
   const [activeTab, setActiveTab] = useState('new-analysis');
   const [reanalyzePreFill, setReanalyzePreFill] = useState<ReanalyzePreFill | null>(null);
-  const { ppaPrecedentThreshold, updateSettings } = useUserSettings();
-  const { uniqueProjectCount, uniqueTemplateCount } = usePPAPrecedentBank();
+  const { uniqueProjectCount } = usePPAPrecedentBank();
    const { activeLearnings } = usePPALearnings();
-  
+
   // Count unique deals, not individual positions
   const precedentCount = uniqueProjectCount;
-  const templateCount = uniqueTemplateCount;
-  const marketComparisonEnabled = precedentCount >= ppaPrecedentThreshold;
-
-  const handleThresholdChange = (value: string) => {
-    const num = parseInt(value, 10);
-    if (!isNaN(num) && num >= 1 && num <= 50) {
-      updateSettings.mutate({ ppa_precedent_threshold: num });
-    }
-  };
 
   const handleReanalyze = useCallback((analysis: PPAAnalysis) => {
     // Pre-fill the form with the existing analysis settings
@@ -84,44 +70,6 @@ export default function PPAAnalyst() {
               Analyze PPAs and term sheets against market standards and precedents
             </p>
           </div>
-          
-          {/* Market Comparison Status */}
-          <Card className="w-full sm:w-80">
-            <CardHeader className="py-3 px-4">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Settings2 className="h-4 w-4" />
-                Market Comparison
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="py-2 px-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Precedents banked:</span>
-                <Badge variant={marketComparisonEnabled ? "default" : "secondary"}>
-                  {precedentCount}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-2">
-                <Label htmlFor="threshold" className="text-sm text-muted-foreground whitespace-nowrap">
-                  Min. threshold:
-                </Label>
-                <Input
-                  id="threshold"
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={ppaPrecedentThreshold}
-                  onChange={(e) => handleThresholdChange(e.target.value)}
-                  className="w-16 h-8 text-center"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {marketComparisonEnabled 
-                  ? '✓ Market position analysis active'
-                  : `Need ${ppaPrecedentThreshold - precedentCount} more precedent${ppaPrecedentThreshold - precedentCount !== 1 ? 's' : ''} to enable`
-                }
-              </p>
-            </CardContent>
-          </Card>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">

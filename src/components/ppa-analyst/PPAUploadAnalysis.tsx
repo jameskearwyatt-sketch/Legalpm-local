@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -84,6 +84,14 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
   const [detectionNotes, setDetectionNotes] = useState<string | null>(null);
   const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
   const progress = useAnalystProgress();
+  const cancelledRef = useRef(false);
+
+  const handleCancel = useCallback(() => {
+    cancelledRef.current = true;
+    progress.reset();
+    setStep('configure');
+    toast.info('Analysis cancelled. Server-side processing may continue briefly.');
+  }, [progress]);
 
   // Auto-detect PPA metadata after file upload
   const detectPPAMetadata = useCallback(async (file: File) => {
@@ -266,6 +274,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
 
     setStep('analyzing');
     setError(null);
+    cancelledRef.current = false;
     progress.reset();
     progress.setPhase('extract');
 
@@ -532,6 +541,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         },
       });
 
+      if (cancelledRef.current) return;
       const analysisResult = await createAnalysisWithPositions.mutateAsync({
         analysis: {
           analysis_type: analysisType,
@@ -570,12 +580,14 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         positions: positionsPayload,
       });
 
+      if (cancelledRef.current) return;
       progress.setPhase('complete');
       setCreatedAnalysisId(analysisResult.id);
       setStep('results');
       toast.success('Analysis complete!');
 
     } catch (err) {
+      if (cancelledRef.current) return;
       console.error('Analysis error:', err);
       void logLlmCall({
         analystType: 'ppa',
@@ -632,6 +644,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
         narrative={progress.narrative}
         elapsedMs={progress.elapsedMs}
         statusOverride={progress.statusOverride ?? undefined}
+        onCancel={handleCancel}
       />
     );
   }

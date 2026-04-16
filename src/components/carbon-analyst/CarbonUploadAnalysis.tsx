@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +51,14 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
   const [detectedFramework, setDetectedFramework] = useState<string | null>(null);
   const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
   const progress = useAnalystProgress();
+  const cancelledRef = useRef(false);
+
+  const handleCancel = useCallback(() => {
+    cancelledRef.current = true;
+    progress.reset();
+    setStep('configure');
+    toast.info('Analysis cancelled. Server-side processing may continue briefly.');
+  }, [progress]);
 
   // Auto-detect carbon metadata after clicking Start Analysis
   const detectCarbonMetadata = useCallback(async (file: File) => {
@@ -185,6 +193,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
 
     setStep('analyzing');
     setError(null);
+    cancelledRef.current = false;
     progress.reset();
     progress.setPhase('extract');
 
@@ -320,6 +329,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
         market_benchmark: pos.market_benchmark || null,
       }));
 
+      if (cancelledRef.current) return;
       const analysisResult = await createAnalysisWithPositions.mutateAsync({
         analysis: {
           analysis_type: analysisType, perspective, project_name: projectName.trim(),
@@ -343,11 +353,13 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
         positions: positionsPayload,
       });
 
+      if (cancelledRef.current) return;
       progress.setPhase('complete');
       setCreatedAnalysisId(analysisResult.id);
       setStep('results');
       toast.success('Analysis complete!');
     } catch (err) {
+      if (cancelledRef.current) return;
       console.error('Analysis error:', err);
       void logLlmCall({
         analystType: 'carbon',
@@ -396,6 +408,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
         narrative={progress.narrative}
         elapsedMs={progress.elapsedMs}
         statusOverride={progress.statusOverride ?? undefined}
+        onCancel={handleCancel}
       />
     );
   }

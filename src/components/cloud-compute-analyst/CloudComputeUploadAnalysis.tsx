@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +41,14 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
   const progress = useAnalystProgress();
+  const cancelledRef = useRef(false);
+
+  const handleCancel = useCallback(() => {
+    cancelledRef.current = true;
+    progress.reset();
+    setStep('configure');
+    toast.info('Analysis cancelled. Server-side processing may continue briefly.');
+  }, [progress]);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -55,6 +63,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
     if (!contractFile) { toast.error('Please upload a contract'); return; }
     if (!projectName.trim()) { toast.error('Please enter a project name'); return; }
     setStep('analyzing'); setError(null);
+    cancelledRef.current = false;
     progress.reset(); progress.setPhase('extract');
 
     // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
@@ -153,6 +162,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
         market_benchmark: pos.market_benchmark || null,
       }));
 
+      if (cancelledRef.current) return;
       const analysisResult = await createAnalysisWithPositions.mutateAsync({
         analysis: {
           analysis_type: analysisType, perspective, project_name: projectName.trim(), jurisdiction: jurisdiction || null,
@@ -171,8 +181,10 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
         positions: positionsPayload,
       });
 
+      if (cancelledRef.current) return;
       progress.setPhase('complete'); setCreatedAnalysisId(analysisResult.id); setStep('results'); toast.success('Analysis complete!');
     } catch (err) {
+      if (cancelledRef.current) return;
       console.error('Analysis error:', err);
       void logLlmCall({
         analystType: 'cloud_compute',
@@ -208,6 +220,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       narrative={progress.narrative}
       elapsedMs={progress.elapsedMs}
       statusOverride={progress.statusOverride ?? undefined}
+      onCancel={handleCancel}
     />
   );
 

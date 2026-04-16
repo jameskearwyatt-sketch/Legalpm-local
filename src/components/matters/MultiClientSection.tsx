@@ -14,6 +14,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -184,6 +185,7 @@ export function MultiClientSection({
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>Add New Client</DialogTitle>
+                <DialogDescription>Create a new client record to associate with this matter.</DialogDescription>
               </DialogHeader>
               <ClientForm 
                 onSuccess={() => {
@@ -360,8 +362,9 @@ export function MultiClientSection({
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add New Client</DialogTitle>
+              <DialogDescription>Create a new client record to associate with this matter.</DialogDescription>
             </DialogHeader>
-            <ClientForm 
+            <ClientForm
               onSuccess={() => {
                 setShowNewClientDialog(false);
                 onClientCreated?.();

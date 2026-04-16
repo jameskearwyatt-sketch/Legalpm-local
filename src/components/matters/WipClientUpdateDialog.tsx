@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -1314,6 +1315,9 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
             <Mail className="h-5 w-5" />
             Update Clients on Work in Progress
           </DialogTitle>
+          <DialogDescription>
+            Draft and send WIP status emails to selected clients for the matters you choose below.
+          </DialogDescription>
         </DialogHeader>
 
         {/* Step indicator */}

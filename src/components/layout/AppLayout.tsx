@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
@@ -111,8 +111,23 @@ export default function AppLayout({ children }: AppLayoutProps) {
     allAnalystHrefs.some(h => location.pathname.startsWith(h))
   );
 
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [mobileMenuOpen]);
+
   return (
     <div className="min-h-screen bg-background">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[60] focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground focus:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        Skip to main content
+      </a>
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-50 hidden w-64 bg-sidebar lg:block">
         <div className="flex h-full flex-col">
@@ -262,7 +277,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="p-2 -ml-2 rounded-lg hover:bg-muted touch-manipulation"
+            aria-label="Open navigation menu"
+            className="p-2 -ml-2 rounded-lg hover:bg-muted touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Menu className="h-6 w-6" />
           </button>
@@ -273,7 +289,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="p-1 rounded-full hover:bg-muted transition-colors touch-manipulation">
+            <button aria-label="Open user menu" className="p-1 rounded-full hover:bg-muted transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                   {userInitials}
@@ -299,7 +315,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Mobile menu overlay */}
       {mobileMenuOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+          <div role="presentation" className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
           <div className="fixed inset-y-0 left-0 w-[280px] sm:w-72 bg-sidebar flex flex-col overflow-hidden shadow-2xl transition-transform duration-300 safe-area-top">
             <div className="flex h-14 sm:h-16 shrink-0 items-center justify-between px-4 sm:px-6 border-b border-sidebar-border">
               <div className="flex items-center gap-2">
@@ -308,7 +324,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
               </div>
               <button
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2 rounded-lg hover:bg-sidebar-accent/50 touch-manipulation"
+                aria-label="Close navigation menu"
+                className="p-2 rounded-lg hover:bg-sidebar-accent/50 touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
               >
                 <X className="h-5 w-5 text-sidebar-foreground" />
               </button>
@@ -419,7 +436,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       )}
 
       {/* Main content */}
-      <main className="lg:pl-64">
+      <main id="main-content" className="lg:pl-64">
         <div className="min-h-[calc(100vh-3.5rem)] sm:min-h-[calc(100vh-4rem)] lg:min-h-screen safe-area-bottom">
           {children}
         </div>

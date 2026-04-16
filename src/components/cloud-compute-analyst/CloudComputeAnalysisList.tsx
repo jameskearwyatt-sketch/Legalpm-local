@@ -24,6 +24,7 @@ export function CloudComputeAnalysisList() {
       analyses={analyses}
       isLoading={isLoading}
       description="View and manage your past cloud compute analyses"
+      emptyStateHint="Upload a cloud compute agreement from the New Analysis tab to get started."
       getAnalysisTypeLabel={(t) => (t === 'agreement_vs_bible' ? 'vs Knowledge' : 'vs Term Sheet')}
       getPerspectiveLabel={(p) => (p === 'tenant' ? 'Tenant' : 'Provider')}
       extraColumns={[

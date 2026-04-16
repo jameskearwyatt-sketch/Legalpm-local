@@ -29,6 +29,7 @@ const JURISDICTIONS = [
 import { TOLLING_TECHNOLOGY_TYPES, TOLLING_FACILITY_STAGES, type TollingFacilityStage } from '@/lib/tollingCategories';
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { validateUploadFile } from '@/lib/analyst/fileValidation';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
@@ -78,6 +79,12 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
 
     if (!validTypes.includes(file.type)) {
       toast.error('Please upload a PDF or Word document (.doc/.docx)');
+      return;
+    }
+
+    const sizeCheck = validateUploadFile(file);
+    if (!sizeCheck.ok) {
+      toast.error(sizeCheck.error ?? 'File is invalid.');
       return;
     }
 

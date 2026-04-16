@@ -14,6 +14,7 @@ import { ITSupplyAnalysisReport } from './ITSupplyAnalysisReport';
 import { IT_SUPPLY_TYPES, IT_SUPPLY_CONTRACT_STAGES, type ITSupplyContractStage } from '@/lib/itSupplyCategories';
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { validateUploadFile } from '@/lib/analyst/fileValidation';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
@@ -58,6 +59,11 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
     const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'];
     if (!validTypes.includes(file.type)) {
       toast.error('Please upload a PDF or Word document');
+      return;
+    }
+    const sizeCheck = validateUploadFile(file);
+    if (!sizeCheck.ok) {
+      toast.error(sizeCheck.error ?? 'File is invalid.');
       return;
     }
     setContractFile(file);

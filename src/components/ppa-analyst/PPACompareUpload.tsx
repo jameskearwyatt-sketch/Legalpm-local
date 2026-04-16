@@ -9,6 +9,7 @@ import { FileText, Upload, Loader2, GitCompare, ArrowRight } from 'lucide-react'
 import { supabase } from '@/integrations/supabase/client';
 import { usePPAAnalyses, PPAAnalysis, PPAExtractedPosition } from '@/lib/hooks/usePPAAnalyses';
 import { toast } from 'sonner';
+import { validateUploadFile } from '@/lib/analyst/fileValidation';
 
 interface PPACompareUploadProps {
   parentAnalysis: PPAAnalysis;
@@ -36,6 +37,11 @@ export function PPACompareUpload({
       const ext = file.name.split('.').pop()?.toLowerCase();
       if (!['pdf', 'docx', 'doc'].includes(ext || '')) {
         toast.error('Please upload a PDF or Word document');
+        return;
+      }
+      const sizeCheck = validateUploadFile(file);
+      if (!sizeCheck.ok) {
+        toast.error(sizeCheck.error ?? 'File is invalid.');
         return;
       }
       setNewDraftFile(file);

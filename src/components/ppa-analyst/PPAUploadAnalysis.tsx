@@ -16,6 +16,7 @@ import { PPAAnalysisReport } from './PPAAnalysisReport';
 import { generateMarketIntelligence, formatIntelligenceForPrompt } from '@/lib/ppaPrecedentIntelligence';
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { validateUploadFile } from '@/lib/analyst/fileValidation';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
@@ -215,6 +216,12 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
     
     if (!validTypes.includes(file.type)) {
       toast.error('Please upload a PDF or Word document (.docx)');
+      return;
+    }
+
+    const sizeCheck = validateUploadFile(file);
+    if (!sizeCheck.ok) {
+      toast.error(sizeCheck.error ?? 'File is invalid.');
       return;
     }
 

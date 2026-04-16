@@ -14,6 +14,7 @@ import { CarbonAnalysisReport } from './CarbonAnalysisReport';
 import { CARBON_PROJECT_TYPES, CARBON_PROJECT_STAGES, CARBON_CREDIT_CLASSES, getCreditClassForType, type CarbonProjectStage, type CarbonCreditClass } from '@/lib/carbonCategories';
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { validateUploadFile } from '@/lib/analyst/fileValidation';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
@@ -166,6 +167,8 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
     if (!file) return;
     const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'];
     if (!validTypes.includes(file.type)) { toast.error('Please upload a PDF or Word document'); return; }
+    const sizeCheck = validateUploadFile(file);
+    if (!sizeCheck.ok) { toast.error(sizeCheck.error ?? 'File is invalid.'); return; }
     setCarbonFile(file);
     if (!projectName) setProjectName(file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' '));
   }, [projectName]);

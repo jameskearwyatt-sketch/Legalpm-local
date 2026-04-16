@@ -14,6 +14,7 @@ import { CloudComputeAnalysisReport } from './CloudComputeAnalysisReport';
 import { CLOUD_SERVICE_TYPES, CLOUD_DEPLOYMENT_MODELS, type CloudDeploymentModel } from '@/lib/cloudComputeCategories';
 import { logLlmCall, classifyLlmError } from '@/lib/analyst/llmCallLog';
 import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
+import { validateUploadFile } from '@/lib/analyst/fileValidation';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
 
@@ -55,6 +56,8 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
     if (!file) return;
     const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword'];
     if (!validTypes.includes(file.type)) { toast.error('Please upload a PDF or Word document'); return; }
+    const sizeCheck = validateUploadFile(file);
+    if (!sizeCheck.ok) { toast.error(sizeCheck.error ?? 'File is invalid.'); return; }
     setContractFile(file);
     if (!projectName) setProjectName(file.name.replace(/\.[^/.]+$/, '').replace(/_/g, ' '));
   }, [projectName]);

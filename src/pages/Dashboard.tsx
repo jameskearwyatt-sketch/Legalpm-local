@@ -379,18 +379,23 @@ export default function Dashboard() {
     return onOrAfterFyStart ? y + 1 : y;
   }, [fyStart]);
 
-  // Write-offs grouped by financial year (for Realization Rate drill-down)
+  // Write-offs grouped by financial year (for Realization Rate drill-down).
+  // Each entry in stats.writeOffsByMatter represents one dated write-off event,
+  // so a single matter can contribute to multiple years. matterCount counts
+  // distinct matters rather than events.
   const writeOffsByYear = useMemo(() => {
     const rows = stats?.writeOffsByMatter || [];
-    const byYear = new Map<number, { year: number; totalUsd: number; matterCount: number }>();
+    const byYear = new Map<number, { year: number; totalUsd: number; matterIds: Set<string> }>();
     rows.forEach(w => {
       const fy = getFiscalYear(w.asOfDate);
-      const entry = byYear.get(fy) || { year: fy, totalUsd: 0, matterCount: 0 };
+      const entry = byYear.get(fy) || { year: fy, totalUsd: 0, matterIds: new Set<string>() };
       entry.totalUsd += w.writeOffUsd;
-      entry.matterCount += 1;
+      entry.matterIds.add(w.id);
       byYear.set(fy, entry);
     });
-    return Array.from(byYear.values()).sort((a, b) => b.year - a.year);
+    return Array.from(byYear.values())
+      .map(e => ({ year: e.year, totalUsd: e.totalUsd, matterCount: e.matterIds.size }))
+      .sort((a, b) => b.year - a.year);
   }, [stats?.writeOffsByMatter, getFiscalYear]);
 
   const isFiscalYearCalendar = fyStart.month === 1 && fyStart.day === 1;

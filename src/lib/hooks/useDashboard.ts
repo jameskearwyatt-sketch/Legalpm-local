@@ -172,6 +172,15 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         .in('matter_id', matterIds)
         .order('as_of_date', { ascending: false }) : { data: [] };
 
+      // Get dated write-off events for each matter. Each event represents the
+      // delta added to that matter's write-offs on a specific date, so the
+      // dashboard can bucket them by financial year without guessing.
+      const { data: writeOffEventRows } = matterIds.length > 0 ? await supabase
+        .from('write_off_events' as never)
+        .select('*')
+        .in('matter_id', matterIds)
+        .order('write_off_date', { ascending: false }) : { data: [] };
+
       // Get selected WIP shaping proposals for matters that have show_shaping_proposal enabled
       const { data: wipProposals } = matterIds.length > 0 ? await supabase
         .from('wip_shaping_proposals')
@@ -291,16 +300,8 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
             currency: feeCurrency,
           });
 
-          if (actualWipWriteOffAmount > 0) {
-            const writeOffUsd = convertToUsd(actualWipWriteOffAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-            writeOffsByMatter.push({
-              id: matter.id,
-              matterName: matter.matter_name,
-              clientName: getMatterClientDisplayName(matter),
-              writeOffUsd,
-              asOfDate: snapshot?.as_of_date || new Date().toISOString().slice(0, 10),
-            });
-          }
+          // Write-off entries for the FY breakdown are now built from the dated
+          // write_off_events table below, outside this loop.
         }
 
         // Budget burn = WIP + AR + Paid (each value is mutually exclusive)
@@ -461,6 +462,28 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         }
     });
 
+      // Build the dated write-off entries for the FY breakdown from the
+      // write_off_events table. Each event already has its own write_off_date
+      // and currency snapshotted at the time of the event.
+      const matterLookup = new Map<string, any>();
+      (liveMatters ?? []).forEach((m: any) => matterLookup.set(m.id, m));
+      (writeOffEventRows as any[] | null | undefined)?.forEach((evt: any) => {
+        if (!evt || excludedSet.has(evt.matter_id)) return;
+        const matter = matterLookup.get(evt.matter_id);
+        if (!matter) return;
+        const amount = Number(evt.write_off_amount) || 0;
+        if (amount <= 0) return;
+        const eventCurrency = evt.fee_currency || matter.fee_currency || 'GBP';
+        const eventRate = Number(evt.exchange_rate) || Number(matter.exchange_rate) || 1;
+        const usd = convertToUsd(amount, eventCurrency, eventRate, gbpToUsdRate, liveRates);
+        writeOffsByMatter.push({
+          id: matter.id,
+          matterName: matter.matter_name,
+          clientName: getMatterClientDisplayName(matter),
+          writeOffUsd: usd,
+          asOfDate: evt.write_off_date,
+        });
+      });
 
       // Generate pipeline alerts
       pipelineMatters?.forEach(matter => {

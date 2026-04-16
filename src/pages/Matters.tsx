@@ -864,10 +864,19 @@ export default function Matters() {
           aVal = `${aClient} - ${a.matter_name.toLowerCase()}`;
           bVal = `${bClient} - ${b.matter_name.toLowerCase()}`;
           break;
-        case 'fee_amount':
-          aVal = a.fee_amount_upper_end || 0;
-          bVal = b.fee_amount_upper_end || 0;
+        case 'fee_amount': {
+          // Sort by USD-equivalent budget so deals in different currencies compare fairly.
+          // Display still shows the native fee_currency value.
+          const aFeeCurrency = a.fee_currency || 'GBP';
+          const bFeeCurrency = b.fee_currency || 'GBP';
+          const aExchangeRate = a.exchange_rate || 1;
+          const bExchangeRate = b.exchange_rate || 1;
+          const aBudget = a.fee_amount_upper_end || 0;
+          const bBudget = b.fee_amount_upper_end || 0;
+          aVal = convertToUsd(aBudget, aFeeCurrency, aExchangeRate, gbpToUsdRate, liveRates);
+          bVal = convertToUsd(bBudget, bFeeCurrency, bExchangeRate, gbpToUsdRate, liveRates);
           break;
+        }
         case 'headroom':
           // Sort by headroom percentage (high to low by default)
           aVal = a.headroom_percent || 0;

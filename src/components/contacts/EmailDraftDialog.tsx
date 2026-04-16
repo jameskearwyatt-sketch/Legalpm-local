@@ -148,18 +148,31 @@ export function EmailDraftDialog({ open, onOpenChange, contacts, campaignId }: E
     [japaneseContacts]
   );
 
-  // Extract first name from full_name
-  // Names are now stored in "FirstName Surname" format
+  // Extract first name from full_name.
+  // Handles both legacy "Surname, FirstName" and modern "FirstName Surname" formats.
   const getFirstName = (fullName: string): string => {
     const trimmed = fullName.trim();
+    if (trimmed.includes(',')) {
+      const parts = trimmed.split(',').map(p => p.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        // Legacy "Surname, FirstName" → first given name only
+        return parts[1].split(/\s+/)[0] || parts[1];
+      }
+    }
     const parts = trimmed.split(/\s+/);
     return parts[0] || trimmed;
   };
 
-  // Get surname for Japanese addressing
-  // Names are now stored in "FirstName Surname" format
+  // Extract surname for Japanese addressing.
+  // Handles both legacy "Surname, FirstName" and modern "FirstName Surname" formats.
   const getSurname = (fullName: string): string => {
     const trimmed = fullName.trim();
+    if (trimmed.includes(',')) {
+      const parts = trimmed.split(',').map(p => p.trim()).filter(Boolean);
+      if (parts.length >= 1) {
+        return parts[0];
+      }
+    }
     const parts = trimmed.split(/\s+/);
     return parts[parts.length - 1] || trimmed;
   };

@@ -17,8 +17,8 @@ export default {
         '14': 'repeat(14, minmax(0, 1fr))',
       },
       fontFamily: {
-        heading: ['Outfit', 'sans-serif'],
-        body: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        heading: ['Cormorant Garamond', 'Times New Roman', 'serif'],
+        body: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",

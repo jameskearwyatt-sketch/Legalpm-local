@@ -17,7 +17,7 @@ import {
   Scale,
   LayoutDashboard,
   Briefcase,
-  Settings,
+  Shield,
   HelpCircle,
   LogOut,
   Menu,
@@ -88,7 +88,7 @@ const navigation: NavEntry[] = [
   { name: 'Admin Flags', href: '/flags', icon: AlertTriangle },
   { name: 'Analyst Backfill', href: '/admin/analyst-backfill', icon: Database },
   { name: 'Analyst Telemetry', href: '/admin/analyst-telemetry', icon: Activity },
-  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Security', href: '/settings', icon: Shield },
   { name: 'Help', href: '/help', icon: HelpCircle },
 ];
 
@@ -245,8 +245,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => navigate('/settings')}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Settings
+                  <Shield className="mr-2 h-4 w-4" />
+                  Security
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleSignOut}>
                   <LogOut className="mr-2 h-4 w-4" />
@@ -286,8 +286,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <DropdownMenuLabel className="truncate">{user?.email}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => navigate('/settings')}>
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
+              <Shield className="mr-2 h-4 w-4" />
+              Security
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleSignOut}>
               <LogOut className="mr-2 h-4 w-4" />

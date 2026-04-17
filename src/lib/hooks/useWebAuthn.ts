@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { startRegistration, startAuthentication } from '@simplewebauthn/browser';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -6,23 +6,20 @@ export function useWebAuthn() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Check if WebAuthn is supported
-  const isSupported = typeof window !== 'undefined' && 
+  const isSupported = useMemo(() => typeof window !== 'undefined' &&
     window.PublicKeyCredential !== undefined &&
-    typeof window.PublicKeyCredential === 'function';
+    typeof window.PublicKeyCredential === 'function', []);
 
-  // Check if platform authenticator (Face ID/Touch ID) is available
-  const checkPlatformAuthenticator = async (): Promise<boolean> => {
+  const checkPlatformAuthenticator = useCallback(async (): Promise<boolean> => {
     if (!isSupported) return false;
     try {
       return await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
     } catch {
       return false;
     }
-  };
+  }, [isSupported]);
 
-  // Register a new passkey (requires authenticated user)
-  const registerPasskey = async (deviceName?: string): Promise<{ success: boolean; error?: string }> => {
+  const registerPasskey = useCallback(async (deviceName?: string): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
     setError(null);
 
@@ -70,10 +67,9 @@ export function useWebAuthn() {
       setIsLoading(false);
       return { success: false, error: errorMessage };
     }
-  };
+  }, []);
 
-  // Authenticate with passkey
-  const authenticateWithPasskey = async (email: string): Promise<{ success: boolean; error?: string }> => {
+  const authenticateWithPasskey = useCallback(async (email: string): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
     setError(null);
 
@@ -139,10 +135,9 @@ export function useWebAuthn() {
       setIsLoading(false);
       return { success: false, error: errorMessage };
     }
-  };
+  }, []);
 
-  // Check if user has passkeys registered (silently handles 404s as expected)
-  const checkPasskeysForEmail = async (email: string): Promise<boolean> => {
+  const checkPasskeysForEmail = useCallback(async (email: string): Promise<boolean> => {
     try {
       const { data, error } = await supabase.functions.invoke('webauthn-authenticate', {
         body: { action: 'generate-options', email },
@@ -157,7 +152,7 @@ export function useWebAuthn() {
       // Network or other errors - silently return false
       return false;
     }
-  };
+  }, []);
 
   return {
     isSupported,

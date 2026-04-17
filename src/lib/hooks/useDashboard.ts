@@ -175,11 +175,47 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       // Get dated write-off events for each matter. Each event represents the
       // delta added to that matter's write-offs on a specific date, so the
       // dashboard can bucket them by financial year without guessing.
-      const { data: writeOffEventRows } = matterIds.length > 0 ? await supabase
+      let { data: writeOffEventRows } = matterIds.length > 0 ? await supabase
         .from('write_off_events' as never)
         .select('*')
         .in('matter_id', matterIds)
         .order('write_off_date', { ascending: false }) : { data: [] };
+
+      // One-time backfill: if write_off_events is empty but snapshots have
+      // write-offs, seed the table from the latest snapshot per matter.
+      // This covers DBs where the trigger migration was applied after
+      // snapshots already existed.
+      if ((!writeOffEventRows || writeOffEventRows.length === 0) && snapshots && snapshots.length > 0) {
+        const latestByMatter = new Map<string, typeof snapshots[0]>();
+        snapshots.forEach(snap => {
+          if (!latestByMatter.has(snap.matter_id)) latestByMatter.set(snap.matter_id, snap);
+        });
+        const toInsert: Array<Record<string, unknown>> = [];
+        latestByMatter.forEach((snap) => {
+          const wo = Number(snap.wip_write_off_amount) || 0;
+          if (wo <= 0) return;
+          const matter = (liveMatters || []).find(m => m.id === snap.matter_id);
+          toInsert.push({
+            matter_id: snap.matter_id,
+            user_id: snap.user_id,
+            write_off_amount: wo,
+            fee_currency: matter?.fee_currency || 'GBP',
+            exchange_rate: Number(matter?.exchange_rate) || 1,
+            write_off_date: snap.as_of_date,
+            source_snapshot_id: snap.id,
+            description: 'Backfill: seeded from latest snapshot',
+          });
+        });
+        if (toInsert.length > 0) {
+          await supabase.from('write_off_events' as never).insert(toInsert as never);
+          const { data: refetched } = await supabase
+            .from('write_off_events' as never)
+            .select('*')
+            .in('matter_id', matterIds)
+            .order('write_off_date', { ascending: false });
+          writeOffEventRows = refetched;
+        }
+      }
 
       // Get selected WIP shaping proposals for matters that have show_shaping_proposal enabled
       const { data: wipProposals } = matterIds.length > 0 ? await supabase

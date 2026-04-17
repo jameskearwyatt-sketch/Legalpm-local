@@ -1898,7 +1898,7 @@ export default function MatterDetail() {
                         .map(snap => ({
                           date: format(new Date(snap.as_of_date), 'MMM d'),
                           wip: snap.wip_amount || 0,
-                          ar: snap.billed_amount || 0,
+                          ar: Math.max((snap.billed_amount || 0) - (snap.paid_amount || 0), 0),
                           paid: snap.paid_amount || 0,
                         }));
                       return sortedSnapshots;

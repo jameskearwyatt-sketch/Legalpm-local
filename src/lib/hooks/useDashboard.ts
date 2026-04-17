@@ -485,30 +485,6 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         });
       });
 
-      // Fallback: if the write_off_events table returned no rows (trigger not
-      // applied or table missing) but snapshots have write-off amounts, derive
-      // FY entries from the latest snapshot per matter so the drill-down is
-      // never empty when real write-offs exist.
-      if (writeOffsByMatter.length === 0 && totalWipWriteOffUsd > 0) {
-        snapshotMap.forEach((snapshot, matterId) => {
-          if (excludedSet.has(matterId)) return;
-          const wo = Number(snapshot.wip_write_off_amount) || 0;
-          if (wo <= 0) return;
-          const matter = matterLookup.get(matterId);
-          if (!matter) return;
-          const feeCurrency = matter.fee_currency || 'GBP';
-          const exchangeRate = Number(matter.exchange_rate) || 1;
-          const usd = convertToUsd(wo, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-          writeOffsByMatter.push({
-            id: matterId,
-            matterName: matter.matter_name,
-            clientName: getMatterClientDisplayName(matter),
-            writeOffUsd: usd,
-            asOfDate: snapshot.as_of_date,
-          });
-        });
-      }
-
       // Generate pipeline alerts
       pipelineMatters?.forEach(matter => {
         const clientName = matter.clients?.name || 'Unknown Client';

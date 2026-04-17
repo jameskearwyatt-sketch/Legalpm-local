@@ -727,38 +727,12 @@ export function QuickToDoButton() {
   const promoteSlateOnlyToTaskList = async (item: SlateItem) => {
     if (!user) return;
     
-    // Use the database-backed hook if it's a SlateItem
-    if ('user_id' in item) {
-      promoteToQuickTask.mutate(item as SlateItem, {
-        onSuccess: () => {
-          // Refetch tasks since QuickToDoButton uses local state instead of react-query
-          fetchTasks();
-        }
-      });
-    } else {
-      // Legacy SlateOnlyItem support (shouldn't happen anymore)
-      const { data, error } = await supabase
-        .from('quick_tasks')
-        .insert({
-          title: item.title,
-          user_id: user.id,
-          on_slate: true,
-          is_completed: false,
-          is_urgent: false,
-          importance: 'unset',
-          urgency: 'unset',
-          effort: 'unset',
-        })
-        .select()
-        .single();
-      
-      if (error) {
-        toast.error('Failed to add to task list');
-      } else {
+    promoteToQuickTask.mutate(item, {
+      onSuccess: () => {
+        // Refetch tasks since QuickToDoButton uses local state instead of react-query
         fetchTasks();
-        toast.success('Added to task list');
       }
-    }
+    });
   };
 
   const handleMoveToGrowth = async () => {

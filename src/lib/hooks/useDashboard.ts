@@ -521,6 +521,49 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         });
       });
 
+      // If write_off_events table is missing/empty (migration not applied),
+      // derive dated entries by walking each matter's snapshot history to find
+      // when write-offs actually increased. This correctly attributes each
+      // write-off delta to the snapshot date it first appeared, so FY
+      // attribution survives across financial year boundaries.
+      if (writeOffsByMatter.length === 0 && snapshots && snapshots.length > 0) {
+        // Group snapshots by matter, ordered oldest-first so we can diff forward
+        const snapshotsByMatter = new Map<string, typeof snapshots>();
+        snapshots.forEach(snap => {
+          const list = snapshotsByMatter.get(snap.matter_id) || [];
+          list.push(snap);
+          snapshotsByMatter.set(snap.matter_id, list);
+        });
+
+        snapshotsByMatter.forEach((matterSnaps, matterId) => {
+          if (excludedSet.has(matterId)) return;
+          const matter = matterLookup.get(matterId);
+          if (!matter) return;
+
+          // Sort oldest-first so we walk forward in time
+          matterSnaps.sort((a, b) => a.as_of_date.localeCompare(b.as_of_date));
+
+          let prevWo = 0;
+          const feeCurrency = matter.fee_currency || 'GBP';
+          const exchangeRate = Number(matter.exchange_rate) || 1;
+
+          matterSnaps.forEach(snap => {
+            const currentWo = Number(snap.wip_write_off_amount) || 0;
+            const delta = currentWo - prevWo;
+            if (delta > 0) {
+              writeOffsByMatter.push({
+                id: matterId,
+                matterName: matter.matter_name,
+                clientName: getMatterClientDisplayName(matter),
+                writeOffUsd: convertToUsd(delta, feeCurrency, exchangeRate, gbpToUsdRate, liveRates),
+                asOfDate: snap.as_of_date,
+              });
+            }
+            prevWo = currentWo;
+          });
+        });
+      }
+
       // Generate pipeline alerts
       pipelineMatters?.forEach(matter => {
         const clientName = matter.clients?.name || 'Unknown Client';

@@ -131,7 +131,7 @@ export default function MatterForm() {
   const [isMultiClient, setIsMultiClient] = useState(false);
   const [clientAllocations, setClientAllocations] = useState<ClientAllocation[]>([]);
 
-  const [formData, setFormData] = useState<Partial<CreateMatterInput> & { rate_modifier?: string | null; rate_modifier_value?: number | null; pricing_model?: string | null }>({
+  const [formData, setFormData] = useState<Partial<CreateMatterInput> & { rate_modifier?: string | null; rate_modifier_value?: number | null; pricing_model?: string | null; progress?: number }>({
     client_id: '',
     matter_name: '',
     matter_number: '',
@@ -205,9 +205,9 @@ export default function MatterForm() {
         exchange_rate: existingMatter.exchange_rate || 1.0,
         fee_currency: existingMatter.fee_currency || 'GBP',
         fee_type: existingMatter.fee_type || null,
-        rate_modifier: (existingMatter as any).rate_modifier || null,
-        rate_modifier_value: (existingMatter as any).rate_modifier_value || null,
-        pricing_model: (existingMatter as any).pricing_model || null,
+        rate_modifier: existingMatter.rate_modifier || null,
+        rate_modifier_value: existingMatter.rate_modifier_value || null,
+        pricing_model: existingMatter.pricing_model || null,
         source: existingMatter.source || null,
         originator: existingMatter.originator || '',
         deal_currency: existingMatter.deal_currency || '',
@@ -220,10 +220,10 @@ export default function MatterForm() {
         submitted: existingMatter.submitted || false,
         decision_date: existingMatter.decision_date || '',
         pipeline_outcome: existingMatter.pipeline_outcome || null,
-        jurisdictions: (existingMatter as any).jurisdictions || [],
+        jurisdictions: existingMatter.jurisdictions || [],
       });
       // Set multi-client flag from matter
-      setIsMultiClient((existingMatter as any).is_multi_client || false);
+      setIsMultiClient(existingMatter.is_multi_client || false);
     }
   }, [existingMatter]);
 
@@ -492,11 +492,11 @@ export default function MatterForm() {
                       type="range"
                       min="0"
                       max="100"
-                      value={(formData as any).progress || 0}
+                      value={formData.progress || 0}
                       onChange={(e) => updateField('progress', parseInt(e.target.value))}
                       className="flex-1 h-2 bg-secondary rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-pointer [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-0"
                     />
-                    <span className="text-sm font-medium min-w-[40px]">{(formData as any).progress || 0}%</span>
+                    <span className="text-sm font-medium min-w-[40px]">{formData.progress || 0}%</span>
                   </div>
                   <p className="text-xs text-muted-foreground">Drag to indicate how far through the deal you are</p>
                 </div>

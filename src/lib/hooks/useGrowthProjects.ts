@@ -57,6 +57,7 @@ export interface GrowthTask {
   pinned_to_tasklist: boolean;
   on_slate: boolean;
   slate_sort_order: number;
+  must_do_today?: boolean;
   created_at: string;
   updated_at: string;
 }

@@ -179,15 +179,15 @@ export function PPAAnalysisList({ onReanalyze }: PPAAnalysisListProps) {
                       </Badge>
                     </TableCell>
                     <TableCell onClick={() => setSelectedAnalysisId(analysis.id)}>
-                      {(analysis as any).ppa_type ? (
+                      {analysis.ppa_type ? (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Badge variant="outline" className="text-xs">
-                              {((analysis as any).ppa_type as string).toUpperCase()}
+                              {(analysis.ppa_type as string).toUpperCase()}
                             </Badge>
                           </TooltipTrigger>
                           <TooltipContent>
-                            {PPA_STRUCTURE_LABELS[(analysis as any).ppa_type as PPAStructureType] || (analysis as any).ppa_type}
+                            {PPA_STRUCTURE_LABELS[analysis.ppa_type as PPAStructureType] || analysis.ppa_type}
                           </TooltipContent>
                         </Tooltip>
                       ) : (

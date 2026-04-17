@@ -117,7 +117,7 @@ export default function Dashboard() {
         return;
       }
 
-      const mma = (fullMatter as any).matter_managing_attorney || '';
+      const mma = fullMatter.matter_managing_attorney || '';
       const billingPartner = fullMatter.lead_partner || '';
 
       // Check if user is MMA or Billing Partner (case-insensitive comparison)
@@ -154,7 +154,7 @@ export default function Dashboard() {
         return;
       }
 
-      const mma = (fullMatter as any).matter_managing_attorney || '';
+      const mma = fullMatter.matter_managing_attorney || '';
       const billingPartner = fullMatter.lead_partner || '';
 
       // Check if user is MMA or Billing Partner (case-insensitive comparison)

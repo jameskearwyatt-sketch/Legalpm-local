@@ -829,7 +829,7 @@ export function QuickToDoButton() {
       assignee: gt.assignee,
       on_slate: gt.on_slate || false,
       slate_sort_order: gt.slate_sort_order || 0,
-      must_do_today: (gt as any).must_do_today || false,
+      must_do_today: gt.must_do_today || false,
     }));
   }, [upcomingGrowthTasks]);
 

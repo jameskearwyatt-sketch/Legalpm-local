@@ -318,10 +318,10 @@ export function CarbonAnalysisReport({ analysisId, onNewAnalysis, onViewHistory 
                                   <div className="text-sm text-foreground whitespace-pre-line">{position.position_summary}</div>
                                   {position.comparison_position && <div className="text-xs text-muted-foreground italic border-l-2 border-primary/30 pl-2 mt-1">{position.comparison_position}</div>}
                                   {cleanedNotes && <div className="text-xs text-muted-foreground">{cleanedNotes}</div>}
-                                  {(position as any).market_benchmark && (
+                                  {position.market_benchmark && (
                                     <div className="mt-2 p-2 bg-primary/5 border border-primary/20 rounded text-xs">
                                       <span className="font-medium text-primary">📊 What's Market?</span>
-                                      <span className="text-muted-foreground ml-2">{(position as any).market_benchmark}</span>
+                                      <span className="text-muted-foreground ml-2">{position.market_benchmark}</span>
                                     </div>
                                   )}
                                 </div>

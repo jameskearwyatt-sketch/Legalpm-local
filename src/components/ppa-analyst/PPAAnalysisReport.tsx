@@ -316,7 +316,7 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
         template_name: null,
         template_description: null,
         // New learning fields
-        ppa_type: (analysis as any).ppa_type || null,
+        ppa_type: analysis.ppa_type || null,
         source_text: p.source_text || null,
         confidence: p.confidence || 'medium',
         market_position: p.variance_notes?.includes('[ON MARKET]') ? 'on_market' 
@@ -328,11 +328,11 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
           : p.variance_notes?.includes('[BALANCED]') ? 'balanced'
           : null,
         // Party names from analysis
-        buyer_name: (analysis as any).buyer_name || null,
-        seller_name: (analysis as any).seller_name || null,
+        buyer_name: analysis.buyer_name || null,
+        seller_name: analysis.seller_name || null,
         // Normalized names for intelligent search
-        buyer_normalized: (analysis as any).buyer_normalized || null,
-        seller_normalized: (analysis as any).seller_normalized || null,
+        buyer_normalized: analysis.buyer_normalized || null,
+        seller_normalized: analysis.seller_normalized || null,
       }));
 
     try {
@@ -700,10 +700,10 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
                                     </div>
                                   )}
                                   {/* What's Market? Benchmark */}
-                                  {(position as any).market_benchmark && (
+                                  {position.market_benchmark && (
                                     <div className="mt-2 p-2 bg-primary/5 border border-primary/20 rounded text-xs">
                                       <span className="font-medium text-primary">📊 What's Market?</span>
-                                      <span className="text-muted-foreground ml-2">{(position as any).market_benchmark}</span>
+                                      <span className="text-muted-foreground ml-2">{position.market_benchmark}</span>
                                     </div>
                                   )}
                                 </div>
@@ -820,7 +820,7 @@ export function PPAAnalysisReport({ analysisId, onNewAnalysis, onViewHistory, on
            analysisId={analysisId}
            projectName={analysis.project_name}
            jurisdiction={analysis.jurisdiction}
-           ppaType={(analysis as any).ppa_type}
+           ppaType={analysis.ppa_type}
            varianceNotes={teachDialogPosition.variance_notes}
            onPositionUpdated={(newSummary, newVarianceNotes) => {
              handlePositionUpdated(teachDialogPosition.id, newSummary, newVarianceNotes);

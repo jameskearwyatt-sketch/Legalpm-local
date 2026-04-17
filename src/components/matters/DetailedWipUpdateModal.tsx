@@ -137,8 +137,8 @@ export function DetailedWipUpdateModal({
           fee_amount: item.fee_amount,
           provider: item.provider,
           lc_firm_name: item.lc_firm_name,
-          wip_amount: roundCurrency((item as any).wip_amount || 0),
-          write_off_amount: roundCurrency((item as any).wip_write_off || 0),
+          wip_amount: roundCurrency(item.wip_amount || 0),
+          write_off_amount: roundCurrency(item.wip_write_off || 0),
         }))
       );
       setHasAcknowledged(false);

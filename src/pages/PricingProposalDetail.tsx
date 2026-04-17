@@ -237,8 +237,8 @@ export default function PricingProposalDetail() {
         setPhasesInitialized(true);
       }
       // Load locked categories from proposal (only once)
-      if ((proposal as any).locked_categories && lockedCategories.size === 0) {
-        const loaded = new Set<string>((proposal as any).locked_categories as string[]);
+      if (proposal?.locked_categories && lockedCategories.size === 0) {
+        const loaded = new Set<string>(proposal?.locked_categories as string[]);
         setLockedCategories(loaded);
         lockedCategoriesRef.current = loaded;
       }
@@ -259,33 +259,33 @@ export default function PricingProposalDetail() {
       setDraftItems(savedItems.map(item => ({
         id: item.id,
         work_item: item.work_item,
-        detail: (item as any).detail || null,  // Load detail from database
+        detail: item.detail || null,  // Load detail from database
         provider: item.provider,
         fee_amount: item.fee_amount,
         fee_lower: item.fee_lower,  // Preserve saved fee range
         fee_upper: item.fee_upper,  // Preserve saved fee range
         pricing_method: item.pricing_method,
         category: item.category,
-        phase_id: (item as any).phase_id || null,  // Load phase assignment
+        phase_id: item.phase_id || null,  // Load phase assignment
         lc_firm_name: item.lc_firm_name || undefined,
         lc_country: item.lc_country || undefined,
         lc_library_id: item.lc_library_id || undefined,
         lc_currency: item.lc_currency || undefined,
         is_optional: item.is_optional,
         is_included: item.is_included ?? true,  // Default to included
-        is_pc_sum: (item as any).is_pc_sum ?? false,  // Load PC Sum flag
-        internal_input_dept: (item as any).internal_input_dept || null,  // Load BM Input dept
+        is_pc_sum: item.is_pc_sum ?? false,  // Load PC Sum flag
+        internal_input_dept: item.internal_input_dept || null,  // Load BM Input dept
         ai_rationale: item.ai_rationale,
         partner_hours: item.partner_hours || 0,
         associate_hours: item.associate_hours || 0,
         num_turns: item.num_turns || 1,
         item_type: item.item_type || 'documentation',
-        assumption_linked: (item as any).assumption_linked ?? false,
-        assumption_text: (item as any).assumption_text || null,
-        alt_fee_lower: (item as any).alt_fee_lower ?? 0,
-        alt_fee_upper: (item as any).alt_fee_upper ?? 0,
-        is_multiplied: (item as any).is_multiplied ?? false,
-        multiplier_qty: (item as any).multiplier_qty ?? 1,
+        assumption_linked: item.assumption_linked ?? false,
+        assumption_text: item.assumption_text || null,
+        alt_fee_lower: item.alt_fee_lower ?? 0,
+        alt_fee_upper: item.alt_fee_upper ?? 0,
+        is_multiplied: item.is_multiplied ?? false,
+        multiplier_qty: item.multiplier_qty ?? 1,
       })));
 
       // Extract custom categories from saved items
@@ -2089,10 +2089,10 @@ export default function PricingProposalDetail() {
       associate_hours: item.associate_hours || 0,
       num_turns: item.num_turns || 1,
       item_type: item.item_type || 'documentation',
-      assumption_linked: (item as any).assumption_linked ?? false,
-      assumption_text: (item as any).assumption_text || null,
-      alt_fee_lower: (item as any).alt_fee_lower ?? 0,
-      alt_fee_upper: (item as any).alt_fee_upper ?? 0,
+      assumption_linked: item.assumption_linked ?? false,
+      assumption_text: item.assumption_text || null,
+      alt_fee_lower: item.alt_fee_lower ?? 0,
+      alt_fee_upper: item.alt_fee_upper ?? 0,
     })));
     setIsViewingHistory(true);
     setHasUnsavedChanges(false);
@@ -2125,10 +2125,10 @@ export default function PricingProposalDetail() {
       associate_hours: item.associate_hours || 0,
       num_turns: item.num_turns || 1,
       item_type: item.item_type || 'documentation',
-      assumption_linked: (item as any).assumption_linked ?? false,
-      assumption_text: (item as any).assumption_text || null,
-      alt_fee_lower: (item as any).alt_fee_lower ?? 0,
-      alt_fee_upper: (item as any).alt_fee_upper ?? 0,
+      assumption_linked: item.assumption_linked ?? false,
+      assumption_text: item.assumption_text || null,
+      alt_fee_lower: item.alt_fee_lower ?? 0,
+      alt_fee_upper: item.alt_fee_upper ?? 0,
     })));
     setSelectedVersionId(null);
     setIsViewingHistory(false);

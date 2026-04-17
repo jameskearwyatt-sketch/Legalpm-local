@@ -590,7 +590,7 @@ export function useMatters() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['matters'] });
       // Show a more informative message when propagating
-      const effectiveScope = (variables as any).rate_modifier_scope;
+      const effectiveScope = variables.rate_modifier_scope;
       if (effectiveScope === 'all_client_matters') {
         toast({ title: 'Rate modifier applied to all client matters' });
       } else {

@@ -121,7 +121,7 @@ export function WipShapingProposalDialog({
     if (isOpen && !isInitialized) {
       if (existingProposal) {
         // Editing existing proposal - use stored values directly
-        setWriteOffMode((existingProposal as any).write_off_mode || 'fixed_writeoff');
+        setWriteOffMode(existingProposal.write_off_mode || 'fixed_writeoff');
         const rawWip = roundTo2(existingProposal.wip_amount);
         const wipWriteOff = roundTo2(existingProposal.wip_write_off_amount);
         // Use the stored ar_write_off_amount directly instead of recalculating

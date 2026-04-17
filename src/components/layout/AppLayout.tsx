@@ -118,7 +118,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
     navigate('/auth');
   };
 
-  const userInitials = user?.email?.slice(0, 2).toUpperCase() || 'U';
+  const userInitials = (() => {
+    const name = user?.user_metadata?.full_name as string | undefined;
+    if (name) {
+      const parts = name.trim().split(/\s+/);
+      if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+      if (parts[0]?.length >= 2) return parts[0].slice(0, 2).toUpperCase();
+    }
+    return user?.email?.slice(0, 2).toUpperCase() || 'U';
+  })();
 
   const allAnalystHrefs: string[] = analystNavigation.flatMap(c =>
     'type' in c && c.type === 'subgroup' ? c.children.map(sc => sc.href) : [(c as NavItem).href]

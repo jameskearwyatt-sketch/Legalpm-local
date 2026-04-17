@@ -590,22 +590,21 @@ export default function Flags() {
       if (!matter.start_date) flags.push('no_start_date');
       if (matter.is_multi_client && mattersWithInvalidSplit.has(matter.id)) flags.push('invalid_client_split');
       if (!matter.cm_number || matter.cm_number.trim() === '') flags.push('no_cm_number');
-      // Cast to any to access new field until types are regenerated
-      const mma = (matter as any).matter_managing_attorney;
+      const mma = matter.matter_managing_attorney;
       if (!mma || mma.trim() === '') flags.push('no_mma');
       if (!matter.lead_partner || matter.lead_partner.trim() === '') flags.push('no_billing_partner');
       // Local counsel billing missing check - check per-LC billing_mode
-      const localCounsels = (matter as any).local_counsels || [];
+      const localCounsels = matter.local_counsels || [];
       const localCounselFee = Number(matter.local_counsel_fee) || 0;
       // Flag if there's LC fee but no LC records, or if any LC is missing billing_mode
       const hasLcWithMissingBilling = localCounsels.length > 0 
-        ? localCounsels.some((lc: any) => !lc.billing_mode)
+        ? localCounsels.some((lc) => !lc.billing_mode)
         : localCounselFee > 0; // Flag if fee exists but no LC records
       if (hasLcWithMissingBilling) {
         flags.push('no_lc_billing');
       }
       // Check for missing jurisdictions
-      const jurisdictions = (matter as any).jurisdictions || [];
+      const jurisdictions = matter.jurisdictions || [];
       if (!jurisdictions || jurisdictions.length === 0) {
         flags.push('no_jurisdictions');
       }
@@ -673,7 +672,7 @@ export default function Flags() {
     if (type === 'no_jurisdictions') {
       // Get current jurisdictions from the matter
       const matterData = liveMatters.find(m => m.id === matter.id);
-      const currentJurisdictions = (matterData as any)?.jurisdictions || [];
+      const currentJurisdictions = matterData?.jurisdictions || [];
       return (
         <JurisdictionsInlineEditor
           matterId={matter.id}

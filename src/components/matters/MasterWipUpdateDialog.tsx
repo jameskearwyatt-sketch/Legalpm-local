@@ -305,20 +305,20 @@ export function MasterWipUpdateDialog({
       // This ensures we don't compare against WIP shaping proposal data, which is aspirational
       const mattersForMatching = matters.map(m => {
         // Use actual_snapshot for comparison - this NEVER contains proposal data
-        const snapshot = (m as any).actual_snapshot || m.latest_snapshot;
+        const snapshot = m.actual_snapshot || m.latest_snapshot;
         // Check if the latest snapshot was manually updated
         const snapshotAny = snapshot as Record<string, unknown> | null;
         const wasManual = snapshotAny?.update_source === 'manual';
         // Get LC data for disbursement comparison
-        const lcWip = (m as any).lc_wip || 0;
-        const lcBilled = (m as any).lc_billed || 0;
+        const lcWip = m.lc_wip || 0;
+        const lcBilled = m.lc_billed || 0;
         return {
           id: m.id,
           matter_name: m.matter_name,
           matter_number: m.matter_number,
           client_name: m.clients?.name || '',
           cm_number: m.cm_number || '',
-          currency: (m as any).effective_currency ?? m.fee_currency,
+          currency: m.effective_currency ?? m.fee_currency,
           current_wip: snapshot?.wip_amount || 0,
           current_wip_write_off: snapshot?.wip_write_off_amount || 0,
           current_ar: snapshot?.accounts_receivable || 0,
@@ -506,8 +506,8 @@ export function MasterWipUpdateDialog({
     const matter = matters.find(m => m.id === matterId);
     if (!matter) return true;
     
-    const lcWip = (matter as any).lc_wip || 0;
-    const lcBilled = (matter as any).lc_billed || 0;
+    const lcWip = matter.lc_wip || 0;
+    const lcBilled = matter.lc_billed || 0;
     const totalLcTracked = lcWip + lcBilled; // Total LC amount already tracked in the matter
     
     // If there's no existing LC data at all, any significant disbursement is potentially untracked
@@ -550,8 +550,8 @@ export function MasterWipUpdateDialog({
     const matter = matters.find(m => m.id === matterId);
     if (!matter) return false;
     
-    const lcWip = (matter as any).lc_wip || 0;
-    const lcBilled = (matter as any).lc_billed || 0;
+    const lcWip = matter.lc_wip || 0;
+    const lcBilled = matter.lc_billed || 0;
     const totalLcTracked = lcWip + lcBilled;
     const totalDisbFromExcel = wipDisb + billedDisb;
     
@@ -1003,7 +1003,7 @@ export function MasterWipUpdateDialog({
           matchConfidence: 'high',
           needsConfirmation: false,
           isMultiClientAggregate: true,
-          currency: (targetMatter as any).effective_currency ?? targetMatter.fee_currency,
+          currency: targetMatter.effective_currency ?? targetMatter.fee_currency,
           wip: {
             value: agg.totalWip,
             current: snapshot?.wip_amount || 0,
@@ -1082,7 +1082,7 @@ export function MasterWipUpdateDialog({
       matchedMatterName: selectedMatter.matter_name,
       matchConfidence: 'high',
       needsConfirmation: false,
-      currency: (selectedMatter as any).effective_currency ?? selectedMatter.fee_currency,
+      currency: selectedMatter.effective_currency ?? selectedMatter.fee_currency,
       wip: { 
         ...item.wip, 
         current: snapshot?.wip_amount || 0,

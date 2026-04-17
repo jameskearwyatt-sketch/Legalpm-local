@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useToast } from '@/hooks/use-toast';
+import type { WipShapingProposal } from './useWipShapingProposals';
 
 export type MatterCategory = 'Live' | 'Pipeline' | 'Closed' | 'Lost';
 export type MatterStage = 'Pre-Start' | 'Term Sheet' | 'Documentation - Start' | 'Documentation - Close' | 'Closing Process' | 'Paused' | 'Closed' | 'Won' | 'Pending' | 'Lost';
@@ -30,7 +31,6 @@ export interface Matter {
   budget_notes: string | null;
   fee_earner_mix_notes: string | null;
   billing_terms: string | null;
-  // New fields
   category: MatterCategory;
   current_stage: MatterStage | null;
   fee_amount_upper_end: number;
@@ -52,18 +52,26 @@ export interface Matter {
   submitted: boolean;
   decision_date: string | null;
   pipeline_outcome: PipelineOutcome | null;
-  // Billing currency fields
   different_billing_currency: boolean;
   agreed_billing_amount: number;
   quote_currency: string | null;
   billing_currency: string | null;
   is_multi_client: boolean;
-  // Full time costs mode (no estimate/headroom tracking)
   pay_full_time_costs: boolean;
-  // Progress - percentage through the deal (0-100)
   progress: number;
-  // Jurisdictions - countries where the project is located
   jurisdictions: string[];
+  matter_display_name: string | null;
+  on_hold_months: number;
+  show_shaping_proposal: boolean;
+  lc_wip: number;
+  lc_billed: number;
+  lc_last_updated: string | null;
+  manual_budget_amount: number;
+  use_manual_budget: boolean;
+  rate_modifier: string | null;
+  rate_modifier_value: number | null;
+  rate_modifier_scope: string | null;
+  pricing_model: string | null;
   created_at: string;
   updated_at: string;
   clients?: {
@@ -123,6 +131,12 @@ export interface MatterWithFinancials extends Matter {
   lc_headroom_percent: number;
   total_paid_ar_wip: number;
   local_counsels?: LocalCounselBrief[];
+  effective_fee_upper_end: number;
+  effective_bm_fee: number;
+  effective_local_counsel_fee: number;
+  effective_currency: string;
+  mandated_rate: number;
+  selected_proposal: WipShapingProposal | null;
 }
 
 export interface CreateMatterInput {
@@ -298,7 +312,7 @@ export function useMatters() {
       return matters?.map(matter => {
         const snapshot = snapshotMap.get(matter.id);
         const selectedProposal = selectedProposalMap.get(matter.id);
-        const showProposalData = (matter as any).show_shaping_proposal && selectedProposal;
+        const showProposalData = matter.show_shaping_proposal && selectedProposal;
         
         // Use proposal data if enabled, otherwise use snapshot
         // IMPORTANT: For proposals, wip_amount is RAW and we subtract write-off to get NET
@@ -447,7 +461,7 @@ export function useMatters() {
           local_counsels: localCounsels,
           // Include proposal info for highlighting in master table
           selected_proposal: selectedProposal || null,
-          show_shaping_proposal: (matter as any).show_shaping_proposal || false,
+          show_shaping_proposal: matter.show_shaping_proposal || false,
           // Include snapshot history for sparkline charts
           snapshot_history: snapshotHistoryMap.get(matter.id) || [],
         } as MatterWithFinancials;
@@ -576,7 +590,7 @@ export function useMatters() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['matters'] });
       // Show a more informative message when propagating
-      const effectiveScope = (variables as any).rate_modifier_scope;
+      const effectiveScope = variables.rate_modifier_scope;
       if (effectiveScope === 'all_client_matters') {
         toast({ title: 'Rate modifier applied to all client matters' });
       } else {

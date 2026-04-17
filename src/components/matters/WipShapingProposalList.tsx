@@ -73,7 +73,7 @@ export function WipShapingProposalList({
   };
 
   const renderProposalCard = (proposal: WipShapingProposal, isArchived = false) => {
-    const isFixedTarget = (proposal as any).write_off_mode === 'fixed_target';
+    const isFixedTarget = proposal.write_off_mode === 'fixed_target';
     const netWip = proposal.wip_amount - proposal.wip_write_off_amount;
     const rawAr = proposal.accounts_receivable + proposal.ar_write_off_amount;
     const netAr = proposal.accounts_receivable;
@@ -129,7 +129,7 @@ export function WipShapingProposalList({
                   <>
                     <div className="flex justify-between">
                       <span className="text-primary font-medium">Target WIP:</span>
-                      <span className="text-primary font-medium">{formatCurrency((proposal as any).wip_target_amount || 0, currency)}</span>
+                      <span className="text-primary font-medium">{formatCurrency(proposal.wip_target_amount || 0, currency)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-xs text-muted-foreground italic">Write-off auto-adjusts</span>

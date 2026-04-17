@@ -373,13 +373,13 @@ export default function MatterDetail() {
         exchange_rate: matter.exchange_rate || 1.0,
         fee_currency: matter.fee_currency || 'GBP',
         fee_type: matter.fee_type || null,
-        rate_modifier: (matter as any).rate_modifier || null,
-        rate_modifier_value: (matter as any).rate_modifier_value || null,
-        rate_modifier_scope: (matter as any).rate_modifier_scope || null,
-        pricing_model: (matter as any).pricing_model || null,
+        rate_modifier: matter.rate_modifier || null,
+        rate_modifier_value: matter.rate_modifier_value || null,
+        rate_modifier_scope: matter.rate_modifier_scope || null,
+        pricing_model: matter.pricing_model || null,
         source: matter.source || null,
         originator: matter.originator || '',
-        matter_managing_attorney: (matter as any).matter_managing_attorney || '',
+        matter_managing_attorney: matter.matter_managing_attorney || '',
         deal_currency: matter.deal_currency || '',
         deal_value: matter.deal_value || undefined,
         cm_number: matter.cm_number || '',
@@ -397,18 +397,18 @@ export default function MatterDetail() {
         quote_currency: matter.quote_currency || matter.fee_currency || 'GBP',
         // Local counsel financial tracking
         local_counsel_billing: matter.local_counsel_billing || '',
-        lc_wip: (matter as any).lc_wip || 0,
-        lc_billed: (matter as any).lc_billed || 0,
-        lc_last_updated: (matter as any).lc_last_updated || '',
+        lc_wip: matter.lc_wip || 0,
+        lc_billed: matter.lc_billed || 0,
+        lc_last_updated: matter.lc_last_updated || '',
         // Jurisdictions
-        jurisdictions: (matter as any).jurisdictions || [],
+        jurisdictions: matter.jurisdictions || [],
         // Progress
-        progress: (matter as any).progress || 0,
+        progress: matter.progress || 0,
         // On hold months for burn rate calculation
-        on_hold_months: (matter as any).on_hold_months || 0,
+        on_hold_months: matter.on_hold_months || 0,
         // Manual budget override
-        use_manual_budget: (matter as any).use_manual_budget || false,
-        manual_budget_amount: (matter as any).manual_budget_amount || 0,
+        use_manual_budget: matter.use_manual_budget || false,
+        manual_budget_amount: matter.manual_budget_amount || 0,
       });
       setHasChanges(false);
       setIsFormInitialized(true);
@@ -584,7 +584,7 @@ export default function MatterDetail() {
   
   // Determine if we should show proposal values instead of real snapshot
   // Cast to any to access new show_shaping_proposal field (types will update after regeneration)
-  const showProposalValues = (matter as any).show_shaping_proposal && selectedProposal;
+  const showProposalValues = matter.show_shaping_proposal && selectedProposal;
   
   // Financial snapshots are stored in BILLING currency - no conversion needed
   // If showing proposal, use proposal values; otherwise use snapshot values
@@ -592,9 +592,9 @@ export default function MatterDetail() {
   // For snapshots (imported data), wip_amount IS already NET - write-off is tracked separately for realization only
   
   // For fixed_target proposals, dynamically recalculate write-off from current snapshot WIP
-  const isFixedTargetProposal = showProposalValues && (selectedProposal as any).write_off_mode === 'fixed_target';
+  const isFixedTargetProposal = showProposalValues && selectedProposal.write_off_mode === 'fixed_target';
   const currentSnapshotWip = latestSnapshot?.wip_amount || 0;
-  const proposalTargetWip = isFixedTargetProposal ? ((selectedProposal as any).wip_target_amount || 0) : 0;
+  const proposalTargetWip = isFixedTargetProposal ? (selectedProposal.wip_target_amount || 0) : 0;
   
   const wipWriteOffAmount = showProposalValues 
     ? (isFixedTargetProposal 
@@ -616,7 +616,7 @@ export default function MatterDetail() {
   
   // AR write-off is separate - applies to accounts receivable
   const arWriteOffAmount = showProposalValues 
-    ? (selectedProposal as any).ar_write_off_amount || 0
+    ? selectedProposal.ar_write_off_amount || 0
     : 0; // Snapshots don't have separate AR write-offs
   
   const billedAmount = showProposalValues 
@@ -657,8 +657,8 @@ export default function MatterDetail() {
     : feeUpperEnd;
   
   // Check for manual budget override
-  const useManualBudget = formData.use_manual_budget ?? (matter as any).use_manual_budget ?? false;
-  const manualBudgetAmount = formData.manual_budget_amount ?? (matter as any).manual_budget_amount ?? 0;
+  const useManualBudget = formData.use_manual_budget ?? matter.use_manual_budget ?? false;
+  const manualBudgetAmount = formData.manual_budget_amount ?? matter.manual_budget_amount ?? 0;
   
   // BM Fee - use manual budget if enabled, otherwise calculated from detailed budget
   const calculatedBmFee = differentBillingCurrency && agreedBillingAmount > 0
@@ -875,7 +875,7 @@ export default function MatterDetail() {
               <CardHeader className="flex flex-row items-start justify-between">
                 <div>
                   <CardTitle className="text-lg font-heading">Budget Overview</CardTitle>
-                  {(formData as any).pay_full_time_costs ? (
+                  {formData.pay_full_time_costs ? (
                     <CardDescription className="text-xs text-muted-foreground">
                       Client pays full time costs
                     </CardDescription>
@@ -885,7 +885,7 @@ export default function MatterDetail() {
                     </CardDescription>
                   )}
                 </div>
-                {!(formData as any).pay_full_time_costs && latestLineItems.length > 0 && (
+                {!formData.pay_full_time_costs && latestLineItems.length > 0 && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -893,8 +893,8 @@ export default function MatterDetail() {
                       try {
                         await exportBudgetToExcel({
                           items: latestLineItems,
-                          matterName: (matter as any)?.matter_display_name || matter?.matter_name || 'Unknown Matter',
-                          clientName: (matter?.clients as any)?.display_name || matter?.clients?.name || 'Unknown Client',
+                          matterName: matter?.matter_display_name || matter?.matter_name || 'Unknown Matter',
+                          clientName: matter?.clients?.display_name || matter?.clients?.name || 'Unknown Client',
                           currency: currency,
                           versionNumber: undefined,
                           versionDate: undefined,
@@ -913,7 +913,7 @@ export default function MatterDetail() {
                 )}
               </CardHeader>
               <CardContent className="space-y-6">
-                {(formData as any).pay_full_time_costs ? (
+                {formData.pay_full_time_costs ? (
                   <div className="p-4 rounded-lg bg-muted/50 text-center">
                     <p className="text-muted-foreground">
                       Budget tracking is disabled for this matter.
@@ -1179,7 +1179,7 @@ export default function MatterDetail() {
                         <div className="flex items-center gap-2">
                           <Checkbox
                             id="show-proposal-toggle"
-                            checked={(matter as any).show_shaping_proposal || false}
+                            checked={matter.show_shaping_proposal || false}
                             onCheckedChange={async (checked) => {
                               await supabase
                                 .from('matters')
@@ -1499,7 +1499,7 @@ export default function MatterDetail() {
             isOpen={showFinancialUpdateDialog}
             onClose={() => setShowFinancialUpdateDialog(false)}
             currency={currency}
-            matterName={(matter as any).matter_display_name || matter.matter_name}
+            matterName={matter.matter_display_name || matter.matter_name}
             differentBillingCurrency={differentBillingCurrency}
             quoteCurrency={quoteCurrency}
             localCounsels={localCounsels.map(lc => ({
@@ -1608,7 +1608,7 @@ export default function MatterDetail() {
               setEditingProposal(null);
             }}
             currency={currency}
-            matterName={(matter as any).matter_display_name || matter.matter_name}
+            matterName={matter.matter_display_name || matter.matter_name}
             differentBillingCurrency={differentBillingCurrency}
             quoteCurrency={quoteCurrency}
             existingProposal={editingProposal}

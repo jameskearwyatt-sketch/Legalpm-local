@@ -325,16 +325,16 @@ function DraggableProposalItemInner({
                       size="sm" 
                       className={cn(
                         "h-7 text-xs justify-start max-w-[160px]",
-                        !(item as any).lc_country && "text-destructive border-destructive"
+                        !item.lc_country && "text-destructive border-destructive"
                       )}
-                      title={(item as any).lc_country 
-                        ? `${(item as any).lc_country}${item.lc_firm_name ? ` — ${item.lc_firm_name}` : ''}` 
+                      title={item.lc_country 
+                        ? `${item.lc_country}${item.lc_firm_name ? ` — ${item.lc_firm_name}` : ''}` 
                         : 'Set country (required)'}
                     >
                       <Building2 className="h-3 w-3 mr-1 shrink-0" />
                       <span className="truncate">
-                        {(item as any).lc_country 
-                          ? `${(item as any).lc_country}${item.lc_firm_name ? ` — ${item.lc_firm_name}` : ''}` 
+                        {item.lc_country 
+                          ? `${item.lc_country}${item.lc_firm_name ? ` — ${item.lc_firm_name}` : ''}` 
                           : 'Set country...'}
                       </span>
                     </Button>
@@ -347,10 +347,10 @@ function DraggableProposalItemInner({
                       <div className="space-y-1">
                         <Label className="text-xs">Country *</Label>
                         <CountryCombobox
-                          value={(item as any).lc_country || ''}
+                          value={item.lc_country || ''}
                           onValueChange={(value) => {
                             onUpdate(index, { 
-                              ...(({ lc_country: value }) as any)
+                              lc_country: value
                             });
                           }}
                           className="h-8 text-xs"

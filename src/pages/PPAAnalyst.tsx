@@ -39,8 +39,8 @@ export default function PPAAnalyst() {
       jurisdiction: analysis.jurisdiction || '',
       perspective: analysis.perspective,
       analysisType: analysis.analysis_type,
-      ppaType: (analysis as any).ppa_type || 'vppa',
-      counterpartyType: (analysis as any).counterparty_type || '',
+      ppaType: analysis.ppa_type || 'vppa',
+      counterpartyType: analysis.counterparty_type || '',
       originalFileName: analysis.document_file_name,
     });
     

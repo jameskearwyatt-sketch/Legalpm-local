@@ -88,22 +88,22 @@ export function LocalCounselPanel({
 
     draftItems.forEach((item, index) => {
       if (item.provider === 'Local Counsel') {
-        const country = (item as any).lc_country || 'Unassigned';
+        const country = item.lc_country || 'Unassigned';
         const workItemKey = getWorkItemKey(item);
         
         if (!byCountry[country]) {
           byCountry[country] = {
             country,
             items: [],
-            activeFirmId: (item as any).lc_library_id,
+            activeFirmId: item.lc_library_id,
             activeFirmName: item.lc_firm_name,
           };
         }
         
         byCountry[country].items.push({ item, index, workItemKey });
         // Use the first item's firm as the active one
-        if (!byCountry[country].activeFirmId && (item as any).lc_library_id) {
-          byCountry[country].activeFirmId = (item as any).lc_library_id;
+        if (!byCountry[country].activeFirmId && item.lc_library_id) {
+          byCountry[country].activeFirmId = item.lc_library_id;
           byCountry[country].activeFirmName = item.lc_firm_name;
         }
       }
@@ -137,8 +137,8 @@ export function LocalCounselPanel({
         
         // Check if current values differ from stored quotes
         const currentAmount = item.fee_amount || 0;
-        const currentLower = (item as any).fee_lower ?? currentAmount;
-        const currentUpper = (item as any).fee_upper ?? currentAmount;
+        const currentLower = item.fee_lower ?? currentAmount;
+        const currentUpper = item.fee_upper ?? currentAmount;
         
         const needsUpdate = 
           currentAmount !== storedQuote.fee_amount ||
@@ -206,7 +206,9 @@ export function LocalCounselPanel({
         fee_amount: quote?.fee_amount || 0,
         fee_lower: quote?.fee_lower || 0,
         fee_upper: quote?.fee_upper || 0,
-        ...(({ lc_country: firm.country, lc_library_id: firm.id, lc_currency: firm.currency }) as any),
+        lc_country: firm.country,
+        lc_library_id: firm.id,
+        lc_currency: firm.currency,
       });
     });
 
@@ -278,7 +280,9 @@ export function LocalCounselPanel({
         fee_amount: amount,
         fee_lower: lower,
         fee_upper: upper,
-        ...(({ lc_country: quotingFirm.country, lc_library_id: quotingFirm.id, lc_currency: quotingFirm.currency }) as any),
+        lc_country: quotingFirm.country,
+        lc_library_id: quotingFirm.id,
+        lc_currency: quotingFirm.currency,
       });
     });
 

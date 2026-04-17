@@ -50,7 +50,7 @@ export default function Reports() {
   // Helper to check if user is MMA or BP for a matter
   const isMyMatter = (matter: MatterWithFinancials): boolean => {
     if (!userName) return false;
-    const mma = (matter as any).matter_managing_attorney || '';
+    const mma = matter.matter_managing_attorney || '';
     const bp = matter.lead_partner || '';
     const userNameLower = userName.toLowerCase().trim();
     const isMMA = mma.trim() !== '' && mma.toLowerCase().trim() === userNameLower;

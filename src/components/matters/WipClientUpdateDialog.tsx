@@ -330,11 +330,10 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
 
       // Calculate effective agreed budget - use the matter's effective budget
       // This accounts for manual budget overrides, different billing currencies, and line item totals
-      const matterAny = matter as any;
-      const useManualBudget = matterAny.use_manual_budget ?? false;
-      const manualBudgetAmount = matterAny.manual_budget_amount ?? 0;
-      const differentBillingCurrency = matterAny.different_billing_currency ?? false;
-      const agreedBillingAmount = matterAny.agreed_billing_amount ?? 0;
+      const useManualBudget = matter.use_manual_budget ?? false;
+      const manualBudgetAmount = matter.manual_budget_amount ?? 0;
+      const differentBillingCurrency = matter.different_billing_currency ?? false;
+      const agreedBillingAmount = matter.agreed_billing_amount ?? 0;
       const feeUpperEnd = matter.fee_amount_upper_end ?? 0;
       const bmFeeComponent = matter.bm_fee_component ?? 0;
       const localCounselFee = matter.local_counsel_fee ?? 0;
@@ -355,7 +354,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
 
       newData.set(matter.id, {
         matterId: matter.id,
-        matterName: (matter as any).matter_display_name || matter.matter_name,
+        matterName: matter.matter_display_name || matter.matter_name,
         clientId: matter.client_id,
         clientName: getClientDisplayName(client || matter.clients),
         feeCurrency: matter.fee_currency || "GBP",
@@ -369,7 +368,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         currentPaid,
         totalBudgetUtilised: currentWip + currentAr + currentPaid,
         agreedBudget: effectiveAgreedBudget,
-        isMultiClient: (matter as any).is_multi_client || false,
+        isMultiClient: matter.is_multi_client || false,
       });
     });
 
@@ -825,7 +824,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
                         />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">
-                          {(matter as any).matter_display_name || matter.matter_name}
+                          {matter.matter_display_name || matter.matter_name}
                         </p>
                         <p className="text-sm text-muted-foreground truncate">
                           {getClientDisplayName(client || matter.clients)}

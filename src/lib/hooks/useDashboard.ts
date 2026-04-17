@@ -523,11 +523,11 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
 
       // If write_off_events table is missing/empty (migration not applied),
       // derive dated entries by walking each matter's snapshot history to find
-      // when write-offs actually increased. This correctly attributes each
-      // write-off delta to the snapshot date it first appeared, so FY
-      // attribution survives across financial year boundaries.
+      // when write-offs actually increased. Positive deltas are recorded for
+      // FY attribution, then scaled so the per-matter total matches the latest
+      // snapshot's cumulative value — this prevents over-counting when
+      // write-offs are corrected downward between snapshots.
       if (writeOffsByMatter.length === 0 && snapshots && snapshots.length > 0) {
-        // Group snapshots by matter, ordered oldest-first so we can diff forward
         const snapshotsByMatter = new Map<string, typeof snapshots>();
         snapshots.forEach(snap => {
           const list = snapshotsByMatter.get(snap.matter_id) || [];
@@ -540,26 +540,40 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           const matter = matterLookup.get(matterId);
           if (!matter) return;
 
-          // Sort oldest-first so we walk forward in time
           matterSnaps.sort((a, b) => a.as_of_date.localeCompare(b.as_of_date));
 
-          let prevWo = 0;
+          const latestSnap = matterSnaps[matterSnaps.length - 1];
+          const latestWo = Number(latestSnap.wip_write_off_amount) || 0;
+          if (latestWo <= 0) return;
+
           const feeCurrency = matter.fee_currency || 'GBP';
           const exchangeRate = Number(matter.exchange_rate) || 1;
 
+          // Collect positive deltas to preserve FY attribution dates
+          let prevWo = 0;
+          const deltas: { date: string; amount: number }[] = [];
           matterSnaps.forEach(snap => {
             const currentWo = Number(snap.wip_write_off_amount) || 0;
             const delta = currentWo - prevWo;
             if (delta > 0) {
-              writeOffsByMatter.push({
-                id: matterId,
-                matterName: matter.matter_name,
-                clientName: getMatterClientDisplayName(matter),
-                writeOffUsd: convertToUsd(delta, feeCurrency, exchangeRate, gbpToUsdRate, liveRates),
-                asOfDate: snap.as_of_date,
-              });
+              deltas.push({ date: snap.as_of_date, amount: delta });
             }
             prevWo = currentWo;
+          });
+
+          // Scale proportionally so the total equals the latest cumulative,
+          // correcting for any interim reductions/reversals
+          const deltaSum = deltas.reduce((s, d) => s + d.amount, 0);
+          const scaleFactor = deltaSum > 0 ? latestWo / deltaSum : 0;
+
+          deltas.forEach(d => {
+            writeOffsByMatter.push({
+              id: matterId,
+              matterName: matter.matter_name,
+              clientName: getMatterClientDisplayName(matter),
+              writeOffUsd: convertToUsd(d.amount * scaleFactor, feeCurrency, exchangeRate, gbpToUsdRate, liveRates),
+              asOfDate: d.date,
+            });
           });
         });
       }

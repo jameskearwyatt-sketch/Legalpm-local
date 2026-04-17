@@ -189,7 +189,7 @@ function MmaBpTableRow({ matter, userProfile, updateMatter }: MmaBpTableRowProps
         >
           <p className="font-medium text-foreground">{getClientDisplayName(matter.clients)}</p>
           <p className="text-sm text-muted-foreground group-hover:text-primary transition-colors line-clamp-2" title={matter.matter_name}>
-            {(matter as any).matter_display_name || matter.matter_name}
+            {matter.matter_display_name || matter.matter_name}
           </p>
         </Link>
       </TableCell>
@@ -576,13 +576,13 @@ export default function Matters() {
   
   // Compute matters that have selected WIP proposals
   const mattersWithProposals = useMemo(() => {
-    return matters.filter(m => (m as any).selected_proposal);
+    return matters.filter(m => m.selected_proposal);
   }, [matters]);
   
   // Check if all matters with proposals have show_shaping_proposal enabled
   const allProposalsApplied = useMemo(() => {
     if (mattersWithProposals.length === 0) return false;
-    return mattersWithProposals.every(m => (m as any).show_shaping_proposal);
+    return mattersWithProposals.every(m => m.show_shaping_proposal);
   }, [mattersWithProposals]);
   
   // Toggle all WIP proposals on/off
@@ -712,7 +712,7 @@ export default function Matters() {
   useEffect(() => {
     const summarizeLongNames = async () => {
       const mattersNeedingSummary = matters.filter(
-        (m) => m.matter_name.length > 60 && !(m as any).matter_display_name
+        (m) => m.matter_name.length > 60 && !m.matter_display_name
       );
       
       // Process one at a time to avoid overwhelming the API
@@ -859,8 +859,8 @@ export default function Matters() {
       switch (sortField) {
         case 'matter_name':
           // Sort by "Client Name - Matter Name" combined for alphabetical ordering
-          const aClient = ((a as any).clients?.display_name || (a as any).clients?.name || '').toLowerCase();
-          const bClient = ((b as any).clients?.display_name || (b as any).clients?.name || '').toLowerCase();
+          const aClient = (a.clients?.display_name || a.clients?.name || '').toLowerCase();
+          const bClient = (b.clients?.display_name || b.clients?.name || '').toLowerCase();
           aVal = `${aClient} - ${a.matter_name.toLowerCase()}`;
           bVal = `${bClient} - ${b.matter_name.toLowerCase()}`;
           break;
@@ -905,13 +905,13 @@ export default function Matters() {
           break;
         case 'budget_burn_pct':
           // Sort by BM burn percentage (100 - bm_headroom_percent) - higher burn first
-          aVal = 100 - ((a as any).bm_headroom_percent || 0);
-          bVal = 100 - ((b as any).bm_headroom_percent || 0);
+          aVal = 100 - (a.bm_headroom_percent || 0);
+          bVal = 100 - (b.bm_headroom_percent || 0);
           break;
         case 'local_burn_pct':
           // Sort by LC burn percentage (100 - lc_headroom_percent) - higher burn first
-          aVal = 100 - ((a as any).lc_headroom_percent || 0);
-          bVal = 100 - ((b as any).lc_headroom_percent || 0);
+          aVal = 100 - (a.lc_headroom_percent || 0);
+          bVal = 100 - (b.lc_headroom_percent || 0);
           break;
         case 'local_counsel':
           aVal = a.local_counsel_fee || 0;
@@ -929,8 +929,8 @@ export default function Matters() {
           bVal = convertToUsd(bBmFee, bFeeCurrency, bExchangeRate, gbpToUsdRate, liveRates);
           break;
         case 'progress':
-          aVal = (a as any).progress || 0;
-          bVal = (b as any).progress || 0;
+          aVal = a.progress || 0;
+          bVal = b.progress || 0;
           break;
         case 'burn_rate_usd':
           // Calculate burn rate per month in USD for sorting
@@ -949,7 +949,7 @@ export default function Matters() {
             totalMonths += dayDiff / daysInCurrentMonth;
             
             // Subtract on-hold months from total months
-            const onHoldMonths = (m as any).on_hold_months || 0;
+            const onHoldMonths = m.on_hold_months || 0;
             const activeMonths = totalMonths - onHoldMonths;
             const monthsElapsed = Math.max(activeMonths, 0.1);
             
@@ -1410,8 +1410,8 @@ export default function Matters() {
                   <TableBody>
                     {filteredMatters.map((matter) => {
                       // Use proposal values for budgetBurn if engaged, otherwise use snapshot
-                      const hasActiveProposal = (matter as any).show_shaping_proposal && (matter as any).selected_proposal;
-                      const proposal = (matter as any).selected_proposal;
+                      const hasActiveProposal = matter.show_shaping_proposal && matter.selected_proposal;
+                      const proposal = matter.selected_proposal;
                       
                       let budgetBurn: number;
                       if (hasActiveProposal && proposal) {

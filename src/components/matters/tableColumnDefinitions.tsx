@@ -172,8 +172,8 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
       <SortableHeader field="matter_name" {...ctx}>Client / Matter</SortableHeader>
     ),
     renderCell: (ctx) => {
-      const hasProposal = !!(ctx.matter as any).selected_proposal;
-      const isProposalActive = (ctx.matter as any).show_shaping_proposal && hasProposal;
+      const hasProposal = !!ctx.matter.selected_proposal;
+      const isProposalActive = ctx.matter.show_shaping_proposal && hasProposal;
       
       const handleToggleProposal = async (e: React.MouseEvent) => {
         e.preventDefault();
@@ -214,7 +214,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
             >
               <p className="font-medium text-foreground">{getClientDisplayName(ctx.matter.clients)}</p>
               <p className="text-sm text-muted-foreground group-hover:text-primary transition-colors line-clamp-2" title={ctx.matter.matter_name}>
-                {(ctx.matter as any).matter_display_name || ctx.matter.matter_name}
+                {ctx.matter.matter_display_name || ctx.matter.matter_name}
               </p>
             </Link>
           </div>
@@ -230,16 +230,16 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     headerClassName: 'text-right min-w-[110px]',
     cellClassName: (ctx) => cn(
       "p-1",
-      (ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
+      ctx.matter.show_shaping_proposal && ctx.matter.selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: () => <span>Financials</span>,
     renderCell: (ctx) => {
       const changeData = ctx.masterChangesMap.get(ctx.matter.id);
-      const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
+      const currency = ctx.matter.effective_currency ?? ctx.matter.fee_currency;
       
       // Check if proposal is active
-      const hasActiveProposal = (ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal;
-      const proposal = (ctx.matter as any).selected_proposal;
+      const hasActiveProposal = ctx.matter.show_shaping_proposal && ctx.matter.selected_proposal;
+      const proposal = ctx.matter.selected_proposal;
       
       // Get current values - may be from proposal or snapshot
       const currentWip = ctx.matter.latest_snapshot?.wip_amount || 0;
@@ -343,7 +343,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     headerClassName: 'text-right min-w-[95px]',
     cellClassName: (ctx) => cn(
       "text-right",
-      (ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
+      ctx.matter.show_shaping_proposal && ctx.matter.selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: (ctx) => (
       <div className="flex items-center gap-1">
@@ -360,16 +360,16 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
       </div>
     ),
     renderCell: (ctx) => {
-      const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
-      const bmBudget = (ctx.matter as any).effective_bm_fee || ctx.matter.bm_fee_component || 0;
-      const burnPercent = 100 - ((ctx.matter as any).bm_headroom_percent || 0);
+      const currency = ctx.matter.effective_currency ?? ctx.matter.fee_currency;
+      const bmBudget = ctx.matter.effective_bm_fee || ctx.matter.bm_fee_component || 0;
+      const burnPercent = 100 - (ctx.matter.bm_headroom_percent || 0);
       const usdEquivalent = currency !== 'USD' 
         ? convertToUsd(ctx.budgetBurn, currency, ctx.matter.exchange_rate, ctx.gbpToUsdRate, ctx.liveRates)
         : undefined;
       
       // Check for active proposal
-      const hasActiveProposal = !!(ctx.matter as any).show_shaping_proposal && !!(ctx.matter as any).selected_proposal;
-      const proposal = (ctx.matter as any).selected_proposal;
+      const hasActiveProposal = !!ctx.matter.show_shaping_proposal && !!ctx.matter.selected_proposal;
+      const proposal = ctx.matter.selected_proposal;
       
       // Calculate raw burn (before proposal adjustments) for the drop visualization
       const rawBurn = (ctx.matter.latest_snapshot?.wip_amount || 0) + 
@@ -378,14 +378,14 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
       
       return (
         <BurnSparkline
-          snapshots={(ctx.matter as any).snapshot_history || []}
+          snapshots={ctx.matter.snapshot_history || []}
           bmBudget={bmBudget}
           currentBurn={ctx.budgetBurn}
           currency={currency}
           burnPercent={burnPercent}
           usdEquivalent={usdEquivalent}
           startDate={ctx.matter.start_date}
-          onHoldMonths={(ctx.matter as any).on_hold_months || 0}
+          onHoldMonths={ctx.matter.on_hold_months || 0}
           hasActiveProposal={hasActiveProposal}
           proposalData={hasActiveProposal ? {
             wip_write_off_amount: proposal?.wip_write_off_amount || 0,
@@ -407,14 +407,14 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     headerClassName: 'text-right min-w-[75px]',
     cellClassName: (ctx) => cn(
       "text-right",
-      (ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
+      ctx.matter.show_shaping_proposal && ctx.matter.selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: (ctx) => (
       <SortableHeader field="local_burn_pct" {...ctx}>Local Burn</SortableHeader>
     ),
     renderCell: (ctx) => {
-      const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
-      const localCounsels = (ctx.matter as any).local_counsels || [];
+      const currency = ctx.matter.effective_currency ?? ctx.matter.fee_currency;
+      const localCounsels = ctx.matter.local_counsels || [];
       // Check if any local counsel has 'Disb' billing mode, or fallback to matter-level setting
       const hasDisb = ctx.matter.local_counsel_billing === 'Disb' || 
         localCounsels.some((lc: { billing_mode?: string }) => lc.billing_mode === 'Disb');
@@ -423,14 +423,14 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
         return (
           <div className="flex flex-col items-end">
             <span className="text-muted-foreground">
-              {formatCurrency(((ctx.matter as any).lc_wip || 0) + ((ctx.matter as any).lc_billed || 0), currency)}
+              {formatCurrency((ctx.matter.lc_wip || 0) + (ctx.matter.lc_billed || 0), currency)}
             </span>
             <span className={cn(
               "text-[10px]",
-              (100 - ((ctx.matter as any).lc_headroom_percent || 0)) > 100 ? "text-danger" :
-              (100 - ((ctx.matter as any).lc_headroom_percent || 0)) > 80 ? "text-warning" : "text-success"
+              (100 - (ctx.matter.lc_headroom_percent || 0)) > 100 ? "text-danger" :
+              (100 - (ctx.matter.lc_headroom_percent || 0)) > 80 ? "text-warning" : "text-success"
             )}>
-              {(100 - ((ctx.matter as any).lc_headroom_percent || 0)).toFixed(0)}%
+              {(100 - (ctx.matter.lc_headroom_percent || 0)).toFixed(0)}%
             </span>
           </div>
         );
@@ -446,7 +446,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     headerClassName: 'text-right min-w-[70px]',
     cellClassName: (ctx) => cn(
       "text-right",
-      (ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
+      ctx.matter.show_shaping_proposal && ctx.matter.selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: (ctx) => (
       <SortableHeader field="burn_rate_usd" {...ctx}>
@@ -468,7 +468,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
       totalMonths += dayDiff / daysInCurrentMonth;
       
       // Subtract on-hold months from total months
-      const onHoldMonths = (ctx.matter as any).on_hold_months || 0;
+      const onHoldMonths = ctx.matter.on_hold_months || 0;
       const activeMonths = totalMonths - onHoldMonths;
       const monthsElapsed = Math.max(activeMonths, 0.1);
       
@@ -476,9 +476,9 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
         return <span className="text-muted-foreground text-xs">-</span>;
       }
       
-      const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
+      const currency = ctx.matter.effective_currency ?? ctx.matter.fee_currency;
       const burnUsd = convertToUsd(ctx.budgetBurn, currency, ctx.matter.exchange_rate, ctx.gbpToUsdRate, ctx.liveRates);
-      const bmBudgetUsd = convertToUsd((ctx.matter as any).effective_bm_fee ?? ctx.matter.bm_fee_component, currency, ctx.matter.exchange_rate, ctx.gbpToUsdRate, ctx.liveRates);
+      const bmBudgetUsd = convertToUsd(ctx.matter.effective_bm_fee ?? ctx.matter.bm_fee_component, currency, ctx.matter.exchange_rate, ctx.gbpToUsdRate, ctx.liveRates);
       const burnRateUsd = burnUsd / monthsElapsed;
       const remainingBudget = bmBudgetUsd - burnUsd;
       const monthsToExhaustion = burnRateUsd > 0 ? remainingBudget / burnRateUsd : Infinity;
@@ -509,7 +509,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     headerClassName: 'text-right min-w-[65px]',
     cellClassName: (ctx) => cn(
       "text-right",
-      (ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
+      ctx.matter.show_shaping_proposal && ctx.matter.selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: (ctx) => (
       <SortableHeader field="headroom" {...ctx}>
@@ -517,13 +517,13 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
       </SortableHeader>
     ),
     renderCell: (ctx) => {
-      if ((ctx.matter as any).pay_full_time_costs) {
+      if (ctx.matter.pay_full_time_costs) {
         return <span className="text-muted-foreground">N/A</span>;
       }
       const bmHeadroom = ctx.matter.bm_headroom ?? 0;
       const bmHeadroomPercent = ctx.matter.bm_headroom_percent ?? 0;
       const bmHeadroomStatus = bmHeadroomPercent < 0 ? 'danger' : bmHeadroomPercent < 20 ? 'warning' : 'success';
-      const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
+      const currency = ctx.matter.effective_currency ?? ctx.matter.fee_currency;
       return (
         <div className="flex flex-col items-end">
           <span className={cn(
@@ -555,10 +555,10 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
       <SortableHeader field="fee_amount" {...ctx}>Budget</SortableHeader>
     ),
     renderCell: (ctx) => {
-      if ((ctx.matter as any).pay_full_time_costs) {
+      if (ctx.matter.pay_full_time_costs) {
         return <span className="text-muted-foreground">N/A</span>;
       }
-      const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
+      const currency = ctx.matter.effective_currency ?? ctx.matter.fee_currency;
       return (
         <div className="flex flex-col items-end gap-0.5">
           {(() => {
@@ -570,11 +570,11 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
             ) : null;
           })()}
           <span className="font-medium">
-            {formatCurrency((ctx.matter as any).effective_fee_upper_end ?? ctx.matter.fee_amount_upper_end, currency)}
+            {formatCurrency(ctx.matter.effective_fee_upper_end ?? ctx.matter.fee_amount_upper_end, currency)}
           </span>
-          {(ctx.matter as any).different_billing_currency && (ctx.matter as any).agreed_billing_amount > 0 && (
+          {ctx.matter.different_billing_currency && ctx.matter.agreed_billing_amount > 0 && (
             <span className="text-[10px] text-muted-foreground/70">
-              (quoted: {formatCurrency(ctx.matter.fee_amount_upper_end, (ctx.matter as any).quote_currency)})
+              (quoted: {formatCurrency(ctx.matter.fee_amount_upper_end, ctx.matter.quote_currency)})
             </span>
           )}
         </div>
@@ -590,13 +590,13 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     cellClassName: 'text-right',
     renderHeader: () => <span>USD</span>,
     renderCell: (ctx) => {
-      const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
+      const currency = ctx.matter.effective_currency ?? ctx.matter.fee_currency;
       return (
         <div className="flex flex-col items-end">
           <span className="text-muted-foreground">
-            {formatCurrency((ctx.matter as any).effective_bm_fee ?? ctx.matter.bm_fee_component, currency)}
+            {formatCurrency(ctx.matter.effective_bm_fee ?? ctx.matter.bm_fee_component, currency)}
           </span>
-          {!(ctx.matter as any).different_billing_currency && ctx.matter.fee_currency !== 'USD' && (
+          {!ctx.matter.different_billing_currency && ctx.matter.fee_currency !== 'USD' && (
             <span className="text-[10px] text-muted-foreground/70">
               ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(convertToUsd(ctx.matter.bm_fee_component, ctx.matter.fee_currency || 'GBP', ctx.matter.exchange_rate || 1, ctx.gbpToUsdRate, ctx.liveRates))}
             </span>
@@ -618,16 +618,16 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
       </SortableHeader>
     ),
     renderCell: (ctx) => {
-      if ((ctx.matter as any).pay_full_time_costs) {
+      if (ctx.matter.pay_full_time_costs) {
         return <span className="text-muted-foreground font-normal">N/A</span>;
       }
-      const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
+      const currency = ctx.matter.effective_currency ?? ctx.matter.fee_currency;
       return (
         <div className="flex flex-col items-end">
-          <span>{formatCurrency((ctx.matter as any).effective_bm_fee ?? ctx.matter.bm_fee_component, currency)}</span>
+          <span>{formatCurrency(ctx.matter.effective_bm_fee ?? ctx.matter.bm_fee_component, currency)}</span>
           {currency !== 'USD' && (
             <span className="text-[10px] text-muted-foreground/70 font-normal">
-              ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(convertToUsd((ctx.matter as any).effective_bm_fee ?? ctx.matter.bm_fee_component, currency ?? 'GBP', ctx.matter.exchange_rate || 1, ctx.gbpToUsdRate, ctx.liveRates))}
+              ≈ ${new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(convertToUsd(ctx.matter.effective_bm_fee ?? ctx.matter.bm_fee_component, currency ?? 'GBP', ctx.matter.exchange_rate || 1, ctx.gbpToUsdRate, ctx.liveRates))}
             </span>
           )}
         </div>
@@ -645,16 +645,16 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
       <SortableHeader field="local_counsel" {...ctx}>Local Budget</SortableHeader>
     ),
     renderCell: (ctx) => {
-      if ((ctx.matter as any).pay_full_time_costs) {
+      if (ctx.matter.pay_full_time_costs) {
         return <span className="text-muted-foreground">N/A</span>;
       }
-      const currency = (ctx.matter as any).effective_currency ?? ctx.matter.fee_currency;
-      const localCounsels = (ctx.matter as any).local_counsels || [];
+      const currency = ctx.matter.effective_currency ?? ctx.matter.fee_currency;
+      const localCounsels = ctx.matter.local_counsels || [];
       
       return (
         <div className="flex flex-col items-end gap-1">
           <span className="text-muted-foreground">
-            {formatCurrency((ctx.matter as any).effective_local_counsel_fee ?? ctx.matter.local_counsel_fee, currency)}
+            {formatCurrency(ctx.matter.effective_local_counsel_fee ?? ctx.matter.local_counsel_fee, currency)}
           </span>
           {localCounsels.length > 0 ? (
             <div className="flex flex-col gap-1 items-end">
@@ -866,7 +866,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     cellClassName: '',
     renderHeader: () => <span>Outcome</span>,
     renderCell: (ctx) => {
-      const outcome = (ctx.matter as any).pipeline_outcome || 'Pending';
+      const outcome = ctx.matter.pipeline_outcome || 'Pending';
       return (
         <Select
           value={outcome}
@@ -905,7 +905,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     categories: ['Live'],
     headerClassName: 'min-w-[180px]',
     cellClassName: (ctx) => cn(
-      (ctx.matter as any).show_shaping_proposal && (ctx.matter as any).selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
+      ctx.matter.show_shaping_proposal && ctx.matter.selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: (ctx) => (
       <SortableHeader field="progress" {...ctx}>BM Progress</SortableHeader>
@@ -913,8 +913,8 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     renderCell: (ctx) => (
       <ProgressSlider
         matterId={ctx.matter.id}
-        initialProgress={(ctx.matter as any).progress || 0}
-        currency={(ctx.matter as any).effective_currency ?? ctx.matter.fee_currency}
+        initialProgress={ctx.matter.progress || 0}
+        currency={ctx.matter.effective_currency ?? ctx.matter.fee_currency}
         currentBurn={ctx.budgetBurn}
         bmBudget={ctx.matter.bm_fee_component || 0}
         onSave={async (id, progress) => {

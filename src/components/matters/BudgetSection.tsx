@@ -215,12 +215,12 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   }, [latestLineItems, hasExistingBudget, isEditing]);
 
   // Currency conversion helpers
-  const differentBillingCurrency = (matter as any)?.different_billing_currency ?? false;
-  const quoteCurrency = (matter as any)?.quote_currency || currency;
-  const billingCurrency = (matter as any)?.billing_currency || currency;
-  const agreedBillingAmount = (matter as any)?.agreed_billing_amount || 0;
+  const differentBillingCurrency = matter?.different_billing_currency ?? false;
+  const quoteCurrency = matter?.quote_currency || currency;
+  const billingCurrency = matter?.billing_currency || currency;
+  const agreedBillingAmount = matter?.agreed_billing_amount || 0;
   const originalFeeUpperEnd = matter?.fee_amount_upper_end || 0;
-  const payFullTimeCosts = (matter as any)?.pay_full_time_costs ?? false;
+  const payFullTimeCosts = matter?.pay_full_time_costs ?? false;
   
   // Calculate mandated exchange rate (billing currency per quote currency)
   const mandatedRate = (differentBillingCurrency && originalFeeUpperEnd > 0 && agreedBillingAmount > 0)
@@ -624,8 +624,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     try {
       await exportDraftBudgetToExcel({
         items: itemsToExport,
-        matterName: (matter as any)?.matter_display_name || matter?.matter_name || 'Unknown Matter',
-        clientName: (matter?.clients as any)?.display_name || matter?.clients?.name || 'Unknown Client',
+        matterName: matter?.matter_display_name || matter?.matter_name || 'Unknown Matter',
+        clientName: matter?.clients?.display_name || matter?.clients?.name || 'Unknown Client',
         currency: billingCurrency,
         draftName: draft?.name || 'Draft Budget Proposal',
         notes: draft?.notes || notes || undefined,
@@ -900,8 +900,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                   try {
                     await exportBudgetToExcel({
                       items: draftItems,
-                      matterName: (matter as any)?.matter_display_name || matter?.matter_name || 'Unknown Matter',
-                      clientName: (matter?.clients as any)?.display_name || matter?.clients?.name || 'Unknown Client',
+                      matterName: matter?.matter_display_name || matter?.matter_name || 'Unknown Matter',
+                      clientName: matter?.clients?.display_name || matter?.clients?.name || 'Unknown Client',
                       currency: billingCurrency,
                       versionNumber: latestVersion?.version_number,
                       versionDate: latestVersion?.finalized_at,

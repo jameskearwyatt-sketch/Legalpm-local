@@ -105,6 +105,8 @@ function AppRoutes() {
     <Suspense fallback={<RouteLoader />}>
       <Routes>
         <Route path="/auth" element={<Auth />} />
+        <Route path="/index" element={<Navigate to="/" replace />} />
+        <Route path="/index.html" element={<Navigate to="/" replace />} />
         <Route path="/palette-preview" element={<PalettePreview />} />
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/matters" element={<ProtectedRoute><Matters /></ProtectedRoute>} />

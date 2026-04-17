@@ -58,7 +58,7 @@ import {
   type TaskWithProject,
 } from "@/lib/hooks/useGrowthProjects";
 import { useSlateItems, useSlateOrder, type SlateItem } from "@/lib/hooks/useSlateItems";
-import type { QuickTask, UnifiedTask, EisenhowerQuadrant } from "./types";
+import type { QuickTask, UnifiedTask, EisenhowerQuadrant, TaskImportance, TaskUrgency, TaskEffort } from "./types";
 import { STORAGE_KEY, SLATE_POSITION_KEY, PANEL_OPEN_KEY, SLATE_OPEN_KEY, deadlineOptions, isFullyTriaged, getQuadrant, quadrantInfo } from "./constants";
 import { TriagePills } from "./TriagePills";
 import { SortableSlateItem } from "./SortableSlateItem";
@@ -724,7 +724,7 @@ export function QuickToDoButton() {
   };
 
   // Promote slate-only item to main task list - now uses database
-  const promoteSlateOnlyToTaskList = async (item: SlateItem | SlateOnlyItem) => {
+  const promoteSlateOnlyToTaskList = async (item: SlateItem) => {
     if (!user) return;
     
     // Use the database-backed hook if it's a SlateItem

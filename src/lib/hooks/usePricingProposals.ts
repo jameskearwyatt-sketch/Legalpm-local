@@ -806,6 +806,8 @@ export function usePricingProposal(proposalId?: string) {
           .insert({
             matter_id: matterId,
             user_id: user!.id,
+            created_by: user!.id,
+            updated_by: user!.id,
             version_number: 1,
             total_amount: roundedTotal,
             bm_total: roundedBmTotal,

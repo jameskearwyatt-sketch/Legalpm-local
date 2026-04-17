@@ -116,6 +116,7 @@ export function useGrowthProjects(projectType?: GrowthProjectType) {
           mentee_name: project.mentee_name,
           user_id: user!.id,
           created_by: user!.id,
+          updated_by: user!.id,
         }])
         .select()
         .single();
@@ -135,7 +136,7 @@ export function useGrowthProjects(projectType?: GrowthProjectType) {
     mutationFn: async ({ id, ...updates }: Partial<GrowthProject> & { id: string }) => {
       const { data, error } = await supabase
         .from('growth_projects')
-        .update(updates)
+        .update({ ...updates, updated_by: user!.id })
         .eq('id', id)
         .select()
         .single();

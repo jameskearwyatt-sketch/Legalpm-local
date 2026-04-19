@@ -322,8 +322,17 @@ export default function Dashboard() {
         description: 'The financial snapshots for this date have been removed.',
       });
       
-      // Invalidate the dashboard query to refresh data
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      // Wipe cached chart data entirely — invalidate alone would render
+      // the stale cache momentarily before the background refetch completes,
+      // leaving graphs showing deleted data on filter combinations the user
+      // hasn't yet revisited.
+      queryClient.removeQueries({ queryKey: ['dashboard'] });
+      queryClient.removeQueries({ queryKey: ['report-realization'] });
+      queryClient.removeQueries({ queryKey: ['report-budget-burn'] });
+      queryClient.removeQueries({ queryKey: ['report-wip-movement'] });
+      queryClient.removeQueries({ queryKey: ['report-collection'] });
+      queryClient.invalidateQueries({ queryKey: ['snapshots'] });
+      queryClient.invalidateQueries({ queryKey: ['matters'] });
     } catch (error) {
       console.error('Error deleting data point:', error);
       toast({

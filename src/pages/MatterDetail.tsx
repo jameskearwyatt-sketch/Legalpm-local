@@ -1577,11 +1577,19 @@ export default function MatterDetail() {
                 }
               }
 
-              // Invalidate queries
+              // Invalidate list-view caches, but REMOVE cached chart data so
+              // any previously-viewed filter (e.g. Dashboard exclusion set,
+              // Report date range) refetches fresh next time it's activated
+              // rather than showing the stale pre-edit snapshot.
               queryClient.invalidateQueries({ queryKey: ['snapshots', id] });
               queryClient.invalidateQueries({ queryKey: ['matter', id] });
               queryClient.invalidateQueries({ queryKey: ['matters'] });
               queryClient.invalidateQueries({ queryKey: ['localCounsels', id] });
+              queryClient.removeQueries({ queryKey: ['dashboard'] });
+              queryClient.removeQueries({ queryKey: ['report-realization'] });
+              queryClient.removeQueries({ queryKey: ['report-budget-burn'] });
+              queryClient.removeQueries({ queryKey: ['report-wip-movement'] });
+              queryClient.removeQueries({ queryKey: ['report-collection'] });
               toast.success('Financial snapshot updated');
             }}
           />

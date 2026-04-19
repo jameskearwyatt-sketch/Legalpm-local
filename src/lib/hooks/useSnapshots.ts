@@ -49,6 +49,24 @@ export function useSnapshots(matterId?: string) {
     enabled: !!user && !!matterId,
   });
 
+  // Snapshot mutations must both refresh list views AND wipe cached chart data.
+  // React Query keeps separate cache entries per queryKey (e.g. per exclusion
+  // set on the dashboard, per date range on reports). `invalidateQueries` marks
+  // them stale, but when the user switches back to a previously-viewed filter
+  // the stale data is rendered first and only swapped after the background
+  // refetch completes — which makes deleted/edited snapshot data appear to
+  // persist. `removeQueries` drops those cache entries entirely so every future
+  // view fetches fresh.
+  const refreshAllChartAndListCaches = () => {
+    queryClient.removeQueries({ queryKey: ['dashboard'] });
+    queryClient.removeQueries({ queryKey: ['report-realization'] });
+    queryClient.removeQueries({ queryKey: ['report-budget-burn'] });
+    queryClient.removeQueries({ queryKey: ['report-wip-movement'] });
+    queryClient.removeQueries({ queryKey: ['report-collection'] });
+    queryClient.invalidateQueries({ queryKey: ['snapshots'] });
+    queryClient.invalidateQueries({ queryKey: ['matters'] });
+  };
+
   const createSnapshot = useMutation({
     mutationFn: async (input: CreateSnapshotInput) => {
       const { data, error } = await supabase
@@ -66,9 +84,7 @@ export function useSnapshots(matterId?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['snapshots'] });
-      queryClient.invalidateQueries({ queryKey: ['matters'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      refreshAllChartAndListCaches();
       toast({ title: 'Snapshot created successfully' });
     },
     onError: (error: Error) => {
@@ -148,11 +164,9 @@ export function useSnapshots(matterId?: string) {
       return { data: inserted, matterId };
     },
     onSuccess: (result) => {
-      queryClient.invalidateQueries({ queryKey: ['snapshots'] });
       queryClient.invalidateQueries({ queryKey: ['snapshots', result.matterId] });
       queryClient.invalidateQueries({ queryKey: ['matter', result.matterId] });
-      queryClient.invalidateQueries({ queryKey: ['matters'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      refreshAllChartAndListCaches();
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to update', description: error.message, variant: 'destructive' });
@@ -172,9 +186,7 @@ export function useSnapshots(matterId?: string) {
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['snapshots'] });
-      queryClient.invalidateQueries({ queryKey: ['matters'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      refreshAllChartAndListCaches();
       toast({ title: 'Snapshot updated successfully' });
     },
     onError: (error: Error) => {
@@ -192,9 +204,7 @@ export function useSnapshots(matterId?: string) {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['snapshots'] });
-      queryClient.invalidateQueries({ queryKey: ['matters'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      refreshAllChartAndListCaches();
       toast({ title: 'Snapshot deleted successfully' });
     },
     onError: (error: Error) => {

@@ -835,7 +835,7 @@ export default function Dashboard() {
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between py-3 gap-1">
             <CardTitle className="font-heading text-base sm:text-lg flex items-center gap-2">
               <ListChecks className="h-5 w-5 text-primary" />
-              Matters
+              Matters &amp; Budgets
             </CardTitle>
             <span className="text-xs sm:text-sm text-muted-foreground">
               {includedLiveCount + includedPipelineCount} of {(stats?.liveMatters?.length || 0) + (stats?.pipelineMatters?.length || 0)} included

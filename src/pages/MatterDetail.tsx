@@ -497,8 +497,9 @@ export default function MatterDetail() {
       setHasChanges(false);
       hasChangesRef.current = false;
     } catch (error) {
-      toast.error('Failed to auto-save changes');
-      console.error(error);
+      const message = error instanceof Error ? error.message : String(error);
+      toast.error('Failed to auto-save changes', { description: message });
+      console.error('Auto-save error:', error);
     } finally {
       setIsSaving(false);
       isAutoSavingRef.current = false;
@@ -514,24 +515,37 @@ export default function MatterDetail() {
     hasChangesRef.current = hasChanges;
   }, [hasChanges]);
 
-  // Debounced auto-save effect - triggers 1 second after changes stop
+  // Debounced auto-save effect - triggers 1 second after changes stop.
+  //
+  // IMPORTANT: this effect must NOT depend on `performAutoSave`. That callback
+  // closes over `updateMatter` (a React Query mutation object whose identity
+  // changes on every state transition: idle -> pending -> error -> idle).
+  // When a save failed, the error state transition would re-memoise
+  // performAutoSave, re-run this effect, schedule another 1-second save, and
+  // fail again — an infinite retry loop with repeating "Failed to auto-save"
+  // toasts until the user navigated away.
+  //
+  // Depend instead on `formData` (a useState value, only changes on user
+  // input) and invoke the save via a stable ref. A failed save leaves
+  // hasChanges=true; the next genuine user edit changes formData, which
+  // re-runs this effect and retries the save. No loop.
   useEffect(() => {
     if (!hasChanges || !isFormInitialized) return;
-    
+
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
-    
+
     autoSaveTimeoutRef.current = setTimeout(() => {
-      performAutoSave();
+      performAutoSaveRef.current?.();
     }, 1000);
-    
+
     return () => {
       if (autoSaveTimeoutRef.current) {
         clearTimeout(autoSaveTimeoutRef.current);
       }
     };
-  }, [hasChanges, isFormInitialized, performAutoSave]);
+  }, [hasChanges, isFormInitialized, formData]);
 
   // Flush pending changes on unmount — prevents data loss when navigating away
   useEffect(() => {
@@ -1577,11 +1591,19 @@ export default function MatterDetail() {
                 }
               }
 
-              // Invalidate queries
+              // Invalidate list-view caches, but REMOVE cached chart data so
+              // any previously-viewed filter (e.g. Dashboard exclusion set,
+              // Report date range) refetches fresh next time it's activated
+              // rather than showing the stale pre-edit snapshot.
               queryClient.invalidateQueries({ queryKey: ['snapshots', id] });
               queryClient.invalidateQueries({ queryKey: ['matter', id] });
               queryClient.invalidateQueries({ queryKey: ['matters'] });
               queryClient.invalidateQueries({ queryKey: ['localCounsels', id] });
+              queryClient.removeQueries({ queryKey: ['dashboard'] });
+              queryClient.removeQueries({ queryKey: ['report-realization'] });
+              queryClient.removeQueries({ queryKey: ['report-budget-burn'] });
+              queryClient.removeQueries({ queryKey: ['report-wip-movement'] });
+              queryClient.removeQueries({ queryKey: ['report-collection'] });
               toast.success('Financial snapshot updated');
             }}
           />

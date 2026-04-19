@@ -13,7 +13,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
-  Scale,
   LayoutDashboard,
   Briefcase,
   Shield,
@@ -74,11 +73,17 @@ const dataCenterSuiteChildren: NavItem[] = [
   { name: 'Cloud Compute Services', href: '/cloud-compute-analyst', icon: Cloud },
 ];
 
+const analystAdminChildren: NavItem[] = [
+  { name: 'Analyst Backfill', href: '/admin/analyst-backfill', icon: Database, adminOnly: true },
+  { name: 'Analyst Telemetry', href: '/admin/analyst-telemetry', icon: Activity, adminOnly: true },
+];
+
 const analystNavigation: NavGroupChild[] = [
   { name: 'PPA Analyst', href: '/ppa-analyst', icon: FileSearch },
   { name: 'Tolling Analyst', href: '/tolling-analyst', icon: FlaskConical },
   { type: 'subgroup', name: 'Carbon Removals Suite', children: carbonRemovalsChildren },
   { type: 'subgroup', name: 'Data Center Suite', children: dataCenterSuiteChildren },
+  { type: 'subgroup', name: 'Admin', children: analystAdminChildren },
 ];
 
 const navigation: NavEntry[] = [
@@ -93,8 +98,6 @@ const navigation: NavEntry[] = [
   { name: 'Time Recording', href: '/time-recording', icon: Clock },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Flags', href: '/flags', icon: Flag },
-  { name: 'Analyst Backfill', href: '/admin/analyst-backfill', icon: Database, adminOnly: true },
-  { name: 'Analyst Telemetry', href: '/admin/analyst-telemetry', icon: Activity, adminOnly: true },
   { name: 'Activity Log', href: '/admin/activity', icon: History, adminOnly: true },
   { name: 'Security', href: '/settings', icon: Shield },
   { name: 'Help', href: '/help', icon: HelpCircle },
@@ -108,12 +111,32 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const visibleNavigation = useMemo<NavEntry[]>(() => {
-    return navigation.filter((entry) => {
-      if ('type' in entry && entry.type === 'separator') return true;
-      if ('type' in entry && entry.type === 'group') return true;
-      const item = entry as NavItem;
-      return !item.adminOnly || isAdmin;
-    });
+    return navigation
+      .map((entry) => {
+        if ('type' in entry && entry.type === 'group') {
+          // Filter admin-only items out of subgroups and direct children, drop
+          // subgroups that end up empty for non-admins.
+          const filteredChildren = entry.children
+            .map((child) => {
+              if ('type' in child && child.type === 'subgroup') {
+                const visibleSubChildren = child.children.filter((sc) => !sc.adminOnly || isAdmin);
+                if (visibleSubChildren.length === 0) return null;
+                return { ...child, children: visibleSubChildren };
+              }
+              const item = child as NavItem;
+              return !item.adminOnly || isAdmin ? item : null;
+            })
+            .filter((c): c is NavGroupChild => c !== null);
+          return { ...entry, children: filteredChildren };
+        }
+        return entry;
+      })
+      .filter((entry) => {
+        if ('type' in entry && entry.type === 'separator') return true;
+        if ('type' in entry && entry.type === 'group') return entry.children.length > 0;
+        const item = entry as NavItem;
+        return !item.adminOnly || isAdmin;
+      });
   }, [isAdmin]);
 
   const handleSignOut = async () => {
@@ -158,16 +181,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Desktop sidebar */}
       <aside className="fixed inset-y-0 left-0 z-50 hidden w-64 bg-sidebar lg:block">
         <div className="flex h-full flex-col">
-          {/* Logo */}
+          {/* Brand */}
           <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
-            <div className="flex items-center gap-3">
-              <div className="p-1.5 rounded-lg bg-sidebar-primary">
-                <Scale className="h-5 w-5 text-sidebar-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-lg font-heading font-semibold text-sidebar-foreground">Legal Practice Manager</h1>
-              </div>
-            </div>
+            <h1 className="text-lg font-heading font-semibold text-sidebar-foreground">Legal Practice Manager</h1>
             <NotificationBell />
           </div>
 
@@ -197,7 +213,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       <ChevronDown className={cn('ml-auto h-4 w-4 transition-transform', analystOpen && 'rotate-180')} />
                     </CollapsibleTrigger>
                     <CollapsibleContent className="pl-4 space-y-0.5 mt-0.5">
-                      {(analystNavigation as NavGroupChild[]).map((child, ci) => {
+                      {group.children.map((child, ci) => {
                         if ('type' in child && child.type === 'subgroup') {
                           return (
                             <div key={child.name} className="mt-1.5">
@@ -311,8 +327,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           >
             <Menu className="h-6 w-6" />
           </button>
-          <div className="flex items-center gap-2 min-w-0">
-            <Scale className="h-5 w-5 sm:h-6 sm:w-6 text-primary shrink-0" />
+          <div className="flex items-center min-w-0">
             <span className="font-heading font-semibold text-sm sm:text-base truncate">Legal PM</span>
           </div>
         </div>
@@ -350,10 +365,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <div role="presentation" className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
           <div className="fixed inset-y-0 left-0 w-[280px] sm:w-72 bg-sidebar flex flex-col overflow-hidden shadow-2xl transition-transform duration-300 safe-area-top">
             <div className="flex h-14 sm:h-16 shrink-0 items-center justify-between px-4 sm:px-6 border-b border-sidebar-border">
-              <div className="flex items-center gap-2">
-                <Scale className="h-5 w-5 text-sidebar-primary" />
-                <span className="font-heading font-semibold text-sm sm:text-base text-sidebar-foreground">Legal Practice Manager</span>
-              </div>
+              <span className="font-heading font-semibold text-sm sm:text-base text-sidebar-foreground">Legal Practice Manager</span>
               <button
                 onClick={() => setMobileMenuOpen(false)}
                 aria-label="Close navigation menu"

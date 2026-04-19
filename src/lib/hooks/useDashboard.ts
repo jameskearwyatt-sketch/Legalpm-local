@@ -18,12 +18,14 @@ export interface LiveMatter {
   id: string;
   matterName: string;
   clientName: string;
+  bmFeeUsd: number;
 }
 
 export interface PipelineMatter {
   id: string;
   matterName: string;
   clientName: string;
+  bmFeeUsd: number;
 }
 
 export interface MatterBreakdown {
@@ -138,18 +140,40 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       const matterIds = liveMatters?.map(m => m.id) || [];
       
       // Build live matters list for the UI (always includes all matters)
-      const liveMattersForUI: LiveMatter[] = (liveMatters || []).map(matter => ({
-        id: matter.id,
-        matterName: matter.matter_name,
-        clientName: getMatterClientDisplayName(matter),
-      }));
+      // Each matter carries its BM-fee-in-USD so the dashboard can compute
+      // filtered totals client-side without re-fetching.
+      const liveMattersForUI: LiveMatter[] = (liveMatters || []).map(matter => {
+        const bmFee = Number(matter.bm_fee_component) || 0;
+        const exchangeRate = Number(matter.exchange_rate) || 1;
+        const feeCurrency = matter.fee_currency || 'GBP';
+        const differentBillingCurrency = matter.different_billing_currency || false;
+        const agreedBillingAmount = Number(matter.agreed_billing_amount) || 0;
+        const originalFeeUpperEnd = Number(matter.fee_amount_upper_end) || 0;
+        let effectiveBmFee = bmFee;
+        if (differentBillingCurrency && agreedBillingAmount > 0 && originalFeeUpperEnd > 0) {
+          const bmProportion = bmFee / originalFeeUpperEnd;
+          effectiveBmFee = agreedBillingAmount * bmProportion;
+        }
+        return {
+          id: matter.id,
+          matterName: matter.matter_name,
+          clientName: getMatterClientDisplayName(matter),
+          bmFeeUsd: convertToUsd(effectiveBmFee, feeCurrency, exchangeRate, gbpToUsdRate, liveRates),
+        };
+      });
 
       // Build pipeline matters list for the UI (always includes all matters)
-      const pipelineMattersForUI: PipelineMatter[] = (pipelineMatters || []).map(matter => ({
-        id: matter.id,
-        matterName: matter.matter_name,
-        clientName: getMatterClientDisplayName(matter),
-      }));
+      const pipelineMattersForUI: PipelineMatter[] = (pipelineMatters || []).map(matter => {
+        const bmFee = Number(matter.bm_fee_component) || 0;
+        const exchangeRate = Number(matter.exchange_rate) || 1;
+        const feeCurrency = matter.fee_currency || 'GBP';
+        return {
+          id: matter.id,
+          matterName: matter.matter_name,
+          clientName: getMatterClientDisplayName(matter),
+          bmFeeUsd: convertToUsd(bmFee, feeCurrency, exchangeRate, gbpToUsdRate, liveRates),
+        };
+      });
 
       if (matterIds.length === 0 && (!pipelineMatters || pipelineMatters.length === 0)) {
         return {

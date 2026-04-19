@@ -229,6 +229,24 @@ export default function Dashboard() {
     return stats.pipelineMatters.filter(m => !excludedPipelineMatterIds.includes(m.id)).length;
   }, [stats?.pipelineMatters, excludedPipelineMatterIds]);
 
+  // Budget totals computed client-side from per-matter USD values on
+  // stats.liveMatters / stats.pipelineMatters. This keeps the tiles
+  // instantly in sync with the exclusion checkboxes without waiting for
+  // a useDashboard refetch or any server-side filter logic.
+  const displayedLiveBudget = useMemo(() => {
+    if (!stats?.liveMatters) return 0;
+    return stats.liveMatters
+      .filter(m => !excludedMatterIds.includes(m.id))
+      .reduce((sum, m) => sum + (m.bmFeeUsd || 0), 0);
+  }, [stats?.liveMatters, excludedMatterIds]);
+
+  const displayedPipelineBudget = useMemo(() => {
+    if (!stats?.pipelineMatters) return 0;
+    return stats.pipelineMatters
+      .filter(m => !excludedPipelineMatterIds.includes(m.id))
+      .reduce((sum, m) => sum + (m.bmFeeUsd || 0), 0);
+  }, [stats?.pipelineMatters, excludedPipelineMatterIds]);
+
   const handleMatterToggle = (matterId: string, checked: boolean) => {
     setExcludedMatterIds(prev =>
       checked
@@ -760,8 +778,8 @@ export default function Dashboard() {
               <div className="flex items-start justify-between">
                 <div className="space-y-1 min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-muted-foreground">Live Matters BM Budget</p>
-                  <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency(stats?.totalBudget || 0, 'USD')}</p>
-                  <p className="text-xs text-muted-foreground">{stats?.openMattersCount || 0} live matters</p>
+                  <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency(displayedLiveBudget, 'USD')}</p>
+                  <p className="text-xs text-muted-foreground">{includedLiveCount} live matters</p>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10 text-primary">
                   <Briefcase className="h-5 w-5" />
@@ -776,8 +794,8 @@ export default function Dashboard() {
               <div className="flex items-start justify-between">
                 <div className="space-y-1 min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-muted-foreground">Pipeline (Potential)</p>
-                  <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency(stats?.totalPipelineValueUsd || 0, 'USD')}</p>
-                  <p className="text-xs text-muted-foreground">{stats?.pipelineMattersCount || 0} pipeline matters</p>
+                  <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency(displayedPipelineBudget, 'USD')}</p>
+                  <p className="text-xs text-muted-foreground">{includedPipelineCount} pipeline matters</p>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10 text-primary">
                   <Rocket className="h-5 w-5" />
@@ -792,7 +810,7 @@ export default function Dashboard() {
               <div className="flex items-start justify-between">
                 <div className="space-y-1 min-w-0">
                   <p className="text-xs sm:text-sm font-medium text-muted-foreground">Grand Total (Theoretical)</p>
-                  <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency((stats?.totalBudget || 0) + (stats?.totalPipelineValueUsd || 0), 'USD')}</p>
+                  <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency(displayedLiveBudget + displayedPipelineBudget, 'USD')}</p>
                   <p className="text-xs text-muted-foreground">Live + Pipeline if all won</p>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10 text-primary">

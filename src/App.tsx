@@ -20,8 +20,6 @@ const Settings = lazy(() => import("./pages/Settings"));
 const Reports = lazy(() => import("./pages/Reports"));
 const Help = lazy(() => import("./pages/Help"));
 const Flags = lazy(() => import("./pages/Flags"));
-const RedFlags = lazy(() => import("./pages/RedFlags"));
-const PipelineFlags = lazy(() => import("./pages/PipelineFlags"));
 const TimeRecording = lazy(() => import("./pages/TimeRecording"));
 const ExcelAnalyzer = lazy(() => import("./pages/ExcelAnalyzer"));
 const MatterPricing = lazy(() => import("./pages/MatterPricing"));
@@ -127,12 +125,12 @@ function AppRoutes() {
         <Route path="/cloud-compute-analyst" element={<ProtectedRoute><CloudComputeAnalyst /></ProtectedRoute>} />
         <Route path="/growth" element={<ProtectedRoute><Growth /></ProtectedRoute>} />
         <Route path="/growth/:projectId" element={<ProtectedRoute><GrowthProjectDetail /></ProtectedRoute>} />
-        <Route path="/flags" element={<AdminRoute><Flags /></AdminRoute>} />
+        <Route path="/flags" element={<ProtectedRoute><Flags /></ProtectedRoute>} />
+        <Route path="/red-flags" element={<Navigate to="/flags" replace />} />
+        <Route path="/pipeline-flags" element={<Navigate to="/flags" replace />} />
         <Route path="/admin/analyst-backfill" element={<AdminRoute><AdminAnalystBackfill /></AdminRoute>} />
         <Route path="/admin/analyst-telemetry" element={<AdminRoute><AdminAnalystTelemetry /></AdminRoute>} />
         <Route path="/admin/activity" element={<AdminRoute><ActivityLog /></AdminRoute>} />
-        <Route path="/red-flags" element={<ProtectedRoute><RedFlags /></ProtectedRoute>} />
-        <Route path="/pipeline-flags" element={<ProtectedRoute><PipelineFlags /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
         <Route path="/excel-analyzer" element={<ProtectedRoute><ExcelAnalyzer /></ProtectedRoute>} />

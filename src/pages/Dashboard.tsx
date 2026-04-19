@@ -888,10 +888,13 @@ export default function Dashboard() {
                             onCheckedChange={(checked) => handleMatterToggle(matter.id, !!checked)}
                             className="h-3.5 w-3.5"
                           />
-                          <span className={`text-xs truncate ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
+                          <span className={`text-xs truncate flex-1 ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
                             <span className="font-medium">{matter.clientName}</span>
                             <span className="text-muted-foreground"> – </span>
                             <span>{matter.matterName}</span>
+                          </span>
+                          <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
+                            {formatCurrency(matter.bmFeeUsd || 0, 'USD')}
                           </span>
                         </label>
                       );
@@ -922,10 +925,13 @@ export default function Dashboard() {
                             onCheckedChange={(checked) => handlePipelineMatterToggle(matter.id, !!checked)}
                             className="h-3.5 w-3.5"
                           />
-                          <span className={`text-xs truncate ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
+                          <span className={`text-xs truncate flex-1 ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
                             <span className="font-medium">{matter.clientName}</span>
                             <span className="text-muted-foreground"> – </span>
                             <span>{matter.matterName}</span>
+                          </span>
+                          <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
+                            {formatCurrency(matter.bmFeeUsd || 0, 'USD')}
                           </span>
                         </label>
                       );

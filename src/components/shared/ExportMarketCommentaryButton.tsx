@@ -41,31 +41,31 @@ function generateWordHtml(results: WhatsMarketResult[], analystTitle: string): s
   const sectionHtml = results.map((r, idx) => {
     const renderPosition = (data: { title: string; summary: string; points: string[] }, color: string) => `
       <div style="margin-bottom: 18px;">
-        <h4 style="font-family: 'Fraunces', Georgia, serif; font-size: 13pt; color: ${color}; margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 0.5px;">${data.title}</h4>
-        <p style="font-family: 'Fraunces', Georgia, serif; font-size: 11pt; color: #374151; font-style: italic; margin: 0 0 8px 0;">${data.summary}</p>
+        <h4 style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 13pt; color: ${color}; margin: 0 0 6px 0; text-transform: uppercase; letter-spacing: 0.5px;">${data.title}</h4>
+        <p style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #374151; font-style: italic; margin: 0 0 8px 0;">${data.summary}</p>
         <ul style="margin: 0; padding-left: 20px;">
-          ${data.points.map(pt => `<li style="font-family: 'Fraunces', Georgia, serif; font-size: 10.5pt; color: #1f2937; margin-bottom: 5px; line-height: 1.5;">${pt}</li>`).join('')}
+          ${data.points.map(pt => `<li style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 10.5pt; color: #1f2937; margin-bottom: 5px; line-height: 1.5;">${pt}</li>`).join('')}
         </ul>
       </div>
     `;
 
     const insightsHtml = r.keyInsights?.length ? `
       <div style="background-color: #f0f9ff; border-left: 3px solid #3b82f6; padding: 12px 16px; margin: 16px 0;">
-        <p style="font-family: 'Fraunces', Georgia, serif; font-size: 10pt; font-weight: bold; color: #1e40af; margin: 0 0 6px 0;">KEY INSIGHTS</p>
-        ${r.keyInsights.map(ins => `<p style="font-family: 'Fraunces', Georgia, serif; font-size: 10pt; color: #1e3a5f; margin: 3px 0;">💡 ${ins}</p>`).join('')}
+        <p style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 10pt; font-weight: bold; color: #1e40af; margin: 0 0 6px 0;">KEY INSIGHTS</p>
+        ${r.keyInsights.map(ins => `<p style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #1e3a5f; margin: 3px 0;">💡 ${ins}</p>`).join('')}
       </div>
     ` : '';
 
     const confidenceHtml = r.confidenceNote ? `
-      <p style="font-family: 'Fraunces', Georgia, serif; font-size: 9pt; color: #6b7280; font-style: italic; margin-top: 12px;">📊 ${r.confidenceNote}</p>
+      <p style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 9pt; color: #6b7280; font-style: italic; margin-top: 12px;">📊 ${r.confidenceNote}</p>
     ` : '';
 
     return `
       <div style="page-break-inside: avoid; margin-bottom: 36px;">
-        <h2 style="font-family: 'Fraunces', Georgia, serif; font-size: 16pt; color: #111827; border-bottom: 2px solid #1e40af; padding-bottom: 6px; margin: 0 0 4px 0;">
+        <h2 style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 16pt; color: #111827; border-bottom: 2px solid #1e40af; padding-bottom: 6px; margin: 0 0 4px 0;">
           ${idx + 1}. ${r.category}
         </h2>
-        <p style="font-family: 'Fraunces', Georgia, serif; font-size: 10pt; color: #6b7280; margin: 0 0 18px 0;">Based on ${r.dealCount} banked precedent${r.dealCount !== 1 ? 's' : ''}</p>
+        <p style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #6b7280; margin: 0 0 18px 0;">Based on ${r.dealCount} banked precedent${r.dealCount !== 1 ? 's' : ''}</p>
         ${renderPosition(r.balanced, '#1e40af')}
         ${renderPosition(r.buyerFriendly, '#047857')}
         ${renderPosition(r.sellerFriendly, '#b45309')}
@@ -81,7 +81,7 @@ function generateWordHtml(results: WhatsMarketResult[], analystTitle: string): s
   <meta charset="utf-8">
   <style>
     @page { size: A4; margin: 2.5cm 2cm; }
-    body { font-family: 'Fraunces', Georgia, serif; }
+    body { font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; }
     @page Section1 { mso-header-margin: 0.5in; mso-footer-margin: 0.5in; }
     div.Section1 { page: Section1; }
   </style>
@@ -90,11 +90,11 @@ function generateWordHtml(results: WhatsMarketResult[], analystTitle: string): s
 <div class="Section1">
   <!-- Title page -->
   <div style="text-align: center; padding-top: 120px; padding-bottom: 80px;">
-    <h1 style="font-family: 'Fraunces', Georgia, serif; font-size: 28pt; color: #111827; font-weight: 700; margin: 0 0 12px 0; letter-spacing: -0.5px;">MARKET COMMENTARY</h1>
+    <h1 style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 28pt; color: #111827; font-weight: 700; margin: 0 0 12px 0; letter-spacing: -0.5px;">MARKET COMMENTARY</h1>
     <div style="width: 80px; height: 3px; background-color: #1e40af; margin: 0 auto 20px auto;"></div>
-    <p style="font-family: 'Fraunces', Georgia, serif; font-size: 14pt; color: #4b5563; margin: 0 0 8px 0;">${analystTitle}</p>
-    <p style="font-family: 'Fraunces', Georgia, serif; font-size: 11pt; color: #9ca3af; margin: 0 0 4px 0;">${now}</p>
-    <p style="font-family: 'Fraunces', Georgia, serif; font-size: 10pt; color: #9ca3af; margin: 0;">
+    <p style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 14pt; color: #4b5563; margin: 0 0 8px 0;">${analystTitle}</p>
+    <p style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #9ca3af; margin: 0 0 4px 0;">${now}</p>
+    <p style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #9ca3af; margin: 0;">
       ${results.length} categor${results.length !== 1 ? 'ies' : 'y'} analysed
     </p>
   </div>
@@ -102,9 +102,9 @@ function generateWordHtml(results: WhatsMarketResult[], analystTitle: string): s
   <br clear="all" style="page-break-before:always" />
 
   <!-- Table of Contents -->
-  <h2 style="font-family: 'Fraunces', Georgia, serif; font-size: 16pt; color: #111827; border-bottom: 2px solid #1e40af; padding-bottom: 6px; margin-bottom: 16px;">Contents</h2>
+  <h2 style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 16pt; color: #111827; border-bottom: 2px solid #1e40af; padding-bottom: 6px; margin-bottom: 16px;">Contents</h2>
   <ol style="padding-left: 20px;">
-    ${results.map((r, i) => `<li style="font-family: 'Fraunces', Georgia, serif; font-size: 11pt; color: #374151; margin-bottom: 6px;">${r.category} <span style="color: #9ca3af;">(${r.dealCount} precedent${r.dealCount !== 1 ? 's' : ''})</span></li>`).join('')}
+    ${results.map((r, i) => `<li style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 11pt; color: #374151; margin-bottom: 6px;">${r.category} <span style="color: #9ca3af;">(${r.dealCount} precedent${r.dealCount !== 1 ? 's' : ''})</span></li>`).join('')}
   </ol>
 
   <br clear="all" style="page-break-before:always" />
@@ -113,7 +113,7 @@ function generateWordHtml(results: WhatsMarketResult[], analystTitle: string): s
 
   <!-- Footer -->
   <div style="border-top: 1px solid #d1d5db; padding-top: 12px; margin-top: 40px;">
-    <p style="font-family: 'Fraunces', Georgia, serif; font-size: 8pt; color: #9ca3af; text-align: center;">
+    <p style="font-family: 'Manrope', 'Segoe UI', Arial, sans-serif; font-size: 8pt; color: #9ca3af; text-align: center;">
       This market commentary has been generated from the firm's internal precedent bank and is intended for internal use only.
       It does not constitute legal advice and should not be shared with clients without review.
     </p>

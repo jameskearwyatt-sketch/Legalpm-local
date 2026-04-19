@@ -17,11 +17,11 @@ export default {
         '14': 'repeat(14, minmax(0, 1fr))',
       },
       fontFamily: {
-        heading: ['Fraunces', 'Times New Roman', 'Georgia', 'serif'],
-        body: ['Fraunces', 'Times New Roman', 'Georgia', 'serif'],
-        sans: ['Fraunces', 'Times New Roman', 'Georgia', 'serif'],
-        serif: ['Fraunces', 'Times New Roman', 'Georgia', 'serif'],
-        mono: ['Fraunces', 'Times New Roman', 'Georgia', 'serif'],
+        heading: ['Manrope', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        body: ['Manrope', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        sans: ['Manrope', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        serif: ['Manrope', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        mono: ['Manrope', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
       },
       colors: {
         border: "hsl(var(--border))",

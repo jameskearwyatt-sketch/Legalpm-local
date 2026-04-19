@@ -36,6 +36,7 @@ const CloudComputeAnalyst = lazy(() => import("./pages/CloudComputeAnalyst"));
 const AdaptPricingWizard = lazy(() => import("./pages/AdaptPricingWizard"));
 const AdminAnalystBackfill = lazy(() => import("./pages/AdminAnalystBackfill"));
 const AdminAnalystTelemetry = lazy(() => import("./pages/AdminAnalystTelemetry"));
+const ActivityLog = lazy(() => import("./pages/ActivityLog"));
 const PalettePreview = lazy(() => import("./pages/PalettePreview"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -129,6 +130,7 @@ function AppRoutes() {
         <Route path="/flags" element={<AdminRoute><Flags /></AdminRoute>} />
         <Route path="/admin/analyst-backfill" element={<AdminRoute><AdminAnalystBackfill /></AdminRoute>} />
         <Route path="/admin/analyst-telemetry" element={<AdminRoute><AdminAnalystTelemetry /></AdminRoute>} />
+        <Route path="/admin/activity" element={<AdminRoute><ActivityLog /></AdminRoute>} />
         <Route path="/red-flags" element={<ProtectedRoute><RedFlags /></ProtectedRoute>} />
         <Route path="/pipeline-flags" element={<ProtectedRoute><PipelineFlags /></ProtectedRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />

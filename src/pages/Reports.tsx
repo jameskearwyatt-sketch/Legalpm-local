@@ -1,6 +1,7 @@
 import AppLayout from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
-import { Download, Briefcase, Rocket, Loader2 } from 'lucide-react';
+import { Download, Briefcase, Rocket, Loader2, BarChart3, TrendingUp, DollarSign, ArrowLeftRight } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMatters, MatterWithFinancials } from '@/lib/hooks/useMatters';
 import { useExchangeRates } from '@/lib/hooks/useExchangeRates';
 import { useToast } from '@/hooks/use-toast';
@@ -11,6 +12,11 @@ import { convertToUsd } from '@/lib/currencyUtils';
 import { getMatterClientDisplayName } from '@/lib/clientUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import RealizationReport from '@/components/reports/RealizationReport';
+import BudgetBurnReport from '@/components/reports/BudgetBurnReport';
+import WipMovementReport from '@/components/reports/WipMovementReport';
+import CollectionReport from '@/components/reports/CollectionReport';
+import SavedReportsList from '@/components/reports/SavedReportsList';
 
 export default function Reports() {
   const { matters, isLoading } = useMatters();
@@ -430,38 +436,87 @@ export default function Reports() {
 
   return (
     <AppLayout>
-      <div className="p-4 sm:p-6 lg:p-8 max-w-2xl mx-auto space-y-6 sm:space-y-8">
-        <div className="text-center">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-heading font-bold text-foreground">Report Export</h1>
-          <p className="text-muted-foreground mt-2">Download formatted Excel reports with charts</p>
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+        <div>
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-heading font-bold text-foreground flex items-center gap-2">
+            <BarChart3 className="h-6 w-6" />
+            Reports & Analytics
+          </h1>
+          <p className="text-muted-foreground mt-1">Financial analysis and data export</p>
         </div>
 
-        <div className="flex flex-col gap-4">
-          <Button
-            size="lg"
-            className="h-16 text-lg gap-3"
-            onClick={handleExportAllMatters}
-            disabled={isLoading || exportingMatters}
-          >
-            {exportingMatters ? <Loader2 className="h-5 w-5 animate-spin" /> : <Briefcase className="h-5 w-5" />}
-            Export All Matters
-            <Download className="h-5 w-5 ml-auto" />
-          </Button>
+        <Tabs defaultValue="export" className="space-y-4">
+          <TabsList className="flex flex-wrap h-auto gap-1">
+            <TabsTrigger value="export" className="gap-1.5">
+              <Download className="h-3.5 w-3.5" /> Export
+            </TabsTrigger>
+            <TabsTrigger value="realization" className="gap-1.5">
+              <TrendingUp className="h-3.5 w-3.5" /> Realization
+            </TabsTrigger>
+            <TabsTrigger value="budget" className="gap-1.5">
+              <DollarSign className="h-3.5 w-3.5" /> Budget Burn
+            </TabsTrigger>
+            <TabsTrigger value="wip" className="gap-1.5">
+              <ArrowLeftRight className="h-3.5 w-3.5" /> WIP Movement
+            </TabsTrigger>
+            <TabsTrigger value="collection" className="gap-1.5">
+              <BarChart3 className="h-3.5 w-3.5" /> Collection
+            </TabsTrigger>
+            <TabsTrigger value="saved" className="gap-1.5">
+              Saved
+            </TabsTrigger>
+          </TabsList>
 
-          <Button
-            size="lg"
-            variant="secondary"
-            className="h-16 text-lg gap-3"
-            onClick={handleExportPipeline}
-            disabled={isLoading || exportingPipeline}
-          >
-            {exportingPipeline ? <Loader2 className="h-5 w-5 animate-spin" /> : <Rocket className="h-5 w-5" />}
-            Export All Pipeline
-            <Download className="h-5 w-5 ml-auto" />
-          </Button>
-        </div>
+          <TabsContent value="export">
+            <div className="max-w-2xl mx-auto space-y-6">
+              <div className="flex flex-col gap-4">
+                <Button
+                  size="lg"
+                  className="h-16 text-lg gap-3"
+                  onClick={handleExportAllMatters}
+                  disabled={isLoading || exportingMatters}
+                >
+                  {exportingMatters ? <Loader2 className="h-5 w-5 animate-spin" /> : <Briefcase className="h-5 w-5" />}
+                  Export All Matters
+                  <Download className="h-5 w-5 ml-auto" />
+                </Button>
 
-        {isLoading && <p className="text-center text-muted-foreground text-sm">Loading matters data...</p>}
+                <Button
+                  size="lg"
+                  variant="secondary"
+                  className="h-16 text-lg gap-3"
+                  onClick={handleExportPipeline}
+                  disabled={isLoading || exportingPipeline}
+                >
+                  {exportingPipeline ? <Loader2 className="h-5 w-5 animate-spin" /> : <Rocket className="h-5 w-5" />}
+                  Export All Pipeline
+                  <Download className="h-5 w-5 ml-auto" />
+                </Button>
+              </div>
+              {isLoading && <p className="text-center text-muted-foreground text-sm">Loading matters data...</p>}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="realization">
+            <RealizationReport />
+          </TabsContent>
+
+          <TabsContent value="budget">
+            <BudgetBurnReport />
+          </TabsContent>
+
+          <TabsContent value="wip">
+            <WipMovementReport />
+          </TabsContent>
+
+          <TabsContent value="collection">
+            <CollectionReport />
+          </TabsContent>
+
+          <TabsContent value="saved">
+            <SavedReportsList />
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );

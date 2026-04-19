@@ -35,8 +35,11 @@ import {
   Cloud,
   Database,
   Activity,
+  History,
+  BarChart3,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import NotificationBell from '@/components/layout/NotificationBell';
 import {
   Collapsible,
   CollapsibleContent,
@@ -88,11 +91,13 @@ const navigation: NavEntry[] = [
   { name: 'BM EMI Expertise Map', href: '/bm-expertise', icon: Network },
   { name: 'Growth', href: '/growth', icon: Rocket },
   { name: 'Time Recording', href: '/time-recording', icon: Clock },
+  { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Red Flags', href: '/red-flags', icon: AlertTriangle },
   { name: 'Pipeline Flags', href: '/pipeline-flags', icon: Flag },
   { name: 'Admin Flags', href: '/flags', icon: AlertTriangle, adminOnly: true },
   { name: 'Analyst Backfill', href: '/admin/analyst-backfill', icon: Database, adminOnly: true },
   { name: 'Analyst Telemetry', href: '/admin/analyst-telemetry', icon: Activity, adminOnly: true },
+  { name: 'Activity Log', href: '/admin/activity', icon: History, adminOnly: true },
   { name: 'Security', href: '/settings', icon: Shield },
   { name: 'Help', href: '/help', icon: HelpCircle },
 ];
@@ -156,13 +161,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
       <aside className="fixed inset-y-0 left-0 z-50 hidden w-64 bg-sidebar lg:block">
         <div className="flex h-full flex-col">
           {/* Logo */}
-          <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
-            <div className="p-1.5 rounded-lg bg-sidebar-primary">
-              <Scale className="h-5 w-5 text-sidebar-primary-foreground" />
+          <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
+            <div className="flex items-center gap-3">
+              <div className="p-1.5 rounded-lg bg-sidebar-primary">
+                <Scale className="h-5 w-5 text-sidebar-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-lg font-heading font-semibold text-sidebar-foreground">Legal Practice Manager</h1>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-heading font-semibold text-sidebar-foreground">Legal Practice Manager</h1>
-            </div>
+            <NotificationBell />
           </div>
 
           {/* Navigation */}
@@ -310,7 +318,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <span className="font-heading font-semibold text-sm sm:text-base truncate">Legal PM</span>
           </div>
         </div>
-        <DropdownMenu>
+        <div className="flex items-center gap-1">
+          <NotificationBell />
+          <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button aria-label="Open user menu" className="p-1 rounded-full hover:bg-muted transition-colors touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <Avatar className="h-8 w-8">
@@ -333,6 +343,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        </div>
       </header>
 
       {/* Mobile menu overlay */}

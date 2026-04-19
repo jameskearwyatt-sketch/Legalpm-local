@@ -88,6 +88,7 @@ import { toast } from 'sonner';
 import { JurisdictionsMultiSelect } from '@/components/matters/JurisdictionsMultiSelect';
 import { exportBudgetToExcel } from '@/lib/exportBudgetToExcel';
 import { useUnallocatedLcDisbursements } from '@/lib/hooks/useUnallocatedLcDisbursements';
+import MatterActivityTimeline from '@/components/matters/MatterActivityTimeline';
 import { UnallocatedLcBanner } from '@/components/matters/UnallocatedLcBanner';
 import { AllocateLcDialog } from '@/components/matters/AllocateLcDialog';
 
@@ -2462,6 +2463,21 @@ export default function MatterDetail() {
             </CollapsibleContent>
           </Collapsible>
         )}
+
+        {/* Activity Timeline */}
+        <Collapsible defaultOpen={false} className="group">
+          <CollapsibleTrigger className="w-full">
+            <Card className="shadow-card hover:bg-muted/50 transition-colors cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between py-4">
+                <CardTitle className="text-lg font-heading">Activity Timeline</CardTitle>
+                <ChevronDown className="h-5 w-5 text-muted-foreground transition-transform duration-200 group-data-[state=open]:rotate-180" />
+              </CardHeader>
+            </Card>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2">
+            <MatterActivityTimeline matterId={id!} />
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Pipeline Information (conditionally shown) */}
         {isPipeline && (

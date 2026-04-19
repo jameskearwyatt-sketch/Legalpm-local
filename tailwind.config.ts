@@ -17,8 +17,11 @@ export default {
         '14': 'repeat(14, minmax(0, 1fr))',
       },
       fontFamily: {
-        heading: ['Cormorant Garamond', 'Times New Roman', 'serif'],
-        body: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+        heading: ['Fraunces', 'Times New Roman', 'Georgia', 'serif'],
+        body: ['Fraunces', 'Times New Roman', 'Georgia', 'serif'],
+        sans: ['Fraunces', 'Times New Roman', 'Georgia', 'serif'],
+        serif: ['Fraunces', 'Times New Roman', 'Georgia', 'serif'],
+        mono: ['Fraunces', 'Times New Roman', 'Georgia', 'serif'],
       },
       colors: {
         border: "hsl(var(--border))",

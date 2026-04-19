@@ -12,9 +12,9 @@ import { useEffect } from 'react';
 
 const STYLES = `
 :root {
-  --pv-font-body: 'Inter', system-ui, -apple-system, sans-serif;
-  --pv-font-heading-serif: 'Cormorant Garamond', 'Times New Roman', serif;
-  --pv-font-heading-sans: 'Outfit', sans-serif;
+  --pv-font-body: 'Fraunces', 'Times New Roman', Georgia, serif;
+  --pv-font-heading-serif: 'Fraunces', 'Times New Roman', Georgia, serif;
+  --pv-font-heading-sans: 'Fraunces', 'Times New Roman', Georgia, serif;
 }
 .pv-root { font-family: var(--pv-font-body); background: #efefea; padding: 24px; color: #1a1a1a; line-height: 1.5; min-height: 100vh; }
 .pv-root *, .pv-root *::before, .pv-root *::after { box-sizing: border-box; }
@@ -211,7 +211,7 @@ export default function PalettePreview() {
       link.id = id;
       link.rel = 'stylesheet';
       link.href =
-        'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap';
+        'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..900&display=swap';
       document.head.appendChild(link);
     }
   }, []);

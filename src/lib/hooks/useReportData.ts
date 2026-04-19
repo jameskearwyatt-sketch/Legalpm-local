@@ -95,6 +95,8 @@ export function useRealizationReport(dateRange: DateRange, groupBy: 'month' | 'q
       return results;
     },
     enabled: !!user,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
 
@@ -167,6 +169,8 @@ export function useBudgetBurnReport(dateRange: DateRange, groupBy: 'practice_are
       return results.sort((a, b) => b.burnPercent - a.burnPercent);
     },
     enabled: !!user,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
 
@@ -212,6 +216,8 @@ export function useWipMovementReport(dateRange: DateRange, groupBy: 'month' | 'q
       return results;
     },
     enabled: !!user,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }
 
@@ -270,5 +276,7 @@ export function useCollectionReport(dateRange: DateRange, groupBy: 'practice_are
       return results.sort((a, b) => a.collectionRate - b.collectionRate);
     },
     enabled: !!user,
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }

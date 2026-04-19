@@ -12,9 +12,9 @@ import { useEffect } from 'react';
 
 const STYLES = `
 :root {
-  --pv-font-body: 'Manrope', system-ui, -apple-system, sans-serif;
-  --pv-font-heading-serif: 'Manrope', system-ui, -apple-system, sans-serif;
-  --pv-font-heading-sans: 'Manrope', system-ui, -apple-system, sans-serif;
+  --pv-font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --pv-font-heading-serif: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --pv-font-heading-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 .pv-root { font-family: var(--pv-font-body); background: #efefea; padding: 24px; color: #1a1a1a; line-height: 1.5; min-height: 100vh; }
 .pv-root *, .pv-root *::before, .pv-root *::after { box-sizing: border-box; }
@@ -211,7 +211,7 @@ export default function PalettePreview() {
       link.id = id;
       link.rel = 'stylesheet';
       link.href =
-        'https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap';
+        'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap';
       document.head.appendChild(link);
     }
   }, []);

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,126 +6,148 @@
 
 @layer base {
   :root {
-    /* Cashmere & Cognac — Loro Piana-inspired luxury palette.
-       Warm cream backgrounds, deep espresso text, cognac primary,
-       camel accents. HSL so shadcn tokens chain correctly. */
-    --background: 40 55% 96%;
-    --foreground: 33 22% 10%;
+    /* Vector Energy Intelligence palette — warm off-white canvas, near-black
+       ink, muted cream-grey chrome, brown accent. HSL values keep shadcn
+       tokens chained; raw hex aliases are exposed below for direct consumers. */
 
-    --card: 40 69% 97%;
-    --card-foreground: 33 22% 10%;
+    --background: 40 17% 98%;          /* #FAFAF8 warm off-white */
+    --foreground: 0 0% 11%;             /* #1B1B1B near-black ink */
 
-    --popover: 40 69% 97%;
-    --popover-foreground: 33 22% 10%;
+    --card: 0 0% 100%;                  /* #FFFFFF elevated surfaces */
+    --card-foreground: 0 0% 11%;
 
-    /* Cognac primary */
-    --primary: 29 42% 30%;
-    --primary-foreground: 40 69% 97%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 11%;
 
-    /* Soft stone secondary */
-    --secondary: 41 46% 91%;
-    --secondary-foreground: 29 42% 30%;
+    /* Brown accent — used for focus rings, hover underlines, primary CTAs. */
+    --primary: 30 24% 44%;              /* #8B7355 */
+    --primary-foreground: 0 0% 100%;
 
-    --muted: 41 46% 91%;
-    --muted-foreground: 36 16% 36%;
+    /* Cream-grey secondary surface. */
+    --secondary: 30 15% 89%;            /* #E8E4DF */
+    --secondary-foreground: 0 0% 11%;
 
-    /* Camel accent */
-    --accent: 37 36% 56%;
-    --accent-foreground: 40 69% 97%;
+    --muted: 30 15% 89%;                /* #E8E4DF */
+    --muted-foreground: 30 6% 40%;      /* #6B6560 supporting copy */
 
-    --destructive: 13 61% 27%;
-    --destructive-foreground: 40 69% 97%;
+    /* Warm beige — subtle hover / active state for light surfaces. */
+    --accent: 35 30% 70%;               /* #C9B99A */
+    --accent-foreground: 0 0% 11%;
 
-    --border: 37 28% 76%;
-    --input: 37 28% 76%;
-    --ring: 29 42% 30%;
+    --destructive: 358 54% 52%;         /* #C4444A */
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 30 15% 89%;               /* #E8E4DF subtle cream-grey */
+    --input: 30 15% 89%;
+    --ring: 30 24% 44%;                 /* #8B7355 brown focus */
 
     --radius: 0.5rem;
 
-    /* Status colors — tuned to the palette so they harmonise rather than fight it */
-    --success: 78 29% 27%;
-    --success-foreground: 40 69% 97%;
-    --warning: 38 74% 27%;
-    --warning-foreground: 40 69% 97%;
-    --danger: 13 61% 27%;
-    --danger-foreground: 40 69% 97%;
+    /* Status colours drawn from the palette. Warning reuses the brown accent
+       since the spec doesn't include a dedicated amber/yellow. */
+    --success: 146 37% 36%;             /* #3A7D5C */
+    --success-foreground: 0 0% 100%;
+    --warning: 30 24% 44%;              /* #8B7355 brown */
+    --warning-foreground: 0 0% 100%;
+    --danger: 358 54% 52%;              /* #C4444A */
+    --danger-foreground: 0 0% 100%;
+    --info: 210 46% 43%;                /* #3A6B9F informational */
+    --info-foreground: 0 0% 100%;
 
-    /* Chart colors — jewel-toned series spread across the wheel for clear
-       line-vs-line discriminability while staying within the luxury palette.
-       Hues: 29 (cognac), 215 (deep navy), 38 (honey gold),
-             350 (burgundy wine), 158 (forest sage). */
-    --chart-1: 29 55% 38%;    /* cognac */
-    --chart-2: 215 45% 36%;   /* deep navy */
-    --chart-3: 38 78% 44%;    /* honey gold */
-    --chart-4: 350 52% 40%;   /* burgundy wine */
-    --chart-5: 158 38% 32%;   /* forest sage */
+    /* Chart series — palette-faithful five-colour lineup. */
+    --chart-1: 30 24% 44%;              /* brown accent */
+    --chart-2: 210 46% 43%;             /* regulatory blue */
+    --chart-3: 146 37% 36%;             /* technology green */
+    --chart-4: 358 54% 52%;             /* alert red */
+    --chart-5: 35 30% 55%;              /* mid-beige */
 
-    /* Gold standard accent — retuned to warm honey instead of neon amber */
-    --gold: 38 74% 27%;
-    --gold-foreground: 40 69% 97%;
-    --gold-muted: 41 65% 87%;
-    --gold-border: 40 58% 64%;
+    /* Gold standard accent — now a quiet beige tier. */
+    --gold: 30 24% 44%;
+    --gold-foreground: 0 0% 100%;
+    --gold-muted: 35 30% 88%;
+    --gold-border: 35 30% 70%;
 
-    /* Sidebar */
-    --sidebar-background: 33 22% 10%;
-    --sidebar-foreground: 38 32% 87%;
-    --sidebar-primary: 37 36% 56%;
-    --sidebar-primary-foreground: 33 22% 10%;
-    --sidebar-accent: 32 22% 15%;
-    --sidebar-accent-foreground: 37 46% 69%;
-    --sidebar-border: 33 26% 18%;
-    --sidebar-ring: 37 36% 56%;
+    /* Sidebar — dark chrome with cream text, warm-beige active. */
+    --sidebar-background: 0 0% 11%;     /* #1B1B1B */
+    --sidebar-foreground: 30 15% 89%;   /* #E8E4DF */
+    --sidebar-primary: 35 30% 70%;      /* #C9B99A active */
+    --sidebar-primary-foreground: 0 0% 11%;
+    --sidebar-accent: 0 0% 15%;
+    --sidebar-accent-foreground: 35 30% 70%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 35 30% 70%;
 
-    /* Typography — Manrope across the entire app */
-    --font-heading: 'Manrope', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-body: 'Manrope', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    /* Typography — Inter across the entire app. */
+    --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+    /* Raw hex aliases — use these where the spec names them directly. */
+    --color-bg:             #FAFAF8;
+    --color-card-bg:        #FFFFFF;
+    --color-sidebar-bg:     #1B1B1B;
+    --color-sidebar-text:   #E8E4DF;
+    --color-sidebar-active: #C9B99A;
+    --color-border:         #E8E4DF;
+    --color-text-primary:   #1B1B1B;
+    --color-text-secondary: #6B6560;
+    --color-text-muted:     #9B9590;
+    --color-accent:         #8B7355;
+    --color-accent-light:   #C9B99A;
+    --color-red:            #C4444A;
+    --color-blue:           #3A6B9F;
+    --color-green:          #3A7D5C;
   }
 
   .dark {
-    /* Dark mode retuned to the palette: deep espresso background, warm camel/cream foreground */
-    --background: 33 22% 8%;
-    --foreground: 38 32% 87%;
+    /* Dark mode — same near-black canvas as the sidebar, cream ink,
+       warm-beige primary. Keeps the palette family consistent with light. */
+    --background: 0 0% 11%;             /* #1B1B1B */
+    --foreground: 30 15% 89%;           /* #E8E4DF */
 
-    --card: 32 22% 12%;
-    --card-foreground: 38 32% 87%;
+    --card: 0 0% 15%;
+    --card-foreground: 30 15% 89%;
 
-    --popover: 32 22% 12%;
-    --popover-foreground: 38 32% 87%;
+    --popover: 0 0% 15%;
+    --popover-foreground: 30 15% 89%;
 
-    --primary: 37 46% 69%;
-    --primary-foreground: 33 22% 10%;
+    --primary: 35 30% 70%;              /* warm beige */
+    --primary-foreground: 0 0% 11%;
 
-    --secondary: 33 20% 18%;
-    --secondary-foreground: 38 32% 87%;
+    --secondary: 0 0% 18%;
+    --secondary-foreground: 30 15% 89%;
 
-    --muted: 33 20% 18%;
-    --muted-foreground: 39 19% 65%;
+    --muted: 0 0% 18%;
+    --muted-foreground: 30 6% 59%;      /* #9B9590 */
 
-    --accent: 37 36% 56%;
-    --accent-foreground: 33 22% 10%;
+    --accent: 30 24% 44%;               /* brown accent on dark */
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 13 40% 45%;
-    --destructive-foreground: 40 69% 97%;
+    --destructive: 358 54% 52%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 33 26% 20%;
-    --input: 33 26% 20%;
-    --ring: 37 36% 56%;
+    --border: 0 0% 20%;
+    --input: 0 0% 20%;
+    --ring: 35 30% 70%;
 
-    /* Chart colors — same hues as light mode, lifted for dark background */
-    --chart-1: 29 70% 62%;    /* cognac */
-    --chart-2: 215 60% 64%;   /* deep navy */
-    --chart-3: 38 85% 60%;    /* honey gold */
-    --chart-4: 350 65% 64%;   /* burgundy wine */
-    --chart-5: 158 50% 56%;   /* forest sage */
+    --success: 146 37% 42%;
+    --warning: 35 30% 60%;
+    --danger: 358 54% 58%;
+    --info: 210 46% 55%;
 
-    --sidebar-background: 33 22% 6%;
-    --sidebar-foreground: 38 32% 87%;
-    --sidebar-primary: 37 36% 56%;
-    --sidebar-primary-foreground: 33 22% 10%;
-    --sidebar-accent: 32 22% 12%;
-    --sidebar-accent-foreground: 37 46% 69%;
-    --sidebar-border: 33 26% 15%;
-    --sidebar-ring: 37 36% 56%;
+    --chart-1: 35 30% 70%;
+    --chart-2: 210 46% 55%;
+    --chart-3: 146 37% 50%;
+    --chart-4: 358 54% 58%;
+    --chart-5: 30 15% 70%;
+
+    --sidebar-background: 0 0% 8%;
+    --sidebar-foreground: 30 15% 89%;
+    --sidebar-primary: 35 30% 70%;
+    --sidebar-primary-foreground: 0 0% 11%;
+    --sidebar-accent: 0 0% 14%;
+    --sidebar-accent-foreground: 35 30% 70%;
+    --sidebar-border: 0 0% 16%;
+    --sidebar-ring: 35 30% 70%;
   }
 }
 
@@ -135,13 +157,31 @@
   }
 
   body {
-    @apply bg-background text-foreground font-body antialiased;
+    @apply bg-background text-foreground font-body;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    @apply font-heading font-semibold tracking-tight;
+    @apply font-heading tracking-tight;
+    font-weight: 600; /* weight 700 reserved for the largest page titles */
+  }
+
+  /* Inline links in body prose blend into the paragraph — no hyperlink blue.
+     Components that opt out with their own color/text-decoration class still
+     win, so shadcn Button/Link variants are unaffected. */
+  p a,
+  li a,
+  .prose a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--color-accent, #8B7355);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
   }
 
   /* Touch-friendly interactive elements on touch devices — exclude small UI controls */
@@ -177,6 +217,12 @@
   .safe-area-top {
     padding-top: env(safe-area-inset-top, 0px);
   }
+
+  /* Refined scrollbar — thin, transparent track, warm-grey thumb. */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.08); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.14); }
 }
 
 @layer utilities {
@@ -186,6 +232,56 @@
 
   .font-body {
     font-family: var(--font-body);
+  }
+
+  /* Vector Intelligence typography utilities.
+     Spec:
+       body copy       : 14px / 400 / #1B1B1B / line-height 1.5  (applied on <body>)
+       secondary       : 12-13px / 400 / #6B6560 / line-height 1.6
+       muted metadata  : 11px / 400 / #9B9590
+       section labels  : 10px / 600 / uppercase / letter-spacing 1.2px / #9B9590
+       list titles     : 11px / 400, hover 600 / truncate */
+
+  .text-secondary {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--color-text-secondary, #6B6560);
+    line-height: 1.6;
+  }
+
+  .text-muted-meta {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--color-text-muted, #9B9590);
+  }
+
+  .label-section {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--color-text-muted, #9B9590);
+  }
+
+  .list-item-title {
+    font-size: 11px;
+    font-weight: 400;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .list-item-title:hover {
+    font-weight: 600;
+  }
+
+  /* Inline link style for prose that needs it explicitly (e.g. Tailwind
+     utility classes bypassing the base selectors above). */
+  .link-inline {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--color-accent, #8B7355);
+    text-decoration-thickness: 1px;
+    text-underline-offset: 2px;
   }
 
   /* Gradient backgrounds */
@@ -227,6 +323,11 @@
     animation: slideUp 0.3s ease-out forwards;
   }
 
+  /* Vector Intelligence page / card enter animations. */
+  .animate-page-in {
+    animation: pageIn 200ms ease-out forwards;
+  }
+
   .animate-scale-in {
     animation: scaleIn 0.2s ease-out forwards;
   }
@@ -236,14 +337,19 @@
     to { opacity: 1; }
   }
 
+  @keyframes pageIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
   @keyframes slideUp {
-    from { 
-      opacity: 0; 
-      transform: translateY(10px); 
+    from {
+      opacity: 0;
+      transform: translateY(10px);
     }
-    to { 
-      opacity: 1; 
-      transform: translateY(0); 
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 

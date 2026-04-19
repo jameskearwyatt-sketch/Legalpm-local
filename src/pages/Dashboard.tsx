@@ -879,24 +879,30 @@ export default function Dashboard() {
                     {stats.liveMatters.map((matter) => {
                       const isIncluded = !excludedMatterIds.includes(matter.id);
                       return (
-                        <label
+                        <div
                           key={matter.id}
-                          className="flex items-center gap-2 py-1 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1"
+                          className="flex items-center gap-2 py-1 rounded px-1 -mx-1 hover:bg-muted/50"
                         >
                           <Checkbox
                             checked={isIncluded}
                             onCheckedChange={(checked) => handleMatterToggle(matter.id, !!checked)}
-                            className="h-3.5 w-3.5"
+                            className="h-3.5 w-3.5 cursor-pointer"
+                            aria-label={`Include ${matter.matterName} in totals`}
                           />
-                          <span className={`text-xs truncate flex-1 ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
-                            <span className="font-medium">{matter.clientName}</span>
-                            <span className="text-muted-foreground"> – </span>
-                            <span>{matter.matterName}</span>
-                          </span>
-                          <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
-                            {formatCurrency(matter.bmFeeUsd || 0, 'USD')}
-                          </span>
-                        </label>
+                          <Link
+                            to={`/matters/${matter.id}`}
+                            className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer"
+                          >
+                            <span className={`text-xs truncate flex-1 ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
+                              <span className="font-medium">{matter.clientName}</span>
+                              <span className="text-muted-foreground"> – </span>
+                              <span>{matter.matterName}</span>
+                            </span>
+                            <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
+                              {formatCurrency(matter.bmFeeUsd || 0, 'USD')}
+                            </span>
+                          </Link>
+                        </div>
                       );
                     })}
                   </div>
@@ -916,24 +922,30 @@ export default function Dashboard() {
                     {stats.pipelineMatters.map((matter) => {
                       const isIncluded = !excludedPipelineMatterIds.includes(matter.id);
                       return (
-                        <label
+                        <div
                           key={matter.id}
-                          className="flex items-center gap-2 py-1 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1"
+                          className="flex items-center gap-2 py-1 rounded px-1 -mx-1 hover:bg-muted/50"
                         >
                           <Checkbox
                             checked={isIncluded}
                             onCheckedChange={(checked) => handlePipelineMatterToggle(matter.id, !!checked)}
-                            className="h-3.5 w-3.5"
+                            className="h-3.5 w-3.5 cursor-pointer"
+                            aria-label={`Include ${matter.matterName} in totals`}
                           />
-                          <span className={`text-xs truncate flex-1 ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
-                            <span className="font-medium">{matter.clientName}</span>
-                            <span className="text-muted-foreground"> – </span>
-                            <span>{matter.matterName}</span>
-                          </span>
-                          <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
-                            {formatCurrency(matter.bmFeeUsd || 0, 'USD')}
-                          </span>
-                        </label>
+                          <Link
+                            to={`/matters/${matter.id}`}
+                            className="flex-1 min-w-0 flex items-center gap-2 cursor-pointer"
+                          >
+                            <span className={`text-xs truncate flex-1 ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
+                              <span className="font-medium">{matter.clientName}</span>
+                              <span className="text-muted-foreground"> – </span>
+                              <span>{matter.matterName}</span>
+                            </span>
+                            <span className="text-xs text-muted-foreground tabular-nums flex-shrink-0">
+                              {formatCurrency(matter.bmFeeUsd || 0, 'USD')}
+                            </span>
+                          </Link>
+                        </div>
                       );
                     })}
                   </div>

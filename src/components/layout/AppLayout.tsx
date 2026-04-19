@@ -35,6 +35,7 @@ import {
   Cloud,
   Database,
   Activity,
+  History,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -93,6 +94,7 @@ const navigation: NavEntry[] = [
   { name: 'Admin Flags', href: '/flags', icon: AlertTriangle, adminOnly: true },
   { name: 'Analyst Backfill', href: '/admin/analyst-backfill', icon: Database, adminOnly: true },
   { name: 'Analyst Telemetry', href: '/admin/analyst-telemetry', icon: Activity, adminOnly: true },
+  { name: 'Activity Log', href: '/admin/activity', icon: History, adminOnly: true },
   { name: 'Security', href: '/settings', icon: Shield },
   { name: 'Help', href: '/help', icon: HelpCircle },
 ];

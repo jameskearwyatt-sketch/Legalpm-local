@@ -89,11 +89,22 @@ export interface PipelineAlert {
   message: string;
 }
 
-export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineMatterIds: string[] = []) {
+export interface AlertThresholds {
+  nearBudgetPercent?: number;
+  wipWarningAmount?: number;
+  poorCollectionPercent?: number;
+  staleDays?: number;
+}
+
+export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineMatterIds: string[] = [], thresholds?: AlertThresholds) {
+  const nearBudgetPct = thresholds?.nearBudgetPercent ?? 80;
+  const wipWarning = thresholds?.wipWarningAmount ?? 50000;
+  const poorCollectionPct = thresholds?.poorCollectionPercent ?? 60;
+  const staleDaysThreshold = thresholds?.staleDays ?? 10;
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['dashboard', user?.id, excludedMatterIds.sort().join(','), excludedPipelineMatterIds.sort().join(',')],
+    queryKey: ['dashboard', user?.id, excludedMatterIds.sort().join(','), excludedPipelineMatterIds.sort().join(','), nearBudgetPct, wipWarning, poorCollectionPct, staleDaysThreshold],
     queryFn: async () => {
       // Fetch exchange rates for GBP to USD conversion
       const { data: ratesData } = await supabase.functions.invoke('fetch-exchange-rates');
@@ -374,7 +385,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           });
         }
         // Near budget check (>= 80%)
-        else if (budget > 0 && budgetUsedPercent >= 80 && budgetUsedPercent <= 100) {
+        else if (budget > 0 && budgetUsedPercent >= nearBudgetPct && budgetUsedPercent <= 100) {
           alerts.push({
             id: `near-${matter.id}`,
             type: 'Near Budget',
@@ -390,7 +401,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         }
 
         // High WIP check
-        if (wipAmount > 50000 && billedAmount < wipAmount * 0.5) {
+        if (wipAmount > wipWarning && billedAmount < wipAmount * 0.5) {
           alerts.push({
             id: `wip-${matter.id}`,
             type: 'High WIP',
@@ -406,7 +417,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         }
 
         // Poor collection check
-        if (billedAmount > 0 && collectionRate < 60) {
+        if (billedAmount > 0 && collectionRate < poorCollectionPct) {
           alerts.push({
             id: `collection-${matter.id}`,
             type: 'Poor Collection',
@@ -426,7 +437,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         if (snapshot?.updated_at) {
           const snapshotUpdatedAt = parseISO(snapshot.updated_at);
           const daysSinceUpdate = differenceInDays(today, snapshotUpdatedAt);
-          if (daysSinceUpdate >= 10) {
+          if (daysSinceUpdate >= staleDaysThreshold) {
             alerts.push({
               id: `stale-${matter.id}`,
               type: 'Stale Financials',
@@ -478,7 +489,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
             const staleLCs = localCounsels.filter((lc: any) => {
               if (!lc.last_updated) return true;
               const daysSinceUpdate = differenceInDays(today, parseISO(lc.last_updated));
-              return daysSinceUpdate >= 10;
+              return daysSinceUpdate >= staleDaysThreshold;
             });
             
             if (staleLCs.length > 0) {
@@ -491,7 +502,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
                 cmNumber,
                 clientName,
                 currency: feeCurrency,
-                message: `${staleLCs.length} LC firm${staleLCs.length > 1 ? 's' : ''} not updated in 10+ days`,
+                message: `${staleLCs.length} LC firm${staleLCs.length > 1 ? 's' : ''} not updated in ${staleDaysThreshold}+ days`,
               });
             }
           }

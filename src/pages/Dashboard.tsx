@@ -9,6 +9,8 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useDashboard, TrendDataPoint, MatterBreakdown } from '@/lib/hooks/useDashboard';
+import { useNotifications } from '@/lib/hooks/useNotifications';
+import { useUserSettings } from '@/lib/hooks/useUserSettings';
 import { useMatters } from '@/lib/hooks/useMatters';
 import { useAuth } from '@/lib/auth';
 import { formatCurrency } from '@/lib/currencyUtils';
@@ -75,10 +77,23 @@ export default function Dashboard() {
   const breakdownRef = useRef<HTMLDivElement>(null);
   // "Not my matters" checkbox defaults to unchecked (meaning they're excluded by default)
   const [notMyMattersIncluded, setNotMyMattersIncluded] = useState(false);
-  const { data: stats, isLoading } = useDashboard(excludedMatterIds, excludedPipelineMatterIds);
+  const { settings } = useUserSettings();
+  const alertThresholds = useMemo(() => settings ? {
+    nearBudgetPercent: settings.near_budget_threshold,
+    wipWarningAmount: settings.wip_warning_threshold,
+    poorCollectionPercent: settings.poor_collection_threshold,
+  } : undefined, [settings]);
+  const { data: stats, isLoading } = useDashboard(excludedMatterIds, excludedPipelineMatterIds, alertThresholds);
   const { matters } = useMatters();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { syncAlerts } = useNotifications();
+
+  useEffect(() => {
+    if (stats?.alerts || stats?.pipelineAlerts) {
+      syncAlerts(stats.alerts || [], stats.pipelineAlerts || []);
+    }
+  }, [stats?.alerts, stats?.pipelineAlerts, syncAlerts]);
 
   // Fetch current user's profile for the "Me" filter
   const { data: userProfile } = useQuery({

@@ -80,29 +80,29 @@ function renderPositionHtml(p: ExportPosition): string {
     ? `<span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9pt; background-color: ${MARKET_STYLE[p.marketPosition].bg}; color: ${MARKET_STYLE[p.marketPosition].color}; border: 1px solid ${MARKET_STYLE[p.marketPosition].border}; margin-right: 6px; font-weight: 600;">${MARKET_STYLE[p.marketPosition].label}</span>`
     : '';
   const sourceBadge = p.sourceText
-    ? `<span style="display: inline-block; padding: 2px 6px; font-size: 9pt; font-family: 'Courier New', monospace; background-color: #f3f4f6; color: #6b7280; border-radius: 3px;">${escapeHtml(p.sourceText)}</span>`
+    ? `<span style="display: inline-block; padding: 2px 6px; font-size: 9pt; font-family: 'Fraunces', Georgia, serif; background-color: #f3f4f6; color: #6b7280; border-radius: 3px;">${escapeHtml(p.sourceText)}</span>`
     : '';
 
   const summaryLines = p.positionSummary.split('\n').filter(l => l.trim());
   const summaryHtml = summaryLines
-    .map(line => `<p style="font-family: 'Georgia', serif; font-size: 10.5pt; color: #1f2937; margin: 4px 0; line-height: 1.55;">${escapeHtml(line)}</p>`)
+    .map(line => `<p style="font-family: 'Fraunces', Georgia, serif; font-size: 10.5pt; color: #1f2937; margin: 4px 0; line-height: 1.55;">${escapeHtml(line)}</p>`)
     .join('');
 
   const comparisonHtml = p.comparisonPosition
     ? `<div style="border-left: 3px solid #c7d2fe; padding: 6px 10px; margin: 8px 0; background-color: #f5f3ff;">
-         <p style="font-family: 'Georgia', serif; font-size: 9pt; color: #6b7280; font-weight: 600; margin: 0 0 3px 0; text-transform: uppercase; letter-spacing: 0.4px;">Comparison</p>
-         <p style="font-family: 'Georgia', serif; font-size: 10pt; color: #4c1d95; font-style: italic; margin: 0;">${escapeHtml(p.comparisonPosition)}</p>
+         <p style="font-family: 'Fraunces', Georgia, serif; font-size: 9pt; color: #6b7280; font-weight: 600; margin: 0 0 3px 0; text-transform: uppercase; letter-spacing: 0.4px;">Comparison</p>
+         <p style="font-family: 'Fraunces', Georgia, serif; font-size: 10pt; color: #4c1d95; font-style: italic; margin: 0;">${escapeHtml(p.comparisonPosition)}</p>
        </div>`
     : '';
 
   const cleanedNotes = stripMarkers(p.varianceNotes);
   const notesHtml = cleanedNotes
-    ? `<p style="font-family: 'Georgia', serif; font-size: 9.5pt; color: #6b7280; margin: 6px 0 0 0; font-style: italic;">${escapeHtml(cleanedNotes)}</p>`
+    ? `<p style="font-family: 'Fraunces', Georgia, serif; font-size: 9.5pt; color: #6b7280; margin: 6px 0 0 0; font-style: italic;">${escapeHtml(cleanedNotes)}</p>`
     : '';
 
   return `
     <div style="page-break-inside: avoid; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px 14px; margin-bottom: 10px; background-color: #ffffff;">
-      <p style="font-family: 'Georgia', serif; font-size: 11.5pt; font-weight: 700; color: #111827; margin: 0 0 8px 0;">${escapeHtml(p.category)}</p>
+      <p style="font-family: 'Fraunces', Georgia, serif; font-size: 11.5pt; font-weight: 700; color: #111827; margin: 0 0 8px 0;">${escapeHtml(p.category)}</p>
       <div style="margin-bottom: 8px;">${confBadge}${mktBadge}${sourceBadge}</div>
       ${summaryHtml}
       ${comparisonHtml}
@@ -120,7 +120,7 @@ function generateHtml(payload: AnalystReportExport): string {
     .filter(g => g.positions.length > 0)
     .map((g, idx) => `
       <div style="page-break-inside: avoid; margin-top: ${idx === 0 ? '0' : '24px'};">
-        <h2 style="font-family: 'Georgia', serif; font-size: 15pt; color: #111827; border-bottom: 2px solid #1e40af; padding-bottom: 5px; margin: 0 0 14px 0;">
+        <h2 style="font-family: 'Fraunces', Georgia, serif; font-size: 15pt; color: #111827; border-bottom: 2px solid #1e40af; padding-bottom: 5px; margin: 0 0 14px 0;">
           ${escapeHtml(g.group)}
           <span style="font-size: 10pt; color: #6b7280; font-weight: normal;">&nbsp;·&nbsp;${g.positions.length} position${g.positions.length !== 1 ? 's' : ''}</span>
         </h2>
@@ -149,7 +149,7 @@ function generateHtml(payload: AnalystReportExport): string {
   <meta charset="utf-8">
   <style>
     @page { size: A4; margin: 2.5cm 2cm; }
-    body { font-family: 'Georgia', serif; }
+    body { font-family: 'Fraunces', Georgia, serif; }
     @page Section1 { mso-header-margin: 0.5in; mso-footer-margin: 0.5in; }
     div.Section1 { page: Section1; }
   </style>
@@ -157,11 +157,11 @@ function generateHtml(payload: AnalystReportExport): string {
 <body>
 <div class="Section1">
   <div style="text-align: center; padding-top: 100px; padding-bottom: 60px;">
-    <p style="font-family: 'Georgia', serif; font-size: 11pt; color: #6b7280; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 2px;">${escapeHtml(payload.analystTitle)} — Analysis Report</p>
-    <h1 style="font-family: 'Georgia', serif; font-size: 26pt; color: #111827; font-weight: 700; margin: 0 0 14px 0; letter-spacing: -0.5px;">${escapeHtml(payload.projectName)}</h1>
+    <p style="font-family: 'Fraunces', Georgia, serif; font-size: 11pt; color: #6b7280; margin: 0 0 8px 0; text-transform: uppercase; letter-spacing: 2px;">${escapeHtml(payload.analystTitle)} — Analysis Report</p>
+    <h1 style="font-family: 'Fraunces', Georgia, serif; font-size: 26pt; color: #111827; font-weight: 700; margin: 0 0 14px 0; letter-spacing: -0.5px;">${escapeHtml(payload.projectName)}</h1>
     <div style="width: 80px; height: 3px; background-color: #1e40af; margin: 0 auto 20px auto;"></div>
-    <p style="font-family: 'Georgia', serif; font-size: 11pt; color: #4b5563; margin: 0 0 4px 0;">${now}</p>
-    <p style="font-family: 'Georgia', serif; font-size: 10pt; color: #9ca3af; margin: 0;">
+    <p style="font-family: 'Fraunces', Georgia, serif; font-size: 11pt; color: #4b5563; margin: 0 0 4px 0;">${now}</p>
+    <p style="font-family: 'Fraunces', Georgia, serif; font-size: 10pt; color: #9ca3af; margin: 0;">
       ${totalGroups} section${totalGroups !== 1 ? 's' : ''} · ${totalPositions} position${totalPositions !== 1 ? 's' : ''}
     </p>
   </div>
@@ -169,7 +169,7 @@ function generateHtml(payload: AnalystReportExport): string {
   <br clear="all" style="page-break-before:always" />
 
   <div style="margin-bottom: 28px;">
-    <h2 style="font-family: 'Georgia', serif; font-size: 15pt; color: #111827; border-bottom: 2px solid #1e40af; padding-bottom: 5px; margin: 0 0 14px 0;">Analysis Overview</h2>
+    <h2 style="font-family: 'Fraunces', Georgia, serif; font-size: 15pt; color: #111827; border-bottom: 2px solid #1e40af; padding-bottom: 5px; margin: 0 0 14px 0;">Analysis Overview</h2>
     <div style="margin-bottom: 12px;">
       ${jurisdictionPill}
       <span style="display: inline-block; padding: 3px 9px; margin-right: 6px; font-size: 10pt; background-color: #f3f4f6; color: #374151; border-radius: 4px; border: 1px solid #d1d5db;">${escapeHtml(payload.analysisTypeLabel)}</span>
@@ -177,13 +177,13 @@ function generateHtml(payload: AnalystReportExport): string {
       ${extraBadgesHtml}
       ${agreedPill}
     </div>
-    <p style="font-family: 'Georgia', serif; font-size: 10pt; color: #6b7280; margin: 0;">Analysed: ${analysedAt}</p>
+    <p style="font-family: 'Fraunces', Georgia, serif; font-size: 10pt; color: #6b7280; margin: 0;">Analysed: ${analysedAt}</p>
   </div>
 
   ${groupsHtml}
 
   <div style="border-top: 1px solid #d1d5db; padding-top: 12px; margin-top: 40px;">
-    <p style="font-family: 'Georgia', serif; font-size: 8pt; color: #9ca3af; text-align: center;">
+    <p style="font-family: 'Fraunces', Georgia, serif; font-size: 8pt; color: #9ca3af; text-align: center;">
       This analysis report has been generated from the firm's internal ${escapeHtml(payload.analystTitle)} tool and is intended for internal use only.
       It does not constitute legal advice and should not be shared with clients without review.
     </p>

@@ -104,29 +104,31 @@ export function useBudgetBurnReport(dateRange: DateRange, groupBy: 'practice_are
   return useQuery({
     queryKey: ['report-budget-burn', dateRange.start.toISOString(), dateRange.end.toISOString(), groupBy],
     queryFn: async () => {
+      // fee_amount_upper_end is the budget field used by the dashboard
       const { data: matters } = await supabase
         .from('matters')
-        .select('id, matter_name, practice_area, total_budget, fee_currency, exchange_rate, category, matter_clients(client:clients(company_name))')
+        .select('id, matter_name, practice_area, fee_amount_upper_end, fee_currency, exchange_rate, category, clients(name)')
         .eq('category', 'Live')
-        .gt('total_budget', 0);
+        .gt('fee_amount_upper_end', 0);
 
       if (!matters || matters.length === 0) return [];
 
       const matterIds = matters.map(m => m.id);
       const { data: snapshots } = await supabase
         .from('financial_snapshots')
-        .select('matter_id, wip_amount, billed_amount, paid_amount')
+        .select('matter_id, wip_amount, accounts_receivable, paid_amount')
         .in('matter_id', matterIds)
         .gte('as_of_date', dateRange.start.toISOString().split('T')[0])
         .lte('as_of_date', dateRange.end.toISOString().split('T')[0])
         .order('as_of_date', { ascending: false });
 
-      const latestByMatter = new Map<string, { wip: number; billed: number; paid: number }>();
+      // Take the latest snapshot per matter in the date range
+      const latestByMatter = new Map<string, { wip: number; ar: number; paid: number }>();
       for (const s of snapshots || []) {
         if (!latestByMatter.has(s.matter_id)) {
           latestByMatter.set(s.matter_id, {
             wip: s.wip_amount || 0,
-            billed: s.billed_amount || 0,
+            ar: s.accounts_receivable || 0,
             paid: s.paid_amount || 0,
           });
         }
@@ -137,11 +139,12 @@ export function useBudgetBurnReport(dateRange: DateRange, groupBy: 'practice_are
       for (const m of matters) {
         const key = groupBy === 'practice_area'
           ? (m.practice_area || 'Unspecified')
-          : ((m.matter_clients as any)?.[0]?.client?.company_name || 'Unknown Client');
+          : ((m as any).clients?.name || 'Unknown Client');
 
         const snapshot = latestByMatter.get(m.id);
-        const budget = Number(m.total_budget) || 0;
-        const spend = snapshot ? (snapshot.wip + snapshot.billed + snapshot.paid) : 0;
+        const budget = Number(m.fee_amount_upper_end) || 0;
+        // Budget burn = WIP + AR + Paid (matches dashboard totalUsed formula)
+        const spend = snapshot ? (snapshot.wip + snapshot.ar + snapshot.paid) : 0;
 
         const existing = groupMap.get(key) || { budget: 0, spend: 0, count: 0 };
         existing.budget += budget;

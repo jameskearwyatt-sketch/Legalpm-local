@@ -255,6 +255,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       let totalPaidUsd = 0;
       let totalWipWriteOffUsd = 0;
       let totalPipelineValueUsd = 0;
+      let includedLiveCount = 0;
       let hasActiveWipProposals = false; // Track if any proposals are affecting WIP
       const alerts: Alert[] = [];
       const pipelineAlerts: PipelineAlert[] = [];
@@ -335,6 +336,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           totalPaidUsd += paidUsd;
           // Only use ACTUAL write-offs for realization rate - never proposal write-offs
           totalWipWriteOffUsd += convertToUsd(actualWipWriteOffAmount, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          includedLiveCount++;
 
           matterBreakdowns.push({
             id: matter.id,
@@ -708,7 +710,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         totalWipWriteOff: totalWipWriteOffUsd,
         avgCollectionRate,
         realizationRate,
-        openMattersCount: liveMatters?.length || 0,
+        openMattersCount: includedLiveCount,
         pipelineMattersCount: includedPipelineCount,
         totalPipelineValueUsd,
         alerts: alerts.sort((a, b) => {

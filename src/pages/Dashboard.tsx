@@ -136,8 +136,9 @@ export default function Dashboard() {
       const billingPartner = fullMatter.lead_partner || '';
 
       // Check if user is MMA or Billing Partner (case-insensitive comparison)
-      const isMMA = mma.toLowerCase().trim() === userName.toLowerCase().trim();
-      const isBillingPartner = billingPartner.toLowerCase().trim() === userName.toLowerCase().trim();
+      // If fields are blank, user is NOT considered MMA/BP
+      const isMMA = mma.trim() !== '' && mma.toLowerCase().trim() === userName.toLowerCase().trim();
+      const isBillingPartner = billingPartner.trim() !== '' && billingPartner.toLowerCase().trim() === userName.toLowerCase().trim();
 
       if (isMMA || isBillingPartner) {
         myIds.add(liveMatter.id);
@@ -218,9 +219,27 @@ export default function Dashboard() {
     return allIds;
   }, [stats?.liveMatters, excludedMatterIds]);
 
+  const includedLiveCount = useMemo(() => {
+    if (!stats?.liveMatters) return 0;
+    return stats.liveMatters.filter(m => !excludedMatterIds.includes(m.id)).length;
+  }, [stats?.liveMatters, excludedMatterIds]);
+
+  const includedPipelineCount = useMemo(() => {
+    if (!stats?.pipelineMatters) return 0;
+    return stats.pipelineMatters.filter(m => !excludedPipelineMatterIds.includes(m.id)).length;
+  }, [stats?.pipelineMatters, excludedPipelineMatterIds]);
+
   const handleMatterToggle = (matterId: string, checked: boolean) => {
-    setExcludedMatterIds(prev => 
-      checked 
+    setExcludedMatterIds(prev =>
+      checked
+        ? prev.filter(id => id !== matterId)
+        : [...prev, matterId]
+    );
+  };
+
+  const handlePipelineMatterToggle = (matterId: string, checked: boolean) => {
+    setExcludedPipelineMatterIds(prev =>
+      checked
         ? prev.filter(id => id !== matterId)
         : [...prev, matterId]
     );
@@ -784,19 +803,19 @@ export default function Dashboard() {
           </Card>
         </div>
 
-        {/* Live Matters Filter Section */}
+        {/* Matters Filter Section */}
         <Card className="shadow-card">
           <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between py-3 gap-1">
             <CardTitle className="font-heading text-base sm:text-lg flex items-center gap-2">
               <ListChecks className="h-5 w-5 text-primary" />
-              Live Matters
+              Matters
             </CardTitle>
             <span className="text-xs sm:text-sm text-muted-foreground">
-              {includedMatterIds.size} of {stats?.liveMatters?.length || 0} included
+              {includedLiveCount + includedPipelineCount} of {(stats?.liveMatters?.length || 0) + (stats?.pipelineMatters?.length || 0)} included
             </span>
           </CardHeader>
           <CardContent className="pt-0">
-            {stats?.liveMatters && stats.liveMatters.length > 0 ? (
+            {((stats?.liveMatters?.length || 0) + (stats?.pipelineMatters?.length || 0)) > 0 ? (
               <>
                 {/* Master Toggle Checkboxes */}
                 {userName && (
@@ -811,7 +830,7 @@ export default function Dashboard() {
                         Matters Where I Am MMA and/or Billing Partner
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        ({myMatterIds.size})
+                        ({myMatterIds.size + myPipelineMatterIds.size})
                       </span>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer">
@@ -824,37 +843,82 @@ export default function Dashboard() {
                         Matters Where I Am Not MMA or Billing Partner
                       </span>
                       <span className="text-xs text-muted-foreground">
-                        ({notMyMatterIds.size})
+                        ({notMyMatterIds.size + notMyPipelineMatterIds.size})
                       </span>
                     </label>
                   </div>
                 )}
-                {/* Individual Matter Checkboxes */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 sm:gap-x-8 gap-y-1 sm:gap-y-2 max-h-48 overflow-y-auto">
-                  {stats.liveMatters.map((matter) => {
-                    const isIncluded = !excludedMatterIds.includes(matter.id);
-                    return (
-                      <label
-                        key={matter.id}
-                        className="flex items-center gap-2 py-1 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1"
-                      >
-                        <Checkbox
-                          checked={isIncluded}
-                          onCheckedChange={(checked) => handleMatterToggle(matter.id, !!checked)}
-                          className="h-3.5 w-3.5"
-                        />
-                        <span className={`text-xs truncate ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          <span className="font-medium">{matter.clientName}</span>
-                          <span className="text-muted-foreground"> – </span>
-                          <span>{matter.matterName}</span>
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
+
+                {/* Live Matters subsection */}
+                <h3 className="text-sm font-heading font-semibold text-foreground mt-2 mb-2">
+                  Live Matters
+                  <span className="text-xs font-normal text-muted-foreground ml-2">
+                    {includedLiveCount} of {stats?.liveMatters?.length || 0} included
+                  </span>
+                </h3>
+                {stats?.liveMatters && stats.liveMatters.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 sm:gap-x-8 gap-y-1 sm:gap-y-2 max-h-48 overflow-y-auto">
+                    {stats.liveMatters.map((matter) => {
+                      const isIncluded = !excludedMatterIds.includes(matter.id);
+                      return (
+                        <label
+                          key={matter.id}
+                          className="flex items-center gap-2 py-1 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1"
+                        >
+                          <Checkbox
+                            checked={isIncluded}
+                            onCheckedChange={(checked) => handleMatterToggle(matter.id, !!checked)}
+                            className="h-3.5 w-3.5"
+                          />
+                          <span className={`text-xs truncate ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            <span className="font-medium">{matter.clientName}</span>
+                            <span className="text-muted-foreground"> – </span>
+                            <span>{matter.matterName}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground py-1">No live matters</p>
+                )}
+
+                {/* Pipeline Matters subsection */}
+                <h3 className="text-sm font-heading font-semibold text-foreground mt-6 mb-2">
+                  Pipeline Matters
+                  <span className="text-xs font-normal text-muted-foreground ml-2">
+                    {includedPipelineCount} of {stats?.pipelineMatters?.length || 0} included
+                  </span>
+                </h3>
+                {stats?.pipelineMatters && stats.pipelineMatters.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 sm:gap-x-8 gap-y-1 sm:gap-y-2 max-h-48 overflow-y-auto">
+                    {stats.pipelineMatters.map((matter) => {
+                      const isIncluded = !excludedPipelineMatterIds.includes(matter.id);
+                      return (
+                        <label
+                          key={matter.id}
+                          className="flex items-center gap-2 py-1 cursor-pointer hover:bg-muted/50 rounded px-1 -mx-1"
+                        >
+                          <Checkbox
+                            checked={isIncluded}
+                            onCheckedChange={(checked) => handlePipelineMatterToggle(matter.id, !!checked)}
+                            className="h-3.5 w-3.5"
+                          />
+                          <span className={`text-xs truncate ${isIncluded ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            <span className="font-medium">{matter.clientName}</span>
+                            <span className="text-muted-foreground"> – </span>
+                            <span>{matter.matterName}</span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground py-1">No pipeline matters</p>
+                )}
               </>
             ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">No live matters</p>
+              <p className="text-sm text-muted-foreground text-center py-4">No matters</p>
             )}
           </CardContent>
         </Card>

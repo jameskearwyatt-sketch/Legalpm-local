@@ -119,7 +119,7 @@ export default function Dashboard() {
 
   // Categorize LIVE matters into "my matters" and "not my matters"
   const { myMatterIds, notMyMatterIds } = useMemo(() => {
-    if (!stats?.liveMatters || !userName) {
+    if (!stats?.liveMatters || !userName || matters.length === 0) {
       return { myMatterIds: new Set<string>(), notMyMatterIds: new Set<string>() };
     }
 
@@ -157,7 +157,7 @@ export default function Dashboard() {
   // Categorize PIPELINE matters into "my matters" and "not my matters"
   // If MMA/BP fields are blank, the matter goes to "not my matters" (assumption: if I were MMA/BP, I'd have set it)
   const { myPipelineMatterIds, notMyPipelineMatterIds } = useMemo(() => {
-    if (!stats?.pipelineMatters || !userName) {
+    if (!stats?.pipelineMatters || !userName || matters.length === 0) {
       return { myPipelineMatterIds: new Set<string>(), notMyPipelineMatterIds: new Set<string>() };
     }
 

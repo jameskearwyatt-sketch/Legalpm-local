@@ -309,12 +309,29 @@ export default function Dashboard() {
     
     setIsDeleting(true);
     try {
+      // Find the snapshot ids being deleted so their seeded write_off_events
+      // can be cleaned up too. Without this, the write-off amounts persist
+      // (FK is ON DELETE SET NULL) and keep contributing to dashboard /
+      // realization / burn calculations after the snapshot is gone.
+      const { data: snapsToDelete } = await supabase
+        .from('financial_snapshots')
+        .select('id')
+        .eq('as_of_date', rawDate)
+        .eq('user_id', user.id);
+      const snapIds = (snapsToDelete || []).map(s => s.id);
+      if (snapIds.length > 0) {
+        await supabase
+          .from('write_off_events' as never)
+          .delete()
+          .in('source_snapshot_id', snapIds);
+      }
+
       const { error } = await supabase
         .from('financial_snapshots')
         .delete()
         .eq('as_of_date', rawDate)
         .eq('user_id', user.id);
-      
+
       if (error) throw error;
       
       toast({

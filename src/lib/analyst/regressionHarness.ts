@@ -288,7 +288,7 @@ async function runCaseAgainstAnalyzer(
       ...kase.analysis_config,
     };
     const controller = new AbortController();
-    const tid = setTimeout(() => controller.abort(), 300_000);
+    const tid = setTimeout(() => controller.abort(), 600_000);
     const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${endpoint}`, {
       method: 'POST',
       headers: {

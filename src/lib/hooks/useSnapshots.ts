@@ -47,6 +47,11 @@ export function useSnapshots(matterId?: string) {
       return data as FinancialSnapshot[];
     },
     enabled: !!user && !!matterId,
+    // Snapshots feed the MatterDetail trend chart. Force a fresh fetch on
+    // every activation so edits/deletes anywhere in the app are reflected
+    // without the user having to hard-refresh the browser.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // Snapshot mutations must both refresh list views AND wipe cached chart data.
@@ -196,6 +201,16 @@ export function useSnapshots(matterId?: string) {
 
   const deleteSnapshot = useMutation({
     mutationFn: async (id: string) => {
+      // Delete any write_off_events seeded from this snapshot first. The FK
+      // is ON DELETE SET NULL, so without this the write-off amount stays in
+      // dashboard / realization / burn calculations even after the snapshot
+      // is gone — which is exactly what "deleted data still in graphs" looks
+      // like to the user.
+      await supabase
+        .from('write_off_events' as never)
+        .delete()
+        .eq('source_snapshot_id', id);
+
       const { error } = await supabase
         .from('financial_snapshots')
         .delete()

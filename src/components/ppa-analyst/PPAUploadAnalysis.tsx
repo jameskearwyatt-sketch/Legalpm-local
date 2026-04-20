@@ -439,8 +439,7 @@ export function PPAUploadAnalysis({ onAnalysisComplete, preFill, onClearPreFill 
       // Helper function to make the API call with retry
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
         const controller = new AbortController();
-        // 5 minute timeout per attempt - long enough for complex PPA analysis
-        const timeoutId = setTimeout(() => controller.abort(), 300000);
+        const timeoutId = setTimeout(() => controller.abort(), 600000);
         
         const { data: sessionData2 } = await supabase.auth.getSession();
         const authToken = sessionData2?.session?.access_token;

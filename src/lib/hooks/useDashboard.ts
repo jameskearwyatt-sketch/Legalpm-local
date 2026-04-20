@@ -756,5 +756,12 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       } as DashboardStats;
     },
     enabled: !!user,
+    // Charts must reflect snapshot mutations (deletes, edits) the instant the
+    // user activates a filter combination. With a non-zero staleTime React
+    // Query can serve a previously-cached result for the same key, so deleted
+    // data momentarily reappears. staleTime: 0 forces a fresh fetch on every
+    // activation while still caching within a single render pass.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 }

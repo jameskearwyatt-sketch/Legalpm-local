@@ -220,7 +220,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
       // Step 4: Call analyze-tolling edge function
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000);
+        const timeoutId = setTimeout(() => controller.abort(), 600000);
         const { data: sessionData2 } = await supabase.auth.getSession();
         const authToken = sessionData2?.session?.access_token;
 

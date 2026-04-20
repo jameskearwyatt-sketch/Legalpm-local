@@ -330,9 +330,26 @@ export default function MatterDetail() {
   const [showProposalList, setShowProposalList] = useState(false);
   const [editingProposal, setEditingProposal] = useState<typeof selectedProposal>(null);
   const [chartTimeRange, setChartTimeRange] = useState<TimeRange>("all");
-  
+
   // Highlight movements for individual matter
   const { highlightEnabled, toggleHighlight } = useMatterHighlightMovements(id || '');
+
+  // Memoised chart points so re-renders driven by unrelated state don't
+  // re-sort/re-map the snapshot list. The only inputs that matter are the
+  // snapshots array (which refetches fresh on any mutation) and the time
+  // range selector.
+  const chartData = useMemo(() => {
+    const cutoff = getTimeRangeCutoff(chartTimeRange);
+    return [...snapshots]
+      .filter(snap => !cutoff || new Date(snap.as_of_date) >= cutoff)
+      .sort((a, b) => a.as_of_date.localeCompare(b.as_of_date))
+      .map(snap => ({
+        date: format(new Date(snap.as_of_date), 'MMM d'),
+        wip: snap.wip_amount || 0,
+        ar: Math.max((snap.billed_amount || 0) - (snap.paid_amount || 0), 0),
+        paid: snap.paid_amount || 0,
+      }));
+  }, [snapshots, chartTimeRange]);
   
   // Get previous snapshot for highlighting (second most recent snapshot)
   const previousSnapshot = useMemo(() => {
@@ -1912,21 +1929,7 @@ export default function MatterDetail() {
             <CardContent>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart 
-                    data={(() => {
-                      const cutoff = getTimeRangeCutoff(chartTimeRange);
-                      const sortedSnapshots = [...snapshots]
-                        .filter(snap => !cutoff || new Date(snap.as_of_date) >= cutoff)
-                        .sort((a, b) => a.as_of_date.localeCompare(b.as_of_date))
-                        .map(snap => ({
-                          date: format(new Date(snap.as_of_date), 'MMM d'),
-                          wip: snap.wip_amount || 0,
-                          ar: Math.max((snap.billed_amount || 0) - (snap.paid_amount || 0), 0),
-                          paid: snap.paid_amount || 0,
-                        }));
-                      return sortedSnapshots;
-                    })()}
-                  >
+                  <LineChart data={chartData}>
                     <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                     <XAxis dataKey="date" className="text-xs" />
                     <YAxis 

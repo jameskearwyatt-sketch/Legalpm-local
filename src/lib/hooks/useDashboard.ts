@@ -47,6 +47,13 @@ export interface MatterWriteOff {
   asOfDate: string; // ISO date — client attributes to FY using user's financial-year start
 }
 
+export interface MonthlyBurn {
+  month: string;
+  monthLabel: string;
+  burnUsd: number;
+  matterCount: number;
+}
+
 export interface DashboardStats {
   totalBudget: number;
   totalWip: number;
@@ -66,6 +73,10 @@ export interface DashboardStats {
   hasActiveWipProposals: boolean;
   matterBreakdowns: MatterBreakdown[];
   writeOffsByMatter: MatterWriteOff[];
+  avgMonthlyBurn3M: number;
+  avgMonthlyBurn6M: number;
+  avgMonthlyBurn12M: number;
+  monthlyBurnData: MonthlyBurn[];
 }
 
 export interface Alert {
@@ -193,6 +204,10 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           hasActiveWipProposals: false,
           matterBreakdowns: [],
           writeOffsByMatter: [],
+          avgMonthlyBurn3M: 0,
+          avgMonthlyBurn6M: 0,
+          avgMonthlyBurn12M: 0,
+          monthlyBurnData: [],
         } as DashboardStats;
       }
 
@@ -726,6 +741,87 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           paid: Math.round(values.paid),
         }));
 
+      // --- Rolling burn / busyness computation ---
+      // Build per-matter snapshot lists sorted ASC for included live matters
+      const includedLiveMatters = (liveMatters || []).filter(m => !excludedSet.has(m.id));
+      const burnSnapshotsByMatter = new Map<string, typeof snapshots>();
+      (snapshots || []).forEach(snap => {
+        if (excludedSet.has(snap.matter_id)) return;
+        const list = burnSnapshotsByMatter.get(snap.matter_id) || [];
+        list.push(snap);
+        burnSnapshotsByMatter.set(snap.matter_id, list);
+      });
+      burnSnapshotsByMatter.forEach(list => list.sort((a, b) => a.as_of_date.localeCompare(b.as_of_date)));
+
+      // 13 month-end anchors: [0] = end of current month, [12] = end of 12-months-ago
+      const monthAnchors: string[] = [];
+      for (let i = 0; i <= 12; i++) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i + 1, 0);
+        monthAnchors.push(format(d, 'yyyy-MM-dd'));
+      }
+
+      // For a matter's ASC-sorted snapshots, find the latest snapshot ≤ anchorKey
+      const findLatestBefore = (matterSnaps: any[], anchorKey: string) => {
+        let result: any = null;
+        for (let i = matterSnaps.length - 1; i >= 0; i--) {
+          if (matterSnaps[i].as_of_date <= anchorKey) {
+            result = matterSnaps[i];
+            break;
+          }
+        }
+        return result;
+      };
+
+      // monthlyBurnUsd[0] = burn in most recent completed month, [11] = oldest
+      const monthlyBurnUsd: number[] = new Array(12).fill(0);
+      const monthlyMatterCounts: number[] = new Array(12).fill(0);
+
+      includedLiveMatters.forEach(matter => {
+        const matterSnaps = burnSnapshotsByMatter.get(matter.id);
+        if (!matterSnaps || matterSnaps.length < 2) return;
+        const mData = matterDataMap.get(matter.id);
+        const exchangeRate = mData?.exchangeRate || 1;
+        const feeCurrency = mData?.feeCurrency || 'GBP';
+
+        for (let m = 0; m < 12; m++) {
+          const endAnchor = monthAnchors[m];
+          const startAnchor = monthAnchors[m + 1];
+          const endSnap = findLatestBefore(matterSnaps, endAnchor);
+          const startSnap = findLatestBefore(matterSnaps, startAnchor);
+          if (!endSnap) continue;
+          const startWip = startSnap ? Number(startSnap.wip_amount) || 0 : 0;
+          const startBilled = startSnap ? Number(startSnap.billed_amount) || 0 : 0;
+          const startWriteOff = startSnap ? Number(startSnap.wip_write_off_amount) || 0 : 0;
+          const deltaWip = (Number(endSnap.wip_amount) || 0) - startWip;
+          const deltaBilled = (Number(endSnap.billed_amount) || 0) - startBilled;
+          const deltaWriteOff = (Number(endSnap.wip_write_off_amount) || 0) - startWriteOff;
+          const burnNative = deltaWip + deltaBilled + deltaWriteOff;
+          if (burnNative === 0 && !startSnap) continue;
+          monthlyBurnUsd[m] += convertToUsd(burnNative, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          monthlyMatterCounts[m] += 1;
+        }
+      });
+
+      // Build monthly burn data array (oldest first for chart display)
+      const monthlyBurnData: MonthlyBurn[] = [];
+      for (let m = 11; m >= 0; m--) {
+        const monthDate = new Date(today.getFullYear(), today.getMonth() - m, 1);
+        monthlyBurnData.push({
+          month: format(monthDate, 'yyyy-MM'),
+          monthLabel: format(monthDate, 'MMM yyyy'),
+          burnUsd: Math.round(monthlyBurnUsd[m]),
+          matterCount: monthlyMatterCounts[m],
+        });
+      }
+
+      // Averages: sum of recent N months / N
+      const sum3M = monthlyBurnUsd.slice(0, 3).reduce((s, v) => s + v, 0);
+      const sum6M = monthlyBurnUsd.slice(0, 6).reduce((s, v) => s + v, 0);
+      const sum12M = monthlyBurnUsd.reduce((s, v) => s + v, 0);
+      const avgMonthlyBurn3M = sum3M / 3;
+      const avgMonthlyBurn6M = sum6M / 6;
+      const avgMonthlyBurn12M = sum12M / 12;
+
       return {
         totalBudget: totalBmFeesUsd,
         totalWip: totalWipUsd,
@@ -753,6 +849,10 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         hasActiveWipProposals,
         matterBreakdowns: matterBreakdowns.sort((a, b) => b.wipAmount - a.wipAmount),
         writeOffsByMatter: writeOffsByMatter.sort((a, b) => b.writeOffUsd - a.writeOffUsd),
+        avgMonthlyBurn3M,
+        avgMonthlyBurn6M,
+        avgMonthlyBurn12M,
+        monthlyBurnData,
       } as DashboardStats;
     },
     enabled: !!user,

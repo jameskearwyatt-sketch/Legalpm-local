@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useDashboard, TrendDataPoint, MatterBreakdown } from '@/lib/hooks/useDashboard';
+import { useDashboard, TrendDataPoint, MatterBreakdown, MonthlyBurn } from '@/lib/hooks/useDashboard';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
 import { useMatters } from '@/lib/hooks/useMatters';
@@ -31,9 +31,10 @@ import {
   CalendarClock,
   ListChecks,
   Trash2,
-  Percent
+  Percent,
+  Activity
 } from 'lucide-react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,6 +46,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
+import { BusynessDetailDialog } from '@/components/dashboard/BusynessDetailDialog';
 
 export default function Dashboard() {
   const [excludedMatterIds, setExcludedMatterIds] = useState<string[]>([]);
@@ -59,6 +61,7 @@ export default function Dashboard() {
   const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [expandedTile, setExpandedTile] = useState<'wip' | 'ar' | 'paid' | 'realization' | null>(null);
   const [excludedWriteOffYears, setExcludedWriteOffYears] = useState<Set<number>>(new Set());
+  const [busynessDialogOpen, setBusynessDialogOpen] = useState(false);
   // Financial year start (month 1-12, day 1-31). Persisted to localStorage so it
   // survives reloads. Default: 1 July (firm's choice — adjustable in the drill-down).
   const [fyStart, setFyStart] = useState<{ month: number; day: number }>(() => {
@@ -846,6 +849,94 @@ export default function Dashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Busyness Level */}
+        {stats?.monthlyBurnData && stats.monthlyBurnData.length > 0 && (
+          <Card
+            className="shadow-card cursor-pointer hover:shadow-card-hover transition-shadow ring-offset-background hover:ring-2 hover:ring-primary/20"
+            onClick={() => setBusynessDialogOpen(true)}
+          >
+            <CardContent className="p-4 sm:p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                {/* Left: Title + averages */}
+                <div className="flex items-start gap-3 sm:w-64 shrink-0">
+                  <div className="p-2 rounded-lg bg-primary/10 text-primary">
+                    <Activity className="h-5 w-5" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-muted-foreground">Busyness Level</p>
+                    <div className="flex items-baseline gap-3">
+                      <div>
+                        <span className="text-lg font-heading font-bold text-foreground tabular-nums">
+                          {formatCurrency(stats.avgMonthlyBurn3M, 'USD')}
+                        </span>
+                        <span className="text-xs text-muted-foreground ml-1">/ mo</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 text-xs text-muted-foreground">
+                      <span>6M: {formatCurrency(stats.avgMonthlyBurn6M, 'USD')}</span>
+                      <span>12M: {formatCurrency(stats.avgMonthlyBurn12M, 'USD')}</span>
+                    </div>
+                  </div>
+                </div>
+                {/* Right: Sparkline */}
+                <div className="flex-1 h-16 min-w-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={stats.monthlyBurnData} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+                      <defs>
+                        <linearGradient id="sparkBurnGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <Area
+                        type="monotone"
+                        dataKey="burnUsd"
+                        stroke="hsl(var(--primary))"
+                        strokeWidth={1.5}
+                        fill="url(#sparkBurnGradient)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+                {/* Trend badge */}
+                <div className="sm:w-28 shrink-0 text-right">
+                  {(() => {
+                    const trend = stats.avgMonthlyBurn12M > 0
+                      ? ((stats.avgMonthlyBurn3M - stats.avgMonthlyBurn12M) / stats.avgMonthlyBurn12M) * 100
+                      : 0;
+                    if (trend > 5) return (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+                        <TrendingUp className="h-3.5 w-3.5" /> Busier
+                      </span>
+                    );
+                    if (trend < -5) return (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600">
+                        <TrendingUp className="h-3.5 w-3.5 rotate-180" /> Quieter
+                      </span>
+                    );
+                    return (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                        Stable
+                      </span>
+                    );
+                  })()}
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Click for detail</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Busyness Detail Dialog */}
+        <BusynessDetailDialog
+          open={busynessDialogOpen}
+          onOpenChange={setBusynessDialogOpen}
+          monthlyData={stats?.monthlyBurnData || []}
+          avg3M={stats?.avgMonthlyBurn3M || 0}
+          avg6M={stats?.avgMonthlyBurn6M || 0}
+          avg12M={stats?.avgMonthlyBurn12M || 0}
+        />
 
         {/* Matters Filter Section */}
         <Card className="shadow-card">

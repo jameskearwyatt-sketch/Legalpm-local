@@ -540,7 +540,11 @@ export default function Dashboard() {
     }, 50);
   };
 
-  const kpiCards = [
+  const burn3M = stats?.avgMonthlyBurn3M || 0;
+  const burn6M = stats?.avgMonthlyBurn6M || 0;
+  const burn12M = stats?.avgMonthlyBurn12M || 0;
+
+  const primaryKpiCards = [
     {
       title: 'Work in Progress',
       value: formatCurrency(stats?.totalWip || 0, 'USD'),
@@ -570,6 +574,19 @@ export default function Dashboard() {
       variant: 'default' as const,
       tileKey: null,
     },
+    {
+      title: 'Avg Monthly Burn (3M)',
+      value: `${formatCurrency(burn3M, 'USD')} / mo`,
+      icon: <Flame className="h-5 w-5" />,
+      variant: 'default' as const,
+      infoTooltip: 'Average monthly burn over the trailing 3, 6, and 12 months. For each window, we sum (latest snapshot − snapshot at window start) of WIP + Billed + Paid across included matters (BM only, USD), then divide by the number of months. Helps you track work volume and progress against monthly targets.',
+      note: `6M: ${formatCurrency(burn6M, 'USD')} / mo  ·  12M: ${formatCurrency(burn12M, 'USD')} / mo`,
+      noteVariant: 'info' as const,
+      tileKey: null,
+    },
+  ];
+
+  const secondaryKpiCards = [
     {
       title: 'Total Paid',
       value: formatCurrency(stats?.totalPaid || 0, 'USD'),

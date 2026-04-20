@@ -808,10 +808,20 @@ export default function Dashboard() {
           <Card className="shadow-card">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-start justify-between">
-                <div className="space-y-1 min-w-0">
+                <div className="space-y-1 min-w-0 flex-1">
                   <p className="text-xs sm:text-sm font-medium text-muted-foreground">Live Matters BM Budget</p>
                   <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency(displayedLiveBudget, 'USD')}</p>
                   <p className="text-xs text-muted-foreground">{includedLiveCount} live matters</p>
+                  <div className="pt-2 mt-1 border-t border-border/50 grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Used</p>
+                      <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">{formatCurrency(displayedLiveUsed, 'USD')}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Remaining</p>
+                      <p className={`text-xs sm:text-sm font-semibold tabular-nums truncate ${(displayedLiveBudget - displayedLiveUsed) < 0 ? 'text-danger' : 'text-foreground'}`}>{formatCurrency(displayedLiveBudget - displayedLiveUsed, 'USD')}</p>
+                    </div>
+                  </div>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10 text-primary">
                   <Briefcase className="h-5 w-5" />

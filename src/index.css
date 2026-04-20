@@ -400,10 +400,29 @@
     filter: blur(10px);
   }
 
+  @keyframes analysisGlow {
+    0%, 100% {
+      box-shadow: 0 0 0 1px hsl(30 24% 44% / 0.15), 0 2px 8px hsl(30 24% 44% / 0.08);
+    }
+    50% {
+      box-shadow: 0 0 0 1px hsl(30 24% 44% / 0.35), 0 2px 12px hsl(30 24% 44% / 0.18), 0 0 20px hsl(30 24% 44% / 0.06);
+    }
+  }
+
+  .animate-analysis-glow {
+    animation: analysisGlow 2.5s ease-in-out infinite;
+  }
+
+  .analysis-complete-glow {
+    box-shadow: 0 0 0 1px hsl(146 37% 36% / 0.35), 0 2px 10px hsl(146 37% 36% / 0.15);
+    border-color: hsl(146 37% 36% / 0.3);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .animate-fade-in,
     .animate-slide-up,
     .animate-scale-in,
+    .animate-analysis-glow,
     .ai-button-alive,
     .ai-button-alive::before {
       animation: none !important;

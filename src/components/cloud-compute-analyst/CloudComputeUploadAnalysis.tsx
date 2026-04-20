@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
 import { validateUploadFile } from '@/lib/analyst/fileValidation';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
+import { useBackgroundAnalysis, registerJob, updateJobPhase, completeJob, failJob, dismissJob } from '@/lib/analyst/backgroundAnalysis';
 
 const JURISDICTIONS = ['United States', 'United Kingdom', 'EU', 'Germany', 'Ireland', 'Singapore', 'Japan', 'Australia', 'Other'];
 
@@ -43,6 +44,22 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
   const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
   const progress = useAnalystProgress();
   const cancelledRef = useRef(false);
+  const backgroundJob = useBackgroundAnalysis();
+
+  useEffect(() => {
+    if (!backgroundJob || backgroundJob.analystType !== 'cloud_compute') return;
+    if (backgroundJob.status === 'running' && step !== 'analyzing') {
+      setStep('analyzing');
+      progress.setPhase(backgroundJob.phase as any);
+    } else if (backgroundJob.status === 'complete' && backgroundJob.analysisId) {
+      setCreatedAnalysisId(backgroundJob.analysisId);
+      setStep('results');
+      dismissJob();
+    } else if (backgroundJob.status === 'failed') {
+      toast.error('Analysis failed: ' + (backgroundJob.error || 'Unknown error'));
+      dismissJob();
+    }
+  }, [backgroundJob?.status, backgroundJob?.analystType]);
 
   const handleCancel = useCallback(() => {
     cancelledRef.current = true;
@@ -68,6 +85,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
     setStep('analyzing'); setError(null);
     cancelledRef.current = false;
     progress.reset(); progress.setPhase('extract');
+    registerJob('cloud_compute', projectName.trim());
 
     // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
     const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
@@ -81,6 +99,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       if (!parseResponse.ok) { const ed = await parseResponse.json(); throw new Error(ed.error || 'Failed to parse document'); }
       const { text: contractText } = await parseResponse.json();
       progress.setPhase('retrieve');
+      updateJobPhase('retrieve');
 
       // Optional PII redaction before any text leaves the browser.
       let contractTextForLLM = contractText;
@@ -111,6 +130,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       const userLearningsPrompt = formatLearningsForPrompt(selectedLearnings);
       if (selectedLearnings.length > 0) console.log(`Including ${selectedLearnings.length} cloud compute learnings (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
       progress.setPhase('analyze');
+      updateJobPhase('analyze');
 
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
         const controller = new AbortController(); const timeoutId = setTimeout(() => controller.abort(), 600000);
@@ -130,6 +150,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       if (!analyzeRes.ok) { let em = 'Failed to analyze contract'; try { const ed = await analyzeRes.json(); em = ed.error || em; } catch {} throw new Error(em); }
       const analyzeResponse = await analyzeRes.json();
       progress.setPhase('save');
+      updateJobPhase('save');
       void logLlmCall({
         analystType: 'cloud_compute',
         functionName: 'analyze-cloud-compute',
@@ -185,7 +206,7 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
       });
 
       if (cancelledRef.current) return;
-      progress.setPhase('complete'); setCreatedAnalysisId(analysisResult.id); setStep('results'); toast.success('Analysis complete!');
+      progress.setPhase('complete'); completeJob(analysisResult.id); setCreatedAnalysisId(analysisResult.id); setStep('results'); toast.success('Analysis complete!');
     } catch (err) {
       if (cancelledRef.current) return;
       console.error('Analysis error:', err);
@@ -205,10 +226,12 @@ export function CloudComputeUploadAnalysis({ onAnalysisComplete }: Props) {
           pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
         },
       });
-      setError(err instanceof Error ? err.message : 'Analysis failed');
+      const errMsg = err instanceof Error ? err.message : 'Analysis failed';
+      failJob(errMsg);
+      setError(errMsg);
       setStep('configure');
       progress.reset();
-      toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      toast.error('Analysis failed: ' + errMsg);
     }
   };
 

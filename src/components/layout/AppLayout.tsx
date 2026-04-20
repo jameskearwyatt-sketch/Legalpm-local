@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { useUserRole } from '@/lib/hooks/useUserRole';
 import { QuickToDoButton } from '@/components/QuickToDo/QuickToDoButton';
+import { AnalysisStatusBar } from '@/components/shared/AnalysisStatusBar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -485,6 +486,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
           {children}
         </div>
       </main>
+
+      {/* Background analysis indicator */}
+      <AnalysisStatusBar />
 
       {/* Floating Quick To-Do */}
       <QuickToDoButton />

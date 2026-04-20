@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,7 @@ import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
 import { validateUploadFile } from '@/lib/analyst/fileValidation';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
+import { useBackgroundAnalysis, registerJob, updateJobPhase, completeJob, failJob, dismissJob } from '@/lib/analyst/backgroundAnalysis';
 
 interface TollingUploadAnalysisProps {
   onAnalysisComplete?: () => void;
@@ -59,6 +60,22 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
   const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
   const progress = useAnalystProgress();
   const cancelledRef = useRef(false);
+  const backgroundJob = useBackgroundAnalysis();
+
+  useEffect(() => {
+    if (!backgroundJob || backgroundJob.analystType !== 'tolling') return;
+    if (backgroundJob.status === 'running' && step !== 'analyzing') {
+      setStep('analyzing');
+      progress.setPhase(backgroundJob.phase as any);
+    } else if (backgroundJob.status === 'complete' && backgroundJob.analysisId) {
+      setCreatedAnalysisId(backgroundJob.analysisId);
+      setStep('results');
+      dismissJob();
+    } else if (backgroundJob.status === 'failed') {
+      toast.error('Analysis failed: ' + (backgroundJob.error || 'Unknown error'));
+      dismissJob();
+    }
+  }, [backgroundJob?.status, backgroundJob?.analystType]);
 
   const handleCancel = useCallback(() => {
     cancelledRef.current = true;
@@ -115,6 +132,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
     cancelledRef.current = false;
     progress.reset();
     progress.setPhase('extract');
+    registerJob('tolling', projectName.trim());
 
     // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
     const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
@@ -144,6 +162,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
 
       const { text: tollingText } = await parseResponse.json();
       progress.setPhase('retrieve');
+      updateJobPhase('retrieve');
 
       // Step 2: Parse comparison document if provided
       let comparisonText = null;
@@ -216,6 +235,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
       }
 
       progress.setPhase('analyze');
+      updateJobPhase('analyze');
 
       // Step 4: Call analyze-tolling edge function
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
@@ -279,6 +299,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
 
       const analyzeResponse = await analyzeRes.json();
       progress.setPhase('save');
+      updateJobPhase('save');
 
       void logLlmCall({
         analystType: 'tolling',
@@ -358,6 +379,7 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
 
       if (cancelledRef.current) return;
       progress.setPhase('complete');
+      completeJob(analysisResult.id);
       setCreatedAnalysisId(analysisResult.id);
       setStep('results');
       toast.success('Analysis complete!');
@@ -382,10 +404,12 @@ export function TollingUploadAnalysis({ onAnalysisComplete }: TollingUploadAnaly
           structured_output: true,
         },
       });
-      setError(err instanceof Error ? err.message : 'Analysis failed');
+      const errMsg = err instanceof Error ? err.message : 'Analysis failed';
+      failJob(errMsg);
+      setError(errMsg);
       setStep('configure');
       progress.reset();
-      toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      toast.error('Analysis failed: ' + errMsg);
     }
   };
 

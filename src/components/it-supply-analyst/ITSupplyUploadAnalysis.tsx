@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,7 @@ import { redactPII, summarizeRedaction } from '@/lib/analyst/piiRedaction';
 import { validateUploadFile } from '@/lib/analyst/fileValidation';
 import { PIIRedactionToggle } from '@/components/shared/PIIRedactionToggle';
 import { AnalystAnalysisProgress, useAnalystProgress } from '@/components/shared/AnalystAnalysisProgress';
+import { useBackgroundAnalysis, registerJob, updateJobPhase, completeJob, failJob, dismissJob } from '@/lib/analyst/backgroundAnalysis';
 
 const JURISDICTIONS = ['United States', 'United Kingdom', 'EU', 'Taiwan', 'South Korea', 'Japan', 'China', 'Singapore', 'Other'];
 
@@ -45,6 +46,22 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
   const [redactPIIEnabled, setRedactPIIEnabled] = useState(false);
   const progress = useAnalystProgress();
   const cancelledRef = useRef(false);
+  const backgroundJob = useBackgroundAnalysis();
+
+  useEffect(() => {
+    if (!backgroundJob || backgroundJob.analystType !== 'it_supply') return;
+    if (backgroundJob.status === 'running' && step !== 'analyzing') {
+      setStep('analyzing');
+      progress.setPhase(backgroundJob.phase as any);
+    } else if (backgroundJob.status === 'complete' && backgroundJob.analysisId) {
+      setCreatedAnalysisId(backgroundJob.analysisId);
+      setStep('results');
+      dismissJob();
+    } else if (backgroundJob.status === 'failed') {
+      toast.error('Analysis failed: ' + (backgroundJob.error || 'Unknown error'));
+      dismissJob();
+    }
+  }, [backgroundJob?.status, backgroundJob?.analystType]);
 
   const handleCancel = useCallback(() => {
     cancelledRef.current = true;
@@ -81,6 +98,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
     cancelledRef.current = false;
     progress.reset();
     progress.setPhase('extract');
+    registerJob('it_supply', projectName.trim());
 
     // Hoisted so catch block can report PII stats even if analysis fails after redaction ran.
     const piiCounts = { email: 0, phone: 0, ssn: 0, ein: 0, iban: 0, card: 0 };
@@ -105,6 +123,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
 
       const { text: contractText } = await parseResponse.json();
       progress.setPhase('retrieve');
+      updateJobPhase('retrieve');
 
       // Optional PII redaction before any text leaves the browser.
       let contractTextForLLM = contractText;
@@ -143,6 +162,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
       if (selectedLearnings.length > 0) console.log(`Including ${selectedLearnings.length} IT supply learnings (semantic=${relevantLearningsRes.usedSemanticRetrieval}, pool=${activeLearnings.length})`);
 
       progress.setPhase('analyze');
+      updateJobPhase('analyze');
 
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
         const controller = new AbortController();
@@ -183,6 +203,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
 
       const analyzeResponse = await analyzeRes.json();
       progress.setPhase('save');
+      updateJobPhase('save');
 
       void logLlmCall({
         analystType: 'it_supply',
@@ -243,6 +264,7 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
 
       if (cancelledRef.current) return;
       progress.setPhase('complete');
+      completeJob(analysisResult.id);
       setCreatedAnalysisId(analysisResult.id);
       setStep('results');
       toast.success('Analysis complete!');
@@ -264,10 +286,12 @@ export function ITSupplyUploadAnalysis({ onAnalysisComplete }: ITSupplyUploadAna
           pii_total_redactions: redactPIIEnabled ? piiTotalRedactions : 0,
         },
       });
-      setError(err instanceof Error ? err.message : 'Analysis failed');
+      const errMsg = err instanceof Error ? err.message : 'Analysis failed';
+      failJob(errMsg);
+      setError(errMsg);
       setStep('configure');
       progress.reset();
-      toast.error('Analysis failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      toast.error('Analysis failed: ' + errMsg);
     }
   };
 

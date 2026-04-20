@@ -29,6 +29,13 @@ export interface PipelineMatter {
   bmFeeUsd: number;
 }
 
+export interface ArTranche {
+  estimatedDate: string;
+  originalAmount: number;
+  remainingAmount: number;
+  ageDays: number;
+}
+
 export interface MatterBreakdown {
   id: string;
   matterName: string;
@@ -38,6 +45,7 @@ export interface MatterBreakdown {
   paidAmount: number;
   billedAmount: number;
   currency: string;
+  arTranches: ArTranche[];
 }
 
 export interface MatterWriteOff {
@@ -415,6 +423,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
             paidAmount: paidAmount,
             billedAmount: billedAmount,
             currency: feeCurrency,
+            arTranches: [],
           });
 
           // Write-off entries for the FY breakdown are now built from the dated
@@ -741,6 +750,44 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         snapshotsByMatter.set(snap.matter_id, list);
       });
       snapshotsByMatter.forEach(list => list.sort((a, b) => a.as_of_date.localeCompare(b.as_of_date)));
+
+      // AR aging: derive outstanding billing tranches per matter using FIFO
+      matterBreakdowns.forEach(breakdown => {
+        if (breakdown.arAmount <= 0) return;
+        const matterSnaps = snapshotsByMatter.get(breakdown.id);
+        if (!matterSnaps || matterSnaps.length === 0) return;
+
+        const tranches: { date: string; original: number; remaining: number }[] = [];
+        let prevBilled = 0;
+        let prevPaid = 0;
+
+        for (const snap of matterSnaps) {
+          const billed = Number(snap.billed_amount) || 0;
+          const paid = Number(snap.paid_amount) || 0;
+          const billingDelta = billed - prevBilled;
+          if (billingDelta > 0) {
+            tranches.push({ date: snap.as_of_date, original: billingDelta, remaining: billingDelta });
+          }
+          let paymentDelta = paid - prevPaid;
+          for (const t of tranches) {
+            if (paymentDelta <= 0) break;
+            const consume = Math.min(t.remaining, paymentDelta);
+            t.remaining -= consume;
+            paymentDelta -= consume;
+          }
+          prevBilled = billed;
+          prevPaid = paid;
+        }
+
+        breakdown.arTranches = tranches
+          .filter(t => t.remaining > 0.01)
+          .map(t => ({
+            estimatedDate: t.date,
+            originalAmount: t.original,
+            remainingAmount: t.remaining,
+            ageDays: differenceInDays(today, parseISO(t.date)),
+          }));
+      });
 
       const sortedTrendDates = Array.from(new Set(
         (snapshots || [])

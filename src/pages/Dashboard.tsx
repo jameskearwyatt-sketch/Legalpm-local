@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useDashboard, TrendDataPoint, MatterBreakdown, MonthlyBurn } from '@/lib/hooks/useDashboard';
+import { useDashboard, TrendDataPoint, MatterBreakdown, ArTranche, MonthlyBurn } from '@/lib/hooks/useDashboard';
+import { format, parseISO } from 'date-fns';
 import { useNotifications } from '@/lib/hooks/useNotifications';
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
 import { useMatters } from '@/lib/hooks/useMatters';
@@ -48,6 +49,19 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
 import { BusynessDetailDialog } from '@/components/dashboard/BusynessDetailDialog';
+
+function formatArAge(days: number): string {
+  if (days < 7) return '< 1 wk';
+  if (days < 30) { const w = Math.round(days / 7); return `~${w} wk${w === 1 ? '' : 's'}`; }
+  const m = Math.round(days / 30);
+  return `~${m} mo${m === 1 ? '' : 's'}`;
+}
+
+function arAgeColor(days: number): string {
+  if (days > 90) return 'text-red-600 dark:text-red-400';
+  if (days > 30) return 'text-amber-600 dark:text-amber-400';
+  return 'text-emerald-600 dark:text-emerald-400';
+}
 
 export default function Dashboard() {
   const [excludedMatterIds, setExcludedMatterIds] = useState<string[]>([]);
@@ -459,6 +473,22 @@ export default function Dashboard() {
     return [];
   }, [expandedTile, stats?.matterBreakdowns]);
 
+  const clientArGroups = useMemo(() => {
+    if (expandedTile !== 'ar' || !stats?.matterBreakdowns) return [];
+    const byClient = new Map<string, { clientName: string; totalAr: number; currency: string; matters: MatterBreakdown[] }>();
+    stats.matterBreakdowns
+      .filter(m => m.arAmount > 0)
+      .forEach(m => {
+        const group = byClient.get(m.clientName) || { clientName: m.clientName, totalAr: 0, currency: m.currency, matters: [] };
+        group.totalAr += m.arAmount;
+        group.matters.push(m);
+        byClient.set(m.clientName, group);
+      });
+    return Array.from(byClient.values())
+      .sort((a, b) => b.totalAr - a.totalAr)
+      .map(g => ({ ...g, matters: g.matters.sort((a, b) => b.arAmount - a.arAmount) }));
+  }, [expandedTile, stats?.matterBreakdowns]);
+
   // Attribute a snapshot date to the firm's financial year (by FY-ending calendar year).
   // Example: FY starts 1 July. A write-off on 30 Jun 2026 → FY 2026 (ends 30 Jun 2026).
   // A write-off on 1 Jul 2026 → FY 2027 (next FY, ends 30 Jun 2027).
@@ -814,8 +844,8 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Matter Breakdown Panel */}
-        {expandedTile && expandedTile !== 'realization' && breakdownData.length > 0 && (
+        {/* Matter Breakdown Panel — WIP / Paid */}
+        {expandedTile && expandedTile !== 'realization' && expandedTile !== 'ar' && breakdownData.length > 0 && (
           <div ref={breakdownRef}>
             <Card className="shadow-card animate-in slide-in-from-top-2 duration-200 max-w-2xl">
               <CardHeader className="pb-2 pt-4 px-4 sm:px-6">
@@ -855,6 +885,65 @@ export default function Dashboard() {
                     </tbody>
                   </table>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* AR Aging Breakdown — grouped by client with per-tranche ages */}
+        {expandedTile === 'ar' && clientArGroups.length > 0 && (
+          <div ref={breakdownRef}>
+            <Card className="shadow-card animate-in slide-in-from-top-2 duration-200 max-w-3xl">
+              <CardHeader className="pb-2 pt-4 px-4 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm font-medium text-foreground">
+                    Accounts Receivable Aging ({breakdownData.length} matter{breakdownData.length !== 1 ? 's' : ''}, {clientArGroups.length} client{clientArGroups.length !== 1 ? 's' : ''})
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setExpandedTile(null)} className="text-xs text-muted-foreground">
+                    Close
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="px-4 sm:px-6 pb-4 pt-0">
+                <div className="max-h-[28rem] overflow-y-auto space-y-3">
+                  {clientArGroups.map(group => (
+                    <div key={group.clientName} className="rounded-lg border border-border/60">
+                      <div className="flex items-center justify-between px-3 py-2 bg-muted/30">
+                        <span className="text-xs font-semibold text-foreground">{group.clientName}</span>
+                        <span className="text-xs font-semibold text-foreground tabular-nums">{formatCurrency(group.totalAr, group.currency)}</span>
+                      </div>
+                      <div className="divide-y divide-border/30">
+                        {group.matters.map(m => (
+                          <div key={m.id} className="px-3 py-2">
+                            <div className="flex items-center justify-between">
+                              <Link to={`/matters/${m.id}`} className="text-primary hover:underline text-xs sm:text-sm font-medium">
+                                {m.matterName}
+                              </Link>
+                              <span className="text-xs sm:text-sm font-medium text-foreground tabular-nums ml-2">{formatCurrency(m.arAmount, m.currency)}</span>
+                            </div>
+                            {m.arTranches.length > 0 && (
+                              <div className="mt-1.5 space-y-1">
+                                {m.arTranches.map((t, i) => (
+                                  <div key={i} className="flex items-center justify-between text-[11px] pl-3 sm:pl-4">
+                                    <span className="text-muted-foreground">
+                                      ~{formatCurrency(t.remainingAmount, m.currency)} billed ~{format(parseISO(t.estimatedDate), 'MMM d, yyyy')}
+                                    </span>
+                                    <span className={cn('font-medium tabular-nums ml-2 whitespace-nowrap', arAgeColor(t.ageDays))}>
+                                      {formatArAge(t.ageDays)}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center mt-3">
+                  Age estimated from snapshot billing dates — approximate ±1 week
+                </p>
               </CardContent>
             </Card>
           </div>

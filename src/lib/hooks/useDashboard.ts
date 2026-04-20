@@ -682,51 +682,82 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       const totalResolvedWip = totalBilledUsd + totalWipWriteOffUsd;
       const realizationRate = totalResolvedWip > 0 ? (totalPaidUsd / totalResolvedWip) * 100 : 100;
 
-      // Build historical trend data from all snapshots
-      // Create a map of matter_id to matter data for currency conversion
+      // Build historical trend data from snapshot history. Important: the
+      // dashboard trend is a portfolio view, not a sparse event log. When one
+      // included matter has no row on a date that another matter does, we carry
+      // forward that matter's latest known snapshot instead of dropping it from
+      // the aggregate for that date. This avoids the exact "looks like deleted
+      // Sweden data came back when other matters are added" behaviour caused by
+      // summing only exact-date rows.
       const matterDataMap = new Map<string, { exchangeRate: number; feeCurrency: string }>();
       liveMatters?.forEach(matter => {
         matterDataMap.set(matter.id, {
           exchangeRate: Number(matter.exchange_rate) || 1,
-          feeCurrency: matter.fee_currency || 'GBP'
+          feeCurrency: matter.fee_currency || 'GBP',
         });
       });
 
-      // Group all snapshots by date and aggregate (excluding excluded matters)
-      // Also track how many matters have data for each date to detect incomplete data
+      const includedLiveMatters = (liveMatters || []).filter(matter => !excludedSet.has(matter.id));
+      const includedMatterIdsForTrend = new Set(includedLiveMatters.map(matter => matter.id));
+
+      const snapshotsByMatter = new Map<string, any[]>();
+      (snapshots || []).forEach(snap => {
+        if (!includedMatterIdsForTrend.has(snap.matter_id)) return;
+        const list = snapshotsByMatter.get(snap.matter_id) || [];
+        list.push(snap);
+        snapshotsByMatter.set(snap.matter_id, list);
+      });
+      snapshotsByMatter.forEach(list => list.sort((a, b) => a.as_of_date.localeCompare(b.as_of_date)));
+
+      const sortedTrendDates = Array.from(new Set(
+        (snapshots || [])
+          .filter(snap => includedMatterIdsForTrend.has(snap.matter_id))
+          .map(snap => snap.as_of_date)
+      )).sort((dateA, dateB) => dateA.localeCompare(dateB));
+
       const trendByDate = new Map<string, { wip: number; ar: number; paid: number; matterCount: number }>();
-      snapshots?.forEach(snap => {
-        // Skip excluded matters for trend data
-        if (excludedSet.has(snap.matter_id)) return;
-        
-        const dateKey = snap.as_of_date;
-        const matterData = matterDataMap.get(snap.matter_id);
-        const exchangeRate = matterData?.exchangeRate || 1;
-        const feeCurrency = matterData?.feeCurrency || 'GBP';
-        
-        const billedUsd = convertToUsd(Number(snap.billed_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-        const paidUsd = convertToUsd(Number(snap.paid_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-        
-        const existing = trendByDate.get(dateKey) || { wip: 0, ar: 0, paid: 0, matterCount: 0 };
-        existing.wip += convertToUsd(Number(snap.wip_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-        existing.ar += Math.max(billedUsd - paidUsd, 0);
-        existing.paid += paidUsd;
-        existing.matterCount += 1;
-        trendByDate.set(dateKey, existing);
+      const cursorByMatter = new Map<string, number>();
+      const lastSnapshotByMatter = new Map<string, any | null>();
+
+      sortedTrendDates.forEach(dateKey => {
+        const values = { wip: 0, ar: 0, paid: 0, matterCount: 0 };
+
+        includedLiveMatters.forEach(matter => {
+          const matterSnaps = snapshotsByMatter.get(matter.id) || [];
+          let cursor = cursorByMatter.get(matter.id) ?? 0;
+          let lastSnap = lastSnapshotByMatter.get(matter.id) ?? null;
+
+          while (cursor < matterSnaps.length && matterSnaps[cursor].as_of_date <= dateKey) {
+            lastSnap = matterSnaps[cursor];
+            cursor += 1;
+          }
+
+          cursorByMatter.set(matter.id, cursor);
+          lastSnapshotByMatter.set(matter.id, lastSnap);
+
+          if (!lastSnap) return;
+
+          const matterData = matterDataMap.get(matter.id);
+          const exchangeRate = matterData?.exchangeRate || 1;
+          const feeCurrency = matterData?.feeCurrency || 'GBP';
+          const billedUsd = convertToUsd(Number(lastSnap.billed_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          const paidUsd = convertToUsd(Number(lastSnap.paid_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+
+          values.wip += convertToUsd(Number(lastSnap.wip_amount) || 0, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          values.ar += Math.max(billedUsd - paidUsd, 0);
+          values.paid += paidUsd;
+          values.matterCount += 1;
+        });
+
+        trendByDate.set(dateKey, values);
       });
 
-      // Sort by date
       const sortedEntries = Array.from(trendByDate.entries())
         .sort(([dateA], [dateB]) => dateA.localeCompare(dateB));
-      
-      // Find the maximum matter count (most complete data point)
-      const maxMatterCount = Math.max(...sortedEntries.map(([, v]) => v.matterCount), 1);
-      
-      // Filter out trailing data points that have significantly fewer matters
-      // (indicating incomplete/partial data uploads)
-      // Only include points where at least 50% of matters have data, or keep all if there are few matters
+
+      const maxMatterCount = Math.max(...sortedEntries.map(([, values]) => values.matterCount), 1);
       const minMatterThreshold = Math.max(Math.floor(maxMatterCount * 0.5), 1);
-      
+
       const sortedTrendData: TrendDataPoint[] = sortedEntries
         .filter(([, values]) => values.matterCount >= minMatterThreshold)
         .map(([dateStr, values]) => ({

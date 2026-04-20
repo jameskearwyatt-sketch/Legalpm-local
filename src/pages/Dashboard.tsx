@@ -345,17 +345,25 @@ export default function Dashboard() {
         description: 'The financial snapshots for this date have been removed.',
       });
       
-      // Wipe cached chart data entirely — invalidate alone would render
-      // the stale cache momentarily before the background refetch completes,
-      // leaving graphs showing deleted data on filter combinations the user
-      // hasn't yet revisited.
+      // Wipe cached chart data entirely AND force every mounted observer to
+      // refetch right now. `removeQueries` alone clears the cache but mounted
+      // observers (like this very dashboard query) keep their last-rendered
+      // data until something else triggers a fetch — which is exactly the
+      // "deleted points still appear when toggling matter exclusions" bug.
       queryClient.removeQueries({ queryKey: ['dashboard'] });
       queryClient.removeQueries({ queryKey: ['report-realization'] });
       queryClient.removeQueries({ queryKey: ['report-budget-burn'] });
       queryClient.removeQueries({ queryKey: ['report-wip-movement'] });
       queryClient.removeQueries({ queryKey: ['report-collection'] });
-      queryClient.invalidateQueries({ queryKey: ['snapshots'] });
-      queryClient.invalidateQueries({ queryKey: ['matters'] });
+      queryClient.removeQueries({ queryKey: ['matter'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['report-realization'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['report-budget-burn'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['report-wip-movement'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['report-collection'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['snapshots'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['matters'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['matter'], refetchType: 'all' });
     } catch (error) {
       console.error('Error deleting data point:', error);
       toast({

@@ -67,6 +67,9 @@ export interface DashboardStats {
   hasActiveWipProposals: boolean;
   matterBreakdowns: MatterBreakdown[];
   writeOffsByMatter: MatterWriteOff[];
+  avgMonthlyBurn3M: number;
+  avgMonthlyBurn6M: number;
+  avgMonthlyBurn12M: number;
 }
 
 export interface Alert {

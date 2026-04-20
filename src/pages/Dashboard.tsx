@@ -666,8 +666,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* KPI Cards — Row 1: balances + burn (5 tiles) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
+        {/* KPI Cards — Row 1: balances (4 tiles) */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
           {primaryKpiCards.map((card) => (
             <StatCard
               key={card.title}
@@ -951,15 +951,23 @@ export default function Dashboard() {
                   </div>
                 </div>
                 {/* Right: Sparkline */}
-                <div className="flex-1 h-16 min-w-0">
+                <div className="flex-1 h-20 min-w-0">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={stats.monthlyBurnData} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
+                    <AreaChart data={stats.monthlyBurnData} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
                       <defs>
                         <linearGradient id="sparkBurnGradient" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.25} />
                           <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                         </linearGradient>
                       </defs>
+                      <XAxis
+                        dataKey="monthLabel"
+                        tick={{ fontSize: 9, fill: 'hsl(var(--muted-foreground))' }}
+                        tickFormatter={(v: string) => v.split(' ')[0].slice(0, 3)}
+                        axisLine={false}
+                        tickLine={false}
+                        interval={1}
+                      />
                       <Area
                         type="monotone"
                         dataKey="burnUsd"
@@ -970,20 +978,29 @@ export default function Dashboard() {
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
-                {/* Trend badge */}
-                <div className="sm:w-28 shrink-0 text-right">
+                {/* Trend badge — compares recent quarter vs preceding quarter */}
+                <div className="sm:w-32 shrink-0 text-right">
                   {(() => {
-                    const trend = stats.avgMonthlyBurn12M > 0
-                      ? ((stats.avgMonthlyBurn3M - stats.avgMonthlyBurn12M) / stats.avgMonthlyBurn12M) * 100
-                      : 0;
-                    if (trend > 5) return (
-                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
-                        <TrendingUp className="h-3.5 w-3.5" /> Busier
+                    const data = stats.monthlyBurnData;
+                    const recent3 = data.slice(-3);
+                    const prev3 = data.slice(-6, -3);
+                    const recentAvg = recent3.reduce((s, d) => s + d.burnUsd, 0) / 3;
+                    const prevAvg = prev3.reduce((s, d) => s + d.burnUsd, 0) / 3;
+                    const prevHasData = prev3.some(d => d.matterCount > 0);
+                    if (!prevHasData) return (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                        New data
                       </span>
                     );
-                    if (trend < -5) return (
+                    const change = prevAvg > 0 ? ((recentAvg - prevAvg) / prevAvg) * 100 : 0;
+                    if (change > 10) return (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+                        <TrendingUp className="h-3.5 w-3.5" /> +{change.toFixed(0)}%
+                      </span>
+                    );
+                    if (change < -10) return (
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-600">
-                        <TrendingUp className="h-3.5 w-3.5 rotate-180" /> Quieter
+                        <TrendingUp className="h-3.5 w-3.5 rotate-180" /> {change.toFixed(0)}%
                       </span>
                     );
                     return (
@@ -992,7 +1009,7 @@ export default function Dashboard() {
                       </span>
                     );
                   })()}
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Click for detail</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">vs prior quarter</p>
                 </div>
               </div>
             </CardContent>

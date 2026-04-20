@@ -30,7 +30,14 @@ export function BusynessDetailDialog({ open, onOpenChange, monthlyData, avg3M, a
   }, [monthlyData]);
 
   const maxBurn = Math.max(...monthlyData.map(d => d.burnUsd), 1);
-  const trend3v12 = avg12M > 0 ? ((avg3M - avg12M) / avg12M) * 100 : 0;
+
+  // Quarter-over-quarter trend: recent 3 months vs preceding 3 months
+  const recent3 = monthlyData.slice(-3);
+  const prev3 = monthlyData.slice(-6, -3);
+  const recentQAvg = recent3.reduce((s, d) => s + d.burnUsd, 0) / 3;
+  const prevQAvg = prev3.reduce((s, d) => s + d.burnUsd, 0) / 3;
+  const prevQHasData = prev3.some(d => d.matterCount > 0);
+  const qoqChange = prevQHasData && prevQAvg > 0 ? ((recentQAvg - prevQAvg) / prevQAvg) * 100 : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -62,24 +69,30 @@ export function BusynessDetailDialog({ open, onOpenChange, monthlyData, avg3M, a
             </div>
           </div>
 
-          {/* Trend Indicator */}
+          {/* Trend Indicator — quarter-over-quarter */}
           <div className="flex items-center justify-center gap-2 text-sm">
-            {trend3v12 > 5 ? (
+            {qoqChange === null ? (
+              <>
+                <Minus className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground font-medium">Insufficient history for trend</span>
+              </>
+            ) : qoqChange > 10 ? (
               <>
                 <TrendingUp className="h-4 w-4 text-emerald-600" />
                 <span className="text-emerald-600 font-medium">Getting busier</span>
-                <span className="text-muted-foreground">({trend3v12 > 0 ? '+' : ''}{trend3v12.toFixed(0)}% vs 12M avg)</span>
+                <span className="text-muted-foreground">(+{qoqChange.toFixed(0)}% vs prior quarter)</span>
               </>
-            ) : trend3v12 < -5 ? (
+            ) : qoqChange < -10 ? (
               <>
                 <TrendingDown className="h-4 w-4 text-amber-600" />
                 <span className="text-amber-600 font-medium">Quietening down</span>
-                <span className="text-muted-foreground">({trend3v12.toFixed(0)}% vs 12M avg)</span>
+                <span className="text-muted-foreground">({qoqChange.toFixed(0)}% vs prior quarter)</span>
               </>
             ) : (
               <>
                 <Minus className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground font-medium">Stable</span>
+                <span className="text-muted-foreground">({qoqChange > 0 ? '+' : ''}{qoqChange.toFixed(0)}% vs prior quarter)</span>
               </>
             )}
           </div>

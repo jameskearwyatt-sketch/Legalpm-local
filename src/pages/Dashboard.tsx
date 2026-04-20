@@ -578,7 +578,7 @@ export default function Dashboard() {
       title: 'Avg Monthly Burn',
       icon: <Flame className="h-5 w-5" />,
       variant: 'default' as const,
-      infoTooltip: 'Average gross WIP incurred per month over the last 3, 6, and 12 months. Calculated as ΔWIP + ΔBilled + ΔWrite-off between month-end snapshots, so billings and write-offs are added back to recover the work actually done. 12M × 12 ≈ trailing-year total burn.',
+      infoTooltip: 'Total gross WIP burn over the last N months, divided by N. Burn = ΔWIP + ΔBilled + ΔWrite-off between the latest snapshot and the snapshot ~N months ago, so billings and write-offs are added back to recover the work actually done. By construction, 12M × 12 ≡ trailing-12M total burn.',
       valueSlot: (
         <div className="space-y-0.5 mt-0.5">
           <div className="flex items-baseline justify-between gap-2">

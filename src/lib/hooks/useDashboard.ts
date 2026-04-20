@@ -774,81 +774,69 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           paid: Math.round(values.paid),
         }));
 
-      // Average monthly WIP burn (USD, BM only). "Burn" = WIP *incurred* in
-      // the month, i.e. the gross work done before it gets converted to
-      // billings or written off. Tracking ΔWIP alone understates burn badly
-      // because billing reduces WIP — when work gets billed out, wip_amount
-      // drops, which would cancel out genuine burn from other matters.
+      // Average monthly WIP burn (USD, BM only). "Burn" = gross WIP *incurred*
+      // over the window, i.e. work done before it gets billed or written off.
       //
-      // Gross burn per matter per month:
-      //   burn = ΔWIP + ΔBilled + ΔWriteOff
-      //        = (WIP_end − WIP_start)
-      //        + (Billed_end − Billed_start)
-      //        + (WriteOff_end − WriteOff_start)
+      // Per-window formula (N ∈ {3, 6, 12} months):
+      //   For each included matter:
+      //     end   = latest snapshot today
+      //     start = latest snapshot on-or-before (today − N months)
+      //             — if the matter has no pre-window snapshot (e.g. onboarded
+      //               mid-window), fall back to its EARLIEST in-window snapshot
+      //               so we don't treat its accumulated balance as burn.
+      //     burn  = ΔWIP + ΔBilled + ΔWriteOff
+      //   windowTotal = Σ burn across matters
+      //   avg = windowTotal / N
       //
-      // Adding back ΔBilled recovers WIP that was converted to bills during
-      // the month; adding back ΔWriteOff recovers WIP that was written off.
-      // Result: 12 × avgMonthlyBurn12M ≈ trailing-year total burn.
-      const monthAnchors: { key: string; date: Date }[] = [];
-      // Build 13 month-end anchors (current + 12 prior) so we can diff 12 months.
-      for (let i = 0; i <= 12; i++) {
-        const d = new Date(today.getFullYear(), today.getMonth() - i + 1, 0); // last day of month (today - i)
-        monthAnchors.push({ key: format(d, 'yyyy-MM-dd'), date: d });
-      }
-      // monthAnchors[0] = end of current month, monthAnchors[12] = end of month 12 ago.
+      // This guarantees `12M avg × 12 ≡ trailing-12M total burn` by
+      // construction (modulo new-matter baseline truncation, unavoidable).
+      // The previous per-month-anchor loop dropped burn whenever a matter had
+      // sparse snapshots, because months without a snapshot were skipped
+      // entirely instead of being absorbed into the window-edge delta.
 
-      const valuesAtAnchor = (
-        matterSnaps: any[],
-        anchorKey: string,
-      ): { wip: number; billed: number; writeOff: number; found: boolean } => {
-        for (const snap of matterSnaps) {
-          if (snap.as_of_date <= anchorKey) {
-            return {
-              wip: Number(snap.wip_amount) || 0,
-              billed: Number(snap.billed_amount) || 0,
-              writeOff: Number(snap.wip_write_off_amount) || 0,
-              found: true,
-            };
+      const computeAvgBurnForWindow = (months: number): number => {
+        const startDate = new Date(today.getFullYear(), today.getMonth() - months, today.getDate());
+        const startKey = format(startDate, 'yyyy-MM-dd');
+        let windowTotalUsd = 0;
+
+        includedLiveMatters.forEach(matter => {
+          const matterSnaps = snapshotsByMatter.get(matter.id) || [];
+          if (matterSnaps.length === 0) return;
+          const matterData = matterDataMap.get(matter.id);
+          const exchangeRate = matterData?.exchangeRate || 1;
+          const feeCurrency = matterData?.feeCurrency || 'GBP';
+
+          // matterSnaps are ordered DESC by as_of_date. End = most recent.
+          const endSnap = matterSnaps[0];
+
+          // Find latest snapshot on-or-before the window start.
+          let startSnap = matterSnaps.find(s => s.as_of_date <= startKey);
+
+          // If there's no pre-window snapshot, this matter started inside the
+          // window. Use its EARLIEST in-window snapshot as the baseline so we
+          // measure only the burn that actually occurred during the window —
+          // not the accumulated balance the matter brought into the window.
+          if (!startSnap) {
+            startSnap = matterSnaps[matterSnaps.length - 1];
           }
-        }
-        return { wip: 0, billed: 0, writeOff: 0, found: false };
-      };
 
-      // monthlyMovementsUsd[0] = burn in most recent month, [11] = oldest of 12.
-      const monthlyMovementsUsd: number[] = new Array(12).fill(0);
-      includedLiveMatters.forEach(matter => {
-        const matterSnaps = snapshotsByMatter.get(matter.id) || [];
-        if (matterSnaps.length === 0) return;
-        const matterData = matterDataMap.get(matter.id);
-        const exchangeRate = matterData?.exchangeRate || 1;
-        const feeCurrency = matterData?.feeCurrency || 'GBP';
+          // If start === end (only one snapshot ever), there's no measurable
+          // movement for this matter in the window.
+          if (startSnap === endSnap) return;
 
-        for (let m = 0; m < 12; m++) {
-          const endAnchor = monthAnchors[m];     // end of month m-ago
-          const startAnchor = monthAnchors[m + 1]; // end of previous month
-          const endVal = valuesAtAnchor(matterSnaps, endAnchor.key);
-          const startVal = valuesAtAnchor(matterSnaps, startAnchor.key);
-          // Only count a month if we have a snapshot ≤ the end anchor —
-          // otherwise the matter didn't exist yet or had no data for the month.
-          if (!endVal.found) continue;
-          const deltaWip = endVal.wip - startVal.wip;
-          const deltaBilled = endVal.billed - startVal.billed;
-          const deltaWriteOff = endVal.writeOff - startVal.writeOff;
+          const deltaWip = (Number(endSnap.wip_amount) || 0) - (Number(startSnap.wip_amount) || 0);
+          const deltaBilled = (Number(endSnap.billed_amount) || 0) - (Number(startSnap.billed_amount) || 0);
+          const deltaWriteOff = (Number(endSnap.wip_write_off_amount) || 0) - (Number(startSnap.wip_write_off_amount) || 0);
           const burnNative = deltaWip + deltaBilled + deltaWriteOff;
-          const burnUsd = convertToUsd(burnNative, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-          monthlyMovementsUsd[m] += burnUsd;
-        }
-      });
+          windowTotalUsd += convertToUsd(burnNative, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+        });
 
-      const avgOfFirstN = (n: number): number => {
-        let sum = 0;
-        for (let i = 0; i < n; i++) sum += monthlyMovementsUsd[i] || 0;
-        return sum / n;
+        return windowTotalUsd / months;
       };
 
-      const avgMonthlyBurn3M = avgOfFirstN(3);
-      const avgMonthlyBurn6M = avgOfFirstN(6);
-      const avgMonthlyBurn12M = avgOfFirstN(12);
+      const avgMonthlyBurn3M = computeAvgBurnForWindow(3);
+      const avgMonthlyBurn6M = computeAvgBurnForWindow(6);
+      const avgMonthlyBurn12M = computeAvgBurnForWindow(12);
 
       return {
         avgMonthlyBurn3M,

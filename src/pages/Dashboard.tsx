@@ -261,6 +261,7 @@ export default function Dashboard() {
   };
 
   const handleMyMattersToggle = (checked: boolean) => {
+    setMyMattersAllIncluded(checked);
     if (checked) {
       // Include all my matters (remove from excluded) - both Live and Pipeline
       setExcludedMatterIds(prev => prev.filter(id => !myMatterIds.has(id)));
@@ -281,6 +282,7 @@ export default function Dashboard() {
   };
 
   const handleNotMyMattersToggle = (checked: boolean) => {
+    setNotMyMattersAllIncluded(checked);
     if (checked) {
       // Include all not-my matters (remove from excluded) - both Live and Pipeline
       setExcludedMatterIds(prev => prev.filter(id => !notMyMatterIds.has(id)));

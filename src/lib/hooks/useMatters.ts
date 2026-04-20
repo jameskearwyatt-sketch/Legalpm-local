@@ -589,6 +589,7 @@ export function useMatters() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['matters'] });
+      queryClient.invalidateQueries({ queryKey: ['matter', variables.id] });
       // Show a more informative message when propagating
       const effectiveScope = variables.rate_modifier_scope;
       if (effectiveScope === 'all_client_matters') {

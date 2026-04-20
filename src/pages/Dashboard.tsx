@@ -542,9 +542,6 @@ export default function Dashboard() {
     }, 50);
   };
 
-  const burn3M = stats?.avgMonthlyBurn3M || 0;
-  const burn6M = stats?.avgMonthlyBurn6M || 0;
-  const burn12M = stats?.avgMonthlyBurn12M || 0;
 
   const primaryKpiCards = [
     {
@@ -574,29 +571,6 @@ export default function Dashboard() {
       value: formatCurrency(stats?.totalBilled || 0, 'USD'),
       icon: <FileText className="h-5 w-5" />,
       variant: 'default' as const,
-      tileKey: null,
-    },
-    {
-      title: 'Avg Monthly Burn',
-      icon: <Flame className="h-5 w-5" />,
-      variant: 'default' as const,
-      infoTooltip: 'Total gross WIP burn over the last N months, divided by N. Burn = ΔWIP + ΔBilled + ΔWrite-off between the latest snapshot and the snapshot ~N months ago, so billings and write-offs are added back to recover the work actually done. By construction, 12M × 12 ≡ trailing-12M total burn.',
-      valueSlot: (
-        <div className="space-y-0.5 mt-0.5">
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-xs font-medium text-muted-foreground">3M</span>
-            <span className="text-sm sm:text-base font-heading font-bold text-foreground tabular-nums">{formatCurrency(burn3M, 'USD')} / mo</span>
-          </div>
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-xs font-medium text-muted-foreground">6M</span>
-            <span className="text-sm sm:text-base font-heading font-bold text-foreground tabular-nums">{formatCurrency(burn6M, 'USD')} / mo</span>
-          </div>
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="text-xs font-medium text-muted-foreground">12M</span>
-            <span className="text-sm sm:text-base font-heading font-bold text-foreground tabular-nums">{formatCurrency(burn12M, 'USD')} / mo</span>
-          </div>
-        </div>
-      ),
       tileKey: null,
     },
   ];

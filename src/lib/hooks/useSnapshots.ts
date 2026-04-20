@@ -56,20 +56,33 @@ export function useSnapshots(matterId?: string) {
 
   // Snapshot mutations must both refresh list views AND wipe cached chart data.
   // React Query keeps separate cache entries per queryKey (e.g. per exclusion
-  // set on the dashboard, per date range on reports). `invalidateQueries` marks
-  // them stale, but when the user switches back to a previously-viewed filter
-  // the stale data is rendered first and only swapped after the background
-  // refetch completes — which makes deleted/edited snapshot data appear to
-  // persist. `removeQueries` drops those cache entries entirely so every future
-  // view fetches fresh.
+  // set on the dashboard, per date range on reports). Two-step strategy:
+  //   1. `removeQueries` drops every cached entry for these prefixes — so any
+  //      future activation (toggling exclusion checkboxes, switching date
+  //      ranges, navigating back) starts from an empty cache and fetches
+  //      fresh.
+  //   2. `invalidateQueries` with `refetchType: 'all'` forces every CURRENTLY
+  //      mounted observer (e.g. the dashboard query the user is staring at)
+  //      to refetch immediately. Without this, `removeQueries` alone clears
+  //      the cache but mounted observers keep their last rendered data until
+  //      something else (remount, window focus) triggers a fetch — which is
+  //      exactly the "deleted data still shows in graphs" bug when the user
+  //      toggles between matter exclusions on the dashboard.
   const refreshAllChartAndListCaches = () => {
     queryClient.removeQueries({ queryKey: ['dashboard'] });
     queryClient.removeQueries({ queryKey: ['report-realization'] });
     queryClient.removeQueries({ queryKey: ['report-budget-burn'] });
     queryClient.removeQueries({ queryKey: ['report-wip-movement'] });
     queryClient.removeQueries({ queryKey: ['report-collection'] });
-    queryClient.invalidateQueries({ queryKey: ['snapshots'] });
-    queryClient.invalidateQueries({ queryKey: ['matters'] });
+    queryClient.removeQueries({ queryKey: ['matter'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' });
+    queryClient.invalidateQueries({ queryKey: ['report-realization'], refetchType: 'all' });
+    queryClient.invalidateQueries({ queryKey: ['report-budget-burn'], refetchType: 'all' });
+    queryClient.invalidateQueries({ queryKey: ['report-wip-movement'], refetchType: 'all' });
+    queryClient.invalidateQueries({ queryKey: ['report-collection'], refetchType: 'all' });
+    queryClient.invalidateQueries({ queryKey: ['snapshots'], refetchType: 'all' });
+    queryClient.invalidateQueries({ queryKey: ['matters'], refetchType: 'all' });
+    queryClient.invalidateQueries({ queryKey: ['matter'], refetchType: 'all' });
   };
 
   const createSnapshot = useMutation({

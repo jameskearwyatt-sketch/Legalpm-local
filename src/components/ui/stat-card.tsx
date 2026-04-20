@@ -10,7 +10,8 @@ import {
 
 interface StatCardProps {
   title: string;
-  value: string | number;
+  value?: string | number;
+  valueSlot?: ReactNode;
   icon?: ReactNode;
   trend?: {
     value: number;
@@ -25,7 +26,7 @@ interface StatCardProps {
   isExpanded?: boolean;
 }
 
-export function StatCard({ title, value, icon, trend, variant = 'default', className, infoTooltip, note, noteVariant = 'default', onClick, isExpanded }: StatCardProps) {
+export function StatCard({ title, value, valueSlot, icon, trend, variant = 'default', className, infoTooltip, note, noteVariant = 'default', onClick, isExpanded }: StatCardProps) {
   const variantStyles = {
     default: 'bg-card',
     success: 'bg-success/5 border-success/20',
@@ -76,7 +77,11 @@ export function StatCard({ title, value, icon, trend, variant = 'default', class
                 </Popover>
               )}
             </div>
-            <p className="text-sm sm:text-base lg:text-lg font-heading font-bold text-foreground tabular-nums break-words leading-tight">{value}</p>
+            {valueSlot ? (
+              valueSlot
+            ) : (
+              <p className="text-sm sm:text-base lg:text-lg font-heading font-bold text-foreground tabular-nums break-words leading-tight">{value}</p>
+            )}
             {note && (
               <p className={cn(
                 'text-xs mt-0.5',

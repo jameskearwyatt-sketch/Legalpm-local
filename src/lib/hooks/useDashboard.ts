@@ -19,6 +19,7 @@ export interface LiveMatter {
   matterName: string;
   clientName: string;
   bmFeeUsd: number;
+  usedUsd: number;
 }
 
 export interface PipelineMatter {
@@ -159,6 +160,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           matterName: matter.matter_name,
           clientName: getMatterClientDisplayName(matter),
           bmFeeUsd: convertToUsd(effectiveBmFee, feeCurrency, exchangeRate, gbpToUsdRate, liveRates),
+          usedUsd: 0,
         };
       });
 
@@ -346,6 +348,15 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           const bmProportion = bmFee / originalFeeUpperEnd;
           effectiveBmFee = agreedBillingAmount * bmProportion;
         }
+
+        // Per-matter USD burn (WIP + AR + Paid). Computed for ALL live matters
+        // (not just included) so the dashboard tile can show "Used / Remaining"
+        // for whichever subset the user toggles on.
+        const accountsReceivablePre = Number(snapshot?.accounts_receivable) || 0;
+        const usedNative = wipAmount + accountsReceivablePre + paidAmount;
+        const usedUsdPerMatter = convertToUsd(usedNative, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+        const liveMatterEntry = liveMattersForUI.find(lm => lm.id === matter.id);
+        if (liveMatterEntry) liveMatterEntry.usedUsd = usedUsdPerMatter;
 
         // Only include in financial totals if not excluded
         if (!isExcluded) {

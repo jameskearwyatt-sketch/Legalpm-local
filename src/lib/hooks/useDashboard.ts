@@ -217,14 +217,30 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       const excludedSet = new Set(excludedMatterIds);
       const excludedPipelineSet = new Set(excludedPipelineMatterIds);
 
-      // Get all snapshots for each matter (trend chart + burn need full history).
-      // Supabase default limit is 1000 rows — must override to avoid silent truncation.
-      const { data: snapshots } = matterIds.length > 0 ? await supabase
-        .from('financial_snapshots')
-        .select('*')
-        .in('matter_id', matterIds)
-        .order('as_of_date', { ascending: false })
-        .limit(10000) : { data: [] };
+      // Fetch ALL snapshots for live matters. The trend chart and burn computation
+      // need full history (~14 months). Supabase/PostgREST caps rows per request
+      // (default 1000, configurable per project). We paginate to guarantee completeness.
+      let snapshots: any[] = [];
+      if (matterIds.length > 0) {
+        const PAGE_SIZE = 1000;
+        let offset = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const { data: page } = await supabase
+            .from('financial_snapshots')
+            .select('*')
+            .in('matter_id', matterIds)
+            .order('as_of_date', { ascending: false })
+            .range(offset, offset + PAGE_SIZE - 1);
+          if (page && page.length > 0) {
+            snapshots = snapshots.concat(page);
+            offset += page.length;
+            hasMore = page.length === PAGE_SIZE;
+          } else {
+            hasMore = false;
+          }
+        }
+      }
 
       // Get dated write-off events for each matter. Each event represents the
       // delta added to that matter's write-offs on a specific date, so the

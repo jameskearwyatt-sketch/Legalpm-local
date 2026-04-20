@@ -160,6 +160,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           matterName: matter.matter_name,
           clientName: getMatterClientDisplayName(matter),
           bmFeeUsd: convertToUsd(effectiveBmFee, feeCurrency, exchangeRate, gbpToUsdRate, liveRates),
+          usedUsd: 0,
         };
       });
 

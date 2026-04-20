@@ -581,7 +581,6 @@ export default function Dashboard() {
       variant: 'default' as const,
       infoTooltip: 'Average monthly burn over the trailing 3, 6, and 12 months. For each window, we sum (latest snapshot − snapshot at window start) of WIP + Billed + Paid across included matters (BM only, USD), then divide by the number of months. Helps you track work volume and progress against monthly targets.',
       note: `6M: ${formatCurrency(burn6M, 'USD')} / mo  ·  12M: ${formatCurrency(burn12M, 'USD')} / mo`,
-      noteVariant: 'info' as const,
       tileKey: null,
     },
   ];
@@ -696,7 +695,7 @@ export default function Dashboard() {
               }
               noteVariant={
                 'noteVariant' in card && card.noteVariant
-                  ? card.noteVariant
+                  ? (card.noteVariant as 'amber' | 'info' | 'default')
                   : 'hasProposalAdjustment' in card && card.hasProposalAdjustment
                     ? 'amber'
                     : undefined

@@ -794,17 +794,30 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           const exchangeRate = matterData?.exchangeRate || 1;
           const feeCurrency = matterData?.feeCurrency || 'GBP';
 
+          // matterSnaps is ordered DESC by as_of_date.
+          // latestInWindow = most recent snapshot at/before today.
+          // baseline = latest snapshot at/before windowStart, OR (if the matter
+          // didn't exist yet) the EARLIEST snapshot inside the window. The
+          // earliest-in-window fallback prevents overstating burn for newly
+          // onboarded matters — we only count growth that happened within the
+          // window, not the matter's entire historic value.
           let latestInWindow: any = null;
           let baseline: any = null;
+          let earliestInWindow: any = null;
           for (const snap of matterSnaps) {
+            if (snap.as_of_date <= todayKey && !latestInWindow) {
+              latestInWindow = snap;
+            }
             if (snap.as_of_date <= windowStartKey) {
               baseline = snap;
+              break; // snaps are DESC; first one ≤ windowStart is the latest baseline
             }
-            if (snap.as_of_date <= todayKey) {
-              latestInWindow = snap;
+            if (snap.as_of_date > windowStartKey && snap.as_of_date <= todayKey) {
+              earliestInWindow = snap; // keep overwriting; last assignment wins = earliest (DESC order)
             }
           }
           if (!latestInWindow) return;
+          const baselineSnap = baseline || earliestInWindow;
 
           const sumNative = (s: any) =>
             (Number(s?.wip_amount) || 0) +
@@ -812,7 +825,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
             (Number(s?.paid_amount) || 0);
 
           const latestUsd = convertToUsd(sumNative(latestInWindow), feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-          const baselineUsd = baseline ? convertToUsd(sumNative(baseline), feeCurrency, exchangeRate, gbpToUsdRate, liveRates) : 0;
+          const baselineUsd = baselineSnap ? convertToUsd(sumNative(baselineSnap), feeCurrency, exchangeRate, gbpToUsdRate, liveRates) : 0;
           const delta = latestUsd - baselineUsd;
           if (delta > 0) totalBurnUsd += delta;
         });

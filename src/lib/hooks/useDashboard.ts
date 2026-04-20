@@ -789,6 +789,14 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       // Adding back ΔBilled recovers WIP that was converted to bills during
       // the month; adding back ΔWriteOff recovers WIP that was written off.
       // Result: 12 × avgMonthlyBurn12M ≈ trailing-year total burn.
+      const monthAnchors: { key: string; date: Date }[] = [];
+      // Build 13 month-end anchors (current + 12 prior) so we can diff 12 months.
+      for (let i = 0; i <= 12; i++) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i + 1, 0); // last day of month (today - i)
+        monthAnchors.push({ key: format(d, 'yyyy-MM-dd'), date: d });
+      }
+      // monthAnchors[0] = end of current month, monthAnchors[12] = end of month 12 ago.
+
       const valuesAtAnchor = (
         matterSnaps: any[],
         anchorKey: string,

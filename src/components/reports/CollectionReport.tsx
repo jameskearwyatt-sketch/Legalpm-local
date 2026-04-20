@@ -38,7 +38,7 @@ export default function CollectionReport() {
         { header: 'Paid ($)', key: 'paid', format: 'currency' },
         { header: 'Collection Rate', key: 'collectionRate', format: 'percent' },
       ],
-      rows: data,
+      rows: data as unknown as Record<string, unknown>[],
     });
   };
 

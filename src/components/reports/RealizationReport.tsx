@@ -45,7 +45,7 @@ export default function RealizationReport() {
         { header: 'Write-offs ($)', key: 'writeOffs', format: 'currency' },
         { header: 'Realization Rate', key: 'realizationRate', format: 'percent' },
       ],
-      rows: data,
+      rows: data as unknown as Record<string, unknown>[],
     });
   };
 

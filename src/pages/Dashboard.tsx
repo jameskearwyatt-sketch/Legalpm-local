@@ -32,7 +32,8 @@ import {
   ListChecks,
   Trash2,
   Percent,
-  Activity
+  Activity,
+  RefreshCw
 } from 'lucide-react';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import {
@@ -204,16 +205,13 @@ export default function Dashboard() {
     }
   }, [notMyMatterIds, notMyPipelineMatterIds, hasInitializedExclusions]);
 
-  // Calculate master checkbox states for Live matters
-  const myMattersAllIncluded = useMemo(() => {
-    if (myMatterIds.size === 0) return false;
-    return Array.from(myMatterIds).every(id => !excludedMatterIds.includes(id));
-  }, [myMatterIds, excludedMatterIds]);
-
-  const notMyMattersAllIncluded = useMemo(() => {
-    if (notMyMatterIds.size === 0) return false;
-    return Array.from(notMyMatterIds).every(id => !excludedMatterIds.includes(id));
-  }, [notMyMatterIds, excludedMatterIds]);
+  // Master checkbox states are user-controlled only (one-way control).
+  // Toggling a master checkbox includes/excludes all its children, but
+  // toggling individual child matters does NOT change the master state.
+  // Defaults match the initial exclusion behavior: "my matters" included,
+  // "not my matters" excluded.
+  const [myMattersAllIncluded, setMyMattersAllIncluded] = useState(true);
+  const [notMyMattersAllIncluded, setNotMyMattersAllIncluded] = useState(false);
 
   const includedMatterIds = useMemo(() => {
     if (!stats?.liveMatters) return new Set<string>();
@@ -243,6 +241,13 @@ export default function Dashboard() {
       .reduce((sum, m) => sum + (m.bmFeeUsd || 0), 0);
   }, [stats?.liveMatters, excludedMatterIds]);
 
+  const displayedLiveUsed = useMemo(() => {
+    if (!stats?.liveMatters) return 0;
+    return stats.liveMatters
+      .filter(m => !excludedMatterIds.includes(m.id))
+      .reduce((sum, m) => sum + (m.usedUsd || 0), 0);
+  }, [stats?.liveMatters, excludedMatterIds]);
+
   const displayedPipelineBudget = useMemo(() => {
     if (!stats?.pipelineMatters) return 0;
     return stats.pipelineMatters
@@ -267,6 +272,7 @@ export default function Dashboard() {
   };
 
   const handleMyMattersToggle = (checked: boolean) => {
+    setMyMattersAllIncluded(checked);
     if (checked) {
       // Include all my matters (remove from excluded) - both Live and Pipeline
       setExcludedMatterIds(prev => prev.filter(id => !myMatterIds.has(id)));
@@ -287,6 +293,7 @@ export default function Dashboard() {
   };
 
   const handleNotMyMattersToggle = (checked: boolean) => {
+    setNotMyMattersAllIncluded(checked);
     if (checked) {
       // Include all not-my matters (remove from excluded) - both Live and Pipeline
       setExcludedMatterIds(prev => prev.filter(id => !notMyMatterIds.has(id)));
@@ -342,17 +349,25 @@ export default function Dashboard() {
         description: 'The financial snapshots for this date have been removed.',
       });
       
-      // Wipe cached chart data entirely — invalidate alone would render
-      // the stale cache momentarily before the background refetch completes,
-      // leaving graphs showing deleted data on filter combinations the user
-      // hasn't yet revisited.
+      // Wipe cached chart data entirely AND force every mounted observer to
+      // refetch right now. `removeQueries` alone clears the cache but mounted
+      // observers (like this very dashboard query) keep their last-rendered
+      // data until something else triggers a fetch — which is exactly the
+      // "deleted points still appear when toggling matter exclusions" bug.
       queryClient.removeQueries({ queryKey: ['dashboard'] });
       queryClient.removeQueries({ queryKey: ['report-realization'] });
       queryClient.removeQueries({ queryKey: ['report-budget-burn'] });
       queryClient.removeQueries({ queryKey: ['report-wip-movement'] });
       queryClient.removeQueries({ queryKey: ['report-collection'] });
-      queryClient.invalidateQueries({ queryKey: ['snapshots'] });
-      queryClient.invalidateQueries({ queryKey: ['matters'] });
+      queryClient.removeQueries({ queryKey: ['matter'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['report-realization'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['report-budget-burn'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['report-wip-movement'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['report-collection'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['snapshots'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['matters'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['matter'], refetchType: 'all' });
     } catch (error) {
       console.error('Error deleting data point:', error);
       toast({
@@ -527,7 +542,11 @@ export default function Dashboard() {
     }, 50);
   };
 
-  const kpiCards = [
+  const burn3M = stats?.avgMonthlyBurn3M || 0;
+  const burn6M = stats?.avgMonthlyBurn6M || 0;
+  const burn12M = stats?.avgMonthlyBurn12M || 0;
+
+  const primaryKpiCards = [
     {
       title: 'Work in Progress',
       value: formatCurrency(stats?.totalWip || 0, 'USD'),
@@ -557,6 +576,32 @@ export default function Dashboard() {
       variant: 'default' as const,
       tileKey: null,
     },
+    {
+      title: 'Avg Monthly Burn',
+      icon: <Flame className="h-5 w-5" />,
+      variant: 'default' as const,
+      infoTooltip: 'Total gross WIP burn over the last N months, divided by N. Burn = ΔWIP + ΔBilled + ΔWrite-off between the latest snapshot and the snapshot ~N months ago, so billings and write-offs are added back to recover the work actually done. By construction, 12M × 12 ≡ trailing-12M total burn.',
+      valueSlot: (
+        <div className="space-y-0.5 mt-0.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">3M</span>
+            <span className="text-sm sm:text-base font-heading font-bold text-foreground tabular-nums">{formatCurrency(burn3M, 'USD')} / mo</span>
+          </div>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">6M</span>
+            <span className="text-sm sm:text-base font-heading font-bold text-foreground tabular-nums">{formatCurrency(burn6M, 'USD')} / mo</span>
+          </div>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">12M</span>
+            <span className="text-sm sm:text-base font-heading font-bold text-foreground tabular-nums">{formatCurrency(burn12M, 'USD')} / mo</span>
+          </div>
+        </div>
+      ),
+      tileKey: null,
+    },
+  ];
+
+  const secondaryKpiCards = [
     {
       title: 'Total Paid',
       value: formatCurrency(stats?.totalPaid || 0, 'USD'),
@@ -611,6 +656,29 @@ export default function Dashboard() {
             <p className="text-sm sm:text-base text-muted-foreground mt-1">Overview of your legal matter finances</p>
           </div>
           <div className="flex gap-2 sm:gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="sm:h-10 sm:px-4 sm:py-2"
+              onClick={() => {
+                // Hard refresh: drop every cached dashboard/snapshot/matter/report
+                // entry (covers all filter permutations) then force every mounted
+                // observer to refetch immediately. Escape hatch when stale data
+                // lingers despite mutation-driven invalidation.
+                const prefixes = [
+                  ['dashboard'], ['snapshots'], ['matters'], ['matter'],
+                  ['report-realization'], ['report-budget-burn'],
+                  ['report-wip-movement'], ['report-collection'],
+                ];
+                prefixes.forEach((key) => queryClient.removeQueries({ queryKey: key }));
+                prefixes.forEach((key) => queryClient.invalidateQueries({ queryKey: key, refetchType: 'all' }));
+                toast({ title: 'Refreshed', description: 'Reloaded data from the database.' });
+              }}
+              title="Force refresh from database"
+            >
+              <RefreshCw className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
             <Button asChild variant="outline" size="sm" className="sm:h-10 sm:px-4 sm:py-2">
               <Link to="/matters">View All Matters</Link>
             </Button>
@@ -624,9 +692,40 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 gap-2 sm:gap-4">
-          {kpiCards.map((card) => (
+        {/* KPI Cards — Row 1: balances + burn (5 tiles) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
+          {primaryKpiCards.map((card) => (
+            <StatCard
+              key={card.title}
+              title={card.title}
+              value={'value' in card ? card.value : undefined}
+              valueSlot={'valueSlot' in card ? card.valueSlot : undefined}
+              icon={card.icon}
+              variant={card.variant}
+              infoTooltip={'infoTooltip' in card ? card.infoTooltip : undefined}
+              note={
+                'note' in card && card.note
+                  ? (card.note as string)
+                  : 'hasProposalAdjustment' in card && card.hasProposalAdjustment
+                    ? 'Adjusted for WIP proposals'
+                    : undefined
+              }
+              noteVariant={
+                'noteVariant' in card && card.noteVariant
+                  ? (card.noteVariant as 'amber' | 'info' | 'default')
+                  : 'hasProposalAdjustment' in card && card.hasProposalAdjustment
+                    ? 'amber'
+                    : undefined
+              }
+              onClick={card.tileKey ? () => handleTileClick(card.tileKey!) : undefined}
+              isExpanded={card.tileKey ? expandedTile === card.tileKey : false}
+            />
+          ))}
+        </div>
+
+        {/* KPI Cards — Row 2: realization metrics (always visually separate) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 mt-4">
+          {secondaryKpiCards.map((card) => (
             <StatCard
               key={card.title}
               title={card.title}
@@ -634,20 +733,8 @@ export default function Dashboard() {
               icon={card.icon}
               variant={card.variant}
               infoTooltip={'infoTooltip' in card ? card.infoTooltip : undefined}
-              note={
-                'note' in card && card.note
-                  ? card.note
-                  : 'hasProposalAdjustment' in card && card.hasProposalAdjustment
-                    ? 'Adjusted for WIP proposals'
-                    : undefined
-              }
-              noteVariant={
-                'noteVariant' in card && card.noteVariant
-                  ? card.noteVariant
-                  : 'hasProposalAdjustment' in card && card.hasProposalAdjustment
-                    ? 'amber'
-                    : undefined
-              }
+              note={'note' in card ? card.note : undefined}
+              noteVariant={'noteVariant' in card ? card.noteVariant : undefined}
               onClick={card.tileKey ? () => handleTileClick(card.tileKey!) : undefined}
               isExpanded={card.tileKey ? expandedTile === card.tileKey : false}
             />
@@ -805,10 +892,20 @@ export default function Dashboard() {
           <Card className="shadow-card">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-start justify-between">
-                <div className="space-y-1 min-w-0">
+                <div className="space-y-1 min-w-0 flex-1">
                   <p className="text-xs sm:text-sm font-medium text-muted-foreground">Live Matters BM Budget</p>
                   <p className="text-lg sm:text-2xl font-heading font-bold text-foreground truncate">{formatCurrency(displayedLiveBudget, 'USD')}</p>
                   <p className="text-xs text-muted-foreground">{includedLiveCount} live matters</p>
+                  <div className="pt-2 mt-1 border-t border-border/50 grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Used</p>
+                      <p className="text-xs sm:text-sm font-semibold text-foreground tabular-nums truncate">{formatCurrency(displayedLiveUsed, 'USD')}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Remaining</p>
+                      <p className={`text-xs sm:text-sm font-semibold tabular-nums truncate ${(displayedLiveBudget - displayedLiveUsed) < 0 ? 'text-danger' : 'text-foreground'}`}>{formatCurrency(displayedLiveBudget - displayedLiveUsed, 'USD')}</p>
+                    </div>
+                  </div>
                 </div>
                 <div className="p-3 rounded-lg bg-primary/10 text-primary">
                   <Briefcase className="h-5 w-5" />

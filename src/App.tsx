@@ -50,6 +50,22 @@ const queryClient = new QueryClient({
   },
 });
 
+// One-time global cache purge. Existing users carry stale React Query caches
+// (e.g. dashboard aggregates referencing snapshots that were later deleted)
+// across sessions because the cache lives in memory until the tab is closed.
+// Bumping the flag below forces a single `clear()` per browser per deploy so
+// every user gets a clean slate without needing to know about the manual
+// Refresh button. Bump the version string to trigger a future purge.
+const CACHE_PURGE_FLAG = 'cache-purge-v2026-04-20';
+try {
+  if (typeof window !== 'undefined' && !localStorage.getItem(CACHE_PURGE_FLAG)) {
+    queryClient.clear();
+    localStorage.setItem(CACHE_PURGE_FLAG, '1');
+  }
+} catch {
+  // localStorage may be unavailable (private mode, SSR) — purge is best-effort.
+}
+
 function RouteLoader() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">

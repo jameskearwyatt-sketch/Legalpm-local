@@ -1,142 +1,39 @@
 
+The user is right to question this. Let me think through it properly.
 
-# Scope-Aware Pricing Intelligence
+**User's mental model:** trailing-12M total burn ≈ $2.63M. So 12M avg/mo × 12 should ≈ $2.63M, i.e. ~$219K/mo. We're showing ~$190K/mo → ~$2.28M, a ~$350K shortfall.
 
-## Problem
+**Where the gap comes from**
 
-The system cannot distinguish between:
-- A **single DD task** like "Colombian DD (incl land)" (~GBP 15-26k)
-- A **comprehensive DD report** covering dozens of project documents (~GBP 100-287k)
+The current calculation in `useDashboard.ts` walks 13 month-end anchors and for each matter does `endVal − startVal` per month using `wipAtAnchor`-style helpers. The anchor logic uses the **latest snapshot on or before the anchor date**. This drops burn whenever:
 
-Both fall into the "Due Diligence" category. The current matching either finds an exact text match (unlikely for broad items) or falls back to a flat category median (~GBP 17k), which is wildly wrong for a comprehensive report.
+1. **A matter has no snapshot before the 12M start anchor.** A matter onboarded 9 months ago will have `startVal = 0` for its first month-in-window, but its earliest snapshot already contains accumulated WIP/Billed/Paid from before that anchor — so that pre-existing balance is treated as month-1 burn, OR (depending on how the helper handles "no row found") is silently zeroed. Either way, months where `endVal.found === false` are skipped entirely → real burn dropped.
+2. **Months with no snapshot get zero delta**, but the *next* month with a snapshot only captures movement vs the last anchor that *did* find a row — so the missing months' burn collapses into one delta, which is fine in isolation, but combined with (1) and the "skip if not found" guard, multi-month gaps lose burn.
+3. **The trailing-12M total the user is comparing against** is almost certainly computed differently elsewhere (single delta: latest snapshot − snapshot ~12 months ago, per matter). That's a cleaner, gap-tolerant measurement. The monthly-anchor sum will *always* be ≤ that figure when matters have sparse snapshots.
 
-This is not unique to DD -- the same problem exists across categories (e.g., a single security agreement vs. a full security package; a simple legal opinion vs. a multi-jurisdiction opinion covering 10 topics).
+**The fix: make the 12M figure equal `trailing-12M total / 12` by construction**
 
-## Solution: Scope Classification + Complexity-Weighted Percentile Pricing
+Stop summing 12 monthly deltas. Instead, for each window N ∈ {3, 6, 12}:
 
-### Core Idea
+- For each included matter, take **latest snapshot today** and **latest snapshot on-or-before (today − N months)**.
+  - If no pre-window snapshot exists, use the **earliest snapshot in-window** as baseline (matches the previous fix for new matters).
+- Compute `burn = ΔWIP + ΔBilled + ΔWriteOff` (gross, same formula as now — this part is correct).
+- Sum across matters → `windowTotalBurn`.
+- `avg = windowTotalBurn / N`.
 
-Before pricing, classify each item's **scope** using signals already available in the data:
+This guarantees `12M avg × 12 ≡ trailing-12M total burn` (modulo new-matter baseline truncation, which is unavoidable and small). It also matches the user's intuition exactly.
 
-1. **Detail text length** -- a comprehensive DD report will have a 300+ character detail describing all the areas covered; a single task will have a short or empty detail
-2. **Keyword indicators** -- words like "comprehensive", "full", "report", "review of all", "covering", "including" signal broad scope; words like a single country/entity name signal narrow scope
-3. **The item's own work_item label** -- "Due diligence report" (generic/broad) vs. "Colombian DD (incl land)" (specific/narrow)
+**Trade-off the user should know:** this loses month-by-month granularity (we no longer compute per-month figures), but since the tile only ever shows averages, that granularity wasn't being used. The simpler formula is also more robust to sparse snapshots.
 
-Use this to place the item on a **percentile scale within its category**, rather than always using the median.
+**Plan**
 
-### Changes to `suggest-pricing/index.ts`
+1. Replace the 13-anchor monthly-loop in `src/lib/hooks/useDashboard.ts` with a 2-anchor window-delta calc per N ∈ {3, 6, 12}. Keep gross formula (`ΔWIP + ΔBilled + ΔWriteOff`), keep BM-only / USD / matter-exclusion respect, keep the new-matter earliest-in-window baseline fallback.
+2. Update the tile's helper popover text to: "Total WIP burn over the last N months (gross — adds back billings and write-offs), divided by N."
+3. Update `mem://features/dashboard/kpi-config` to record the corrected formula.
 
-**Add scope classification function:**
+**Files**
+- `src/lib/hooks/useDashboard.ts`
+- `src/pages/Dashboard.tsx` (helper text only)
+- `mem://features/dashboard/kpi-config`
 
-```text
-classifyScope(workItem, detail) -> 'narrow' | 'moderate' | 'broad'
-
-Signals for 'broad':
-  - detail length > 250 chars
-  - Keywords in work_item or detail: "report", "comprehensive", "full", 
-    "all project", "covering", "review of all", "package", "suite",
-    "multi", "portfolio"
-  - Generic work_item with no specific entity/country name
-  
-Signals for 'narrow':
-  - detail length < 80 chars or no detail
-  - Specific entity/country in work_item (e.g., "Colombian", "BVI", "Singapore")
-  - Single-topic keywords: specific contract type names
-  
-Default: 'moderate'
-```
-
-**Replace flat category stats with percentile-based pricing:**
-
-Currently when an item has no text match, it falls through to AI with only a category average. Instead:
-
-1. Compute **percentiles** (25th, 50th, 75th, 90th) for each category from historical data
-2. Map scope to percentile:
-   - `narrow` -> 25th percentile
-   - `moderate` -> 50th percentile (median)
-   - `broad` -> 75th-90th percentile
-3. Use this as a **strong anchor** -- either as the direct precedent price (Tier 2) or as explicit guidance to the AI
-
-**Improve AI prompt for remaining unmatched items:**
-
-When items still go to AI, include the scope classification and the percentile range in the prompt so the AI knows where in the range to price:
-
-```text
-Item: "Due diligence report"
-Scope: BROAD (detail covers 15+ topics across multiple document types)
-Category: Due Diligence
-Historical range for Due Diligence: 25th=GBP 15,000, median=GBP 23,000, 75th=GBP 65,000, 90th=GBP 114,000
--> Price this at the 75th-90th percentile given its broad scope.
-```
-
-vs.
-
-```text
-Item: "Corporate DD on BVI entity"  
-Scope: NARROW (single entity, single jurisdiction)
-Category: Due Diligence
--> Price this at the 25th percentile.
-```
-
-**Better category-relevant context for AI:**
-
-Instead of sending `allHistorical.slice(0, 30)` (arbitrary first 30), for each unmatched item send:
-- Top 5 highest-fee items from the same category (so the AI sees the range ceiling)
-- 5 lowest-fee items from the same category (so it sees the floor)
-- The percentile stats
-
-### Changes to `allocate-target-pricing/index.ts`
-
-Apply the same scope classification and percentile-based pricing to the base price generation step (Phase 2). The deterministic scaling in Phase 3 remains unchanged.
-
-### Implementation Detail
-
-**Percentile helper functions:**
-
-```text
-median(values[]) -> number
-percentile(values[], p) -> number  // p = 25, 75, 90
-```
-
-**Scope classifier:**
-
-```text
-function classifyScope(workItem: string, detail: string | null): 'narrow' | 'moderate' | 'broad'
-
-broadIndicators = /\b(report|comprehensive|full|all project|covering|review of all|
-  package|suite|multi|portfolio|across|various|range of|complete|
-  extensive|wide|broad|overall|summary|overview)\b/i
-
-narrowIndicators = specific country/entity names, short detail, 
-  single contract type references
-
-Logic:
-  score = 0
-  if detail length > 250: score += 2
-  if detail length > 150: score += 1  
-  if broadIndicators match in workItem or detail: score += 2
-  if narrowIndicators match: score -= 2
-  if workItem is very generic (< 5 significant words, no proper nouns): score += 1
-  
-  score >= 3 -> 'broad'
-  score <= -1 -> 'narrow'
-  else -> 'moderate'
-```
-
-**Pricing by scope:**
-
-```text
-For Tier 2 (category match, no text match):
-  narrow  -> percentile(categoryFees, 25)
-  moderate -> percentile(categoryFees, 50)  
-  broad   -> percentile(categoryFees, 80)
-```
-
-### Files to Modify
-
-1. **`supabase/functions/suggest-pricing/index.ts`** -- Add `classifyScope()`, `median()`, `percentile()` helpers; replace flat category average with scope-aware percentile pricing; improve AI context with category-relevant items and scope guidance
-2. **`supabase/functions/allocate-target-pricing/index.ts`** -- Same scope classification and percentile logic for base price generation
-
-### What This Achieves
-
-A "Due diligence report" with a long detail covering many topics will be classified as `broad` and priced at the 80th percentile of DD items (~GBP 80-100k+ depending on data), while "Colombian DD (incl land)" will be classified as `narrow` and priced at the 25th percentile (~GBP 15k). This matches the user's intuitive understanding and requires no additional data -- it uses signals already present in the work item label and detail text.
+No UI structure changes. No StatCard changes. The figures will go up — 12M should land at ~$219K/mo if the user's $2.63M reference is accurate.

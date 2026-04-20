@@ -575,10 +575,10 @@ export default function Dashboard() {
       tileKey: null,
     },
     {
-      title: 'Avg Monthly WIP Movement',
+      title: 'Avg Monthly Burn',
       icon: <Flame className="h-5 w-5" />,
       variant: 'default' as const,
-      infoTooltip: 'Shows the average monthly WIP movement over the last 3, 6, and 12 months, based on monthly changes in the latest snapshots. Net of billings and write-offs (snapshot data only).',
+      infoTooltip: 'Average gross WIP incurred per month over the last 3, 6, and 12 months. Calculated as ΔWIP + ΔBilled + ΔWrite-off between month-end snapshots, so billings and write-offs are added back to recover the work actually done. 12M × 12 ≈ trailing-year total burn.',
       valueSlot: (
         <div className="space-y-0.5 mt-0.5">
           <div className="flex items-baseline justify-between gap-2">

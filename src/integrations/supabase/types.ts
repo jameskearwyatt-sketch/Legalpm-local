@@ -1544,12 +1544,14 @@ export type Database = {
           as_of_date: string
           billed_amount: number
           created_at: string
+          created_by: string | null
           id: string
           matter_id: string
           notes: string | null
           paid_amount: number
           update_source: string | null
           updated_at: string
+          updated_by: string | null
           user_id: string
           wip_amount: number
           wip_write_off_amount: number
@@ -1559,12 +1561,14 @@ export type Database = {
           as_of_date: string
           billed_amount?: number
           created_at?: string
+          created_by?: string | null
           id?: string
           matter_id: string
           notes?: string | null
           paid_amount?: number
           update_source?: string | null
           updated_at?: string
+          updated_by?: string | null
           user_id: string
           wip_amount?: number
           wip_write_off_amount?: number
@@ -1574,12 +1578,14 @@ export type Database = {
           as_of_date?: string
           billed_amount?: number
           created_at?: string
+          created_by?: string | null
           id?: string
           matter_id?: string
           notes?: string | null
           paid_amount?: number
           update_source?: string | null
           updated_at?: string
+          updated_by?: string | null
           user_id?: string
           wip_amount?: number
           wip_write_off_amount?: number

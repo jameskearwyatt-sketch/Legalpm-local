@@ -806,23 +806,29 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           const exchangeRate = matterData?.exchangeRate || 1;
           const feeCurrency = matterData?.feeCurrency || 'GBP';
 
-          // matterSnaps are ordered DESC by as_of_date. End = most recent.
-          const endSnap = matterSnaps[0];
+          // matterSnaps are ordered ASC by as_of_date. End = most recent.
+          const endSnap = matterSnaps[matterSnaps.length - 1];
 
           // Find latest snapshot on-or-before the window start.
-          let startSnap = matterSnaps.find(s => s.as_of_date <= startKey);
+          let startSnap: (typeof matterSnaps)[number] | undefined;
+          for (let index = matterSnaps.length - 1; index >= 0; index -= 1) {
+            if (matterSnaps[index].as_of_date <= startKey) {
+              startSnap = matterSnaps[index];
+              break;
+            }
+          }
 
           // If there's no pre-window snapshot, this matter started inside the
           // window. Use its EARLIEST in-window snapshot as the baseline so we
           // measure only the burn that actually occurred during the window —
           // not the accumulated balance the matter brought into the window.
           if (!startSnap) {
-            startSnap = matterSnaps[matterSnaps.length - 1];
+            startSnap = matterSnaps[0];
           }
 
           // If start === end (only one snapshot ever), there's no measurable
           // movement for this matter in the window.
-          if (startSnap === endSnap) return;
+          if (!startSnap || startSnap === endSnap) return;
 
           const deltaWip = (Number(endSnap.wip_amount) || 0) - (Number(startSnap.wip_amount) || 0);
           const deltaBilled = (Number(endSnap.billed_amount) || 0) - (Number(startSnap.billed_amount) || 0);

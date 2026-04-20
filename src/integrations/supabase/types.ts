@@ -2673,6 +2673,7 @@ export type Database = {
           submitted: boolean
           target_close_date: string | null
           updated_at: string
+          updated_by: string | null
           use_manual_budget: boolean
           user_id: string
         }
@@ -2740,6 +2741,7 @@ export type Database = {
           submitted?: boolean
           target_close_date?: string | null
           updated_at?: string
+          updated_by?: string | null
           use_manual_budget?: boolean
           user_id: string
         }
@@ -2807,6 +2809,7 @@ export type Database = {
           submitted?: boolean
           target_close_date?: string | null
           updated_at?: string
+          updated_by?: string | null
           use_manual_budget?: boolean
           user_id?: string
         }

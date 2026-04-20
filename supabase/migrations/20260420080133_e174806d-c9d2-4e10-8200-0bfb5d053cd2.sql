@@ -1,0 +1,1 @@
+ALTER TABLE public.matters ADD COLUMN IF NOT EXISTS updated_by uuid;

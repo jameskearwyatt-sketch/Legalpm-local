@@ -3,11 +3,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { TrendingUp, TrendingDown, Minus, HelpCircle, ChevronDown } from 'lucide-react';
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
 
 interface StatCardProps {
   title: string;
@@ -57,16 +56,24 @@ export function StatCard({ title, value, icon, trend, variant = 'default', class
             <div className="flex items-start gap-1.5">
               <p className="text-xs sm:text-sm font-medium text-muted-foreground leading-tight line-clamp-2">{title}</p>
               {infoTooltip && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 hover:text-muted-foreground cursor-help shrink-0 mt-0.5" />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-xs text-xs">
-                      <p>{infoTooltip}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <Popover>
+                  <PopoverTrigger asChild onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="shrink-0 mt-0.5 rounded-full p-0.5 hover:bg-muted transition-colors"
+                      aria-label="More info"
+                    >
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground/60 hover:text-muted-foreground" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="top"
+                    className="max-w-xs text-xs leading-relaxed"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {infoTooltip}
+                  </PopoverContent>
+                </Popover>
               )}
             </div>
             <p className="text-sm sm:text-base lg:text-lg font-heading font-bold text-foreground tabular-nums break-words leading-tight">{value}</p>

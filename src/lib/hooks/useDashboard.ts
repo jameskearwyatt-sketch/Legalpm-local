@@ -825,7 +825,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
 
       includedLiveMatters.forEach(matter => {
         const matterSnaps = snapshotsByMatter.get(matter.id);
-        if (!matterSnaps || matterSnaps.length < 2) return;
+        if (!matterSnaps || matterSnaps.length === 0) return;
         const mData = matterDataMap.get(matter.id);
         const exchangeRate = mData?.exchangeRate || 1;
         const feeCurrency = mData?.feeCurrency || 'GBP';
@@ -834,14 +834,15 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           const endAnchor = monthAnchors[m];
           const startAnchor = monthAnchors[m + 1];
           const endSnap = findLatestBefore(matterSnaps, endAnchor);
+          if (!endSnap) continue;
           const startSnap = findLatestBefore(matterSnaps, startAnchor);
-          // Need BOTH endpoints to measure genuine burn. Without a prior
-          // snapshot the delta is just the initial balance, not real work.
-          if (!endSnap || !startSnap) continue;
-          if (endSnap === startSnap) continue;
-          const deltaWip = (Number(endSnap.wip_amount) || 0) - (Number(startSnap.wip_amount) || 0);
-          const deltaBilled = (Number(endSnap.billed_amount) || 0) - (Number(startSnap.billed_amount) || 0);
-          const deltaWriteOff = (Number(endSnap.wip_write_off_amount) || 0) - (Number(startSnap.wip_write_off_amount) || 0);
+          if (startSnap && endSnap === startSnap) continue;
+          const startWip = startSnap ? (Number(startSnap.wip_amount) || 0) : 0;
+          const startBilled = startSnap ? (Number(startSnap.billed_amount) || 0) : 0;
+          const startWriteOff = startSnap ? (Number(startSnap.wip_write_off_amount) || 0) : 0;
+          const deltaWip = (Number(endSnap.wip_amount) || 0) - startWip;
+          const deltaBilled = (Number(endSnap.billed_amount) || 0) - startBilled;
+          const deltaWriteOff = (Number(endSnap.wip_write_off_amount) || 0) - startWriteOff;
           const burnNative = deltaWip + deltaBilled + deltaWriteOff;
           monthlyBurnUsd[m] += convertToUsd(burnNative, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
           monthlyMatterCounts[m] += 1;

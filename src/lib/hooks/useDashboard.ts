@@ -774,12 +774,21 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           paid: Math.round(values.paid),
         }));
 
-      // Average monthly WIP movement (USD, BM only). For each of the last 12
-      // calendar months, compute per-matter (latest WIP snapshot ≤ month-end)
-      // − (latest WIP snapshot ≤ previous month-end). Sum across included
-      // matters → that's the month's net WIP movement. Then average the most
-      // recent 3, 6, and 12 months. Net (not gross) because snapshots are the
-      // only source of truth available; billings/write-offs reduce the figure.
+      // Average monthly WIP burn (USD, BM only). "Burn" = WIP *incurred* in
+      // the month, i.e. the gross work done before it gets converted to
+      // billings or written off. Tracking ΔWIP alone understates burn badly
+      // because billing reduces WIP — when work gets billed out, wip_amount
+      // drops, which would cancel out genuine burn from other matters.
+      //
+      // Gross burn per matter per month:
+      //   burn = ΔWIP + ΔBilled + ΔWriteOff
+      //        = (WIP_end − WIP_start)
+      //        + (Billed_end − Billed_start)
+      //        + (WriteOff_end − WriteOff_start)
+      //
+      // Adding back ΔBilled recovers WIP that was converted to bills during
+      // the month; adding back ΔWriteOff recovers WIP that was written off.
+      // Result: 12 × avgMonthlyBurn12M ≈ trailing-year total burn.
       const monthAnchors: { key: string; date: Date }[] = [];
       // Build 13 month-end anchors (current + 12 prior) so we can diff 12 months.
       for (let i = 0; i <= 12; i++) {
@@ -788,17 +797,24 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       }
       // monthAnchors[0] = end of current month, monthAnchors[12] = end of month 12 ago.
 
-      // For each matter, find latest snapshot ≤ each anchor date.
-      const wipAtAnchor = (matterSnaps: any[], anchorKey: string): { wip: number; found: boolean } => {
+      const valuesAtAnchor = (
+        matterSnaps: any[],
+        anchorKey: string,
+      ): { wip: number; billed: number; writeOff: number; found: boolean } => {
         for (const snap of matterSnaps) {
           if (snap.as_of_date <= anchorKey) {
-            return { wip: Number(snap.wip_amount) || 0, found: true };
+            return {
+              wip: Number(snap.wip_amount) || 0,
+              billed: Number(snap.billed_amount) || 0,
+              writeOff: Number(snap.wip_write_off_amount) || 0,
+              found: true,
+            };
           }
         }
-        return { wip: 0, found: false };
+        return { wip: 0, billed: 0, writeOff: 0, found: false };
       };
 
-      // monthlyMovementsUsd[0] = movement in most recent month, [11] = oldest of 12.
+      // monthlyMovementsUsd[0] = burn in most recent month, [11] = oldest of 12.
       const monthlyMovementsUsd: number[] = new Array(12).fill(0);
       includedLiveMatters.forEach(matter => {
         const matterSnaps = snapshotsByMatter.get(matter.id) || [];
@@ -810,14 +826,17 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
         for (let m = 0; m < 12; m++) {
           const endAnchor = monthAnchors[m];     // end of month m-ago
           const startAnchor = monthAnchors[m + 1]; // end of previous month
-          const endVal = wipAtAnchor(matterSnaps, endAnchor.key);
-          const startVal = wipAtAnchor(matterSnaps, startAnchor.key);
-          // Only count a month if we have a snapshot ≤ the end anchor — otherwise
-          // the matter didn't exist yet or had no data for that month.
+          const endVal = valuesAtAnchor(matterSnaps, endAnchor.key);
+          const startVal = valuesAtAnchor(matterSnaps, startAnchor.key);
+          // Only count a month if we have a snapshot ≤ the end anchor —
+          // otherwise the matter didn't exist yet or had no data for the month.
           if (!endVal.found) continue;
-          const deltaNative = endVal.wip - startVal.wip;
-          const deltaUsd = convertToUsd(deltaNative, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-          monthlyMovementsUsd[m] += deltaUsd;
+          const deltaWip = endVal.wip - startVal.wip;
+          const deltaBilled = endVal.billed - startVal.billed;
+          const deltaWriteOff = endVal.writeOff - startVal.writeOff;
+          const burnNative = deltaWip + deltaBilled + deltaWriteOff;
+          const burnUsd = convertToUsd(burnNative, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          monthlyMovementsUsd[m] += burnUsd;
         }
       });
 

@@ -19,6 +19,7 @@ export interface LiveMatter {
   matterName: string;
   clientName: string;
   bmFeeUsd: number;
+  usedUsd: number;
 }
 
 export interface PipelineMatter {

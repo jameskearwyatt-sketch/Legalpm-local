@@ -118,7 +118,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
   const { user } = useAuth();
 
   return useQuery({
-    queryKey: ['dashboard', user?.id, excludedMatterIds.sort().join(','), excludedPipelineMatterIds.sort().join(','), nearBudgetPct, wipWarning, poorCollectionPct, staleDaysThreshold],
+    queryKey: ['dashboard', user?.id, [...excludedMatterIds].sort().join(','), [...excludedPipelineMatterIds].sort().join(','), nearBudgetPct, wipWarning, poorCollectionPct, staleDaysThreshold],
     queryFn: async () => {
       // Fetch exchange rates for GBP to USD conversion
       const { data: ratesData } = await supabase.functions.invoke('fetch-exchange-rates');
@@ -770,11 +770,7 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       const sortedEntries = Array.from(trendByDate.entries())
         .sort(([dateA], [dateB]) => dateA.localeCompare(dateB));
 
-      const maxMatterCount = Math.max(...sortedEntries.map(([, values]) => values.matterCount), 1);
-      const minMatterThreshold = Math.max(Math.floor(maxMatterCount * 0.5), 1);
-
       const sortedTrendData: TrendDataPoint[] = sortedEntries
-        .filter(([, values]) => values.matterCount >= minMatterThreshold)
         .map(([dateStr, values]) => ({
           date: format(parseISO(dateStr), 'MMM d'),
           rawDate: dateStr,

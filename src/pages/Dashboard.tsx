@@ -695,7 +695,7 @@ export default function Dashboard() {
               }
               noteVariant={
                 'noteVariant' in card && card.noteVariant
-                  ? card.noteVariant
+                  ? (card.noteVariant as 'amber' | 'info' | 'default')
                   : 'hasProposalAdjustment' in card && card.hasProposalAdjustment
                     ? 'amber'
                     : undefined

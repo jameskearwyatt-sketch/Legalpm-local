@@ -67,6 +67,9 @@ export interface DashboardStats {
   hasActiveWipProposals: boolean;
   matterBreakdowns: MatterBreakdown[];
   writeOffsByMatter: MatterWriteOff[];
+  avgMonthlyBurn3M: number;
+  avgMonthlyBurn6M: number;
+  avgMonthlyBurn12M: number;
 }
 
 export interface Alert {
@@ -195,6 +198,9 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           hasActiveWipProposals: false,
           matterBreakdowns: [],
           writeOffsByMatter: [],
+          avgMonthlyBurn3M: 0,
+          avgMonthlyBurn6M: 0,
+          avgMonthlyBurn12M: 0,
         } as DashboardStats;
       }
 
@@ -768,7 +774,60 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           paid: Math.round(values.paid),
         }));
 
+      // Rolling average monthly burn (USD, BM only — matches existing dashboard
+      // snapshot scope which already excludes LC). Burn for a window = sum
+      // across included matters of (latest snapshot in [now] − latest snapshot
+      // at or before windowStart) for WIP+Billed+Paid; divided by N months.
+      // Matters with no prior-baseline snapshot are treated as having a zero
+      // baseline so newly-onboarded work still contributes to burn.
+      const computeRollingBurn = (months: number): number => {
+        const windowStart = new Date(today);
+        windowStart.setMonth(windowStart.getMonth() - months);
+        const windowStartKey = format(windowStart, 'yyyy-MM-dd');
+        const todayKey = format(today, 'yyyy-MM-dd');
+
+        let totalBurnUsd = 0;
+        includedLiveMatters.forEach(matter => {
+          const matterSnaps = snapshotsByMatter.get(matter.id) || [];
+          if (matterSnaps.length === 0) return;
+          const matterData = matterDataMap.get(matter.id);
+          const exchangeRate = matterData?.exchangeRate || 1;
+          const feeCurrency = matterData?.feeCurrency || 'GBP';
+
+          let latestInWindow: any = null;
+          let baseline: any = null;
+          for (const snap of matterSnaps) {
+            if (snap.as_of_date <= windowStartKey) {
+              baseline = snap;
+            }
+            if (snap.as_of_date <= todayKey) {
+              latestInWindow = snap;
+            }
+          }
+          if (!latestInWindow) return;
+
+          const sumNative = (s: any) =>
+            (Number(s?.wip_amount) || 0) +
+            (Number(s?.billed_amount) || 0) +
+            (Number(s?.paid_amount) || 0);
+
+          const latestUsd = convertToUsd(sumNative(latestInWindow), feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          const baselineUsd = baseline ? convertToUsd(sumNative(baseline), feeCurrency, exchangeRate, gbpToUsdRate, liveRates) : 0;
+          const delta = latestUsd - baselineUsd;
+          if (delta > 0) totalBurnUsd += delta;
+        });
+
+        return totalBurnUsd / months;
+      };
+
+      const avgMonthlyBurn3M = computeRollingBurn(3);
+      const avgMonthlyBurn6M = computeRollingBurn(6);
+      const avgMonthlyBurn12M = computeRollingBurn(12);
+
       return {
+        avgMonthlyBurn3M,
+        avgMonthlyBurn6M,
+        avgMonthlyBurn12M,
         totalBudget: totalBmFeesUsd,
         totalWip: totalWipUsd,
         totalBilled: totalBilledUsd,

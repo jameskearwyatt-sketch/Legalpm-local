@@ -32,7 +32,7 @@ export default function BudgetBurnReport() {
         { header: 'Burn %', key: 'burnPercent', format: 'percent' },
         { header: 'Matters', key: 'matterCount' },
       ],
-      rows: data,
+      rows: data as unknown as Record<string, unknown>[],
     });
   };
 

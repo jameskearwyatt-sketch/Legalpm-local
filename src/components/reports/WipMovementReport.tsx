@@ -32,7 +32,7 @@ export default function WipMovementReport() {
         { header: 'Closing WIP ($)', key: 'closingWip', format: 'currency' },
         { header: 'Delta ($)', key: 'delta', format: 'currency' },
       ],
-      rows: data,
+      rows: data as unknown as Record<string, unknown>[],
     });
   };
 

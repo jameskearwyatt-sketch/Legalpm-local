@@ -25,18 +25,18 @@ function formatDelta(prev: number, next: number): string {
 async function fetchSnapshotEvents(matterId: string): Promise<TimelineEvent[]> {
   const { data, error } = await supabase
     .from('financial_snapshots')
-    .select('id, as_of_date, created_by, wip_amount, billed_amount, accounts_receivable, paid_amount, wip_write_off_amount, created_at, update_source')
+    .select('id, as_of_date, user_id, wip_amount, billed_amount, accounts_receivable, paid_amount, wip_write_off_amount, created_at, update_source')
     .eq('matter_id', matterId)
     .order('as_of_date', { ascending: false })
     .limit(50);
 
   if (error || !data) return [];
 
-  return data.map((s: Record<string, unknown>) => ({
+  return (data as unknown as Record<string, unknown>[]).map((s) => ({
     id: `snapshot-${s.id}`,
     type: 'snapshot' as const,
     date: (s.created_at as string) || (s.as_of_date as string),
-    userId: (s.created_by as string) || null,
+    userId: (s.user_id as string) || null,
     title: `Financial snapshot ${s.update_source === 'bulk' ? '(bulk import)' : 'updated'}`,
     description: `WIP: ${formatCurrency(s.wip_amount as number)}, Billed: ${formatCurrency(s.billed_amount as number)}, AR: ${formatCurrency(s.accounts_receivable as number)}, Paid: ${formatCurrency(s.paid_amount as number)}`,
     metadata: {
@@ -55,14 +55,14 @@ async function fetchSnapshotEvents(matterId: string): Promise<TimelineEvent[]> {
 async function fetchBudgetAmendmentEvents(matterId: string): Promise<TimelineEvent[]> {
   const { data, error } = await supabase
     .from('budget_amendments')
-    .select('id, amendment_date, created_by, previous_budget, new_budget, previous_bm_fee, new_bm_fee, previous_local_counsel, new_local_counsel, notes, created_at')
+    .select('id, amendment_date, user_id, previous_budget, new_budget, previous_bm_fee, new_bm_fee, previous_local_counsel, new_local_counsel, notes, created_at')
     .eq('matter_id', matterId)
     .order('created_at', { ascending: false })
     .limit(50);
 
   if (error || !data) return [];
 
-  return data.map((a: Record<string, unknown>) => {
+  return (data as unknown as Record<string, unknown>[]).map((a) => {
     const parts: string[] = [];
     if (a.previous_budget !== a.new_budget)
       parts.push(`Budget: ${formatDelta(a.previous_budget as number, a.new_budget as number)}`);
@@ -75,7 +75,7 @@ async function fetchBudgetAmendmentEvents(matterId: string): Promise<TimelineEve
       id: `amendment-${a.id}`,
       type: 'budget_amendment' as const,
       date: (a.created_at as string) || (a.amendment_date as string),
-      userId: (a.created_by as string) || null,
+      userId: (a.user_id as string) || null,
       title: 'Budget amended',
       description: parts.join('; ') + (a.notes ? ` \u2014 ${a.notes}` : ''),
       metadata: {
@@ -184,15 +184,15 @@ export function useGlobalActivity(limit = 50) {
         (async () => {
           const { data } = await supabase
             .from('financial_snapshots')
-            .select('id, matter_id, as_of_date, created_by, wip_amount, billed_amount, accounts_receivable, paid_amount, wip_write_off_amount, created_at, update_source')
+            .select('id, matter_id, as_of_date, user_id, wip_amount, billed_amount, accounts_receivable, paid_amount, wip_write_off_amount, created_at, update_source')
             .gte('created_at', cutoff)
             .order('created_at', { ascending: false })
             .limit(100);
-          return (data || []).map((s: Record<string, unknown>) => ({
+          return ((data || []) as unknown as Record<string, unknown>[]).map((s) => ({
             id: `snapshot-${s.id}`,
             type: 'snapshot' as const,
             date: (s.created_at as string) || (s.as_of_date as string),
-            userId: (s.created_by as string) || null,
+            userId: (s.user_id as string) || null,
             title: `Financial snapshot ${s.update_source === 'bulk' ? '(bulk import)' : 'updated'}`,
             description: `WIP: ${formatCurrency(s.wip_amount as number)}, Billed: ${formatCurrency(s.billed_amount as number)}`,
             metadata: { matterId: s.matter_id, asOfDate: s.as_of_date, updateSource: s.update_source },
@@ -201,15 +201,15 @@ export function useGlobalActivity(limit = 50) {
         (async () => {
           const { data } = await supabase
             .from('budget_amendments')
-            .select('id, matter_id, amendment_date, created_by, previous_budget, new_budget, notes, created_at')
+            .select('id, matter_id, amendment_date, user_id, previous_budget, new_budget, notes, created_at')
             .gte('created_at', cutoff)
             .order('created_at', { ascending: false })
             .limit(100);
-          return (data || []).map((a: Record<string, unknown>) => ({
+          return ((data || []) as unknown as Record<string, unknown>[]).map((a) => ({
             id: `amendment-${a.id}`,
             type: 'budget_amendment' as const,
             date: (a.created_at as string) || (a.amendment_date as string),
-            userId: (a.created_by as string) || null,
+            userId: (a.user_id as string) || null,
             title: 'Budget amended',
             description: `Budget: ${formatDelta(a.previous_budget as number, a.new_budget as number)}${a.notes ? ` \u2014 ${a.notes}` : ''}`,
             metadata: { matterId: a.matter_id },

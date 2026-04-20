@@ -261,34 +261,47 @@ serve(async (req) => {
       const arrayBuffer = await file.arrayBuffer();
       const base64Content = toBase64(arrayBuffer);
 
-      const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          messages: [
-            { role: "system", content: "Extract all text from this PDF document. Return only the raw text." },
-            { 
-              role: "user", 
-              content: [
-                { type: "file", file: { filename: file.name, file_data: `data:application/pdf;base64,${base64Content}` } },
-                { type: "text", text: "Extract all text content from this PDF." }
-              ]
-            }
-          ],
-        }),
-      });
+      // Retry with exponential backoff to handle transient gateway 502/503/504s
+      const maxAttempts = 4;
+      let response: Response | null = null;
+      let lastErrText = '';
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash",
+            messages: [
+              { role: "system", content: "Extract all text from this PDF document. Return only the raw text." },
+              { 
+                role: "user", 
+                content: [
+                  { type: "file", file: { filename: file.name, file_data: `data:application/pdf;base64,${base64Content}` } },
+                  { type: "text", text: "Extract all text content from this PDF." }
+                ]
+              }
+            ],
+          }),
+        });
 
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error('AI error:', response.status, errText);
-        throw new Error(`PDF extraction failed: ${response.status}`);
+        if (response.ok) break;
+
+        lastErrText = await response.text();
+        const isTransient = response.status === 502 || response.status === 503 || response.status === 504 || response.status === 429;
+        console.error(`AI error (attempt ${attempt}/${maxAttempts}):`, response.status, lastErrText.slice(0, 200));
+
+        if (!isTransient || attempt === maxAttempts) {
+          throw new Error(`PDF extraction failed: ${response.status}${isTransient ? ' (gateway temporarily unavailable, please retry in a moment)' : ''}`);
+        }
+
+        // Exponential backoff: 1s, 2s, 4s
+        await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, attempt - 1)));
       }
 
-      const data = await response.json();
+      const data = await response!.json();
       extractedText = data.choices?.[0]?.message?.content || '';
       console.log('PDF extracted via AI, length:', extractedText.length);
     } 

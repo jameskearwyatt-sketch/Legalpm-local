@@ -774,68 +774,62 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           paid: Math.round(values.paid),
         }));
 
-      // Rolling average monthly burn (USD, BM only — matches existing dashboard
-      // snapshot scope which already excludes LC). Burn for a window = sum
-      // across included matters of (latest snapshot in [now] − latest snapshot
-      // at or before windowStart) for WIP+Billed+Paid; divided by N months.
-      // Matters with no prior-baseline snapshot are treated as having a zero
-      // baseline so newly-onboarded work still contributes to burn.
-      const computeRollingBurn = (months: number): number => {
-        const windowStart = new Date(today);
-        windowStart.setMonth(windowStart.getMonth() - months);
-        const windowStartKey = format(windowStart, 'yyyy-MM-dd');
-        const todayKey = format(today, 'yyyy-MM-dd');
+      // Average monthly WIP movement (USD, BM only). For each of the last 12
+      // calendar months, compute per-matter (latest WIP snapshot ≤ month-end)
+      // − (latest WIP snapshot ≤ previous month-end). Sum across included
+      // matters → that's the month's net WIP movement. Then average the most
+      // recent 3, 6, and 12 months. Net (not gross) because snapshots are the
+      // only source of truth available; billings/write-offs reduce the figure.
+      const monthAnchors: { key: string; date: Date }[] = [];
+      // Build 13 month-end anchors (current + 12 prior) so we can diff 12 months.
+      for (let i = 0; i <= 12; i++) {
+        const d = new Date(today.getFullYear(), today.getMonth() - i + 1, 0); // last day of month (today - i)
+        monthAnchors.push({ key: format(d, 'yyyy-MM-dd'), date: d });
+      }
+      // monthAnchors[0] = end of current month, monthAnchors[12] = end of month 12 ago.
 
-        let totalBurnUsd = 0;
-        includedLiveMatters.forEach(matter => {
-          const matterSnaps = snapshotsByMatter.get(matter.id) || [];
-          if (matterSnaps.length === 0) return;
-          const matterData = matterDataMap.get(matter.id);
-          const exchangeRate = matterData?.exchangeRate || 1;
-          const feeCurrency = matterData?.feeCurrency || 'GBP';
-
-          // matterSnaps is ordered DESC by as_of_date.
-          // latestInWindow = most recent snapshot at/before today.
-          // baseline = latest snapshot at/before windowStart, OR (if the matter
-          // didn't exist yet) the EARLIEST snapshot inside the window. The
-          // earliest-in-window fallback prevents overstating burn for newly
-          // onboarded matters — we only count growth that happened within the
-          // window, not the matter's entire historic value.
-          let latestInWindow: any = null;
-          let baseline: any = null;
-          let earliestInWindow: any = null;
-          for (const snap of matterSnaps) {
-            if (snap.as_of_date <= todayKey && !latestInWindow) {
-              latestInWindow = snap;
-            }
-            if (snap.as_of_date <= windowStartKey) {
-              baseline = snap;
-              break; // snaps are DESC; first one ≤ windowStart is the latest baseline
-            }
-            if (snap.as_of_date > windowStartKey && snap.as_of_date <= todayKey) {
-              earliestInWindow = snap; // keep overwriting; last assignment wins = earliest (DESC order)
-            }
+      // For each matter, find latest snapshot ≤ each anchor date.
+      const wipAtAnchor = (matterSnaps: any[], anchorKey: string): { wip: number; found: boolean } => {
+        for (const snap of matterSnaps) {
+          if (snap.as_of_date <= anchorKey) {
+            return { wip: Number(snap.wip_amount) || 0, found: true };
           }
-          if (!latestInWindow) return;
-          const baselineSnap = baseline || earliestInWindow;
-
-          const sumNative = (s: any) =>
-            (Number(s?.wip_amount) || 0) +
-            (Number(s?.billed_amount) || 0) +
-            (Number(s?.paid_amount) || 0);
-
-          const latestUsd = convertToUsd(sumNative(latestInWindow), feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
-          const baselineUsd = baselineSnap ? convertToUsd(sumNative(baselineSnap), feeCurrency, exchangeRate, gbpToUsdRate, liveRates) : 0;
-          const delta = latestUsd - baselineUsd;
-          if (delta > 0) totalBurnUsd += delta;
-        });
-
-        return totalBurnUsd / months;
+        }
+        return { wip: 0, found: false };
       };
 
-      const avgMonthlyBurn3M = computeRollingBurn(3);
-      const avgMonthlyBurn6M = computeRollingBurn(6);
-      const avgMonthlyBurn12M = computeRollingBurn(12);
+      // monthlyMovementsUsd[0] = movement in most recent month, [11] = oldest of 12.
+      const monthlyMovementsUsd: number[] = new Array(12).fill(0);
+      includedLiveMatters.forEach(matter => {
+        const matterSnaps = snapshotsByMatter.get(matter.id) || [];
+        if (matterSnaps.length === 0) return;
+        const matterData = matterDataMap.get(matter.id);
+        const exchangeRate = matterData?.exchangeRate || 1;
+        const feeCurrency = matterData?.feeCurrency || 'GBP';
+
+        for (let m = 0; m < 12; m++) {
+          const endAnchor = monthAnchors[m];     // end of month m-ago
+          const startAnchor = monthAnchors[m + 1]; // end of previous month
+          const endVal = wipAtAnchor(matterSnaps, endAnchor.key);
+          const startVal = wipAtAnchor(matterSnaps, startAnchor.key);
+          // Only count a month if we have a snapshot ≤ the end anchor — otherwise
+          // the matter didn't exist yet or had no data for that month.
+          if (!endVal.found) continue;
+          const deltaNative = endVal.wip - startVal.wip;
+          const deltaUsd = convertToUsd(deltaNative, feeCurrency, exchangeRate, gbpToUsdRate, liveRates);
+          monthlyMovementsUsd[m] += deltaUsd;
+        }
+      });
+
+      const avgOfFirstN = (n: number): number => {
+        let sum = 0;
+        for (let i = 0; i < n; i++) sum += monthlyMovementsUsd[i] || 0;
+        return sum / n;
+      };
+
+      const avgMonthlyBurn3M = avgOfFirstN(3);
+      const avgMonthlyBurn6M = avgOfFirstN(6);
+      const avgMonthlyBurn12M = avgOfFirstN(12);
 
       return {
         avgMonthlyBurn3M,

@@ -575,12 +575,26 @@ export default function Dashboard() {
       tileKey: null,
     },
     {
-      title: 'Avg Monthly Burn (3M)',
-      value: `${formatCurrency(burn3M, 'USD')} / mo`,
+      title: 'Avg Monthly WIP Movement',
       icon: <Flame className="h-5 w-5" />,
       variant: 'default' as const,
-      infoTooltip: 'Average monthly burn over the trailing 3, 6, and 12 months. For each window, we sum (latest snapshot − snapshot at window start) of WIP + Billed + Paid across included matters (BM only, USD), then divide by the number of months. Helps you track work volume and progress against monthly targets.',
-      note: `6M: ${formatCurrency(burn6M, 'USD')} / mo  ·  12M: ${formatCurrency(burn12M, 'USD')} / mo`,
+      infoTooltip: 'Shows the average monthly WIP movement over the last 3, 6, and 12 months, based on monthly changes in the latest snapshots. Net of billings and write-offs (snapshot data only).',
+      valueSlot: (
+        <div className="space-y-0.5 mt-0.5">
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">3M</span>
+            <span className="text-sm sm:text-base font-heading font-bold text-foreground tabular-nums">{formatCurrency(burn3M, 'USD')} / mo</span>
+          </div>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">6M</span>
+            <span className="text-sm sm:text-base font-heading font-bold text-foreground tabular-nums">{formatCurrency(burn6M, 'USD')} / mo</span>
+          </div>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="text-xs font-medium text-muted-foreground">12M</span>
+            <span className="text-sm sm:text-base font-heading font-bold text-foreground tabular-nums">{formatCurrency(burn12M, 'USD')} / mo</span>
+          </div>
+        </div>
+      ),
       tileKey: null,
     },
   ];
@@ -682,13 +696,14 @@ export default function Dashboard() {
             <StatCard
               key={card.title}
               title={card.title}
-              value={card.value}
+              value={'value' in card ? card.value : undefined}
+              valueSlot={'valueSlot' in card ? card.valueSlot : undefined}
               icon={card.icon}
               variant={card.variant}
               infoTooltip={'infoTooltip' in card ? card.infoTooltip : undefined}
               note={
                 'note' in card && card.note
-                  ? card.note
+                  ? (card.note as string)
                   : 'hasProposalAdjustment' in card && card.hasProposalAdjustment
                     ? 'Adjusted for WIP proposals'
                     : undefined

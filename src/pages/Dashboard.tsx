@@ -703,7 +703,7 @@ export default function Dashboard() {
               infoTooltip={'infoTooltip' in card ? card.infoTooltip : undefined}
               note={
                 'note' in card && card.note
-                  ? card.note
+                  ? (card.note as string)
                   : 'hasProposalAdjustment' in card && card.hasProposalAdjustment
                     ? 'Adjusted for WIP proposals'
                     : undefined

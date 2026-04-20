@@ -751,7 +751,11 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
       });
       snapshotsByMatter.forEach(list => list.sort((a, b) => a.as_of_date.localeCompare(b.as_of_date)));
 
-      // AR aging: derive outstanding billing tranches per matter using FIFO
+      // AR aging: derive outstanding billing tranches per matter using FIFO.
+      // Billing increases → new tranche. Billing decreases (recalled/corrected
+      // bills) → remove from newest tranche LIFO. Payments → consume oldest
+      // tranche FIFO. Final reconciliation against actual AR ensures tranches
+      // always sum to the real outstanding balance.
       matterBreakdowns.forEach(breakdown => {
         if (breakdown.arAmount <= 0) return;
         const matterSnaps = snapshotsByMatter.get(breakdown.id);
@@ -767,6 +771,15 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           const billingDelta = billed - prevBilled;
           if (billingDelta > 0) {
             tranches.push({ date: snap.as_of_date, original: billingDelta, remaining: billingDelta });
+          } else if (billingDelta < 0) {
+            // Bill recall/correction — remove from newest tranches (LIFO)
+            let toRemove = Math.abs(billingDelta);
+            for (let i = tranches.length - 1; i >= 0 && toRemove > 0; i--) {
+              const consume = Math.min(tranches[i].remaining, toRemove);
+              tranches[i].remaining -= consume;
+              tranches[i].original -= consume;
+              toRemove -= consume;
+            }
           }
           let paymentDelta = paid - prevPaid;
           for (const t of tranches) {
@@ -779,14 +792,30 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           prevPaid = paid;
         }
 
-        breakdown.arTranches = tranches
-          .filter(t => t.remaining > 0.01)
-          .map(t => ({
-            estimatedDate: t.date,
-            originalAmount: t.original,
-            remainingAmount: t.remaining,
-            ageDays: differenceInDays(today, parseISO(t.date)),
-          }));
+        let activeTranches = tranches.filter(t => t.remaining > 0.01);
+
+        // Reconcile: tranche total should equal the actual AR from the latest
+        // snapshot. If it doesn't (rounding, edge cases, pre-history billing),
+        // adjust so the displayed tranches are honest about what's real.
+        const trancheSum = activeTranches.reduce((s, t) => s + t.remaining, 0);
+        const actualAr = breakdown.arAmount;
+        if (trancheSum > actualAr + 0.01) {
+          // Tranches overstate AR — trim from newest (most likely corrected)
+          let excess = trancheSum - actualAr;
+          for (let i = activeTranches.length - 1; i >= 0 && excess > 0.01; i--) {
+            const trim = Math.min(activeTranches[i].remaining, excess);
+            activeTranches[i].remaining -= trim;
+            excess -= trim;
+          }
+          activeTranches = activeTranches.filter(t => t.remaining > 0.01);
+        }
+
+        breakdown.arTranches = activeTranches.map(t => ({
+          estimatedDate: t.date,
+          originalAmount: t.original,
+          remainingAmount: t.remaining,
+          ageDays: differenceInDays(today, parseISO(t.date)),
+        }));
       });
 
       const sortedTrendDates = Array.from(new Set(

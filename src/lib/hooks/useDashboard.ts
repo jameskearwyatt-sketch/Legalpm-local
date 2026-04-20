@@ -198,6 +198,9 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
           hasActiveWipProposals: false,
           matterBreakdowns: [],
           writeOffsByMatter: [],
+          avgMonthlyBurn3M: 0,
+          avgMonthlyBurn6M: 0,
+          avgMonthlyBurn12M: 0,
         } as DashboardStats;
       }
 

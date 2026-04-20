@@ -1,28 +1,18 @@
 
-The user is right. The `refreshAllChartAndListCaches` only fires on snapshot create/update/delete mutations. Since they've already deleted the Sweden datapoints, the dashboard's stale cache (built before my fix shipped) is sitting there permanently — no mutation will trigger the new invalidation logic.
+Approved with addition: 3M, 6M, and 12M rolling averages.
 
-Also visible in the network requests: `write_off_events` table returns 404 ("Could not find the table 'public.write_off_events'") — the delete logic in `useSnapshots.ts` references a table that doesn't exist. This is unrelated to the current bug but worth noting.
+**1. New tile: "Avg Monthly Burn (Rolling)"**
+- Position: directly after "Total Billed".
+- Shows three figures: 3M, 6M, 12M avg/month (BM only, USD, excludes LC).
+- Calculation in `useDashboard.ts`: for each window, sum (latest snapshot in window − latest snapshot before window) per included matter for WIP+Billed+Paid, divide by N months.
+- StatCard: main value = 3M figure, `note` shows 6M and 12M stacked (e.g. "6M: $X / mo · 12M: $Y / mo"), tooltip explains the calculation.
 
-The fix: force a one-time global cache purge so the user can recover without manual browser refresh, and harden the dashboard so stale caches can't silently persist across sessions.
-
-## Plan
-
-**1. Add a manual "Refresh data" button on the Dashboard**
-- Small refresh icon button in the dashboard header (next to the existing controls).
-- On click: calls `queryClient.removeQueries()` for `['dashboard']`, `['snapshots']`, `['matters']`, `['matter']`, `['report-*']`, then `invalidateQueries({ refetchType: 'all' })` for the same. Toasts "Refreshed".
-- This gives the user an escape hatch any time they suspect stale data — not just for this Sweden case.
-
-**2. Reduce dashboard query staleness**
-- In `useDashboard.ts`, set `staleTime: 0` and `refetchOnMount: 'always'` (matching what `useSnapshots` already does).
-- Effect: every time the user navigates to the dashboard, it refetches from the database. No more session-long stale cache.
-- Trade-off: one extra fetch per dashboard visit. Acceptable given how often this bug bites.
-
-**3. One-time auto-purge on app load**
-- In `App.tsx` (or `main.tsx`), on first mount after this deploy, call `queryClient.clear()` once (gated by a localStorage flag like `cache-purge-v2026-04-20`).
-- Guarantees every existing user gets a clean slate the next time they load the app — no need for them to know about the new button.
+**2. Force row break before Total Paid**
+- Row 1 grid: WIP, Total AR, Total Locked Up, Total Billed, Avg Monthly Burn (5 tiles)
+- Row 2 grid: Total Paid, Realization Rate, Collection Rate (3 tiles)
+- Two separate `<div className="grid ...">` wrappers with `mt-4` between, so the groups never mix regardless of viewport width.
 
 ## Files
-
-- `src/pages/Dashboard.tsx` — add refresh button in header
-- `src/lib/hooks/useDashboard.ts` — `staleTime: 0`, `refetchOnMount: 'always'`
-- `src/App.tsx` — one-time `queryClient.clear()` gated by localStorage flag
+- `src/lib/hooks/useDashboard.ts` — add `avgMonthlyBurn3M`, `avgMonthlyBurn6M`, `avgMonthlyBurn12M`
+- `src/pages/Dashboard.tsx` — split KPI grid; insert new tile after Total Billed
+- `mem://features/dashboard/kpi-config` — update layout (5+3) and new tile spec

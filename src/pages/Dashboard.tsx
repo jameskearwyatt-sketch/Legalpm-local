@@ -32,7 +32,8 @@ import {
   ListChecks,
   Trash2,
   Percent,
-  RefreshCw
+  RefreshCw,
+  Flame
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import {

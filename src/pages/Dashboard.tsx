@@ -677,9 +677,9 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7 gap-2 sm:gap-4">
-          {kpiCards.map((card) => (
+        {/* KPI Cards — Row 1: balances + burn (5 tiles) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
+          {primaryKpiCards.map((card) => (
             <StatCard
               key={card.title}
               title={card.title}
@@ -701,6 +701,24 @@ export default function Dashboard() {
                     ? 'amber'
                     : undefined
               }
+              onClick={card.tileKey ? () => handleTileClick(card.tileKey!) : undefined}
+              isExpanded={card.tileKey ? expandedTile === card.tileKey : false}
+            />
+          ))}
+        </div>
+
+        {/* KPI Cards — Row 2: realization metrics (always visually separate) */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 mt-4">
+          {secondaryKpiCards.map((card) => (
+            <StatCard
+              key={card.title}
+              title={card.title}
+              value={card.value}
+              icon={card.icon}
+              variant={card.variant}
+              infoTooltip={'infoTooltip' in card ? card.infoTooltip : undefined}
+              note={'note' in card ? card.note : undefined}
+              noteVariant={'noteVariant' in card ? card.noteVariant : undefined}
               onClick={card.tileKey ? () => handleTileClick(card.tileKey!) : undefined}
               isExpanded={card.tileKey ? expandedTile === card.tileKey : false}
             />

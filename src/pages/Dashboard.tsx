@@ -31,7 +31,8 @@ import {
   CalendarClock,
   ListChecks,
   Trash2,
-  Percent
+  Percent,
+  RefreshCw
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import {
@@ -622,6 +623,29 @@ export default function Dashboard() {
             <p className="text-sm sm:text-base text-muted-foreground mt-1">Overview of your legal matter finances</p>
           </div>
           <div className="flex gap-2 sm:gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              className="sm:h-10 sm:px-4 sm:py-2"
+              onClick={() => {
+                // Hard refresh: drop every cached dashboard/snapshot/matter/report
+                // entry (covers all filter permutations) then force every mounted
+                // observer to refetch immediately. Escape hatch when stale data
+                // lingers despite mutation-driven invalidation.
+                const prefixes = [
+                  ['dashboard'], ['snapshots'], ['matters'], ['matter'],
+                  ['report-realization'], ['report-budget-burn'],
+                  ['report-wip-movement'], ['report-collection'],
+                ];
+                prefixes.forEach((key) => queryClient.removeQueries({ queryKey: key }));
+                prefixes.forEach((key) => queryClient.invalidateQueries({ queryKey: key, refetchType: 'all' }));
+                toast({ title: 'Refreshed', description: 'Reloaded data from the database.' });
+              }}
+              title="Force refresh from database"
+            >
+              <RefreshCw className="h-4 w-4 sm:mr-2" />
+              <span className="hidden sm:inline">Refresh</span>
+            </Button>
             <Button asChild variant="outline" size="sm" className="sm:h-10 sm:px-4 sm:py-2">
               <Link to="/matters">View All Matters</Link>
             </Button>

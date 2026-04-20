@@ -555,7 +555,7 @@ Return ONLY valid JSON:
     };
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 min timeout
+    const timeoutId = setTimeout(() => controller.abort(), 600000);
 
     let response;
     try {

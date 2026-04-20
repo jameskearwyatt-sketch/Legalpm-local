@@ -257,7 +257,7 @@ export function CarbonUploadAnalysis({ onAnalysisComplete }: CarbonUploadAnalysi
 
       const callAnalyzeApi = async (retryCount = 0): Promise<Response> => {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 300000);
+        const timeoutId = setTimeout(() => controller.abort(), 600000);
         const { data: sd2 } = await supabase.auth.getSession();
         try {
           const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-carbon-credit`, {

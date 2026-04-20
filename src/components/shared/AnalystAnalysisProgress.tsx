@@ -76,9 +76,7 @@ const DEFAULT_PHASES: Record<AnalystProgressPhase, PhaseConfig> = {
   analyze: {
     status: 'Running AI analysis…',
     target: 85,
-    // Most analyses complete in ~30–60s; target the bar to look lively
-    // across the full window without ever reaching 100% prematurely.
-    expectedMs: 60000,
+    expectedMs: 180000,
     narrative: [
       'Reading the agreement end-to-end',
       'Extracting positions category-by-category',
@@ -134,7 +132,7 @@ export function AnalystAnalysisProgress({
   narrative,
   elapsedMs,
   statusOverride,
-  footerNote = 'Large contracts can take 1–2 minutes. Feel free to keep this tab open in the background.',
+  footerNote = 'Complex contracts can take up to 5 minutes. Feel free to keep this tab open in the background.',
   onCancel,
 }: Props) {
   const status = statusOverride ?? DEFAULT_PHASES[phase].status;

@@ -237,6 +237,13 @@ export default function Dashboard() {
       .reduce((sum, m) => sum + (m.bmFeeUsd || 0), 0);
   }, [stats?.liveMatters, excludedMatterIds]);
 
+  const displayedLiveUsed = useMemo(() => {
+    if (!stats?.liveMatters) return 0;
+    return stats.liveMatters
+      .filter(m => !excludedMatterIds.includes(m.id))
+      .reduce((sum, m) => sum + (m.usedUsd || 0), 0);
+  }, [stats?.liveMatters, excludedMatterIds]);
+
   const displayedPipelineBudget = useMemo(() => {
     if (!stats?.pipelineMatters) return 0;
     return stats.pipelineMatters

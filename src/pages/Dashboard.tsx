@@ -201,16 +201,13 @@ export default function Dashboard() {
     }
   }, [notMyMatterIds, notMyPipelineMatterIds, hasInitializedExclusions]);
 
-  // Calculate master checkbox states for Live matters
-  const myMattersAllIncluded = useMemo(() => {
-    if (myMatterIds.size === 0) return false;
-    return Array.from(myMatterIds).every(id => !excludedMatterIds.includes(id));
-  }, [myMatterIds, excludedMatterIds]);
-
-  const notMyMattersAllIncluded = useMemo(() => {
-    if (notMyMatterIds.size === 0) return false;
-    return Array.from(notMyMatterIds).every(id => !excludedMatterIds.includes(id));
-  }, [notMyMatterIds, excludedMatterIds]);
+  // Master checkbox states are user-controlled only (one-way control).
+  // Toggling a master checkbox includes/excludes all its children, but
+  // toggling individual child matters does NOT change the master state.
+  // Defaults match the initial exclusion behavior: "my matters" included,
+  // "not my matters" excluded.
+  const [myMattersAllIncluded, setMyMattersAllIncluded] = useState(true);
+  const [notMyMattersAllIncluded, setNotMyMattersAllIncluded] = useState(false);
 
   const includedMatterIds = useMemo(() => {
     if (!stats?.liveMatters) return new Set<string>();
@@ -264,6 +261,7 @@ export default function Dashboard() {
   };
 
   const handleMyMattersToggle = (checked: boolean) => {
+    setMyMattersAllIncluded(checked);
     if (checked) {
       // Include all my matters (remove from excluded) - both Live and Pipeline
       setExcludedMatterIds(prev => prev.filter(id => !myMatterIds.has(id)));
@@ -284,6 +282,7 @@ export default function Dashboard() {
   };
 
   const handleNotMyMattersToggle = (checked: boolean) => {
+    setNotMyMattersAllIncluded(checked);
     if (checked) {
       // Include all not-my matters (remove from excluded) - both Live and Pipeline
       setExcludedMatterIds(prev => prev.filter(id => !notMyMatterIds.has(id)));

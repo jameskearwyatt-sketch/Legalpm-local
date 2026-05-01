@@ -37,6 +37,7 @@ import {
   Activity,
   History,
   BarChart3,
+  Award,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import NotificationBell from '@/components/layout/NotificationBell';
@@ -96,6 +97,7 @@ const navigation: NavEntry[] = [
   { name: 'Contacts', href: '/contacts', icon: Users },
   { name: 'BM EMI Expertise Map', href: '/bm-expertise', icon: Network },
   { name: 'Growth', href: '/growth', icon: Rocket },
+  { name: 'Credentials', href: '/credentials', icon: Award },
   { name: 'Time Recording', href: '/time-recording', icon: Clock },
   { name: 'Reports', href: '/reports', icon: BarChart3 },
   { name: 'Flags', href: '/flags', icon: Flag },

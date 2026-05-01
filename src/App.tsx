@@ -15,6 +15,7 @@ const Matters = lazy(() => import("./pages/Matters"));
 const MatterDetail = lazy(() => import("./pages/MatterDetail"));
 const MatterForm = lazy(() => import("./pages/MatterForm"));
 const Growth = lazy(() => import("./pages/Growth"));
+const Credentials = lazy(() => import("./pages/Credentials"));
 const GrowthProjectDetail = lazy(() => import("./pages/GrowthProjectDetail"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Reports = lazy(() => import("./pages/Reports"));
@@ -141,6 +142,7 @@ function AppRoutes() {
         <Route path="/cloud-compute-analyst" element={<ProtectedRoute><CloudComputeAnalyst /></ProtectedRoute>} />
         <Route path="/growth" element={<ProtectedRoute><Growth /></ProtectedRoute>} />
         <Route path="/growth/:projectId" element={<ProtectedRoute><GrowthProjectDetail /></ProtectedRoute>} />
+        <Route path="/credentials" element={<ProtectedRoute><Credentials /></ProtectedRoute>} />
         <Route path="/flags" element={<ProtectedRoute><Flags /></ProtectedRoute>} />
         <Route path="/red-flags" element={<Navigate to="/flags" replace />} />
         <Route path="/pipeline-flags" element={<Navigate to="/flags" replace />} />

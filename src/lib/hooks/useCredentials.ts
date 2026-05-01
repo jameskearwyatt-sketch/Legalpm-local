@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -142,8 +143,7 @@ export function useCredentials(filters?: CredentialFilters) {
       let query = supabase
         .from('deal_credentials' as never)
         .select('*')
-        .order('year_completed', { ascending: false } as never)
-        .order('created_at', { ascending: false } as never);
+        .order('created_at' as never, { ascending: false });
 
       if (filters?.dealType) {
         query = query.eq('deal_type', filters.dealType);
@@ -272,29 +272,40 @@ export function useCredentials(filters?: CredentialFilters) {
     mutationFn: async () => {
       const { data: matters, error: mattersError } = await supabase
         .from('matters')
-        .select('id, matter_name, client_id, practice_area, jurisdictions, deal_value, deal_currency, lead_partner, start_date, target_close_date, category, status, clients (name)')
+        .select(`
+          *,
+          clients (id, name)
+        `)
         .in('category', ['Live', 'Closed']);
       if (mattersError) throw mattersError;
       if (!matters || matters.length === 0) return 0;
 
       const { data: existing, error: existingError } = await supabase
         .from('deal_credentials' as never)
-        .select('matter_id')
-        .eq('is_auto_generated' as never, true as never);
+        .select('matter_id');
       if (existingError) throw existingError;
 
       const linkedMatterIds = new Set(
-        ((existing || []) as unknown as { matter_id: string }[])
+        ((existing || []) as unknown as { matter_id: string | null }[])
           .map(e => e.matter_id)
-          .filter(Boolean)
+          .filter((id): id is string => !!id)
       );
 
       const newMatters = matters.filter(m => !linkedMatterIds.has(m.id));
       if (newMatters.length === 0) return 0;
 
       const rows = newMatters.map(m => {
-        const clientName = (m.clients as { name: string } | null)?.name || 'Unknown Client';
-        const status: 'Active' | 'Completed' = m.category === 'Closed' ? 'Completed' : 'Active';
+        const clientsData = m.clients as unknown;
+        let clientName = 'Unknown Client';
+        if (clientsData && typeof clientsData === 'object') {
+          if (Array.isArray(clientsData) && clientsData.length > 0) {
+            clientName = clientsData[0].name || 'Unknown Client';
+          } else if ('name' in (clientsData as Record<string, unknown>)) {
+            clientName = (clientsData as { name: string }).name || 'Unknown Client';
+          }
+        }
+
+        const credStatus: 'Active' | 'Completed' = m.category === 'Closed' ? 'Completed' : 'Active';
         const yearCompleted = m.target_close_date
           ? new Date(m.target_close_date).getFullYear()
           : (m.category === 'Closed' ? new Date().getFullYear() : null);
@@ -312,7 +323,7 @@ export function useCredentials(filters?: CredentialFilters) {
           start_date: m.start_date,
           completion_date: m.target_close_date,
           year_completed: yearCompleted,
-          status,
+          status: credStatus,
           is_auto_generated: true,
           created_by: user!.id,
           updated_by: user!.id,
@@ -341,55 +352,25 @@ export function useCredentials(filters?: CredentialFilters) {
     },
   });
 
-  const usedSectors = useQuery({
-    queryKey: ['credentials-sectors', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('deal_credentials' as never)
-        .select('sector');
-      if (error) throw error;
-      const sectors = new Set<string>();
-      ((data || []) as unknown as { sector: string | null }[]).forEach(row => {
-        if (row.sector) sectors.add(row.sector);
-      });
-      SECTOR_PRESETS.forEach(s => sectors.add(s));
-      return [...sectors].sort();
-    },
-    enabled: !!user,
-  });
+  const allSectorsComputed = useMemo(() => {
+    const sectors = new Set<string>(SECTOR_PRESETS);
+    (credentialsQuery.data || []).forEach(c => { if (c.sector) sectors.add(c.sector); });
+    return [...sectors].sort();
+  }, [credentialsQuery.data]);
 
-  const usedDealTypes = useQuery({
-    queryKey: ['credentials-deal-types', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('deal_credentials' as never)
-        .select('deal_type');
-      if (error) throw error;
-      const types = new Set<string>();
-      ((data || []) as unknown as { deal_type: string | null }[]).forEach(row => {
-        if (row.deal_type) types.add(row.deal_type);
-      });
-      DEAL_TYPE_PRESETS.forEach(t => types.add(t));
-      return [...types].sort();
-    },
-    enabled: !!user,
-  });
+  const allDealTypesComputed = useMemo(() => {
+    const types = new Set<string>(DEAL_TYPE_PRESETS);
+    (credentialsQuery.data || []).forEach(c => { if (c.deal_type) types.add(c.deal_type); });
+    return [...types].sort();
+  }, [credentialsQuery.data]);
 
-  const usedJurisdictions = useQuery({
-    queryKey: ['credentials-jurisdictions', user?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('deal_credentials' as never)
-        .select('jurisdictions');
-      if (error) throw error;
-      const jurisdictions = new Set<string>();
-      ((data || []) as unknown as { jurisdictions: string[] | null }[]).forEach(row => {
-        if (row.jurisdictions) row.jurisdictions.forEach(j => jurisdictions.add(j));
-      });
-      return [...jurisdictions].sort();
-    },
-    enabled: !!user,
-  });
+  const allJurisdictionsComputed = useMemo(() => {
+    const jurisdictions = new Set<string>();
+    (credentialsQuery.data || []).forEach(c => {
+      if (c.jurisdictions) c.jurisdictions.forEach(j => jurisdictions.add(j));
+    });
+    return [...jurisdictions].sort();
+  }, [credentialsQuery.data]);
 
   return {
     credentials: credentialsQuery.data || [],
@@ -400,8 +381,8 @@ export function useCredentials(filters?: CredentialFilters) {
     deleteCredential,
     bulkCreateCredentials,
     syncFromMatters,
-    allSectors: usedSectors.data || SECTOR_PRESETS,
-    allDealTypes: usedDealTypes.data || DEAL_TYPE_PRESETS,
-    allJurisdictions: usedJurisdictions.data || [],
+    allSectors: allSectorsComputed,
+    allDealTypes: allDealTypesComputed,
+    allJurisdictions: allJurisdictionsComputed,
   };
 }

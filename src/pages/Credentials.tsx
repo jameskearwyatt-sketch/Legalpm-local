@@ -47,6 +47,15 @@ const Credentials = () => {
     bulkCreateCredentials, syncFromMatters, allSectors, allDealTypes, allJurisdictions,
   } = useCredentials(activeFilters);
 
+  const sortedCredentials = useMemo(() =>
+    [...credentials].sort((a, b) => {
+      const yearA = a.year_completed ?? 0;
+      const yearB = b.year_completed ?? 0;
+      if (yearB !== yearA) return yearB - yearA;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }),
+  [credentials]);
+
   const stats = useMemo(() => ({
     total: credentials.length,
     active: credentials.filter(c => c.status === 'Active').length,
@@ -101,7 +110,7 @@ const Credentials = () => {
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <Upload className="h-4 w-4 mr-1" /> Import
             </Button>
-            <ExportCredentialsButton credentials={credentials} />
+            <ExportCredentialsButton credentials={sortedCredentials} />
             <Button size="sm" onClick={() => { setEditingCredential(null); setFormOpen(true); }}>
               <Plus className="h-4 w-4 mr-1" /> Add Credential
             </Button>
@@ -212,14 +221,14 @@ const Credentials = () => {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-lg">
-              {credentials.length} Credential{credentials.length !== 1 ? 's' : ''}
+              {sortedCredentials.length} Credential{sortedCredentials.length !== 1 ? 's' : ''}
               {hasActiveFilters && <span className="text-sm font-normal text-muted-foreground ml-2">(filtered)</span>}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
               <div className="flex items-center justify-center py-12 text-muted-foreground">Loading credentials...</div>
-            ) : credentials.length === 0 ? (
+            ) : sortedCredentials.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Award className="h-12 w-12 mx-auto mb-3 opacity-30" />
                 <p className="text-lg font-medium">No credentials yet</p>
@@ -243,7 +252,7 @@ const Credentials = () => {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {credentials.map(cred => (
+                    {sortedCredentials.map(cred => (
                       <TableRow key={cred.id}>
                         <TableCell>
                           <div className="font-medium text-sm">{cred.deal_name}</div>

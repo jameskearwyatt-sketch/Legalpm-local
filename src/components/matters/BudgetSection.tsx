@@ -380,30 +380,13 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     if (isPDF || isWord) {
       setIsUploadingFile(true);
       try {
-        const formData = new FormData();
-        formData.append('file', file);
+        const { data: result, error: invokeError } = await supabase.functions.invoke('parse-document-text', {
+          body: { file },
+        });
 
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData?.session?.access_token;
+        if (invokeError) throw invokeError;
 
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-document-text`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-            body: formData,
-          }
-        );
-
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to parse document');
-        }
-
-        const result = await response.json();
-        if (result.text) {
+        if (result?.text) {
           setImportText(result.text);
           setImportTab('paste');
           toast.success('Document parsed. Review the extracted text and click Import.');

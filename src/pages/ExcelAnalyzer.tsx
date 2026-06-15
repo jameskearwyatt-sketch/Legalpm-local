@@ -49,22 +49,13 @@ export default function ExcelAnalyzer() {
     setFileName(file.name);
     
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      const { data: result, error } = await supabase.functions.invoke('parse-excel', {
+        body: { file },
+      });
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-excel`,
-        {
-          method: 'POST',
-          body: formData,
-        }
-      );
+      if (error) throw error;
+      if (!result) throw new Error('No data returned');
 
-      if (!response.ok) {
-        throw new Error('Failed to parse Excel file');
-      }
-
-      const result = await response.json();
       setAnalysis(result);
       setRawJson(JSON.stringify(result, null, 2));
       toast({ title: "File parsed successfully", description: `Found ${result.sheetNames.length} sheets` });

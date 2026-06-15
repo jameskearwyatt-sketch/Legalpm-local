@@ -150,31 +150,14 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
     if (fileName.endsWith('.pdf') || fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
       setIsUploadingFile(true);
       try {
-        const formData = new FormData();
-        formData.append('file', file);
+        const { data: response, error: invokeError } = await supabase.functions.invoke('parse-document-text', {
+          body: { file },
+        });
 
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData?.session?.access_token;
+        if (invokeError) throw invokeError;
 
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-document-text`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-            },
-            body: formData,
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          throw new Error(errorData.error || `Failed to extract text (${response.status})`);
-        }
-
-        const data = await response.json();
-        if (data.text) {
-          setImportText(data.text);
+        if (response?.text) {
+          setImportText(response.text);
           setImportTab('paste');
           toast.success('Document text extracted successfully');
         } else {

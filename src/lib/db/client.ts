@@ -1,4 +1,5 @@
 import { getDb } from './pglite';
+import { localStorage as localFileStorage } from './fileStorage';
 
 const LOCAL_USER_ID = 'local-user-00000000-0000-0000-0000-000000000000';
 
@@ -759,6 +760,7 @@ export const db = {
   },
   auth: localAuth,
   functions: localFunctions,
+  storage: localFileStorage,
   rpc: async (name: string, params?: Record<string, unknown>) => {
     const pgDb = await getDb();
     const paramNames = params ? Object.keys(params) : [];

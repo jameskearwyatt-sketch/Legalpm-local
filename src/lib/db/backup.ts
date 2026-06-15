@@ -1,4 +1,5 @@
 import { exportDatabase, importDatabase, resetDb } from './pglite';
+import { clearFileStorage } from './fileStorage';
 import { format } from 'date-fns';
 
 export async function downloadBackup(): Promise<void> {
@@ -20,6 +21,7 @@ export async function restoreFromBackup(file: File | Blob): Promise<void> {
 
 export async function clearAllData(): Promise<void> {
   await resetDb();
+  await clearFileStorage();
   window.location.reload();
 }
 

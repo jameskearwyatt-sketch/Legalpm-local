@@ -3,16 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  FolderOpen, 
-  Upload, 
-  FileText, 
-  Loader2, 
-  Sparkles, 
+import {
+  FolderOpen,
+  Upload,
+  FileText,
+  Loader2,
   ExternalLink,
   Trash2,
   Eye,
-  RefreshCw
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -75,9 +73,6 @@ export const DocumentRepository = ({
   const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number } | null>(null);
   const [showUpload, setShowUpload] = useState(false);
   const [title, setTitle] = useState('');
-  const [askSummarize, setAskSummarize] = useState(false);
-  const [pendingDocuments, setPendingDocuments] = useState<{ id: string; url: string; name: string }[]>([]);
-  const [summarizingId, setSummarizingId] = useState<string | null>(null);
   const [viewingSummary, setViewingSummary] = useState<GrowthDocument | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -87,14 +82,14 @@ export const DocumentRepository = ({
 
     setIsUploading(true);
     setUploadProgress({ current: 0, total: files.length });
-    
-    const uploadedDocs: { id: string; url: string; name: string }[] = [];
-    
+
+    let uploadedCount = 0;
+
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
         setUploadProgress({ current: i + 1, total: files.length });
-        
+
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}-${i}.${fileExt}`;
         const filePath = `${user.id}/${projectId}/documents/${fileName}`;
@@ -108,17 +103,15 @@ export const DocumentRepository = ({
           continue;
         }
 
-        // For multiple files, use individual file names as titles
         const docTitle = files.length === 1 && title.trim() ? title.trim() : file.name;
 
-        // Insert document record with the file path (not public URL since bucket is private)
-        const { data: docData, error: insertError } = await supabase
+        const { error: insertError } = await supabase
           .from('growth_project_documents')
           .insert({
             project_id: projectId,
             user_id: user.id,
             title: docTitle,
-            file_url: filePath, // Store the path, not public URL
+            file_url: filePath,
             file_name: file.name,
             file_type: file.type,
           })
@@ -130,26 +123,16 @@ export const DocumentRepository = ({
           continue;
         }
 
-        // Generate a signed URL for immediate use
-        const { data: signedData } = await supabase.storage
-          .from('growth-files')
-          .createSignedUrl(filePath, 3600); // 1 hour expiry
-
-        uploadedDocs.push({ id: docData.id, url: signedData?.signedUrl || filePath, name: file.name });
+        uploadedCount++;
       }
 
       onDocumentAdded();
       setShowUpload(false);
       setTitle('');
-      
-      // Ask if user wants AI summaries for uploaded docs
-      if (uploadedDocs.length > 0) {
-        setPendingDocuments(uploadedDocs);
-        setAskSummarize(true);
+
+      if (uploadedCount > 0) {
+        toast.success(`Uploaded ${uploadedCount} document${uploadedCount > 1 ? 's' : ''}`);
       }
-      
-      toast.success(`Uploaded ${uploadedDocs.length} document${uploadedDocs.length > 1 ? 's' : ''}`);
-      
     } catch (error: any) {
       toast.error('Failed to upload documents: ' + error.message);
     } finally {
@@ -161,71 +144,12 @@ export const DocumentRepository = ({
     }
   };
 
-  // Helper to get a signed URL for a file path
-  const getSignedUrl = async (filePath: string): Promise<string | null> => {
-    // If it's already a full URL (legacy), return as-is
-    if (filePath.startsWith('http')) {
-      return filePath;
-    }
+  const getFileUrl = async (filePath: string): Promise<string | null> => {
+    if (filePath.startsWith('http')) return filePath;
     const { data } = await supabase.storage
       .from('growth-files')
-      .createSignedUrl(filePath, 3600); // 1 hour expiry
+      .createSignedUrl(filePath, 3600);
     return data?.signedUrl || null;
-  };
-
-  const handleGenerateSummary = async (docId: string, docUrl: string, docName: string) => {
-    setSummarizingId(docId);
-    try {
-      // Get a signed URL if needed
-      const signedUrl = await getSignedUrl(docUrl);
-      if (!signedUrl) {
-        toast.error('Failed to access document');
-        setSummarizingId(null);
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('summarize-document', {
-        body: {
-          documentUrl: signedUrl,
-          fileName: docName,
-          projectName,
-          projectType,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.summary) {
-        // Update the document with the summary
-        const { error: updateError } = await supabase
-          .from('growth_project_documents')
-          .update({
-            ai_summary: data.summary,
-            summary_generated_at: new Date().toISOString(),
-          })
-          .eq('id', docId);
-
-        if (updateError) throw updateError;
-
-        onSummaryGenerated(docId, data.summary);
-        toast.success('Summary generated!');
-      } else if (data?.error) {
-        toast.error(data.error);
-      }
-    } catch (error: any) {
-      console.error('Summary error:', error);
-      toast.error('Failed to generate summary');
-    } finally {
-      setSummarizingId(null);
-    }
-  };
-
-  const handleSummarizeAll = async () => {
-    for (const doc of pendingDocuments) {
-      await handleGenerateSummary(doc.id, doc.url, doc.name);
-    }
-    setAskSummarize(false);
-    setPendingDocuments([]);
   };
 
   const handleDelete = async (docId: string) => {
@@ -236,7 +160,7 @@ export const DocumentRepository = ({
         .eq('id', docId);
 
       if (error) throw error;
-      
+
       onDocumentDeleted(docId);
       toast.success('Document deleted');
     } catch (error: any) {
@@ -257,7 +181,7 @@ export const DocumentRepository = ({
             Upload
           </Button>
         </div>
-        <CardDescription>Reference documents for this project</CardDescription>
+        <CardDescription>Reference documents for this project (stored locally)</CardDescription>
       </CardHeader>
       <CardContent>
         {showUpload && (
@@ -267,7 +191,7 @@ export const DocumentRepository = ({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
             />
-            <div 
+            <div
               className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-accent/50 transition-colors"
               onClick={() => fileInputRef.current?.click()}
             >
@@ -318,10 +242,9 @@ export const DocumentRepository = ({
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-1">
-                  {/* AI Summary Button */}
-                  {doc.ai_summary ? (
+                  {doc.ai_summary && (
                     <Button
                       variant="ghost"
                       size="icon"
@@ -331,39 +254,16 @@ export const DocumentRepository = ({
                     >
                       <Eye className="h-4 w-4 text-yellow-500" />
                     </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={async () => {
-                        const signedUrl = await getSignedUrl(doc.file_url);
-                        if (signedUrl) {
-                          handleGenerateSummary(doc.id, signedUrl, doc.file_name);
-                        } else {
-                          toast.error('Failed to access document');
-                        }
-                      }}
-                      disabled={summarizingId === doc.id}
-                      title="Generate AI Summary"
-                    >
-                      {summarizingId === doc.id ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Sparkles className="h-4 w-4" />
-                      )}
-                    </Button>
                   )}
-                  
-                  {/* Open Document */}
+
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
                     onClick={async () => {
-                      const signedUrl = await getSignedUrl(doc.file_url);
-                      if (signedUrl) {
-                        window.open(signedUrl, '_blank');
+                      const url = await getFileUrl(doc.file_url);
+                      if (url) {
+                        window.open(url, '_blank');
                       } else {
                         toast.error('Failed to access document');
                       }
@@ -372,8 +272,7 @@ export const DocumentRepository = ({
                   >
                     <ExternalLink className="h-4 w-4" />
                   </Button>
-                  
-                  {/* Delete */}
+
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button
@@ -394,7 +293,7 @@ export const DocumentRepository = ({
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction 
+                        <AlertDialogAction
                           onClick={() => handleDelete(doc.id)}
                           className="bg-destructive text-destructive-foreground"
                         >
@@ -406,7 +305,7 @@ export const DocumentRepository = ({
                 </div>
               </div>
             ))}
-            
+
             {documents.length === 0 && !showUpload && (
               <p className="text-center text-muted-foreground py-8">
                 No documents yet. Upload reference materials for your project.
@@ -416,63 +315,11 @@ export const DocumentRepository = ({
         </ScrollArea>
       </CardContent>
 
-      {/* Ask to Summarize Dialog */}
-      <Dialog open={askSummarize} onOpenChange={setAskSummarize}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-yellow-500" />
-              Generate AI {pendingDocuments.length > 1 ? 'Summaries' : 'Summary'}?
-            </DialogTitle>
-            <DialogDescription>
-              {pendingDocuments.length > 1 
-                ? `Would you like me to generate AI summaries for ${pendingDocuments.length} documents? This can help you quickly understand the key points.`
-                : 'Would you like me to generate an AI summary of this document? This can help you quickly understand the key points.'
-              }
-            </DialogDescription>
-          </DialogHeader>
-          {pendingDocuments.length > 1 && (
-            <div className="text-sm text-muted-foreground max-h-32 overflow-auto">
-              {pendingDocuments.map((doc, i) => (
-                <div key={doc.id} className="truncate">• {doc.name}</div>
-              ))}
-            </div>
-          )}
-          <div className="flex justify-end gap-2 mt-4">
-            <Button 
-              variant="outline" 
-              onClick={() => { setAskSummarize(false); setPendingDocuments([]); }}
-            >
-              No, thanks
-            </Button>
-            <Button 
-              onClick={handleSummarizeAll}
-              disabled={summarizingId !== null}
-            >
-              {summarizingId ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Yes, summarize{pendingDocuments.length > 1 ? ' all' : ''}
-                </>
-              )}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
       {/* View Summary Dialog */}
       <Dialog open={!!viewingSummary} onOpenChange={() => setViewingSummary(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-yellow-500" />
-              AI Summary
-            </DialogTitle>
+            <DialogTitle>AI Summary</DialogTitle>
             <DialogDescription>
               {viewingSummary?.title}
             </DialogDescription>
@@ -480,32 +327,11 @@ export const DocumentRepository = ({
           <div className="mt-2 p-4 bg-muted/50 rounded-lg">
             <p className="text-sm leading-relaxed">{viewingSummary?.ai_summary}</p>
           </div>
-          <div className="flex items-center justify-between mt-2">
-            {viewingSummary?.summary_generated_at && (
-              <p className="text-xs text-muted-foreground">
-                Generated on {format(new Date(viewingSummary.summary_generated_at), 'MMM d, yyyy h:mm a')}
-              </p>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                if (viewingSummary) {
-                  const signedUrl = await getSignedUrl(viewingSummary.file_url);
-                  if (signedUrl) {
-                    handleGenerateSummary(viewingSummary.id, signedUrl, viewingSummary.file_name);
-                  } else {
-                    toast.error('Failed to access document');
-                  }
-                  setViewingSummary(null);
-                }
-              }}
-              disabled={summarizingId !== null}
-            >
-              <RefreshCw className="h-4 w-4 mr-1" />
-              Re-run Analysis
-            </Button>
-          </div>
+          {viewingSummary?.summary_generated_at && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Generated on {format(new Date(viewingSummary.summary_generated_at), 'MMM d, yyyy h:mm a')}
+            </p>
+          )}
         </DialogContent>
       </Dialog>
     </Card>

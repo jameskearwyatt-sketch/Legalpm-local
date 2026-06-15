@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, FileText, Loader2, Sparkles } from 'lucide-react';
+import { Upload, FileText, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { toast } from 'sonner';
@@ -16,16 +16,12 @@ interface AddEntryFormProps {
   onCancel: () => void;
 }
 
-// Supported file types for text extraction
-const EXTRACTABLE_TYPES = ['.pdf', '.docx', '.txt', '.md'];
-
 export const AddEntryForm = ({ projectId, onAdd, onCancel }: AddEntryFormProps) => {
   const { user } = useAuth();
   const [entryType, setEntryType] = useState<'note' | 'file'>('note');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [isUploading, setIsUploading] = useState(false);
-  const [isExtracting, setIsExtracting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmitNote = () => {
@@ -37,92 +33,36 @@ export const AddEntryForm = ({ projectId, onAdd, onCancel }: AddEntryFormProps) 
     });
   };
 
-  // Extract text from a file for AI analysis
-  const extractTextFromFile = async (file: File): Promise<string | null> => {
-    const fileName = file.name.toLowerCase();
-    const isExtractable = EXTRACTABLE_TYPES.some(ext => fileName.endsWith(ext));
-    
-    if (!isExtractable) {
-      return null; // Skip extraction for images and other non-text files
-    }
-
-    try {
-      setIsExtracting(true);
-      
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/parse-document-text`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Text extraction failed:', errorData);
-        return null;
-      }
-
-      const data = await response.json();
-      return data.text || null;
-    } catch (error) {
-      console.error('Error extracting text from file:', error);
-      return null;
-    } finally {
-      setIsExtracting(false);
-    }
-  };
-
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
     setIsUploading(true);
     try {
-      // First, try to extract text from the file for AI analysis
-      const extractedText = await extractTextFromFile(file);
-      
-      // Then upload the file to storage
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `${user.id}/${projectId}/${fileName}`;
 
-      const { data, error } = await supabase.storage
+      const { error } = await supabase.storage
         .from('growth-files')
         .upload(filePath, file);
 
       if (error) throw error;
 
-      // Store the file path and extracted content
-      // The content field will trigger AI task extraction just like a pasted note
       onAdd({
         entry_type: 'file',
         title: title.trim() || file.name,
         file_url: filePath,
         file_name: file.name,
-        content: extractedText || undefined, // Include extracted text for AI analysis
       });
 
-      if (extractedText) {
-        toast.success('File uploaded - analyzing for tasks...');
-      }
+      toast.success('File uploaded');
     } catch (error: any) {
       toast.error('Failed to upload file: ' + error.message);
     } finally {
       setIsUploading(false);
     }
   };
-
-  const isProcessing = isUploading || isExtracting;
 
   return (
     <div className="border rounded-lg p-4 space-y-4 bg-muted/30 mb-4">
@@ -176,32 +116,21 @@ export const AddEntryForm = ({ projectId, onAdd, onCancel }: AddEntryFormProps) 
               onChange={(e) => setTitle(e.target.value)}
             />
           </div>
-          <div 
+          <div
             className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-accent/50 transition-colors"
-            onClick={() => !isProcessing && fileInputRef.current?.click()}
+            onClick={() => !isUploading && fileInputRef.current?.click()}
           >
-            {isProcessing ? (
+            {isUploading ? (
               <div className="flex flex-col items-center gap-2">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  {isExtracting ? (
-                    <span className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-yellow-500" />
-                      Extracting text for AI analysis...
-                    </span>
-                  ) : (
-                    'Uploading...'
-                  )}
-                </p>
+                <p className="text-sm text-muted-foreground">Uploading...</p>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-2">
                 <Upload className="h-8 w-8 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground">
-                  Click to upload a file
-                </p>
+                <p className="text-sm text-muted-foreground">Click to upload a file</p>
                 <p className="text-xs text-muted-foreground">
-                  PDFs, Word docs, text files will be analyzed for tasks
+                  Files are stored locally in your browser
                 </p>
               </div>
             )}
@@ -211,11 +140,11 @@ export const AddEntryForm = ({ projectId, onAdd, onCancel }: AddEntryFormProps) 
               className="hidden"
               onChange={handleFileUpload}
               accept=".pdf,.doc,.docx,.txt,.md,.png,.jpg,.jpeg"
-              disabled={isProcessing}
+              disabled={isUploading}
             />
           </div>
           <div className="flex gap-2 justify-end">
-            <Button variant="ghost" size="sm" onClick={onCancel} disabled={isProcessing}>Cancel</Button>
+            <Button variant="ghost" size="sm" onClick={onCancel} disabled={isUploading}>Cancel</Button>
           </div>
         </TabsContent>
       </Tabs>

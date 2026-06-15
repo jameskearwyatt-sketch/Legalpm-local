@@ -5,7 +5,10 @@ import path from "path";
 function securityHeadersPlugin(): Plugin {
   const csp = [
     "default-src 'self'",
-    "script-src 'self'",
+    // PGlite runs PostgreSQL as WebAssembly in the browser; WASM compilation
+    // requires 'wasm-unsafe-eval'. Without it the database never starts and all
+    // data screens hang on a loading spinner.
+    "script-src 'self' 'wasm-unsafe-eval'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",

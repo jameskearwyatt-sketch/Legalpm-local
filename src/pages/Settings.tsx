@@ -1,16 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import AppLayout from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
-import { Fingerprint, Loader2, Trash2, Smartphone, Bell, Save } from 'lucide-react';
+import { Fingerprint, Loader2, Trash2, Smartphone, Bell, Save, Download, Upload, AlertTriangle, HardDrive } from 'lucide-react';
 import { useWebAuthn } from '@/lib/hooks/useWebAuthn';
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { downloadBackup, restoreFromBackup, clearAllData, getStorageEstimate, formatBytes } from '@/lib/db/backup';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface Passkey {
   id: string;
@@ -331,7 +336,147 @@ export default function Settings() {
           </Card>
         )}
 
+        <DataStorageCard />
+
       </div>
     </AppLayout>
+  );
+}
+
+function DataStorageCard() {
+  const { toast } = useToast();
+  const [storageUsed, setStorageUsed] = useState<string>('');
+  const [storageQuota, setStorageQuota] = useState<string>('');
+  const [exporting, setExporting] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmRestore, setConfirmRestore] = useState(false);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    getStorageEstimate().then(est => {
+      if (est) {
+        setStorageUsed(formatBytes(est.used));
+        setStorageQuota(formatBytes(est.quota));
+      }
+    });
+  }, []);
+
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      await downloadBackup();
+      toast({ title: 'Backup downloaded', description: 'Your database has been exported.' });
+    } catch (e) {
+      toast({ title: 'Export failed', description: String(e), variant: 'destructive' });
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingFile(file);
+    setConfirmRestore(true);
+    e.target.value = '';
+  };
+
+  const handleRestore = async () => {
+    if (!pendingFile) return;
+    setImporting(true);
+    setConfirmRestore(false);
+    try {
+      await restoreFromBackup(pendingFile);
+      toast({ title: 'Restore complete', description: 'Your data has been restored. Reloading...' });
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (e) {
+      toast({ title: 'Restore failed', description: String(e), variant: 'destructive' });
+    } finally {
+      setImporting(false);
+      setPendingFile(null);
+    }
+  };
+
+  const handleClear = async () => {
+    setConfirmClear(false);
+    try {
+      await clearAllData();
+    } catch (e) {
+      toast({ title: 'Clear failed', description: String(e), variant: 'destructive' });
+    }
+  };
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HardDrive className="h-5 w-5" />
+            Data Storage
+          </CardTitle>
+          <CardDescription>
+            Your data is stored locally in your browser. Export regularly to avoid data loss.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {storageUsed && (
+            <div className="text-sm text-muted-foreground">
+              Using {storageUsed} of {storageQuota} available
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={exporting}>
+              {exporting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Download className="h-4 w-4 mr-1" />}
+              Export Backup
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={importing}>
+              {importing ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+              Restore from Backup
+            </Button>
+            <input ref={fileInputRef} type="file" accept=".legalpm" className="hidden" onChange={handleFileSelect} />
+          </div>
+          <div className="pt-2 border-t">
+            <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setConfirmClear(true)}>
+              <AlertTriangle className="h-4 w-4 mr-1" />
+              Clear All Data
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={confirmRestore} onOpenChange={setConfirmRestore}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Restore from backup?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will replace all current data with the backup. This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleRestore}>Restore</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear all data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all data from your browser. Export a backup first if you want to keep your data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClear} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Clear Everything
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

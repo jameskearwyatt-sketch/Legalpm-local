@@ -1,73 +1,82 @@
-# Welcome to your Lovable project
+# Legal Practice Manager — Local-Only Edition
 
-## Project info
+A legal practice management application for tracking matters, billing, pricing,
+contacts, business-development pipeline, and deal credentials. This is the
+**local-only edition**: it runs entirely in your browser with **no cloud
+backend and no outbound network calls at runtime**.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+Because the app handles attorney-client privileged data, keeping everything
+local is the central privacy guarantee. Nothing you enter ever leaves your
+machine.
 
-## How can I edit this code?
+## How it works
 
-There are several ways of editing your application.
+- **Frontend:** React 18 + TypeScript + Vite, shadcn/ui + Tailwind CSS.
+- **Data store:** [PGlite](https://github.com/electric-sql/pglite) — PostgreSQL
+  compiled to WebAssembly — running in the browser and persisted to IndexedDB.
+- **Files:** uploads and attachments are stored in IndexedDB.
+- **Auth:** local-only. The app is auto-logged-in as a single admin user; there
+  is no sign-in server.
+- **State/data:** TanStack Query over a Supabase-compatible adapter that
+  translates queries into SQL against PGlite.
 
-**Use Lovable**
+The app is a pure static single-page application. `npm run build` produces a
+static bundle you can host anywhere or open locally — it works fully offline.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## ⚠️ Your data lives only in this browser
 
-Changes made via Lovable will be committed automatically to this repo.
+All data is stored in **this browser profile's** IndexedDB. That means:
 
-**Use your preferred IDE**
+- Clearing site data, uninstalling the browser, or switching to a different
+  browser, device, or profile **will lose everything**.
+- There is no server-side copy and no automatic cloud backup.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+**Back up regularly.** Go to **Settings → Data Management** to download a
+`.legalpm` backup file, restore from one, or clear all data. Do this often and
+keep your backup files somewhere safe.
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Getting started
 
-Follow these steps:
+Requires Node.js and npm.
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Install dependencies
+npm install
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start the dev server (http://localhost:8080)
 npm run dev
+
+# Produce a production build (static, no backend required)
+npm run build
+
+# Preview the production build locally
+npm run preview
+
+# Lint
+npm run lint
 ```
 
-**Edit a file directly in GitHub**
+## Project layout
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```
+src/
+├── pages/                 # Page components (Dashboard, Matters, Contacts, Pricing, Settings, ...)
+├── components/            # Feature components + shadcn/ui primitives
+├── lib/
+│   ├── db/                # Local data layer: PGlite instance, query adapter, schema, file storage, backup
+│   ├── hooks/             # TanStack Query data hooks (the data layer)
+│   └── auth.tsx           # Local-only auth context (auto admin)
+└── integrations/supabase/ # Re-export shim: `supabase` resolves to the local PGlite adapter
+```
 
-**Use GitHub Codespaces**
+See [`CLAUDE.md`](./CLAUDE.md) for a detailed architecture reference.
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Notes
 
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- Do not introduce cloud SDKs, telemetry, or external `fetch()` calls — doing so
+  would break the offline privacy guarantee.
+- A strict Content-Security-Policy (`connect-src 'self'`) is injected at build
+  time to prevent the app from making network connections.
+- Some AI-assisted features in the UI depend on server-side functions that do
+  not exist in this edition; invoking them returns a local "not available"
+  message rather than calling out to any service.

@@ -1,1 +1,0 @@
-ALTER TYPE public.ppa_analysis_type ADD VALUE 'termsheet_vs_bible';

@@ -1,1 +1,0 @@
-ALTER TABLE public.budget_line_items ADD COLUMN detail TEXT DEFAULT NULL;

@@ -27,14 +27,7 @@ const MatterPricing = lazy(() => import("./pages/MatterPricing"));
 const PricingProposalDetail = lazy(() => import("./pages/PricingProposalDetail"));
 const Contacts = lazy(() => import("./pages/Contacts"));
 const BMExpertiseMap = lazy(() => import("./pages/BMExpertiseMap"));
-const PPAAnalyst = lazy(() => import("./pages/PPAAnalyst"));
-const TollingAnalyst = lazy(() => import("./pages/TollingAnalyst"));
-const CarbonCreditAnalyst = lazy(() => import("./pages/CarbonCreditAnalyst"));
-const ITSupplyAnalyst = lazy(() => import("./pages/ITSupplyAnalyst"));
-const CloudComputeAnalyst = lazy(() => import("./pages/CloudComputeAnalyst"));
 const AdaptPricingWizard = lazy(() => import("./pages/AdaptPricingWizard"));
-const AdminAnalystBackfill = lazy(() => import("./pages/AdminAnalystBackfill"));
-const AdminAnalystTelemetry = lazy(() => import("./pages/AdminAnalystTelemetry"));
 const ActivityLog = lazy(() => import("./pages/ActivityLog"));
 const PalettePreview = lazy(() => import("./pages/PalettePreview"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -135,19 +128,12 @@ function AppRoutes() {
         <Route path="/pricing/adapt" element={<ProtectedRoute><AdaptPricingWizard /></ProtectedRoute>} />
         <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
         <Route path="/bm-expertise" element={<ProtectedRoute><BMExpertiseMap /></ProtectedRoute>} />
-        <Route path="/ppa-analyst" element={<ProtectedRoute><PPAAnalyst /></ProtectedRoute>} />
-        <Route path="/tolling-analyst" element={<ProtectedRoute><TollingAnalyst /></ProtectedRoute>} />
-        <Route path="/carbon-credit-analyst" element={<ProtectedRoute><CarbonCreditAnalyst /></ProtectedRoute>} />
-        <Route path="/it-supply-analyst" element={<ProtectedRoute><ITSupplyAnalyst /></ProtectedRoute>} />
-        <Route path="/cloud-compute-analyst" element={<ProtectedRoute><CloudComputeAnalyst /></ProtectedRoute>} />
         <Route path="/growth" element={<ProtectedRoute><Growth /></ProtectedRoute>} />
         <Route path="/growth/:projectId" element={<ProtectedRoute><GrowthProjectDetail /></ProtectedRoute>} />
         <Route path="/credentials" element={<ProtectedRoute><Credentials /></ProtectedRoute>} />
         <Route path="/flags" element={<ProtectedRoute><Flags /></ProtectedRoute>} />
         <Route path="/red-flags" element={<Navigate to="/flags" replace />} />
         <Route path="/pipeline-flags" element={<Navigate to="/flags" replace />} />
-        <Route path="/admin/analyst-backfill" element={<AdminRoute><AdminAnalystBackfill /></AdminRoute>} />
-        <Route path="/admin/analyst-telemetry" element={<AdminRoute><AdminAnalystTelemetry /></AdminRoute>} />
         <Route path="/admin/activity" element={<AdminRoute><ActivityLog /></AdminRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />

@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { useUserRole } from '@/lib/hooks/useUserRole';
 import { QuickToDoButton } from '@/components/QuickToDo/QuickToDoButton';
-import { AnalysisStatusBar } from '@/components/shared/AnalysisStatusBar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -28,24 +27,12 @@ import {
   Calculator,
   Users,
   Network,
-  FileSearch,
-  ChevronDown,
-  FlaskConical,
-  Cpu,
-  Cloud,
-  Database,
-  Activity,
   History,
   BarChart3,
   Award,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import NotificationBell from '@/components/layout/NotificationBell';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -64,33 +51,7 @@ function matchesRoute(pathname: string, href: string): boolean {
   return pathname.startsWith(href + '/');
 }
 
-import { Leaf } from 'lucide-react';
-
-const carbonRemovalsChildren: NavItem[] = [
-  { name: 'Carbon Credit Offtake', href: '/carbon-credit-analyst', icon: Leaf },
-];
-
-const dataCenterSuiteChildren: NavItem[] = [
-  { name: 'IT Supply Analyst', href: '/it-supply-analyst', icon: Cpu },
-  { name: 'Cloud Compute Services', href: '/cloud-compute-analyst', icon: Cloud },
-];
-
-const analystAdminChildren: NavItem[] = [
-  { name: 'Analyst Backfill', href: '/admin/analyst-backfill', icon: Database, adminOnly: true },
-  { name: 'Analyst Telemetry', href: '/admin/analyst-telemetry', icon: Activity, adminOnly: true },
-];
-
-const analystNavigation: NavGroupChild[] = [
-  { name: 'PPA Analyst', href: '/ppa-analyst', icon: FileSearch },
-  { name: 'Tolling Analyst', href: '/tolling-analyst', icon: FlaskConical },
-  { type: 'subgroup', name: 'Carbon Removals Suite', children: carbonRemovalsChildren },
-  { type: 'subgroup', name: 'Data Center Suite', children: dataCenterSuiteChildren },
-  { type: 'subgroup', name: 'Admin', children: analystAdminChildren },
-];
-
 const navigation: NavEntry[] = [
-  { type: 'group', name: 'Analyst', icon: FileSearch, children: analystNavigation },
-  { type: 'separator' },
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Matters', href: '/matters', icon: Briefcase },
   { name: 'Pricing & Assumptions', href: '/pricing', icon: Calculator },
@@ -168,13 +129,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
     return user?.email?.slice(0, 2).toUpperCase() || 'U';
   })();
 
-  const allAnalystHrefs: string[] = analystNavigation.flatMap(c =>
-    'type' in c && c.type === 'subgroup' ? c.children.map(sc => sc.href) : [(c as NavItem).href]
-  );
-  const [analystOpen, setAnalystOpen] = useState(() =>
-    allAnalystHrefs.some(h => matchesRoute(location.pathname, h))
-  );
-
   useEffect(() => {
     if (!mobileMenuOpen) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -250,96 +204,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {visibleNavigation.map((entry, index) => {
               if ('type' in entry && entry.type === 'separator') {
                 return <div key={`sep-${index}`} className="my-2 mx-2 border-t border-dotted border-sidebar-border/60" />;
-              }
-              if ('type' in entry && entry.type === 'group') {
-                const group = entry as NavGroup;
-                const groupActive = group.children.some((c) =>
-                  'type' in c && c.type === 'subgroup'
-                    ? c.children.some((sc) => matchesRoute(location.pathname, sc.href))
-                    : 'href' in c && matchesRoute(location.pathname, c.href)
-                );
-
-                if (collapsed) {
-                  return (
-                    <button
-                      key={group.name}
-                      onClick={() => { setCollapsed(false); setAnalystOpen(true); try { localStorage.setItem('sidebar-collapsed', 'false'); } catch {} }}
-                      className={cn(
-                        'flex items-center w-full rounded-lg transition-colors relative',
-                        groupActive
-                          ? 'bg-[rgba(201,185,154,0.08)] text-sidebar-accent-foreground'
-                          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                      )}
-                      style={{ padding: '11px 0', justifyContent: 'center' }}
-                    >
-                      {groupActive && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r bg-[#C9B99A]" />}
-                      <group.icon className="h-[18px] w-[18px]" />
-                    </button>
-                  );
-                }
-
-                return (
-                  <Collapsible key={group.name} open={analystOpen} onOpenChange={setAnalystOpen}>
-                    <CollapsibleTrigger className={cn(
-                      'flex w-full items-center rounded-lg text-sm font-medium transition-colors relative',
-                      groupActive
-                        ? 'text-sidebar-accent-foreground'
-                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                    )} style={{ gap: 12, padding: '11px 24px' }}>
-                      <group.icon className="h-[18px] w-[18px] shrink-0" />
-                      {group.name}
-                      <ChevronDown className={cn('ml-auto h-4 w-4 transition-transform', analystOpen && 'rotate-180')} />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="pl-4 space-y-0.5 mt-0.5">
-                      {group.children.map((child) => {
-                        if ('type' in child && child.type === 'subgroup') {
-                          return (
-                            <div key={child.name} className="mt-1.5">
-                              <div className="px-3 py-1.5 text-[11px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
-                                {child.name}
-                              </div>
-                              {child.children.map(sc => {
-                                const scActive = matchesRoute(location.pathname, sc.href);
-                                return (
-                                  <Link
-                                    key={sc.name}
-                                    to={sc.href}
-                                    className={cn(
-                                      'flex items-center gap-3 px-3 pl-5 py-2 rounded-lg text-sm font-medium transition-colors',
-                                      scActive
-                                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                                    )}
-                                  >
-                                    <sc.icon className="h-4 w-4 shrink-0" />
-                                    {sc.name}
-                                  </Link>
-                                );
-                              })}
-                            </div>
-                          );
-                        }
-                        const item = child as NavItem;
-                        const childActive = matchesRoute(location.pathname, item.href);
-                        return (
-                          <Link
-                            key={item.name}
-                            to={item.href}
-                            className={cn(
-                              'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                              childActive
-                                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                            )}
-                          >
-                            <item.icon className="h-4 w-4 shrink-0" />
-                            {item.name}
-                          </Link>
-                        );
-                      })}
-                    </CollapsibleContent>
-                  </Collapsible>
-                );
               }
               const item = entry as NavItem;
               const isActive = matchesRoute(location.pathname, item.href);
@@ -491,64 +355,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 if ('type' in entry && entry.type === 'separator') {
                   return <div key={`sep-m-${index}`} className="my-2 mx-2 border-t border-dotted border-sidebar-border/60" />;
                 }
-                  if ('type' in entry && entry.type === 'group') {
-                  const group = entry as NavGroup;
-                  return (
-                    <div key={group.name} className="space-y-0.5">
-                      <div className="px-3 py-2 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider">
-                        {group.name}
-                      </div>
-                      {(analystNavigation as NavGroupChild[]).map((child, ci) => {
-                        if ('type' in child && child.type === 'subgroup') {
-                          return (
-                            <div key={child.name} className="mt-1">
-                              <div className="px-3 pl-6 py-1.5 text-[11px] font-semibold text-sidebar-foreground/40 uppercase tracking-wider">
-                                {child.name}
-                              </div>
-                              {child.children.map(sc => {
-                                const scActive = matchesRoute(location.pathname, sc.href);
-                                return (
-                                  <Link
-                                    key={sc.name}
-                                    to={sc.href}
-                                    onClick={() => setMobileMenuOpen(false)}
-                                    className={cn(
-                                      'flex items-center gap-3 px-3 pl-8 py-2 rounded-lg text-sm font-medium transition-colors',
-                                      scActive
-                                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                                    )}
-                                  >
-                                    <sc.icon className="h-4 w-4" />
-                                    {sc.name}
-                                  </Link>
-                                );
-                              })}
-                            </div>
-                          );
-                        }
-                        const item = child as NavItem;
-                        const childActive = matchesRoute(location.pathname, item.href);
-                        return (
-                          <Link
-                            key={item.name}
-                            to={item.href}
-                            onClick={() => setMobileMenuOpen(false)}
-                            className={cn(
-                              'flex items-center gap-3 px-3 pl-6 py-2 rounded-lg text-sm font-medium transition-colors',
-                              childActive
-                                ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                            )}
-                          >
-                            <item.icon className="h-4 w-4" />
-                            {item.name}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  );
-                }
                 const item = entry as NavItem;
                 const isActive = matchesRoute(location.pathname, item.href);
                 return (
@@ -602,9 +408,6 @@ export default function AppLayout({ children }: AppLayoutProps) {
       >
         {children}
       </main>
-
-      {/* Background analysis indicator */}
-      <AnalysisStatusBar />
 
       {/* Floating Quick To-Do */}
       <QuickToDoButton />

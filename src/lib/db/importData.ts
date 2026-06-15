@@ -158,39 +158,51 @@ export async function importDataExport(file: File): Promise<ImportResult> {
     perTable[table] = 0;
   }
 
-  await db.transaction(async (tx) => {
-    // Disable FK checks + triggers so insert order and circular FKs never fail,
-    // and so original timestamps/values are kept verbatim.
-    await tx.exec(`SET LOCAL session_replication_role = 'replica'`);
+  // Each table is imported in its own transaction. Disabling FK checks + triggers
+  // (session_replication_role = 'replica') means insert order and circular FKs
+  // never fail and original timestamps/values are kept verbatim. Isolating each
+  // table means one problematic table (e.g. an auth table that is irrelevant in
+  // local mode) is skipped with a warning rather than aborting the whole import.
+  for (const plan of plans) {
+    const { table, rows, columns, columnInfo } = plan;
+    const colSql = columns.map(quoteIdent).join(', ');
 
-    for (const plan of plans) {
-      const { table, rows, columns, columnInfo } = plan;
-      const colSql = columns.map(quoteIdent).join(', ');
+    try {
+      const tableInserted = await db.transaction(async (tx) => {
+        await tx.exec(`SET LOCAL session_replication_role = 'replica'`);
 
-      for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
-        const chunk = rows.slice(i, i + CHUNK_SIZE);
-        const params: unknown[] = [];
-        const tuples: string[] = [];
+        let count = 0;
+        for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+          const chunk = rows.slice(i, i + CHUNK_SIZE);
+          const params: unknown[] = [];
+          const tuples: string[] = [];
 
-        for (const row of chunk) {
-          const placeholders = columns.map((col) => {
-            params.push(serialize(row[col], columnInfo.get(col)!));
-            return `$${params.length}`;
-          });
-          tuples.push(`(${placeholders.join(', ')})`);
+          for (const row of chunk) {
+            const placeholders = columns.map((col) => {
+              params.push(serialize(row[col], columnInfo.get(col)!));
+              return `$${params.length}`;
+            });
+            tuples.push(`(${placeholders.join(', ')})`);
+          }
+
+          const sql =
+            `INSERT INTO ${quoteIdent(table)} (${colSql}) VALUES ${tuples.join(', ')} ` +
+            `ON CONFLICT DO NOTHING`;
+
+          const res = await tx.query(sql, params);
+          count += res.affectedRows ?? 0;
         }
+        return count;
+      });
 
-        const sql =
-          `INSERT INTO ${quoteIdent(table)} (${colSql}) VALUES ${tuples.join(', ')} ` +
-          `ON CONFLICT DO NOTHING`;
-
-        const res = await tx.query(sql, params);
-        const affected = res.affectedRows ?? 0;
-        inserted += affected;
-        perTable[table] += affected;
-      }
+      perTable[table] = tableInserted;
+      inserted += tableInserted;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      warnings.push(`Table "${table}": import failed and was skipped — ${message}`);
+      delete perTable[table];
     }
-  });
+  }
 
   return { inserted, tablesWithData, perTable, warnings };
 }

@@ -1,10 +1,18 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
+export interface LocalUser {
+  id: string;
+  email: string;
+  user_metadata: Record<string, unknown>;
+  app_metadata: Record<string, unknown>;
+  aud: string;
+  created_at: string;
+}
+
 interface AuthContextType {
-  user: User | null;
-  session: Session | null;
+  user: LocalUser | null;
+  session: { user: LocalUser; access_token: string } | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
@@ -14,51 +22,39 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<LocalUser | null>(null);
+  const [session, setSession] = useState<{ user: LocalUser; access_token: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+      (_event: string, sess: unknown) => {
+        const s = sess as { user?: LocalUser; access_token?: string } | null;
+        const u = s?.user ?? null;
+        setSession(s && u ? { user: u, access_token: s.access_token ?? '' } : null);
+        setUser(u);
         setLoading(false);
       }
     );
 
-    // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(({ data: { session: sess } }: { data: { session: unknown } }) => {
+      const s = sess as { user?: LocalUser; access_token?: string } | null;
+      const u = s?.user ?? null;
+      setSession(s && u ? { user: u, access_token: s.access_token ?? '' } : null);
+      setUser(u);
       setLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+  const signIn = async (_email: string, _password: string) => {
+    const { error } = await supabase.auth.signInWithPassword({ email: _email, password: _password });
     return { error };
   };
 
-  const signUp = async (email: string, password: string, fullName?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: redirectUrl,
-        data: {
-          full_name: fullName,
-        },
-      },
-    });
+  const signUp = async (_email: string, _password: string, _fullName?: string) => {
+    const { error } = await supabase.auth.signUp({ email: _email, password: _password });
     return { error };
   };
 

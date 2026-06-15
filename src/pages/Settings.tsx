@@ -5,10 +5,11 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
-import { Loader2, Bell, Save, Download, Upload, AlertTriangle, HardDrive } from 'lucide-react';
+import { Loader2, Bell, Save, Download, Upload, AlertTriangle, HardDrive, FileUp } from 'lucide-react';
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
 import { useToast } from '@/hooks/use-toast';
 import { downloadBackup, restoreFromBackup, clearAllData, getStorageEstimate, formatBytes } from '@/lib/db/backup';
+import { importDataExport } from '@/lib/db/importData';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -141,10 +142,14 @@ function DataStorageCard() {
   const [storageQuota, setStorageQuota] = useState<string>('');
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [importingCloud, setImportingCloud] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
   const [confirmRestore, setConfirmRestore] = useState(false);
+  const [confirmImport, setConfirmImport] = useState(false);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingImportFile, setPendingImportFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     getStorageEstimate().then(est => {
@@ -200,6 +205,37 @@ function DataStorageCard() {
     }
   };
 
+  const handleImportSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPendingImportFile(file);
+    setConfirmImport(true);
+    e.target.value = '';
+  };
+
+  const handleImport = async () => {
+    if (!pendingImportFile) return;
+    setImportingCloud(true);
+    setConfirmImport(false);
+    try {
+      const result = await importDataExport(pendingImportFile);
+      const summary = `Imported ${result.inserted} row(s) across ${result.tablesWithData} table(s).`;
+      const description = result.warnings.length > 0
+        ? `${summary} ${result.warnings.length} warning(s). Reloading...`
+        : `${summary} Reloading...`;
+      if (result.warnings.length > 0) {
+        console.warn('[LegalPM] Cloud import warnings:\n' + result.warnings.join('\n'));
+      }
+      toast({ title: 'Import complete', description });
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (e) {
+      toast({ title: 'Import failed', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    } finally {
+      setImportingCloud(false);
+      setPendingImportFile(null);
+    }
+  };
+
   return (
     <>
       <Card>
@@ -228,6 +264,11 @@ function DataStorageCard() {
               Restore from Backup
             </Button>
             <input ref={fileInputRef} type="file" accept=".legalpm" className="hidden" onChange={handleFileSelect} />
+            <Button variant="outline" size="sm" onClick={() => importInputRef.current?.click()} disabled={importingCloud}>
+              {importingCloud ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileUp className="h-4 w-4 mr-1" />}
+              Import data from cloud export
+            </Button>
+            <input ref={importInputRef} type="file" accept=".json" className="hidden" onChange={handleImportSelect} />
           </div>
           <div className="pt-2 border-t">
             <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setConfirmClear(true)}>
@@ -249,6 +290,23 @@ function DataStorageCard() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleRestore}>Restore</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmImport} onOpenChange={setConfirmImport}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Import data from cloud export?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will merge the records from the selected <code>legalpm-data-export</code> JSON file into your
+              local database. Existing rows are kept (matching records are skipped), so this is safe to re-run.
+              The app will reload when the import finishes.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleImport}>Import</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

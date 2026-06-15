@@ -268,7 +268,7 @@ function DataStorageCard() {
               {importingCloud ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <FileUp className="h-4 w-4 mr-1" />}
               Import data from cloud export
             </Button>
-            <input ref={importInputRef} type="file" accept=".json" className="hidden" onChange={handleImportSelect} />
+            <input ref={importInputRef} type="file" accept=".json,application/json,text/json" className="hidden" onChange={handleImportSelect} />
           </div>
           <div className="pt-2 border-t">
             <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => setConfirmClear(true)}>

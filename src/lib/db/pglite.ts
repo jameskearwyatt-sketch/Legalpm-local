@@ -5,19 +5,24 @@ let dbReady: Promise<PGlite> | null = null;
 
 const DATA_DIR = 'idb://legalpm-local';
 
-// PGlite parses date/timestamp columns into JS Date objects by default, but the
-// rest of the app (carried over from the Supabase REST API) expects ISO strings
-// — e.g. it calls parseISO() on them. Override the parsers so these types come
-// back as strings, matching the old cloud behaviour:
+// PGlite returns several column types in shapes the app (carried over from the
+// Supabase REST API) doesn't expect: dates/timestamps come back as JS Date
+// objects, and numeric/decimal/bigint come back as strings/BigInt. Supabase
+// returned dates as ISO strings and numbers as JS numbers, so override the type
+// parsers (keyed by PostgreSQL type OID) to match that:
 //   - date (1082):        plain "YYYY-MM-DD" (NOT converted through UTC, so
 //                         date-only values like billing dates never shift a day)
 //   - timestamp (1114):   "YYYY-MM-DDTHH:MM:SS" (no offset, treated as local)
 //   - timestamptz (1184): "YYYY-MM-DDTHH:MM:SS+00:00" (PGlite emits UTC)
-const DATE_TIME_PARSERS = {
+//   - numeric/decimal (1700) -> number (otherwise financial math yields NaN)
+//   - bigint/int8 (20)       -> number (default is BigInt, which breaks math/JSON)
+const TYPE_PARSERS = {
   1082: (value: string) => value,
   1114: (value: string) => value.replace(' ', 'T'),
   1184: (value: string) =>
     value.replace(' ', 'T').replace(/([+-]\d\d)$/, '$1:00'),
+  1700: (value: string) => parseFloat(value),
+  20: (value: string) => Number(value),
 };
 
 export async function getDb(): Promise<PGlite> {
@@ -31,7 +36,7 @@ export async function getDb(): Promise<PGlite> {
 async function initDb(): Promise<PGlite> {
   const db = await PGlite.create(DATA_DIR, {
     relaxedDurability: true,
-    parsers: DATE_TIME_PARSERS,
+    parsers: TYPE_PARSERS,
   });
 
   const needsInit = await checkSchemaVersion(db);
@@ -106,7 +111,7 @@ export async function importDatabase(data: Blob): Promise<void> {
   const db = await PGlite.create(DATA_DIR, {
     relaxedDurability: true,
     loadDataDir: data,
-    parsers: DATE_TIME_PARSERS,
+    parsers: TYPE_PARSERS,
   });
 
   dbInstance = db;

@@ -116,9 +116,9 @@ export function BurnSparklineDetailedTooltip({
 
   // Determine status color
   const getStatusColor = (percent: number) => {
-    if (percent > 105) return { bg: 'bg-destructive/10', text: 'text-destructive', stroke: '#ef4444', fill: 'rgba(239, 68, 68, 0.2)' };
-    if (percent > 80) return { bg: 'bg-warning/10', text: 'text-warning', stroke: '#f59e0b', fill: 'rgba(245, 158, 11, 0.2)' };
-    return { bg: 'bg-success/10', text: 'text-success', stroke: '#22c55e', fill: 'rgba(34, 197, 94, 0.2)' };
+    if (percent > 105) return { bg: 'bg-destructive/10', text: 'text-destructive', stroke: '#B0423B', fill: 'rgba(176,66,59,0.2)' };
+    if (percent > 80) return { bg: 'bg-warning/10', text: 'text-warning', stroke: '#B08950', fill: 'rgba(176,137,80,0.2)' };
+    return { bg: 'bg-success/10', text: 'text-success', stroke: '#3F7D6E', fill: 'rgba(63,125,110,0.2)' };
   };
 
   const statusColors = getStatusColor(adjustedBurnPercent);
@@ -377,7 +377,7 @@ export function BurnSparklineDetailedTooltip({
                 y1={chartData.proposalDrop.startY}
                 x2={chartData.proposalDrop.endX}
                 y2={chartData.proposalDrop.endY}
-                stroke="#f59e0b"
+                stroke="#B08950"
                 strokeWidth={2}
                 strokeDasharray="4,2"
                 strokeLinecap="round"
@@ -388,7 +388,7 @@ export function BurnSparklineDetailedTooltip({
                 cy={chartData.proposalDrop.startY}
                 r={4}
                 fill="white"
-                stroke="#f59e0b"
+                stroke="#B08950"
                 strokeWidth={2}
               />
               {/* Adjusted burn point (filled) */}
@@ -396,7 +396,7 @@ export function BurnSparklineDetailedTooltip({
                 cx={chartData.proposalDrop.endX}
                 cy={chartData.proposalDrop.endY}
                 r={5}
-                fill="#f59e0b"
+                fill="#B08950"
                 stroke="white"
                 strokeWidth={2}
               />
@@ -406,7 +406,7 @@ export function BurnSparklineDetailedTooltip({
                     L ${chartData.proposalDrop.endX} ${chartData.proposalDrop.endY - 4} 
                     L ${chartData.proposalDrop.endX + 3} ${chartData.proposalDrop.endY - 8}`}
                 fill="none"
-                stroke="#f59e0b"
+                stroke="#B08950"
                 strokeWidth={1.5}
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -416,7 +416,7 @@ export function BurnSparklineDetailedTooltip({
                 x={chartData.proposalDrop.endX}
                 y={chartData.proposalDrop.endY + 16}
                 fontSize={10}
-                fill="#f59e0b"
+                fill="#B08950"
                 textAnchor="middle"
                 fontWeight={500}
               >
@@ -433,7 +433,7 @@ export function BurnSparklineDetailedTooltip({
                 y1={chartData.budgetLineY}
                 x2={width - padding.right}
                 y2={chartData.budgetLineY}
-                stroke="#dc2626"
+                stroke="#B0423B"
                 strokeWidth={1.5}
                 strokeDasharray="4,3"
               />
@@ -441,7 +441,7 @@ export function BurnSparklineDetailedTooltip({
                 x={width - padding.right + 5}
                 y={chartData.budgetLineY + 4}
                 fontSize={11}
-                fill="#dc2626"
+                fill="#B0423B"
                 fontWeight={500}
               >
                 Budget

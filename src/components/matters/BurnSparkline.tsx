@@ -160,9 +160,9 @@ export function BurnSparkline({
   // Determine color based on burn percentage
   // Red only shows at 105%+ (marginally over budget is not alarming)
   const getColor = (percent: number) => {
-    if (percent > 105) return { fill: 'rgba(239, 68, 68, 0.3)', stroke: '#ef4444', stripeColor: '#ef4444' }; // red
-    if (percent > 80) return { fill: 'rgba(245, 158, 11, 0.3)', stroke: '#f59e0b', stripeColor: '#f59e0b' }; // orange/warning
-    return { fill: 'rgba(34, 197, 94, 0.3)', stroke: '#22c55e', stripeColor: '#22c55e' }; // green/success
+    if (percent > 105) return { fill: 'rgba(176,66,59,0.3)', stroke: '#B0423B', stripeColor: '#B0423B' }; // red
+    if (percent > 80) return { fill: 'rgba(176,137,80,0.3)', stroke: '#B08950', stripeColor: '#B08950' }; // orange/warning
+    return { fill: 'rgba(63,125,110,0.3)', stroke: '#3F7D6E', stripeColor: '#3F7D6E' }; // green/success
   };
 
   // Calculate the adjusted burn percent based on proposal if active
@@ -366,7 +366,7 @@ export function BurnSparkline({
                   y1={budgetLineY}
                   x2={width - padding.right}
                   y2={budgetLineY}
-                  stroke="#dc2626"
+                  stroke="#B0423B"
                   strokeWidth={1}
                   strokeDasharray="2,2"
                   opacity={0.6}
@@ -547,7 +547,7 @@ export function BurnSparkline({
                 y1={budgetLineY}
                 x2={width - padding.right}
                 y2={budgetLineY}
-                stroke="#dc2626"
+                stroke="#B0423B"
                 strokeWidth={1}
                 strokeDasharray="2,2"
                 opacity={0.6}

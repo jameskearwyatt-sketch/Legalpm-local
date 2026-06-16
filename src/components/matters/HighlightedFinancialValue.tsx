@@ -26,7 +26,7 @@ export function HighlightedFinancialValue({
   formatFn,
 }: HighlightedFinancialValueProps) {
   if (!isHighlighted || previousValue === undefined) {
-    return <span className={className}>{currentValue}</span>;
+    return <span className={cn('font-mono tabular-nums', className)}>{currentValue}</span>;
   }
 
   return (
@@ -35,6 +35,7 @@ export function HighlightedFinancialValue({
         <TooltipTrigger asChild>
           <span
             className={cn(
+              'font-mono tabular-nums',
               'px-1.5 py-0.5 rounded cursor-help transition-colors',
               'bg-cyan-200 dark:bg-cyan-800/60',
               className

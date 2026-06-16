@@ -250,7 +250,7 @@
         "practice_area": "Project Finance",
         "status": "Open",
         "category": "Live",
-        "lead_partner": "A. Okafor",
+        "lead_partner": "Demo Partner",
         "originator": "R. Castellano",
         "start_date": "2025-07-16",
         "target_close_date": "2026-10-16",
@@ -279,7 +279,7 @@
         "jurisdictions": [
           "United Kingdom"
         ],
-        "matter_managing_attorney": "M. Lindqvist",
+        "matter_managing_attorney": "Demo Partner",
         "pipeline_outcome": null,
         "submission_deadline": null,
         "submitted": false,
@@ -297,7 +297,7 @@
         "practice_area": "M&A",
         "status": "Open",
         "category": "Live",
-        "lead_partner": "R. Castellano",
+        "lead_partner": "Demo Partner",
         "originator": "M. Lindqvist",
         "start_date": "2025-07-16",
         "target_close_date": "2026-10-16",
@@ -326,7 +326,7 @@
         "jurisdictions": [
           "United States"
         ],
-        "matter_managing_attorney": "P. Nakamura",
+        "matter_managing_attorney": "Demo Partner",
         "pipeline_outcome": null,
         "submission_deadline": null,
         "submitted": false,
@@ -344,7 +344,7 @@
         "practice_area": "Capital Markets",
         "status": "Open",
         "category": "Live",
-        "lead_partner": "M. Lindqvist",
+        "lead_partner": "Demo Partner",
         "originator": "P. Nakamura",
         "start_date": "2025-07-16",
         "target_close_date": "2026-10-16",
@@ -373,7 +373,7 @@
         "jurisdictions": [
           "Singapore"
         ],
-        "matter_managing_attorney": "S. Devereux",
+        "matter_managing_attorney": "Demo Partner",
         "pipeline_outcome": null,
         "submission_deadline": null,
         "submitted": false,
@@ -391,7 +391,7 @@
         "practice_area": "Energy Regulatory",
         "status": "Open",
         "category": "Live",
-        "lead_partner": "P. Nakamura",
+        "lead_partner": "Demo Partner",
         "originator": "S. Devereux",
         "start_date": "2025-07-16",
         "target_close_date": "2026-10-16",
@@ -420,7 +420,7 @@
         "jurisdictions": [
           "Germany"
         ],
-        "matter_managing_attorney": "A. Okafor",
+        "matter_managing_attorney": "Demo Partner",
         "pipeline_outcome": null,
         "submission_deadline": null,
         "submitted": false,
@@ -438,7 +438,7 @@
         "practice_area": "Banking",
         "status": "On Hold",
         "category": "Live",
-        "lead_partner": "S. Devereux",
+        "lead_partner": "Demo Partner",
         "originator": "A. Okafor",
         "start_date": "2025-07-16",
         "target_close_date": "2026-10-16",
@@ -467,7 +467,7 @@
         "jurisdictions": [
           "Peru"
         ],
-        "matter_managing_attorney": "R. Castellano",
+        "matter_managing_attorney": "Demo Partner",
         "pipeline_outcome": null,
         "submission_deadline": null,
         "submitted": false,
@@ -485,7 +485,7 @@
         "practice_area": "Disputes",
         "status": "Open",
         "category": "Live",
-        "lead_partner": "A. Okafor",
+        "lead_partner": "Demo Partner",
         "originator": "R. Castellano",
         "start_date": "2025-07-16",
         "target_close_date": "2026-10-16",
@@ -514,7 +514,7 @@
         "jurisdictions": [
           "United Kingdom"
         ],
-        "matter_managing_attorney": "M. Lindqvist",
+        "matter_managing_attorney": "Demo Partner",
         "pipeline_outcome": null,
         "submission_deadline": null,
         "submitted": false,
@@ -532,7 +532,7 @@
         "practice_area": "Project Finance",
         "status": "Open",
         "category": "Pipeline",
-        "lead_partner": "R. Castellano",
+        "lead_partner": "Demo Partner",
         "originator": "M. Lindqvist",
         "start_date": "2024-12-16",
         "target_close_date": "2026-04-16",
@@ -561,7 +561,7 @@
         "jurisdictions": [
           "United States"
         ],
-        "matter_managing_attorney": "P. Nakamura",
+        "matter_managing_attorney": "Demo Partner",
         "pipeline_outcome": "Pending",
         "submission_deadline": "2026-07-16",
         "submitted": true,
@@ -579,7 +579,7 @@
         "practice_area": "M&A",
         "status": "Open",
         "category": "Pipeline",
-        "lead_partner": "M. Lindqvist",
+        "lead_partner": "Demo Partner",
         "originator": "P. Nakamura",
         "start_date": "2024-12-16",
         "target_close_date": "2026-04-16",
@@ -608,7 +608,7 @@
         "jurisdictions": [
           "Singapore"
         ],
-        "matter_managing_attorney": "S. Devereux",
+        "matter_managing_attorney": "Demo Partner",
         "pipeline_outcome": "Pending",
         "submission_deadline": "2026-07-16",
         "submitted": true,
@@ -626,7 +626,7 @@
         "practice_area": "Capital Markets",
         "status": "Open",
         "category": "Pipeline",
-        "lead_partner": "P. Nakamura",
+        "lead_partner": "Demo Partner",
         "originator": "S. Devereux",
         "start_date": "2024-12-16",
         "target_close_date": "2026-04-16",
@@ -655,7 +655,7 @@
         "jurisdictions": [
           "Germany"
         ],
-        "matter_managing_attorney": "A. Okafor",
+        "matter_managing_attorney": "Demo Partner",
         "pipeline_outcome": "Pending",
         "submission_deadline": "2026-07-16",
         "submitted": true,
@@ -673,7 +673,7 @@
         "practice_area": "Energy Regulatory",
         "status": "Closed",
         "category": "Closed",
-        "lead_partner": "S. Devereux",
+        "lead_partner": "Demo Partner",
         "originator": "A. Okafor",
         "start_date": "2024-12-16",
         "target_close_date": "2026-04-16",
@@ -702,7 +702,7 @@
         "jurisdictions": [
           "Peru"
         ],
-        "matter_managing_attorney": "R. Castellano",
+        "matter_managing_attorney": "Demo Partner",
         "pipeline_outcome": null,
         "submission_deadline": null,
         "submitted": false,
@@ -720,7 +720,7 @@
         "practice_area": "Banking",
         "status": "Closed",
         "category": "Closed",
-        "lead_partner": "A. Okafor",
+        "lead_partner": "Demo Partner",
         "originator": "R. Castellano",
         "start_date": "2024-12-16",
         "target_close_date": "2026-04-16",
@@ -749,7 +749,7 @@
         "jurisdictions": [
           "United Kingdom"
         ],
-        "matter_managing_attorney": "M. Lindqvist",
+        "matter_managing_attorney": "Demo Partner",
         "pipeline_outcome": null,
         "submission_deadline": null,
         "submitted": false,
@@ -767,7 +767,7 @@
         "practice_area": "Disputes",
         "status": "Closed",
         "category": "Lost",
-        "lead_partner": "R. Castellano",
+        "lead_partner": "Demo Partner",
         "originator": "M. Lindqvist",
         "start_date": "2024-12-16",
         "target_close_date": "2026-04-16",
@@ -796,7 +796,7 @@
         "jurisdictions": [
           "United States"
         ],
-        "matter_managing_attorney": "P. Nakamura",
+        "matter_managing_attorney": "Demo Partner",
         "pipeline_outcome": "Lost",
         "submission_deadline": null,
         "submitted": false,

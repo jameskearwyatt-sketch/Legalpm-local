@@ -26,7 +26,6 @@ const TimeRecording = lazy(() => import("./pages/TimeRecording"));
 const MatterPricing = lazy(() => import("./pages/MatterPricing"));
 const PricingProposalDetail = lazy(() => import("./pages/PricingProposalDetail"));
 const Contacts = lazy(() => import("./pages/Contacts"));
-const BMExpertiseMap = lazy(() => import("./pages/BMExpertiseMap"));
 const ActivityLog = lazy(() => import("./pages/ActivityLog"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -128,7 +127,6 @@ function AppRoutes() {
         <Route path="/pricing" element={<ProtectedRoute><MatterPricing /></ProtectedRoute>} />
         <Route path="/pricing/proposal/:proposalId" element={<ProtectedRoute><PricingProposalDetail /></ProtectedRoute>} />
         <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
-        <Route path="/bm-expertise" element={<ProtectedRoute><BMExpertiseMap /></ProtectedRoute>} />
         <Route path="/growth" element={<ProtectedRoute><Growth /></ProtectedRoute>} />
         <Route path="/growth/:projectId" element={<ProtectedRoute><GrowthProjectDetail /></ProtectedRoute>} />
         <Route path="/credentials" element={<ProtectedRoute><Credentials /></ProtectedRoute>} />

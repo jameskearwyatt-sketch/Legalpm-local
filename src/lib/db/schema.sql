@@ -1172,51 +1172,6 @@ CREATE INDEX idx_custom_list_contacts_user_id ON public.custom_list_contacts(use
 
 
 -- =============================================================================
--- SECTION: BM INTERNAL CONTACTS
--- =============================================================================
-
-CREATE TABLE public.bm_internal_contacts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  first_name TEXT NOT NULL,
-  surname TEXT NOT NULL,
-  title TEXT,
-  region TEXT,
-  office TEXT,
-  practice_group TEXT,
-  email TEXT,
-  expertise JSONB NOT NULL DEFAULT '{}'::jsonb,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX idx_bm_internal_contacts_region ON public.bm_internal_contacts(region);
-CREATE INDEX idx_bm_internal_contacts_office ON public.bm_internal_contacts(office);
-CREATE INDEX idx_bm_internal_contacts_expertise ON public.bm_internal_contacts USING GIN(expertise);
-
-CREATE TABLE public.bm_contact_shortlists (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  name TEXT NOT NULL,
-  description TEXT,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE public.bm_shortlist_members (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  shortlist_id UUID NOT NULL REFERENCES public.bm_contact_shortlists(id) ON DELETE CASCADE,
-  contact_id UUID NOT NULL REFERENCES public.bm_internal_contacts(id) ON DELETE CASCADE,
-  added_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE(shortlist_id, contact_id)
-);
-
-CREATE INDEX idx_bm_shortlist_members_shortlist ON public.bm_shortlist_members(shortlist_id);
-CREATE INDEX idx_bm_shortlist_members_contact ON public.bm_shortlist_members(contact_id);
-
-
--- =============================================================================
 -- SECTION: WRITE-OFF EVENTS
 -- =============================================================================
 
@@ -1409,12 +1364,6 @@ CREATE TRIGGER update_distribution_campaigns_updated_at BEFORE UPDATE ON public.
 CREATE TRIGGER update_custom_distribution_lists_updated_at BEFORE UPDATE ON public.custom_distribution_lists
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 CREATE TRIGGER update_contact_import_formats_updated_at BEFORE UPDATE ON public.contact_import_formats
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-
--- BM contacts
-CREATE TRIGGER update_bm_internal_contacts_updated_at BEFORE UPDATE ON public.bm_internal_contacts
-  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
-CREATE TRIGGER update_bm_contact_shortlists_updated_at BEFORE UPDATE ON public.bm_contact_shortlists
   FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
 
 -- Write-off events

@@ -1,7 +1,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import schemaSql from './schema.sql?raw';
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 export async function runMigrations(db: PGlite): Promise<void> {
   await db.exec(`
@@ -50,6 +50,14 @@ export async function runMigrations(db: PGlite): Promise<void> {
         ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS is_consultant;
         ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS classification_reason;
         ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS classified_at;
+      `);
+    }
+    if (currentVersion < 4) {
+      // v4: remove the BM EMI Expertise Map feature's tables.
+      await db.exec(`
+        DROP TABLE IF EXISTS public.bm_shortlist_members CASCADE;
+        DROP TABLE IF EXISTS public.bm_contact_shortlists CASCADE;
+        DROP TABLE IF EXISTS public.bm_internal_contacts CASCADE;
       `);
     }
   }

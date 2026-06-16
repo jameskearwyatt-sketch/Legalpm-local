@@ -118,7 +118,7 @@ export function AllocateLcDialog({
 
         <div className="space-y-4">
           {/* Summary of what's pending */}
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-center">
             {totalWip > 0 && (
               <div className="p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
                 <div className="text-xs text-muted-foreground">WIP</div>

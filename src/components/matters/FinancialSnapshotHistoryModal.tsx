@@ -171,7 +171,7 @@ export function FinancialSnapshotHistoryModal({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                       <div>
                         <p className="text-xs text-muted-foreground">Accounts Receivable</p>
                         <p className="font-medium">{formatCurrency(snapshot.accounts_receivable, currency)}</p>

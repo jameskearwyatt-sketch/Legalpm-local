@@ -51,7 +51,7 @@ export function BusynessDetailDialog({ open, onOpenChange, monthlyData, avg3M, a
 
         <div className="space-y-6">
           {/* Summary Row */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="rounded-lg border border-border/60 p-3 text-center">
               <p className="text-xs text-muted-foreground mb-1">3M Avg</p>
               <p className="text-sm font-heading font-bold tabular-nums">{formatCurrency(avg3M, 'USD')}</p>

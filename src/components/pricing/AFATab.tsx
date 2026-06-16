@@ -845,7 +845,7 @@ export function AFATab({
           />
         </div>
         
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-2">
             <Label>Collar Width (%)</Label>
             <Input
@@ -1342,7 +1342,7 @@ export function AFATab({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-4 gap-4 text-sm">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
             <div>
               <p className="text-muted-foreground">BM Fees</p>
               <p className="font-medium">{formatCurrency(baselineTotals.bmTotal)}</p>
@@ -1557,7 +1557,7 @@ export function AFATab({
                                 {/* Internal Economics */}
                                 <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-4">
                                   <p className="text-sm font-medium mb-3">Internal Economics</p>
-                                  <div className="grid grid-cols-4 gap-4 text-sm">
+                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
                                     <div>
                                       <p className="text-muted-foreground">Client Price</p>
                                       <p className="font-bold text-lg">{formatCurrency(clientPrice)}</p>

@@ -604,7 +604,7 @@ export function LocalCounselPanel({
             {getQuoteWorkItems().map(({ item, workItemKey }) => (
               <div key={workItemKey} className="border rounded-lg p-3 space-y-2">
                 <Label className="font-medium text-sm">{item.work_item}</Label>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Lower Estimate</Label>
                     <Input

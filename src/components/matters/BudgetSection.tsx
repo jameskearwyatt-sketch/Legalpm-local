@@ -663,14 +663,14 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
             {/* Budget Editing Summary - Show when editing */}
             {isEditing && hasExistingBudget && originalItems.length > 0 && (
               <div className="mb-4 p-3 bg-muted/30 rounded-lg space-y-2">
-                <div className="grid grid-cols-3 gap-2 text-xs font-medium text-muted-foreground">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-medium text-muted-foreground">
                   <div></div>
                   <div className="text-right">Current</div>
                   <div className="text-right">New</div>
                 </div>
                 
                 {/* BM Total */}
-                <div className="grid grid-cols-3 gap-2 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                   <span className="text-muted-foreground">Baker McKenzie:</span>
                   <div className="text-right text-muted-foreground">
                     {formatCurrency(
@@ -694,7 +694,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 </div>
                 
                 {/* LC Total */}
-                <div className="grid grid-cols-3 gap-2 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
                   <span className="text-muted-foreground">Local Counsel:</span>
                   <div className="text-right text-muted-foreground">
                     {formatCurrency(
@@ -718,7 +718,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 </div>
                 
                 {/* Overall Total */}
-                <div className="grid grid-cols-3 gap-2 text-sm font-semibold border-t pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm font-semibold border-t pt-2">
                   <span>Overall:</span>
                   <div className="text-right text-muted-foreground font-normal">
                     {formatCurrency(
@@ -1202,7 +1202,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                       </div>
                     </div>
                     <div 
-                      className="grid grid-cols-3 gap-2 text-xs cursor-pointer"
+                      className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs cursor-pointer"
                       onClick={() => loadVersionItems(version.id)}
                     >
                       <div>

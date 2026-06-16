@@ -374,7 +374,7 @@ export function CategoryFeeAllocationDialog({
 
         <div className="space-y-4 py-4 overflow-y-auto flex-1">
           {/* Current vs New Total */}
-          <div className="grid grid-cols-3 gap-4 items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-center">
             <div className="text-center">
               <Label className="text-xs text-muted-foreground">Current {isSubtotalEdit ? 'Subtotal' : 'Total'}</Label>
               <div className="text-lg font-semibold">{formatCurrency(currentTotal)}</div>

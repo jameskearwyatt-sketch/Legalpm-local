@@ -368,7 +368,7 @@ export function WipShapingProposalDialog({
             {/* WIP Row */}
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground font-medium">Work in Progress (Time Costs)</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="raw_wip" className="text-xs">Raw WIP ({currencySymbol.trim()})</Label>
                   <Input
@@ -436,7 +436,7 @@ export function WipShapingProposalDialog({
             {/* AR Row */}
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground font-medium">Accounts Receivable (Bills Issued)</p>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="raw_ar" className="text-xs">Bills Issued ({currencySymbol.trim()})</Label>
                   <Input

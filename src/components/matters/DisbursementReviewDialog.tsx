@@ -216,7 +216,7 @@ export function DisbursementReviewDialog({
           {/* Step: Review - Is this an LC fee? */}
           {step === 'review' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-3 text-center">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
                 {current.wipDisbursement >= threshold && (
                   <div className="p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
                     <div className="text-xs text-muted-foreground mb-1">WIP Disbursement</div>

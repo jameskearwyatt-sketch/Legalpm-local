@@ -378,7 +378,7 @@ export function CredentialForm({
             </div>
 
             {/* Deal details */}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="deal_value">Deal Value</Label>
                 <Input id="deal_value" type="number" step="0.01" {...form.register('deal_value')} />
@@ -438,7 +438,7 @@ export function CredentialForm({
             </div>
 
             {/* Dates and status */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="space-y-1.5">
                 <Label htmlFor="start_date">Start Date</Label>
                 <Input id="start_date" type="date" {...form.register('start_date')} />

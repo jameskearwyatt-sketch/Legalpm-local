@@ -981,7 +981,7 @@ export default function MatterDetail() {
                     </div>
 
                     {/* Headroom Grid - now includes Budget Used */}
-                    <div className={cn("grid gap-4", localCounsel > 0 ? "grid-cols-4" : "grid-cols-3")}>
+                    <div className={cn("grid gap-4", localCounsel > 0 ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-1 sm:grid-cols-3")}>
                       {/* BM Budget Used - from budget line items */}
                       <div className="p-4 rounded-lg bg-muted/50">
                         <p className="text-sm text-muted-foreground">BM Budget Used</p>
@@ -1497,7 +1497,7 @@ export default function MatterDetail() {
                 {/* Budget Burn Reference */}
                 <div className="pt-2 border-t border-dashed space-y-2">
                   <p className="text-xs text-muted-foreground font-medium">Budget Burn (from Financial Snapshot)</p>
-                  <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                     <div>
                       <span className="text-muted-foreground">Budget</span>
                       <p className="font-medium">{formatCurrency(bmFee, currency)}</p>

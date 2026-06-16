@@ -28,7 +28,6 @@ const PricingProposalDetail = lazy(() => import("./pages/PricingProposalDetail")
 const Contacts = lazy(() => import("./pages/Contacts"));
 const BMExpertiseMap = lazy(() => import("./pages/BMExpertiseMap"));
 const ActivityLog = lazy(() => import("./pages/ActivityLog"));
-const PalettePreview = lazy(() => import("./pages/PalettePreview"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -120,7 +119,6 @@ function AppRoutes() {
         <Route path="/auth" element={<Auth />} />
         <Route path="/index" element={<Navigate to="/" replace />} />
         <Route path="/index.html" element={<Navigate to="/" replace />} />
-        <Route path="/palette-preview" element={<PalettePreview />} />
         <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
         <Route path="/matters" element={<ProtectedRoute><Matters /></ProtectedRoute>} />
         <Route path="/matters/new" element={<ProtectedRoute><MatterForm /></ProtectedRoute>} />

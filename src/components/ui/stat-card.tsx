@@ -80,7 +80,7 @@ export function StatCard({ title, value, valueSlot, icon, trend, variant = 'defa
             {valueSlot ? (
               valueSlot
             ) : (
-              <p className="text-sm sm:text-base lg:text-lg font-heading font-bold text-foreground tabular-nums break-words leading-tight">{value}</p>
+              <p className="text-sm sm:text-base lg:text-lg font-mono font-semibold text-foreground tabular-nums break-words leading-tight">{value}</p>
             )}
             {note && (
               <p className={cn(

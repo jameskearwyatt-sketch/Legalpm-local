@@ -563,7 +563,7 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
       >
         <Collapsible open={isExpanded} onOpenChange={() => togglePhaseExpansion(phaseId)}>
           <CardHeader className="py-3">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 {!isUnassigned && !viewingHistoricalVersion && dragHandleProps && (
                   <div 
@@ -670,6 +670,68 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
                   No work items in this phase. Drag items here or assign them from the item row.
                 </p>
               ) : (
+                <>
+                {/* Mobile: stacked card layout (desktop renders the full table below) */}
+                <div className="space-y-3 md:hidden">
+                  {orderedCategories.map((category) => {
+                    const mobileItems = categories[category] || [];
+                    return (
+                      <div key={`m-${phaseId}-${category}`} className="space-y-2">
+                        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{category}</p>
+                        {mobileItems.map(({ item, originalIndex }) => (
+                          <div
+                            key={originalIndex}
+                            className={cn("rounded-md border bg-card p-3 space-y-2", item.is_included === false && "opacity-50")}
+                          >
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="min-w-0 flex-1 text-sm font-medium break-words">{item.work_item || 'Untitled item'}</p>
+                              <Checkbox
+                                checked={item.is_included !== false}
+                                onCheckedChange={(checked) => onUpdateItem(originalIndex, { is_included: !!checked })}
+                                disabled={viewingHistoricalVersion}
+                                aria-label="Include item"
+                              />
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {item.category && <Badge variant="outline" className="text-[10px]">{item.category}</Badge>}
+                              <Badge variant="secondary" className="text-[10px]">{item.provider}</Badge>
+                            </div>
+                            {item.detail && <p className="text-xs text-muted-foreground break-words">{item.detail}</p>}
+                            <div className="flex items-center justify-between gap-2 pt-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-[11px] text-muted-foreground">{currencySymbol}</span>
+                                <Input
+                                  type="number"
+                                  inputMode="decimal"
+                                  defaultValue={item.fee_upper ?? item.fee_amount ?? 0}
+                                  onBlur={(e) => {
+                                    const v = parseFloat(e.target.value);
+                                    if (!Number.isNaN(v)) onUpdateItem(originalIndex, { fee_amount: v, fee_lower: v, fee_upper: v });
+                                  }}
+                                  disabled={viewingHistoricalVersion}
+                                  className="h-8 w-28 font-mono tabular-nums"
+                                />
+                              </div>
+                              {!viewingHistoricalVersion && (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={() => onRemoveItem(originalIndex)}
+                                  aria-label="Delete item"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Desktop: full editable table */}
+                <div className="hidden md:block">
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
@@ -854,6 +916,8 @@ export const PhasedWorkItemsView = forwardRef<PhasedWorkItemsViewRef, PhasedWork
                     </div>
                   </TableScrollControls>
                 </DndContext>
+                </div>
+                </>
               )}
             </CardContent>
           </CollapsibleContent>

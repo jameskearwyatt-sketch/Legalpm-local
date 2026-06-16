@@ -5,6 +5,21 @@ let dbReady: Promise<PGlite> | null = null;
 
 const DATA_DIR = 'idb://legalpm-local';
 
+// PGlite parses date/timestamp columns into JS Date objects by default, but the
+// rest of the app (carried over from the Supabase REST API) expects ISO strings
+// — e.g. it calls parseISO() on them. Override the parsers so these types come
+// back as strings, matching the old cloud behaviour:
+//   - date (1082):        plain "YYYY-MM-DD" (NOT converted through UTC, so
+//                         date-only values like billing dates never shift a day)
+//   - timestamp (1114):   "YYYY-MM-DDTHH:MM:SS" (no offset, treated as local)
+//   - timestamptz (1184): "YYYY-MM-DDTHH:MM:SS+00:00" (PGlite emits UTC)
+const DATE_TIME_PARSERS = {
+  1082: (value: string) => value,
+  1114: (value: string) => value.replace(' ', 'T'),
+  1184: (value: string) =>
+    value.replace(' ', 'T').replace(/([+-]\d\d)$/, '$1:00'),
+};
+
 export async function getDb(): Promise<PGlite> {
   if (dbInstance?.ready) return dbInstance;
   if (dbReady) return dbReady;
@@ -16,6 +31,7 @@ export async function getDb(): Promise<PGlite> {
 async function initDb(): Promise<PGlite> {
   const db = await PGlite.create(DATA_DIR, {
     relaxedDurability: true,
+    parsers: DATE_TIME_PARSERS,
   });
 
   const needsInit = await checkSchemaVersion(db);
@@ -90,6 +106,7 @@ export async function importDatabase(data: Blob): Promise<void> {
   const db = await PGlite.create(DATA_DIR, {
     relaxedDurability: true,
     loadDataDir: data,
+    parsers: DATE_TIME_PARSERS,
   });
 
   dbInstance = db;

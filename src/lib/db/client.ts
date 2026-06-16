@@ -746,22 +746,11 @@ const localAuth = {
   }),
 };
 
-const localFunctions = {
-  invoke: async (name: string, options?: { body?: unknown }) => {
-    console.warn(`[LegalPM Local] Edge function "${name}" called — AI features require API key configuration.`);
-    return {
-      data: null,
-      error: new Error(`Edge function "${name}" is not available in local mode. Configure an AI provider in Settings to enable AI features.`),
-    };
-  },
-};
-
 export const db = {
   from<T = Record<string, unknown>>(table: string): QueryBuilder<T> {
     return new QueryBuilder<T>(table);
   },
   auth: localAuth,
-  functions: localFunctions,
   storage: localFileStorage,
   rpc: async (name: string, params?: Record<string, unknown>) => {
     const pgDb = await getDb();

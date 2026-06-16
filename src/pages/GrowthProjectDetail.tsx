@@ -7,20 +7,16 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  ArrowLeft, 
-  Plus, 
-  FileText, 
-  CheckCircle2, 
-  Sparkles,
+import {
+  ArrowLeft,
+  Plus,
+  FileText,
+  CheckCircle2,
   Loader2,
   MoreVertical,
-  ChevronDown,
   AlertCircle,
   Archive,
-  Trash2,
-  User,
-  Calendar
+  Trash2
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -48,38 +44,24 @@ import {
   type GrowthProjectEntry,
   calculateDueDate
 } from '@/lib/hooks/useGrowthProjects';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { isPast, format } from 'date-fns';
+import { isPast } from 'date-fns';
 import { TaskItem } from '@/components/growth/TaskItem';
 import { AddEntryForm } from '@/components/growth/AddEntryForm';
 import { EntryCard } from '@/components/growth/EntryCard';
-import { TaskExtractionDialog, type ExtractedTask, type TaskAmendment, type CompletedTaskSuggestion } from '@/components/growth/TaskExtractionDialog';
 import { DocumentRepository } from '@/components/growth/DocumentRepository';
 import { TodaysFocusView } from '@/components/growth/TaskListViews';
 
 const GrowthProjectDetail = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
-  const { project, entries, tasks, documents, isLoading, isSynthesizing, addEntry, deleteEntry, addTask, updateTask, deleteTask, synthesizeProject, refreshDocuments, updateDocumentSummary } = useGrowthProject(projectId);
+  const { project, entries, tasks, documents, isLoading, addEntry, deleteEntry, addTask, updateTask, deleteTask, refreshDocuments, updateDocumentSummary } = useGrowthProject(projectId);
   const { updateProject, deleteProject } = useGrowthProjects();
-  const { addAssignee } = useKnownAssignees();
   const [showAddEntry, setShowAddEntry] = useState(false);
   const [showAddTask, setShowAddTask] = useState(false);
-  const [showCompleted, setShowCompleted] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  
-  
-  // Task extraction state
-  const [extractedTasks, setExtractedTasks] = useState<ExtractedTask[]>([]);
-  const [taskAmendments, setTaskAmendments] = useState<TaskAmendment[]>([]);
-  const [completedTaskSuggestions, setCompletedTaskSuggestions] = useState<CompletedTaskSuggestion[]>([]);
-  const [showTaskExtraction, setShowTaskExtraction] = useState(false);
-  const [isExtracting, setIsExtracting] = useState(false);
 
   const pendingTasks = useMemo(() => tasks.filter(t => !t.is_completed), [tasks]);
-  const completedTasks = useMemo(() => tasks.filter(t => t.is_completed), [tasks]);
-  
+
   // Find overdue tasks
   const now = new Date();
   const overdueTasks = pendingTasks.filter(t => {
@@ -99,168 +81,10 @@ const GrowthProjectDetail = () => {
     await updateProject.mutateAsync({ id: projectId, status: 'archived' });
   };
 
-  // Handle new entry with task extraction
+  // Add a new scrapbook entry (manual only).
   const handleAddEntry = async (entry: Partial<GrowthProjectEntry>) => {
-    // Add the entry first
     await addEntry.mutateAsync(entry);
     setShowAddEntry(false);
-
-    // If there's text content, extract tasks
-    if (entry.content && entry.content.trim().length > 20 && project) {
-      setIsExtracting(true);
-      setShowTaskExtraction(true);
-
-      try {
-        // Pass existing tasks for context
-        const existingTasksForAI = tasks.map(t => ({
-          id: t.id,
-          title: t.title,
-          assignee: t.assignee,
-          is_completed: t.is_completed,
-        }));
-
-        // Pass existing entries for context (excluding the one just added)
-        const existingEntriesForAI = entries.map(e => ({
-          title: e.title,
-          content: e.content,
-          entry_type: e.entry_type,
-          created_at: e.created_at,
-        }));
-
-        const { data, error } = await supabase.functions.invoke('extract-tasks', {
-          body: {
-            newEntryContent: entry.content,
-            projectName: project.name,
-            projectType: project.project_type,
-            existingTasks: existingTasksForAI,
-            existingEntries: existingEntriesForAI,
-          },
-        });
-
-        if (error) throw error;
-
-        // Process new tasks
-        const newTasks = (data?.tasks || []).map((t: { title: string; assignee?: string; deadline_type: string }) => ({
-          ...t,
-          deadline_type: t.deadline_type as TaskDeadlineType,
-          selected: true,
-        }));
-        setExtractedTasks(newTasks);
-
-        // Process amendments - match with existing task IDs
-        const amendments = (data?.amendments || []).map((a: { original_task_title: string; suggested_title?: string; suggested_assignee?: string; suggested_deadline_type?: string; reason: string }) => {
-          const matchingTask = tasks.find(t => t.title.toLowerCase() === a.original_task_title.toLowerCase());
-          return {
-            ...a,
-            original_task_id: matchingTask?.id,
-            suggested_deadline_type: a.suggested_deadline_type as TaskDeadlineType | undefined,
-            selected: true,
-          };
-        });
-        setTaskAmendments(amendments);
-
-        // Process completed tasks - match with existing task IDs
-        const completed = (data?.completedTasks || []).map((c: { original_task_title: string; evidence: string }) => {
-          const matchingTask = tasks.find(t => t.title.toLowerCase() === c.original_task_title.toLowerCase());
-          return {
-            ...c,
-            original_task_id: matchingTask?.id,
-            selected: true,
-          };
-        });
-        setCompletedTaskSuggestions(completed);
-
-      } catch (err) {
-        console.error('Task extraction error:', err);
-        toast.error('Could not extract tasks from content');
-        setShowTaskExtraction(false);
-      } finally {
-        setIsExtracting(false);
-      }
-    }
-  };
-
-  // Handle confirming extracted tasks - dialog closes immediately to prevent double-clicks
-  const handleConfirmExtractedTasks = async (
-    newTasks: ExtractedTask[], 
-    amendments: TaskAmendment[], 
-    completed: CompletedTaskSuggestion[]
-  ) => {
-    // Dialog is already closed by the dialog component
-    setExtractedTasks([]);
-    setTaskAmendments([]);
-    setCompletedTaskSuggestions([]);
-    
-    let addedCount = 0;
-    let amendedCount = 0;
-    let completedCount = 0;
-
-    // Process new tasks
-    for (const task of newTasks) {
-      try {
-        if (task.assignee && task.assignee !== 'Me') {
-          addAssignee.mutate(task.assignee);
-        }
-        await addTask.mutateAsync({
-          title: task.title,
-          assignee: task.assignee || undefined,
-          deadline_type: task.deadline_type,
-        });
-        addedCount++;
-      } catch (err) {
-        console.error('Failed to add task:', err);
-      }
-    }
-
-    // Process amendments
-    for (const amendment of amendments) {
-      if (!amendment.original_task_id) continue;
-      try {
-        const updates: Record<string, unknown> = {};
-        if (amendment.suggested_title) updates.title = amendment.suggested_title;
-        if (amendment.suggested_assignee) {
-          updates.assignee = amendment.suggested_assignee || undefined;
-          if (amendment.suggested_assignee !== 'Me') {
-            addAssignee.mutate(amendment.suggested_assignee);
-          }
-        }
-        if (amendment.suggested_deadline_type) {
-          updates.deadline_type = amendment.suggested_deadline_type;
-          updates.deadline_set_at = new Date().toISOString();
-        }
-        if (Object.keys(updates).length > 0) {
-          await updateTask.mutateAsync({ id: amendment.original_task_id, ...updates });
-          amendedCount++;
-        }
-      } catch (err) {
-        console.error('Failed to amend task:', err);
-      }
-    }
-
-    // Process completed tasks
-    for (const completedTask of completed) {
-      if (!completedTask.original_task_id) continue;
-      try {
-        await updateTask.mutateAsync({ 
-          id: completedTask.original_task_id, 
-          is_completed: true,
-          completed_at: new Date().toISOString(),
-          completion_notes: completedTask.completion_notes || null,
-        });
-        completedCount++;
-      } catch (err) {
-        console.error('Failed to mark task complete:', err);
-      }
-    }
-    
-    // Show summary toast
-    const parts = [];
-    if (addedCount > 0) parts.push(`${addedCount} added`);
-    if (amendedCount > 0) parts.push(`${amendedCount} amended`);
-    if (completedCount > 0) parts.push(`${completedCount} completed`);
-    if (parts.length > 0) {
-      toast.success(`Tasks: ${parts.join(', ')}`);
-    }
   };
 
   if (isLoading) {
@@ -340,39 +164,6 @@ const GrowthProjectDetail = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-
-        {/* AI Summary */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-yellow-500" />
-                AI Summary
-              </CardTitle>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={synthesizeProject}
-                disabled={isSynthesizing}
-              >
-                {isSynthesizing ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  'Refresh'
-                )}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {project.ai_summary ? (
-              <p className="text-muted-foreground">{project.ai_summary}</p>
-            ) : (
-              <p className="text-muted-foreground italic">
-                Add content and tasks to generate an AI summary of your project status.
-              </p>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Overdue Tasks Alert */}
         {overdueTasks.length > 0 && (
@@ -506,20 +297,6 @@ const GrowthProjectDetail = () => {
           />
         </div>
       </div>
-
-      {/* Task Extraction Dialog */}
-      <TaskExtractionDialog
-        open={showTaskExtraction}
-        onOpenChange={setShowTaskExtraction}
-        tasks={extractedTasks}
-        amendments={taskAmendments}
-        completedTasks={completedTaskSuggestions}
-        onTasksChange={setExtractedTasks}
-        onAmendmentsChange={setTaskAmendments}
-        onCompletedTasksChange={setCompletedTaskSuggestions}
-        onConfirm={handleConfirmExtractedTasks}
-        isLoading={isExtracting}
-      />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

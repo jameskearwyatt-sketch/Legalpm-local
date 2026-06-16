@@ -37,7 +37,6 @@ import {
   useDistributionContact,
   useUpdateDistributionContact,
 } from "@/lib/hooks/useDistributionContacts";
-import { useEnrichContact } from "@/lib/hooks/useContactEnrichment";
 import { ContactFormDialog } from "./ContactFormDialog";
 import { getPrimaryNaicsSector } from "@/lib/naicsUtils";
 import { formatDisplayName } from "@/lib/utils";
@@ -52,8 +51,6 @@ import {
   AlertTriangle,
   Pencil,
   Trash2,
-  Wand2,
-  Loader2,
   CheckCircle,
   XCircle,
   Tags,
@@ -74,22 +71,11 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const deleteContact = useDeleteDistributionContact();
-  const enrichContact = useEnrichContact();
   const updateContact = useUpdateDistributionContact();
   
-  // Fetch fresh data so dialog auto-updates after enrichment/edits
+  // Fetch fresh data so dialog auto-updates after edits
   const { data: freshContact } = useDistributionContact(open ? initialContact.id : undefined);
   const contact = freshContact ?? initialContact;
-
-  const handleEnrich = () => {
-    enrichContact.mutate({
-      contactId: contact.id,
-      fullName: contact.full_name,
-      email: contact.email,
-      linkedinUrl: contact.linkedin_url,
-      company: contact.company,
-    });
-  };
 
   const handleDelete = async () => {
     await deleteContact.mutateAsync(contact.id);
@@ -283,7 +269,7 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs">
                         <p className="text-xs">
-                          {contact.classification_reason || "Classified by AI"}
+                          {contact.classification_reason || "Manually classified"}
                         </p>
                         <p className="text-xs text-muted-foreground mt-1">
                           {format(new Date(contact.classified_at), "d MMM yyyy")}
@@ -352,19 +338,6 @@ export function ContactDetailDialog({ contact: initialContact, open, onOpenChang
 
           {/* Fixed footer */}
           <div className="flex gap-2 p-6 pt-4 border-t bg-background flex-shrink-0">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={handleEnrich}
-              disabled={enrichContact.isPending}
-            >
-              {enrichContact.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Wand2 className="h-4 w-4 mr-2" />
-              )}
-              Enrich
-            </Button>
             <Button
               variant="outline"
               className="flex-1"

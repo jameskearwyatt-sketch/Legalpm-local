@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,31 +31,20 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAssumptions, ASSUMPTION_LABELS, AssumptionLabel } from '@/lib/hooks/useAssumptions';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { 
-  Upload, 
-  Plus, 
-  Trash2, 
-  Pencil, 
-  Loader2, 
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  Loader2,
   FileText,
-  Sparkles,
   Check,
   X
 } from 'lucide-react';
 
 interface AssumptionsSectionProps {
   matterId: string;
-}
-
-export interface ExtractedAssumption {
-  label: string;
-  assumption_text: string;
-  is_standard: boolean;
-  selected: boolean;
 }
 
 // Color mapping for assumption labels - updated for new categories
@@ -80,168 +69,24 @@ const labelColors: Record<string, string> = {
 // Export the label colors for use in other components
 export { labelColors };
 
-// Export a function to extract assumptions that can be reused
-export async function extractAssumptionsFromText(text: string): Promise<ExtractedAssumption[]> {
-  const { data, error } = await supabase.functions.invoke('extract-assumptions', {
-    body: { text },
-  });
-
-  if (error) throw error;
-  
-  if (data.assumptions && data.assumptions.length > 0) {
-    return data.assumptions.map((a: { label: string; assumption_text: string; is_standard?: boolean }) => ({
-      ...a,
-      is_standard: a.is_standard ?? false,
-      selected: true, // Default all to selected
-    }));
-  }
-  
-  return [];
-}
-
 export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
-  const { 
-    assumptions, 
-    isLoading, 
+  const {
+    assumptions,
+    isLoading,
     createAssumption,
-    createBulkAssumptions,
-    updateAssumption, 
+    updateAssumption,
     deleteAssumption,
     deleteAllAssumptions,
   } = useAssumptions(matterId);
 
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [importTab, setImportTab] = useState<'upload' | 'paste'>('upload');
-  const [importText, setImportText] = useState('');
-  const [isExtracting, setIsExtracting] = useState(false);
-  const [isUploadingFile, setIsUploadingFile] = useState(false);
-  const [extractedAssumptions, setExtractedAssumptions] = useState<ExtractedAssumption[]>([]);
-  const [showPreview, setShowPreview] = useState(false);
-  
+
   // Add/Edit form state
   const [newLabel, setNewLabel] = useState<AssumptionLabel>('Other');
   const [newText, setNewText] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editLabel, setEditLabel] = useState<AssumptionLabel>('Other');
   const [editText, setEditText] = useState('');
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const fileName = file.name.toLowerCase();
-    
-    // Handle text files directly
-    if (fileName.endsWith('.txt')) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const text = event.target?.result as string;
-        setImportText(text);
-        setImportTab('paste');
-      };
-      reader.readAsText(file);
-      return;
-    }
-
-    // Handle PDF and Word files via edge function
-    if (fileName.endsWith('.pdf') || fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
-      setIsUploadingFile(true);
-      try {
-        const { data: response, error: invokeError } = await supabase.functions.invoke('parse-document-text', {
-          body: { file },
-        });
-
-        if (invokeError) throw invokeError;
-
-        if (response?.text) {
-          setImportText(response.text);
-          setImportTab('paste');
-          toast.success('Document text extracted successfully');
-        } else {
-          throw new Error('No text extracted from document');
-        }
-      } catch (error) {
-        console.error('Error extracting document text:', error);
-        toast.error(error instanceof Error ? error.message : 'Failed to extract document text');
-      } finally {
-        setIsUploadingFile(false);
-      }
-      return;
-    }
-
-    toast.error('Unsupported file type. Please use PDF, DOCX, DOC, or TXT files.');
-  };
-
-  const handleExtractAssumptions = async () => {
-    if (!importText.trim()) {
-      toast.error('Please provide engagement letter text');
-      return;
-    }
-
-    setIsExtracting(true);
-    try {
-      const extracted = await extractAssumptionsFromText(importText);
-      
-      if (extracted.length > 0) {
-        setExtractedAssumptions(extracted);
-        setShowPreview(true);
-        toast.success(`Found ${extracted.length} assumptions`);
-      } else {
-        toast.info('No assumptions found in the document');
-      }
-    } catch (error) {
-      console.error('Error extracting assumptions:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to extract assumptions');
-    } finally {
-      setIsExtracting(false);
-    }
-  };
-
-  const toggleAssumptionSelection = (index: number) => {
-    setExtractedAssumptions(prev => 
-      prev.map((a, i) => i === index ? { ...a, selected: !a.selected } : a)
-    );
-  };
-
-  const selectAllAssumptions = () => {
-    setExtractedAssumptions(prev => prev.map(a => ({ ...a, selected: true })));
-  };
-
-  const deselectAllAssumptions = () => {
-    setExtractedAssumptions(prev => prev.map(a => ({ ...a, selected: false })));
-  };
-
-  const selectedCount = extractedAssumptions.filter(a => a.selected).length;
-
-  const handleImportAssumptions = async () => {
-    const selectedAssumptions = extractedAssumptions.filter(a => a.selected);
-    if (selectedAssumptions.length === 0) {
-      toast.error('Please select at least one assumption to import');
-      return;
-    }
-
-    try {
-      await createBulkAssumptions.mutateAsync(
-        selectedAssumptions.map(a => ({
-          label: a.label,
-          assumption_text: a.assumption_text,
-          is_standard: a.is_standard,
-          source_document: 'Engagement Letter Import',
-        }))
-      );
-      
-      // Reset state
-      setIsImportDialogOpen(false);
-      setImportText('');
-      setExtractedAssumptions([]);
-      setShowPreview(false);
-    } catch (error) {
-      // Error handled in hook
-    }
-  };
 
   const handleAddAssumption = async () => {
     if (!newText.trim()) {
@@ -255,7 +100,7 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
         label: newLabel,
         assumption_text: newText.trim(),
       });
-      
+
       setIsAddDialogOpen(false);
       setNewLabel('Other');
       setNewText('');
@@ -348,7 +193,7 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
               </AlertDialogContent>
             </AlertDialog>
           )}
-          
+
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
@@ -396,231 +241,6 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
               </DialogFooter>
             </DialogContent>
           </Dialog>
-
-          <Dialog open={isImportDialogOpen} onOpenChange={(open) => {
-            setIsImportDialogOpen(open);
-            if (!open) {
-              setImportText('');
-              setExtractedAssumptions([]);
-              setShowPreview(false);
-            }
-          }}>
-            <DialogTrigger asChild>
-              <Button size="sm">
-                <Sparkles className="h-4 w-4 mr-1" />
-                Import from EL
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>Import Assumptions from Engagement Letter</DialogTitle>
-                <DialogDescription>
-                  Upload an engagement letter or paste its text to extract assumptions using AI
-                </DialogDescription>
-              </DialogHeader>
-              
-              {!showPreview ? (
-                <>
-                  <Tabs value={importTab} onValueChange={(v) => setImportTab(v as 'upload' | 'paste')}>
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="upload">
-                        <Upload className="h-4 w-4 mr-1" />
-                        Upload File
-                      </TabsTrigger>
-                      <TabsTrigger value="paste">
-                        <FileText className="h-4 w-4 mr-1" />
-                        Paste Text
-                      </TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="upload" className="space-y-4">
-                      <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept=".pdf,.docx,.doc,.txt"
-                          className="hidden"
-                          onChange={handleFileUpload}
-                        />
-                        {isUploadingFile ? (
-                          <div className="flex flex-col items-center gap-2">
-                            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">Extracting text from document...</p>
-                          </div>
-                        ) : (
-                          <>
-                            <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                            <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
-                              Choose File
-                            </Button>
-                            <p className="text-sm text-muted-foreground mt-2">
-                              PDF, DOCX, DOC, or TXT (max 5MB)
-                            </p>
-                          </>
-                        )}
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="paste" className="space-y-4">
-                      <Textarea
-                        value={importText}
-                        onChange={(e) => setImportText(e.target.value)}
-                        placeholder="Paste the engagement letter text here..."
-                        rows={10}
-                        className="font-mono text-sm"
-                      />
-                      {importText && (
-                        <p className="text-xs text-muted-foreground">
-                          {importText.length.toLocaleString()} characters
-                        </p>
-                      )}
-                    </TabsContent>
-                  </Tabs>
-                  
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsImportDialogOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button 
-                      onClick={handleExtractAssumptions} 
-                      disabled={!importText.trim() || isExtracting}
-                    >
-                      {isExtracting ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                          Extracting...
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles className="h-4 w-4 mr-1" />
-                          Extract Assumptions
-                        </>
-                      )}
-                    </Button>
-                  </DialogFooter>
-                </>
-              ) : (
-                <>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-4">
-                        <h4 className="font-medium">
-                          Found {extractedAssumptions.length} assumptions
-                        </h4>
-                        <span className="text-sm text-muted-foreground">
-                          ({selectedCount} selected)
-                        </span>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={selectAllAssumptions}
-                        >
-                          Select All
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={deselectAllAssumptions}
-                        >
-                          Deselect All
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setShowPreview(false)}
-                        >
-                          Back to Text
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                      {extractedAssumptions.map((assumption, index) => (
-                        <div 
-                          key={index}
-                          className={`border rounded-lg p-3 space-y-2 transition-colors ${
-                            assumption.selected 
-                              ? 'bg-background border-primary/50' 
-                              : 'bg-muted/30 border-muted opacity-60'
-                          }`}
-                        >
-                          <div className="flex items-start gap-3">
-                            <Checkbox 
-                              checked={assumption.selected}
-                              onCheckedChange={() => toggleAssumptionSelection(index)}
-                              className="mt-1"
-                            />
-                            <div className="flex-1 space-y-2">
-                              <div className="flex items-center gap-2">
-                                <Select
-                                  value={assumption.label}
-                                  onValueChange={(newLabel) => {
-                                    setExtractedAssumptions(prev => 
-                                      prev.map((a, i) => i === index ? { ...a, label: newLabel } : a)
-                                    );
-                                  }}
-                                >
-                                  <SelectTrigger 
-                                    className={`w-auto h-auto py-0.5 px-2 text-xs font-medium border-0 ${labelColors[assumption.label] || labelColors['Other']}`}
-                                    onClick={(e) => e.stopPropagation()}
-                                  >
-                                    <SelectValue>{assumption.label}</SelectValue>
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {ASSUMPTION_LABELS.map((label) => (
-                                      <SelectItem key={label} value={label}>
-                                        <span className={`px-1.5 py-0.5 rounded text-xs ${labelColors[label] || labelColors['Other']}`}>
-                                          {label}
-                                        </span>
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                {assumption.is_standard && (
-                                  <Badge variant="outline" className="text-xs border-primary/50 text-primary">
-                                    Standard
-                                  </Badge>
-                                )}
-                              </div>
-                              <p 
-                                className="text-sm flex items-start gap-2 cursor-pointer"
-                                onClick={() => toggleAssumptionSelection(index)}
-                              >
-                                <span className="text-muted-foreground">•</span>
-                                <span>{assumption.assumption_text}</span>
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setShowPreview(false)}>
-                      Back
-                    </Button>
-                    <Button 
-                      onClick={handleImportAssumptions}
-                      disabled={createBulkAssumptions.isPending || selectedCount === 0}
-                    >
-                      {createBulkAssumptions.isPending ? (
-                        <>
-                          <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                          Importing...
-                        </>
-                      ) : (
-                        <>
-                          <Check className="h-4 w-4 mr-1" />
-                          Import {selectedCount} Assumption{selectedCount !== 1 ? 's' : ''}
-                        </>
-                      )}
-                    </Button>
-                  </DialogFooter>
-                </>
-              )}
-            </DialogContent>
-          </Dialog>
         </div>
       </CardHeader>
 
@@ -633,7 +253,7 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
           <div className="text-center py-8 text-muted-foreground">
             <FileText className="h-8 w-8 mx-auto mb-2 opacity-50" />
             <p>No assumptions recorded yet</p>
-            <p className="text-sm">Import from an engagement letter or add manually</p>
+            <p className="text-sm">Add assumptions manually</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -656,7 +276,7 @@ export function AssumptionsSection({ matterId }: AssumptionsSectionProps) {
                   </div>
                   {/* Assumption rows */}
                   {groupedAssumptions[label].map((assumption) => (
-                    <div 
+                    <div
                       key={assumption.id}
                       className="group flex items-start gap-2 p-2 rounded hover:bg-muted/50 transition-colors"
                     >

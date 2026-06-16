@@ -17,7 +17,7 @@ import {
 import { DraftLineItem, BUDGET_CATEGORIES, BudgetCategory } from '@/lib/hooks/useBudgetVersions';
 import { CategoryGroup } from './CategoryGroup';
 import { DraggableBudgetItem } from './DraggableBudgetItem';
-import { Loader2, Wand2, Plus, Layers } from 'lucide-react';
+import { Plus, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -70,7 +70,7 @@ interface CategorizedBudgetViewProps {
   mandatedRate: number;
   existingLcFirmNames: string[];
   hasOptionalItems: boolean;
-  aiSuggestedIndices: Set<number>;
+  aiSuggestedIndices?: Set<number>;
   originalItems: DraftLineItem[];
   updateLineItemOptional: any;
   toggleLineItemIncluded: any;
@@ -96,7 +96,7 @@ export function CategorizedBudgetView({
   mandatedRate,
   existingLcFirmNames,
   hasOptionalItems,
-  aiSuggestedIndices,
+  aiSuggestedIndices = new Set(),
   originalItems,
   updateLineItemOptional,
   toggleLineItemIncluded,
@@ -105,7 +105,6 @@ export function CategorizedBudgetView({
   settledItems,
 }: CategorizedBudgetViewProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [isCategorizing, setIsCategorizing] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -301,71 +300,6 @@ export function CategorizedBudgetView({
     }
   };
 
-  // Auto-categorize items using AI
-  const handleAutoCategorize = async () => {
-    // Categorize all items with work_item text, not just uncategorized ones
-    const itemsToCategorize = items
-      .map((item, index) => ({ ...item, index }))
-      .filter(item => item.work_item.trim());
-    
-    if (itemsToCategorize.length === 0) {
-      toast.info('No items to categorize');
-      return;
-    }
-
-    setIsCategorizing(true);
-    try {
-      const response = await supabase.functions.invoke('categorize-budget-items', {
-        body: { 
-          items: itemsToCategorize.map(item => ({
-            index: item.index,
-            work_item: item.work_item
-          }))
-        }
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message || 'Failed to categorize items');
-      }
-
-      const { categorizations } = response.data;
-      
-      if (!categorizations || categorizations.length === 0) {
-        toast.error('No categorizations returned');
-        return;
-      }
-
-      // Apply categorizations
-      const updatedItems = [...items];
-      const itemsToSave: { id: string; category: string }[] = [];
-      
-      categorizations.forEach((cat: { index: number; category: string }) => {
-        if (updatedItems[cat.index]) {
-          updatedItems[cat.index] = { ...updatedItems[cat.index], category: cat.category };
-          // If item has an ID, queue it for DB save
-          const item = items[cat.index];
-          if (item.id) {
-            itemsToSave.push({ id: item.id, category: cat.category });
-          }
-        }
-      });
-      
-      onItemsChange(updatedItems);
-      
-      // Save all categorized items to DB
-      for (const item of itemsToSave) {
-        await saveCategoryToDb(item.id, item.category);
-      }
-      
-      toast.success(`Categorized ${categorizations.length} items`);
-    } catch (error) {
-      console.error('Error categorizing items:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to categorize items');
-    } finally {
-      setIsCategorizing(false);
-    }
-  };
-
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
   };
@@ -461,32 +395,11 @@ export function CategorizedBudgetView({
 
   return (
     <div className="space-y-4">
-      {/* Auto-categorize button */}
-      <div className="flex items-center justify-between">
+      {uncategorizedCount > 0 && (
         <div className="text-sm text-muted-foreground">
-          {uncategorizedCount > 0 && (
-            <span>{uncategorizedCount} item(s) need categorization</span>
-          )}
+          {uncategorizedCount} item(s) need categorization
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleAutoCategorize}
-          disabled={isCategorizing || items.filter(i => i.work_item.trim()).length === 0}
-        >
-          {isCategorizing ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Categorizing...
-            </>
-          ) : (
-            <>
-              <Wand2 className="h-4 w-4 mr-2" />
-              Auto-Categorize
-            </>
-          )}
-        </Button>
-      </div>
+      )}
 
       {/* Additional Scope Section */}
       {hasAdditionalScope && (

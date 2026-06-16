@@ -46,8 +46,6 @@ import { BilledAmountCell } from '@/components/matters/BilledAmountCell';
 import { Search, Plus, ArrowUpDown, Loader2, Briefcase, TrendingUp, CheckCircle2, XCircle, MoreHorizontal, ArrowRightCircle, AlertTriangle, Clock, Users, Building2, Save, Trash2, Filter, X, ChevronDown, Upload, History, Eye, Lightbulb, Download, Mail } from 'lucide-react';
 import { ExportMattersDialog } from '@/components/matters/ExportMattersDialog';
 import { ProgressSlider } from '@/components/matters/ProgressSlider';
-import { MasterWipUpdateDialog } from '@/components/matters/MasterWipUpdateDialog';
-import { DisbursementReviewResult } from '@/components/matters/DisbursementReviewDialog';
 import { MasterWipHistoryDialog } from '@/components/matters/MasterWipHistoryDialog';
 import { WipClientUpdateDialog } from '@/components/matters/WipClientUpdateDialog';
 import { useMasterWipUpdates } from '@/lib/hooks/useMasterWipUpdates';
@@ -566,7 +564,6 @@ export default function Matters() {
   const columnCategory = (tabFilter === 'MMA/BP' || tabFilter === 'Clients') ? 'Live' : tabFilter;
   const { columns, setColumns, resetColumns, isColumnVisible } = useColumnSettings(columnCategory);
 
-  const [showMasterWipDialog, setShowMasterWipDialog] = useState(false);
   const [showMasterWipHistoryDialog, setShowMasterWipHistoryDialog] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [showWipClientUpdateDialog, setShowWipClientUpdateDialog] = useState(false);
@@ -707,35 +704,6 @@ export default function Matters() {
     queryClient.invalidateQueries({ queryKey: ['matters'] });
     queryClient.invalidateQueries({ queryKey: ['local-counsels'] });
   };
-
-  // Auto-summarize long matter names that don't have a display name yet
-  useEffect(() => {
-    const summarizeLongNames = async () => {
-      const mattersNeedingSummary = matters.filter(
-        (m) => m.matter_name.length > 60 && !m.matter_display_name
-      );
-      
-      // Process one at a time to avoid overwhelming the API
-      for (const matter of mattersNeedingSummary.slice(0, 3)) {
-        try {
-          const response = await supabase.functions.invoke('summarize-matter-name', {
-            body: { matterId: matter.id, matterName: matter.matter_name },
-          });
-          
-          if (response.data?.saved) {
-            // Refresh matters to get the updated display name
-            queryClient.invalidateQueries({ queryKey: ['matters'] });
-          }
-        } catch (error) {
-          console.error('Failed to summarize matter name:', error);
-        }
-      }
-    };
-    
-    if (matters.length > 0) {
-      summarizeLongNames();
-    }
-  }, [matters.length]); // Only re-run when matters count changes
 
   const handleCategoryChange = async (matterId: string, newCategory: MatterCategory, pipelineOutcome?: 'Won' | 'Lost') => {
     try {
@@ -1088,16 +1056,6 @@ export default function Matters() {
                 <Mail className="mr-1.5 h-4 w-4" />
                 <span className="hidden md:inline">Update Clients on WIP</span>
                 <span className="md:hidden">Client WIP</span>
-              </Button>
-              <Button
-                variant="default"
-                onClick={() => setShowMasterWipDialog(true)}
-                className="bg-amber-600 hover:bg-amber-700 text-white"
-                size="sm"
-              >
-                <Upload className="mr-1.5 h-4 w-4" />
-                <span className="hidden md:inline">Master Financial Snapshot Update</span>
-                <span className="md:hidden">Snapshot Update</span>
               </Button>
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -1471,185 +1429,6 @@ export default function Matters() {
         </Card>
         )}
       </div>
-
-      {/* Master WIP Update Dialog */}
-      <MasterWipUpdateDialog
-        isOpen={showMasterWipDialog}
-        onClose={() => setShowMasterWipDialog(false)}
-        matters={matters.filter(m => m.category === 'Live')}
-        onApplyUpdates={async (updates, lcAllocations) => {
-          const today = new Date().toISOString().split('T')[0];
-          const snapshotChanges: Array<{
-            matter_id: string;
-            snapshot_id: string | null;
-            was_new_snapshot: boolean;
-            before_wip_amount: number;
-            before_billed_amount: number;
-            before_paid_amount: number;
-            before_accounts_receivable: number;
-            before_wip_write_off_amount: number;
-          }> = [];
-
-          for (const update of updates) {
-            // Get the current snapshot to track "before" values
-            const matter = matters.find(m => m.id === update.matter_id);
-            const currentSnapshot = matter?.latest_snapshot;
-            
-            // Check if there's already a snapshot for today
-            const { data: existingTodaySnapshot } = await supabase
-              .from('financial_snapshots')
-              .select('*')
-              .eq('matter_id', update.matter_id)
-              .eq('as_of_date', today)
-              .maybeSingle();
-
-            // Track the before state
-            snapshotChanges.push({
-              matter_id: update.matter_id,
-              snapshot_id: null, // Will be updated after upsert
-              was_new_snapshot: !existingTodaySnapshot,
-              before_wip_amount: existingTodaySnapshot?.wip_amount ?? currentSnapshot?.wip_amount ?? 0,
-              before_billed_amount: existingTodaySnapshot?.billed_amount ?? currentSnapshot?.billed_amount ?? 0,
-              before_paid_amount: existingTodaySnapshot?.paid_amount ?? currentSnapshot?.paid_amount ?? 0,
-              before_accounts_receivable: existingTodaySnapshot?.accounts_receivable ?? currentSnapshot?.accounts_receivable ?? 0,
-              before_wip_write_off_amount: existingTodaySnapshot?.wip_write_off_amount ?? currentSnapshot?.wip_write_off_amount ?? 0,
-            });
-
-            // Apply the updates
-            await upsertTodaySnapshot.mutateAsync({
-              matterId: update.matter_id,
-              field: 'wip_amount',
-              value: update.wip_amount,
-            });
-            await upsertTodaySnapshot.mutateAsync({
-              matterId: update.matter_id,
-              field: 'wip_write_off_amount',
-              value: update.wip_write_off_amount,
-            });
-            await upsertTodaySnapshot.mutateAsync({
-              matterId: update.matter_id,
-              field: 'billed_amount',
-              value: update.billed_amount,
-            });
-            await upsertTodaySnapshot.mutateAsync({
-              matterId: update.matter_id,
-              field: 'accounts_receivable',
-              value: update.accounts_receivable,
-            });
-            const result = await upsertTodaySnapshot.mutateAsync({
-              matterId: update.matter_id,
-              field: 'paid_amount',
-              value: update.paid_amount,
-            });
-
-            // Update the snapshot_id in our tracking
-            const idx = snapshotChanges.findIndex(c => c.matter_id === update.matter_id);
-            if (idx >= 0 && result.data) {
-              snapshotChanges[idx].snapshot_id = result.data.id;
-            }
-          }
-
-          // Track LC changes for reverting later
-          const lcChanges: Array<{
-            matter_id: string;
-            local_counsel_id: string;
-            before_wip_amount: number;
-            before_billed_amount: number;
-          }> = [];
-
-          // Apply local counsel allocations if provided and capture before values
-          if (lcAllocations && lcAllocations.length > 0) {
-            for (const allocation of lcAllocations) {
-              if (!allocation.isLocalCounselFee) continue;
-
-              // Handle "allocate later" — save to unallocated_lc_disbursements
-              if (allocation.allocateLater) {
-                if (user?.id) {
-                  const { error } = await supabase
-                    .from('unallocated_lc_disbursements' as any)
-                    .insert({
-                      matter_id: allocation.matterId,
-                      user_id: user.id,
-                      wip_amount: allocation.wipDisbursement || 0,
-                      ar_amount: allocation.arDisbursement || 0,
-                      paid_amount: allocation.paidDisbursement || 0,
-                      source: 'master_update',
-                      notes: `From master update on ${today}`,
-                    });
-                  if (error) {
-                    console.error('Failed to save unallocated LC disbursement:', error);
-                  }
-                }
-                continue;
-              }
-
-              if (allocation.allocations.length === 0) continue;
-              
-              for (const lcAlloc of allocation.allocations) {
-                // Fetch current LC values before updating
-                const { data: currentLc } = await supabase
-                  .from('matter_local_counsels')
-                  .select('wip_amount, billed_amount')
-                  .eq('id', lcAlloc.localCounselId)
-                  .single();
-
-                // Track the before state
-                if (currentLc) {
-                  lcChanges.push({
-                    matter_id: allocation.matterId,
-                    local_counsel_id: lcAlloc.localCounselId,
-                    before_wip_amount: currentLc.wip_amount || 0,
-                    before_billed_amount: currentLc.billed_amount || 0,
-                  });
-                }
-
-                // Update the local counsel's WIP and billed amounts
-                const { error } = await supabase
-                  .from('matter_local_counsels')
-                  .update({
-                    wip_amount: lcAlloc.wipAmount,
-                    billed_amount: lcAlloc.billedAmount,
-                    wip_updated_at: new Date().toISOString(),
-                    billed_updated_at: new Date().toISOString(),
-                    update_source: 'bulk',
-                    last_updated: new Date().toISOString(),
-                  })
-                  .eq('id', lcAlloc.localCounselId);
-
-                if (error) {
-                  console.error('Failed to update local counsel:', error);
-                }
-              }
-            }
-            
-            // Invalidate local counsel queries
-            queryClient.invalidateQueries({ queryKey: ['local-counsels'] });
-            queryClient.invalidateQueries({ queryKey: ['unallocated-lc-disbursements'] });
-            
-            const lcCount = lcAllocations.filter(a => a.isLocalCounselFee && a.allocations.length > 0).length;
-            const deferredCount = lcAllocations.filter(a => a.allocateLater).length;
-            if (lcCount > 0) {
-              toast.success(`Updated local counsel data for ${lcCount} matter(s)`);
-            }
-            if (deferredCount > 0) {
-              toast.info(`${deferredCount} LC fee(s) saved for later allocation`);
-            }
-          }
-
-          // Save the changes to the tracking table (including LC changes)
-          if (snapshotChanges.length > 0) {
-            try {
-              await createMasterUpdate.mutateAsync({
-                updates: snapshotChanges,
-                lcChanges: lcChanges.length > 0 ? lcChanges : undefined,
-              });
-            } catch (error) {
-              console.error('Failed to save master update tracking:', error);
-              toast.error('Warning: Financial updates applied, but history tracking failed. Check console for details.');
-            }
-          }
-        }}
-      />
 
       {/* Master WIP History Dialog */}
       <MasterWipHistoryDialog

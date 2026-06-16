@@ -18,14 +18,13 @@ import {
 } from '@/components/ui/alert-dialog';
 import {
   Award, Plus, Search, RefreshCw, MoreHorizontal, Pencil, Trash2,
-  FileDown, Upload, Building2, Globe, Calendar, Filter,
+  FileDown, Building2, Globe, Calendar, Filter,
 } from 'lucide-react';
 import AppLayout from '@/components/layout/AppLayout';
 import {
   useCredentials, type DealCredential, type CredentialFilters,
 } from '@/lib/hooks/useCredentials';
 import { CredentialForm } from '@/components/credentials/CredentialForm';
-import { CredentialImport } from '@/components/credentials/CredentialImport';
 import { ExportCredentialsButton } from '@/components/credentials/ExportCredentialsButton';
 
 const Credentials = () => {
@@ -34,7 +33,6 @@ const Credentials = () => {
   const [formOpen, setFormOpen] = useState(false);
   const [editingCredential, setEditingCredential] = useState<DealCredential | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [importOpen, setImportOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
   const activeFilters = useMemo(() => ({
@@ -44,7 +42,7 @@ const Credentials = () => {
 
   const {
     credentials, isLoading, createCredential, updateCredential, deleteCredential,
-    bulkCreateCredentials, syncFromMatters, allSectors, allDealTypes, allJurisdictions,
+    syncFromMatters, allSectors, allDealTypes, allJurisdictions,
   } = useCredentials(activeFilters);
 
   const sortedCredentials = useMemo(() =>
@@ -106,9 +104,6 @@ const Credentials = () => {
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => syncFromMatters.mutate()} disabled={syncFromMatters.isPending}>
               <RefreshCw className={`h-4 w-4 mr-1 ${syncFromMatters.isPending ? 'animate-spin' : ''}`} /> Sync from Matters
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
-              <Upload className="h-4 w-4 mr-1" /> Import
             </Button>
             <ExportCredentialsButton credentials={sortedCredentials} />
             <Button size="sm" onClick={() => { setEditingCredential(null); setFormOpen(true); }}>
@@ -343,14 +338,6 @@ const Credentials = () => {
         isSubmitting={createCredential.isPending || updateCredential.isPending}
         allSectors={allSectors}
         allDealTypes={allDealTypes}
-      />
-
-      {/* Import Dialog */}
-      <CredentialImport
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        onImport={(rows) => bulkCreateCredentials.mutate(rows, { onSuccess: () => setImportOpen(false) })}
-        isImporting={bulkCreateCredentials.isPending}
       />
 
       {/* Delete Confirmation */}

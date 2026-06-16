@@ -42,20 +42,15 @@ import { ContactImportDialog } from "./ContactImportDialog";
 import { EmailDraftDialog } from "./EmailDraftDialog";
 import { ContactDetailDialog } from "./ContactDetailDialog";
 import { ContactHistoryDialog } from "./ContactHistoryDialog";
-import { FocusAreaAssignmentDialog } from "./FocusAreaAssignmentDialog";
 import { ExclusionFilterCheckbox } from "./ExclusionFilterCheckbox";
 import { ReidentifyExcludedDialog } from "./ReidentifyExcludedDialog";
-import { EnrichmentPreCheckDialog } from "./EnrichmentPreCheckDialog";
 import { SortableFilterableHeader, SortDirection } from "./SortableFilterableHeader";
 import { StickyTableHeader } from "@/components/ui/sticky-table-header";
 import { TableScrollControls } from "@/components/ui/table-scroll-controls";
 import { MultiSelectFilter } from "@/components/ui/multi-select-filter";
-import { SmartSectorSearch } from "./SmartSectorSearch";
-import { SmartMatchBadge } from "./SmartMatchBadge";
 import { CustomDistributionListDropdown } from "./CustomDistributionListDropdown";
 import { AddToListDialog } from "./AddToListDialog";
 import { useCustomListContacts } from "@/lib/hooks/useCustomDistributionLists";
-import { useSmartSectorSearch } from "@/lib/hooks/useSmartSectorSearch";
 import { exportContactsToExcel } from "@/lib/exportContactsToExcel";
 import {
   Plus,
@@ -68,28 +63,20 @@ import {
   X,
   XCircle,
   AlertTriangle,
-  Sparkles,
   Trash2,
-  Wand2,
-  Loader2,
   History,
   Clock,
   Target,
-  AlertCircle,
   Scale,
   Users,
   RotateCcw,
   List,
   Copy,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDisplayName, extractSurnameForSort } from "@/lib/utils";
 import { useLogDistributionActivity } from "@/lib/hooks/useDistributionActivityLog";
-import { useBulkEnrichContacts } from "@/lib/hooks/useContactEnrichment";
-import { useEnrichmentChanges, getContactsWithMeaningfulChanges, type ContactEnrichmentChanges } from "@/lib/hooks/useEnrichmentChanges";
-import { useDetectEmailMismatch, useDismissEmailMismatch } from "@/lib/hooks/useEmailMismatchDetection";
-import { useClassifyContacts } from "@/lib/hooks/useContactClassification";
-import { GenderAssignmentDialog } from "./GenderAssignmentDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -118,7 +105,6 @@ export function ContactsListView() {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showFocusAreaDialog, setShowFocusAreaDialog] = useState(false);
   const [selectedContact, setSelectedContact] = useState<DistributionContact | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [historyContact, setHistoryContact] = useState<{ id: string; name: string } | null>(null);
@@ -130,9 +116,7 @@ export function ContactsListView() {
   const [showAddToListDialog, setShowAddToListDialog] = useState(false);
   const [showRemoveFromListConfirm, setShowRemoveFromListConfirm] = useState(false);
   const [isRemovingFromList, setIsRemovingFromList] = useState(false);
-  const [showEnrichmentPreCheck, setShowEnrichmentPreCheck] = useState(false);
-  const [justEnrichedIds, setJustEnrichedIds] = useState<Set<string> | null>(null);
-  const [showOnlyEnrichedWithChanges, setShowOnlyEnrichedWithChanges] = useState(false);
+  const [justAddedIds, setJustAddedIds] = useState<Set<string> | null>(null);
 
   // Sorting state
   const [sortKey, setSortKey] = useState<string | null>("full_name");
@@ -155,57 +139,22 @@ export function ContactsListView() {
   const { data: relationshipOwners = [] } = useDistributionRelationshipOwners();
   const logActivity = useLogDistributionActivity();
   const bulkDelete = useBulkDeleteDistributionContacts();
-  const bulkEnrich = useBulkEnrichContacts();
-  const detectMismatch = useDetectEmailMismatch();
-  const dismissMismatch = useDismissEmailMismatch();
-  const classifyContacts = useClassifyContacts();
-  
-  // Smart sector search
-  const {
-    searchState: smartSearchState,
-    isSearching: isSmartSearching,
-    isDeepSearching,
-    executeQuickSearch,
-    executeDeepSearch,
-    clearSearch: clearSmartSearch,
-    getMatchForContact,
-    isContactMatched,
-  } = useSmartSectorSearch();
-
-  // Fetch enrichment changes for recently enriched contacts (email/company diffs)
-  const justEnrichedIdsArray = useMemo(
-    () => (justEnrichedIds ? Array.from(justEnrichedIds) : null),
-    [justEnrichedIds]
-  );
-  const { data: enrichmentChanges = {} } = useEnrichmentChanges(justEnrichedIdsArray);
-  
-  // Contacts with meaningful email/company changes
-  const contactsWithMeaningfulChanges = useMemo(
-    () => getContactsWithMeaningfulChanges(enrichmentChanges),
-    [enrichmentChanges]
-  );
 
   // Custom distribution list contacts
   const { contactIds: customListContactIds, removeContacts } = useCustomListContacts(selectedListId);
 
-  const uniqueOwners = useMemo(() => 
+  const uniqueOwners = useMemo(() =>
     [...new Set(contacts.map(c => c.relationship_owner).filter(Boolean) as string[])].sort(),
     [contacts]
   );
 
-  const uniqueCompanies = useMemo(() => 
+  const uniqueCompanies = useMemo(() =>
     [...new Set(contacts.map(c => c.company).filter(Boolean) as string[])]
       .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
     [contacts]
   );
 
-  const uniqueJobTitles = useMemo(() => 
-    [...new Set(contacts.map(c => c.job_title).filter(Boolean) as string[])]
-      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
-    [contacts]
-  );
-
-  const uniqueCountries = useMemo(() => 
+  const uniqueCountries = useMemo(() =>
     [...new Set(contacts.map(c => c.country).filter(Boolean) as string[])]
       .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' })),
     [contacts]
@@ -230,7 +179,7 @@ export function ContactsListView() {
     return Array.from(areas).sort();
   }, [allContacts]);
 
-  // Apply column filters, smart search, sorting, and exclusion filters
+  // Apply column filters, sorting, and exclusion filters
   // NOTE: Exclusion filters (excludeLawFirms, excludeConsultants) are applied HERE
   // so they filter only the currently visible/filtered list, not the entire dataset
   const filteredAndSortedContacts = useMemo(() => {
@@ -276,27 +225,16 @@ export function ContactsListView() {
       result = result.filter(contact => customListSet.has(contact.id));
     }
 
-    // Apply "just enriched" filter (if active - shows only recently enriched contacts)
-    if (justEnrichedIds && justEnrichedIds.size > 0) {
-      result = result.filter(contact => justEnrichedIds.has(contact.id));
-      
-      // Further filter to only show those with meaningful changes (email/company)
-      if (showOnlyEnrichedWithChanges && contactsWithMeaningfulChanges.size > 0) {
-        result = result.filter(contact => contactsWithMeaningfulChanges.has(contact.id));
-      }
+    // Apply "just added" filter (if active - shows only recently added/imported contacts)
+    if (justAddedIds && justAddedIds.size > 0) {
+      result = result.filter(contact => justAddedIds.has(contact.id));
     }
 
-    // Apply smart sector search filter (if active)
-    if (smartSearchState.isActive) {
-      result = result.filter(contact => smartSearchState.matches.has(contact.id));
-    }
-
-    // Apply column filters
     // Apply column filters (use getFilterValue - searches full name)
     Object.entries(columnFilters).forEach(([key, value]) => {
       if (!value) return;
       const lowerValue = value.toLowerCase();
-      
+
       result = result.filter(contact => {
         const fieldValue = getFilterValue(contact, key);
         if (fieldValue === null || fieldValue === undefined) return false;
@@ -309,11 +247,11 @@ export function ContactsListView() {
       result.sort((a, b) => {
         const aVal = getSortValue(a, sortKey);
         const bVal = getSortValue(b, sortKey);
-        
+
         // Handle nulls
         if (aVal === null || aVal === undefined) return sortDirection === "asc" ? 1 : -1;
         if (bVal === null || bVal === undefined) return sortDirection === "asc" ? -1 : 1;
-        
+
         // String comparison
         const comparison = String(aVal).localeCompare(String(bVal), undefined, { sensitivity: 'base' });
         return sortDirection === "asc" ? comparison : -comparison;
@@ -321,7 +259,7 @@ export function ContactsListView() {
     }
 
     return result;
-  }, [contacts, columnFilters, sortKey, sortDirection, smartSearchState.isActive, smartSearchState.matches, selectedListId, customListContactIds, justEnrichedIds, showOnlyEnrichedWithChanges, contactsWithMeaningfulChanges]);
+  }, [contacts, columnFilters, sortKey, sortDirection, selectedListId, customListContactIds, justAddedIds]);
 
   // Contacts BEFORE exclusion filters are applied - used for the exclusion filter popover lists
   const contactsBeforeExclusion = filteredAndSortedContacts;
@@ -329,28 +267,28 @@ export function ContactsListView() {
   // Apply exclusion filters LAST - these filter from the currently visible list
   const contactsAfterExclusion = useMemo(() => {
     let result = [...filteredAndSortedContacts];
-    
+
     if (filters.excludeLawFirms) {
       result = result.filter(c => c.is_law_firm !== true);
     }
     if (filters.excludeConsultants) {
       result = result.filter(c => c.is_consultant !== true);
     }
-    
+
     return result;
   }, [filteredAndSortedContacts, filters.excludeLawFirms, filters.excludeConsultants]);
 
-  const eligibleContacts = useMemo(() => 
+  const eligibleContacts = useMemo(() =>
     contactsAfterExclusion.filter(c => !c.do_not_contact),
     [contactsAfterExclusion]
   );
 
-  const selectedContacts = useMemo(() => 
+  const selectedContacts = useMemo(() =>
     contacts.filter(c => selectedIds.has(c.id)),
     [contacts, selectedIds]
   );
 
-  const dncSelected = useMemo(() => 
+  const dncSelected = useMemo(() =>
     selectedContacts.some(c => c.do_not_contact),
     [selectedContacts]
   );
@@ -391,7 +329,7 @@ export function ContactsListView() {
   };
 
   const handleExport = async () => {
-    const contactsToExport = selectedIds.size > 0 
+    const contactsToExport = selectedIds.size > 0
       ? contacts.filter(c => selectedIds.has(c.id))
       : contactsAfterExclusion;
 
@@ -446,51 +384,26 @@ export function ContactsListView() {
     setColumnFilters({});
     setSortKey("full_name");
     setSortDirection("asc");
-    clearSmartSearch();
-    setJustEnrichedIds(null);
-    setShowOnlyEnrichedWithChanges(false);
+    setJustAddedIds(null);
   };
 
   const hasActiveFilters = Object.entries(filters).some(([_, v]) => {
     if (Array.isArray(v)) return v.length > 0;
     return v !== undefined && v !== "";
-  }) || searchQuery || Object.values(columnFilters).some(v => v) || smartSearchState.isActive || justEnrichedIds !== null;
+  }) || searchQuery || Object.values(columnFilters).some(v => v) || justAddedIds !== null;
 
   const hasColumnFilters = Object.values(columnFilters).some(v => v);
 
-  const [showGenderDialog, setShowGenderDialog] = useState(false);
-
-  const unknownGenderCount = useMemo(() => 
-    contacts.filter(c => c.gender === 'unknown').length,
-    [contacts]
-  );
-
-  const noFocusAreaCount = useMemo(() => 
-    contacts.filter(c => !c.emi_focus_areas || c.emi_focus_areas.length === 0).length,
-    [contacts]
-  );
-
-  const emailMismatchCount = useMemo(() => 
-    contacts.filter(c => c.email_company_mismatch && !c.email_mismatch_dismissed).length,
-    [contacts]
-  );
-
   // Get contacts that would be excluded by law firm filter FROM THE CURRENTLY VISIBLE LIST
-  const excludedLawFirmContacts = useMemo(() => 
+  const excludedLawFirmContacts = useMemo(() =>
     contactsBeforeExclusion.filter(c => c.is_law_firm === true),
     [contactsBeforeExclusion]
   );
 
   // Get contacts that would be excluded by consultant filter FROM THE CURRENTLY VISIBLE LIST
-  const excludedConsultantContacts = useMemo(() => 
+  const excludedConsultantContacts = useMemo(() =>
     contactsBeforeExclusion.filter(c => c.is_consultant === true),
     [contactsBeforeExclusion]
-  );
-
-  // Count unclassified contacts
-  const unclassifiedCount = useMemo(() => 
-    contacts.filter(c => c.classified_at === null).length,
-    [contacts]
   );
 
   const updateContact = useUpdateDistributionContact();
@@ -512,9 +425,9 @@ export function ContactsListView() {
     });
   }, [updateContact]);
 
-  // Bulk protection handlers for the new checkbox-based UI
+  // Bulk protection handlers for the checkbox-based UI
   const handleBulkProtectFromLawFirm = useCallback(async (contactIds: string[]) => {
-    const promises = contactIds.map(id => 
+    const promises = contactIds.map(id =>
       updateContact.mutateAsync({
         id,
         is_law_firm: false,
@@ -525,7 +438,7 @@ export function ContactsListView() {
   }, [updateContact]);
 
   const handleBulkProtectFromConsultant = useCallback(async (contactIds: string[]) => {
-    const promises = contactIds.map(id => 
+    const promises = contactIds.map(id =>
       updateContact.mutateAsync({
         id,
         is_consultant: false,
@@ -538,19 +451,18 @@ export function ContactsListView() {
   // Find protected contacts - those that were PREVIOUSLY classified as law firms or consultants
   // but were manually protected by the user (indicated by specific classification_reason values)
   const protectedContacts = useMemo(() => {
-    return allContacts.filter(c => 
+    return allContacts.filter(c =>
       c.classification_reason?.includes("User protected from law firm exclusion") ||
       c.classification_reason?.includes("User protected from consultant exclusion")
     );
   }, [allContacts]);
-
 
   const handleReidentifyProtected = useCallback(async (contactIds: string[]) => {
     setIsReidentifying(true);
     try {
       // Filter to only the selected contacts
       const contactsToUpdate = protectedContacts.filter(c => contactIds.includes(c.id));
-      
+
       // Update selected protected contacts to re-include them in exclusion filters
       const updates = contactsToUpdate.map(contact => {
         const updateData: { id: string; is_law_firm?: boolean; is_consultant?: boolean; classification_reason: string } = {
@@ -565,7 +477,7 @@ export function ContactsListView() {
         }
         return updateContact.mutateAsync(updateData);
       });
-      
+
       await Promise.all(updates);
       toast.success(`Re-identified ${contactsToUpdate.length} contact(s)`);
     } catch (error) {
@@ -618,39 +530,17 @@ export function ContactsListView() {
             </Button>
           )}
 
-          {/* Just Added/Enriched indicator */}
-          {justEnrichedIds && justEnrichedIds.size > 0 && (
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary" className="gap-1.5 bg-success/10 text-success border-success/20">
-                <Wand2 className="h-3 w-3" />
-                Showing {justEnrichedIds.size} just added
-                <button 
-                  onClick={() => {
-                    setJustEnrichedIds(null);
-                    setShowOnlyEnrichedWithChanges(false);
-                  }}
-                  className="ml-1 hover:bg-success/20 rounded p-0.5"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </Badge>
-              
-              {/* Filter to show only contacts with email/company changes */}
-              {contactsWithMeaningfulChanges.size > 0 && (
-                <Button
-                  variant={showOnlyEnrichedWithChanges ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setShowOnlyEnrichedWithChanges(!showOnlyEnrichedWithChanges)}
-                  className="gap-1.5 h-6 text-xs"
-                >
-                  <Sparkles className="h-3 w-3" />
-                  {showOnlyEnrichedWithChanges 
-                    ? `Showing ${contactsWithMeaningfulChanges.size} with changes`
-                    : `${contactsWithMeaningfulChanges.size} with email/company changes`
-                  }
-                </Button>
-              )}
-            </div>
+          {/* Just Added indicator */}
+          {justAddedIds && justAddedIds.size > 0 && (
+            <Badge variant="secondary" className="gap-1.5 bg-success/10 text-success border-success/20">
+              Showing {justAddedIds.size} just added
+              <button
+                onClick={() => setJustAddedIds(null)}
+                className="ml-1 hover:bg-success/20 rounded p-0.5"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
           )}
 
           <div className="flex-1" />
@@ -660,63 +550,6 @@ export function ContactsListView() {
             selectedListId={selectedListId}
             onSelectList={setSelectedListId}
           />
-
-          {/* Smart Sector Search */}
-          <SmartSectorSearch
-            onSearch={executeQuickSearch}
-            onDeepSearch={executeDeepSearch}
-            onClear={clearSmartSearch}
-            isSearching={isSmartSearching}
-            isDeepSearching={isDeepSearching}
-            isActive={smartSearchState.isActive}
-            matchCount={smartSearchState.matches.size}
-            queryUnderstanding={smartSearchState.queryUnderstanding}
-            activeQuery={smartSearchState.query}
-          />
-
-          {unknownGenderCount > 0 && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setShowGenderDialog(true)}
-              className="gap-2"
-            >
-              <Sparkles className="h-4 w-4" />
-              Assign Genders ({unknownGenderCount})
-            </Button>
-          )}
-
-          {noFocusAreaCount > 0 && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setShowFocusAreaDialog(true)}
-              className="gap-2"
-            >
-              <Target className="h-4 w-4" />
-              EMI Focus Area ({noFocusAreaCount})
-            </Button>
-          )}
-
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => detectMismatch.mutate({ runAll: true })}
-            disabled={detectMismatch.isPending}
-            className="gap-2"
-          >
-            {detectMismatch.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <AlertCircle className="h-4 w-4" />
-            )}
-            Check Emails
-            {emailMismatchCount > 0 && (
-              <Badge variant="destructive" className="ml-1 h-5 px-1.5">
-                {emailMismatchCount}
-              </Badge>
-            )}
-          </Button>
 
           <Button variant="outline" size="sm" onClick={() => setShowImportDialog(true)} className="gap-2">
             <Upload className="h-4 w-4" />
@@ -792,35 +625,14 @@ export function ContactsListView() {
             {/* Time period filter */}
             <Select
               value={filters.updatedPeriod || ""}
-              onValueChange={(v) => setFilters(f => ({ 
-                ...f, 
-                updatedPeriod: v as UpdatedTimePeriod || undefined 
+              onValueChange={(v) => setFilters(f => ({
+                ...f,
+                updatedPeriod: v as UpdatedTimePeriod || undefined
               }))}
             >
               <SelectTrigger className="w-[160px]">
                 <Clock className="h-3 w-3 mr-1" />
                 <SelectValue placeholder="Updated in..." />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="week">Last Week</SelectItem>
-                <SelectItem value="month">Last Month</SelectItem>
-                <SelectItem value="3months">Last 3 Months</SelectItem>
-                <SelectItem value="6months">Last 6 Months</SelectItem>
-                <SelectItem value="year">Last Year</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {/* Enriched period filter */}
-            <Select
-              value={filters.enrichedPeriod || ""}
-              onValueChange={(v) => setFilters(f => ({ 
-                ...f, 
-                enrichedPeriod: v as UpdatedTimePeriod || undefined 
-              }))}
-            >
-              <SelectTrigger className="w-[160px]">
-                <Sparkles className="h-3 w-3 mr-1" />
-                <SelectValue placeholder="Enriched in..." />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="week">Last Week</SelectItem>
@@ -846,7 +658,7 @@ export function ContactsListView() {
 
             <div className="h-6 w-px bg-border" />
 
-            {/* AI Classification Exclusion Filters */}
+            {/* Classification Exclusion Filters */}
             <ExclusionFilterCheckbox
               label="Exclude law firms"
               checked={filters.excludeLawFirms === true}
@@ -880,24 +692,6 @@ export function ContactsListView() {
               </Button>
             )}
 
-            {/* Classify button if there are unclassified contacts */}
-            {unclassifiedCount > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => classifyContacts.mutate({ classifyAll: true })}
-                disabled={classifyContacts.isPending}
-                className="gap-2"
-              >
-                {classifyContacts.isPending ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3 w-3" />
-                )}
-                Classify ({unclassifiedCount})
-              </Button>
-            )}
-
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
                 <X className="h-4 w-4" />
@@ -914,7 +708,7 @@ export function ContactsListView() {
           <span className="text-sm font-medium">
             {selectedIds.size} contact{selectedIds.size !== 1 ? 's' : ''} selected
           </span>
-          
+
           {dncSelected && (
             <Badge variant="destructive" className="gap-1">
               <AlertTriangle className="h-3 w-3" />
@@ -924,9 +718,9 @@ export function ContactsListView() {
 
           <div className="flex-1" />
 
-          <Button 
-            variant="destructive" 
-            size="sm" 
+          <Button
+            variant="destructive"
+            size="sm"
             onClick={() => setShowDeleteConfirm(true)}
             className="gap-2"
           >
@@ -934,24 +728,9 @@ export function ContactsListView() {
             Delete
           </Button>
 
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setShowEnrichmentPreCheck(true)}
-            disabled={bulkEnrich.isPending}
-            className="gap-2"
-          >
-            {bulkEnrich.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Wand2 className="h-4 w-4" />
-            )}
-            Enrich
-          </Button>
-
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => setShowAddToListDialog(true)}
             className="gap-2"
           >
@@ -961,9 +740,9 @@ export function ContactsListView() {
 
           {/* Remove from List - only shown when viewing a specific list */}
           {selectedListId && (
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => setShowRemoveFromListConfirm(true)}
               className="gap-2 text-destructive hover:text-destructive"
             >
@@ -977,17 +756,17 @@ export function ContactsListView() {
             Export
           </Button>
 
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={() => {
-              const selectedContacts = contacts.filter(c => selectedIds.has(c.id));
-              const emails = selectedContacts
+              const selected = contacts.filter(c => selectedIds.has(c.id));
+              const emails = selected
                 .map(c => c.email)
                 .filter(Boolean)
                 .join('; ');
               navigator.clipboard.writeText(emails).then(() => {
-                toast.success(`Copied ${selectedContacts.length} email address${selectedContacts.length !== 1 ? 'es' : ''}`);
+                toast.success(`Copied ${selected.length} email address${selected.length !== 1 ? 'es' : ''}`);
               }).catch(() => {
                 toast.error('Failed to copy to clipboard');
               });
@@ -998,8 +777,8 @@ export function ContactsListView() {
             Copy Emails
           </Button>
 
-          <Button 
-            size="sm" 
+          <Button
+            size="sm"
             onClick={handleEmailAction}
             disabled={dncSelected}
             className="gap-2"
@@ -1149,7 +928,7 @@ export function ContactsListView() {
                   </TableRow>
                 ) : (
                   contactsAfterExclusion.map((contact) => (
-                    <TableRow 
+                    <TableRow
                       key={contact.id}
                       className={contact.do_not_contact ? "opacity-60 bg-muted/30" : ""}
                     >
@@ -1170,106 +949,13 @@ export function ContactsListView() {
                           {contact.do_not_contact && (
                             <Badge variant="destructive" className="shrink-0 text-xs">DNC</Badge>
                           )}
-                          {smartSearchState.isActive && getMatchForContact(contact.id) && (
-                            <SmartMatchBadge match={getMatchForContact(contact.id)!} compact />
-                          )}
                         </div>
                       </TableCell>
                       <TableCell className="truncate text-sm">
-                        {(() => {
-                          const emailChange = enrichmentChanges[contact.id]?.email;
-                          const hasEmailChange = emailChange && emailChange.old !== emailChange.new;
-                          
-                          if (contact.email_company_mismatch && !contact.email_mismatch_dismissed) {
-                            return (
-                              <div className="flex items-center gap-1">
-                                <span className="text-destructive font-medium truncate">{contact.email}</span>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          dismissMismatch.mutate(contact.id);
-                                        }}
-                                        className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
-                                      >
-                                        <XCircle className="h-4 w-4" />
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p className="text-xs">Email may not match company. Click to dismiss.</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                            );
-                          }
-                          
-                          if (hasEmailChange) {
-                            return (
-                              <div className="flex items-center gap-1">
-                                <span className="text-muted-foreground truncate">{contact.email}</span>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="shrink-0 text-primary">
-                                        <Sparkles className="h-3 w-3" />
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-xs">
-                                      <div className="text-xs space-y-1">
-                                        <p className="font-medium">Email enriched</p>
-                                        <p className="text-muted-foreground">
-                                          <span className="line-through">{emailChange.old || "(empty)"}</span>
-                                          {" → "}
-                                          <span className="text-foreground">{emailChange.new}</span>
-                                        </p>
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                            );
-                          }
-                          
-                          return <span className="text-muted-foreground">{contact.email}</span>;
-                        })()}
+                        <span className="text-muted-foreground">{contact.email}</span>
                       </TableCell>
                       <TableCell className="truncate text-sm">
-                        {(() => {
-                          const companyChange = enrichmentChanges[contact.id]?.company;
-                          const hasCompanyChange = companyChange && companyChange.old !== companyChange.new;
-                          
-                          if (hasCompanyChange) {
-                            return (
-                              <div className="flex items-center gap-1">
-                                <span className="truncate">{contact.company || "-"}</span>
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="shrink-0 text-primary">
-                                        <Sparkles className="h-3 w-3" />
-                                      </span>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="max-w-xs">
-                                      <div className="text-xs space-y-1">
-                                        <p className="font-medium">Company enriched</p>
-                                        <p className="text-muted-foreground">
-                                          <span className="line-through">{companyChange.old || "(empty)"}</span>
-                                          {" → "}
-                                          <span className="text-foreground">{companyChange.new}</span>
-                                        </p>
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
-                            );
-                          }
-                          
-                          return <span>{contact.company || "-"}</span>;
-                        })()}
+                        <span>{contact.company || "-"}</span>
                       </TableCell>
                       <TableCell className="truncate text-sm">{contact.job_title || "-"}</TableCell>
                       <TableCell className="text-muted-foreground truncate text-sm">{contact.relationship_owner || "-"}</TableCell>
@@ -1309,9 +995,6 @@ export function ContactsListView() {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <div className="flex items-center justify-center gap-1 text-xs text-muted-foreground">
-                                {contact.last_enriched_at && (
-                                  <Sparkles className="h-3 w-3 text-primary" />
-                                )}
                                 <span>
                                   {format(new Date(contact.created_at), "d MMM")}
                                 </span>
@@ -1321,12 +1004,6 @@ export function ContactsListView() {
                               <div className="text-xs space-y-1">
                                 <div>Added: {format(new Date(contact.created_at), "d MMM yyyy HH:mm")}</div>
                                 <div>Updated: {format(new Date(contact.updated_at), "d MMM yyyy HH:mm")}</div>
-                                {contact.last_enriched_at && (
-                                  <div className="flex items-center gap-1">
-                                    <Sparkles className="h-3 w-3" />
-                                    Enriched: {format(new Date(contact.last_enriched_at), "d MMM yyyy HH:mm")}
-                                  </div>
-                                )}
                               </div>
                             </TooltipContent>
                           </Tooltip>
@@ -1353,7 +1030,7 @@ export function ContactsListView() {
                                 View Details
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem 
+                              <DropdownMenuItem
                                 onClick={() => {
                                   if (!contact.do_not_contact) {
                                     setSelectedIds(new Set([contact.id]));
@@ -1379,7 +1056,7 @@ export function ContactsListView() {
 
       {/* Summary */}
       <div className="text-sm text-muted-foreground">
-        Showing {contactsAfterExclusion.length} contact{contactsAfterExclusion.length !== 1 ? 's' : ''} 
+        Showing {contactsAfterExclusion.length} contact{contactsAfterExclusion.length !== 1 ? 's' : ''}
         {contactsAfterExclusion.length !== contacts.length && (
           <> (filtered from {contacts.length})</>
         )}
@@ -1392,13 +1069,12 @@ export function ContactsListView() {
       <ContactFormDialog
         open={showAddDialog}
         onOpenChange={setShowAddDialog}
-        onContactCreated={(contactId, wasEnriched) => {
+        onContactCreated={(contactId) => {
           // Auto-filter to show the newly created contact
-          setJustEnrichedIds(new Set([contactId]));
-          toast.success(
-            wasEnriched ? 'Contact created and enriched' : 'Contact created',
-            { description: 'Showing new contact. Click badge to see all.' }
-          );
+          setJustAddedIds(new Set([contactId]));
+          toast.success('Contact created', {
+            description: 'Showing new contact. Click badge to see all.',
+          });
         }}
       />
 
@@ -1411,7 +1087,7 @@ export function ContactsListView() {
             const idsSet = new Set(importedIds);
             // Small delay to allow query invalidation to propagate and refetch
             await new Promise(resolve => setTimeout(resolve, 500));
-            setJustEnrichedIds(idsSet);
+            setJustAddedIds(idsSet);
             toast.success(
               `Imported ${importedIds.length} contact${importedIds.length !== 1 ? 's' : ''}`,
               { description: 'Showing imported contacts. Click badge to see all.' }
@@ -1456,12 +1132,6 @@ export function ContactsListView() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <GenderAssignmentDialog
-        open={showGenderDialog}
-        onOpenChange={setShowGenderDialog}
-        contacts={contacts}
-      />
-
       {historyContact && (
         <ContactHistoryDialog
           open={!!historyContact}
@@ -1470,13 +1140,6 @@ export function ContactsListView() {
           contactName={historyContact.name}
         />
       )}
-
-      <FocusAreaAssignmentDialog
-        open={showFocusAreaDialog}
-        onOpenChange={setShowFocusAreaDialog}
-        selectedContactIds={Array.from(selectedIds)}
-        onComplete={() => setSelectedIds(new Set())}
-      />
 
       {/* Re-identify protected contacts dialog */}
       <ReidentifyExcludedDialog
@@ -1505,7 +1168,7 @@ export function ContactsListView() {
           <AlertDialogHeader>
             <AlertDialogTitle>Remove {selectedIds.size} Contact{selectedIds.size !== 1 ? 's' : ''} from List?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will remove the selected contact{selectedIds.size !== 1 ? 's' : ''} from this distribution list. 
+              This will remove the selected contact{selectedIds.size !== 1 ? 's' : ''} from this distribution list.
               The contacts themselves will not be deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -1528,48 +1191,6 @@ export function ContactsListView() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {/* Smart Enrichment Pre-Check Dialog */}
-      <EnrichmentPreCheckDialog
-        open={showEnrichmentPreCheck}
-        onOpenChange={setShowEnrichmentPreCheck}
-        contacts={selectedContacts}
-        isEnriching={bulkEnrich.isPending}
-        onEnrich={(contactIds) => {
-          const contactsToEnrich = selectedContacts
-            .filter(c => contactIds.includes(c.id))
-            .map(c => ({
-              contactId: c.id,
-              fullName: c.full_name,
-              email: c.email,
-              linkedinUrl: c.linkedin_url,
-              company: c.company,
-            }));
-          bulkEnrich.mutate(contactsToEnrich, {
-            onSuccess: (results) => {
-              const successIds = results
-                .filter(r => r.success)
-                .map(r => r.contactId);
-              const failed = results.filter(r => !r.success).length;
-              
-              setShowEnrichmentPreCheck(false);
-              setSelectedIds(new Set()); // Clear selection
-              
-              // Apply filter to show only enriched contacts
-              if (successIds.length > 0) {
-                setJustEnrichedIds(new Set(successIds));
-                toast.success(
-                  `Enriched ${successIds.length} contact${successIds.length !== 1 ? 's' : ''}`,
-                  { description: 'Showing enriched contacts. Click "Clear all" to see all contacts.' }
-                );
-              }
-              if (failed > 0) {
-                toast.error(`Failed to enrich ${failed} contact${failed !== 1 ? 's' : ''}`);
-              }
-            },
-          });
-        }}
-      />
     </div>
   );
 }

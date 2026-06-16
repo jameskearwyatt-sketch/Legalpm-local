@@ -23,12 +23,10 @@ const Reports = lazy(() => import("./pages/Reports"));
 const Help = lazy(() => import("./pages/Help"));
 const Flags = lazy(() => import("./pages/Flags"));
 const TimeRecording = lazy(() => import("./pages/TimeRecording"));
-const ExcelAnalyzer = lazy(() => import("./pages/ExcelAnalyzer"));
 const MatterPricing = lazy(() => import("./pages/MatterPricing"));
 const PricingProposalDetail = lazy(() => import("./pages/PricingProposalDetail"));
 const Contacts = lazy(() => import("./pages/Contacts"));
 const BMExpertiseMap = lazy(() => import("./pages/BMExpertiseMap"));
-const AdaptPricingWizard = lazy(() => import("./pages/AdaptPricingWizard"));
 const ActivityLog = lazy(() => import("./pages/ActivityLog"));
 const PalettePreview = lazy(() => import("./pages/PalettePreview"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -131,7 +129,6 @@ function AppRoutes() {
         <Route path="/time-recording" element={<ProtectedRoute><TimeRecording /></ProtectedRoute>} />
         <Route path="/pricing" element={<ProtectedRoute><MatterPricing /></ProtectedRoute>} />
         <Route path="/pricing/proposal/:proposalId" element={<ProtectedRoute><PricingProposalDetail /></ProtectedRoute>} />
-        <Route path="/pricing/adapt" element={<ProtectedRoute><AdaptPricingWizard /></ProtectedRoute>} />
         <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
         <Route path="/bm-expertise" element={<ProtectedRoute><BMExpertiseMap /></ProtectedRoute>} />
         <Route path="/growth" element={<ProtectedRoute><Growth /></ProtectedRoute>} />
@@ -143,7 +140,6 @@ function AppRoutes() {
         <Route path="/admin/activity" element={<AdminRoute><ActivityLog /></AdminRoute>} />
         <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
-        <Route path="/excel-analyzer" element={<ProtectedRoute><ExcelAnalyzer /></ProtectedRoute>} />
         <Route path="/help" element={<ProtectedRoute><Help /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

@@ -7,10 +7,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { type DistributionContactInsert } from "@/lib/hooks/useDistributionContacts";
 import { useDistributionSectors } from "@/lib/hooks/useDistributionSectors";
 import { useDistributionRelationshipOwners, useEnsureRelationshipOwner } from "@/lib/hooks/useDistributionRelationshipOwners";
@@ -18,8 +15,7 @@ import { useContactImportFormats, ContactColumnMappings } from "@/lib/hooks/useC
 import { ContactFormatTrainingDialog } from "./ContactFormatTrainingDialog";
 import { ImportPreviewDialog } from "./ImportPreviewDialog";
 import { OwnerSelector } from "./OwnerSelector";
-import { supabase } from "@/integrations/supabase/client";
-import { Upload, FileText, Loader2, FileSpreadsheet, X, CreditCard, Camera, Sparkles } from "lucide-react";
+import { Upload, Loader2, FileSpreadsheet, X } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 
@@ -30,10 +26,7 @@ interface ContactImportDialogProps {
 }
 
 export function ContactImportDialog({ open, onOpenChange, onImportComplete }: ContactImportDialogProps) {
-  const [activeTab, setActiveTab] = useState("paste");
-  const [pastedText, setPastedText] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [parsedData, setParsedData] = useState<Record<string, string>[]>([]);
   const [parsedHeaders, setParsedHeaders] = useState<string[]>([]);
@@ -42,7 +35,6 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
   const [contactsToPreview, setContactsToPreview] = useState<DistributionContactInsert[]>([]);
   const [importSource, setImportSource] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const { data: sectors = [] } = useDistributionSectors();
   const { data: relationshipOwners = [] } = useDistributionRelationshipOwners();
@@ -58,9 +50,9 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
   };
 
   const applyIndexMappingToRow = (
-    row: Record<string, string>, 
+    row: Record<string, string>,
     headers: string[],
-    mappings: ContactColumnMappings, 
+    mappings: ContactColumnMappings,
     fallbackOwner?: string
   ): DistributionContactInsert | null => {
     const getValue = (fieldIndex: number | undefined): string => {
@@ -72,20 +64,20 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
     let fullName = getValue(mappings.full_name);
     const firstName = getValue(mappings.first_name);
     const lastName = getValue(mappings.last_name);
-    
+
     if (!fullName && (firstName || lastName)) {
       // Always use "FirstName Surname" format for consistency
       fullName = [firstName, lastName].filter(Boolean).join(" ");
     }
 
     const email = getValue(mappings.email).toLowerCase();
-    
+
     if (!email || !email.includes("@")) return null;
     if (!fullName) fullName = "Unknown";
 
     const sectorsValue = getValue(mappings.sectors);
     const sectorNames = sectors.map(s => s.name.toLowerCase());
-    const parsedSectors = sectorsValue 
+    const parsedSectors = sectorsValue
       ? sectorsValue.split(/[,;]/).map(s => s.trim()).filter(s => sectorNames.includes(s.toLowerCase()))
       : [];
 
@@ -117,12 +109,12 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
           const data = e.target?.result;
           const workbook = XLSX.read(data, { type: 'binary' });
           const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          
+
           const range = XLSX.utils.decode_range(firstSheet['!ref'] || 'A1');
           range.e.r = Math.min(range.e.r, 5000);
           firstSheet['!ref'] = XLSX.utils.encode_range(range);
-          
-          const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(firstSheet, { 
+
+          const jsonData = XLSX.utils.sheet_to_json<Record<string, string>>(firstSheet, {
             defval: '',
             raw: false,
           });
@@ -159,57 +151,57 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
   const autoDetectMappings = (headers: string[]): { mappings: ContactColumnMappings; hasMissingEssentials: boolean } => {
     const mappings: ContactColumnMappings = {};
     const lowerHeaders = headers.map(h => h.toLowerCase().trim());
-    
+
     // Email detection patterns
     const emailPatterns = ['email', 'e-mail', 'email address', 'emailaddress', 'mail'];
     const emailIdx = lowerHeaders.findIndex(h => emailPatterns.some(p => h.includes(p)));
     if (emailIdx !== -1) mappings.email = emailIdx;
-    
+
     // Full name detection patterns
     const fullNamePatterns = ['full name', 'fullname', 'name', 'contact name', 'contact'];
     const fullNameIdx = lowerHeaders.findIndex(h => fullNamePatterns.some(p => h === p || h.includes(p)));
     if (fullNameIdx !== -1 && fullNameIdx !== emailIdx) mappings.full_name = fullNameIdx;
-    
+
     // First name detection
     const firstNamePatterns = ['first name', 'firstname', 'first', 'given name', 'forename'];
     const firstNameIdx = lowerHeaders.findIndex(h => firstNamePatterns.some(p => h === p || h.includes(p)));
     if (firstNameIdx !== -1) mappings.first_name = firstNameIdx;
-    
-    // Last name detection  
+
+    // Last name detection
     const lastNamePatterns = ['last name', 'lastname', 'surname', 'family name', 'last'];
     const lastNameIdx = lowerHeaders.findIndex(h => lastNamePatterns.some(p => h === p || h.includes(p)));
     if (lastNameIdx !== -1) mappings.last_name = lastNameIdx;
-    
+
     // Company detection
     const companyPatterns = ['company', 'organization', 'organisation', 'employer', 'firm', 'company name'];
     const companyIdx = lowerHeaders.findIndex(h => companyPatterns.some(p => h === p || h.includes(p)));
     if (companyIdx !== -1) mappings.company = companyIdx;
-    
+
     // Job title detection
     const titlePatterns = ['job title', 'title', 'position', 'role', 'designation'];
     const titleIdx = lowerHeaders.findIndex(h => titlePatterns.some(p => h === p || h.includes(p)));
     if (titleIdx !== -1) mappings.job_title = titleIdx;
-    
+
     // Country detection
     const countryPatterns = ['country', 'location', 'nation'];
     const countryIdx = lowerHeaders.findIndex(h => countryPatterns.some(p => h === p || h.includes(p)));
     if (countryIdx !== -1) mappings.country = countryIdx;
-    
+
     // City detection
     const cityPatterns = ['city', 'town'];
     const cityIdx = lowerHeaders.findIndex(h => cityPatterns.some(p => h === p || h.includes(p)));
     if (cityIdx !== -1) mappings.city = cityIdx;
-    
+
     // LinkedIn detection
     const linkedinPatterns = ['linkedin', 'linkedin url', 'linkedin profile'];
     const linkedinIdx = lowerHeaders.findIndex(h => linkedinPatterns.some(p => h === p || h.includes(p)));
     if (linkedinIdx !== -1) mappings.linkedin_url = linkedinIdx;
-    
+
     // Check if essential fields are present
     const hasEmail = mappings.email !== undefined;
-    const hasName = mappings.full_name !== undefined || 
+    const hasName = mappings.full_name !== undefined ||
                     (mappings.first_name !== undefined && mappings.last_name !== undefined);
-    
+
     return { mappings, hasMissingEssentials: !hasEmail || !hasName };
   };
 
@@ -223,14 +215,14 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
       setParsedHeaders(headers);
 
       const matchedFormat = findMatchingFormat(headers);
-      
+
       if (matchedFormat) {
         toast.success(`Recognized format: "${matchedFormat.format_name}". Processing ${rows.length} contacts...`);
         await processWithMappings(rows, headers, matchedFormat.column_mappings);
       } else {
         // Try auto-detection
         const { mappings: autoMappings, hasMissingEssentials } = autoDetectMappings(headers);
-        
+
         if (hasMissingEssentials) {
           // Essential fields not found - prompt for training
           toast.warning(`Could not auto-detect Email or Name columns. Please map the columns manually.`);
@@ -250,7 +242,7 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
   };
 
   const processWithMappings = async (
-    rows: Record<string, string>[], 
+    rows: Record<string, string>[],
     headers: string[],
     mappings: ContactColumnMappings
   ) => {
@@ -296,173 +288,12 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
     await processWithMappings(parsedData, parsedHeaders, mappings);
   };
 
-  const handlePasteImport = async () => {
-    if (!pastedText.trim()) {
-      toast.error("Please paste some contact data");
-      return;
-    }
-
-    setIsProcessing(true);
-    try {
-      if (defaultOwner) {
-        await ensureOwner.mutateAsync(defaultOwner);
-      }
-
-      // Use AI to intelligently parse the pasted text
-      const { data, error } = await supabase.functions.invoke("parse-pasted-contacts", {
-        body: { pastedText: pastedText.trim() },
-      });
-
-      if (error) throw new Error(error.message);
-      if (!data.success) throw new Error(data.error || "Failed to parse contacts");
-
-      const extractedContacts = data.contacts || [];
-      
-      if (extractedContacts.length === 0) {
-        toast.error("No valid contacts found. Please check the pasted data contains names and email addresses.");
-        return;
-      }
-
-      // Convert extracted contacts to DistributionContactInsert format
-      const contacts: DistributionContactInsert[] = extractedContacts.map((c: {
-        full_name: string;
-        email: string;
-        company?: string | null;
-        job_title?: string | null;
-        phone?: string | null;
-      }) => ({
-        full_name: c.full_name,
-        email: c.email.toLowerCase(),
-        company: c.company || null,
-        job_title: c.job_title || null,
-        country: null,
-        city: null,
-        gender: "unknown" as const,
-        sectors: [],
-        sectors_ai_assigned: false,
-        linkedin_url: null,
-        notes: c.phone ? `Phone: ${c.phone}` : null,
-        relationship_owner: defaultOwner || null,
-        do_not_contact: false,
-        provenance: "Pasted import (AI parsed)",
-      }));
-
-      toast.success(`AI extracted ${contacts.length} contact${contacts.length !== 1 ? 's' : ''}`);
-
-      // Show preview dialog
-      setContactsToPreview(contacts);
-      setImportSource("pasted text");
-      setParseStep("preview");
-    } catch (error) {
-      console.error("Paste import error:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to parse pasted contacts");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleBusinessCardUpload = async () => {
-    if (!selectedImage) return;
-
-    setIsProcessing(true);
-    try {
-      if (defaultOwner) {
-        await ensureOwner.mutateAsync(defaultOwner);
-      }
-
-      // Read file as base64
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          // Remove data URL prefix to get just the base64
-          const base64Data = result.split(",")[1];
-          resolve(base64Data);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(selectedImage);
-      });
-
-      const { data, error } = await supabase.functions.invoke("parse-business-card", {
-        body: { 
-          imageBase64: base64,
-          mimeType: selectedImage.type 
-        },
-      });
-
-      if (error) throw new Error(error.message);
-      if (!data.success) throw new Error(data.error || "Failed to parse business card");
-
-      const extractedContacts = data.contacts || [];
-      const totalDetected = data.total_cards_detected || extractedContacts.length;
-      
-      if (extractedContacts.length === 0) {
-        toast.error("No business cards detected in the image");
-        return;
-      }
-
-      // Convert extracted contacts to DistributionContactInsert format
-      const contactInserts: DistributionContactInsert[] = extractedContacts
-        .filter((contact: { full_name?: string; email?: string }) => 
-          contact.full_name && contact.email && contact.email.includes("@")
-        )
-        .map((contact: { 
-          full_name: string; 
-          email: string; 
-          company?: string; 
-          job_title?: string; 
-          country?: string; 
-          city?: string; 
-          linkedin_url?: string; 
-          phone?: string 
-        }) => ({
-          full_name: contact.full_name || "Unknown",
-          email: (contact.email || "").toLowerCase(),
-          company: contact.company || null,
-          job_title: contact.job_title || null,
-          country: contact.country || null,
-          city: contact.city || null,
-          gender: "unknown" as const,
-          sectors: [],
-          sectors_ai_assigned: false,
-          linkedin_url: contact.linkedin_url || null,
-          notes: contact.phone ? `Phone: ${contact.phone}` : null,
-          relationship_owner: defaultOwner || null,
-          do_not_contact: false,
-          provenance: `Business card: ${selectedImage.name}`,
-        }));
-
-      if (contactInserts.length === 0) {
-        toast.error("Could not extract valid email addresses from the business card(s)");
-        return;
-      }
-
-      // Show info about extraction results
-      if (totalDetected > contactInserts.length) {
-        toast.info(`Extracted ${contactInserts.length} of ${totalDetected} detected cards (some missing email addresses)`);
-      } else if (contactInserts.length > 1) {
-        toast.success(`Found ${contactInserts.length} business cards in the image`);
-      }
-
-      // Show preview dialog
-      setContactsToPreview(contactInserts);
-      setImportSource(`business card${contactInserts.length > 1 ? 's' : ''}: ${selectedImage.name}`);
-      setParseStep("preview");
-
-    } catch (error) {
-      console.error("Business card parsing error:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to parse business card");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const validExtensions = ['.xlsx', '.xls', '.csv'];
       const hasValidExtension = validExtensions.some(ext => file.name.toLowerCase().endsWith(ext));
-      
+
       if (hasValidExtension) {
         setSelectedFile(file);
         setParsedData([]);
@@ -474,26 +305,8 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
-      const isValidType = validTypes.includes(file.type.toLowerCase()) || 
-        file.name.toLowerCase().endsWith('.heic') ||
-        file.name.toLowerCase().endsWith('.heif');
-      
-      if (isValidType) {
-        setSelectedImage(file);
-      } else {
-        toast.error("Please upload an image file (JPG, PNG, WebP, or HEIC)");
-      }
-    }
-  };
-
   const resetDialog = () => {
-    setPastedText("");
     setSelectedFile(null);
-    setSelectedImage(null);
     setParsedData([]);
     setParsedHeaders([]);
     setParseStep("select");
@@ -501,7 +314,6 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
     setContactsToPreview([]);
     setImportSource("");
     if (fileInputRef.current) fileInputRef.current.value = '';
-    if (imageInputRef.current) imageInputRef.current.value = '';
   };
 
   const clearFile = () => {
@@ -510,11 +322,6 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
     setParsedHeaders([]);
     setParseStep("select");
     if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const clearImage = () => {
-    setSelectedImage(null);
-    if (imageInputRef.current) imageInputRef.current.value = '';
   };
 
   const ownerSelectorProps = {
@@ -531,154 +338,59 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
             <DialogTitle>Import Contacts</DialogTitle>
           </DialogHeader>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="paste" className="gap-2">
-                <FileText className="h-4 w-4" />
-                Paste Text
-              </TabsTrigger>
-              <TabsTrigger value="file" className="gap-2">
-                <Upload className="h-4 w-4" />
-                Upload File
-              </TabsTrigger>
-              <TabsTrigger value="card" className="gap-2">
-                <CreditCard className="h-4 w-4" />
-                Business Card
-              </TabsTrigger>
-            </TabsList>
+          <div className="space-y-4 mt-2">
+            <div>
+              <Label>Upload Excel or CSV file</Label>
+              <p className="text-sm text-muted-foreground mb-2">
+                Upload your file and train the system to recognize column mappings.
+              </p>
 
-            <TabsContent value="paste" className="space-y-4 mt-4">
-              <div>
-                <Label className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-primary" />
-                  Paste contact data
-                </Label>
-                <p className="text-sm text-muted-foreground mb-2">
-                  Paste contacts from Outlook, emails, or any source. AI will intelligently extract names and email addresses from any format.
-                </p>
-                <Textarea
-                  rows={8}
-                  placeholder="John Smith &lt;john.smith@example.com&gt;; Jane Doe (jane.doe@company.org)&#10;&#10;Or any format - AI will figure it out!"
-                  value={pastedText}
-                  onChange={(e) => setPastedText(e.target.value)}
-                />
-              </div>
-              <OwnerSelector {...ownerSelectorProps} />
-            </TabsContent>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleFileChange}
+                className="hidden"
+              />
 
-            <TabsContent value="file" className="space-y-4 mt-4">
-              <div>
-                <Label>Upload Excel or CSV file</Label>
-                <p className="text-sm text-muted-foreground mb-2">
-                  Upload your file and train the system to recognize column mappings.
-                </p>
-                
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  onChange={handleFileChange}
-                  className="hidden"
-                />
-
-                {selectedFile ? (
-                  <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg border">
-                    <FileSpreadsheet className="h-8 w-8 text-primary" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{selectedFile.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {(selectedFile.size / 1024).toFixed(1)} KB
-                      </p>
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={clearFile}>
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="w-full p-6 border-2 border-dashed rounded-lg hover:bg-muted/50 transition-colors text-center"
-                  >
-                    <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm font-medium">Click to select file</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Supports .xlsx, .xls, .csv
+              {selectedFile ? (
+                <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg border">
+                  <FileSpreadsheet className="h-8 w-8 text-primary" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{selectedFile.name}</p>
+                    <p className="text-sm text-muted-foreground">
+                      {(selectedFile.size / 1024).toFixed(1)} KB
                     </p>
-                  </button>
-                )}
-              </div>
-              <OwnerSelector {...ownerSelectorProps} />
-            </TabsContent>
-
-            <TabsContent value="card" className="space-y-4 mt-4">
-              <div>
-                <Label>Upload Business Card Photo</Label>
-                <p className="text-sm text-muted-foreground mb-2">
-                  Upload a photo of a business card. AI will extract contact details automatically.
-                </p>
-                
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/jpeg,image/jpg,image/png,image/webp,image/heic,image/heif,.heic,.heif"
-                  onChange={handleImageChange}
-                  className="hidden"
-                />
-
-                {selectedImage ? (
-                  <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg border">
-                    <Camera className="h-8 w-8 text-primary" />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{selectedImage.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {(selectedImage.size / 1024).toFixed(1)} KB
-                      </p>
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={clearImage}>
-                      <X className="h-4 w-4" />
-                    </Button>
                   </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => imageInputRef.current?.click()}
-                    className="w-full p-6 border-2 border-dashed rounded-lg hover:bg-muted/50 transition-colors text-center"
-                  >
-                    <Camera className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                    <p className="text-sm font-medium">Click to upload business card</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Supports JPG, PNG, WebP, HEIC
-                    </p>
-                  </button>
-                )}
-              </div>
-              <OwnerSelector {...ownerSelectorProps} />
-            </TabsContent>
-          </Tabs>
+                  <Button variant="ghost" size="icon" onClick={clearFile}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full p-6 border-2 border-dashed rounded-lg hover:bg-muted/50 transition-colors text-center"
+                >
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-sm font-medium">Click to select file</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Supports .xlsx, .xls, .csv
+                  </p>
+                </button>
+              )}
+            </div>
+            <OwnerSelector {...ownerSelectorProps} />
+          </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => { resetDialog(); onOpenChange(false); }}>
               Cancel
             </Button>
-            {activeTab === "paste" && (
-              <Button onClick={handlePasteImport} disabled={isProcessing || !pastedText.trim() || !defaultOwner}>
-                {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Continue
-              </Button>
-            )}
-            {activeTab === "file" && (
-              <Button onClick={handleFileAnalyse} disabled={isProcessing || !selectedFile || !defaultOwner}>
-                {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Analyse File
-              </Button>
-            )}
-            {activeTab === "card" && (
-              <Button onClick={handleBusinessCardUpload} disabled={isProcessing || !selectedImage || !defaultOwner}>
-                {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Extract Contact
-              </Button>
-            )}
+            <Button onClick={handleFileAnalyse} disabled={isProcessing || !selectedFile || !defaultOwner}>
+              {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Analyse File
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

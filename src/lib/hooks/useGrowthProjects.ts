@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -251,8 +250,6 @@ export function useGrowthProject(projectId?: string) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['growth-project-entries', projectId] });
-      // Trigger AI synthesis
-      synthesizeProject();
     },
     onError: (error: Error) => {
       toast.error('Failed to add entry: ' + error.message);
@@ -295,7 +292,6 @@ export function useGrowthProject(projectId?: string) {
       queryClient.invalidateQueries({ queryKey: ['my-upcoming-growth-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['all-growth-tasks'] });
       queryClient.invalidateQueries({ queryKey: ['overdue-tasks'] });
-      synthesizeProject();
     },
     onError: (error: Error) => {
       toast.error('Failed to add task: ' + error.message);
@@ -378,24 +374,6 @@ export function useGrowthProject(projectId?: string) {
     },
   });
 
-  const [isSynthesizing, setIsSynthesizing] = useState(false);
-
-  const synthesizeProject = async () => {
-    if (!projectId) return;
-    setIsSynthesizing(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('synthesize-growth-project', {
-        body: { projectId },
-      });
-      if (error) throw error;
-      queryClient.invalidateQueries({ queryKey: ['growth-project', projectId] });
-    } catch (error) {
-      console.error('Synthesis error:', error);
-    } finally {
-      setIsSynthesizing(false);
-    }
-  };
-
   const refreshDocuments = () => {
     queryClient.invalidateQueries({ queryKey: ['growth-project-documents', projectId] });
   };
@@ -417,13 +395,11 @@ export function useGrowthProject(projectId?: string) {
     tasks,
     documents,
     isLoading: projectLoading || entriesLoading || tasksLoading || documentsLoading,
-    isSynthesizing,
     addEntry,
     deleteEntry,
     addTask,
     updateTask,
     deleteTask,
-    synthesizeProject,
     refreshDocuments,
     updateDocumentSummary,
   };

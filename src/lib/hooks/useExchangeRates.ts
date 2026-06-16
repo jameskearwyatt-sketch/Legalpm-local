@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 
 interface ExchangeRatesResponse {
   success: boolean;
@@ -9,37 +8,31 @@ interface ExchangeRatesResponse {
   error?: string;
 }
 
+// Local-only edition: there is no network access, so currency conversion uses a
+// fixed set of default rates (expressed as "1 USD = X units of currency").
+function getDefaultRates(): ExchangeRatesResponse {
+  return {
+    success: true,
+    base: 'USD',
+    date: new Date().toISOString().split('T')[0],
+    rates: {
+      'USD': 1,
+      'GBP': 0.79,
+      'EUR': 0.92,
+      'CHF': 0.88,
+      'AUD': 1.53,
+      'CAD': 1.36,
+      'SGD': 1.34,
+      'Ringgit': 4.47,
+      'SEK': 10.95,
+    },
+  };
+}
+
 export function useExchangeRates() {
   return useQuery({
     queryKey: ['exchange-rates'],
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke<ExchangeRatesResponse>(
-        'fetch-exchange-rates'
-      );
-      
-      if (error) {
-        console.error('Error fetching exchange rates:', error);
-        // Return fallback rates
-        return {
-          success: false,
-          base: 'USD',
-          date: new Date().toISOString().split('T')[0],
-          rates: {
-            'USD': 1,
-            'GBP': 0.79,
-            'EUR': 0.92,
-            'CHF': 0.88,
-            'AUD': 1.53,
-            'CAD': 1.36,
-            'SGD': 1.34,
-            'Ringgit': 4.47,
-            'SEK': 10.95,
-          }
-        };
-      }
-      
-      return data;
-    },
+    queryFn: async () => getDefaultRates(),
     staleTime: 1000 * 60 * 60, // Cache for 1 hour
     gcTime: 1000 * 60 * 60 * 24, // Keep in cache for 24 hours
     refetchOnWindowFocus: false,

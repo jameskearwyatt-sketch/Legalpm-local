@@ -404,84 +404,43 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
     queryClient.invalidateQueries({ queryKey: ["clients"] });
   };
 
-  // Generate narratives for all matters
+  // Build a factual financial narrative for a matter from its current figures.
+  // No AI: this composes a plain, editable summary the user can refine before sending.
+  const buildNarrative = (data: MatterEmailData): string => {
+    const fmt = (amount: number) => formatCurrency(amount, data.feeCurrency);
+    const lines: string[] = [];
+    lines.push(`As at ${format(data.reviewPeriodEnd, "d MMMM yyyy")}, the financial position on this matter is as follows:`);
+    lines.push("");
+    lines.push(`• Work in progress: ${fmt(data.currentWip)}`);
+    lines.push(`• Accounts receivable: ${fmt(data.currentAr)}`);
+    lines.push(`• Paid to date: ${fmt(data.currentPaid)}`);
+    lines.push(`• Total budget utilised: ${fmt(data.totalBudgetUtilised)}`);
+    if (data.agreedBudget > 0) {
+      const pct = Math.round((data.totalBudgetUtilised / data.agreedBudget) * 100);
+      lines.push(`• Agreed budget: ${fmt(data.agreedBudget)} (${pct}% utilised)`);
+    }
+    if (data.reviewPeriodStart) {
+      lines.push("");
+      lines.push(`This update covers the period since ${format(data.reviewPeriodStart, "d MMMM yyyy")}.`);
+    }
+    if (data.userNotes.trim()) {
+      lines.push("");
+      lines.push(data.userNotes.trim());
+    }
+    return lines.join("\n");
+  };
+
+  // Generate narratives for all matters from their financial figures.
   const generateNarratives = async () => {
     setIsGenerating(true);
 
     try {
-      // Fetch snapshot history for analysis
-      const matterIds = Array.from(matterEmailData.keys());
-      
-      const mattersForAnalysis = await Promise.all(
-        matterIds.map(async (matterId) => {
-          const data = matterEmailData.get(matterId)!;
-          
-          let startSnapshot = null;
-          
-          // Only fetch start snapshot if we have a period start date (not "all time")
-          if (data.reviewPeriodStart) {
-            // Fetch the most recent canonical snapshot AT or BEFORE the review period start
-            // Use financial_snapshots (not history) to avoid picking up intermediate audit records
-            const { data: startSnapshots } = await supabase
-              .from("financial_snapshots")
-              .select("*")
-              .eq("matter_id", matterId)
-              .lte("as_of_date", format(data.reviewPeriodStart, "yyyy-MM-dd"))
-              .order("as_of_date", { ascending: false })
-              .limit(1);
-
-            startSnapshot = startSnapshots?.[0] || null;
-          }
-
-          return {
-            matterId,
-            matterName: data.matterName,
-            clientName: data.clientName,
-            feeCurrency: data.feeCurrency,
-            startSnapshot: startSnapshot ? {
-              wip_amount: startSnapshot.wip_amount,
-              billed_amount: startSnapshot.billed_amount,
-              paid_amount: startSnapshot.paid_amount,
-              accounts_receivable: startSnapshot.accounts_receivable,
-              wip_write_off_amount: startSnapshot.wip_write_off_amount,
-              as_of_date: startSnapshot.as_of_date,
-            } : null,
-            endSnapshot: null,
-            currentWip: data.currentWip,
-            currentAr: data.currentAr,
-            currentPaid: data.currentPaid,
-            totalBudgetUtilised: data.totalBudgetUtilised,
-            agreedBudget: data.agreedBudget,
-            // reviewPeriodDays: null means "from beginning" / all time
-            reviewPeriodDays: data.reviewPeriodStart 
-              ? differenceInDays(data.reviewPeriodEnd, data.reviewPeriodStart)
-              : null,
-            userNotes: data.userNotes,
-          };
-        })
-      );
-
-      // Call edge function
-      const { data: analysisData, error } = await supabase.functions.invoke("analyze-wip-changes", {
-        body: {
-          matters: mattersForAnalysis,
-        },
-      });
-
-      if (error) throw error;
-
-      // Update matter data with generated narratives
-      const results = analysisData?.results || [];
       const newData = new Map(matterEmailData);
-
-      results.forEach((result: { matterId: string; narrative: string }) => {
-        const existing = newData.get(result.matterId);
-        if (existing) {
-          newData.set(result.matterId, {
-            ...existing,
-            generatedNarrative: result.narrative,
-          });
-        }
+      newData.forEach((existing, matterId) => {
+        newData.set(matterId, {
+          ...existing,
+          generatedNarrative: buildNarrative(existing),
+        });
       });
 
       setMatterEmailData(newData);
@@ -654,62 +613,14 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
     });
   };
 
-  // Regenerate single email
+  // Rebuild a single email's narrative from its current financial figures.
   const regenerateSingleEmail = async (matterId: string) => {
     const data = matterEmailData.get(matterId);
     if (!data) return;
 
     setIsGenerating(true);
     try {
-      let startSnapshot = null;
-      
-      // Only fetch start snapshot if we have a period start date (not "all time")
-      if (data.reviewPeriodStart) {
-        const { data: startSnapshots } = await supabase
-          .from("financial_snapshots")
-          .select("*")
-          .eq("matter_id", matterId)
-          .lte("as_of_date", format(data.reviewPeriodStart, "yyyy-MM-dd"))
-          .order("as_of_date", { ascending: false })
-          .limit(1);
-
-        startSnapshot = startSnapshots?.[0] || null;
-      }
-
-      const { data: analysisData, error } = await supabase.functions.invoke("analyze-wip-changes", {
-        body: {
-          matters: [{
-            matterId,
-            matterName: data.matterName,
-            clientName: data.clientName,
-            feeCurrency: data.feeCurrency,
-            startSnapshot: startSnapshot ? {
-              wip_amount: startSnapshot.wip_amount,
-              billed_amount: startSnapshot.billed_amount,
-              paid_amount: startSnapshot.paid_amount,
-              accounts_receivable: startSnapshot.accounts_receivable,
-              wip_write_off_amount: startSnapshot.wip_write_off_amount,
-              as_of_date: startSnapshot.as_of_date,
-            } : null,
-            endSnapshot: null,
-            currentWip: data.currentWip,
-            currentAr: data.currentAr,
-            currentPaid: data.currentPaid,
-            totalBudgetUtilised: data.totalBudgetUtilised,
-            reviewPeriodDays: data.reviewPeriodStart 
-              ? differenceInDays(data.reviewPeriodEnd, data.reviewPeriodStart)
-              : null,
-            userNotes: data.userNotes,
-          }],
-        },
-      });
-
-      if (error) throw error;
-
-      const result = analysisData?.results?.[0];
-      if (result) {
-        updateNarrative(matterId, result.narrative);
-      }
+      updateNarrative(matterId, buildNarrative(data));
       toast.success("Email regenerated");
     } catch (error) {
       console.error("Failed to regenerate:", error);
@@ -1062,7 +973,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
         return (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Configure the review period and optional notes for each matter. The AI will analyse financial changes during this period.
+              Configure the review period and optional notes for each matter. A financial summary will be drafted for this period.
             </p>
             <ScrollArea className="h-[400px]">
               <div className="space-y-4 pr-4">
@@ -1149,7 +1060,7 @@ export function WipClientUpdateDialog({ open, onOpenChange, matters }: WipClient
                         </div>
 
                         <div className="mt-3">
-                          <Label className="text-xs">Additional Notes (optional - AI will polish)</Label>
+                          <Label className="text-xs">Additional Notes (optional)</Label>
                           <Textarea
                             value={data.userNotes}
                             onChange={(e) => updateMatterNotes(data.matterId, e.target.value)}

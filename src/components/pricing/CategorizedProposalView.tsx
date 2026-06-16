@@ -1,11 +1,9 @@
 import { useMemo, useState, useCallback } from 'react';
-import { Loader2, Wand2, Pencil, HelpCircle, Lock, LockOpen, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Pencil, HelpCircle, Lock, LockOpen, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from '@/components/ui/alert-dialog';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { DraftProposalItem, BUDGET_CATEGORIES, ProposalPhase } from '@/lib/hooks/usePricingProposals';
@@ -157,8 +155,6 @@ export function CategorizedProposalView({
   lockedCategories = new Set(),
   onToggleLock,
 }: CategorizedProposalViewProps) {
-  const [isCategorizing, setIsCategorizing] = useState(false);
-  
   // Review checkboxes state (visual aid only)
   const [reviewedItems, setReviewedItems] = useState<Set<string>>(new Set());
   
@@ -409,72 +405,6 @@ export function CategorizedProposalView({
     onItemsChange(newItems);
     toast.success(`Allocated fees across ${allocations.size} work items`);
   }, [items, onItemsChange]);
-
-  // Auto-categorize items using AI
-  const handleAutoCategorize = async () => {
-    const itemsToCategorize = items
-      .map((item, index) => ({ ...item, index }))
-      .filter(item => item.work_item.trim());
-    
-    if (itemsToCategorize.length === 0) {
-      toast.info('No items to categorize');
-      return;
-    }
-
-    setIsCategorizing(true);
-    try {
-      const response = await supabase.functions.invoke('categorize-budget-items', {
-        body: { 
-          items: itemsToCategorize.map(item => ({
-            index: item.index,
-            work_item: item.work_item
-          }))
-        }
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message || 'Failed to categorize items');
-      }
-
-      const { categorizations } = response.data;
-      
-      if (!categorizations || categorizations.length === 0) {
-        toast.error('No categorizations returned');
-        return;
-      }
-
-      const updatedItems = [...items];
-      
-      categorizations.forEach((cat: { index: number; category: string }) => {
-        if (updatedItems[cat.index]) {
-          updatedItems[cat.index] = { ...updatedItems[cat.index], category: cat.category };
-        }
-      });
-      
-      const categoryOrder = Object.fromEntries(
-        BUDGET_CATEGORIES.map((cat, idx) => [cat, idx])
-      );
-      
-      updatedItems.sort((a, b) => {
-        const catA = a.category || '';
-        const catB = b.category || '';
-        if (!catA && catB) return 1;
-        if (catA && !catB) return -1;
-        if (!catA && !catB) return 0;
-        const orderA = categoryOrder[catA] ?? 999;
-        const orderB = categoryOrder[catB] ?? 999;
-        return orderA - orderB;
-      });
-      
-      onItemsChange(updatedItems);
-      toast.success(`Categorized ${categorizations.length} items`);
-    } catch (error) {
-      console.error('Error categorizing items:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to categorize items');
-    } finally {
-      setIsCategorizing(false);
-    }
-  };
 
   // Helper to render a category breakdown section
   const renderCategoryBreakdown = (
@@ -814,8 +744,7 @@ export function CategorizedProposalView({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Auto-categorize button row */}
-      <div className="flex items-center justify-between">
+      {(uncategorizedCount > 0 || onNavigateToCategory) && (
         <div className="text-sm text-muted-foreground">
           {uncategorizedCount > 0 && (
             <span>{uncategorizedCount} item(s) need categorization</span>
@@ -824,25 +753,7 @@ export function CategorizedProposalView({
             <span className="ml-2 text-xs">(Click a tile to navigate)</span>
           )}
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleAutoCategorize}
-          disabled={isCategorizing || items.filter(i => i.work_item.trim()).length === 0}
-        >
-          {isCategorizing ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Categorizing...
-            </>
-          ) : (
-            <>
-              <Wand2 className="h-4 w-4 mr-2" />
-              Auto-Categorize
-            </>
-          )}
-        </Button>
-      </div>
+      )}
 
       {/* Assumptions Not All True toggle */}
       {hasAssumptionLinkedItems && onToggleAssumptionsNotTrue && (

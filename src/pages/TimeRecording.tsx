@@ -22,11 +22,10 @@ import { WorkItemAllocator } from '@/components/time-recording/WorkItemAllocator
 import { useTimeRecordingDrafts, TimeRecordingDraft } from '@/lib/hooks/useTimeRecordingDrafts';
 import { getMatterClientDisplayName } from '@/lib/clientUtils';
 import { 
-  CalendarIcon, 
-  Clock, 
-  Copy, 
-  Check, 
-  Sparkles, 
+  CalendarIcon,
+  Clock,
+  Copy,
+  Check,
   Loader2,
   FileText,
   ArrowRight,
@@ -452,20 +451,8 @@ export default function TimeRecording() {
     setGridEntries(prev => prev.filter(e => e.id !== id));
   };
 
-  const polishNarrative = async (narrative: string): Promise<string> => {
-    if (!narrative.trim()) return '';
-    try {
-      const { data, error } = await supabase.functions.invoke('polish-narrative', {
-        body: { narrative }
-      });
-      
-      if (error) throw error;
-      return data.polishedNarrative || narrative;
-    } catch (err) {
-      console.error('Error polishing narrative:', err);
-      return narrative;
-    }
-  };
+  // Narratives are used exactly as the user entered them — no AI polishing.
+  const polishNarrative = (narrative: string): string => narrative.trim();
 
   // Even time spreading - divides hours equally across selected days
   // Rounds to nearest 0.25 (15 mins) and ensures total matches input
@@ -729,7 +716,7 @@ export default function TimeRecording() {
       setStep('output');
       toast({
         title: "Processing complete",
-        description: "Your time entries have been processed with polished narratives.",
+        description: "Your time entries have been processed.",
       });
     } catch (err) {
       console.error('Error processing:', err);
@@ -1129,8 +1116,8 @@ export default function TimeRecording() {
                   </>
                 ) : (
                   <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Process & Polish Narratives
+                    <FileText className="mr-2 h-4 w-4" />
+                    Process Narratives
                   </>
                 )}
               </Button>
@@ -1198,7 +1185,7 @@ export default function TimeRecording() {
         <CardHeader>
           <CardTitle>Time Entries</CardTitle>
           <CardDescription>
-            Enter hours and narratives for each matter or activity. AI will polish your narratives.
+            Enter hours and narratives for each matter or activity.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -1316,7 +1303,7 @@ export default function TimeRecording() {
                             {/* Narrative Input - only show after work items selected (or if no budget items) */}
                             {(entry.workItemAllocations.length > 0 || !matterBudgetItems[entry.matterId]?.length) && (
                               <Input
-                                placeholder="Brief notes - AI will polish"
+                                placeholder="Brief notes"
                                 value={entry.narrative}
                                 onChange={(e) => updateEntry(entry.id, { narrative: e.target.value })}
                               />
@@ -1439,7 +1426,7 @@ export default function TimeRecording() {
                     {mode === 'single' ? (
                       <TableCell>
                         <Input
-                          placeholder="Brief notes - AI will polish"
+                          placeholder="Brief notes"
                           value={entry.narrative}
                           onChange={(e) => updateEntry(entry.id, { narrative: e.target.value })}
                           disabled={entry.hours === 0}
@@ -1558,7 +1545,7 @@ export default function TimeRecording() {
                     {mode === 'single' ? (
                       <TableCell>
                         <Input
-                          placeholder="Brief notes - AI will polish"
+                          placeholder="Brief notes"
                           value={entry.narrative}
                           onChange={(e) => updateEntry(entry.id, { narrative: e.target.value })}
                           disabled={entry.hours === 0}
@@ -1654,8 +1641,8 @@ export default function TimeRecording() {
             </>
           ) : (
             <>
-              <Sparkles className="mr-2 h-4 w-4" />
-              Process & Polish Narratives
+              <FileText className="mr-2 h-4 w-4" />
+              Process Narratives
             </>
           )}
         </Button>

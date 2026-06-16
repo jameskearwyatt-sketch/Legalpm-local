@@ -31,9 +31,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, Loader2, ChevronDown, History, Check, FileText, Upload, Sparkles, TrendingUp, Download, FileEdit, Send } from 'lucide-react';
+import { Trash2, Loader2, ChevronDown, History, Check, TrendingUp, Download, FileEdit } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useBudgetVersions, DraftLineItem, BudgetLineItem } from '@/lib/hooks/useBudgetVersions';
 import { useBudgetDrafts, BudgetDraft } from '@/lib/hooks/useBudgetDrafts';
@@ -42,8 +41,6 @@ import { useDetailedWipUpdates } from '@/lib/hooks/useDetailedWipUpdates';
 import { useSnapshots } from '@/lib/hooks/useSnapshots';
 import { useLocalCounsels } from '@/lib/hooks/useLocalCounsels';
 import { useMatter } from '@/lib/hooks/useMatters';
-import { useAssumptions } from '@/lib/hooks/useAssumptions';
-import { extractAssumptionsFromText, ExtractedAssumption, labelColors } from '@/components/matters/AssumptionsSection';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -91,10 +88,6 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [notes, setNotes] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [pastedText, setPastedText] = useState('');
-  const [isSummarizing, setIsSummarizing] = useState(false);
-  // Track which line items were AI-suggested (by index)
-  const [aiSuggestedIndices, setAiSuggestedIndices] = useState<Set<number>>(new Set());
   // Store original values when editing starts for comparison
   const [originalItems, setOriginalItems] = useState<DraftLineItem[]>([]);
   // Store version 1 (original settled) line items for budget creep visibility
@@ -116,21 +109,7 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [selectedVersionItems, setSelectedVersionItems] = useState<BudgetLineItem[]>([]);
   const [loadingVersionItems, setLoadingVersionItems] = useState(false);
-  
-  // Import from engagement letter state
-  const [isImportOpen, setIsImportOpen] = useState(false);
-  const [importText, setImportText] = useState('');
-  const [isImporting, setIsImporting] = useState(false);
-  const [importTab, setImportTab] = useState<'paste' | 'upload'>('paste');
-  const fileInputRef = useState<HTMLInputElement | null>(null);
-  
-  // Assumptions import after budget import
-  const [showAssumptionsOffer, setShowAssumptionsOffer] = useState(false);
-  const [pendingAssumptionsText, setPendingAssumptionsText] = useState('');
-  const [isExtractingAssumptions, setIsExtractingAssumptions] = useState(false);
-  const [extractedAssumptions, setExtractedAssumptions] = useState<ExtractedAssumption[]>([]);
-  const [showAssumptionsPreview, setShowAssumptionsPreview] = useState(false);
-  
+
   // Detailed WIP Update state
   const [isDetailedWipOpen, setIsDetailedWipOpen] = useState(false);
   const [isWipHistoryOpen, setIsWipHistoryOpen] = useState(false);
@@ -143,8 +122,6 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
   const [showExportDraftPrompt, setShowExportDraftPrompt] = useState(false);
   const [isDraftsDialogOpen, setIsDraftsDialogOpen] = useState(false);
   const [selectedDraft, setSelectedDraft] = useState<BudgetDraft | null>(null);
-  
-  const { createBulkAssumptions } = useAssumptions(matterId);
 
   const hasExistingBudget = versions.length > 0;
 
@@ -295,181 +272,6 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     ])
   ].sort();
 
-  // Import from engagement letter
-  const handleImportFromEngagementLetter = async (textContent: string) => {
-    if (!textContent.trim()) {
-      toast.error('Please provide text to parse');
-      return;
-    }
-
-    setIsImporting(true);
-    try {
-      const response = await supabase.functions.invoke('parse-engagement-letter', {
-        body: { text: textContent, currency }
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message || 'Failed to parse engagement letter');
-      }
-
-      const { items } = response.data;
-      
-      if (!items || items.length === 0) {
-        toast.error('No budget items found in the text');
-        return;
-      }
-
-      // Convert to draft items and append to existing items
-      const newItems: DraftLineItem[] = items.map((item: any) => ({
-        work_item: item.work_item?.substring(0, 100) || '',
-        detail: item.detail || null,
-        provider: item.provider === 'Local Counsel' ? 'Local Counsel' : 'Baker McKenzie',
-        fee_amount: Number(item.fee_amount) || 0,
-        category: item.category || null,
-        is_additional_scope: hasExistingBudget ? true : false,
-      }));
-
-      // Filter out empty placeholder items and add new ones
-      const existingNonEmpty = draftItems.filter(item => item.work_item.trim() !== '');
-      setDraftItems([...existingNonEmpty, ...newItems]);
-      
-      // Start editing mode if not already
-      if (!isEditing && hasExistingBudget) {
-        setIsEditing(true);
-      }
-
-      setIsImportOpen(false);
-      toast.success(`Imported ${items.length} budget items as draft`);
-      
-      // Offer to import assumptions from the same text
-      setPendingAssumptionsText(textContent);
-      setShowAssumptionsOffer(true);
-    } catch (error) {
-      console.error('Error importing engagement letter:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to parse engagement letter');
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  const [isUploadingFile, setIsUploadingFile] = useState(false);
-
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const fileName = file.name.toLowerCase();
-    const fileType = file.type;
-
-    // For text files, read directly
-    if (fileType === 'text/plain' || fileName.endsWith('.txt')) {
-      const text = await file.text();
-      setImportText(text);
-      setImportTab('paste');
-      toast.success('File loaded. Review and click Import.');
-      return;
-    }
-
-    // For PDF and Word files, use the parse-document-text edge function
-    const isPDF = fileType === 'application/pdf' || fileName.endsWith('.pdf');
-    const isWord = fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
-                   fileType === 'application/msword' ||
-                   fileName.endsWith('.docx') || 
-                   fileName.endsWith('.doc');
-
-    if (isPDF || isWord) {
-      setIsUploadingFile(true);
-      try {
-        const { data: result, error: invokeError } = await supabase.functions.invoke('parse-document-text', {
-          body: { file },
-        });
-
-        if (invokeError) throw invokeError;
-
-        if (result?.text) {
-          setImportText(result.text);
-          setImportTab('paste');
-          toast.success('Document parsed. Review the extracted text and click Import.');
-        } else {
-          throw new Error('No text extracted from document');
-        }
-      } catch (error) {
-        console.error('Error parsing document:', error);
-        toast.error(error instanceof Error ? error.message : 'Failed to parse document');
-      } finally {
-        setIsUploadingFile(false);
-      }
-      return;
-    }
-
-    toast.error('Unsupported file type. Please upload a PDF, Word document, or text file.');
-  };
-
-  // Assumptions import handlers
-  const handleExtractAssumptions = async () => {
-    if (!pendingAssumptionsText.trim()) return;
-    
-    setIsExtractingAssumptions(true);
-    try {
-      const extracted = await extractAssumptionsFromText(pendingAssumptionsText);
-      if (extracted.length > 0) {
-        setExtractedAssumptions(extracted);
-        setShowAssumptionsOffer(false);
-        setShowAssumptionsPreview(true);
-        toast.success(`Found ${extracted.length} assumptions`);
-      } else {
-        toast.info('No assumptions found in the document');
-        setShowAssumptionsOffer(false);
-      }
-    } catch (error) {
-      console.error('Error extracting assumptions:', error);
-      toast.error('Failed to extract assumptions');
-    } finally {
-      setIsExtractingAssumptions(false);
-    }
-  };
-
-  const toggleAssumptionSelection = (index: number) => {
-    setExtractedAssumptions(prev => 
-      prev.map((a, i) => i === index ? { ...a, selected: !a.selected } : a)
-    );
-  };
-
-  const selectedAssumptionsCount = extractedAssumptions.filter(a => a.selected).length;
-
-  const handleImportSelectedAssumptions = async () => {
-    const selected = extractedAssumptions.filter(a => a.selected);
-    if (selected.length === 0) {
-      toast.error('Please select at least one assumption');
-      return;
-    }
-
-    try {
-      await createBulkAssumptions.mutateAsync(
-        selected.map(a => ({
-          label: a.label,
-          assumption_text: a.assumption_text,
-          is_standard: a.is_standard,
-          source_document: 'Engagement Letter Import',
-        }))
-      );
-      setShowAssumptionsPreview(false);
-      setExtractedAssumptions([]);
-      setPendingAssumptionsText('');
-      setImportText('');
-    } catch (error) {
-      // Error handled in hook
-    }
-  };
-
-  const skipAssumptionsImport = () => {
-    setShowAssumptionsOffer(false);
-    setShowAssumptionsPreview(false);
-    setExtractedAssumptions([]);
-    setPendingAssumptionsText('');
-    setImportText('');
-  };
-
   // Calculate totals (current draft) - only include items that are not optional OR are optional and included
   const includedDraftItems = draftItems.filter(item => 
     !item.is_optional || (item.is_optional && item.is_included !== false)
@@ -521,8 +323,6 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
 
     setNotes('');
     setIsEditing(false);
-    setAiSuggestedIndices(new Set()); // Clear AI suggestions after finalizing
-    setPastedText('');
     setOriginalItems([]); // Clear original items after finalizing
   };
 
@@ -565,8 +365,6 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       })));
     }
     setNotes('');
-    setPastedText('');
-    setAiSuggestedIndices(new Set());
     setOriginalItems([]);
   };
 
@@ -664,136 +462,8 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
     setIsEditing(false);
   };
 
-  // AI summarization for budget update rationale - also extracts budget changes
-  const handleSummarizeRationale = async () => {
-    if (!pastedText.trim()) {
-      toast.error('Please paste some text first');
-      return;
-    }
-
-    setIsSummarizing(true);
-    try {
-      // Send current line items for context
-      const currentLineItems = draftItems.map(item => ({
-        work_item: item.work_item,
-        provider: item.provider,
-        fee_amount: item.fee_amount,
-      }));
-
-      const response = await supabase.functions.invoke('summarize-amendment-rationale', {
-        body: { 
-          text: pastedText,
-          currentLineItems,
-        },
-      });
-
-      if (response.error) throw response.error;
-      
-      const { summary, line_item_updates } = response.data || {};
-      
-      if (summary) {
-        setNotes(summary);
-      }
-      
-      // Process line item updates from AI
-      if (line_item_updates && Array.isArray(line_item_updates) && line_item_updates.length > 0) {
-        const newSuggestedIndices = new Set<number>();
-        let updatedItems = [...draftItems];
-        let updatesCount = 0;
-        let newCount = 0;
-        
-        for (const update of line_item_updates) {
-          if (!update.work_item || typeof update.fee_amount !== 'number') continue;
-          
-          // If AI provided a matched_index and it's not a new item, use that directly
-          let targetIndex = -1;
-          
-          if (!update.is_new && typeof update.matched_index === 'number' && update.matched_index >= 0 && update.matched_index < updatedItems.length) {
-            targetIndex = update.matched_index;
-          } else if (!update.is_new) {
-            // Fallback: fuzzy match by work item name and provider preference
-            const normalizedUpdateName = update.work_item.toLowerCase().replace(/[^a-z0-9]/g, '');
-            
-            // First try exact provider + name match
-            targetIndex = updatedItems.findIndex(item => {
-              const normalizedItemName = item.work_item.toLowerCase().replace(/[^a-z0-9]/g, '');
-              const providerMatch = !update.provider || item.provider === update.provider;
-              return providerMatch && (
-                normalizedItemName.includes(normalizedUpdateName.substring(0, 8)) ||
-                normalizedUpdateName.includes(normalizedItemName.substring(0, 8))
-              );
-            });
-            
-            // If no match with provider, try without
-            if (targetIndex < 0) {
-              targetIndex = updatedItems.findIndex(item => {
-                const normalizedItemName = item.work_item.toLowerCase().replace(/[^a-z0-9]/g, '');
-                return normalizedItemName.includes(normalizedUpdateName.substring(0, 8)) ||
-                       normalizedUpdateName.includes(normalizedItemName.substring(0, 8));
-              });
-            }
-          }
-          
-          if (targetIndex >= 0) {
-            // Check if the fee actually changed before marking as AI suggested
-            const currentFee = updatedItems[targetIndex].fee_amount || 0;
-            const feeChanged = Math.abs(currentFee - update.fee_amount) > 0.01;
-            
-            if (feeChanged) {
-              // Update existing item at the matched index
-              updatedItems[targetIndex] = {
-                ...updatedItems[targetIndex],
-                fee_amount: update.fee_amount,
-                provider: update.provider || updatedItems[targetIndex].provider,
-              };
-              newSuggestedIndices.add(targetIndex);
-              updatesCount++;
-            }
-            // If fee didn't change, skip this item entirely
-          } else {
-            // Add as new item at the end
-            const newIndex = updatedItems.length;
-            updatedItems.push({
-              work_item: update.work_item,
-              provider: update.provider || 'Baker McKenzie',
-              fee_amount: update.fee_amount,
-            });
-            newSuggestedIndices.add(newIndex);
-            newCount++;
-          }
-        }
-        
-        setDraftItems(updatedItems);
-        setAiSuggestedIndices(newSuggestedIndices);
-        const message = [
-          updatesCount > 0 ? `${updatesCount} update(s)` : '',
-          newCount > 0 ? `${newCount} new item(s)` : ''
-        ].filter(Boolean).join(' and ');
-        toast.success(`AI suggested ${message}. Review highlighted items.`);
-      } else if (summary) {
-        toast.success('Rationale summarized and added to notes');
-      } else {
-        throw new Error('No data returned from AI');
-      }
-      
-      setPastedText(''); // Clear the pasted text after successful processing
-    } catch (error) {
-      console.error('Error summarizing:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to process. Please try again.');
-    } finally {
-      setIsSummarizing(false);
-    }
-  };
-
-  // Clear AI suggestion highlighting when user manually edits an item
   const handleItemEdit = (index: number, field: keyof DraftLineItem, value: string | number) => {
     updateLineItem(index, field, value);
-    // Remove from AI suggested when user edits
-    if (aiSuggestedIndices.has(index)) {
-      const newIndices = new Set(aiSuggestedIndices);
-      newIndices.delete(index);
-      setAiSuggestedIndices(newIndices);
-    }
   };
 
   const loadVersionItems = async (versionId: string) => {
@@ -830,33 +500,6 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="text-lg font-heading">Budget</CardTitle>
         <div className="flex items-center gap-2">
-          {/* Import buttons - show when editing or no budget yet */}
-          {(isEditing || !hasExistingBudget) && (
-            <>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => {
-                  setImportTab('upload');
-                  setIsImportOpen(true);
-                }}
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Upload RFP
-              </Button>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => {
-                  setImportTab('paste');
-                  setIsImportOpen(true);
-                }}
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Paste Information
-              </Button>
-            </>
-          )}
           {/* Detailed WIP Update button - show when budget exists and not editing */}
           {hasExistingBudget && latestVersion && !isEditing && (
             <>
@@ -1117,7 +760,6 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
               mandatedRate={mandatedRate}
               existingLcFirmNames={existingLcFirmNames}
               hasOptionalItems={hasOptionalItems}
-              aiSuggestedIndices={aiSuggestedIndices}
               originalItems={originalItems}
               updateLineItemOptional={updateLineItemOptional}
               toggleLineItemIncluded={toggleLineItemIncluded}
@@ -1242,38 +884,6 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
                 : "Any notes about this budget (optional)"}
               rows={2}
             />
-            
-            {/* AI Summarization for budget updates - only show when editing existing budget */}
-            {hasExistingBudget && (
-              <div className="space-y-2 border rounded-lg p-3 bg-muted/30">
-                <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <FileText className="h-3.5 w-3.5" />
-                  Paste correspondence to auto-generate rationale
-                </div>
-                <Textarea
-                  value={pastedText}
-                  onChange={(e) => setPastedText(e.target.value)}
-                  placeholder="Paste email exchange or client notes here..."
-                  rows={3}
-                  className="text-xs"
-                />
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="sm"
-                  onClick={handleSummarizeRationale}
-                  disabled={isSummarizing || !pastedText.trim()}
-                  className="w-full"
-                >
-                  {isSummarizing ? (
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                  ) : (
-                    <Sparkles className="mr-2 h-3 w-3" />
-                  )}
-                  Summarize with AI
-                </Button>
-              </div>
-            )}
           </div>
         )}
 
@@ -1658,230 +1268,6 @@ export function BudgetSection({ matterId, currency }: BudgetSectionProps) {
           </Collapsible>
         )}
       </CardContent>
-
-      {/* Assumptions Import Offer Dialog */}
-      <Dialog open={showAssumptionsOffer} onOpenChange={setShowAssumptionsOffer}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Import Assumptions?</DialogTitle>
-            <DialogDescription>
-              Would you like to also extract and import assumptions from the same engagement letter?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={skipAssumptionsImport}>
-              Skip
-            </Button>
-            <Button onClick={handleExtractAssumptions} disabled={isExtractingAssumptions}>
-              {isExtractingAssumptions ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                  Extracting...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-1" />
-                  Yes, Extract Assumptions
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Assumptions Preview Dialog */}
-      <Dialog open={showAssumptionsPreview} onOpenChange={(open) => {
-        if (!open) skipAssumptionsImport();
-      }}>
-        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Import Assumptions</DialogTitle>
-            <DialogDescription>
-              Select the assumptions you want to import ({selectedAssumptionsCount} of {extractedAssumptions.length} selected)
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            <div className="flex gap-2 justify-end">
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setExtractedAssumptions(prev => prev.map(a => ({ ...a, selected: true })))}
-              >
-                Select All
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => setExtractedAssumptions(prev => prev.map(a => ({ ...a, selected: false })))}
-              >
-                Deselect All
-              </Button>
-            </div>
-            
-            <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-              {extractedAssumptions.map((assumption, index) => (
-                <div 
-                  key={index}
-                  className={`border rounded-lg p-3 space-y-2 cursor-pointer transition-colors ${
-                    assumption.selected 
-                      ? 'bg-background border-primary/50' 
-                      : 'bg-muted/30 border-muted opacity-60'
-                  }`}
-                  onClick={() => toggleAssumptionSelection(index)}
-                >
-                  <div className="flex items-start gap-3">
-                    <Checkbox 
-                      checked={assumption.selected}
-                      onCheckedChange={() => toggleAssumptionSelection(index)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="mt-1"
-                    />
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Badge className={labelColors[assumption.label] || labelColors['Other']}>
-                          {assumption.label}
-                        </Badge>
-                        {assumption.is_standard && (
-                          <Badge variant="outline" className="text-xs border-primary/50 text-primary">
-                            Standard
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm flex items-start gap-2">
-                        <span className="text-muted-foreground">•</span>
-                        <span>{assumption.assumption_text}</span>
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={skipAssumptionsImport}>
-              Skip
-            </Button>
-            <Button 
-              onClick={handleImportSelectedAssumptions}
-              disabled={createBulkAssumptions.isPending || selectedAssumptionsCount === 0}
-            >
-              {createBulkAssumptions.isPending ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
-                  Importing...
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4 mr-1" />
-                  Import {selectedAssumptionsCount} Assumption{selectedAssumptionsCount !== 1 ? 's' : ''}
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Import from Engagement Letter Dialog */}
-      <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Import Budget Items</DialogTitle>
-            <DialogDescription>
-              Upload an RFP or engagement letter, or paste the text directly to extract budget line items.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <Tabs value={importTab} onValueChange={(v) => setImportTab(v as 'paste' | 'upload')}>
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="paste">
-                <FileText className="h-4 w-4 mr-2" />
-                Paste Text
-              </TabsTrigger>
-              <TabsTrigger value="upload">
-                <Upload className="h-4 w-4 mr-2" />
-                Upload File
-              </TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="paste" className="space-y-4 mt-4">
-              <Textarea
-                value={importText}
-                onChange={(e) => setImportText(e.target.value)}
-                placeholder="Paste the engagement letter or RFP text here..."
-                rows={12}
-                className="font-mono text-sm"
-              />
-            </TabsContent>
-            
-            <TabsContent value="upload" className="space-y-4 mt-4">
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                <Upload className="h-8 w-8 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mb-4">
-                  Upload a PDF, Word document, or text file
-                </p>
-                <input
-                  type="file"
-                  accept=".pdf,.doc,.docx,.txt"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  id="budget-file-upload"
-                />
-                <Button asChild variant="outline" disabled={isUploadingFile}>
-                  {isUploadingFile ? (
-                    <span>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Parsing document...
-                    </span>
-                  ) : (
-                    <label htmlFor="budget-file-upload" className="cursor-pointer">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Choose File
-                    </label>
-                  )}
-                </Button>
-              </div>
-              {importText && (
-                <div className="space-y-2">
-                  <Label>Extracted Text (review before importing)</Label>
-                  <Textarea
-                    value={importText}
-                    onChange={(e) => setImportText(e.target.value)}
-                    rows={8}
-                    className="font-mono text-sm"
-                  />
-                </div>
-              )}
-            </TabsContent>
-          </Tabs>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => {
-              setIsImportOpen(false);
-              setImportText('');
-            }}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={() => handleImportFromEngagementLetter(importText)}
-              disabled={isImporting || !importText.trim()}
-            >
-              {isImporting ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Parsing...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Import Budget Items
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       {/* Detailed WIP Update Modal */}
       <DetailedWipUpdateModal

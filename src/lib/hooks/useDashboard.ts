@@ -128,8 +128,21 @@ export function useDashboard(excludedMatterIds: string[] = [], excludedPipelineM
   return useQuery({
     queryKey: ['dashboard', user?.id, [...excludedMatterIds].sort().join(','), [...excludedPipelineMatterIds].sort().join(','), nearBudgetPct, wipWarning, poorCollectionPct, staleDaysThreshold],
     queryFn: async () => {
-      // Fetch exchange rates for GBP to USD conversion
-      const { data: ratesData } = await supabase.functions.invoke('fetch-exchange-rates');
+      // Local-only edition: no network access, so use fixed default exchange
+      // rates (expressed as "1 USD = X units of currency") for conversion.
+      const ratesData = {
+        rates: {
+          'USD': 1,
+          'GBP': 0.79,
+          'EUR': 0.92,
+          'CHF': 0.88,
+          'AUD': 1.53,
+          'CAD': 1.36,
+          'SGD': 1.34,
+          'Ringgit': 4.47,
+          'SEK': 10.95,
+        } as Record<string, number>,
+      };
       // Calculate GBP to USD rate: if 1 USD = 0.74 GBP, then 1 GBP = 1/0.74 USD = 1.35 USD
       const gbpToUsdRate = ratesData?.rates?.GBP ? (1 / ratesData.rates.GBP) : 1.35;
       const liveRates = ratesData?.rates as Record<string, number> | undefined;

@@ -2890,7 +2890,7 @@ export default function PricingProposalDetail() {
         {/* Bottom Save Bar */}
         {proposal.status === 'Draft' && !viewingHistoricalVersion && (
           <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <div className="container flex items-center justify-end gap-3 py-3 px-6">
+            <div className="container flex flex-wrap items-center justify-end gap-2 sm:gap-3 py-3 px-4 sm:px-6">
               {/* Auto-save status indicator */}
               <span className="text-sm text-muted-foreground mr-auto flex items-center gap-2">
                 {autoSaveStatus === 'saving' && (

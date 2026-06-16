@@ -23,8 +23,6 @@ export interface DistributionContact {
   provenance: string | null;
   created_at: string;
   updated_at: string;
-  last_enriched_at: string | null;
-  // Apollo enrichment fields
   email_status: string | null;
   sic_codes: string[] | null;
   naics_codes: string[] | null;
@@ -43,12 +41,11 @@ export interface DistributionContact {
   classified_at: string | null;
 }
 
-export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'last_enriched_at' | 'email_status' | 'sic_codes' | 'naics_codes' | 'company_keywords' | 'emi_focus_areas' | 'emi_focus_areas_assigned_at' | 'emi_focus_areas_manual_edit' | 'email_company_mismatch' | 'email_mismatch_dismissed' | 'is_law_firm' | 'is_consultant' | 'classification_reason' | 'classified_at'> & {
+export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'email_status' | 'sic_codes' | 'naics_codes' | 'company_keywords' | 'emi_focus_areas' | 'emi_focus_areas_assigned_at' | 'emi_focus_areas_manual_edit' | 'email_company_mismatch' | 'email_mismatch_dismissed' | 'is_law_firm' | 'is_consultant' | 'classification_reason' | 'classified_at'> & {
   email_status?: string | null;
   sic_codes?: string[] | null;
   naics_codes?: string[] | null;
   company_keywords?: string[] | null;
-  last_enriched_at?: string | null;
   emi_focus_areas?: string[];
   emi_focus_areas_assigned_at?: string | null;
   emi_focus_areas_manual_edit?: boolean;
@@ -74,7 +71,6 @@ export interface ContactFilters {
   do_not_contact?: boolean;
   search?: string;
   updatedPeriod?: UpdatedTimePeriod;
-  enrichedPeriod?: UpdatedTimePeriod;
   // AI classification exclusion filters
   excludeLawFirms?: boolean;
   excludeConsultants?: boolean;
@@ -154,13 +150,6 @@ export function useDistributionContacts(filters?: ContactFilters) {
         const cutoff = getPeriodCutoff(filters.updatedPeriod);
         if (cutoff) {
           query = query.gte("updated_at", cutoff.toISOString());
-        }
-      }
-      if (filters?.enrichedPeriod) {
-        const cutoff = getPeriodCutoff(filters.enrichedPeriod);
-        if (cutoff) {
-          query = query.not("last_enriched_at", "is", null);
-          query = query.gte("last_enriched_at", cutoff.toISOString());
         }
       }
 

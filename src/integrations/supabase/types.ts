@@ -1296,7 +1296,6 @@ export type Database = {
           is_consultant: boolean | null
           is_law_firm: boolean | null
           job_title: string | null
-          last_enriched_at: string | null
           linkedin_url: string | null
           naics_codes: string[] | null
           notes: string | null
@@ -1330,7 +1329,6 @@ export type Database = {
           is_consultant?: boolean | null
           is_law_firm?: boolean | null
           job_title?: string | null
-          last_enriched_at?: string | null
           linkedin_url?: string | null
           naics_codes?: string[] | null
           notes?: string | null
@@ -1364,7 +1362,6 @@ export type Database = {
           is_consultant?: boolean | null
           is_law_firm?: boolean | null
           job_title?: string | null
-          last_enriched_at?: string | null
           linkedin_url?: string | null
           naics_codes?: string[] | null
           notes?: string | null

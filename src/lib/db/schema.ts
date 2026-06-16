@@ -1,7 +1,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import schemaSql from './schema.sql?raw';
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export async function runMigrations(db: PGlite): Promise<void> {
   await db.exec(`
@@ -19,7 +19,17 @@ export async function runMigrations(db: PGlite): Promise<void> {
   if (currentVersion >= SCHEMA_VERSION) return;
 
   if (currentVersion === 0) {
+    // Fresh database — apply the full schema (already free of enrichment columns).
     await db.exec(schemaSql);
+  } else {
+    // Incremental migrations for existing local databases.
+    if (currentVersion < 2) {
+      // v2: drop the leftover contact-enrichment column/index.
+      await db.exec(`
+        DROP INDEX IF EXISTS idx_distribution_contacts_last_enriched;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS last_enriched_at;
+      `);
+    }
   }
 
   await db.query(

@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useContactHistory, getFieldLabel } from "@/lib/hooks/useContactHistory";
 import { format } from "date-fns";
-import { History, ArrowRight, Sparkles, Upload, Pencil, Loader2 } from "lucide-react";
+import { History, ArrowRight, Upload, Pencil, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ContactHistoryDialogProps {
@@ -21,13 +21,11 @@ interface ContactHistoryDialogProps {
 
 const sourceIcons: Record<string, React.ReactNode> = {
   manual: <Pencil className="h-3 w-3" />,
-  enrichment: <Sparkles className="h-3 w-3" />,
   import: <Upload className="h-3 w-3" />,
 };
 
 const sourceColors: Record<string, string> = {
   manual: "bg-secondary text-secondary-foreground",
-  enrichment: "bg-primary/20 text-primary",
   import: "bg-accent text-accent-foreground",
 };
 

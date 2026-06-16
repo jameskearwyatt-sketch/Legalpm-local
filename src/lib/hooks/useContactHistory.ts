@@ -7,7 +7,7 @@ export interface ContactHistoryEntry {
   contact_id: string;
   user_id: string;
   changed_at: string;
-  change_source: 'manual' | 'enrichment' | 'import';
+  change_source: 'manual' | 'import';
   field_name: string;
   old_value: string | null;
   new_value: string | null;
@@ -51,7 +51,7 @@ export function useLogContactChange() {
       fieldName: string;
       oldValue: string | null;
       newValue: string | null;
-      changeSource?: 'manual' | 'enrichment' | 'import';
+      changeSource?: 'manual' | 'import';
     }) => {
       if (!user) throw new Error("Not authenticated");
 
@@ -88,7 +88,7 @@ export function useBulkLogContactChanges() {
         fieldName: string;
         oldValue: string | null;
         newValue: string | null;
-        changeSource?: 'manual' | 'enrichment' | 'import';
+        changeSource?: 'manual' | 'import';
       }[]
     ) => {
       if (!user) throw new Error("Not authenticated");

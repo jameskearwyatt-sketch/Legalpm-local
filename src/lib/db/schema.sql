@@ -1070,8 +1070,6 @@ CREATE TABLE public.distribution_contacts (
   relationship_owner TEXT,
   do_not_contact BOOLEAN NOT NULL DEFAULT false,
   provenance TEXT,
-  -- Enrichment fields
-  last_enriched_at TIMESTAMPTZ,
   email_status TEXT,
   sic_codes TEXT[] DEFAULT '{}',
   naics_codes TEXT[] DEFAULT '{}',
@@ -1093,7 +1091,6 @@ CREATE TABLE public.distribution_contacts (
   UNIQUE(user_id, email)
 );
 
-CREATE INDEX idx_distribution_contacts_last_enriched ON public.distribution_contacts(last_enriched_at DESC NULLS LAST);
 CREATE INDEX idx_distribution_contacts_updated_at ON public.distribution_contacts(updated_at DESC);
 CREATE INDEX idx_distribution_contacts_is_law_firm ON public.distribution_contacts(is_law_firm) WHERE is_law_firm IS NOT NULL;
 CREATE INDEX idx_distribution_contacts_is_consultant ON public.distribution_contacts(is_consultant) WHERE is_consultant IS NOT NULL;

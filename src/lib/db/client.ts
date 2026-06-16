@@ -1,7 +1,9 @@
 import { getDb } from './pglite';
 import { localStorage as localFileStorage } from './fileStorage';
 
-const LOCAL_USER_ID = 'local-user-00000000-0000-0000-0000-000000000000';
+// Must be a valid UUID: every user_id column in the schema is UUID-typed, so an
+// invalid value would make both record creation and the data importer fail.
+const LOCAL_USER_ID = '00000000-0000-0000-0000-000000000000';
 
 type FilterOp = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in' | 'contains' | 'overlaps' | 'ilike' | 'is' | 'not' | 'like';
 type OrderSpec = { column: string; ascending: boolean; nullsFirst?: boolean };

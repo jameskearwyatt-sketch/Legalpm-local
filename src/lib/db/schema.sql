@@ -6,6 +6,11 @@
 -- Compatible with PGlite (standard PostgreSQL)
 -- =============================================================================
 
+-- Functions below (e.g. has_role) are defined before the tables they reference.
+-- Disable function-body validation so these forward references don't fail when
+-- the schema is applied top-to-bottom.
+SET check_function_bodies = false;
+
 -- =============================================================================
 -- ENUM TYPES
 -- =============================================================================

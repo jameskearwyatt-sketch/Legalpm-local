@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import NotificationBell from '@/components/layout/NotificationBell';
+import AutoBackupBanner from '@/components/layout/AutoBackupBanner';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -406,6 +407,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         )}
         style={{ transition: 'padding-left 0.2s ease' }}
       >
+        <AutoBackupBanner />
         {children}
       </main>
 

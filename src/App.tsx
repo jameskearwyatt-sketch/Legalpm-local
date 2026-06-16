@@ -1,13 +1,14 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, MutationCache } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/lib/auth";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useUserRole } from "@/lib/hooks/useUserRole";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { autoBackup } from "@/lib/db/autoBackup";
 
 const Auth = lazy(() => import("./pages/Auth"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
@@ -42,6 +43,11 @@ const queryClient = new QueryClient({
       retry: 0,
     },
   },
+  // Any successful data mutation marks the local auto-backup dirty so it gets
+  // written to the user's chosen file shortly after.
+  mutationCache: new MutationCache({
+    onSuccess: () => autoBackup.markDirty(),
+  }),
 });
 
 // One-time global cache purge. Existing users carry stale React Query caches
@@ -145,6 +151,14 @@ function AppRoutes() {
   );
 }
 
+function AutoBackupResumer() {
+  // Re-attach a previously chosen auto-backup file on load (no prompt).
+  useEffect(() => {
+    void autoBackup.resume();
+  }, []);
+  return null;
+}
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
@@ -152,6 +166,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <AutoBackupResumer />
           <BrowserRouter>
             <AppRoutes />
           </BrowserRouter>

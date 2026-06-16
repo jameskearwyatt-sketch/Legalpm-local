@@ -5,11 +5,13 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
-import { Loader2, Bell, Save, Download, Upload, AlertTriangle, HardDrive, FileUp } from 'lucide-react';
+import { Loader2, Bell, Save, Download, Upload, AlertTriangle, HardDrive, FileUp, ShieldCheck, RefreshCw, Power } from 'lucide-react';
 import { useUserSettings } from '@/lib/hooks/useUserSettings';
 import { useToast } from '@/hooks/use-toast';
 import { downloadBackup, restoreFromBackup, clearAllData, getStorageEstimate, formatBytes } from '@/lib/db/backup';
 import { importDataExport } from '@/lib/db/importData';
+import { useAutoBackup } from '@/lib/db/autoBackup';
+import { formatDistanceToNow } from 'date-fns';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -130,9 +132,109 @@ export default function Settings() {
         </div>
 
         <AlertPreferencesCard />
+        <AutoBackupCard />
         <DataStorageCard />
       </div>
     </AppLayout>
+  );
+}
+
+function AutoBackupCard() {
+  const { toast } = useToast();
+  const { status, fileName, lastSavedAt, error, isSupported, setup, reconnect, disable, saveNow } = useAutoBackup();
+
+  const handleSetup = async () => {
+    try {
+      await setup();
+      toast({ title: 'Auto-backup on', description: 'Your data will now be saved to that file automatically.' });
+    } catch (e) {
+      // The user cancelling the file picker throws AbortError — ignore that.
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+      toast({ title: 'Could not set up auto-backup', description: String(e), variant: 'destructive' });
+    }
+  };
+
+  const handleSaveNow = async () => {
+    await saveNow();
+    toast({ title: 'Saved to disk' });
+  };
+
+  return (
+    <Card className="shadow-card">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 font-heading text-lg">
+          <ShieldCheck className="h-5 w-5" />
+          Automatic local backup
+        </CardTitle>
+        <CardDescription>
+          Keep a continuously updated copy of your data in a file on your computer, so you never lose work — even if the browser is cleared.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!isSupported && (
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            Automatic backup isn’t supported in this browser. Use <strong>Chrome</strong> or <strong>Edge</strong> for hands-off backups,
+            or use <strong>Export Backup</strong> below to save manually.
+          </div>
+        )}
+
+        {isSupported && status === 'off' && (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Choose a file once (e.g. in a synced folder like OneDrive, Dropbox, or iCloud Drive). The app then saves to it automatically
+              a few seconds after each change.
+            </p>
+            <Button onClick={handleSetup} className="w-full sm:w-auto">
+              <ShieldCheck className="mr-2 h-4 w-4" /> Set up auto-backup
+            </Button>
+          </>
+        )}
+
+        {isSupported && status === 'needs-permission' && (
+          <>
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              Auto-backup is set up{fileName ? <> for <strong>{fileName}</strong></> : null}, but the browser needs your permission again
+              to keep writing to it (this happens after restarting the browser). Click resume to continue.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => void reconnect()}>
+                <RefreshCw className="mr-2 h-4 w-4" /> Resume auto-backup
+              </Button>
+              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => void disable()}>
+                <Power className="mr-2 h-4 w-4" /> Turn off
+              </Button>
+            </div>
+          </>
+        )}
+
+        {isSupported && (status === 'active' || status === 'saving' || status === 'error') && (
+          <>
+            <div className="flex items-center gap-2 text-sm">
+              <span className={`inline-block h-2.5 w-2.5 rounded-full ${status === 'error' ? 'bg-destructive' : status === 'saving' ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+              <span className="font-medium">
+                {status === 'saving' ? 'Saving…' : status === 'error' ? 'Auto-backup error' : 'Auto-backup on'}
+              </span>
+              {fileName && <span className="text-muted-foreground">· {fileName}</span>}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {status === 'error'
+                ? error
+                : lastSavedAt
+                  ? `Last saved ${formatDistanceToNow(lastSavedAt, { addSuffix: true })}.`
+                  : 'Waiting for the first change to save.'}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={handleSaveNow} disabled={status === 'saving'}>
+                <Save className="mr-2 h-4 w-4" /> Save now
+              </Button>
+              <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => void disable()}>
+                <Power className="mr-2 h-4 w-4" /> Turn off
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

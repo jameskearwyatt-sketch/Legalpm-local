@@ -1436,7 +1436,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                               variant="ghost"
                               className="h-7 w-7 text-muted-foreground hover:text-destructive"
                               onClick={() => {
-                                const updated = state.simpleAssumptions.map(a =>
+                                const updated = (state.simpleAssumptions || []).map(a =>
                                   a.assumptionId === assumption.assumptionId
                                     ? { ...a, enabled: false, narrative: '', inputValue: undefined }
                                     : a
@@ -1542,7 +1542,7 @@ export function ScopeAssumptionsTab({ value, onChange, currency, workItems = [] 
                             className="h-7 w-7 text-muted-foreground hover:text-destructive"
                             onClick={() => {
                               const combinableIds = ['single_counterparty', 'single_signing', 'virtual_completion', 'counterparty_experienced_counsel', 'counterparty_reasonable_conduct', 'client_timely_provision', 'no_technical_meetings'];
-                              const updated = state.simpleAssumptions.map(a =>
+                              const updated = (state.simpleAssumptions || []).map(a =>
                                 combinableIds.includes(a.assumptionId)
                                   ? { ...a, enabled: false, narrative: '', inputValue: undefined }
                                   : a
@@ -1714,7 +1714,7 @@ export function getGroupedAssumptionNarratives(state: ScopeAssumptionsState | nu
   const grouped: GroupedAssumptionNarratives = {};
   
   // Group individual assumptions by category
-  state.simpleAssumptions.forEach(a => {
+  (state.simpleAssumptions || []).forEach(a => {
     if (!a.enabled || !a.narrative) return;
     if (COMBINABLE_PROCESS_IDS.includes(a.assumptionId)) return; // Handle separately
     
@@ -1727,7 +1727,7 @@ export function getGroupedAssumptionNarratives(state: ScopeAssumptionsState | nu
   });
   
   // Get combined process narrative (override or generated from combinable assumptions only)
-  const combinableProcessAssumptions = state.simpleAssumptions.filter(a => 
+  const combinableProcessAssumptions = (state.simpleAssumptions || []).filter(a => 
     a.enabled && COMBINABLE_PROCESS_IDS.includes(a.assumptionId)
   );
   

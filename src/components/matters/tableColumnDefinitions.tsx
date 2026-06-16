@@ -342,7 +342,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     categories: ['Live'],
     headerClassName: 'text-right min-w-[95px]',
     cellClassName: (ctx) => cn(
-      "text-right",
+      "text-right font-mono tabular-nums",
       ctx.matter.show_shaping_proposal && ctx.matter.selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: (ctx) => (
@@ -406,7 +406,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     categories: ['Live'],
     headerClassName: 'text-right min-w-[75px]',
     cellClassName: (ctx) => cn(
-      "text-right",
+      "text-right font-mono tabular-nums",
       ctx.matter.show_shaping_proposal && ctx.matter.selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: (ctx) => (
@@ -445,7 +445,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     categories: ['Live'],
     headerClassName: 'text-right min-w-[70px]',
     cellClassName: (ctx) => cn(
-      "text-right",
+      "text-right font-mono tabular-nums",
       ctx.matter.show_shaping_proposal && ctx.matter.selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: (ctx) => (
@@ -508,7 +508,7 @@ export const columnDefinitions: Record<string, TableColumnDefinition> = {
     categories: ['Live'],
     headerClassName: 'text-right min-w-[65px]',
     cellClassName: (ctx) => cn(
-      "text-right",
+      "text-right font-mono tabular-nums",
       ctx.matter.show_shaping_proposal && ctx.matter.selected_proposal && "bg-amber-50 dark:bg-amber-900/20"
     ),
     renderHeader: (ctx) => (

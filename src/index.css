@@ -1,153 +1,148 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Vector Energy Intelligence palette — warm off-white canvas, near-black
-       ink, muted cream-grey chrome, brown accent. HSL values keep shadcn
-       tokens chained; raw hex aliases are exposed below for direct consumers. */
+    /* Ledger · Verdigris — scholarly deep-pine palette over faintly green-tinted
+       paper. Bare HSL channels, consumed as hsl(var(--token)). */
+    --background: 120 10% 96%;
+    --foreground: 156 16% 12%;
 
-    --background: 40 17% 98%;          /* #FAFAF8 warm off-white */
-    --foreground: 0 0% 11%;             /* #1B1B1B near-black ink */
-
-    --card: 0 0% 100%;                  /* #FFFFFF elevated surfaces */
-    --card-foreground: 0 0% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 156 16% 12%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 11%;
+    --popover-foreground: 156 16% 12%;
 
-    /* Brown accent — used for focus rings, hover underlines, primary CTAs. */
-    --primary: 30 24% 44%;              /* #8B7355 */
-    --primary-foreground: 0 0% 100%;
+    --primary: 168 43% 21%;            /* deep pine */
+    --primary-foreground: 120 10% 96%;
 
-    /* Cream-grey secondary surface. */
-    --secondary: 30 15% 89%;            /* #E8E4DF */
-    --secondary-foreground: 0 0% 11%;
+    --secondary: 146 15% 91%;
+    --secondary-foreground: 168 43% 21%;
 
-    --muted: 30 15% 89%;                /* #E8E4DF */
-    --muted-foreground: 30 6% 40%;      /* #6B6560 supporting copy */
+    --muted: 120 10% 94%;
+    --muted-foreground: 156 7% 39%;
 
-    /* Warm beige — subtle hover / active state for light surfaces. */
-    --accent: 35 30% 70%;               /* #C9B99A */
-    --accent-foreground: 0 0% 11%;
+    --accent: 165 33% 37%;             /* verdigris */
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 358 54% 52%;         /* #C4444A */
+    --destructive: 4 50% 46%;          /* muted brick */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 30 15% 89%;               /* #E8E4DF subtle cream-grey */
-    --input: 30 15% 89%;
-    --ring: 30 24% 44%;                 /* #8B7355 brown focus */
+    --border: 150 11% 86%;
+    --input: 150 11% 86%;
+    --ring: 168 43% 21%;
 
-    --radius: 0.5rem;
+    --radius: 0.25rem;
 
-    /* Status colours drawn from the palette. Warning reuses the brown accent
-       since the spec doesn't include a dedicated amber/yellow. */
-    --success: 146 37% 36%;             /* #3A7D5C */
+    --success: 165 33% 37%;
     --success-foreground: 0 0% 100%;
-    --warning: 30 24% 44%;              /* #8B7355 brown */
+    --warning: 36 38% 50%;             /* aged brass */
     --warning-foreground: 0 0% 100%;
-    --danger: 358 54% 52%;              /* #C4444A */
+    --danger: 4 50% 46%;
     --danger-foreground: 0 0% 100%;
-    --info: 210 46% 43%;                /* #3A6B9F informational */
+    --info: 198 24% 38%;               /* slate blue */
     --info-foreground: 0 0% 100%;
 
-    /* Chart series — palette-faithful five-colour lineup. */
-    --chart-1: 30 24% 44%;              /* brown accent */
-    --chart-2: 210 46% 43%;             /* regulatory blue */
-    --chart-3: 146 37% 36%;             /* technology green */
-    --chart-4: 358 54% 52%;             /* alert red */
-    --chart-5: 35 30% 55%;              /* mid-beige */
+    --chart-1: 168 43% 21%;            /* pine */
+    --chart-2: 165 33% 37%;            /* verdigris */
+    --chart-3: 104 18% 52%;            /* sage */
+    --chart-4: 36 38% 50%;             /* aged brass */
+    --chart-5: 198 24% 38%;            /* slate blue */
 
-    /* Gold standard accent — now a quiet beige tier. */
-    --gold: 30 24% 44%;
+    --gold: 36 38% 50%;
     --gold-foreground: 0 0% 100%;
-    --gold-muted: 35 30% 88%;
-    --gold-border: 35 30% 70%;
+    --gold-muted: 36 38% 90%;
+    --gold-border: 36 38% 70%;
 
-    /* Sidebar — dark chrome with cream text, warm-beige active. */
-    --sidebar-background: 0 0% 11%;     /* #1B1B1B */
-    --sidebar-foreground: 30 15% 89%;   /* #E8E4DF */
-    --sidebar-primary: 35 30% 70%;      /* #C9B99A active */
-    --sidebar-primary-foreground: 0 0% 11%;
-    --sidebar-accent: 0 0% 15%;
-    --sidebar-accent-foreground: 35 30% 70%;
-    --sidebar-border: 0 0% 18%;
-    --sidebar-ring: 35 30% 70%;
+    --sidebar-background: 168 40% 12%; /* deep pine chrome */
+    --sidebar-foreground: 120 12% 88%;
+    --sidebar-primary: 165 33% 46%;    /* verdigris active */
+    --sidebar-primary-foreground: 168 43% 9%;
+    --sidebar-accent: 168 30% 18%;
+    --sidebar-accent-foreground: 120 14% 92%;
+    --sidebar-border: 168 24% 18%;
+    --sidebar-ring: 165 33% 46%;
 
-    /* Typography — Inter across the entire app. */
-    --font-heading: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-heading: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-    /* Raw hex aliases — use these where the spec names them directly. */
-    --color-bg:             #FAFAF8;
+    --color-bg:             #F1F4F0;
     --color-card-bg:        #FFFFFF;
-    --color-sidebar-bg:     #1B1B1B;
-    --color-sidebar-text:   #E8E4DF;
-    --color-sidebar-active: #C9B99A;
-    --color-border:         #E8E4DF;
-    --color-text-primary:   #1B1B1B;
-    --color-text-secondary: #6B6560;
-    --color-text-muted:     #9B9590;
-    --color-accent:         #8B7355;
-    --color-accent-light:   #C9B99A;
-    --color-red:            #C4444A;
-    --color-blue:           #3A6B9F;
-    --color-green:          #3A7D5C;
+    --color-sidebar-bg:     #122C26;
+    --color-sidebar-text:   #DCE6E0;
+    --color-sidebar-active: #4F9A86;
+    --color-border:         #D6DEDA;
+    --color-text-primary:   #1A2722;
+    --color-text-secondary: #5B6A64;
+    --color-text-muted:     #8A968F;
+    --color-accent:         #3F7D6F;
+    --color-accent-light:   #57A893;
+    --color-red:            #B0463E;
+    --color-blue:           #4A7383;
+    --color-green:          #3F7D6F;
   }
 
   .dark {
-    /* Dark mode — same near-black canvas as the sidebar, cream ink,
-       warm-beige primary. Keeps the palette family consistent with light. */
-    --background: 0 0% 11%;             /* #1B1B1B */
-    --foreground: 30 15% 89%;           /* #E8E4DF */
+    /* Verdigris dark — deep pine-black canvas, bright verdigris primary. */
+    --background: 165 22% 7%;
+    --foreground: 150 17% 89%;
 
-    --card: 0 0% 15%;
-    --card-foreground: 30 15% 89%;
+    --card: 164 21% 10%;
+    --card-foreground: 150 17% 89%;
 
-    --popover: 0 0% 15%;
-    --popover-foreground: 30 15% 89%;
+    --popover: 155 20% 12%;
+    --popover-foreground: 150 17% 89%;
 
-    --primary: 35 30% 70%;              /* warm beige */
-    --primary-foreground: 0 0% 11%;
+    --primary: 166 33% 53%;
+    --primary-foreground: 163 23% 6%;
 
-    --secondary: 0 0% 18%;
-    --secondary-foreground: 30 15% 89%;
+    --secondary: 163 19% 15%;
+    --secondary-foreground: 150 17% 89%;
 
-    --muted: 0 0% 18%;
-    --muted-foreground: 30 6% 59%;      /* #9B9590 */
+    --muted: 164 19% 12%;
+    --muted-foreground: 148 8% 56%;
 
-    --accent: 30 24% 44%;               /* brown accent on dark */
-    --accent-foreground: 0 0% 100%;
+    --accent: 166 33% 53%;
+    --accent-foreground: 163 23% 6%;
 
-    --destructive: 358 54% 52%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 3 54% 62%;
+    --destructive-foreground: 4 49% 7%;
 
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 35 30% 70%;
+    --border: 159 16% 17%;
+    --input: 159 16% 17%;
+    --ring: 166 33% 53%;
 
-    --success: 146 37% 42%;
-    --warning: 35 30% 60%;
-    --danger: 358 54% 58%;
-    --info: 210 46% 55%;
+    --success: 162 39% 59%;
+    --success-foreground: 163 23% 6%;
+    --warning: 38 48% 61%;
+    --warning-foreground: 163 23% 6%;
+    --danger: 3 54% 62%;
+    --danger-foreground: 4 49% 7%;
+    --info: 198 25% 55%;
+    --info-foreground: 163 23% 6%;
 
-    --chart-1: 35 30% 70%;
-    --chart-2: 210 46% 55%;
-    --chart-3: 146 37% 50%;
-    --chart-4: 358 54% 58%;
-    --chart-5: 30 15% 70%;
+    --chart-1: 166 33% 53%;
+    --chart-2: 146 33% 64%;
+    --chart-3: 83 29% 63%;
+    --chart-4: 38 48% 61%;
+    --chart-5: 198 25% 55%;
 
-    --sidebar-background: 0 0% 8%;
-    --sidebar-foreground: 30 15% 89%;
-    --sidebar-primary: 35 30% 70%;
-    --sidebar-primary-foreground: 0 0% 11%;
-    --sidebar-accent: 0 0% 14%;
-    --sidebar-accent-foreground: 35 30% 70%;
-    --sidebar-border: 0 0% 16%;
-    --sidebar-ring: 35 30% 70%;
+    --gold: 38 48% 61%;
+    --gold-foreground: 163 23% 6%;
+    --gold-muted: 38 30% 20%;
+    --gold-border: 38 40% 34%;
+
+    --sidebar-background: 165 25% 6%;
+    --sidebar-foreground: 150 17% 85%;
+    --sidebar-primary: 166 33% 53%;
+    --sidebar-primary-foreground: 163 23% 6%;
+    --sidebar-accent: 164 20% 12%;
+    --sidebar-accent-foreground: 150 17% 89%;
+    --sidebar-border: 159 16% 15%;
+    --sidebar-ring: 166 33% 53%;
   }
 }
 

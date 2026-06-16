@@ -92,7 +92,6 @@ export function ContactImportDialog({ open, onOpenChange, onImportComplete }: Co
       city: getValue(mappings.city) || null,
       gender: normaliseGender(getValue(mappings.gender)),
       sectors: parsedSectors,
-      sectors_ai_assigned: parsedSectors.length > 0,
       linkedin_url: getValue(mappings.linkedin_url) || null,
       notes: null,
       relationship_owner: rowOwner || fallbackOwner || null,

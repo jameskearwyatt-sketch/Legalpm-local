@@ -28,13 +28,11 @@ import {
 import {
   useDistributionContacts,
   useBulkDeleteDistributionContacts,
-  useUpdateDistributionContact,
   type ContactFilters,
   type DistributionContact,
   type UpdatedTimePeriod,
 } from "@/lib/hooks/useDistributionContacts";
 import { useDistributionSectors } from "@/lib/hooks/useDistributionSectors";
-import { getPrimaryNaicsSector } from "@/lib/naicsUtils";
 import { useDistinctCountries, useDistinctCompanies } from "@/lib/hooks/useDistributionContacts";
 import { useDistributionRelationshipOwners } from "@/lib/hooks/useDistributionRelationshipOwners";
 import { ContactFormDialog } from "./ContactFormDialog";
@@ -42,8 +40,6 @@ import { ContactImportDialog } from "./ContactImportDialog";
 import { EmailDraftDialog } from "./EmailDraftDialog";
 import { ContactDetailDialog } from "./ContactDetailDialog";
 import { ContactHistoryDialog } from "./ContactHistoryDialog";
-import { ExclusionFilterCheckbox } from "./ExclusionFilterCheckbox";
-import { ReidentifyExcludedDialog } from "./ReidentifyExcludedDialog";
 import { SortableFilterableHeader, SortDirection } from "./SortableFilterableHeader";
 import { StickyTableHeader } from "@/components/ui/sticky-table-header";
 import { TableScrollControls } from "@/components/ui/table-scroll-controls";
@@ -67,9 +63,6 @@ import {
   History,
   Clock,
   Target,
-  Scale,
-  Users,
-  RotateCcw,
   List,
   Copy,
   Loader2,
@@ -108,8 +101,6 @@ export function ContactsListView() {
   const [selectedContact, setSelectedContact] = useState<DistributionContact | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [historyContact, setHistoryContact] = useState<{ id: string; name: string } | null>(null);
-  const [showReidentifyConfirm, setShowReidentifyConfirm] = useState(false);
-  const [isReidentifying, setIsReidentifying] = useState(false);
 
   // Custom distribution list state
   const [selectedListId, setSelectedListId] = useState<string | null>(null);
@@ -160,16 +151,6 @@ export function ContactsListView() {
     [contacts]
   );
 
-  // Get unique NAICS-derived sectors for filtering (from ALL contacts, not filtered)
-  const uniqueNaicsSectors = useMemo(() => {
-    const sectors = new Set<string>();
-    allContacts.forEach(c => {
-      const sector = getPrimaryNaicsSector(c.naics_codes);
-      if (sector) sectors.add(sector);
-    });
-    return Array.from(sectors).sort();
-  }, [allContacts]);
-
   // Get unique EMI Focus Areas for filtering (from ALL contacts, not filtered)
   const uniqueEmiFocusAreas = useMemo(() => {
     const areas = new Set<string>();
@@ -179,9 +160,7 @@ export function ContactsListView() {
     return Array.from(areas).sort();
   }, [allContacts]);
 
-  // Apply column filters, sorting, and exclusion filters
-  // NOTE: Exclusion filters (excludeLawFirms, excludeConsultants) are applied HERE
-  // so they filter only the currently visible/filtered list, not the entire dataset
+  // Apply column filters and sorting
   const filteredAndSortedContacts = useMemo(() => {
     let result = [...contacts];
 
@@ -196,7 +175,6 @@ export function ContactsListView() {
         case 'city': return contact.city;
         case 'relationship_owner': return contact.relationship_owner;
         case 'gender': return contact.gender;
-        case 'naics_sector': return getPrimaryNaicsSector(contact.naics_codes);
         case 'created_at': return contact.created_at;
         default: return null;
       }
@@ -213,7 +191,6 @@ export function ContactsListView() {
         case 'city': return contact.city;
         case 'relationship_owner': return contact.relationship_owner;
         case 'gender': return contact.gender;
-        case 'naics_sector': return getPrimaryNaicsSector(contact.naics_codes);
         case 'created_at': return contact.created_at;
         default: return null;
       }
@@ -261,26 +238,9 @@ export function ContactsListView() {
     return result;
   }, [contacts, columnFilters, sortKey, sortDirection, selectedListId, customListContactIds, justAddedIds]);
 
-  // Contacts BEFORE exclusion filters are applied - used for the exclusion filter popover lists
-  const contactsBeforeExclusion = filteredAndSortedContacts;
-
-  // Apply exclusion filters LAST - these filter from the currently visible list
-  const contactsAfterExclusion = useMemo(() => {
-    let result = [...filteredAndSortedContacts];
-
-    if (filters.excludeLawFirms) {
-      result = result.filter(c => c.is_law_firm !== true);
-    }
-    if (filters.excludeConsultants) {
-      result = result.filter(c => c.is_consultant !== true);
-    }
-
-    return result;
-  }, [filteredAndSortedContacts, filters.excludeLawFirms, filters.excludeConsultants]);
-
   const eligibleContacts = useMemo(() =>
-    contactsAfterExclusion.filter(c => !c.do_not_contact),
-    [contactsAfterExclusion]
+    filteredAndSortedContacts.filter(c => !c.do_not_contact),
+    [filteredAndSortedContacts]
   );
 
   const selectedContacts = useMemo(() =>
@@ -312,7 +272,7 @@ export function ContactsListView() {
 
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      setSelectedIds(new Set(contactsAfterExclusion.map(c => c.id)));
+      setSelectedIds(new Set(filteredAndSortedContacts.map(c => c.id)));
     } else {
       setSelectedIds(new Set());
     }
@@ -331,7 +291,7 @@ export function ContactsListView() {
   const handleExport = async () => {
     const contactsToExport = selectedIds.size > 0
       ? contacts.filter(c => selectedIds.has(c.id))
-      : contactsAfterExclusion;
+      : filteredAndSortedContacts;
 
     await exportContactsToExcel(contactsToExport);
 
@@ -394,99 +354,6 @@ export function ContactsListView() {
 
   const hasColumnFilters = Object.values(columnFilters).some(v => v);
 
-  // Get contacts that would be excluded by law firm filter FROM THE CURRENTLY VISIBLE LIST
-  const excludedLawFirmContacts = useMemo(() =>
-    contactsBeforeExclusion.filter(c => c.is_law_firm === true),
-    [contactsBeforeExclusion]
-  );
-
-  // Get contacts that would be excluded by consultant filter FROM THE CURRENTLY VISIBLE LIST
-  const excludedConsultantContacts = useMemo(() =>
-    contactsBeforeExclusion.filter(c => c.is_consultant === true),
-    [contactsBeforeExclusion]
-  );
-
-  const updateContact = useUpdateDistributionContact();
-
-  // Handler to "protect" a contact from exclusion filter (set is_law_firm or is_consultant to false)
-  const handleProtectFromLawFirm = useCallback((contactId: string) => {
-    updateContact.mutate({
-      id: contactId,
-      is_law_firm: false,
-      classification_reason: "User protected from law firm exclusion",
-    });
-  }, [updateContact]);
-
-  const handleProtectFromConsultant = useCallback((contactId: string) => {
-    updateContact.mutate({
-      id: contactId,
-      is_consultant: false,
-      classification_reason: "User protected from consultant exclusion",
-    });
-  }, [updateContact]);
-
-  // Bulk protection handlers for the checkbox-based UI
-  const handleBulkProtectFromLawFirm = useCallback(async (contactIds: string[]) => {
-    const promises = contactIds.map(id =>
-      updateContact.mutateAsync({
-        id,
-        is_law_firm: false,
-        classification_reason: "User protected from law firm exclusion",
-      })
-    );
-    await Promise.all(promises);
-  }, [updateContact]);
-
-  const handleBulkProtectFromConsultant = useCallback(async (contactIds: string[]) => {
-    const promises = contactIds.map(id =>
-      updateContact.mutateAsync({
-        id,
-        is_consultant: false,
-        classification_reason: "User protected from consultant exclusion",
-      })
-    );
-    await Promise.all(promises);
-  }, [updateContact]);
-
-  // Find protected contacts - those that were PREVIOUSLY classified as law firms or consultants
-  // but were manually protected by the user (indicated by specific classification_reason values)
-  const protectedContacts = useMemo(() => {
-    return allContacts.filter(c =>
-      c.classification_reason?.includes("User protected from law firm exclusion") ||
-      c.classification_reason?.includes("User protected from consultant exclusion")
-    );
-  }, [allContacts]);
-
-  const handleReidentifyProtected = useCallback(async (contactIds: string[]) => {
-    setIsReidentifying(true);
-    try {
-      // Filter to only the selected contacts
-      const contactsToUpdate = protectedContacts.filter(c => contactIds.includes(c.id));
-
-      // Update selected protected contacts to re-include them in exclusion filters
-      const updates = contactsToUpdate.map(contact => {
-        const updateData: { id: string; is_law_firm?: boolean; is_consultant?: boolean; classification_reason: string } = {
-          id: contact.id,
-          classification_reason: "Re-identified by user",
-        };
-        if (contact.is_law_firm === false) {
-          updateData.is_law_firm = true;
-        }
-        if (contact.is_consultant === false) {
-          updateData.is_consultant = true;
-        }
-        return updateContact.mutateAsync(updateData);
-      });
-
-      await Promise.all(updates);
-      toast.success(`Re-identified ${contactsToUpdate.length} contact(s)`);
-    } catch (error) {
-      toast.error("Failed to re-identify some contacts");
-      throw error;
-    } finally {
-      setIsReidentifying(false);
-    }
-  }, [protectedContacts, updateContact]);
   return (
     <div className="space-y-4">
       {/* Sticky top section - higher z-index than table headers */}
@@ -565,16 +432,6 @@ export function ContactsListView() {
         {/* Advanced filters panel - for bulk/category filters */}
         {showFilters && (
           <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/30 rounded-lg border">
-            {/* Multi-select: Assigned Sector (NAICS) */}
-            <MultiSelectFilter
-              options={uniqueNaicsSectors}
-              selected={filters.naicsSectors || []}
-              onChange={(v) => setFilters(f => ({ ...f, naicsSectors: v.length > 0 ? v : undefined }))}
-              placeholder="Assigned Sector"
-              className="w-[200px]"
-              popoverWidth="320px"
-            />
-
             {/* Multi-select: Country */}
             <MultiSelectFilter
               options={[...countries].sort((a, b) => a.localeCompare(b))}
@@ -654,42 +511,6 @@ export function ContactsListView() {
                 className="w-[180px]"
                 popoverWidth="280px"
               />
-            )}
-
-            <div className="h-6 w-px bg-border" />
-
-            {/* Classification Exclusion Filters */}
-            <ExclusionFilterCheckbox
-              label="Exclude law firms"
-              checked={filters.excludeLawFirms === true}
-              onCheckedChange={(checked) => setFilters(f => ({ ...f, excludeLawFirms: checked || undefined }))}
-              excludedContacts={excludedLawFirmContacts}
-              onProtectContact={handleProtectFromLawFirm}
-              onBulkProtectContacts={handleBulkProtectFromLawFirm}
-              icon={<Scale className="h-3 w-3" />}
-            />
-
-            <ExclusionFilterCheckbox
-              label="Exclude consultants"
-              checked={filters.excludeConsultants === true}
-              onCheckedChange={(checked) => setFilters(f => ({ ...f, excludeConsultants: checked || undefined }))}
-              excludedContacts={excludedConsultantContacts}
-              onProtectContact={handleProtectFromConsultant}
-              onBulkProtectContacts={handleBulkProtectFromConsultant}
-              icon={<Users className="h-3 w-3" />}
-            />
-
-            {/* Re-identify protected contacts button */}
-            {protectedContacts.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowReidentifyConfirm(true)}
-                className="gap-2 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950"
-              >
-                <RotateCcw className="h-3 w-3" />
-                Re-identify Excluded ({protectedContacts.length})
-              </Button>
             )}
 
             {hasActiveFilters && (
@@ -795,7 +616,7 @@ export function ContactsListView() {
 
       {/* Contact count display */}
       <div className="text-sm text-muted-foreground px-1">
-        {contactsAfterExclusion.length} contact{contactsAfterExclusion.length !== 1 ? 's' : ''} showing
+        {filteredAndSortedContacts.length} contact{filteredAndSortedContacts.length !== 1 ? 's' : ''} showing
       </div>
 
       {/* Contacts table with sticky header and floating scroll bar */}
@@ -807,7 +628,7 @@ export function ContactsListView() {
                 <TableRow>
                   <TableHead className="w-10 bg-muted/50">
                     <Checkbox
-                      checked={contactsAfterExclusion.length > 0 && selectedIds.size === contactsAfterExclusion.length}
+                      checked={filteredAndSortedContacts.length > 0 && selectedIds.size === filteredAndSortedContacts.length}
                       onCheckedChange={handleSelectAll}
                     />
                   </TableHead>
@@ -886,17 +707,6 @@ export function ContactsListView() {
                       mode="dropdown-filter"
                     />
                   </TableHead>
-                  {/* Sector: Sort only */}
-                  <TableHead className="w-[120px] bg-muted/50">
-                    <SortableFilterableHeader
-                      label="Assigned Sector"
-                      columnKey="naics_sector"
-                      sortKey={sortKey}
-                      sortDirection={sortDirection}
-                      onSort={handleSort}
-                      mode="sort-only"
-                    />
-                  </TableHead>
                   <TableHead className="w-[120px] bg-muted/50">
                     <span className="text-xs font-medium">EMI Focus Area</span>
                   </TableHead>
@@ -916,18 +726,18 @@ export function ContactsListView() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       Loading contacts...
                     </TableCell>
                   </TableRow>
-                ) : contactsAfterExclusion.length === 0 ? (
+                ) : filteredAndSortedContacts.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={11} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center py-8 text-muted-foreground">
                       {hasColumnFilters || hasActiveFilters ? "No contacts match the current filters." : "No contacts found. Add your first contact or import from a file."}
                     </TableCell>
                   </TableRow>
                 ) : (
-                  contactsAfterExclusion.map((contact) => (
+                  filteredAndSortedContacts.map((contact) => (
                     <TableRow
                       key={contact.id}
                       className={contact.do_not_contact ? "opacity-60 bg-muted/30" : ""}
@@ -960,9 +770,6 @@ export function ContactsListView() {
                       <TableCell className="truncate text-sm">{contact.job_title || "-"}</TableCell>
                       <TableCell className="text-muted-foreground truncate text-sm">{contact.relationship_owner || "-"}</TableCell>
                       <TableCell className="text-sm">{contact.country || "-"}</TableCell>
-                      <TableCell className="text-sm truncate">
-                        {getPrimaryNaicsSector(contact.naics_codes) || "-"}
-                      </TableCell>
                       <TableCell className="text-sm truncate">
                         {contact.emi_focus_areas?.length > 0 ? (
                           <TooltipProvider>
@@ -1056,11 +863,11 @@ export function ContactsListView() {
 
       {/* Summary */}
       <div className="text-sm text-muted-foreground">
-        Showing {contactsAfterExclusion.length} contact{contactsAfterExclusion.length !== 1 ? 's' : ''}
-        {contactsAfterExclusion.length !== contacts.length && (
+        Showing {filteredAndSortedContacts.length} contact{filteredAndSortedContacts.length !== 1 ? 's' : ''}
+        {filteredAndSortedContacts.length !== contacts.length && (
           <> (filtered from {contacts.length})</>
         )}
-        {eligibleContacts.length !== contactsAfterExclusion.length && (
+        {eligibleContacts.length !== filteredAndSortedContacts.length && (
           <> • {eligibleContacts.length} contactable</>
         )}
       </div>
@@ -1140,14 +947,6 @@ export function ContactsListView() {
           contactName={historyContact.name}
         />
       )}
-
-      {/* Re-identify protected contacts dialog */}
-      <ReidentifyExcludedDialog
-        open={showReidentifyConfirm}
-        onOpenChange={setShowReidentifyConfirm}
-        protectedContacts={protectedContacts}
-        onReidentify={handleReidentifyProtected}
-      />
 
       {/* Add to Custom List Dialog */}
       <AddToListDialog

@@ -1064,36 +1064,19 @@ CREATE TABLE public.distribution_contacts (
   city TEXT,
   gender public.contact_gender NOT NULL DEFAULT 'unknown',
   sectors TEXT[] NOT NULL DEFAULT '{}',
-  sectors_ai_assigned BOOLEAN NOT NULL DEFAULT false,
   linkedin_url TEXT,
   notes TEXT,
   relationship_owner TEXT,
   do_not_contact BOOLEAN NOT NULL DEFAULT false,
   provenance TEXT,
-  email_status TEXT,
-  sic_codes TEXT[] DEFAULT '{}',
-  naics_codes TEXT[] DEFAULT '{}',
-  company_keywords TEXT[] DEFAULT '{}',
-  -- EMI focus areas
+  -- EMI focus areas (manually edited)
   emi_focus_areas TEXT[] NOT NULL DEFAULT '{}',
-  emi_focus_areas_assigned_at TIMESTAMPTZ,
-  emi_focus_areas_manual_edit BOOLEAN NOT NULL DEFAULT false,
-  -- Email mismatch tracking
-  email_company_mismatch BOOLEAN NOT NULL DEFAULT false,
-  email_mismatch_dismissed BOOLEAN NOT NULL DEFAULT false,
-  -- AI classification
-  is_law_firm BOOLEAN DEFAULT NULL,
-  is_consultant BOOLEAN DEFAULT NULL,
-  classification_reason TEXT DEFAULT NULL,
-  classified_at TIMESTAMPTZ DEFAULT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE(user_id, email)
 );
 
 CREATE INDEX idx_distribution_contacts_updated_at ON public.distribution_contacts(updated_at DESC);
-CREATE INDEX idx_distribution_contacts_is_law_firm ON public.distribution_contacts(is_law_firm) WHERE is_law_firm IS NOT NULL;
-CREATE INDEX idx_distribution_contacts_is_consultant ON public.distribution_contacts(is_consultant) WHERE is_consultant IS NOT NULL;
 
 CREATE TABLE public.distribution_contact_history (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

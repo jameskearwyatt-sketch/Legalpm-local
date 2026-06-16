@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
-import { getPrimaryNaicsSector } from "@/lib/naicsUtils";
 
 export interface DistributionContact {
   id: string;
@@ -15,7 +14,6 @@ export interface DistributionContact {
   city: string | null;
   gender: 'male' | 'female' | 'unknown';
   sectors: string[];
-  sectors_ai_assigned: boolean;
   linkedin_url: string | null;
   notes: string | null;
   relationship_owner: string | null;
@@ -23,38 +21,12 @@ export interface DistributionContact {
   provenance: string | null;
   created_at: string;
   updated_at: string;
-  email_status: string | null;
-  sic_codes: string[] | null;
-  naics_codes: string[] | null;
-  company_keywords: string[] | null;
-  // EMI Focus Areas
+  // EMI Focus Areas (manually edited)
   emi_focus_areas: string[];
-  emi_focus_areas_assigned_at: string | null;
-  emi_focus_areas_manual_edit: boolean;
-  // Email-company mismatch tracking
-  email_company_mismatch: boolean;
-  email_mismatch_dismissed: boolean;
-  // AI classification
-  is_law_firm: boolean | null;
-  is_consultant: boolean | null;
-  classification_reason: string | null;
-  classified_at: string | null;
 }
 
-export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'email_status' | 'sic_codes' | 'naics_codes' | 'company_keywords' | 'emi_focus_areas' | 'emi_focus_areas_assigned_at' | 'emi_focus_areas_manual_edit' | 'email_company_mismatch' | 'email_mismatch_dismissed' | 'is_law_firm' | 'is_consultant' | 'classification_reason' | 'classified_at'> & {
-  email_status?: string | null;
-  sic_codes?: string[] | null;
-  naics_codes?: string[] | null;
-  company_keywords?: string[] | null;
+export type DistributionContactInsert = Omit<DistributionContact, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'emi_focus_areas'> & {
   emi_focus_areas?: string[];
-  emi_focus_areas_assigned_at?: string | null;
-  emi_focus_areas_manual_edit?: boolean;
-  email_company_mismatch?: boolean;
-  email_mismatch_dismissed?: boolean;
-  is_law_firm?: boolean | null;
-  is_consultant?: boolean | null;
-  classification_reason?: string | null;
-  classified_at?: string | null;
 };
 export type DistributionContactUpdate = Partial<DistributionContactInsert>;
 
@@ -62,7 +34,6 @@ export type UpdatedTimePeriod = 'week' | 'month' | '3months' | '6months' | 'year
 
 export interface ContactFilters {
   sectors?: string[];
-  naicsSectors?: string[];  // Multi-select for NAICS-derived sectors
   emiFocusAreas?: string[]; // Multi-select for EMI Focus Areas
   countries?: string[];     // Multi-select for countries
   relationship_owners?: string[]; // Multi-select for owners
@@ -71,11 +42,7 @@ export interface ContactFilters {
   do_not_contact?: boolean;
   search?: string;
   updatedPeriod?: UpdatedTimePeriod;
-  // AI classification exclusion filters
-  excludeLawFirms?: boolean;
-  excludeConsultants?: boolean;
   // Legacy single-value filters (for backwards compatibility)
-  naicsSector?: string;
   emiFocusArea?: string;
   country?: string;
   relationship_owner?: string;
@@ -167,24 +134,7 @@ export function useDistributionContacts(filters?: ContactFilters) {
 
       if (error) throw error;
 
-      // Filters that require JS-side processing (computed values not in DB)
-      let contacts = (data || []) as DistributionContact[];
-
-      // NAICS-derived sectors require JS computation (derived from naics_codes array)
-      if (filters?.naicsSectors && filters.naicsSectors.length > 0) {
-        contacts = contacts.filter(c => {
-          const sector = getPrimaryNaicsSector(c.naics_codes);
-          return sector && filters.naicsSectors!.includes(sector);
-        });
-      } else if (filters?.naicsSector) {
-        contacts = contacts.filter(c => {
-          const sector = getPrimaryNaicsSector(c.naics_codes);
-          return sector === filters.naicsSector;
-        });
-      }
-
-      // Note: excludeLawFirms and excludeConsultants are applied at the UI level
-      // (in ContactsListView) so they filter the currently visible list, not the entire dataset
+      const contacts = (data || []) as DistributionContact[];
 
       return contacts;
     },

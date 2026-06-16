@@ -1,7 +1,7 @@
 import type { PGlite } from '@electric-sql/pglite';
 import schemaSql from './schema.sql?raw';
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export async function runMigrations(db: PGlite): Promise<void> {
   await db.exec(`
@@ -28,6 +28,28 @@ export async function runMigrations(db: PGlite): Promise<void> {
       await db.exec(`
         DROP INDEX IF EXISTS idx_distribution_contacts_last_enriched;
         ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS last_enriched_at;
+      `);
+    }
+    if (currentVersion < 3) {
+      // v3: drop the leftover AI-classification / Apollo-enrichment columns and
+      // their indexes from distribution_contacts. The manually-edited
+      // emi_focus_areas column is retained.
+      await db.exec(`
+        DROP INDEX IF EXISTS idx_distribution_contacts_is_law_firm;
+        DROP INDEX IF EXISTS idx_distribution_contacts_is_consultant;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS sectors_ai_assigned;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS email_status;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS sic_codes;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS naics_codes;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS company_keywords;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS emi_focus_areas_assigned_at;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS emi_focus_areas_manual_edit;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS email_company_mismatch;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS email_mismatch_dismissed;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS is_law_firm;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS is_consultant;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS classification_reason;
+        ALTER TABLE public.distribution_contacts DROP COLUMN IF EXISTS classified_at;
       `);
     }
   }

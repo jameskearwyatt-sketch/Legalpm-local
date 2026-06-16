@@ -1276,100 +1276,61 @@ export type Database = {
       distribution_contacts: {
         Row: {
           city: string | null
-          classification_reason: string | null
-          classified_at: string | null
           company: string | null
-          company_keywords: string[] | null
           country: string | null
           created_at: string
           do_not_contact: boolean
           email: string
-          email_company_mismatch: boolean
-          email_mismatch_dismissed: boolean
-          email_status: string | null
           emi_focus_areas: string[]
-          emi_focus_areas_assigned_at: string | null
-          emi_focus_areas_manual_edit: boolean
           full_name: string
           gender: Database["public"]["Enums"]["contact_gender"]
           id: string
-          is_consultant: boolean | null
-          is_law_firm: boolean | null
           job_title: string | null
           linkedin_url: string | null
-          naics_codes: string[] | null
           notes: string | null
           provenance: string | null
           relationship_owner: string | null
           sectors: string[]
-          sectors_ai_assigned: boolean
-          sic_codes: string[] | null
           updated_at: string
           user_id: string
         }
         Insert: {
           city?: string | null
-          classification_reason?: string | null
-          classified_at?: string | null
           company?: string | null
-          company_keywords?: string[] | null
           country?: string | null
           created_at?: string
           do_not_contact?: boolean
           email: string
-          email_company_mismatch?: boolean
-          email_mismatch_dismissed?: boolean
-          email_status?: string | null
           emi_focus_areas?: string[]
-          emi_focus_areas_assigned_at?: string | null
-          emi_focus_areas_manual_edit?: boolean
           full_name: string
           gender?: Database["public"]["Enums"]["contact_gender"]
           id?: string
-          is_consultant?: boolean | null
-          is_law_firm?: boolean | null
           job_title?: string | null
           linkedin_url?: string | null
-          naics_codes?: string[] | null
           notes?: string | null
           provenance?: string | null
           relationship_owner?: string | null
           sectors?: string[]
-          sectors_ai_assigned?: boolean
-          sic_codes?: string[] | null
           updated_at?: string
           user_id: string
         }
         Update: {
           city?: string | null
-          classification_reason?: string | null
-          classified_at?: string | null
           company?: string | null
-          company_keywords?: string[] | null
           country?: string | null
           created_at?: string
           do_not_contact?: boolean
           email?: string
-          email_company_mismatch?: boolean
-          email_mismatch_dismissed?: boolean
-          email_status?: string | null
           emi_focus_areas?: string[]
-          emi_focus_areas_assigned_at?: string | null
-          emi_focus_areas_manual_edit?: boolean
           full_name?: string
           gender?: Database["public"]["Enums"]["contact_gender"]
           id?: string
-          is_consultant?: boolean | null
-          is_law_firm?: boolean | null
           job_title?: string | null
           linkedin_url?: string | null
-          naics_codes?: string[] | null
           notes?: string | null
           provenance?: string | null
           relationship_owner?: string | null
           sectors?: string[]
-          sectors_ai_assigned?: boolean
-          sic_codes?: string[] | null
           updated_at?: string
           user_id?: string
         }

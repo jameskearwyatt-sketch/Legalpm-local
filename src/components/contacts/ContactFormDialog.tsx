@@ -149,13 +149,6 @@ export function ContactFormDialog({ open, onOpenChange, contact, onContactCreate
       await ensureOwner.mutateAsync(data.relationship_owner);
     }
 
-    // Determine if EMI focus areas were manually changed
-    const hadExistingFocusAreas = contact?.emi_focus_areas && contact.emi_focus_areas.length > 0;
-    const focusAreasChanged = contact 
-      ? JSON.stringify(data.emi_focus_areas.sort()) !== JSON.stringify((contact.emi_focus_areas || []).sort())
-      : data.emi_focus_areas.length > 0;
-    const markAsManualEdit = focusAreasChanged || contact?.emi_focus_areas_manual_edit;
-
     if (contact) {
       await updateContact.mutateAsync({
         id: contact.id,
@@ -163,8 +156,6 @@ export function ContactFormDialog({ open, onOpenChange, contact, onContactCreate
         email: data.email,
         gender: data.gender,
         emi_focus_areas: data.emi_focus_areas,
-        emi_focus_areas_manual_edit: markAsManualEdit ? true : false,
-        emi_focus_areas_assigned_at: focusAreasChanged ? new Date().toISOString() : contact.emi_focus_areas_assigned_at,
         do_not_contact: data.do_not_contact,
         company: data.company || null,
         job_title: data.job_title || null,
@@ -182,9 +173,7 @@ export function ContactFormDialog({ open, onOpenChange, contact, onContactCreate
         email: data.email,
         gender: data.gender,
         sectors: [],
-        sectors_ai_assigned: false,
         emi_focus_areas: data.emi_focus_areas,
-        emi_focus_areas_manual_edit: data.emi_focus_areas.length > 0,
         do_not_contact: data.do_not_contact,
         company: data.company || null,
         job_title: data.job_title || null,

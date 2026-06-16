@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;}
+  @keyframes scShimmer{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+  @keyframes scSpin{to{transform:rotate(360deg);}}
+  .sk{background:linear-gradient(90deg,var(--muted),color-mix(in srgb,var(--muted) 45%,var(--card)),var(--muted));background-size:200% 100%;animation:scShimmer 1.5s ease-in-out infinite;border-radius:4px;}
+  .spin{display:inline-block;animation:scSpin .7s linear infinite;}
+  .scStage ::-webkit-scrollbar{height:9px;width:9px;}
+  .scStage ::-webkit-scrollbar-thumb{background:var(--border);border-radius:8px;}
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:#0c0d11;color:#e8e8ec;font-family:'Hanken Grotesk',system-ui,sans-serif;padding:24px 28px 70px;">
+
+  <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:24px;flex-wrap:wrap;margin-bottom:18px;">
+    <div>
+      <div style="font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#7f8294;font-weight:600;">Verdigris · Phase 2 QA Target</div>
+      <div style="font-size:25px;font-weight:700;letter-spacing:-.01em;margin-top:6px;">Component &amp; State Gallery</div>
+      <div style="font-size:13px;color:#8a8d9e;margin-top:5px;max-width:660px;line-height:1.5;">The single source of visual truth for the rollout. Four views = four implementation batches. Diff each against the live build, light and dark.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;background:#16171d;border:1px solid #25262f;border-radius:12px;padding:5px;">
+      <button onClick="{{ setLight }}" style="{{ lightBtn }}">Light</button>
+      <button onClick="{{ setDark }}" style="{{ darkBtn }}">Dark</button>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;">
+    <sc-for list="{{ groupTabs }}" as="g" hint-placeholder-count="4">
+      <button onClick="{{ g.select }}" style="{{ g.style }}">
+        <span style="font-family:'IBM Plex Mono',monospace;opacity:.55;">{{ g.no }}</span>
+        <span>{{ g.label }}</span>
+      </button>
+    </sc-for>
+  </div>
+
+  <div class="scStage" style="{{ rootStyle }}">
+    <svg width="0" height="0" style="position:absolute;" aria-hidden="true">
+      <defs>
+        <symbol id="ic-dash" viewBox="0 0 24 24"><path d="M3 3h7v7H3z M14 3h7v7h-7z M14 14h7v7h-7z M3 14h7v7H3z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"></path></symbol>
+        <symbol id="ic-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"></path></symbol>
+        <symbol id="ic-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"></circle><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></symbol>
+        <symbol id="ic-tag" viewBox="0 0 24 24"><path d="M20.6 13.4 13 21l-9-9V4h8z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"></path><circle cx="8" cy="8" r="1.3" fill="currentColor"></circle></symbol>
+        <symbol id="ic-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.7"></circle><path d="M4.5 21a7.5 7.5 0 0 1 15 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></symbol>
+        <symbol id="ic-chart" viewBox="0 0 24 24"><path d="M3 21h18 M6 21v-7 M12 21V7 M18 21v-10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></symbol>
+        <symbol id="ic-cog" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7"></circle><path d="M12 2v3 M12 19v3 M2 12h3 M19 12h3 M4.9 4.9l2.1 2.1 M17 17l2.1 2.1 M19.1 4.9 17 7 M7 17l-2.1 2.1" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></symbol>
+        <symbol id="ic-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.7"></circle><path d="M21 21l-4.2-4.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></symbol>
+        <symbol id="ic-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7 2.5 7h-17S6 15 6 9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"></path><path d="M10 20a2 2 0 0 0 4 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"></path></symbol>
+        <symbol id="ic-plus" viewBox="0 0 24 24"><path d="M12 5v14 M5 12h14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"></path></symbol>
+        <symbol id="ic-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 6.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+        <symbol id="ic-menu" viewBox="0 0 24 24"><path d="M4 7h16 M4 12h16 M4 17h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></symbol>
+        <symbol id="ic-x" viewBox="0 0 24 24"><path d="M6 6l12 12 M18 6L6 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></symbol>
+        <symbol id="ic-chevright" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+        <symbol id="ic-check2" viewBox="0 0 24 24"><path d="M9 12.5l2.2 2.2L16 9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+        <symbol id="ic-add" viewBox="0 0 24 24"><path d="M12 6v12 M6 12h12" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"></path></symbol>
+      </defs>
+    </svg>
+
+    <!-- GROUP A: SHELL & NAVIGATION -->
+    <sc-if value="{{ isShell }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:26px 26px 40px;display:flex;flex-direction:column;gap:30px;background:var(--background);">
+
+        <!-- Sidebars -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Sidebar</div>
+          <div style="font-size:12.5px;color:var(--muted-foreground);margin-bottom:14px;">Expanded (228px) and collapsed (66px) rails. Active item = solid primary; rest muted with a hover fill.</div>
+          <div style="display:flex;gap:18px;flex-wrap:wrap;">
+            <!-- expanded -->
+            <div style="width:228px;background:var(--card);border:1px solid var(--border);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;padding:16px 12px;gap:3px;min-height:430px;">
+              <div style="display:flex;align-items:center;gap:10px;padding:4px 8px 14px;">
+                <div style="width:30px;height:30px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center;color:var(--primary-foreground);font-weight:700;font-size:15px;">L</div>
+                <div style="line-height:1.1;"><div style="font-weight:600;font-size:14px;color:var(--card-foreground);">Legal PM</div><div style="font-size:10px;color:var(--muted-foreground);letter-spacing:.04em;margin-top:2px;">Local · Private</div></div>
+              </div>
+              <div style="display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;background:var(--primary);color:var(--primary-foreground);font-size:13px;font-weight:600;"><svg viewBox="0 0 24 24" style="width:17px;height:17px;"><use href="#ic-folder"></use></svg>Matters<span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;background:color-mix(in srgb,var(--primary-foreground) 22%,transparent);padding:1px 7px;border-radius:999px;">128</span></div>
+              <div style="display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;color:var(--muted-foreground);font-size:13px;font-weight:500;"><svg viewBox="0 0 24 24" style="width:17px;height:17px;"><use href="#ic-dash"></use></svg>Dashboard</div>
+              <div style="display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;color:var(--card-foreground);font-size:13px;font-weight:500;background:var(--muted);"><svg viewBox="0 0 24 24" style="width:17px;height:17px;"><use href="#ic-clock"></use></svg>Time Recording<span style="margin-left:auto;font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-foreground);">hover</span></div>
+              <div style="display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;color:var(--muted-foreground);font-size:13px;font-weight:500;"><svg viewBox="0 0 24 24" style="width:17px;height:17px;"><use href="#ic-tag"></use></svg>Pricing</div>
+              <div style="display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;color:var(--muted-foreground);font-size:13px;font-weight:500;"><svg viewBox="0 0 24 24" style="width:17px;height:17px;"><use href="#ic-user"></use></svg>Contacts</div>
+              <div style="display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;color:var(--muted-foreground);font-size:13px;font-weight:500;"><svg viewBox="0 0 24 24" style="width:17px;height:17px;"><use href="#ic-chart"></use></svg>Reports</div>
+              <div style="margin-top:auto;border-top:1px solid var(--border);padding-top:11px;display:flex;align-items:center;gap:10px;">
+                <div style="width:28px;height:28px;border-radius:50%;background:color-mix(in srgb,var(--accent) 28%,var(--muted));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);">AO</div>
+                <div style="line-height:1.15;"><div style="font-size:12.5px;font-weight:600;color:var(--card-foreground);">A. Okafor</div><div style="font-size:10.5px;color:var(--muted-foreground);">Partner</div></div>
+              </div>
+            </div>
+            <!-- collapsed -->
+            <div style="width:66px;background:var(--card);border:1px solid var(--border);border-radius:8px;display:flex;flex-direction:column;padding:16px 0;gap:4px;align-items:center;min-height:430px;">
+              <div style="width:30px;height:30px;border-radius:8px;background:var(--primary);display:flex;align-items:center;justify-content:center;color:var(--primary-foreground);font-weight:700;font-size:15px;margin-bottom:10px;">L</div>
+              <div style="width:42px;height:38px;border-radius:6px;background:var(--primary);color:var(--primary-foreground);display:flex;align-items:center;justify-content:center;position:relative;"><svg viewBox="0 0 24 24" style="width:18px;height:18px;"><use href="#ic-folder"></use></svg><span style="position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--accent-foreground);"></span></div>
+              <div style="width:42px;height:38px;border-radius:6px;color:var(--muted-foreground);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" style="width:18px;height:18px;"><use href="#ic-dash"></use></svg></div>
+              <div style="width:42px;height:38px;border-radius:6px;color:var(--card-foreground);background:var(--muted);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" style="width:18px;height:18px;"><use href="#ic-clock"></use></svg></div>
+              <div style="width:42px;height:38px;border-radius:6px;color:var(--muted-foreground);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" style="width:18px;height:18px;"><use href="#ic-tag"></use></svg></div>
+              <div style="width:42px;height:38px;border-radius:6px;color:var(--muted-foreground);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" style="width:18px;height:18px;"><use href="#ic-user"></use></svg></div>
+              <div style="width:42px;height:38px;border-radius:6px;color:var(--muted-foreground);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" style="width:18px;height:18px;"><use href="#ic-chart"></use></svg></div>
+              <div style="margin-top:auto;width:28px;height:28px;border-radius:50%;background:color-mix(in srgb,var(--accent) 28%,var(--muted));display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--accent);">AO</div>
+            </div>
+            <!-- mobile -->
+            <div style="width:300px;height:430px;background:var(--background);border:1px solid var(--border);border-radius:18px;overflow:hidden;position:relative;box-shadow:0 18px 40px -24px rgba(0,0,0,.5);">
+              <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--card);">
+                <svg viewBox="0 0 24 24" style="width:20px;height:20px;color:var(--foreground);"><use href="#ic-menu"></use></svg>
+                <div style="font-weight:600;font-size:15px;color:var(--card-foreground);">Matters</div>
+                <svg viewBox="0 0 24 24" style="width:19px;height:19px;color:var(--muted-foreground);margin-left:auto;"><use href="#ic-search"></use></svg>
+                <svg viewBox="0 0 24 24" style="width:19px;height:19px;color:var(--muted-foreground);"><use href="#ic-bell"></use></svg>
+              </div>
+              <!-- drawer -->
+              <div style="position:absolute;inset:0;top:0;background:rgba(8,12,10,.45);">
+                <div style="width:230px;height:100%;background:var(--card);border-right:1px solid var(--border);padding:16px 12px;display:flex;flex-direction:column;gap:3px;animation:scShimmer 0s;">
+                  <div style="display:flex;align-items:center;gap:10px;padding:4px 8px 14px;">
+                    <div style="width:28px;height:28px;border-radius:7px;background:var(--primary);display:flex;align-items:center;justify-content:center;color:var(--primary-foreground);font-weight:700;font-size:14px;">L</div>
+                    <div style="font-weight:600;font-size:13.5px;color:var(--card-foreground);">Legal PM</div>
+                    <svg viewBox="0 0 24 24" style="width:17px;height:17px;color:var(--muted-foreground);margin-left:auto;"><use href="#ic-x"></use></svg>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;background:var(--primary);color:var(--primary-foreground);font-size:13px;font-weight:600;"><svg viewBox="0 0 24 24" style="width:17px;height:17px;"><use href="#ic-folder"></use></svg>Matters</div>
+                  <div style="display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;color:var(--muted-foreground);font-size:13px;"><svg viewBox="0 0 24 24" style="width:17px;height:17px;"><use href="#ic-dash"></use></svg>Dashboard</div>
+                  <div style="display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;color:var(--muted-foreground);font-size:13px;"><svg viewBox="0 0 24 24" style="width:17px;height:17px;"><use href="#ic-clock"></use></svg>Time Recording</div>
+                  <div style="display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:4px;color:var(--muted-foreground);font-size:13px;"><svg viewBox="0 0 24 24" style="width:17px;height:17px;"><use href="#ic-tag"></use></svg>Pricing</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Header -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Top header</div>
+          <div style="font-size:12.5px;color:var(--muted-foreground);margin-bottom:14px;">Page title + breadcrumb, search, secondary + primary actions.</div>
+          <div style="border:1px solid var(--border);border-radius:8px;overflow:hidden;">
+            <div style="display:flex;align-items:center;gap:14px;padding:13px 18px;background:color-mix(in srgb,var(--card) 55%,var(--background));">
+              <div>
+                <div style="font-size:11px;color:var(--muted-foreground);display:flex;align-items:center;gap:5px;">Workspace <svg viewBox="0 0 24 24" style="width:12px;height:12px;"><use href="#ic-chevright"></use></svg> Matters</div>
+                <div style="font-size:19px;font-weight:600;color:var(--foreground);letter-spacing:-.01em;margin-top:1px;">Matters</div>
+              </div>
+              <div style="margin-left:8px;flex:1;max-width:320px;position:relative;">
+                <svg viewBox="0 0 24 24" style="width:15px;height:15px;color:var(--muted-foreground);position:absolute;left:11px;top:50%;transform:translateY(-50%);"><use href="#ic-search"></use></svg>
+                <input placeholder="Search matters, clients…" style="width:100%;background:var(--background);border:1px solid var(--input);border-radius:4px;padding:8px 12px 8px 32px;font-size:13px;color:var(--foreground);font-family:'IBM Plex Sans',sans-serif;outline:none;" />
+              </div>
+              <div style="margin-left:auto;display:flex;align-items:center;gap:10px;">
+                <div style="position:relative;color:var(--muted-foreground);"><svg viewBox="0 0 24 24" style="width:19px;height:19px;"><use href="#ic-bell"></use></svg><span style="position:absolute;top:-2px;right:-2px;width:7px;height:7px;border-radius:50%;background:var(--destructive);border:1.5px solid var(--background);"></span></div>
+                <button style="background:transparent;border:1px solid var(--border);border-radius:4px;padding:8px 13px;font-size:13px;font-weight:500;color:var(--foreground);font-family:'IBM Plex Sans';cursor:pointer;">Export</button>
+                <button style="display:flex;align-items:center;gap:6px;background:var(--primary);color:var(--primary-foreground);border:none;border-radius:4px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;"><svg viewBox="0 0 24 24" style="width:15px;height:15px;"><use href="#ic-plus"></use></svg>New Matter</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Auto-backup banner -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Auto-backup banner</div>
+          <div style="font-size:12.5px;color:var(--muted-foreground);margin-bottom:14px;">Reassurance, not alarm — primary tint, calm.</div>
+          <div style="display:flex;align-items:center;gap:13px;background:color-mix(in srgb,var(--primary) 7%,var(--card));border:1px solid color-mix(in srgb,var(--primary) 22%,var(--border));border-radius:6px;padding:13px 16px;">
+            <div style="width:34px;height:34px;border-radius:8px;background:color-mix(in srgb,var(--primary) 14%,transparent);color:var(--primary);display:flex;align-items:center;justify-content:center;flex:none;"><svg viewBox="0 0 24 24" style="width:19px;height:19px;"><use href="#ic-check"></use></svg></div>
+            <div style="flex:1;"><div style="font-size:13.5px;font-weight:600;color:var(--card-foreground);">Auto-backup complete · 14:02</div><div style="font-size:12.5px;color:var(--muted-foreground);margin-top:1px;">Encrypted snapshot saved locally. Everything stays on this device.</div></div>
+            <button style="background:transparent;border:1px solid color-mix(in srgb,var(--primary) 30%,var(--border));color:var(--primary);border-radius:4px;padding:7px 12px;font-size:12.5px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">View backups</button>
+            <svg viewBox="0 0 24 24" style="width:16px;height:16px;color:var(--muted-foreground);cursor:pointer;"><use href="#ic-x"></use></svg>
+          </div>
+        </div>
+
+        <!-- QuickToDo FAB -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">QuickToDo · floating button</div>
+          <div style="font-size:12.5px;color:var(--muted-foreground);margin-bottom:14px;">Collapsed FAB and its open quick-capture panel.</div>
+          <div style="display:flex;gap:26px;align-items:flex-end;flex-wrap:wrap;">
+            <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+              <button style="width:52px;height:52px;border-radius:50%;background:var(--primary);color:var(--primary-foreground);border:none;display:flex;align-items:center;justify-content:center;box-shadow:0 10px 24px -8px color-mix(in srgb,var(--primary) 60%,transparent);cursor:pointer;"><svg viewBox="0 0 24 24" style="width:24px;height:24px;"><use href="#ic-check"></use></svg></button>
+              <span style="font-size:11px;color:var(--muted-foreground);">collapsed</span>
+            </div>
+            <div style="width:290px;background:var(--popover);border:1px solid var(--border);border-radius:10px;box-shadow:0 18px 50px -16px rgba(0,0,0,.4);overflow:hidden;">
+              <div style="display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--border);"><div style="font-size:13.5px;font-weight:600;color:var(--card-foreground);">Quick to-dos</div><span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted-foreground);">3</span><svg viewBox="0 0 24 24" style="width:15px;height:15px;color:var(--muted-foreground);margin-left:auto;"><use href="#ic-x"></use></svg></div>
+              <div style="padding:8px 6px;display:flex;flex-direction:column;">
+                <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;font-size:13px;color:var(--card-foreground);"><span style="width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex:none;"></span>Call Hartwell re: discovery</div>
+                <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;font-size:13px;color:var(--card-foreground);"><span style="width:16px;height:16px;border-radius:4px;background:var(--primary);color:var(--primary-foreground);display:flex;align-items:center;justify-content:center;flex:none;"><svg viewBox="0 0 24 24" style="width:12px;height:12px;"><use href="#ic-check2"></use></svg></span><span style="text-decoration:line-through;color:var(--muted-foreground);">File Meridian NDA</span></div>
+                <div style="display:flex;align-items:center;gap:10px;padding:7px 8px;font-size:13px;color:var(--card-foreground);"><span style="width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);flex:none;"></span>Review Lumen invoice</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid var(--border);"><input placeholder="Add a task…" style="flex:1;background:var(--background);border:1px solid var(--input);border-radius:4px;padding:7px 10px;font-size:12.5px;color:var(--foreground);font-family:'IBM Plex Sans';outline:none;" /><button style="width:30px;height:30px;border-radius:4px;background:var(--primary);color:var(--primary-foreground);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;"><svg viewBox="0 0 24 24" style="width:16px;height:16px;"><use href="#ic-add"></use></svg></button></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </sc-if>
+
+    <!-- GROUP B placeholder --><sc-if value="{{ isForms }}" hint-placeholder-val=""><div style="padding:26px 26px 40px;display:flex;flex-direction:column;gap:30px;background:var(--background);">
+
+        <!-- Buttons -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Buttons — variants &amp; states</div>
+          <div style="font-size:12.5px;color:var(--muted-foreground);margin-bottom:14px;">Default · hover · disabled · with icon · loading. 4px radius, 600 weight.</div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:14px;">
+            <div style="display:grid;grid-template-columns:90px repeat(5,1fr);gap:10px 12px;align-items:center;">
+              <div></div>
+              <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;text-align:center;">Default</div>
+              <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;text-align:center;">Hover</div>
+              <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;text-align:center;">Disabled</div>
+              <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;text-align:center;">Icon</div>
+              <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;text-align:center;">Loading</div>
+
+              <div style="font-size:12px;color:var(--muted-foreground);font-weight:600;">Primary</div>
+              <div style="display:flex;justify-content:center;"><button style="background:var(--primary);color:var(--primary-foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Save</button></div>
+              <div style="display:flex;justify-content:center;"><button style="background:color-mix(in srgb,var(--primary) 86%,#000);color:var(--primary-foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Save</button></div>
+              <div style="display:flex;justify-content:center;"><button style="background:var(--primary);color:var(--primary-foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';opacity:.45;cursor:not-allowed;">Save</button></div>
+              <div style="display:flex;justify-content:center;"><button style="display:flex;align-items:center;gap:6px;background:var(--primary);color:var(--primary-foreground);border:none;border-radius:4px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;"><svg viewBox="0 0 24 24" style="width:15px;height:15px;"><use href="#ic-plus"></use></svg>New</button></div>
+              <div style="display:flex;justify-content:center;"><button style="display:flex;align-items:center;gap:7px;background:var(--primary);color:var(--primary-foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';opacity:.85;cursor:default;"><span class="spin" style="width:13px;height:13px;border:2px solid color-mix(in srgb,var(--primary-foreground) 35%,transparent);border-top-color:var(--primary-foreground);border-radius:50%;"></span>Saving</button></div>
+
+              <div style="font-size:12px;color:var(--muted-foreground);font-weight:600;">Secondary</div>
+              <div style="display:flex;justify-content:center;"><button style="background:var(--secondary);color:var(--secondary-foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Filter</button></div>
+              <div style="display:flex;justify-content:center;"><button style="background:color-mix(in srgb,var(--secondary) 80%,var(--foreground));color:var(--secondary-foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Filter</button></div>
+              <div style="display:flex;justify-content:center;"><button style="background:var(--secondary);color:var(--secondary-foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';opacity:.45;cursor:not-allowed;">Filter</button></div>
+              <div style="display:flex;justify-content:center;"><button style="display:flex;align-items:center;gap:6px;background:var(--secondary);color:var(--secondary-foreground);border:none;border-radius:4px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;"><svg viewBox="0 0 24 24" style="width:15px;height:15px;"><use href="#ic-clock"></use></svg>Log</button></div>
+              <div style="display:flex;justify-content:center;color:var(--muted-foreground);font-size:11px;">—</div>
+
+              <div style="font-size:12px;color:var(--muted-foreground);font-weight:600;">Outline</div>
+              <div style="display:flex;justify-content:center;"><button style="background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Cancel</button></div>
+              <div style="display:flex;justify-content:center;"><button style="background:var(--muted);color:var(--foreground);border:1px solid var(--border);border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Cancel</button></div>
+              <div style="display:flex;justify-content:center;"><button style="background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';opacity:.45;cursor:not-allowed;">Cancel</button></div>
+              <div style="display:flex;justify-content:center;"><button style="display:flex;align-items:center;gap:6px;background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:4px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;"><svg viewBox="0 0 24 24" style="width:15px;height:15px;"><use href="#ic-search"></use></svg>Find</button></div>
+              <div style="display:flex;justify-content:center;color:var(--muted-foreground);font-size:11px;">—</div>
+
+              <div style="font-size:12px;color:var(--muted-foreground);font-weight:600;">Ghost</div>
+              <div style="display:flex;justify-content:center;"><button style="background:transparent;color:var(--foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Details</button></div>
+              <div style="display:flex;justify-content:center;"><button style="background:var(--muted);color:var(--foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Details</button></div>
+              <div style="display:flex;justify-content:center;"><button style="background:transparent;color:var(--foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';opacity:.4;cursor:not-allowed;">Details</button></div>
+              <div style="display:flex;justify-content:center;"><button style="display:flex;align-items:center;gap:5px;background:transparent;color:var(--primary);border:none;border-radius:4px;padding:8px 12px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;text-decoration:underline;text-underline-offset:3px;">Open link<svg viewBox="0 0 24 24" style="width:13px;height:13px;"><use href="#ic-chevright"></use></svg></button></div>
+              <div style="display:flex;justify-content:center;color:var(--muted-foreground);font-size:11px;">link</div>
+
+              <div style="font-size:12px;color:var(--destructive);font-weight:600;">Destructive</div>
+              <div style="display:flex;justify-content:center;"><button style="background:var(--destructive);color:var(--destructive-foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Delete</button></div>
+              <div style="display:flex;justify-content:center;"><button style="background:color-mix(in srgb,var(--destructive) 86%,#000);color:var(--destructive-foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Delete</button></div>
+              <div style="display:flex;justify-content:center;"><button style="background:var(--destructive);color:var(--destructive-foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';opacity:.45;cursor:not-allowed;">Delete</button></div>
+              <div style="display:flex;justify-content:center;"><button style="background:transparent;color:var(--destructive);border:1px solid color-mix(in srgb,var(--destructive) 45%,var(--border));border-radius:4px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Remove</button></div>
+              <div style="display:flex;justify-content:center;color:var(--muted-foreground);font-size:11px;">outline</div>
+            </div>
+            <div style="border-top:1px solid var(--border);padding-top:13px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;margin-right:4px;">Sizes</span>
+              <button style="background:var(--primary);color:var(--primary-foreground);border:none;border-radius:4px;padding:5px 11px;font-size:11.5px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Small</button>
+              <button style="background:var(--primary);color:var(--primary-foreground);border:none;border-radius:4px;padding:8px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Default</button>
+              <button style="background:var(--primary);color:var(--primary-foreground);border:none;border-radius:5px;padding:11px 22px;font-size:14.5px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Large</button>
+              <button style="width:36px;height:36px;background:var(--primary);color:var(--primary-foreground);border:none;border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><svg viewBox="0 0 24 24" style="width:17px;height:17px;"><use href="#ic-plus"></use></svg></button>
+              <span style="font-size:11px;color:var(--muted-foreground);">icon</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inputs -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Inputs &amp; fields</div>
+          <div style="font-size:12.5px;color:var(--muted-foreground);margin-bottom:14px;">Default · focus (ring) · filled · error · disabled · with icon · textarea.</div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px 20px;">
+            <div style="display:flex;flex-direction:column;gap:6px;"><label style="font-size:12px;font-weight:600;color:var(--foreground);">Default</label><input placeholder="Matter name" style="background:var(--background);border:1px solid var(--input);border-radius:4px;padding:9px 12px;font-size:13px;color:var(--foreground);font-family:'IBM Plex Sans';outline:none;" /><span style="font-size:11.5px;color:var(--muted-foreground);">Helper text goes here.</span></div>
+            <div style="display:flex;flex-direction:column;gap:6px;"><label style="font-size:12px;font-weight:600;color:var(--foreground);">Focused</label><input value="Hartwell v. Northbridge" style="background:var(--background);border:1px solid var(--ring);border-radius:4px;padding:9px 12px;font-size:13px;color:var(--foreground);font-family:'IBM Plex Sans';outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--ring) 22%,transparent);" /><span style="font-size:11.5px;color:var(--muted-foreground);">2px ring at 22% on focus.</span></div>
+            <div style="display:flex;flex-direction:column;gap:6px;"><label style="font-size:12px;font-weight:600;color:var(--destructive);">Error</label><input value="—" style="background:var(--background);border:1px solid var(--destructive);border-radius:4px;padding:9px 12px;font-size:13px;color:var(--foreground);font-family:'IBM Plex Sans';outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--destructive) 18%,transparent);" /><span style="font-size:11.5px;color:var(--destructive);font-weight:500;">Matter name is required.</span></div>
+            <div style="display:flex;flex-direction:column;gap:6px;"><label style="font-size:12px;font-weight:600;color:var(--foreground);">With icon</label><div style="position:relative;"><svg viewBox="0 0 24 24" style="width:15px;height:15px;color:var(--muted-foreground);position:absolute;left:11px;top:50%;transform:translateY(-50%);"><use href="#ic-search"></use></svg><input placeholder="Search clients" style="width:100%;background:var(--background);border:1px solid var(--input);border-radius:4px;padding:9px 12px 9px 32px;font-size:13px;color:var(--foreground);font-family:'IBM Plex Sans';outline:none;" /></div></div>
+            <div style="display:flex;flex-direction:column;gap:6px;"><label style="font-size:12px;font-weight:600;color:var(--muted-foreground);">Disabled</label><input value="Locked field" disabled style="background:var(--muted);border:1px solid var(--border);border-radius:4px;padding:9px 12px;font-size:13px;color:var(--muted-foreground);font-family:'IBM Plex Sans';outline:none;cursor:not-allowed;" /></div>
+            <div style="display:flex;flex-direction:column;gap:6px;"><label style="font-size:12px;font-weight:600;color:var(--foreground);">Select</label><div style="display:flex;align-items:center;justify-content:space-between;background:var(--background);border:1px solid var(--input);border-radius:4px;padding:9px 12px;font-size:13px;color:var(--foreground);cursor:pointer;">Litigation<svg viewBox="0 0 24 24" style="width:15px;height:15px;color:var(--muted-foreground);transform:rotate(90deg);"><use href="#ic-chevright"></use></svg></div></div>
+            <div style="grid-column:1 / 3;display:flex;flex-direction:column;gap:6px;"><label style="font-size:12px;font-weight:600;color:var(--foreground);">Textarea</label><textarea rows="3" style="background:var(--background);border:1px solid var(--input);border-radius:4px;padding:9px 12px;font-size:13px;color:var(--foreground);font-family:'IBM Plex Sans';outline:none;resize:none;line-height:1.5;">Engagement covers discovery, deposition prep and pre-trial motions. Billed monthly against the agreed cap.</textarea></div>
+            <div style="display:flex;flex-direction:column;gap:8px;"><label style="font-size:12px;font-weight:600;color:var(--foreground);">Open select</label><div style="background:var(--popover);border:1px solid var(--border);border-radius:6px;box-shadow:0 14px 36px -14px rgba(0,0,0,.35);overflow:hidden;font-size:13px;"><div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:color-mix(in srgb,var(--primary) 10%,transparent);color:var(--primary);font-weight:600;">Litigation<svg viewBox="0 0 24 24" style="width:14px;height:14px;"><use href="#ic-check2"></use></svg></div><div style="padding:8px 12px;color:var(--card-foreground);">Corporate / M&amp;A</div><div style="padding:8px 12px;color:var(--card-foreground);">Intellectual Property</div><div style="padding:8px 12px;color:var(--card-foreground);">Real Estate</div></div></div>
+          </div>
+        </div>
+
+        <!-- Selection controls -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Switches · checkboxes · radios · slider</div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px;display:grid;grid-template-columns:repeat(4,1fr);gap:22px;align-items:start;">
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;">Switch</span>
+              <div style="display:flex;align-items:center;gap:10px;"><span style="width:40px;height:22px;border-radius:999px;background:var(--primary);position:relative;flex:none;"><span style="position:absolute;top:2px;left:20px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);"></span></span><span style="font-size:13px;color:var(--foreground);">On</span></div>
+              <div style="display:flex;align-items:center;gap:10px;"><span style="width:40px;height:22px;border-radius:999px;background:var(--muted);position:relative;flex:none;"><span style="position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);"></span></span><span style="font-size:13px;color:var(--muted-foreground);">Off</span></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;">Checkbox</span>
+              <div style="display:flex;align-items:center;gap:9px;"><span style="width:17px;height:17px;border-radius:4px;background:var(--primary);color:var(--primary-foreground);display:flex;align-items:center;justify-content:center;flex:none;"><svg viewBox="0 0 24 24" style="width:13px;height:13px;"><use href="#ic-check2"></use></svg></span><span style="font-size:13px;color:var(--foreground);">Billable</span></div>
+              <div style="display:flex;align-items:center;gap:9px;"><span style="width:17px;height:17px;border-radius:4px;border:1.5px solid var(--border);flex:none;"></span><span style="font-size:13px;color:var(--foreground);">Pro bono</span></div>
+              <div style="display:flex;align-items:center;gap:9px;"><span style="width:17px;height:17px;border-radius:4px;background:var(--primary);display:flex;align-items:center;justify-content:center;flex:none;"><span style="width:8px;height:2px;background:var(--primary-foreground);border-radius:2px;"></span></span><span style="font-size:13px;color:var(--muted-foreground);">Indeterminate</span></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:12px;">
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;">Radio</span>
+              <div style="display:flex;align-items:center;gap:9px;"><span style="width:17px;height:17px;border-radius:50%;border:1.5px solid var(--primary);display:flex;align-items:center;justify-content:center;flex:none;"><span style="width:8px;height:8px;border-radius:50%;background:var(--primary);"></span></span><span style="font-size:13px;color:var(--foreground);">Hourly</span></div>
+              <div style="display:flex;align-items:center;gap:9px;"><span style="width:17px;height:17px;border-radius:50%;border:1.5px solid var(--border);flex:none;"></span><span style="font-size:13px;color:var(--foreground);">Fixed fee</span></div>
+              <div style="display:flex;align-items:center;gap:9px;"><span style="width:17px;height:17px;border-radius:50%;border:1.5px solid var(--border);flex:none;"></span><span style="font-size:13px;color:var(--foreground);">Capped</span></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:14px;">
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;">Slider</span>
+              <div><div style="display:flex;justify-content:space-between;font-size:11.5px;color:var(--muted-foreground);margin-bottom:8px;"><span>Budget</span><span style="font-family:'IBM Plex Mono',monospace;color:var(--foreground);font-weight:600;">$240k</span></div><div style="position:relative;height:6px;background:var(--muted);border-radius:999px;"><div style="position:absolute;left:0;height:6px;width:62%;background:var(--primary);border-radius:999px;"></div><div style="position:absolute;left:62%;top:50%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:var(--card);border:2px solid var(--primary);box-shadow:0 1px 3px rgba(0,0,0,.2);"></div></div></div>
+              <div><div style="font-size:11.5px;color:var(--muted-foreground);margin-bottom:8px;">Range</div><div style="position:relative;height:6px;background:var(--muted);border-radius:999px;"><div style="position:absolute;left:25%;height:6px;width:45%;background:var(--accent);border-radius:999px;"></div><div style="position:absolute;left:25%;top:50%;transform:translate(-50%,-50%);width:15px;height:15px;border-radius:50%;background:var(--card);border:2px solid var(--accent);"></div><div style="position:absolute;left:70%;top:50%;transform:translate(-50%,-50%);width:15px;height:15px;border-radius:50%;background:var(--card);border:2px solid var(--accent);"></div></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Form card -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Composed form</div>
+          <div style="font-size:12.5px;color:var(--muted-foreground);margin-bottom:14px;">Labels, helper, one error field, footer actions — the New Matter pattern.</div>
+          <div style="max-width:560px;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:20px;">
+            <div style="font-size:16px;font-weight:600;color:var(--card-foreground);margin-bottom:2px;">New Matter</div>
+            <div style="font-size:12.5px;color:var(--muted-foreground);margin-bottom:18px;">Stored locally only. All fields encrypted at rest.</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div style="grid-column:1 / 3;display:flex;flex-direction:column;gap:6px;"><label style="font-size:12px;font-weight:600;color:var(--destructive);">Matter name</label><input style="background:var(--background);border:1px solid var(--destructive);border-radius:4px;padding:9px 12px;font-size:13px;color:var(--foreground);font-family:'IBM Plex Sans';outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--destructive) 16%,transparent);" /><span style="font-size:11.5px;color:var(--destructive);">This field is required.</span></div>
+              <div style="display:flex;flex-direction:column;gap:6px;"><label style="font-size:12px;font-weight:600;color:var(--foreground);">Client</label><div style="display:flex;align-items:center;justify-content:space-between;background:var(--background);border:1px solid var(--input);border-radius:4px;padding:9px 12px;font-size:13px;color:var(--muted-foreground);cursor:pointer;">Select client<svg viewBox="0 0 24 24" style="width:14px;height:14px;transform:rotate(90deg);"><use href="#ic-chevright"></use></svg></div></div>
+              <div style="display:flex;flex-direction:column;gap:6px;"><label style="font-size:12px;font-weight:600;color:var(--foreground);">Practice area</label><div style="display:flex;align-items:center;justify-content:space-between;background:var(--background);border:1px solid var(--input);border-radius:4px;padding:9px 12px;font-size:13px;color:var(--foreground);cursor:pointer;">Litigation<svg viewBox="0 0 24 24" style="width:14px;height:14px;transform:rotate(90deg);"><use href="#ic-chevright"></use></svg></div></div>
+            </div>
+            <div style="display:flex;align-items:center;gap:9px;margin-top:16px;"><span style="width:40px;height:22px;border-radius:999px;background:var(--primary);position:relative;flex:none;"><span style="position:absolute;top:2px;left:20px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);"></span></span><span style="font-size:13px;color:var(--foreground);">Notify the assigned team</span></div>
+            <div style="display:flex;justify-content:flex-end;gap:9px;margin-top:20px;border-top:1px solid var(--border);padding-top:16px;"><button style="background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:4px;padding:9px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Cancel</button><button style="background:var(--primary);color:var(--primary-foreground);border:none;border-radius:4px;padding:9px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Create matter</button></div>
+          </div>
+        </div>
+
+      </div></sc-if>
+    <!-- GROUP C placeholder --><sc-if value="{{ isOverlays }}" hint-placeholder-val=""><div style="padding:26px 26px 40px;display:flex;flex-direction:column;gap:30px;background:var(--background);">
+
+        <!-- Dialog + Alert-dialog -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Dialog &amp; alert-dialog</div>
+          <div style="font-size:12.5px;color:var(--muted-foreground);margin-bottom:14px;">Shown open. Popover surface, 1px border, generous radius, soft overlay shadow.</div>
+          <div style="display:flex;gap:18px;flex-wrap:wrap;">
+            <div style="width:420px;max-width:100%;background:var(--popover);border:1px solid var(--border);border-radius:8px;padding:22px;box-shadow:0 28px 64px -22px rgba(0,0,0,.45);">
+              <div style="font-size:18px;font-weight:600;color:var(--card-foreground);">Create snapshot</div>
+              <div style="font-size:13px;color:var(--muted-foreground);margin-top:4px;line-height:1.5;">A local encrypted copy of this matter will be saved. You can restore it any time from Settings.</div>
+              <div style="display:flex;flex-direction:column;gap:6px;margin-top:16px;"><label style="font-size:12px;font-weight:600;color:var(--foreground);">Label</label><input value="Pre-deposition · Mar 14" style="background:var(--background);border:1px solid var(--input);border-radius:4px;padding:9px 12px;font-size:13px;color:var(--foreground);font-family:'IBM Plex Sans';outline:none;" /></div>
+              <div style="display:flex;justify-content:flex-end;gap:9px;margin-top:20px;"><button style="background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:4px;padding:9px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Cancel</button><button style="background:var(--primary);color:var(--primary-foreground);border:none;border-radius:4px;padding:9px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Save snapshot</button></div>
+            </div>
+            <div style="width:380px;max-width:100%;background:var(--popover);border:1px solid var(--border);border-radius:8px;padding:22px;box-shadow:0 28px 64px -22px rgba(0,0,0,.45);">
+              <div style="display:flex;gap:13px;align-items:flex-start;"><div style="width:36px;height:36px;border-radius:8px;background:color-mix(in srgb,var(--destructive) 13%,transparent);color:var(--destructive);display:flex;align-items:center;justify-content:center;flex:none;"><svg viewBox="0 0 24 24" style="width:19px;height:19px;"><use href="#ic-x"></use></svg></div><div><div style="font-size:16px;font-weight:600;color:var(--card-foreground);">Delete this matter?</div><div style="font-size:13px;color:var(--muted-foreground);margin-top:4px;line-height:1.5;">This permanently removes Hartwell v. Northbridge and all time entries. This cannot be undone.</div></div></div>
+              <div style="display:flex;justify-content:flex-end;gap:9px;margin-top:20px;"><button style="background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:4px;padding:9px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Cancel</button><button style="background:var(--destructive);color:var(--destructive-foreground);border:none;border-radius:4px;padding:9px 16px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Delete matter</button></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Sheet + Dropdown + Tooltip -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Sheet · dropdown menu · tooltip</div>
+          <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start;">
+            <!-- sheet -->
+            <div style="width:320px;height:360px;background:var(--background);border:1px solid var(--border);border-radius:8px;position:relative;overflow:hidden;">
+              <div style="position:absolute;inset:0;background:rgba(8,12,10,.4);"></div>
+              <div style="position:absolute;right:0;top:0;height:100%;width:240px;background:var(--popover);border-left:1px solid var(--border);box-shadow:-18px 0 44px -20px rgba(0,0,0,.4);padding:18px;display:flex;flex-direction:column;">
+                <div style="display:flex;align-items:center;justify-content:space-between;"><div style="font-size:15px;font-weight:600;color:var(--card-foreground);">Filters</div><svg viewBox="0 0 24 24" style="width:16px;height:16px;color:var(--muted-foreground);"><use href="#ic-x"></use></svg></div>
+                <div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;margin:16px 0 8px;">Status</div>
+                <div style="display:flex;flex-direction:column;gap:9px;font-size:13px;color:var(--foreground);">
+                  <div style="display:flex;align-items:center;gap:9px;"><span style="width:16px;height:16px;border-radius:4px;background:var(--primary);color:var(--primary-foreground);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" style="width:12px;height:12px;"><use href="#ic-check2"></use></svg></span>Active</div>
+                  <div style="display:flex;align-items:center;gap:9px;"><span style="width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);"></span>In Review</div>
+                  <div style="display:flex;align-items:center;gap:9px;"><span style="width:16px;height:16px;border-radius:4px;border:1.5px solid var(--border);"></span>On Hold</div>
+                </div>
+                <div style="margin-top:auto;display:flex;gap:8px;"><button style="flex:1;background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:4px;padding:8px;font-size:12.5px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Reset</button><button style="flex:1;background:var(--primary);color:var(--primary-foreground);border:none;border-radius:4px;padding:8px;font-size:12.5px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Apply</button></div>
+              </div>
+            </div>
+            <!-- dropdown -->
+            <div style="width:210px;background:var(--popover);border:1px solid var(--border);border-radius:6px;box-shadow:0 16px 40px -16px rgba(0,0,0,.4);padding:5px;font-size:13px;">
+              <div style="padding:6px 10px;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;">Matter actions</div>
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:4px;color:var(--card-foreground);background:var(--muted);"><svg viewBox="0 0 24 24" style="width:15px;height:15px;color:var(--muted-foreground);"><use href="#ic-search"></use></svg>Open<span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted-foreground);">↵</span></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:4px;color:var(--card-foreground);"><svg viewBox="0 0 24 24" style="width:15px;height:15px;color:var(--muted-foreground);"><use href="#ic-clock"></use></svg>Log time</div>
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:4px;color:var(--card-foreground);"><svg viewBox="0 0 24 24" style="width:15px;height:15px;color:var(--muted-foreground);"><use href="#ic-tag"></use></svg>Duplicate<span style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted-foreground);">⌘D</span></div>
+              <div style="height:1px;background:var(--border);margin:5px 0;"></div>
+              <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:4px;color:var(--destructive);"><svg viewBox="0 0 24 24" style="width:15px;height:15px;"><use href="#ic-x"></use></svg>Delete</div>
+            </div>
+            <!-- tooltip -->
+            <div style="display:flex;flex-direction:column;align-items:center;gap:0;padding-top:24px;">
+              <div style="position:relative;background:var(--foreground);color:var(--background);font-size:12px;font-weight:500;padding:6px 10px;border-radius:5px;box-shadow:0 8px 20px -8px rgba(0,0,0,.4);">Write off this entry<span style="position:absolute;left:50%;bottom:-4px;transform:translateX(-50%) rotate(45deg);width:8px;height:8px;background:var(--foreground);"></span></div>
+              <div style="height:9px;"></div>
+              <button style="width:36px;height:36px;background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:4px;display:flex;align-items:center;justify-content:center;cursor:pointer;"><svg viewBox="0 0 24 24" style="width:17px;height:17px;"><use href="#ic-clock"></use></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Toasts -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Toasts — sonner &amp; shadcn toaster</div>
+          <div style="display:flex;gap:24px;flex-wrap:wrap;">
+            <div style="display:flex;flex-direction:column;gap:9px;width:300px;">
+              <span style="font-size:11px;color:var(--muted-foreground);">sonner — stacked, compact</span>
+              <div style="display:flex;align-items:center;gap:10px;background:var(--popover);border:1px solid var(--border);border-radius:7px;padding:11px 13px;box-shadow:0 12px 30px -14px rgba(0,0,0,.4);"><span style="width:22px;height:22px;border-radius:6px;background:color-mix(in srgb,var(--success) 16%,transparent);color:var(--success);display:flex;align-items:center;justify-content:center;flex:none;"><svg viewBox="0 0 24 24" style="width:14px;height:14px;"><use href="#ic-check2"></use></svg></span><span style="font-size:13px;color:var(--card-foreground);font-weight:500;">Time entry saved</span></div>
+              <div style="display:flex;align-items:center;gap:10px;background:var(--popover);border:1px solid var(--border);border-radius:7px;padding:11px 13px;box-shadow:0 12px 30px -14px rgba(0,0,0,.4);"><span class="spin" style="width:14px;height:14px;border:2px solid color-mix(in srgb,var(--primary) 30%,transparent);border-top-color:var(--primary);border-radius:50%;flex:none;"></span><span style="font-size:13px;color:var(--card-foreground);font-weight:500;">Generating proposal…</span></div>
+              <div style="display:flex;align-items:center;gap:10px;background:var(--popover);border:1px solid color-mix(in srgb,var(--destructive) 35%,var(--border));border-radius:7px;padding:11px 13px;box-shadow:0 12px 30px -14px rgba(0,0,0,.4);"><span style="width:22px;height:22px;border-radius:6px;background:color-mix(in srgb,var(--destructive) 16%,transparent);color:var(--destructive);display:flex;align-items:center;justify-content:center;flex:none;"><svg viewBox="0 0 24 24" style="width:14px;height:14px;"><use href="#ic-x"></use></svg></span><span style="font-size:13px;color:var(--card-foreground);font-weight:500;">Backup failed — retry</span></div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:9px;width:340px;">
+              <span style="font-size:11px;color:var(--muted-foreground);">shadcn toaster — title + description + action</span>
+              <div style="display:flex;align-items:flex-start;gap:12px;background:var(--popover);border:1px solid var(--border);border-radius:8px;padding:14px;box-shadow:0 16px 40px -16px rgba(0,0,0,.42);"><div style="flex:1;"><div style="font-size:13.5px;font-weight:600;color:var(--card-foreground);">Matter archived</div><div style="font-size:12.5px;color:var(--muted-foreground);margin-top:2px;">Estate of D. Whitfield moved to archive.</div></div><button style="background:transparent;color:var(--primary);border:1px solid color-mix(in srgb,var(--primary) 30%,var(--border));border-radius:4px;padding:5px 11px;font-size:12px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Undo</button><svg viewBox="0 0 24 24" style="width:15px;height:15px;color:var(--muted-foreground);flex:none;margin-top:2px;"><use href="#ic-x"></use></svg></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- States: empty / skeleton / error -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Empty · loading skeleton · error boundary</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:30px 22px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;">
+              <div style="width:48px;height:48px;border-radius:12px;background:var(--muted);color:var(--muted-foreground);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" style="width:24px;height:24px;"><use href="#ic-folder"></use></svg></div>
+              <div><div style="font-size:14.5px;font-weight:600;color:var(--card-foreground);">No matters yet</div><div style="font-size:12.5px;color:var(--muted-foreground);margin-top:4px;line-height:1.5;">Create your first matter to start tracking time and billing.</div></div>
+              <button style="display:flex;align-items:center;gap:6px;background:var(--primary);color:var(--primary-foreground);border:none;border-radius:4px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;"><svg viewBox="0 0 24 24" style="width:15px;height:15px;"><use href="#ic-plus"></use></svg>New Matter</button>
+            </div>
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:18px;display:flex;flex-direction:column;gap:12px;">
+              <div style="display:flex;align-items:center;gap:12px;"><div class="sk" style="width:38px;height:38px;border-radius:9px;"></div><div style="flex:1;display:flex;flex-direction:column;gap:7px;"><div class="sk" style="width:60%;height:11px;"></div><div class="sk" style="width:40%;height:9px;"></div></div></div>
+              <div class="sk" style="width:100%;height:9px;"></div>
+              <div class="sk" style="width:92%;height:9px;"></div>
+              <div class="sk" style="width:78%;height:9px;"></div>
+              <div style="display:flex;gap:10px;margin-top:4px;"><div class="sk" style="width:33%;height:46px;border-radius:6px;"></div><div class="sk" style="width:33%;height:46px;border-radius:6px;"></div><div class="sk" style="width:33%;height:46px;border-radius:6px;"></div></div>
+            </div>
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:30px 22px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:12px;">
+              <div style="width:48px;height:48px;border-radius:12px;background:color-mix(in srgb,var(--destructive) 13%,transparent);color:var(--destructive);display:flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" style="width:26px;height:26px;"><use href="#ic-x"></use></svg></div>
+              <div><div style="font-size:14.5px;font-weight:600;color:var(--card-foreground);">Something went wrong</div><div style="font-size:12.5px;color:var(--muted-foreground);margin-top:4px;line-height:1.5;">This view failed to render. Your data is safe and saved locally.</div></div>
+              <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--muted-foreground);background:var(--muted);border-radius:4px;padding:5px 9px;">TypeError: cannot read 'wip'</div>
+              <button style="background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:4px;padding:8px 14px;font-size:13px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;">Reload view</button>
+            </div>
+          </div>
+        </div>
+
+      </div></sc-if>
+    <!-- GROUP D placeholder --><sc-if value="{{ isData }}" hint-placeholder-val=""><div style="padding:26px 26px 40px;display:flex;flex-direction:column;gap:30px;background:var(--background);">
+
+        <!-- KPI cards -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">KPI / stat cards</div>
+          <div style="font-size:12.5px;color:var(--muted-foreground);margin-bottom:14px;">Mono values, delta in success/destructive, matching sparkline.</div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;">
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:10px;"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground);font-weight:600;">Active Matters</div><div style="display:flex;align-items:flex-end;justify-content:space-between;"><div style="font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;color:var(--card-foreground);line-height:1;">128</div><svg viewBox="0 0 120 36" preserveAspectRatio="none" style="width:74px;height:28px;"><path d="M0,28 L15,24 L30,26 L45,18 L60,20 L75,12 L90,15 L105,8 L120,6" fill="none" stroke="var(--chart-1)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="font-size:12px;font-weight:600;color:var(--success);">▲ 12 <span style="color:var(--muted-foreground);font-weight:500;">this quarter</span></div></div>
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:10px;"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground);font-weight:600;">Billable Hrs · MTD</div><div style="display:flex;align-items:flex-end;justify-content:space-between;"><div style="font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;color:var(--card-foreground);line-height:1;">1,847</div><svg viewBox="0 0 120 36" preserveAspectRatio="none" style="width:74px;height:28px;"><path d="M0,20 L15,22 L30,16 L45,18 L60,12 L75,14 L90,9 L105,11 L120,5" fill="none" stroke="var(--chart-2)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="font-size:12px;font-weight:600;color:var(--success);">▲ 6.4% <span style="color:var(--muted-foreground);font-weight:500;">vs last month</span></div></div>
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:10px;"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground);font-weight:600;">Realization</div><div style="display:flex;align-items:flex-end;justify-content:space-between;"><div style="font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;color:var(--card-foreground);line-height:1;">92%</div><svg viewBox="0 0 120 36" preserveAspectRatio="none" style="width:74px;height:28px;"><path d="M0,26 L15,20 L30,22 L45,16 L60,17 L75,11 L90,13 L105,9 L120,7" fill="none" stroke="var(--chart-3)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="font-size:12px;font-weight:600;color:var(--success);">▲ 3 pts <span style="color:var(--muted-foreground);font-weight:500;">rolling 90d</span></div></div>
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:10px;"><div style="font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-foreground);font-weight:600;">Outstanding AR</div><div style="display:flex;align-items:flex-end;justify-content:space-between;"><div style="font-family:'IBM Plex Mono',monospace;font-size:28px;font-weight:600;color:var(--card-foreground);line-height:1;">$312k</div><svg viewBox="0 0 120 36" preserveAspectRatio="none" style="width:74px;height:28px;"><path d="M0,8 L15,11 L30,9 L45,14 L60,12 L75,16 L90,14 L105,18 L120,16" fill="none" stroke="var(--chart-4)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path></svg></div><div style="font-size:12px;font-weight:600;color:var(--success);">▼ 8% <span style="color:var(--muted-foreground);font-weight:500;">aged &gt; 60d</span></div></div>
+          </div>
+        </div>
+
+        <!-- Charts -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Charts — Recharts palette</div>
+          <div style="display:grid;grid-template-columns:1.5fr 1fr 1fr;gap:14px;">
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px;">
+              <div style="font-size:14px;font-weight:600;color:var(--card-foreground);margin-bottom:10px;">Billable hours</div>
+              <svg viewBox="0 0 520 180" preserveAspectRatio="none" style="width:100%;height:160px;">
+                <defs><linearGradient id="gd-a" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--chart-1)" stop-opacity="0.26"></stop><stop offset="100%" stop-color="var(--chart-1)" stop-opacity="0.02"></stop></linearGradient></defs>
+                <line x1="0" y1="45" x2="520" y2="45" stroke="var(--border)"></line><line x1="0" y1="90" x2="520" y2="90" stroke="var(--border)"></line><line x1="0" y1="135" x2="520" y2="135" stroke="var(--border)"></line>
+                <path d="M0,140 L52,112 L104,126 L156,84 L208,102 L260,66 L312,80 L364,52 L416,70 L468,42 L520,56 L520,180 L0,180 Z" fill="url(#gd-a)"></path>
+                <path d="M0,140 L52,112 L104,126 L156,84 L208,102 L260,66 L312,80 L364,52 L416,70 L468,42 L520,56" fill="none" stroke="var(--chart-1)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </div>
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px;">
+              <div style="font-size:14px;font-weight:600;color:var(--card-foreground);margin-bottom:10px;">Revenue by practice</div>
+              <svg viewBox="0 0 240 150" style="width:100%;height:150px;">
+                <rect x="6" y="26" width="28" height="114" rx="3" fill="var(--chart-1)"></rect><rect x="44" y="52" width="28" height="88" rx="3" fill="var(--chart-2)"></rect><rect x="82" y="74" width="28" height="66" rx="3" fill="var(--chart-3)"></rect><rect x="120" y="92" width="28" height="48" rx="3" fill="var(--chart-4)"></rect><rect x="158" y="106" width="28" height="34" rx="3" fill="var(--chart-5)"></rect><rect x="196" y="116" width="28" height="24" rx="3" fill="color-mix(in srgb,var(--chart-1) 50%,var(--muted))"></rect>
+              </svg>
+            </div>
+            <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:16px;display:flex;flex-direction:column;">
+              <div style="font-size:14px;font-weight:600;color:var(--card-foreground);margin-bottom:6px;">Matters by status</div>
+              <div style="display:flex;align-items:center;gap:14px;flex:1;">
+                <svg viewBox="0 0 42 42" style="width:104px;height:104px;transform:rotate(-90deg);">
+                  <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--chart-1)" stroke-width="7" stroke-dasharray="42 58"></circle>
+                  <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--chart-2)" stroke-width="7" stroke-dasharray="26 74" stroke-dashoffset="-42"></circle>
+                  <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--chart-3)" stroke-width="7" stroke-dasharray="18 82" stroke-dashoffset="-68"></circle>
+                  <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--chart-4)" stroke-width="7" stroke-dasharray="14 86" stroke-dashoffset="-86"></circle>
+                </svg>
+                <div style="display:flex;flex-direction:column;gap:6px;font-size:11.5px;color:var(--muted-foreground);">
+                  <div style="display:flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:2px;background:var(--chart-1);"></span>Active</div>
+                  <div style="display:flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:2px;background:var(--chart-2);"></span>Review</div>
+                  <div style="display:flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:2px;background:var(--chart-3);"></span>On Hold</div>
+                  <div style="display:flex;align-items:center;gap:6px;"><span style="width:9px;height:9px;border-radius:2px;background:var(--chart-4);"></span>Closed</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Badges -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Status badges &amp; pills</div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;padding:18px;display:flex;flex-direction:column;gap:14px;">
+            <div style="display:flex;flex-wrap:wrap;gap:8px;">
+              <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--success) 15%,transparent);color:var(--success);border:1px solid color-mix(in srgb,var(--success) 28%,transparent);">Active</span>
+              <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--chart-1) 15%,transparent);color:var(--chart-1);border:1px solid color-mix(in srgb,var(--chart-1) 28%,transparent);">In Review</span>
+              <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--chart-4) 18%,transparent);color:var(--chart-4);border:1px solid color-mix(in srgb,var(--chart-4) 32%,transparent);">Pending</span>
+              <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--muted-foreground) 14%,transparent);color:var(--muted-foreground);border:1px solid color-mix(in srgb,var(--muted-foreground) 26%,transparent);">On Hold</span>
+              <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--muted-foreground) 14%,transparent);color:var(--muted-foreground);border:1px solid color-mix(in srgb,var(--muted-foreground) 26%,transparent);">Closed</span>
+              <span style="font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:999px;background:color-mix(in srgb,var(--destructive) 14%,transparent);color:var(--destructive);border:1px solid color-mix(in srgb,var(--destructive) 28%,transparent);">Urgent</span>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;margin-right:4px;">Dot</span>
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--foreground);"><span style="width:7px;height:7px;border-radius:50%;background:var(--success);"></span>Active</span>
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--foreground);"><span style="width:7px;height:7px;border-radius:50%;background:var(--chart-4);"></span>Pending</span>
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--foreground);"><span style="width:7px;height:7px;border-radius:50%;background:var(--muted-foreground);"></span>Closed</span>
+              <span style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted-foreground);font-weight:600;margin:0 4px 0 12px;">Solid</span>
+              <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:4px;background:var(--primary);color:var(--primary-foreground);">PRIORITY</span>
+              <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:4px;background:var(--accent);color:var(--accent-foreground);">NEW</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dense table -->
+        <div>
+          <div style="font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted-foreground);font-weight:700;margin-bottom:4px;">Dense data table</div>
+          <div style="font-size:12.5px;color:var(--muted-foreground);margin-bottom:14px;">Toolbar (search, filter chips, column toggle), sortable headers, multi-line financial cell, sparkline column, row hover + selected.</div>
+          <div style="background:var(--card);border:1px solid var(--border);border-radius:6px;overflow:hidden;">
+            <!-- toolbar -->
+            <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+              <div style="position:relative;width:220px;"><svg viewBox="0 0 24 24" style="width:14px;height:14px;color:var(--muted-foreground);position:absolute;left:10px;top:50%;transform:translateY(-50%);"><use href="#ic-search"></use></svg><input placeholder="Search…" style="width:100%;background:var(--background);border:1px solid var(--input);border-radius:4px;padding:7px 10px 7px 30px;font-size:12.5px;color:var(--foreground);font-family:'IBM Plex Sans';outline:none;" /></div>
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:5px 10px;border-radius:999px;background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary);">Status: Active<svg viewBox="0 0 24 24" style="width:12px;height:12px;"><use href="#ic-x"></use></svg></span>
+              <span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:500;padding:5px 10px;border-radius:999px;background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary);">Lead: Okafor<svg viewBox="0 0 24 24" style="width:12px;height:12px;"><use href="#ic-x"></use></svg></span>
+              <div style="margin-left:auto;display:flex;gap:8px;"><button style="display:flex;align-items:center;gap:6px;background:transparent;color:var(--foreground);border:1px solid var(--border);border-radius:4px;padding:7px 11px;font-size:12.5px;font-weight:600;font-family:'IBM Plex Sans';cursor:pointer;"><svg viewBox="0 0 24 24" style="width:14px;height:14px;"><use href="#ic-cog"></use></svg>Columns</button></div>
+            </div>
+            <!-- head -->
+            <div style="display:grid;grid-template-columns:36px 2.2fr 1.5fr 1fr 1.7fr 0.9fr 1.1fr;padding:9px 14px;font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-foreground);font-weight:600;background:color-mix(in srgb,var(--muted) 45%,var(--card));border-bottom:1px solid var(--border);align-items:center;">
+              <div><span style="width:15px;height:15px;border-radius:3px;border:1.5px solid var(--border);display:inline-block;"></span></div>
+              <div style="display:flex;align-items:center;gap:4px;color:var(--foreground);">Matter <svg viewBox="0 0 24 24" style="width:13px;height:13px;transform:rotate(-90deg);"><use href="#ic-chevright"></use></svg></div>
+              <div>Client</div><div>Status</div><div>WIP / AR / Paid</div><div>Trend</div><div style="text-align:right;">Value</div>
+            </div>
+            <!-- rows -->
+            <div style="display:grid;grid-template-columns:36px 2.2fr 1.5fr 1fr 1.7fr 0.9fr 1.1fr;padding:11px 14px;border-bottom:1px solid var(--border);align-items:center;background:color-mix(in srgb,var(--primary) 7%,var(--card));box-shadow:inset 3px 0 0 var(--primary);">
+              <div><span style="width:15px;height:15px;border-radius:3px;background:var(--primary);color:var(--primary-foreground);display:inline-flex;align-items:center;justify-content:center;"><svg viewBox="0 0 24 24" style="width:11px;height:11px;"><use href="#ic-check2"></use></svg></span></div>
+              <div style="font-weight:600;font-size:13px;color:var(--card-foreground);">Hartwell v. Northbridge</div>
+              <div style="font-size:12.5px;color:var(--muted-foreground);">Hartwell Industries</div>
+              <div><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:color-mix(in srgb,var(--success) 15%,transparent);color:var(--success);">Active</span></div>
+              <div style="display:flex;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;"><span style="color:var(--chart-4);">42.1k</span><span style="color:var(--chart-5);">18.4k</span><span style="color:var(--success);">124k</span></div>
+              <div><svg viewBox="0 0 80 24" preserveAspectRatio="none" style="width:64px;height:20px;"><path d="M0,18 L13,14 L26,16 L40,9 L53,12 L66,6 L80,4" fill="none" stroke="var(--chart-1)" stroke-width="2" stroke-linecap="round"></path></svg></div>
+              <div style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;color:var(--card-foreground);">$184.5k</div>
+            </div>
+            <div style="display:grid;grid-template-columns:36px 2.2fr 1.5fr 1fr 1.7fr 0.9fr 1.1fr;padding:11px 14px;border-bottom:1px solid var(--border);align-items:center;background:var(--muted);">
+              <div><span style="width:15px;height:15px;border-radius:3px;border:1.5px solid var(--border);display:inline-block;"></span></div>
+              <div style="font-weight:600;font-size:13px;color:var(--card-foreground);">Project Meridian — M&amp;A <span style="font-size:10px;color:var(--muted-foreground);">· hover</span></div>
+              <div style="font-size:12.5px;color:var(--muted-foreground);">Vantage Holdings</div>
+              <div><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:color-mix(in srgb,var(--chart-1) 15%,transparent);color:var(--chart-1);">In Review</span></div>
+              <div style="display:flex;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;"><span style="color:var(--chart-4);">88.0k</span><span style="color:var(--chart-5);">62.5k</span><span style="color:var(--success);">269k</span></div>
+              <div><svg viewBox="0 0 80 24" preserveAspectRatio="none" style="width:64px;height:20px;"><path d="M0,10 L13,12 L26,7 L40,9 L53,5 L66,8 L80,3" fill="none" stroke="var(--chart-2)" stroke-width="2" stroke-linecap="round"></path></svg></div>
+              <div style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;color:var(--card-foreground);">$420.0k</div>
+            </div>
+            <div style="display:grid;grid-template-columns:36px 2.2fr 1.5fr 1fr 1.7fr 0.9fr 1.1fr;padding:11px 14px;border-bottom:1px solid var(--border);align-items:center;">
+              <div><span style="width:15px;height:15px;border-radius:3px;border:1.5px solid var(--border);display:inline-block;"></span></div>
+              <div style="font-weight:600;font-size:13px;color:var(--card-foreground);">TM Opposition — "Lumen"</div>
+              <div style="font-size:12.5px;color:var(--muted-foreground);">Lumen Bioworks</div>
+              <div><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:color-mix(in srgb,var(--chart-4) 18%,transparent);color:var(--chart-4);">Pending</span></div>
+              <div style="display:flex;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;"><span style="color:var(--chart-4);">9.8k</span><span style="color:var(--chart-5);">4.2k</span><span style="color:var(--success);">22k</span></div>
+              <div><svg viewBox="0 0 80 24" preserveAspectRatio="none" style="width:64px;height:20px;"><path d="M0,8 L13,10 L26,9 L40,12 L53,11 L66,14 L80,13" fill="none" stroke="var(--chart-4)" stroke-width="2" stroke-linecap="round"></path></svg></div>
+              <div style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;color:var(--card-foreground);">$36.2k</div>
+            </div>
+            <div style="display:grid;grid-template-columns:36px 2.2fr 1.5fr 1fr 1.7fr 0.9fr 1.1fr;padding:11px 14px;align-items:center;">
+              <div><span style="width:15px;height:15px;border-radius:3px;border:1.5px solid var(--border);display:inline-block;"></span></div>
+              <div style="font-weight:600;font-size:13px;color:var(--card-foreground);">Riverside Lease</div>
+              <div style="font-size:12.5px;color:var(--muted-foreground);">Calloway Estates</div>
+              <div><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;background:color-mix(in srgb,var(--muted-foreground) 14%,transparent);color:var(--muted-foreground);">On Hold</span></div>
+              <div style="display:flex;gap:10px;font-family:'IBM Plex Mono',monospace;font-size:11px;"><span style="color:var(--chart-4);">15.0k</span><span style="color:var(--chart-5);">11.9k</span><span style="color:var(--success);">32k</span></div>
+              <div><svg viewBox="0 0 80 24" preserveAspectRatio="none" style="width:64px;height:20px;"><path d="M0,12 L13,11 L26,13 L40,12 L53,14 L66,13 L80,15" fill="none" stroke="var(--muted-foreground)" stroke-width="2" stroke-linecap="round"></path></svg></div>
+              <div style="text-align:right;font-family:'IBM Plex Mono',monospace;font-size:12.5px;font-weight:600;color:var(--card-foreground);">$58.9k</div>
+            </div>
+          </div>
+        </div>
+
+      </div></sc-if>
+
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280,&quot;height&quot;:1180},&quot;defaultMode&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  state = { group: 'shell', mode: null };
+
+  tokens() {
+    return {
+      light: { bg:'#f4f6f4', fg:'#1a2420', card:'#ffffff', cardFg:'#1a2420', pop:'#ffffff', primary:'#1f4d44', primaryFg:'#f4f6f4', secondary:'#e4ebe7', secondaryFg:'#1f4d44', muted:'#eef1ee', mutedFg:'#5d6c66', accent:'#3f7d6e', accentFg:'#ffffff', destructive:'#b0413a', destructiveFg:'#ffffff', success:'#3f7d6e', border:'#d8e0dc', input:'#d8e0dc', ring:'#1f4d44', c1:'#1f4d44', c2:'#3f7d6e', c3:'#7a9b6e', c4:'#b08a4f', c5:'#4a6a78' },
+      dark: { bg:'#0e1614', fg:'#dde7e2', card:'#15201d', cardFg:'#dde7e2', pop:'#18241f', primary:'#5fae9b', primaryFg:'#0c1311', secondary:'#1e2c28', secondaryFg:'#dde7e2', muted:'#182320', mutedFg:'#87988f', accent:'#5fae9b', accentFg:'#0c1311', destructive:'#d2706a', destructiveFg:'#1a0a09', success:'#6fc0a8', border:'#25332e', input:'#25332e', ring:'#5fae9b', c1:'#5fae9b', c2:'#86c2a0', c3:'#a8bd86', c4:'#cba86a', c5:'#6f97a8' }
+    };
+  }
+
+  curMode() { return this.state.mode || this.props.defaultMode || 'light'; }
+
+  renderVals() {
+    const mode = this.curMode();
+    const t = this.tokens()[mode];
+    const rootStyle = {
+      position: 'relative', minHeight: '500px', borderRadius: '14px', overflow: 'hidden',
+      border: '1px solid var(--border)', boxShadow: '0 30px 80px -44px rgba(0,0,0,.55)',
+      '--background': t.bg, '--foreground': t.fg, '--card': t.card, '--card-foreground': t.cardFg,
+      '--popover': t.pop, '--popover-foreground': t.cardFg, '--primary': t.primary, '--primary-foreground': t.primaryFg,
+      '--secondary': t.secondary, '--secondary-foreground': t.secondaryFg, '--muted': t.muted, '--muted-foreground': t.mutedFg,
+      '--accent': t.accent, '--accent-foreground': t.accentFg, '--destructive': t.destructive, '--destructive-foreground': t.destructiveFg,
+      '--success': t.success, '--border': t.border, '--input': t.input, '--ring': t.ring,
+      '--chart-1': t.c1, '--chart-2': t.c2, '--chart-3': t.c3, '--chart-4': t.c4, '--chart-5': t.c5,
+      fontFamily: "'IBM Plex Sans', system-ui, sans-serif", background: t.bg, color: t.fg
+    };
+
+    const groups = [
+      { id: 'shell', no: '01', label: 'Shell & navigation' },
+      { id: 'forms', no: '02', label: 'Forms & inputs' },
+      { id: 'overlays', no: '03', label: 'Overlays & feedback' },
+      { id: 'data', no: '04', label: 'Data & viz' }
+    ];
+    const groupTabs = groups.map(g => {
+      const sel = g.id === this.state.group;
+      return {
+        no: g.no, label: g.label, select: () => this.setState({ group: g.id }),
+        style: {
+          display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer',
+          padding: '9px 15px', borderRadius: '10px', fontSize: '13px', fontWeight: 600,
+          fontFamily: "'Hanken Grotesk', sans-serif",
+          background: sel ? '#1c1e27' : '#15161c',
+          color: sel ? '#f2f2f5' : '#9a9db0',
+          border: sel ? '1.5px solid ' + t.accent : '1px solid #24252e',
+          boxShadow: sel ? '0 0 0 3px ' + this.hexA(t.accent, .16) : 'none'
+        }
+      };
+    });
+
+    const modeBtn = (active) => ({
+      background: active ? '#2a2c38' : 'transparent', color: active ? '#f2f2f5' : '#8a8d9e',
+      border: 'none', borderRadius: '8px', padding: '7px 16px', fontSize: '13px', fontWeight: 600,
+      cursor: 'pointer', fontFamily: "'Hanken Grotesk', sans-serif"
+    });
+
+    return {
+      rootStyle, groupTabs,
+      isShell: this.state.group === 'shell',
+      isForms: this.state.group === 'forms',
+      isOverlays: this.state.group === 'overlays',
+      isData: this.state.group === 'data',
+      lightBtn: modeBtn(mode === 'light'), darkBtn: modeBtn(mode === 'dark'),
+      setLight: () => this.setState({ mode: 'light' }),
+      setDark: () => this.setState({ mode: 'dark' })
+    };
+  }
+
+  hexA(hex, a) {
+    if (!hex || hex[0] !== '#' || hex.length < 7) return hex;
+    const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+  }
+}
+</script>
+</body>
+</html>

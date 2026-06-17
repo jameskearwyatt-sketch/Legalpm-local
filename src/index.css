@@ -151,7 +151,16 @@
     @apply border-border;
   }
 
+  /* Hard stop against any element widening the page on mobile (which makes
+     iOS Safari zoom the whole layout out). iOS needs this on html + #root,
+     not just body. Wide content keeps its own overflow-x-auto scrollers. */
+  html, #root {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
   body {
+    max-width: 100%;
     @apply bg-background text-foreground font-body;
     font-size: 14px;
     line-height: 1.5;

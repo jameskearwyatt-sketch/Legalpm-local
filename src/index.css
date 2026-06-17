@@ -155,6 +155,11 @@
     @apply bg-background text-foreground font-body;
     font-size: 14px;
     line-height: 1.5;
+    /* Prevent a stray wide element from widening the page and forcing mobile
+       browsers to zoom the whole layout out. Wide content (e.g. data tables)
+       lives in its own overflow-x-auto containers, so this only clips overflow
+       that would otherwise break the page width. */
+    overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     -webkit-tap-highlight-color: transparent;

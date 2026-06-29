@@ -482,7 +482,8 @@ export function CategorizedBudgetView({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
       >
-        <div className="space-y-4">
+        <div className="overflow-x-auto">
+          <div className="min-w-[680px] space-y-4">
           {orderedGroupKeys.map(groupKey => {
             const group = groupedItems[groupKey];
             const [category, providerName] = groupKey.split('|') as [BudgetCategory, string];
@@ -572,6 +573,7 @@ export function CategorizedBudgetView({
               </CategoryGroup>
             );
           })}
+          </div>
         </div>
 
         <DragOverlay>
